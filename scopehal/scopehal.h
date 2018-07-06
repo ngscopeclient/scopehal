@@ -36,7 +36,7 @@
 #ifndef scopehal_h
 #define scopehal_h
 
-#include "../jtaghal/jtaghal.h"
+#include "../log/log.h"
 
 #include <sigc++/sigc++.h>
 

@@ -36,9 +36,20 @@
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
 #include "RedTinLogicAnalyzer.h"
-#include "RedTin_opcodes_enum.h"
 #include "ProtocolDecoder.h"
 //#include "StateDecoder.h"
+
+//Duplicate RED TIN opcodes from YAML for now
+//#include "RedTin_opcodes_enum.h"
+enum RedTin_opcodes
+{
+	REDTIN_READ_SYMTAB = 0,
+	REDTIN_LOAD_TRIGGER = 1,
+	REDTIN_TRIGGER_NOTIF = 2,
+	REDTIN_READ_DATA = 3,
+	REDTIN_PING = 4,
+	REDTIN_READ_CONTINUE = 5
+};
 
 #include <memory.h>
 
@@ -196,7 +207,12 @@ void RedTinLogicAnalyzer::LoadChannels()
 		}
 
 		//Flip the array around
-		FlipByteArray(rxbuf, 2048);
+		for(int i=0; i<1024; i=i+1)
+		{
+			uint8_t tmp = rxbuf[2047 - i];
+			rxbuf[2048 - i] = rxbuf[i];
+			rxbuf[i] = tmp;
+		}
 
 		//Skip the leading zeroes
 		uint8_t* end = rxbuf + 2048;
@@ -829,7 +845,16 @@ void RedTinLogicAnalyzer::StartSingleTrigger()
 
 	//Flip endianness after printing
 	//LogDebug("Endian flip\n");
-	FlipEndian32Array((unsigned char*)&trigger_bitstream[0], trigger_bitstream.size() * 4);
+	unsigned char* tbit = (unsigned char*)(&trigger_bitstream[0]);
+	for(int i=0; i<trigger_bitstream.size(); i++)
+	{
+		unsigned char* data = tbit + (i*4);
+		unsigned char temp[4] = { data[0], data[1], data[2], data[3] };
+		data[0]   = temp[3];
+		data[1] = temp[2];
+		data[2] = temp[1];
+		data[3] = temp[0];
+	}
 
 	//Debug print (in wire endianness)
 	/*
@@ -906,9 +931,8 @@ void RedTinLogicAnalyzer::SetTriggerForChannel(OscilloscopeChannel* channel, std
 		//Hit - sanity-check signal itself
 		if(triggerbits.size() != (size_t)width)
 		{
-			throw JtagExceptionWrapper(
-				"Trigger array size does not match signal width",
-				"");
+			LogError("Trigger array size does not match signal width");
+			return;
 		}
 
 		LogDebug("Signal %s = bits %d to %d\n", chan->m_displayname.c_str(), hi, lo);

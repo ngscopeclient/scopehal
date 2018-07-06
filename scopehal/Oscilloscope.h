@@ -51,14 +51,10 @@ public:
 	Oscilloscope();
 	virtual ~Oscilloscope();
 
-	//Device enumeration
-	static int GetDeviceCount();
-	static Oscilloscope* CreateDevice(int ndev);
-
 	//Channel information
 	size_t GetChannelCount();
 	OscilloscopeChannel* GetChannel(size_t i);
-	OscilloscopeChannel* GetChannel(std::string name, bool bThrowOnFailure = true);
+	OscilloscopeChannel* GetChannel(std::string name);
 
 	void AddChannel(OscilloscopeChannel* chan);
 
@@ -84,7 +80,7 @@ public:
 		TRIGGER_MODE_COUNT
 	};
 	virtual Oscilloscope::TriggerMode PollTrigger() =0;
-	bool WaitForTrigger(int timeout, bool exception_on_timeout = true);
+	bool WaitForTrigger(int timeout);
 
 	/**
 		@brief Clear out all existing trigger conditions

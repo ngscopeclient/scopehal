@@ -110,9 +110,6 @@ ChannelRenderer* OscilloscopeChannel::CreateRenderer()
 	//complex channels must be procedural (and override this)
 	default:
 	case CHANNEL_TYPE_COMPLEX:
-		throw JtagExceptionWrapper(
-			"Invalid channel type",
-			"");
-		break;
+		return NULL;
 	}
 }

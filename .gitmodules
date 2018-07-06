@@ -1,0 +1,6 @@
+[submodule "xptools"]
+	path = xptools
+	url = git@github.com:azonenberg/xptools.git
+[submodule "log"]
+	path = log
+	url = https://github.com/azonenberg/logtools.git

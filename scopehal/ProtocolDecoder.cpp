@@ -153,11 +153,7 @@ bool ProtocolDecoder::IsOverlay()
 ProtocolDecoderParameter& ProtocolDecoder::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
-	{
-		throw JtagExceptionWrapper(
-			"Invalid parameter name",
-			"");
-	}
+		LogError("Invalid parameter name");
 
 	return m_parameters[s];
 }
@@ -173,9 +169,8 @@ string ProtocolDecoder::GetInputName(size_t i)
 		return m_signalNames[i];
 	else
 	{
-		throw JtagExceptionWrapper(
-			"Invalid channel index",
-			"");
+		LogError("Invalid channel index");
+		return "";
 	}
 }
 
@@ -190,17 +185,13 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 		}
 		if(!ValidateChannel(i, channel))
 		{
-			throw JtagExceptionWrapper(
-				"Invalid channel format",
-				"");
+			LogError("Invalid channel format");
 		}
 		m_channels[i] = channel;
 	}
 	else
 	{
-		throw JtagExceptionWrapper(
-			"Invalid channel index",
-			"");
+		LogError("Invalid channel index");
 	}
 }
 
@@ -217,9 +208,7 @@ void ProtocolDecoder::SetInput(string name, OscilloscopeChannel* channel)
 	}
 
 	//Not found
-	throw JtagExceptionWrapper(
-		"Invalid channel name",
-		"");
+	LogError("Invalid channel name");
 }
 
 OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
@@ -228,9 +217,7 @@ OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
 		return m_channels[i];
 	else
 	{
-		throw JtagExceptionWrapper(
-			"Invalid channel index",
-			"");
+		LogError("Invalid channel index");
 	}
 }
 
@@ -253,7 +240,5 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string hwname, 
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](hwname, color);
 
-	throw JtagExceptionWrapper(
-		"Invalid decoder name",
-		"");
+	LogError("Invalid decoder name");
 }
