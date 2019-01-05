@@ -218,6 +218,7 @@ OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
 	else
 	{
 		LogError("Invalid channel index");
+		return NULL;
 	}
 }
 
@@ -241,4 +242,5 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string hwname, 
 		return m_createprocs[protocol](hwname, color);
 
 	LogError("Invalid decoder name");
+	return NULL;
 }
