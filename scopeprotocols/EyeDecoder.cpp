@@ -110,7 +110,9 @@ bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
 
 	//Crunch the histogram to find the number of signal levels in use.
 	//We're looking for peaks of significant height (25% of maximum or more) and not too close to another peak.
-	int neighborhood = 60;
+	float dv = cap->m_maxVoltage - cap->m_minVoltage;
+	int neighborhood = floor(dv * 100);	//dV/10 converted to mV
+	LogDebug("Looking for levels at least %d mV apart\n", neighborhood);
 	int64_t maxpeak = 0;
 	for(auto it : vhist)
 	{
@@ -375,7 +377,7 @@ bool EyeDecoder::MeasureEyeOpenings(EyeCapture* cap, map<int64_t, map<float, int
 {
 	//Measure the width of the eye at each decision point
 	//LogDebug("Measuring eye width\n");
-	float row_height = 0.01;				//sample +/- 10 mV around the decision point
+	float row_height = 0.05;				//sample +/- 50 mV around the decision point
 	for(auto v : cap->m_decisionPoints)
 	{
 		//Initialize the row
@@ -476,6 +478,20 @@ bool EyeDecoder::MeasureEyeOpenings(EyeCapture* cap, map<int64_t, map<float, int
 
 bool EyeDecoder::GenerateEyeData(AnalogCapture* din, EyeCapture* cap, map<int64_t, map<float, int64_t> >& pixmap)
 {
+	//Calculate the histogram bin spacing
+	float vmin = 0;
+	float vmax = 0;
+	size_t nbins = 128;
+	cap->m_histogramBins = nbins;
+	for(auto sin : din->m_samples)
+	{
+		float f = sin;
+		vmin = std::min(vmin, f);
+		vmax = std::max(vmax, f);
+	}
+	float binsize = (vmax - vmin) / nbins;
+	LogDebug("bin size = %.3f mV (v=%.3f, %.3f)\n", binsize * 1000.0f, vmin, vmax);
+
 	//Generate the final pixel map
 	bool first = true;
 	float last_sample_value = 0;
@@ -483,7 +499,10 @@ bool EyeDecoder::GenerateEyeData(AnalogCapture* din, EyeCapture* cap, map<int64_
 	int64_t uis_per_trigger = 16;		//TODO: allow changing this?
 	for(auto sin : din->m_samples)
 	{
+		//Posterize the input to discrete voltage levels
 		float f = sin;
+		size_t bin = (f - vmin) / binsize;
+		f = bin*binsize + vmin;
 
 		//If we haven't triggered, wait for the signal to cross a decision threshold
 		//so we can phase align to the data clock.

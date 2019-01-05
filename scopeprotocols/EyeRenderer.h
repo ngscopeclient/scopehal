@@ -62,6 +62,9 @@ public:
 	//Number of samples we've measured
 	int64_t m_sampleCount;
 
+	//Number of histogram bins
+	size_t m_histogramBins;
+
 	//Extrema of our waveform (highest/lowest voltage ever seen)
 	float m_minVoltage;
 	float m_maxVoltage;

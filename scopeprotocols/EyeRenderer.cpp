@@ -658,6 +658,14 @@ void EyeRenderer::RenderLeftSideInfobox(
 	DrawString(textleft, y, cr, label, false);
 	DrawString(numleft, y, cr, str, false);
 	y += sheight + rowspacing;
+
+	//Bin count
+	label = "Hist bins:";
+	snprintf(str, sizeof(str), "%zu", capture->m_histogramBins);
+	GetStringWidth(cr, label, false, swidth, sheight);
+	DrawString(textleft, y, cr, label, false);
+	DrawString(numleft, y, cr, str, false);
+	y += sheight + rowspacing;
 }
 
 /**
