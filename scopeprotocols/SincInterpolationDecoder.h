@@ -30,35 +30,31 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of SincInterpolationDecoder
  */
+#ifndef SincInterpolationDecoder_h
+#define SincInterpolationDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class SincInterpolationDecoder : public ProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder);
-	AddDecoderClass(NRZDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(UARTDecoder);
+public:
+	SincInterpolationDecoder(std::string hwname, std::string color);
 
-	/*
-	AddDecoderClass(DigitalToAnalogDecoder);
-	AddDecoderClass(DMADecoder);
-	AddDecoderClass(RPCDecoder);
-	AddDecoderClass(RPCNameserverDecoder);
-	AddDecoderClass(SchmittTriggerDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(StateDecoder);
-	*/
-}
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(SincInterpolationDecoder)
+
+protected:
+};
+
+#endif
