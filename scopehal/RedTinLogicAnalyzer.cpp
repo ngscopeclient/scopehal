@@ -846,7 +846,7 @@ void RedTinLogicAnalyzer::StartSingleTrigger()
 	//Flip endianness after printing
 	//LogDebug("Endian flip\n");
 	unsigned char* tbit = (unsigned char*)(&trigger_bitstream[0]);
-	for(int i=0; i<trigger_bitstream.size(); i++)
+	for(size_t i=0; i<trigger_bitstream.size(); i++)
 	{
 		unsigned char* data = tbit + (i*4);
 		unsigned char temp[4] = { data[0], data[1], data[2], data[3] };
