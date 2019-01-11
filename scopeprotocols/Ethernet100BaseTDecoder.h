@@ -52,7 +52,8 @@ protected:
 	bool TrySync(
 		std::vector<DigitalSample>& bits,
 		std::vector<DigitalSample>& descrambled_bits,
-		unsigned int idle_offset);
+		size_t idle_offset,
+		size_t stop);
 };
 
 #endif

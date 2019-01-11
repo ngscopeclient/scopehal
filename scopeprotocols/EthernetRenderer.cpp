@@ -88,6 +88,10 @@ Gdk::Color EthernetRenderer::GetColor(int i)
 		case EthernetFrameSegment::TYPE_FCS:
 			return Gdk::Color("#00ff00");
 
+		//Signal has entirely disappeared
+		case EthernetFrameSegment::TYPE_NO_CARRIER:
+			return Gdk::Color("#FF0000");
+
 		//Payload: dark blue
 		default:
 			return Gdk::Color("#336699");
@@ -110,6 +114,9 @@ string EthernetRenderer::GetText(int i)
 
 		case EthernetFrameSegment::TYPE_SFD:
 			return "SFD";
+
+		case EthernetFrameSegment::TYPE_NO_CARRIER:
+			return "NO CARRIER";
 
 		case EthernetFrameSegment::TYPE_DST_MAC:
 			{
