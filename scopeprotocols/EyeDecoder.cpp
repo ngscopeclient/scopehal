@@ -111,7 +111,7 @@ bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
 	//Crunch the histogram to find the number of signal levels in use.
 	//We're looking for peaks of significant height (25% of maximum or more) and not too close to another peak.
 	float dv = cap->m_maxVoltage - cap->m_minVoltage;
-	int neighborhood = floor(dv * 100);	//dV/10 converted to mV
+	int neighborhood = floor(dv * 50);	//dV/20 converted to mV
 	LogDebug("Looking for levels at least %d mV apart\n", neighborhood);
 	int64_t maxpeak = 0;
 	for(auto it : vhist)
