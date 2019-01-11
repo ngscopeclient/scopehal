@@ -241,7 +241,7 @@ void AnalogRenderer::DrawVerticalAxisLabels(
 {
 	//Draw background for the Y axis labels
 	int lineheight, linewidth;
-	GetStringWidth(cr, "500 mV_x", false, linewidth, lineheight);
+	GetStringWidth(cr, "500 mV_xxx", false, linewidth, lineheight);
 	float lmargin = 5;
 	float textleft = visright - (linewidth + lmargin);
 	cr->set_source_rgba(0, 0, 0, 0.5);
@@ -260,7 +260,7 @@ void AnalogRenderer::DrawVerticalAxisLabels(
 		else if(fabs(v) < 1)
 			snprintf(tmp, sizeof(tmp), "%.0f mV", v*1000);
 		else
-			snprintf(tmp, sizeof(tmp), "%.2f V", v);
+			snprintf(tmp, sizeof(tmp), "%.3f V", v);
 
 		float y = it.second - lineheight/2;
 		if(y < ytop)
