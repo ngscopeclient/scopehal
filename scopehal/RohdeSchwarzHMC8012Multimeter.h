@@ -26,50 +26,69 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
-#ifndef Multimeter_h
-#define Multimeter_h
 
-class Multimeter : public virtual Instrument
+#ifndef RohdeSchwarzHMC8012Multimeter_h
+#define RohdeSchwarzHMC8012Multimeter_h
+
+
+#include "../xptools/Socket.h"
+
+/**
+	@brief A Rohde & Schwarz HMC8012 multimeter
+ */
+class RohdeSchwarzHMC8012Multimeter
+	: public virtual Multimeter
 {
 public:
-	Multimeter();
-	virtual ~Multimeter();
+	RohdeSchwarzHMC8012Multimeter(std::string hostname, unsigned short port);
+	virtual ~RohdeSchwarzHMC8012Multimeter();
 
-	enum MeasurementTypes
-	{
-		DC_VOLTAGE			= 0x01,
-		DC_RMS_AMPLITUDE	= 0x02,
-		AC_RMS_AMPLITUDE	= 0x04,
-		FREQUENCY			= 0x08,
-		DC_CURRENT			= 0x10,
-		AC_CURRENT			= 0x20
+	//Device information
+	virtual std::string GetName();
+	virtual std::string GetVendor();
+	virtual std::string GetSerial();
 
-		//TODO: other types
-	};
-
-	virtual unsigned int GetMeasurementTypes() =0;
+	virtual unsigned int GetInstrumentTypes();
+	
+	virtual unsigned int GetMeasurementTypes();
 
 	//Channel info
-	virtual int GetMeterChannelCount() =0;
-	virtual std::string GetMeterChannelName(int chan) =0;
-	virtual int GetCurrentMeterChannel() =0;
-	virtual void SetCurrentMeterChannel(int chan) =0;
+	virtual int GetMeterChannelCount();
+	virtual std::string GetMeterChannelName(int chan);
+	virtual int GetCurrentMeterChannel();
+	virtual void SetCurrentMeterChannel(int chan);
 
 	//Meter operating mode
-	virtual MeasurementTypes GetMeterMode() =0;
-	virtual void SetMeterMode(MeasurementTypes type) =0;
+	virtual MeasurementTypes GetMeterMode();
+	virtual void SetMeterMode(MeasurementTypes type);
 
 	//Control
-	virtual void SetMeterAutoRange(bool enable) =0;
-	virtual bool GetMeterAutoRange() =0;
-	virtual void StartMeter() =0;
-	virtual void StopMeter() =0;
+	virtual void SetMeterAutoRange(bool enable);
+	virtual bool GetMeterAutoRange();
+	virtual void StartMeter();
+	virtual void StopMeter();
 
 	//Get readings
-	virtual double GetVoltage() =0;
-	virtual double GetPeakToPeak() =0;
-	virtual double GetFrequency() =0;
-	virtual double GetCurrent() =0;
+	virtual double GetVoltage();
+	virtual double GetPeakToPeak();
+	virtual double GetFrequency();
+	virtual double GetCurrent();
+
+protected:
+	Socket m_socket;
+
+	std::string m_hostname;
+	unsigned short m_port;
+
+	std::string m_vendor;
+	std::string m_model;
+	std::string m_serial;
+	std::string m_fwVersion;
+
+	bool SendCommand(std::string cmd);
+	std::string ReadReply();
+	
+	MeasurementTypes m_mode;
 };
 
 #endif
