@@ -53,7 +53,8 @@ public:
 		TYPE_ETHERTYPE,
 		TYPE_VLAN_TAG,
 		TYPE_PAYLOAD,
-		TYPE_FCS
+		TYPE_FCS,
+		TYPE_NO_CARRIER
 	} m_type;
 
 	std::vector<uint8_t> m_data;

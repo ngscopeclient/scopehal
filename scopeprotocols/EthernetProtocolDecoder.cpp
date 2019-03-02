@@ -91,13 +91,18 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 				//In between frames. Look for a preamble
 				if(bytes[i] != 0x55)
-					LogDebug("EthernetProtocolDecoder: Skipping unknown byte %02x\n", bytes[i]);
+				{
+					//LogDebug("EthernetProtocolDecoder: Skipping unknown byte %02x\n", bytes[i]);
+				}
 
 				//Got a valid 55. We're now in the preamble
-				sample.m_offset = starts[i] / cap->m_timescale;
-				sample.m_sample.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
-				sample.m_sample.m_data.clear();
-				sample.m_sample.m_data.push_back(0x55);
+				else
+				{
+					sample.m_offset = starts[i] / cap->m_timescale;
+					sample.m_sample.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
+					sample.m_sample.m_data.clear();
+					sample.m_sample.m_data.push_back(0x55);
+				}
 				break;
 
 			case EthernetFrameSegment::TYPE_PREAMBLE:
@@ -130,7 +135,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 				//Garbage (TODO: handle this better)
 				else
-					LogDebug("EthernetProtocolDecoder: Skipping unknown byte %02x\n", bytes[i]);
+				{
+					//LogDebug("EthernetProtocolDecoder: Skipping unknown byte %02x\n", bytes[i]);
+				}
 
 				break;
 
