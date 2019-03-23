@@ -227,7 +227,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		{
 			if(TrySync(bits, descrambled_bits, idle_offset, istop))
 			{
-				LogDebug("Got good LFSR sync at offset %u\n", idle_offset);
+				LogDebug("Got good LFSR sync at offset %zu\n", idle_offset);
 				synced = true;
 				break;
 			}
@@ -241,7 +241,7 @@ void Ethernet100BaseTDecoder::Refresh()
 
 		//Search until we find a 1100010001 (J-K, start of stream) sequence
 		bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
-		unsigned int i = 0;
+		size_t i = 0;
 		bool hit = true;
 		for(i=0; i<descrambled_bits.size() - 10; i++)
 		{
@@ -263,7 +263,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			LogWarning("No SSD found\n");
 			continue;
 		}
-		LogDebug("Found SSD at %u\n", i);
+		LogDebug("Found SSD at %zu\n", i);
 
 		//Skip the J-K as we already parsed it
 		i += 10;
@@ -373,6 +373,8 @@ void Ethernet100BaseTDecoder::Refresh()
 			first = !first;
 		}
 	}
+
+	LogDebug("%zu samples\n", cap->m_samples.size());
 
 	//If we lost the signal before the end of the capture, add a sample for that
 	if(lost_before_end)
