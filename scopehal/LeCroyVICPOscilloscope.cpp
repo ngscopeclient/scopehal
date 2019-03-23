@@ -610,7 +610,7 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 	float tdiv;
 	sscanf(stdiv.c_str(), "%f", &tdiv);
 	float trigoff = tdiv*5 + delay;
-	LogDebug("    Trigger offset from start of capture: %.3f ns (delay %f ns, tdiv %f ns)\n", trigoff * 1e9,
+	LogTrace("    Trigger offset from start of capture: %.3f ns (delay %f ns, tdiv %f ns)\n", trigoff * 1e9,
 		delay * 1e9, tdiv * 1e9);
 
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
