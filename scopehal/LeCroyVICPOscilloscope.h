@@ -58,6 +58,8 @@ public:
 	virtual void DisableChannel(size_t i);
 	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual double GetChannelAttenuation(size_t i);
+	virtual void SetChannelAttenuation(size_t i, double atten);
 
 	//Triggering
 	virtual void ResetTriggerConditions();

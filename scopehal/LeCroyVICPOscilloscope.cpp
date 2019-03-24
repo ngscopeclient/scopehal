@@ -418,6 +418,26 @@ void LeCroyVICPOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::C
 	//FIXME
 }
 
+double LeCroyVICPOscilloscope::GetChannelAttenuation(size_t i)
+{
+	if(i > m_analogChannelCount)
+		return 1;
+
+	string cmd = "C1:ATTENUATION?";
+	cmd[1] += i;
+	SendCommand(cmd);
+	string reply = ReadSingleBlockString(true);
+
+	double d;
+	sscanf(reply.c_str(), "%lf", &d);
+	return d;
+}
+
+void LeCroyVICPOscilloscope::SetChannelAttenuation(size_t i, double atten)
+{
+	//FIXME
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DMM mode
 

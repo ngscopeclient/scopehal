@@ -111,6 +111,9 @@ public:
 	CouplingType GetCoupling();
 	void SetCoupling(CouplingType type);
 
+	double GetAttenuation();
+	void SetAttenuation(double atten);
+
 protected:
 
 	Oscilloscope* m_scope;

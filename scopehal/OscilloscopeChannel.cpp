@@ -98,6 +98,16 @@ void OscilloscopeChannel::SetCoupling(CouplingType type)
 	m_scope->SetChannelCoupling(m_index, type);
 }
 
+double OscilloscopeChannel::GetAttenuation()
+{
+	return m_scope->GetChannelAttenuation(m_index);
+}
+
+void OscilloscopeChannel::SetAttenuation(double atten)
+{
+	m_scope->SetChannelAttenuation(m_index, atten);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
