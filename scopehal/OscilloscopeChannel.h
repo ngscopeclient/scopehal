@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,9 @@
 #define OscilloscopeChannel_h
 
 #include "CaptureChannel.h"
+
 class ChannelRenderer;
+class Oscilloscope;
 
 /**
 	@brief A single channel on the oscilloscope.
@@ -91,14 +93,23 @@ public:
 	Oscilloscope* GetScope()
 	{ return m_scope; }
 
-	bool IsEnabled()
-	{ return m_scope->IsChannelEnabled(m_index); }
+	//Hardware configuration
+public:
+	bool IsEnabled();
+	void Enable();
+	void Disable();
 
-	void Enable()
-	{ m_scope->EnableChannel(m_index); }
+	enum CouplingType
+	{
+		COUPLE_DC_1M,		//1M ohm, DC coupled
+		COUPLE_AC_1M,		//1M ohm, AC coupled
+		COUPLE_DC_50,		//50 ohm, DC coupled
+		COUPLE_GND,			//tie to ground
+		COUPLE_SYNTHETIC	//channel is math or otherwise not a direct voltage measurement
+	};
 
-	void Disable()
-	{ m_scope->DisableChannel(m_index); }
+	CouplingType GetCoupling();
+	void SetCoupling(CouplingType type);
 
 protected:
 

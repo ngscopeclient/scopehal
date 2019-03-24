@@ -51,24 +51,51 @@ OscilloscopeChannel::OscilloscopeChannel(
 	string color,
 	int width,
 	size_t index)
-	: m_scope(scope)
-	, m_displaycolor(color)
+	: m_displaycolor(color)
 	, m_displayname(hwname)
+	, m_timescale(1e-2)
+	, m_scope(scope)
+	, m_data(NULL)
 	, m_type(type)
 	, m_hwname(hwname)
+	, m_width(width)
+	, m_procedural(false)
 	, m_index(index)
 {
-	m_data = NULL;
-
-	m_width = width;
-
-	m_timescale = 1E-2;
 }
 
 OscilloscopeChannel::~OscilloscopeChannel()
 {
 	delete m_data;
 	m_data = NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers for calling scope functions
+
+bool OscilloscopeChannel::IsEnabled()
+{
+	return m_scope->IsChannelEnabled(m_index);
+}
+
+void OscilloscopeChannel::Enable()
+{
+	m_scope->EnableChannel(m_index);
+}
+
+void OscilloscopeChannel::Disable()
+{
+	m_scope->DisableChannel(m_index);
+}
+
+OscilloscopeChannel::CouplingType OscilloscopeChannel::GetCoupling()
+{
+	return m_scope->GetChannelCoupling(m_index);
+}
+
+void OscilloscopeChannel::SetCoupling(CouplingType type)
+{
+	m_scope->SetChannelCoupling(m_index, type);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

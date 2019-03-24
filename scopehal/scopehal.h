@@ -46,8 +46,8 @@
 
 #include "Instrument.h"
 #include "Multimeter.h"
-#include "Oscilloscope.h"
 #include "OscilloscopeChannel.h"
+#include "Oscilloscope.h"
 #include "PowerSupply.h"
 
 #include <cairomm/context.h>

@@ -52,10 +52,12 @@ public:
 	virtual unsigned int GetInstrumentTypes();
 	virtual unsigned int GetMeasurementTypes();
 
-	//Channel information
+	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
 
 	//Triggering
 	virtual void ResetTriggerConditions();

@@ -388,6 +388,36 @@ void LeCroyVICPOscilloscope::DisableChannel(size_t i)
 	SendCommand(cmd);
 }
 
+OscilloscopeChannel::CouplingType LeCroyVICPOscilloscope::GetChannelCoupling(size_t i)
+{
+	if(i > m_analogChannelCount)
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+
+	string cmd = "C1:COUPLING?";
+	cmd[1] += i;
+	SendCommand(cmd);
+	string reply = ReadSingleBlockString(true);
+
+	if(reply == "A1M")
+		return OscilloscopeChannel::COUPLE_AC_1M;
+	else if(reply == "D1M")
+		return OscilloscopeChannel::COUPLE_DC_1M;
+	else if(reply == "D50")
+		return OscilloscopeChannel::COUPLE_DC_50;
+	else if(reply == "GND")
+		return OscilloscopeChannel::COUPLE_GND;
+
+	LogWarning("LeCroyVICPOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+
+	//invalid
+	return OscilloscopeChannel::COUPLE_SYNTHETIC;
+}
+
+void LeCroyVICPOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
+{
+	//FIXME
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DMM mode
 
