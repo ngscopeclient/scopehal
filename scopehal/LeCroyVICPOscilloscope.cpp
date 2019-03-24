@@ -116,7 +116,8 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
 			1,
-			i));
+			i,
+			true));
 	}
 	m_analogChannelCount = nchans;
 	m_digitalChannelCount = 0;
@@ -436,6 +437,64 @@ double LeCroyVICPOscilloscope::GetChannelAttenuation(size_t i)
 void LeCroyVICPOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
 	//FIXME
+}
+
+/**
+	@brief Gets the bandwidth limiter for the channel, or 0 if no limit
+ */
+int LeCroyVICPOscilloscope::GetChannelBandwidthLimit(size_t i)
+{
+	if(i > m_analogChannelCount)
+		return 0;
+
+	string cmd = "BANDWIDTH_LIMIT?";
+	SendCommand(cmd);
+	string reply = ReadSingleBlockString(true);
+
+	string search = "C1";
+	search[1] += i;
+	size_t index = reply.find(search);
+	if(index == string::npos)
+		return 0;
+
+	char chbw[16];
+	sscanf(reply.c_str() + index + 3, "%15[^,]", chbw);	//offset 3 for "Cn,"
+	string sbw(chbw);
+
+	if(sbw == "OFF")
+		return 0;
+	else if(sbw == "ON")		//apparently "on" means lowest possible B/W?
+		return 20;				//this isn't documented anywhere in the MAUI remote control manual
+	else if(sbw == "20MHZ")
+		return 20;
+	else if(sbw == "200MHZ")
+		return 200;
+	else if(sbw == "500MHZ")
+		return 500;
+	else if(sbw == "1GHZ")
+		return 1000;
+	else if(sbw == "2GHZ")
+		return 2000;
+	else if(sbw == "3GHZ")
+		return 3000;
+	else if(sbw == "4GHZ")
+		return 4000;
+	else if(sbw == "6GHZ")
+		return 6000;
+
+	LogWarning("LeCroyVICPOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+	return 0;
+}
+
+void LeCroyVICPOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+{
+	char cmd[128];
+	if(limit_mhz == 0)
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT C%zu,OFF", i+1);
+	else
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT C%zu,%uMHZ", i+1, limit_mhz);
+
+	SendCommand(cmd);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -50,7 +50,8 @@ OscilloscopeChannel::OscilloscopeChannel(
 	OscilloscopeChannel::ChannelType type,
 	string color,
 	int width,
-	size_t index)
+	size_t index,
+	bool physical)
 	: m_displaycolor(color)
 	, m_displayname(hwname)
 	, m_timescale(1e-2)
@@ -61,6 +62,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_width(width)
 	, m_procedural(false)
 	, m_index(index)
+	, m_physical(physical)
 {
 }
 
@@ -106,6 +108,16 @@ double OscilloscopeChannel::GetAttenuation()
 void OscilloscopeChannel::SetAttenuation(double atten)
 {
 	m_scope->SetChannelAttenuation(m_index, atten);
+}
+
+int OscilloscopeChannel::GetBandwidthLimit()
+{
+	return m_scope->GetChannelBandwidthLimit(m_index);
+}
+
+void OscilloscopeChannel::SetBandwidthLimit(int mhz)
+{
+	m_scope->SetChannelBandwidthLimit(m_index, mhz);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

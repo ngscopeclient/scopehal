@@ -61,6 +61,8 @@ public:
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) =0;
 	virtual double GetChannelAttenuation(size_t i) =0;
 	virtual void SetChannelAttenuation(size_t i, double atten) =0;
+	virtual int GetChannelBandwidthLimit(size_t i) =0;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) =0;
 
 	void AddChannel(OscilloscopeChannel* chan);
 

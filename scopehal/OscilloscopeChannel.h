@@ -64,7 +64,8 @@ public:
 		OscilloscopeChannel::ChannelType type,
 		std::string color,
 		int width = 1,
-		size_t index = 0);
+		size_t index = 0,
+		bool physical = false);
 	virtual ~OscilloscopeChannel();
 
 	///Display color (any valid GDK format)
@@ -114,6 +115,12 @@ public:
 	double GetAttenuation();
 	void SetAttenuation(double atten);
 
+	int GetBandwidthLimit();
+	void SetBandwidthLimit(int mhz);
+
+	bool IsPhysicalChannel()
+	{ return m_physical; }
+
 protected:
 
 	Oscilloscope* m_scope;
@@ -135,6 +142,9 @@ protected:
 
 	///Channel index
 	size_t m_index;
+
+	///true if this is a real physical input on the scope and not a math or other output
+	bool m_physical;
 };
 
 #endif
