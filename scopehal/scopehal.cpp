@@ -39,23 +39,15 @@ using namespace std;
 
 string GetDefaultChannelColor(int i)
 {
-	const int NUM_COLORS = 12;
+	const int NUM_COLORS = 4;
 	static const char* colorTable[NUM_COLORS]=
 	{
-		"#ffa0a0",
-		"#a0ffff",
-		"#ffd0a0",
-		"#a0d0ff",
-		"#ffffa0",
-		"#a0a0ff",
-		"#ffa0d0",
-		"#d0ffa0",
-		"#d0a0ff",
-		"#a0ffa0",
-		"#ffa0ff",
-		"#a0ffd0",
+		"#ffff80",
+		"#ff4080",
+		"#40ff80",
+		"#4080ff"
 	};
-	
+
 	return colorTable[i % NUM_COLORS];
 }
 

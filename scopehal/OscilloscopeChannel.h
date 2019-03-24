@@ -56,7 +56,13 @@ public:
 		CHANNEL_TYPE_COMPLEX
 	};
 
-	OscilloscopeChannel(std::string hwname, OscilloscopeChannel::ChannelType type, std::string color, int width = 1);
+	OscilloscopeChannel(
+		Oscilloscope* scope,
+		std::string hwname,
+		OscilloscopeChannel::ChannelType type,
+		std::string color,
+		int width = 1,
+		size_t index = 0);
 	virtual ~OscilloscopeChannel();
 
 	///Display color (any valid GDK format)
@@ -77,15 +83,26 @@ public:
 
 	virtual ChannelRenderer* CreateRenderer();
 
-	///If not displayed OR used for trigger, may be disabled in the instrument if supported
-	bool m_visible;
-
 	int GetWidth();
 
 	//Display time scale (normally the same for all channels)
 	float m_timescale;
 
+	Oscilloscope* GetScope()
+	{ return m_scope; }
+
+	bool IsEnabled()
+	{ return m_scope->IsChannelEnabled(m_index); }
+
+	void Enable()
+	{ m_scope->EnableChannel(m_index); }
+
+	void Disable()
+	{ m_scope->DisableChannel(m_index); }
+
 protected:
+
+	Oscilloscope* m_scope;
 
 	///Capture data
 	CaptureChannelBase* m_data;
@@ -101,6 +118,9 @@ protected:
 
 	///Set to true if we're the output of a protocol decoder
 	bool m_procedural;
+
+	///Channel index
+	size_t m_index;
 };
 
 #endif

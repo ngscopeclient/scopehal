@@ -55,6 +55,9 @@ public:
 	size_t GetChannelCount();
 	OscilloscopeChannel* GetChannel(size_t i);
 	OscilloscopeChannel* GetChannel(std::string name);
+	virtual bool IsChannelEnabled(size_t i) =0;
+	virtual void EnableChannel(size_t i) =0;
+	virtual void DisableChannel(size_t i) =0;
 
 	void AddChannel(OscilloscopeChannel* chan);
 

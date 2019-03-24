@@ -121,7 +121,7 @@ bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
 	}
 	LogDebug("Highest histogram peak is %ld points\n", maxpeak);
 
-	int64_t peakthresh = maxpeak/4;
+	int64_t peakthresh = maxpeak/8;
 	int64_t second_peak = 0;
 	double second_weighted = 0;
 	for(auto it : vhist)
@@ -377,7 +377,8 @@ bool EyeDecoder::MeasureEyeOpenings(EyeCapture* cap, map<int64_t, map<float, int
 {
 	//Measure the width of the eye at each decision point
 	//LogDebug("Measuring eye width\n");
-	float row_height = 0.05;				//sample +/- 50 mV around the decision point
+	float row_height = 0.015;				//sample +/- 15 mV around the decision point
+											//TODO make this configurable
 	for(auto v : cap->m_decisionPoints)
 	{
 		//Initialize the row

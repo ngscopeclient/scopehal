@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -133,7 +133,7 @@ ProtocolDecoder::ProtocolDecoder(
 	string hwname,
 	OscilloscopeChannel::ChannelType type,
 	string color)
-	: OscilloscopeChannel(hwname, type, color)
+	: OscilloscopeChannel(NULL, hwname, type, color, 0)	//TODO: handle this better?
 {
 }
 

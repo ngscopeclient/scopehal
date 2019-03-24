@@ -109,22 +109,14 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 		}
 
 		//Create the channel
-		auto chan = new OscilloscopeChannel(
+		m_channels.push_back(
+			new OscilloscopeChannel(
+			this,
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			1);
-
-		//See if the channel is enabled, hide it if not
-		string cmd = "C1:TRACE?";
-		cmd[1] += i;
-		SendCommand(cmd);
-		reply = ReadSingleBlockString(true);
-		if(reply == "OFF")
-			chan->m_visible = false;
-
-		//Done, save it
-		m_channels.push_back(chan);
+			1,
+			i));
 	}
 	m_analogChannelCount = nchans;
 	m_digitalChannelCount = 0;
@@ -195,10 +187,12 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 					{
 						snprintf(chn, sizeof(chn), "D%d", i);
 						m_channels.push_back(new OscilloscopeChannel(
+							this,
 							chn,
 							OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 							GetDefaultChannelColor(m_channels.size()),
-							1));
+							1,
+							i + m_analogChannelCount));
 					}
 				}
 			}
@@ -364,6 +358,37 @@ string LeCroyVICPOscilloscope::GetSerial()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Channel configuration
+
+//TODO: None of these 3 functions support LA stuff
+//TODO: cache enable state, at least for a while?
+bool LeCroyVICPOscilloscope::IsChannelEnabled(size_t i)
+{
+	//See if the channel is enabled, hide it if not
+	string cmd = "C1:TRACE?";
+	cmd[1] += i;
+	SendCommand(cmd);
+	string reply = ReadSingleBlockString(true);
+	if(reply == "OFF")
+		return false;
+	return true;
+}
+
+void LeCroyVICPOscilloscope::EnableChannel(size_t i)
+{
+	string cmd = "C1:TRACE ON";
+	cmd[1] += i;
+	SendCommand(cmd);
+}
+
+void LeCroyVICPOscilloscope::DisableChannel(size_t i)
+{
+	string cmd = "C1:TRACE OFF";
+	cmd[1] += i;
+	SendCommand(cmd);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DMM mode
 
 bool LeCroyVICPOscilloscope::GetMeterAutoRange()
@@ -485,6 +510,11 @@ void LeCroyVICPOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 	string stype;
 	switch(type)
 	{
+		//not implemented, disable
+		case Multimeter::AC_CURRENT:
+		case Multimeter::DC_CURRENT:
+			return;
+
 		case Multimeter::DC_VOLTAGE:
 			stype = "DC";
 			break;
@@ -622,7 +652,7 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		//If the channel is invisible, don't waste time capturing data
-		if(!m_channels[i]->m_visible)
+		if(!m_channels[i]->IsEnabled())
 		{
 			m_channels[i]->SetData(NULL);
 			continue;

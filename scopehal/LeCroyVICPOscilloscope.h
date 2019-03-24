@@ -52,6 +52,11 @@ public:
 	virtual unsigned int GetInstrumentTypes();
 	virtual unsigned int GetMeasurementTypes();
 
+	//Channel information
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+
 	//Triggering
 	virtual void ResetTriggerConditions();
 	virtual Oscilloscope::TriggerMode PollTrigger();

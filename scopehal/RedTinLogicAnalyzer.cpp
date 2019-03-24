@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -266,6 +266,7 @@ void RedTinLogicAnalyzer::LoadChannels()
 		//Signal name (null terminated)
 		//Signal width (1 byte)
 		//Reserved for protocol decodes etc (1 byte)
+		size_t ichan = 0;
 		while(ptr < end)
 		{
 			unsigned int width = 0;
@@ -304,13 +305,23 @@ void RedTinLogicAnalyzer::LoadChannels()
 				if(width == 1)
 				{
 					m_channels.push_back(chan = new OscilloscopeChannel(
-						name, OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color));
+						this,
+						name,
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						color,
+						ichan));
 				}
 				else
 				{
 					m_channels.push_back(chan = new OscilloscopeChannel(
-						name, OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, width));
+						this,
+						name,
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						color,
+						width,
+						ichan));
 				}
+				ichan ++;
 			}
 
 			//TODO

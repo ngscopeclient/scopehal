@@ -44,15 +44,21 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-OscilloscopeChannel::OscilloscopeChannel(string hwname, OscilloscopeChannel::ChannelType type, string color, int width)
-	: m_displaycolor(color)
+OscilloscopeChannel::OscilloscopeChannel(
+	Oscilloscope* scope,
+	string hwname,
+	OscilloscopeChannel::ChannelType type,
+	string color,
+	int width,
+	size_t index)
+	: m_scope(scope)
+	, m_displaycolor(color)
 	, m_displayname(hwname)
 	, m_type(type)
 	, m_hwname(hwname)
+	, m_index(index)
 {
 	m_data = NULL;
-
-	m_visible = true;
 
 	m_width = width;
 
