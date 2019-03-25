@@ -1027,6 +1027,13 @@ float LeCroyVICPOscilloscope::GetTriggerVoltage()
 	return level;
 }
 
+void LeCroyVICPOscilloscope::SetTriggerVoltage(float v)
+{
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "TRIG_LEVEL %.3f V", v);
+	SendCommand(tmp);
+}
+
 void LeCroyVICPOscilloscope::SetTriggerForChannel(
 	OscilloscopeChannel* /*channel*/,
 	vector<TriggerType> /*triggerbits*/)

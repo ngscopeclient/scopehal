@@ -108,6 +108,7 @@ public:
 	//For simple triggering
 	virtual size_t GetTriggerChannelIndex() =0;
 	virtual float GetTriggerVoltage() =0;
+	virtual void SetTriggerVoltage(float v) =0;
 
 	/**
 		@brief Sets the trigger condition for a single channel
