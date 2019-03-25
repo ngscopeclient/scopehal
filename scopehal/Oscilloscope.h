@@ -105,6 +105,10 @@ public:
 		TRIGGER_TYPE_DONTCARE	= 5
 	};
 
+	//For simple triggering
+	virtual size_t GetTriggerChannelIndex() =0;
+	virtual float GetTriggerVoltage() =0;
+
 	/**
 		@brief Sets the trigger condition for a single channel
 	 */

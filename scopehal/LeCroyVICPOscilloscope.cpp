@@ -990,7 +990,7 @@ string LeCroyVICPOscilloscope::ReadMultiBlockString()
 
 void LeCroyVICPOscilloscope::Start()
 {
-	LogDebug("Start multi trigger\n");
+	SendCommand("TRIG_MODE NORM");
 }
 
 void LeCroyVICPOscilloscope::StartSingleTrigger()
@@ -1001,7 +1001,30 @@ void LeCroyVICPOscilloscope::StartSingleTrigger()
 
 void LeCroyVICPOscilloscope::Stop()
 {
-	LogDebug("Stop\n");
+	SendCommand("TRIG_MODE STOP");
+}
+
+size_t LeCroyVICPOscilloscope::GetTriggerChannelIndex()
+{
+	SendCommand("TRIG_SELECT?");
+	string reply = ReadSingleBlockString();
+
+	char ignored1[32];
+	char ignored2[32];
+	char source[32] = "";
+	sscanf(reply.c_str(), "%31[^,],%31[^,],%31[^,],\n", ignored1, ignored2, source);
+
+	//TODO: support ext/digital channels
+	return source[1] - '1';
+}
+
+float LeCroyVICPOscilloscope::GetTriggerVoltage()
+{
+	SendCommand("TRIG_LEVEL?");
+	string reply = ReadSingleBlockString();
+	float level;
+	sscanf(reply.c_str(), "%f", &level);
+	return level;
 }
 
 void LeCroyVICPOscilloscope::SetTriggerForChannel(

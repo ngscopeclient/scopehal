@@ -94,6 +94,9 @@ public:
 	Oscilloscope* GetScope()
 	{ return m_scope; }
 
+	size_t GetIndex()
+	{ return m_index; }
+
 	//Hardware configuration
 public:
 	bool IsEnabled();
