@@ -1034,6 +1034,49 @@ void LeCroyVICPOscilloscope::SetTriggerVoltage(float v)
 	SendCommand(tmp);
 }
 
+Oscilloscope::TriggerType LeCroyVICPOscilloscope::GetTriggerType()
+{
+	SendCommand("TRIG_SLOPE?");
+	string reply = ReadSingleBlockString();
+
+	//TODO: TRIG_SELECT to verify its an edge trigger
+
+	//note newline at end of reply
+	if(reply == "POS\n")
+		return Oscilloscope::TRIGGER_TYPE_RISING;
+	else if(reply == "NEG\n")
+		return Oscilloscope::TRIGGER_TYPE_FALLING;
+	else if(reply == "EIT\n")
+		return Oscilloscope::TRIGGER_TYPE_CHANGE;
+
+	//TODO: handle other types
+	return Oscilloscope::TRIGGER_TYPE_DONTCARE;
+}
+
+void LeCroyVICPOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
+{
+	//TODO: TRIG_SELECT to configure the edge trigger
+
+	switch(type)
+	{
+		case Oscilloscope::TRIGGER_TYPE_RISING:
+			SendCommand("TRIG_SLOPE POS");
+			break;
+
+		case Oscilloscope::TRIGGER_TYPE_FALLING:
+			SendCommand("TRIG_SLOPE NEG");
+			break;
+
+		case Oscilloscope::TRIGGER_TYPE_CHANGE:
+			SendCommand("TRIG_SLOPE EIT");
+			break;
+
+		default:
+			LogWarning("Unsupported trigger type\n");
+			break;
+	}
+}
+
 void LeCroyVICPOscilloscope::SetTriggerForChannel(
 	OscilloscopeChannel* /*channel*/,
 	vector<TriggerType> /*triggerbits*/)

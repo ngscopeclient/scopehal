@@ -73,6 +73,8 @@ public:
 	virtual size_t GetTriggerChannelIndex();
 	virtual float GetTriggerVoltage();
 	virtual void SetTriggerVoltage(float v);
+	virtual Oscilloscope::TriggerType GetTriggerType();
+	virtual void SetTriggerType(Oscilloscope::TriggerType type);
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
 	//VICP constant helpers
