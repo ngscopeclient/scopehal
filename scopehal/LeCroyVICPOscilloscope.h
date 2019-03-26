@@ -71,6 +71,7 @@ public:
 	virtual void StartSingleTrigger();
 	virtual void Stop();
 	virtual size_t GetTriggerChannelIndex();
+	virtual void SetTriggerChannelIndex(size_t i);
 	virtual float GetTriggerVoltage();
 	virtual void SetTriggerVoltage(float v);
 	virtual Oscilloscope::TriggerType GetTriggerType();

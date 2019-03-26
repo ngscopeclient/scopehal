@@ -1018,6 +1018,14 @@ size_t LeCroyVICPOscilloscope::GetTriggerChannelIndex()
 	return source[1] - '1';
 }
 
+void LeCroyVICPOscilloscope::SetTriggerChannelIndex(size_t i)
+{
+	//For now, always set trigger mode to edge
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,C%zu", i+1);
+	SendCommand(cmd);
+}
+
 float LeCroyVICPOscilloscope::GetTriggerVoltage()
 {
 	SendCommand("TRIG_LEVEL?");
