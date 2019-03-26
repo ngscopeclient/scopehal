@@ -64,6 +64,16 @@ public:
 	virtual int GetChannelBandwidthLimit(size_t i) =0;
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) =0;
 
+	/**
+		@brief Gets the range of the current channel configuration.
+
+		The range is the distance, in volts, between the most negative/smallest and most positive/largest
+		voltage which the ADC can represent using the current vertical gain configuration.
+
+		The range does not depend on the offset.
+	 */
+	virtual double GetChannelVoltageRange(size_t i) =0;
+
 	void AddChannel(OscilloscopeChannel* chan);
 
 	//Triggering

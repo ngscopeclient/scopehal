@@ -124,6 +124,8 @@ public:
 	bool IsPhysicalChannel()
 	{ return m_physical; }
 
+	double GetVoltageRange();
+
 protected:
 
 	Oscilloscope* m_scope;

@@ -120,6 +120,11 @@ void OscilloscopeChannel::SetBandwidthLimit(int mhz)
 	m_scope->SetChannelBandwidthLimit(m_index, mhz);
 }
 
+double OscilloscopeChannel::GetVoltageRange()
+{
+	return m_scope->GetChannelVoltageRange(m_index);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

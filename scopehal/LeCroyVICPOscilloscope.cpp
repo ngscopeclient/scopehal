@@ -1090,3 +1090,16 @@ void LeCroyVICPOscilloscope::SetTriggerForChannel(
 	vector<TriggerType> /*triggerbits*/)
 {
 }
+
+double LeCroyVICPOscilloscope::GetChannelVoltageRange(size_t i)
+{
+	char cmd[] = "C1:VOLT_DIV?";
+	cmd[1] += i;
+	SendCommand(cmd);
+
+	string reply = ReadSingleBlockString();
+	double volts_per_div;
+	sscanf(reply.c_str(), "%lf", &volts_per_div);
+
+	return volts_per_div * 8;	//plot is 8 divisions high on all MAUI scopes
+}
