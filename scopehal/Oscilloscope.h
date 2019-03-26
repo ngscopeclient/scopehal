@@ -50,6 +50,15 @@ public:
 	Oscilloscope();
 	virtual ~Oscilloscope();
 
+	/**
+		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
+
+		In order to see updates made by the user at the front panel, the cache must be flushed.
+
+		Cache flushing is recommended every second or so during interactive operation.
+	 */
+	virtual void FlushConfigCache();
+
 	//Channel information
 	size_t GetChannelCount();
 	OscilloscopeChannel* GetChannel(size_t i);

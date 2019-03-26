@@ -46,6 +46,8 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 	, m_hasLA(false)
 	, m_hasDVM(false)
 {
+	FlushConfigCache();
+
 	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", hostname.c_str(), port);
 
 	if(!m_socket.Connect(hostname, port))
@@ -313,8 +315,49 @@ string LeCroyVICPOscilloscope::ReadData()
 	return ret;
 }
 
+string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
+{
+	string payload = ReadData();
+
+	if(trimNewline && (payload.length() > 0) )
+	{
+		int iend = payload.length() - 1;
+		if(trimNewline && (payload[iend] == '\n'))
+			payload.resize(iend);
+	}
+
+	payload += "\0";
+	return payload;
+}
+
+string LeCroyVICPOscilloscope::ReadMultiBlockString()
+{
+	//Read until we get the closing quote
+	string data;
+	bool first  = true;
+	while(true)
+	{
+		string payload = ReadSingleBlockString();
+		data += payload;
+		if(!first && payload.find("\"") != string::npos)
+			break;
+		first = false;
+	}
+	return data;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device information
+
+void LeCroyVICPOscilloscope::FlushConfigCache()
+{
+	m_triggerChannel = 0;
+	m_triggerChannelValid = false;
+	m_triggerLevel = 0;
+	m_triggerLevelValid = false;
+	m_triggerType = TRIGGER_TYPE_DONTCARE;
+	m_triggerTypeValid = false;
+}
 
 /**
 	@brief See what measurement capabilities we have
@@ -957,37 +1000,6 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 	return true;
 }
 
-string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
-{
-	string payload = ReadData();
-
-	if(trimNewline && (payload.length() > 0) )
-	{
-		int iend = payload.length() - 1;
-		if(trimNewline && (payload[iend] == '\n'))
-			payload.resize(iend);
-	}
-
-	payload += "\0";
-	return payload;
-}
-
-string LeCroyVICPOscilloscope::ReadMultiBlockString()
-{
-	//Read until we get the closing quote
-	string data;
-	bool first  = true;
-	while(true)
-	{
-		string payload = ReadSingleBlockString();
-		data += payload;
-		if(!first && payload.find("\"") != string::npos)
-			break;
-		first = false;
-	}
-	return data;
-}
-
 void LeCroyVICPOscilloscope::Start()
 {
 	SendCommand("TRIG_MODE NORM");
@@ -1006,6 +1018,10 @@ void LeCroyVICPOscilloscope::Stop()
 
 size_t LeCroyVICPOscilloscope::GetTriggerChannelIndex()
 {
+	//Check cache
+	if(m_triggerChannelValid)
+		return m_triggerChannel;
+
 	SendCommand("TRIG_SELECT?");
 	string reply = ReadSingleBlockString();
 
@@ -1015,7 +1031,11 @@ size_t LeCroyVICPOscilloscope::GetTriggerChannelIndex()
 	sscanf(reply.c_str(), "%31[^,],%31[^,],%31[^,],\n", ignored1, ignored2, source);
 
 	//TODO: support ext/digital channels
-	return source[1] - '1';
+
+	//Update cache
+	m_triggerChannel = source[1] - '1';
+	m_triggerChannelValid = true;
+	return m_triggerChannel;
 }
 
 void LeCroyVICPOscilloscope::SetTriggerChannelIndex(size_t i)
@@ -1024,65 +1044,87 @@ void LeCroyVICPOscilloscope::SetTriggerChannelIndex(size_t i)
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,C%zu", i+1);
 	SendCommand(cmd);
+
+	//Update cache
+	m_triggerChannel = i;
+	m_triggerChannelValid = true;
 }
 
 float LeCroyVICPOscilloscope::GetTriggerVoltage()
 {
-	SendCommand("TRIG_LEVEL?");
+	//Check cache
+	if(m_triggerLevelValid)
+		return m_triggerLevel;
+
+	SendCommand("TRLV?");
 	string reply = ReadSingleBlockString();
-	float level;
-	sscanf(reply.c_str(), "%f", &level);
-	return level;
+	sscanf(reply.c_str(), "%f", &m_triggerLevel);
+	m_triggerLevelValid = true;
+	return m_triggerLevel;
 }
 
 void LeCroyVICPOscilloscope::SetTriggerVoltage(float v)
 {
 	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "TRIG_LEVEL %.3f V", v);
+	snprintf(tmp, sizeof(tmp), "C%zu:TRLV %.3f V", m_triggerChannel + 1, v);
 	SendCommand(tmp);
+
+	//Update cache
+	m_triggerLevelValid = true;
+	m_triggerLevel = v;
 }
 
 Oscilloscope::TriggerType LeCroyVICPOscilloscope::GetTriggerType()
 {
+	if(m_triggerTypeValid)
+		return m_triggerType;
+
 	SendCommand("TRIG_SLOPE?");
 	string reply = ReadSingleBlockString();
+
+	m_triggerTypeValid = true;
 
 	//TODO: TRIG_SELECT to verify its an edge trigger
 
 	//note newline at end of reply
 	if(reply == "POS\n")
-		return Oscilloscope::TRIGGER_TYPE_RISING;
+		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING);
 	else if(reply == "NEG\n")
-		return Oscilloscope::TRIGGER_TYPE_FALLING;
+		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING);
 	else if(reply == "EIT\n")
-		return Oscilloscope::TRIGGER_TYPE_CHANGE;
+		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE);
 
 	//TODO: handle other types
-	return Oscilloscope::TRIGGER_TYPE_DONTCARE;
+	return (m_triggerType = Oscilloscope::TRIGGER_TYPE_DONTCARE);
 }
 
 void LeCroyVICPOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 {
-	//TODO: TRIG_SELECT to configure the edge trigger
+	m_triggerType = type;
+	m_triggerTypeValid = true;
+
+	char tmp[32] = "";
 
 	switch(type)
 	{
 		case Oscilloscope::TRIGGER_TYPE_RISING:
-			SendCommand("TRIG_SLOPE POS");
+			snprintf(tmp, sizeof(tmp), "C%zu:TRSL POS", m_triggerChannel + 1);
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			SendCommand("TRIG_SLOPE NEG");
+			snprintf(tmp, sizeof(tmp), "C%zu:TRSL NEG", m_triggerChannel + 1);
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			SendCommand("TRIG_SLOPE EIT");
+			snprintf(tmp, sizeof(tmp), "C%zu:TRSL EIT", m_triggerChannel + 1);
 			break;
 
 		default:
 			LogWarning("Unsupported trigger type\n");
 			break;
 	}
+
+	SendCommand(tmp);
 }
 
 void LeCroyVICPOscilloscope::SetTriggerForChannel(

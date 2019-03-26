@@ -52,6 +52,8 @@ public:
 	virtual unsigned int GetInstrumentTypes();
 	virtual unsigned int GetMeasurementTypes();
 
+	virtual void FlushConfigCache();
+
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
@@ -139,6 +141,14 @@ protected:
 	//set of SW/HW options we have
 	bool m_hasLA;
 	bool m_hasDVM;
+
+	//Cached configuration
+	bool m_triggerChannelValid;
+	size_t m_triggerChannel;
+	bool m_triggerLevelValid;
+	float m_triggerLevel;
+	bool m_triggerTypeValid;
+	TriggerType m_triggerType;
 };
 
 #endif

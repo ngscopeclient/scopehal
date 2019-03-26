@@ -63,6 +63,11 @@ Oscilloscope::~Oscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device properties
 
+void Oscilloscope::FlushConfigCache()
+{
+	//nothing to do, base class has no caching
+}
+
 size_t Oscilloscope::GetChannelCount()
 {
 	return m_channels.size();
