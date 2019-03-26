@@ -82,6 +82,7 @@ public:
 		The range does not depend on the offset.
 	 */
 	virtual double GetChannelVoltageRange(size_t i) =0;
+	virtual void SetChannelVoltageRange(size_t i, double range) =0;
 
 	void AddChannel(OscilloscopeChannel* chan);
 

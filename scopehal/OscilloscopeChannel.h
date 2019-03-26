@@ -125,6 +125,7 @@ public:
 	{ return m_physical; }
 
 	double GetVoltageRange();
+	void SetVoltageRange(double range);
 
 protected:
 

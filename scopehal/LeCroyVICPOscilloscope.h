@@ -65,6 +65,7 @@ public:
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
 	virtual double GetChannelVoltageRange(size_t i);
+	virtual void SetChannelVoltageRange(size_t i, double range);
 
 	//Triggering
 	virtual void ResetTriggerConditions();
@@ -149,6 +150,7 @@ protected:
 	float m_triggerLevel;
 	bool m_triggerTypeValid;
 	TriggerType m_triggerType;
+	std::map<size_t, double> m_channelVoltageRanges;
 };
 
 #endif

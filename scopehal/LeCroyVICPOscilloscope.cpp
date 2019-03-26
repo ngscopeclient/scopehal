@@ -357,6 +357,7 @@ void LeCroyVICPOscilloscope::FlushConfigCache()
 	m_triggerLevelValid = false;
 	m_triggerType = TRIGGER_TYPE_DONTCARE;
 	m_triggerTypeValid = false;
+	m_channelVoltageRanges.clear();
 }
 
 /**
@@ -1135,6 +1136,9 @@ void LeCroyVICPOscilloscope::SetTriggerForChannel(
 
 double LeCroyVICPOscilloscope::GetChannelVoltageRange(size_t i)
 {
+	if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
+		return m_channelVoltageRanges[i];
+
 	char cmd[] = "C1:VOLT_DIV?";
 	cmd[1] += i;
 	SendCommand(cmd);
@@ -1143,5 +1147,17 @@ double LeCroyVICPOscilloscope::GetChannelVoltageRange(size_t i)
 	double volts_per_div;
 	sscanf(reply.c_str(), "%lf", &volts_per_div);
 
-	return volts_per_div * 8;	//plot is 8 divisions high on all MAUI scopes
+	double v = volts_per_div * 8;	//plot is 8 divisions high on all MAUI scopes
+	m_channelVoltageRanges[i] = v;
+	return v;
+}
+
+void LeCroyVICPOscilloscope::SetChannelVoltageRange(size_t i, double range)
+{
+	double vdiv = range / 8;
+	m_channelVoltageRanges[i] = range;
+
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "C%zu:VOLT_DIV %.4f", i+1, vdiv);
+	SendCommand(cmd);
 }

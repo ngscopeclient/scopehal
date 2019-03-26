@@ -125,6 +125,11 @@ double OscilloscopeChannel::GetVoltageRange()
 	return m_scope->GetChannelVoltageRange(m_index);
 }
 
+void OscilloscopeChannel::SetVoltageRange(double range)
+{
+	return m_scope->SetChannelVoltageRange(m_index, range);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
