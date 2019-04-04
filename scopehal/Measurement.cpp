@@ -58,7 +58,7 @@ string Measurement::GetInputName(size_t i)
 		return m_signalNames[i];
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 		return "";
 	}
 }
@@ -74,13 +74,13 @@ void Measurement::SetInput(size_t i, OscilloscopeChannel* channel)
 		}
 		if(!ValidateChannel(i, channel))
 		{
-			LogError("Invalid channel format");
+			LogError("Invalid channel format\n");
 		}
 		m_channels[i] = channel;
 	}
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 	}
 }
 
@@ -138,6 +138,7 @@ Measurement* Measurement::CreateMeasurement(string protocol)
 // FloatMeasurement
 
 FloatMeasurement::FloatMeasurement()
+	: m_value(0)
 {
 }
 

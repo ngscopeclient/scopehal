@@ -43,6 +43,9 @@ using namespace std;
 
 MaxVoltageMeasurement::MaxVoltageMeasurement()
 {
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
 }
 
 MaxVoltageMeasurement::~MaxVoltageMeasurement()
@@ -59,23 +62,53 @@ string MaxVoltageMeasurement::GetMeasurementName()
 
 bool MaxVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	return true;
-}
-
-float MaxVoltageMeasurement::GetValue()
-{
-	return 0;
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
 }
 
 string MaxVoltageMeasurement::GetValueAsString()
 {
-	return "foo";
+	char tmp[128];
+	if(m_value > 1)
+		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
+	else
+		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
+
+	return tmp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Measurement processing
 
+//TODO: have error indication instead of FLT_MAX?
 void MaxVoltageMeasurement::Refresh()
 {
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		m_value = FLT_MAX;
+		return;
+	}
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		m_value = FLT_MAX;
+		return;
+	}
 
+	//Can't do scaling if we have no samples to work with
+	if(din->GetDepth() == 0)
+	{
+		m_value = FLT_MAX;
+		return;
+	}
+
+	//Loop over samples and find the maximum
+	m_value = FLT_MIN;
+	for(auto sample : *din)
+	{
+		if((float)sample > m_value)
+			m_value = sample;
+	}
 }

@@ -83,7 +83,11 @@ public:
 	FloatMeasurement();
 	virtual ~FloatMeasurement();
 
-	virtual float GetValue() =0;
+	float GetValue()
+	{ return m_value; }
+
+protected:
+	float m_value;
 };
 
 #define MEASUREMENT_INITPROC(T) \

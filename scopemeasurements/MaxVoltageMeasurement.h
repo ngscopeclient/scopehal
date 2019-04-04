@@ -48,7 +48,6 @@ public:
 	static std::string GetMeasurementName();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual float GetValue();
 	virtual std::string GetValueAsString();
 
 	MEASUREMENT_INITPROC(MaxVoltageMeasurement)
