@@ -42,7 +42,7 @@ public:
 	Measurement();
 	virtual ~Measurement();
 
-	virtual void Refresh() =0;
+	virtual bool Refresh() =0;
 
 	virtual std::string GetValueAsString() =0;
 

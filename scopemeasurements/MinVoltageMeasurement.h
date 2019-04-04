@@ -30,18 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of MinVoltageMeasurement
  */
+#ifndef MinVoltageMeasurement_h
+#define MinVoltageMeasurement_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class MinVoltageMeasurement : public FloatMeasurement
 {
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-}
+public:
+	MinVoltageMeasurement();
+	virtual ~MinVoltageMeasurement();
+
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual std::string GetValueAsString();
+
+	MEASUREMENT_INITPROC(MinVoltageMeasurement)
+};
+
+#endif

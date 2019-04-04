@@ -43,7 +43,7 @@ public:
 	MaxVoltageMeasurement();
 	virtual ~MaxVoltageMeasurement();
 
-	virtual void Refresh();
+	virtual bool Refresh();
 
 	static std::string GetMeasurementName();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);

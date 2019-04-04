@@ -81,34 +81,23 @@ string MaxVoltageMeasurement::GetValueAsString()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Measurement processing
 
-//TODO: have error indication instead of FLT_MAX?
-void MaxVoltageMeasurement::Refresh()
+bool MaxVoltageMeasurement::Refresh()
 {
+	m_value = FLT_MIN;
+
 	//Get the input data
 	if(m_channels[0] == NULL)
-	{
-		m_value = FLT_MAX;
-		return;
-	}
+		return false;
 	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		m_value = FLT_MAX;
-		return;
-	}
-
-	//Can't do scaling if we have no samples to work with
-	if(din->GetDepth() == 0)
-	{
-		m_value = FLT_MAX;
-		return;
-	}
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
 
 	//Loop over samples and find the maximum
-	m_value = FLT_MIN;
 	for(auto sample : *din)
 	{
 		if((float)sample > m_value)
 			m_value = sample;
 	}
+
+	return true;
 }

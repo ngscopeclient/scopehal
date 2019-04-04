@@ -3,6 +3,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
 	MaxVoltageMeasurement.cpp
+	MinVoltageMeasurement.cpp
 	scopemeasurements.cpp
 	)
 

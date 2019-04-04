@@ -40,6 +40,7 @@
 #include "../scopehal/Measurement.h"
 
 #include "MaxVoltageMeasurement.h"
+#include "MinVoltageMeasurement.h"
 
 void ScopeMeasurementStaticInit();
 
