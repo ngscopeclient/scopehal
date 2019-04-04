@@ -24,6 +24,7 @@ set(SCOPEHAL_SOURCES
 	PowerSupply.cpp
 
 	ProtocolDecoder.cpp
+	Measurement.cpp
 	)
 
 add_library(scopehal SHARED

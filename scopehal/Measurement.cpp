@@ -26,42 +26,122 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
-
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
-
-#ifndef scopehal_h
-#define scopehal_h
-
-#include "../log/log.h"
-
-#include <sigc++/sigc++.h>
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
-
+#include "scopehal.h"
 #include "Measurement.h"
 
-#include <cairomm/context.h>
+using namespace std;
 
-#include "Graph.h"
+Measurement::CreateMapType Measurement::m_createprocs;
 
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+Measurement::Measurement()
+{
+}
 
-std::string GetDefaultChannelColor(int i);
+Measurement::~Measurement()
+{
+}
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+size_t Measurement::GetInputCount()
+{
+	return m_signalNames.size();
+}
+
+string Measurement::GetInputName(size_t i)
+{
+	if(i < m_signalNames.size())
+		return m_signalNames[i];
+	else
+	{
+		LogError("Invalid channel index");
+		return "";
+	}
+}
+
+void Measurement::SetInput(size_t i, OscilloscopeChannel* channel)
+{
+	if(i < m_signalNames.size())
+	{
+		if(channel == NULL)	//NULL is always legal
+		{
+			m_channels[i] = NULL;
+			return;
+		}
+		if(!ValidateChannel(i, channel))
+		{
+			LogError("Invalid channel format");
+		}
+		m_channels[i] = channel;
+	}
+	else
+	{
+		LogError("Invalid channel index");
+	}
+}
+
+void Measurement::SetInput(string name, OscilloscopeChannel* channel)
+{
+	//Find the channel
+	for(size_t i=0; i<m_signalNames.size(); i++)
+	{
+		if(m_signalNames[i] == name)
+		{
+			SetInput(i, channel);
+			return;
+		}
+	}
+
+	//Not found
+	LogError("Invalid channel name");
+}
+
+OscilloscopeChannel* Measurement::GetInput(size_t i)
+{
+	if(i < m_signalNames.size())
+		return m_channels[i];
+	else
+	{
+		LogError("Invalid channel index");
+		return NULL;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
+
+void Measurement::AddMeasurementClass(string name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
+
+void Measurement::EnumMeasurements(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+Measurement* Measurement::CreateMeasurement(string protocol)
+{
+	if(m_createprocs.find(protocol) != m_createprocs.end())
+		return m_createprocs[protocol]();
+
+	LogError("Invalid measurement name");
+	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FloatMeasurement
+
+FloatMeasurement::FloatMeasurement()
+{
+}
+
+FloatMeasurement::~FloatMeasurement()
+{
+
+}

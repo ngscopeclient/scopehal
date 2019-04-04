@@ -30,38 +30,28 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of MaxVoltageMeasurement
  */
+#ifndef MaxVoltageMeasurement_h
+#define MaxVoltageMeasurement_h
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "../scopehal/Measurement.h"
 
-#include "../log/log.h"
+class MaxVoltageMeasurement : public FloatMeasurement
+{
+public:
+	MaxVoltageMeasurement();
+	virtual ~MaxVoltageMeasurement();
 
-#include <sigc++/sigc++.h>
+	virtual void Refresh();
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
+	virtual float GetValue();
+	virtual std::string GetValueAsString();
 
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
+	MEASUREMENT_INITPROC(MaxVoltageMeasurement)
+};
 
 #endif

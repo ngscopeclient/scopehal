@@ -30,38 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Scope protocol initialization
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopemeasurements.h"
 
-#include "../log/log.h"
+#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
 
-#include <sigc++/sigc++.h>
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-#endif
+/**
+	@brief Static initialization for protocol list
+ */
+void ScopeMeasurementStaticInit()
+{
+	AddMeasurementClass(MaxVoltageMeasurement);
+}

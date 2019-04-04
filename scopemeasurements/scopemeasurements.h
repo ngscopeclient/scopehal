@@ -33,35 +33,14 @@
 	@brief Main library include file
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef scopemeasurements_h
+#define scopemeasurements_h
 
-#include "../log/log.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/Measurement.h"
 
-#include <sigc++/sigc++.h>
+#include "MaxVoltageMeasurement.h"
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
+void ScopeMeasurementStaticInit();
 
 #endif

@@ -30,38 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of Measurement
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef Measurement_h
+#define Measurement_h
 
-#include "../log/log.h"
+class Measurement
+{
+public:
+	Measurement();
+	virtual ~Measurement();
 
-#include <sigc++/sigc++.h>
+	virtual void Refresh() =0;
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	virtual std::string GetValueAsString() =0;
 
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
+	//Channels
+	size_t GetInputCount();
+	std::string GetInputName(size_t i);
+	void SetInput(size_t i, OscilloscopeChannel* channel);
+	void SetInput(std::string name, OscilloscopeChannel* channel);
 
-#include "Measurement.h"
+	OscilloscopeChannel* GetInput(size_t i);
 
-#include <cairomm/context.h>
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel) =0;
 
-#include "Graph.h"
+protected:
 
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
+	///Names of signals we take as input
+	std::vector<std::string> m_signalNames;
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	///The channels corresponding to our signals
+	std::vector<OscilloscopeChannel*> m_channels;
 
-std::string GetDefaultChannelColor(int i);
+public:
+	typedef Measurement* (*CreateProcType)();
+	static void AddMeasurementClass(std::string name, CreateProcType proc);
+
+	static void EnumMeasurements(std::vector<std::string>& names);
+	static Measurement* CreateMeasurement(std::string measurement);
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
+};
+
+class FloatMeasurement : public Measurement
+{
+public:
+	FloatMeasurement();
+	virtual ~FloatMeasurement();
+
+	virtual float GetValue() =0;
+};
+
+#define MEASUREMENT_INITPROC(T) \
+	static Measurement* CreateInstance() \
+	{ return new T; }
 
 #endif

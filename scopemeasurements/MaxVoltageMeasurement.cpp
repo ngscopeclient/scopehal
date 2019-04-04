@@ -30,38 +30,52 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of MaxVoltageMeasurement
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopemeasurements.h"
+#include "MaxVoltageMeasurement.h"
 
-#include "../log/log.h"
+using namespace std;
 
-#include <sigc++/sigc++.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+MaxVoltageMeasurement::MaxVoltageMeasurement()
+{
+}
 
-#include "Instrument.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
+MaxVoltageMeasurement::~MaxVoltageMeasurement()
+{
+}
 
-#include "Measurement.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-#include <cairomm/context.h>
+string MaxVoltageMeasurement::GetMeasurementName()
+{
+	return "Maximum";
+}
 
-#include "Graph.h"
+bool MaxVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	return true;
+}
 
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
+float MaxVoltageMeasurement::GetValue()
+{
+	return 0;
+}
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+string MaxVoltageMeasurement::GetValueAsString()
+{
+	return "foo";
+}
 
-std::string GetDefaultChannelColor(int i);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
 
-#endif
+void MaxVoltageMeasurement::Refresh()
+{
+
+}
