@@ -850,7 +850,12 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 			float v_gain = *reinterpret_cast<float*>(pdesc + 156);
 			float v_off = *reinterpret_cast<float*>(pdesc + 160);
 			float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
-			//double h_off = *reinterpret_cast<double*>(pdesc + 180) * interval;
+			double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+			if(h_off_frac < 0)
+				h_off_frac = interval + h_off_frac;
+			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
+												//We might have multiple offsets
 			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
 			//double trig_time = *reinterpret_cast<double*>(pdesc + 296);	//ps ref some arbitrary unit
 			//LogDebug("V: gain=%f off=%f\n", v_gain, v_off);

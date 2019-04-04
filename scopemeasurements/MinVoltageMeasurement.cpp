@@ -57,7 +57,7 @@ MinVoltageMeasurement::~MinVoltageMeasurement()
 
 string MinVoltageMeasurement::GetMeasurementName()
 {
-	return "Minimum";
+	return "Min";
 }
 
 bool MinVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -70,7 +70,7 @@ bool MinVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 string MinVoltageMeasurement::GetValueAsString()
 {
 	char tmp[128];
-	if(m_value > 1)
+	if(fabs(m_value) > 1)
 		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
 	else
 		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);

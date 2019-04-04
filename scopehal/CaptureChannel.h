@@ -56,6 +56,11 @@ public:
 	 */
 	int64_t m_timescale;
 
+	/**
+		@brief Phase offset, in picoseconds, from the trigger to the sampling clock.
+	 */
+	int64_t m_triggerPhase;
+
 	virtual size_t GetDepth() const =0;
 
 	/**

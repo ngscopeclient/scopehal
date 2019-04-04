@@ -57,7 +57,7 @@ MaxVoltageMeasurement::~MaxVoltageMeasurement()
 
 string MaxVoltageMeasurement::GetMeasurementName()
 {
-	return "Maximum";
+	return "Max";
 }
 
 bool MaxVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -70,7 +70,7 @@ bool MaxVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 string MaxVoltageMeasurement::GetValueAsString()
 {
 	char tmp[128];
-	if(m_value > 1)
+	if(fabs(m_value) > 1)
 		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
 	else
 		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
