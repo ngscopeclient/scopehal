@@ -39,8 +39,10 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/Measurement.h"
 
+#include "AvgVoltageMeasurement.h"
 #include "MaxVoltageMeasurement.h"
 #include "MinVoltageMeasurement.h"
+#include "PkPkVoltageMeasurement.h"
 
 void ScopeMeasurementStaticInit();
 

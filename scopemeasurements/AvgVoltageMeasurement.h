@@ -30,20 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of AvgVoltageMeasurement
  */
+#ifndef AvgVoltageMeasurement_h
+#define AvgVoltageMeasurement_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class AvgVoltageMeasurement : public FloatMeasurement
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-}
+public:
+	AvgVoltageMeasurement();
+	virtual ~AvgVoltageMeasurement();
+
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual std::string GetValueAsString();
+
+	MEASUREMENT_INITPROC(AvgVoltageMeasurement)
+};
+
+#endif

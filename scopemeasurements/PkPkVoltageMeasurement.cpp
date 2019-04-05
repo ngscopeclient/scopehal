@@ -30,20 +30,80 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of PkPkVoltageMeasurement
  */
 
 #include "scopemeasurements.h"
+#include "PkPkVoltageMeasurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+PkPkVoltageMeasurement::PkPkVoltageMeasurement()
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+PkPkVoltageMeasurement::~PkPkVoltageMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string PkPkVoltageMeasurement::GetMeasurementName()
+{
+	return "Pk-Pk";
+}
+
+bool PkPkVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+string PkPkVoltageMeasurement::GetValueAsString()
+{
+	char tmp[128];
+	if(fabs(m_value) > 1)
+		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
+	else
+		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
+
+	return tmp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool PkPkVoltageMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	//Loop over samples and find the minimum and maximum
+	float low = FLT_MAX;
+	float high = FLT_MIN;
+	for(auto sample : *din)
+	{
+		float f = (float)sample;
+		if(f < low)
+			low = sample;
+		if(f > high)
+			high = sample;
+	}
+
+	//Calculate the global peak to peak
+	m_value = high - low;
+
+	return true;
 }

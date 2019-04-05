@@ -30,20 +30,72 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of AvgVoltageMeasurement
  */
 
 #include "scopemeasurements.h"
+#include "AvgVoltageMeasurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+AvgVoltageMeasurement::AvgVoltageMeasurement()
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+AvgVoltageMeasurement::~AvgVoltageMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string AvgVoltageMeasurement::GetMeasurementName()
+{
+	return "Avg";
+}
+
+bool AvgVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+string AvgVoltageMeasurement::GetValueAsString()
+{
+	char tmp[128];
+	if(fabs(m_value) > 1)
+		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
+	else
+		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
+
+	return tmp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool AvgVoltageMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	//Loop over samples and find the average
+	//TODO: more numerically stable summation algorithm for deep captures
+	double sum = 0;
+	for(auto sample : *din)
+		sum += (float)sample;
+	m_value = sum / din->GetDepth();
+
+	return true;
 }
