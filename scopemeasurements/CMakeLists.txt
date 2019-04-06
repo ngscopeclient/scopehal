@@ -4,6 +4,8 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEMEASUREMENTS_SOURCES
 	AvgVoltageMeasurement.cpp
 	BaseMeasurement.cpp
+	Fall1090Measurement.cpp
+	Fall2080Measurement.cpp
 	FrequencyMeasurement.cpp
 	MaxVoltageMeasurement.cpp
 	MinVoltageMeasurement.cpp

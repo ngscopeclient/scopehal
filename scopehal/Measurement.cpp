@@ -417,6 +417,80 @@ float Measurement::GetRiseTime(AnalogCapture* cap, float low, float high)
 	return avg_ps * 1e-12f;
 }
 
+/**
+	@brief Gets the average fall time of a waveform
+
+	The low and high thresholds are fractional values, e.g. 0.2 and 0.8 for 20-80% rise time.
+ */
+float Measurement::GetFallTime(AnalogCapture* cap, float low, float high)
+{
+	float base = GetBaseVoltage(cap);
+	float top = GetTopVoltage(cap);
+	float delta = top-base;
+
+	float start = high*delta + base;
+	float end = low*delta + base;
+
+	//Find all of the falling edges and count stuff
+	enum
+	{
+		STATE_UNKNOWN,
+		STATE_RISING,
+		STATE_FALLING,
+		STATE_HIGH
+	} state = STATE_UNKNOWN;
+	size_t edge_start = 0;
+	double delta_sum = 0;
+	double delta_count = 0;
+	for(size_t i=1; i<cap->GetDepth(); i++)
+	{
+		float v = (*cap)[i];
+
+		switch(state)
+		{
+			//Starting out
+			case STATE_UNKNOWN:
+				if(v > start)
+					state = STATE_HIGH;
+				break;
+
+			//Waiting for falling edge
+			case STATE_RISING:
+				if(v > start)
+					state = STATE_HIGH;
+				break;
+
+			//Wait for start of falling edge
+			case STATE_HIGH:
+				if(v < start)
+				{
+					edge_start = i;
+					state = STATE_FALLING;
+				}
+				break;
+
+			//Wait for end of falling edge
+			case STATE_FALLING:
+				if(v < end)
+				{
+					//Interpolate end point
+					float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(edge_start);
+					delta_samples += InterpolateTime(cap, i-1, end);
+					delta_samples -= InterpolateTime(cap, edge_start-1, start);
+
+					delta_sum += delta_samples * cap->m_timescale;
+					delta_count ++;
+
+					state = STATE_RISING;
+				}
+				break;
+		}
+	}
+
+	double avg_ps = delta_sum / delta_count;
+	return avg_ps * 1e-12f;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FloatMeasurement
 

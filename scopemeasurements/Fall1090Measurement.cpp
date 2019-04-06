@@ -30,28 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of Fall1090Measurement
  */
 
 #include "scopemeasurements.h"
+#include "Fall1090Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+Fall1090Measurement::Fall1090Measurement()
+	: FloatMeasurement(TYPE_TIME)
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+Fall1090Measurement::~Fall1090Measurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType Fall1090Measurement::GetMeasurementType()
+{
+	return Measurement::MEAS_HORZ;
+}
+
+string Fall1090Measurement::GetMeasurementName()
+{
+	return "Fall (90-10%)";
+}
+
+bool Fall1090Measurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool Fall1090Measurement::Refresh()
+{
+	m_value = 0;
+
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	m_value = GetFallTime(din, 0.1, 0.9);
+
+	return true;
 }

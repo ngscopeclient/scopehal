@@ -30,28 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of Fall2080Measurement
  */
+#ifndef Fall2080Measurement_h
+#define Fall2080Measurement_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class Fall2080Measurement : public FloatMeasurement
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
-}
+public:
+	Fall2080Measurement();
+	virtual ~Fall2080Measurement();
+
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual MeasurementType GetMeasurementType();
+
+	MEASUREMENT_INITPROC(Fall2080Measurement)
+};
+
+#endif

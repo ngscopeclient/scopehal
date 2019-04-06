@@ -94,6 +94,7 @@ protected:
 	float GetAvgVoltage(AnalogCapture* cap);
 	float GetPeriod(AnalogCapture* cap);
 	float GetRiseTime(AnalogCapture* cap, float low, float high);
+	float GetFallTime(AnalogCapture* cap, float low, float high);
 	std::vector<size_t> MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins);
 
 protected:

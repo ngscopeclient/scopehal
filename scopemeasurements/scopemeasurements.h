@@ -41,6 +41,8 @@
 
 #include "AvgVoltageMeasurement.h"
 #include "BaseMeasurement.h"
+#include "Fall1090Measurement.h"
+#include "Fall2080Measurement.h"
 #include "FrequencyMeasurement.h"
 #include "MaxVoltageMeasurement.h"
 #include "MinVoltageMeasurement.h"
