@@ -30,109 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Measurement
+	@brief Declaration of Rise1090Measurement
  */
 
-#ifndef Measurement_h
-#define Measurement_h
+#include "scopemeasurements.h"
+#include "Rise1090Measurement.h"
 
-class Measurement
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+Rise1090Measurement::Rise1090Measurement()
+	: FloatMeasurement(TYPE_TIME)
 {
-public:
-	Measurement();
-	virtual ~Measurement();
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
 
-	virtual bool Refresh() =0;
-
-	virtual std::string GetValueAsString() =0;
-
-	//Channels
-	size_t GetInputCount();
-	std::string GetInputName(size_t i);
-	void SetInput(size_t i, OscilloscopeChannel* channel);
-	void SetInput(std::string name, OscilloscopeChannel* channel);
-
-	OscilloscopeChannel* GetInput(size_t i);
-
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel) =0;
-
-	//Type of measurement (used to determine the submenu to display it under)
-	enum MeasurementType
-	{
-		MEAS_VERT,	//basic vertical axis
-		MEAS_HORZ	//basic horizontal axis
-	};
-
-	virtual MeasurementType GetMeasurementType() =0;
-
-protected:
-
-	///Names of signals we take as input
-	std::vector<std::string> m_signalNames;
-
-	///The channels corresponding to our signals
-	std::vector<OscilloscopeChannel*> m_channels;
-
-	//Helpers for superresolution
-	float InterpolateTime(AnalogCapture* cap, size_t a, float voltage);
-
-	//Enumeration / factory
-public:
-	typedef Measurement* (*CreateProcType)();
-	static void AddMeasurementClass(std::string name, CreateProcType proc);
-
-	static void EnumMeasurements(std::vector<std::string>& names);
-	static Measurement* CreateMeasurement(std::string measurement);
-
-protected:
-	//Helpers for more complex measurements
-	//TODO: create some process for caching this so we don't waste CPU time
-	float GetMinVoltage(AnalogCapture* cap);
-	float GetMaxVoltage(AnalogCapture* cap);
-	float GetBaseVoltage(AnalogCapture* cap);
-	float GetTopVoltage(AnalogCapture* cap);
-	float GetAvgVoltage(AnalogCapture* cap);
-	float GetPeriod(AnalogCapture* cap);
-	float GetRiseTime(AnalogCapture* cap, float low, float high);
-	std::vector<size_t> MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins);
-
-protected:
-	//Class enumeration
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-	static CreateMapType m_createprocs;
-};
-
-//Helper class for floating point measurements
-class FloatMeasurement : public Measurement
+Rise1090Measurement::~Rise1090Measurement()
 {
-public:
-	//The type of quantity we're measuring
-	enum FloatMeasurementType
-	{
-		TYPE_VOLTAGE,
-		TYPE_TIME,
-		TYPE_FREQUENCY
-	};
+}
 
-	FloatMeasurement(FloatMeasurementType type);
-	virtual ~FloatMeasurement();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	float GetValue()
-	{ return m_value; }
+Measurement::MeasurementType Rise1090Measurement::GetMeasurementType()
+{
+	return Measurement::MEAS_HORZ;
+}
 
-	virtual std::string GetValueAsString();
+string Rise1090Measurement::GetMeasurementName()
+{
+	return "Rise (10-90%)";
+}
 
-	FloatMeasurementType GetFloatMeasurementType()
-	{ return m_type; }
+bool Rise1090Measurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
 
-protected:
-	float m_value;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
 
-	FloatMeasurementType m_type;
-};
+bool Rise1090Measurement::Refresh()
+{
+	m_value = 0;
 
-#define MEASUREMENT_INITPROC(T) \
-	static Measurement* CreateInstance() \
-	{ return new T; }
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
 
-#endif
+	m_value = GetRiseTime(din, 0.1, 0.9);
+
+	return true;
+}

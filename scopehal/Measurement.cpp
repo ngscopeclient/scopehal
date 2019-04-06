@@ -160,6 +160,12 @@ float Measurement::InterpolateTime(AnalogCapture* cap, size_t a, float voltage)
 	return delta / slope;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement helpers
+
+/**
+	@brief Gets the lowest voltage of a waveform
+ */
 float Measurement::GetMinVoltage(AnalogCapture* cap)
 {
 	//Loop over samples and find the minimum
@@ -172,6 +178,9 @@ float Measurement::GetMinVoltage(AnalogCapture* cap)
 	return tmp;
 }
 
+/**
+	@brief Gets the highest voltage of a waveform
+ */
 float Measurement::GetMaxVoltage(AnalogCapture* cap)
 {
 	//Loop over samples and find the maximum
@@ -184,6 +193,9 @@ float Measurement::GetMaxVoltage(AnalogCapture* cap)
 	return tmp;
 }
 
+/**
+	@brief Gets the average voltage of a waveform
+ */
 float Measurement::GetAvgVoltage(AnalogCapture* cap)
 {
 	//Loop over samples and find the average
@@ -194,6 +206,9 @@ float Measurement::GetAvgVoltage(AnalogCapture* cap)
 	return sum / cap->GetDepth();
 }
 
+/**
+	@brief Gets the average period of a waveform (measured from rising edge to rising edge with +/- 10% hysteresis)
+ */
 float Measurement::GetPeriod(AnalogCapture* cap)
 {
 	//Find min, max, and average voltage of the signal
@@ -236,6 +251,165 @@ float Measurement::GetPeriod(AnalogCapture* cap)
 			first = false;
 			prev_rising = i;
 			current_state = true;
+		}
+	}
+
+	double avg_ps = delta_sum / delta_count;
+	return avg_ps * 1e-12f;
+}
+
+/**
+	@brief Makes a histogram from a waveform with the specified number of bins.
+
+	Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+	@param low	Low endpoint of the histogram (volts)
+	@param high High endpoint of the histogram (volts)
+	@param bins	Number of histogram bins
+ */
+vector<size_t> Measurement::MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins)
+{
+	vector<size_t> ret;
+	for(size_t i=0; i<bins; i++)
+		ret.push_back(0);
+
+	float delta = high-low;
+
+	for(float v : *cap)
+	{
+		float fbin = (v-low) / delta;
+		size_t bin = floor(fbin * bins);
+		if(fbin < 0)
+			bin = 0;
+		if(bin >= bins)
+			bin = bin-1;
+		ret[bin] ++;
+	}
+
+	return ret;
+}
+
+/**
+	@brief Gets the most probable "0" level for a digital waveform
+ */
+float Measurement::GetBaseVoltage(AnalogCapture* cap)
+{
+	float vmin = GetMinVoltage(cap);
+	float vmax = GetMaxVoltage(cap);
+	float delta = vmax - vmin;
+	const int nbins = 100;
+	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+	//Find the highest peak in the first quarter of the histogram
+	size_t binval = 0;
+	int idx = 0;
+	for(int i=0; i<(nbins/4); i++)
+	{
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
+	}
+
+	float fbin = (idx + 0.5f)/nbins;
+	return fbin*delta + vmin;
+}
+
+/**
+	@brief Gets the most probable "1" level for a digital waveform
+ */
+float Measurement::GetTopVoltage(AnalogCapture* cap)
+{
+	float vmin = GetMinVoltage(cap);
+	float vmax = GetMaxVoltage(cap);
+	float delta = vmax - vmin;
+	const int nbins = 100;
+	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+	//Find the highest peak in the third quarter of the histogram
+	size_t binval = 0;
+	int idx = 0;
+	for(int i=(nbins*3)/4; i<nbins; i++)
+	{
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
+	}
+
+	float fbin = (idx + 0.5f)/nbins;
+	return fbin*delta + vmin;
+}
+
+/**
+	@brief Gets the average rise time of a waveform
+
+	The low and high thresholds are fractional values, e.g. 0.2 and 0.8 for 20-80% rise time.
+ */
+float Measurement::GetRiseTime(AnalogCapture* cap, float low, float high)
+{
+	float base = GetBaseVoltage(cap);
+	float top = GetTopVoltage(cap);
+	float delta = top-base;
+
+	float start = low*delta + base;
+	float end = high*delta + base;
+
+	//Find all of the rising edges and count stuff
+	enum
+	{
+		STATE_UNKNOWN,
+		STATE_RISING,
+		STATE_FALLING,
+		STATE_LOW
+	} state = STATE_UNKNOWN;
+	size_t edge_start = 0;
+	double delta_sum = 0;
+	double delta_count = 0;
+	for(size_t i=1; i<cap->GetDepth(); i++)
+	{
+		float v = (*cap)[i];
+
+		switch(state)
+		{
+			//Starting out
+			case STATE_UNKNOWN:
+				if(v > end)
+					state = STATE_FALLING;
+				break;
+
+			//Waiting for falling edge
+			case STATE_FALLING:
+				if(v < start)
+					state = STATE_LOW;
+				break;
+
+			//Wait for start of rising edge
+			case STATE_LOW:
+				if(v > start)
+				{
+					edge_start = i;
+					state = STATE_RISING;
+				}
+				break;
+
+			//Wait for end of rising edge
+			case STATE_RISING:
+				if(v > end)
+				{
+					//Interpolate end point
+					float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(edge_start);
+					delta_samples += InterpolateTime(cap, i-1, end);
+					delta_samples -= InterpolateTime(cap, edge_start-1, start);
+
+					delta_sum += delta_samples * cap->m_timescale;
+					delta_count ++;
+
+					state = STATE_FALLING;
+				}
+				break;
 		}
 	}
 

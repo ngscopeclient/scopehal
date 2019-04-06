@@ -40,11 +40,15 @@
 #include "../scopehal/Measurement.h"
 
 #include "AvgVoltageMeasurement.h"
+#include "BaseMeasurement.h"
 #include "FrequencyMeasurement.h"
 #include "MaxVoltageMeasurement.h"
 #include "MinVoltageMeasurement.h"
 #include "PeriodMeasurement.h"
 #include "PkPkVoltageMeasurement.h"
+#include "Rise1090Measurement.h"
+#include "Rise2080Measurement.h"
+#include "TopMeasurement.h"
 
 void ScopeMeasurementStaticInit();
 
