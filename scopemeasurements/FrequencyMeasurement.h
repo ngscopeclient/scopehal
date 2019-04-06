@@ -30,22 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of FrequencyMeasurement
  */
+#ifndef FrequencyMeasurement_h
+#define FrequencyMeasurement_h
 
-#ifndef scopemeasurements_h
-#define scopemeasurements_h
-
-#include "../scopehal/scopehal.h"
 #include "../scopehal/Measurement.h"
 
-#include "AvgVoltageMeasurement.h"
-#include "FrequencyMeasurement.h"
-#include "MaxVoltageMeasurement.h"
-#include "MinVoltageMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PkPkVoltageMeasurement.h"
+class FrequencyMeasurement : public FloatMeasurement
+{
+public:
+	FrequencyMeasurement();
+	virtual ~FrequencyMeasurement();
 
-void ScopeMeasurementStaticInit();
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual MeasurementType GetMeasurementType();
+
+	MEASUREMENT_INITPROC(FrequencyMeasurement)
+};
 
 #endif

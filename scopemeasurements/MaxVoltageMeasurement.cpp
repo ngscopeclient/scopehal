@@ -42,6 +42,7 @@ using namespace std;
 // Construction/destruction
 
 MaxVoltageMeasurement::MaxVoltageMeasurement()
+	: FloatMeasurement(TYPE_VOLTAGE)
 {
 	//Configure for a single input
 	m_signalNames.push_back("Vin");
@@ -55,6 +56,11 @@ MaxVoltageMeasurement::~MaxVoltageMeasurement()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+Measurement::MeasurementType MaxVoltageMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
 string MaxVoltageMeasurement::GetMeasurementName()
 {
 	return "Max";
@@ -65,17 +71,6 @@ bool MaxVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
-}
-
-string MaxVoltageMeasurement::GetValueAsString()
-{
-	char tmp[128];
-	if(fabs(m_value) > 1)
-		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
-	else
-		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
-
-	return tmp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,12 +87,6 @@ bool MaxVoltageMeasurement::Refresh()
 	if(din == NULL || (din->GetDepth() == 0))
 		return false;
 
-	//Loop over samples and find the maximum
-	for(auto sample : *din)
-	{
-		if((float)sample > m_value)
-			m_value = sample;
-	}
-
+	m_value = GetMaxVoltage(din);
 	return true;
 }

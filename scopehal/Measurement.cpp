@@ -97,7 +97,7 @@ void Measurement::SetInput(string name, OscilloscopeChannel* channel)
 	}
 
 	//Not found
-	LogError("Invalid channel name");
+	LogError("Invalid channel name\n");
 }
 
 OscilloscopeChannel* Measurement::GetInput(size_t i)
@@ -106,7 +106,7 @@ OscilloscopeChannel* Measurement::GetInput(size_t i)
 		return m_channels[i];
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 		return NULL;
 	}
 }
@@ -130,19 +130,169 @@ Measurement* Measurement::CreateMeasurement(string protocol)
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol]();
 
-	LogError("Invalid measurement name");
+	LogError("Invalid measurement name\n");
 	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interpolation helpers
+
+/**
+	@brief Interpolates the actual time of a threshold crossing between two samples
+
+	Simple linear interpolation for now (TODO sinc)
+
+	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
+ */
+float Measurement::InterpolateTime(AnalogCapture* cap, size_t a, float voltage)
+{
+	//If the voltage isn't between the two points, abort
+	float fa = (*cap)[a];
+	float fb = (*cap)[a+1];
+	bool ag = (fa > voltage);
+	bool bg = (fb > voltage);
+	if( (ag && bg) || (!ag && !bg) )
+		return 0;
+
+	//no need to divide by time, sample spacing is normalized to 1 timebase unit
+	float slope = (fb - fa);
+	float delta = voltage - fa;
+	return delta / slope;
+}
+
+float Measurement::GetMinVoltage(AnalogCapture* cap)
+{
+	//Loop over samples and find the minimum
+	float tmp = FLT_MAX;
+	for(auto sample : *cap)
+	{
+		if((float)sample < tmp)
+			tmp = sample;
+	}
+	return tmp;
+}
+
+float Measurement::GetMaxVoltage(AnalogCapture* cap)
+{
+	//Loop over samples and find the maximum
+	float tmp = FLT_MIN;
+	for(auto sample : *cap)
+	{
+		if((float)sample > tmp)
+			tmp = sample;
+	}
+	return tmp;
+}
+
+float Measurement::GetAvgVoltage(AnalogCapture* cap)
+{
+	//Loop over samples and find the average
+	//TODO: more numerically stable summation algorithm for deep captures
+	double sum = 0;
+	for(auto sample : *cap)
+		sum += (float)sample;
+	return sum / cap->GetDepth();
+}
+
+float Measurement::GetPeriod(AnalogCapture* cap)
+{
+	//Find min, max, and average voltage of the signal
+	float low = GetMinVoltage(cap);
+	float high = GetMaxVoltage(cap);
+	float avg = GetAvgVoltage(cap);
+
+	//Hysteresis: aim 10% above and below the average
+	float delta = (high - low) / 10;
+	float vlo = avg - delta;
+	float vhi = avg + delta;
+
+	bool first = true;
+	size_t prev_rising = 0;
+	bool current_state = false;
+	double delta_sum = 0;
+	double delta_count = 0;
+	for(size_t i=1; i<cap->GetDepth(); i++)
+	{
+		//Go from high to low
+		float v = (*cap)[i];
+		if(current_state && (v < vlo) )
+			current_state = false;
+
+		//Go from low to high
+		else if(!current_state && (v > vhi) )
+		{
+			//If we've seen at least one rising edge, calculate the delta
+			if(!first)
+			{
+				//Find the approximate time of the zero crossing, then interpolate
+				float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(prev_rising);
+				delta_samples += InterpolateTime(cap, i-1, vhi);
+				delta_samples -= InterpolateTime(cap, prev_rising-1, vhi);
+
+				delta_sum += delta_samples * cap->m_timescale;
+				delta_count ++;
+			}
+
+			first = false;
+			prev_rising = i;
+			current_state = true;
+		}
+	}
+
+	double avg_ps = delta_sum / delta_count;
+	return avg_ps * 1e-12f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FloatMeasurement
 
-FloatMeasurement::FloatMeasurement()
+FloatMeasurement::FloatMeasurement(FloatMeasurementType type)
 	: m_value(0)
+	, m_type(type)
 {
 }
 
 FloatMeasurement::~FloatMeasurement()
 {
 
+}
+
+/**
+	@brief Pretty-prints our value
+ */
+string FloatMeasurement::GetValueAsString()
+{
+	char tmp[128] = "";
+
+	switch(m_type)
+	{
+		case TYPE_VOLTAGE:
+			if(fabs(m_value) > 1)
+				snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
+			else
+				snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
+			break;
+
+		case TYPE_TIME:
+			if(fabs(m_value) < 1e-9)
+				snprintf(tmp, sizeof(tmp), "%.3f ps", m_value * 1e12);
+			else if(fabs(m_value) < 1e-6)
+				snprintf(tmp, sizeof(tmp), "%.3f ns", m_value * 1e9);
+			else if(fabs(m_value) < 1e-3)
+				snprintf(tmp, sizeof(tmp), "%.3f μs", m_value * 1e6);
+			else
+				snprintf(tmp, sizeof(tmp), "%.3f ms", m_value * 1e3);
+			break;
+
+		case TYPE_FREQUENCY:
+			if(m_value > 1e6)
+				snprintf(tmp, sizeof(tmp), "%.3f MHz", m_value * 1e-6);
+			else if(m_value > 1e3)
+				snprintf(tmp, sizeof(tmp), "%.3f kHz", m_value * 1e-3);
+			else
+				snprintf(tmp, sizeof(tmp), "%.2f Hz", m_value);
+			break;
+	}
+
+	return tmp;
 }

@@ -48,7 +48,7 @@ public:
 	static std::string GetMeasurementName();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual std::string GetValueAsString();
+	virtual MeasurementType GetMeasurementType();
 
 	MEASUREMENT_INITPROC(MinVoltageMeasurement)
 };

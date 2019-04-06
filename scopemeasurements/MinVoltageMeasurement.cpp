@@ -42,6 +42,7 @@ using namespace std;
 // Construction/destruction
 
 MinVoltageMeasurement::MinVoltageMeasurement()
+	: FloatMeasurement(TYPE_VOLTAGE)
 {
 	//Configure for a single input
 	m_signalNames.push_back("Vin");
@@ -55,6 +56,11 @@ MinVoltageMeasurement::~MinVoltageMeasurement()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+Measurement::MeasurementType MinVoltageMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
 string MinVoltageMeasurement::GetMeasurementName()
 {
 	return "Min";
@@ -65,17 +71,6 @@ bool MinVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
-}
-
-string MinVoltageMeasurement::GetValueAsString()
-{
-	char tmp[128];
-	if(fabs(m_value) > 1)
-		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
-	else
-		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
-
-	return tmp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,12 +87,6 @@ bool MinVoltageMeasurement::Refresh()
 	if(din == NULL || (din->GetDepth() == 0))
 		return false;
 
-	//Loop over samples and find the maximum
-	for(auto sample : *din)
-	{
-		if((float)sample < m_value)
-			m_value = sample;
-	}
-
+	m_value = GetMinVoltage(din);
 	return true;
 }

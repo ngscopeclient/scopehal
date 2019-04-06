@@ -42,6 +42,7 @@ using namespace std;
 // Construction/destruction
 
 PkPkVoltageMeasurement::PkPkVoltageMeasurement()
+	: FloatMeasurement(TYPE_VOLTAGE)
 {
 	//Configure for a single input
 	m_signalNames.push_back("Vin");
@@ -55,6 +56,11 @@ PkPkVoltageMeasurement::~PkPkVoltageMeasurement()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+Measurement::MeasurementType PkPkVoltageMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
 string PkPkVoltageMeasurement::GetMeasurementName()
 {
 	return "Pk-Pk";
@@ -65,17 +71,6 @@ bool PkPkVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chan
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
-}
-
-string PkPkVoltageMeasurement::GetValueAsString()
-{
-	char tmp[128];
-	if(fabs(m_value) > 1)
-		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
-	else
-		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
-
-	return tmp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,20 +85,7 @@ bool PkPkVoltageMeasurement::Refresh()
 	if(din == NULL || (din->GetDepth() == 0))
 		return false;
 
-	//Loop over samples and find the minimum and maximum
-	float low = FLT_MAX;
-	float high = FLT_MIN;
-	for(auto sample : *din)
-	{
-		float f = (float)sample;
-		if(f < low)
-			low = sample;
-		if(f > high)
-			high = sample;
-	}
-
 	//Calculate the global peak to peak
-	m_value = high - low;
-
+	m_value = GetMaxVoltage(din) - GetMinVoltage(din);
 	return true;
 }

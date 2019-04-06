@@ -43,7 +43,9 @@
 void ScopeMeasurementStaticInit()
 {
 	AddMeasurementClass(AvgVoltageMeasurement);
+	AddMeasurementClass(FrequencyMeasurement);
 	AddMeasurementClass(MaxVoltageMeasurement);
 	AddMeasurementClass(MinVoltageMeasurement);
+	AddMeasurementClass(PeriodMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 }

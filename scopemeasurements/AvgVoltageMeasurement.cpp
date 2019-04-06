@@ -42,6 +42,7 @@ using namespace std;
 // Construction/destruction
 
 AvgVoltageMeasurement::AvgVoltageMeasurement()
+	: FloatMeasurement(TYPE_VOLTAGE)
 {
 	//Configure for a single input
 	m_signalNames.push_back("Vin");
@@ -55,6 +56,11 @@ AvgVoltageMeasurement::~AvgVoltageMeasurement()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+Measurement::MeasurementType AvgVoltageMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
 string AvgVoltageMeasurement::GetMeasurementName()
 {
 	return "Avg";
@@ -65,17 +71,6 @@ bool AvgVoltageMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
-}
-
-string AvgVoltageMeasurement::GetValueAsString()
-{
-	char tmp[128];
-	if(fabs(m_value) > 1)
-		snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
-	else
-		snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
-
-	return tmp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,12 +85,7 @@ bool AvgVoltageMeasurement::Refresh()
 	if(din == NULL || (din->GetDepth() == 0))
 		return false;
 
-	//Loop over samples and find the average
-	//TODO: more numerically stable summation algorithm for deep captures
-	double sum = 0;
-	for(auto sample : *din)
-		sum += (float)sample;
-	m_value = sum / din->GetDepth();
+	m_value = GetAvgVoltage(din);
 
 	return true;
 }

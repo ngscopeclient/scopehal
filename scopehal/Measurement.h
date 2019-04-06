@@ -56,6 +56,15 @@ public:
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel) =0;
 
+	//Type of measurement (used to determine the submenu to display it under)
+	enum MeasurementType
+	{
+		MEAS_VERT,	//basic vertical axis
+		MEAS_HORZ	//basic horizontal axis
+	};
+
+	virtual MeasurementType GetMeasurementType() =0;
+
 protected:
 
 	///Names of signals we take as input
@@ -64,6 +73,10 @@ protected:
 	///The channels corresponding to our signals
 	std::vector<OscilloscopeChannel*> m_channels;
 
+	//Helpers for superresolution
+	float InterpolateTime(AnalogCapture* cap, size_t a, float voltage);
+
+	//Enumeration / factory
 public:
 	typedef Measurement* (*CreateProcType)();
 	static void AddMeasurementClass(std::string name, CreateProcType proc);
@@ -72,22 +85,45 @@ public:
 	static Measurement* CreateMeasurement(std::string measurement);
 
 protected:
+	//Helpers for more complex measurements
+	float GetMinVoltage(AnalogCapture* cap);
+	float GetMaxVoltage(AnalogCapture* cap);
+	float GetAvgVoltage(AnalogCapture* cap);
+	float GetPeriod(AnalogCapture* cap);
+
+protected:
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
 };
 
+//Helper class for floating point measurements
 class FloatMeasurement : public Measurement
 {
 public:
-	FloatMeasurement();
+	//The type of quantity we're measuring
+	enum FloatMeasurementType
+	{
+		TYPE_VOLTAGE,
+		TYPE_TIME,
+		TYPE_FREQUENCY
+	};
+
+	FloatMeasurement(FloatMeasurementType type);
 	virtual ~FloatMeasurement();
 
 	float GetValue()
 	{ return m_value; }
 
+	virtual std::string GetValueAsString();
+
+	FloatMeasurementType GetFloatMeasurementType()
+	{ return m_type; }
+
 protected:
 	float m_value;
+
+	FloatMeasurementType m_type;
 };
 
 #define MEASUREMENT_INITPROC(T) \

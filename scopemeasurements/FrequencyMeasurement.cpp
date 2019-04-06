@@ -30,22 +30,61 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of FrequencyMeasurement
  */
 
-#ifndef scopemeasurements_h
-#define scopemeasurements_h
-
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Measurement.h"
-
-#include "AvgVoltageMeasurement.h"
+#include "scopemeasurements.h"
 #include "FrequencyMeasurement.h"
-#include "MaxVoltageMeasurement.h"
-#include "MinVoltageMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PkPkVoltageMeasurement.h"
 
-void ScopeMeasurementStaticInit();
+using namespace std;
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+FrequencyMeasurement::FrequencyMeasurement()
+	: FloatMeasurement(TYPE_FREQUENCY)
+{
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+FrequencyMeasurement::~FrequencyMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType FrequencyMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_HORZ;
+}
+
+string FrequencyMeasurement::GetMeasurementName()
+{
+	return "Freq";
+}
+
+bool FrequencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool FrequencyMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	m_value = 1.0 / GetPeriod(din);
+	return true;
+}
