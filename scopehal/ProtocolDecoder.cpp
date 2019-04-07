@@ -132,8 +132,10 @@ void ProtocolDecoderParameter::SetFileName(string f)
 ProtocolDecoder::ProtocolDecoder(
 	string hwname,
 	OscilloscopeChannel::ChannelType type,
-	string color)
+	string color,
+	Category cat)
 	: OscilloscopeChannel(NULL, hwname, type, color, 0)	//TODO: handle this better?
+	, m_category(cat)
 {
 }
 

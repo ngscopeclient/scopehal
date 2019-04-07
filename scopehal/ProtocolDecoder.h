@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,7 +79,17 @@ protected:
 class ProtocolDecoder : public OscilloscopeChannel
 {
 public:
-	ProtocolDecoder(std::string hwname, OscilloscopeChannel::ChannelType type, std::string color);
+
+	enum Category
+	{
+		CAT_ANALYSIS,	//Signal analysis (histograms, eye patterns, etc)
+		CAT_CONVERSION,	//Type conversion
+		CAT_MATH,		//Basic math functions
+		CAT_SERIAL,		//Serial communications
+		CAT_MISC		//anything not otherwise categorized
+	};
+
+	ProtocolDecoder(std::string hwname, OscilloscopeChannel::ChannelType type, std::string color, Category cat);
 	virtual ~ProtocolDecoder();
 
 	virtual void Refresh() =0;
@@ -101,6 +111,9 @@ public:
 	ParameterMapType::iterator GetParamEnd()
 	{ return m_parameters.end(); }
 
+	Category GetCategory()
+	{ return m_category; }
+
 	/**
 		@brief Return true (default) if this decoder should be overlaid on top of the original waveform.
 
@@ -120,6 +133,9 @@ protected:
 
 	///The channels corresponding to our signals
 	std::vector<OscilloscopeChannel*> m_channels;
+
+	///Group used for the display menu
+	Category m_category;
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string, std::string);

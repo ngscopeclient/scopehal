@@ -151,6 +151,10 @@ public:
 	virtual void StartSingleTrigger() =0;
 	virtual void Stop() =0;
 
+	//Optional application-selected nickname of the scope
+	//(for display purposes if we have multiple scopes)
+	std::string m_nickname;
+
 protected:
 
 	///The channels

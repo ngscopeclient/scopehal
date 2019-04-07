@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,11 +38,11 @@ using namespace std;
 
 NRZDecoder::NRZDecoder(
 	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color)
+	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
-	m_channels.push_back(NULL);	
+	m_channels.push_back(NULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ bool NRZDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 string NRZDecoder::GetProtocolName()
 {
-	return "NRZ";
+	return "Threshold";
 }
 
 bool NRZDecoder::NeedsConfig()
@@ -91,7 +91,7 @@ void NRZDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	
+
 	//Can't do scaling if we have no samples to work with
 	if(din->GetDepth() == 0)
 	{
