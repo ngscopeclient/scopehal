@@ -94,6 +94,9 @@ public:
 
 	virtual void Refresh() =0;
 
+	virtual void AddRef();
+	virtual void Release();
+
 	//Channels
 	size_t GetInputCount();
 	std::string GetInputName(size_t i);

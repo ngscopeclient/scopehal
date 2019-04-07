@@ -99,6 +99,9 @@ public:
 	size_t GetIndex()
 	{ return m_index; }
 
+	size_t GetRefCount()
+	{ return m_refcount; }
+
 	//Hardware configuration
 public:
 	bool IsEnabled();
@@ -108,8 +111,8 @@ public:
 	void Disable();
 
 	//These functions are preferred in GUI or other environments with multiple loads
-	void AddRef();
-	void Release();
+	virtual void AddRef();
+	virtual void Release();
 
 	enum CouplingType
 	{
@@ -120,23 +123,23 @@ public:
 		COUPLE_SYNTHETIC	//channel is math or otherwise not a direct voltage measurement
 	};
 
-	CouplingType GetCoupling();
-	void SetCoupling(CouplingType type);
+	virtual CouplingType GetCoupling();
+	virtual void SetCoupling(CouplingType type);
 
-	double GetAttenuation();
-	void SetAttenuation(double atten);
+	virtual double GetAttenuation();
+	virtual void SetAttenuation(double atten);
 
-	int GetBandwidthLimit();
-	void SetBandwidthLimit(int mhz);
+	virtual int GetBandwidthLimit();
+	virtual void SetBandwidthLimit(int mhz);
 
 	bool IsPhysicalChannel()
 	{ return m_physical; }
 
-	double GetVoltageRange();
-	void SetVoltageRange(double range);
+	virtual double GetVoltageRange();
+	virtual void SetVoltageRange(double range);
 
-	double GetOffset();
-	void SetOffset(double offset);
+	virtual double GetOffset();
+	virtual void SetOffset(double offset);
 
 protected:
 

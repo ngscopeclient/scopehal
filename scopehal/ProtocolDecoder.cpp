@@ -137,6 +137,7 @@ ProtocolDecoder::ProtocolDecoder(
 	: OscilloscopeChannel(NULL, hwname, type, color, 0)	//TODO: handle this better?
 	, m_category(cat)
 {
+	m_physical = false;
 }
 
 ProtocolDecoder::~ProtocolDecoder()
@@ -146,6 +147,18 @@ ProtocolDecoder::~ProtocolDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
+
+void ProtocolDecoder::AddRef()
+{
+	m_refcount ++;
+}
+
+void ProtocolDecoder::Release()
+{
+	m_refcount --;
+	if(m_refcount == 0)
+		delete this;
+}
 
 bool ProtocolDecoder::IsOverlay()
 {

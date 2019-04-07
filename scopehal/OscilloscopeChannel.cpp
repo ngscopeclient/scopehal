@@ -92,67 +92,92 @@ void OscilloscopeChannel::Release()
 
 double OscilloscopeChannel::GetOffset()
 {
-	return m_scope->GetChannelOffset(m_index);
+	if(m_scope != NULL)
+		return m_scope->GetChannelOffset(m_index);
+	else
+		return 0;	//todo: if protocol decoder use root channel offset or similar?
 }
 
 void OscilloscopeChannel::SetOffset(double offset)
 {
-	m_scope->SetChannelOffset(m_index, offset);
+	if(m_scope != NULL)
+		m_scope->SetChannelOffset(m_index, offset);
 }
 
 bool OscilloscopeChannel::IsEnabled()
 {
-	return m_scope->IsChannelEnabled(m_index);
+	if(m_scope != NULL)
+		return m_scope->IsChannelEnabled(m_index);
+	else
+		return true;
 }
 
 void OscilloscopeChannel::Enable()
 {
-	m_scope->EnableChannel(m_index);
+	if(m_scope != NULL)
+		m_scope->EnableChannel(m_index);
 }
 
 void OscilloscopeChannel::Disable()
 {
-	m_scope->DisableChannel(m_index);
+	if(m_scope != NULL)
+		m_scope->DisableChannel(m_index);
 }
 
 OscilloscopeChannel::CouplingType OscilloscopeChannel::GetCoupling()
 {
-	return m_scope->GetChannelCoupling(m_index);
+	if(m_scope)
+		return m_scope->GetChannelCoupling(m_index);
+	else
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 }
 
 void OscilloscopeChannel::SetCoupling(CouplingType type)
 {
-	m_scope->SetChannelCoupling(m_index, type);
+	if(m_scope)
+		m_scope->SetChannelCoupling(m_index, type);
 }
 
 double OscilloscopeChannel::GetAttenuation()
 {
-	return m_scope->GetChannelAttenuation(m_index);
+	if(m_scope)
+		return m_scope->GetChannelAttenuation(m_index);
+	else
+		return 1;
 }
 
 void OscilloscopeChannel::SetAttenuation(double atten)
 {
-	m_scope->SetChannelAttenuation(m_index, atten);
+	if(m_scope)
+		m_scope->SetChannelAttenuation(m_index, atten);
 }
 
 int OscilloscopeChannel::GetBandwidthLimit()
 {
-	return m_scope->GetChannelBandwidthLimit(m_index);
+	if(m_scope)
+		return m_scope->GetChannelBandwidthLimit(m_index);
+	else
+		return 0;
 }
 
 void OscilloscopeChannel::SetBandwidthLimit(int mhz)
 {
-	m_scope->SetChannelBandwidthLimit(m_index, mhz);
+	if(m_scope)
+		m_scope->SetChannelBandwidthLimit(m_index, mhz);
 }
 
 double OscilloscopeChannel::GetVoltageRange()
 {
-	return m_scope->GetChannelVoltageRange(m_index);
+	if(m_scope)
+		return m_scope->GetChannelVoltageRange(m_index);
+	else
+		return 1;	//TODO: get from input
 }
 
 void OscilloscopeChannel::SetVoltageRange(double range)
 {
-	return m_scope->SetChannelVoltageRange(m_index, range);
+	if(m_scope)
+		return m_scope->SetChannelVoltageRange(m_index, range);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

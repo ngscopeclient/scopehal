@@ -63,6 +63,11 @@ bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+double ACCoupleDecoder::GetVoltageRange()
+{
+	return m_channels[0]->GetVoltageRange();
+}
+
 string ACCoupleDecoder::GetProtocolName()
 {
 	return "AC Couple";
@@ -109,7 +114,7 @@ void ACCoupleDecoder::Refresh()
 		count ++;
 	}
 	double offset = sum / count;
-	LogDebug("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
 
 	//Subtract all of our samples
 	AnalogCapture* cap = new AnalogCapture;
