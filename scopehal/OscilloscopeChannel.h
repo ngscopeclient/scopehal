@@ -54,6 +54,8 @@ public:
 		CHANNEL_TYPE_ANALOG,
 		CHANNEL_TYPE_DIGITAL,
 
+		CHANNEL_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
+
 		//Complex datatype from a protocol decoder
 		CHANNEL_TYPE_COMPLEX
 	};
@@ -100,8 +102,14 @@ public:
 	//Hardware configuration
 public:
 	bool IsEnabled();
+
+	//Warning: these functions FORCE the channel to be on or off. May break other code that assumes it's on.
 	void Enable();
 	void Disable();
+
+	//These functions are preferred in GUI or other environments with multiple loads
+	void AddRef();
+	void Release();
 
 	enum CouplingType
 	{
@@ -151,6 +159,9 @@ protected:
 
 	///true if this is a real physical input on the scope and not a math or other output
 	bool m_physical;
+
+	///Number of references (channel is disabled when last ref is released)
+	size_t m_refcount;
 };
 
 #endif

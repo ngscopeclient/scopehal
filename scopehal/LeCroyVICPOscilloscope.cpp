@@ -124,6 +124,17 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 	m_analogChannelCount = nchans;
 	m_digitalChannelCount = 0;
 
+	//Add the external trigger input
+	m_extTrigChannel = new OscilloscopeChannel(
+		this,
+		"EXT",
+		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
+		"",
+		1,
+		m_channels.size(),
+		true);
+	m_channels.push_back(m_extTrigChannel);
+
 	//Look at options and see if we have digital channels too
 	SendCommand("*OPT?", true);
 	reply = ReadSingleBlockString(true);
@@ -189,13 +200,15 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 					for(int i=0; i<16; i++)
 					{
 						snprintf(chn, sizeof(chn), "D%d", i);
-						m_channels.push_back(new OscilloscopeChannel(
+						auto chan = new OscilloscopeChannel(
 							this,
 							chn,
 							OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 							GetDefaultChannelColor(m_channels.size()),
 							1,
-							i + m_analogChannelCount));
+							m_channels.size());
+						m_channels.push_back(chan);
+						m_digitalChannels.push_back(chan);
 					}
 				}
 			}
@@ -349,6 +362,11 @@ string LeCroyVICPOscilloscope::ReadMultiBlockString()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device information
 
+OscilloscopeChannel* LeCroyVICPOscilloscope::GetExternalTrigger()
+{
+	return m_extTrigChannel;
+}
+
 void LeCroyVICPOscilloscope::FlushConfigCache()
 {
 	m_triggerChannel = 0;
@@ -409,6 +427,14 @@ string LeCroyVICPOscilloscope::GetSerial()
 //TODO: cache enable state, at least for a while?
 bool LeCroyVICPOscilloscope::IsChannelEnabled(size_t i)
 {
+	//ext trigger should never be displayed
+	if(i == m_extTrigChannel->GetIndex())
+		return false;
+
+	//TODO: handle digital channels, for now just claim they're off
+	if(i >= m_analogChannelCount)
+		return false;
+
 	//See if the channel is enabled, hide it if not
 	string cmd = "C1:TRACE?";
 	cmd[1] += i;
@@ -929,70 +955,84 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 
 	else if(m_digitalChannelCount > 0)
 	{
-		SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
-
-		//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
-		string cmd = "Digital1:WF?";
-		SendCommand(cmd);
-		string data;
-		if(!ReadWaveformBlock(data))
-			return false;
-
-		//See what channels are enabled
-		string tmp = data.substr(data.find("SelectedLines=") + 14);
-		tmp = tmp.substr(0, 16);
-		bool enabledChannels[16];
-		for(int i=0; i<16; i++)
-			enabledChannels[i] = (tmp[i] == '1');
-
-		//Quick and dirty string searching. We only care about a small fraction of the XML
-		//so no sense bringing in a full parser.
-		tmp = data.substr(data.find("<HorPerStep>") + 12);
-		tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
-		float interval = atof(tmp.c_str()) * 1e12f;
-		//LogDebug("Sample interval: %.2f ps\n", interval);
-
-		tmp = data.substr(data.find("<NumSamples>") + 12);
-		tmp = tmp.substr(0, tmp.find("</NumSamples>"));
-		int num_samples = atoi(tmp.c_str());
-		//LogDebug("Expecting %d samples\n", num_samples);
-
-		//Pull out the actual binary data (Base64 coded)
-		tmp = data.substr(data.find("<BinaryData>") + 12);
-		tmp = tmp.substr(0, tmp.find("</BinaryData>"));
-
-		//Decode the base64
-		base64_decodestate state;
-		base64_init_decodestate(&state);
-		unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
-		base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &state);
-
-		//We have each channel's data from start to finish before the next (no interleaving).
-		unsigned int icapchan = 0;
-		for(unsigned int i=0; i<m_digitalChannelCount; i++)
+		//If no digital channels are enabled, skip this step
+		bool enabled = false;
+		for(size_t i=0; i<m_digitalChannels.size(); i++)
 		{
-			if(enabledChannels[icapchan])
+			if(m_digitalChannels[i]->IsEnabled())
 			{
-				DigitalCapture* cap = new DigitalCapture;
-				cap->m_timescale = interval;
-
-				for(int j=0; j<num_samples; j++)
-					cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
-
-				//Done, update the data
-				m_channels[m_analogChannelCount + i]->SetData(cap);
-
-				//Go to next channel in the capture
-				icapchan ++;
-			}
-			else
-			{
-				//No data here for us!
-				m_channels[m_analogChannelCount + i]->SetData(NULL);
+				enabled = true;
+				break;
 			}
 		}
 
-		delete[] block;
+		if(enabled)
+		{
+			SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
+
+			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
+			string cmd = "Digital1:WF?";
+			SendCommand(cmd);
+			string data;
+			if(!ReadWaveformBlock(data))
+				return false;
+
+			//See what channels are enabled
+			string tmp = data.substr(data.find("SelectedLines=") + 14);
+			tmp = tmp.substr(0, 16);
+			bool enabledChannels[16];
+			for(int i=0; i<16; i++)
+				enabledChannels[i] = (tmp[i] == '1');
+
+			//Quick and dirty string searching. We only care about a small fraction of the XML
+			//so no sense bringing in a full parser.
+			tmp = data.substr(data.find("<HorPerStep>") + 12);
+			tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
+			float interval = atof(tmp.c_str()) * 1e12f;
+			//LogDebug("Sample interval: %.2f ps\n", interval);
+
+			tmp = data.substr(data.find("<NumSamples>") + 12);
+			tmp = tmp.substr(0, tmp.find("</NumSamples>"));
+			int num_samples = atoi(tmp.c_str());
+			//LogDebug("Expecting %d samples\n", num_samples);
+
+			//Pull out the actual binary data (Base64 coded)
+			tmp = data.substr(data.find("<BinaryData>") + 12);
+			tmp = tmp.substr(0, tmp.find("</BinaryData>"));
+
+			//Decode the base64
+			base64_decodestate state;
+			base64_init_decodestate(&state);
+			unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
+			base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &state);
+
+			//We have each channel's data from start to finish before the next (no interleaving).
+			unsigned int icapchan = 0;
+			for(unsigned int i=0; i<m_digitalChannelCount; i++)
+			{
+				if(enabledChannels[icapchan])
+				{
+					DigitalCapture* cap = new DigitalCapture;
+					cap->m_timescale = interval;
+
+					for(int j=0; j<num_samples; j++)
+						cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
+
+					//Done, update the data
+					m_digitalChannels[i]->SetData(cap);
+
+					//Go to next channel in the capture
+					icapchan ++;
+				}
+				else
+				{
+					//No data here for us!
+					m_digitalChannels[i]->SetData(NULL);
+				}
+			}
+
+			delete[] block;
+		}
 	}
 
 	//Refresh protocol decoders
@@ -1036,10 +1076,18 @@ size_t LeCroyVICPOscilloscope::GetTriggerChannelIndex()
 	char source[32] = "";
 	sscanf(reply.c_str(), "%31[^,],%31[^,],%31[^,],\n", ignored1, ignored2, source);
 
-	//TODO: support ext/digital channels
+	//TODO: support digital channels
 
 	//Update cache
-	m_triggerChannel = source[1] - '1';
+	if(isdigit(source[1]))
+		m_triggerChannel = source[1] - '1';
+	else if(!strcmp(source, "EX"))
+		m_triggerChannel = m_extTrigChannel->GetIndex();
+	else
+	{
+		LogError("Unknown source %s\n", source);
+		m_triggerChannel = 0;
+	}
 	m_triggerChannelValid = true;
 	return m_triggerChannel;
 }
@@ -1048,8 +1096,18 @@ void LeCroyVICPOscilloscope::SetTriggerChannelIndex(size_t i)
 {
 	//For now, always set trigger mode to edge
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,C%zu", i+1);
+	if(i < m_analogChannelCount)
+		snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,C%zu", i+1);
+	else if(i == m_extTrigChannel->GetIndex())
+		snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,EX");
+	else
+	{
+		LogError("Invalid trigger channel\n");
+		return;
+	}
 	SendCommand(cmd);
+
+	//TODO: support digital channels
 
 	//Update cache
 	m_triggerChannel = i;

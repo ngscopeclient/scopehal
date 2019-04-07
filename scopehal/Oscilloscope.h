@@ -74,6 +74,11 @@ public:
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) =0;
 
 	/**
+		@brief Returns the external trigger input channel, if we have one
+	 */
+	virtual OscilloscopeChannel* GetExternalTrigger() =0;
+
+	/**
 		@brief Gets the range of the current channel configuration.
 
 		The range is the distance, in volts, between the most negative/smallest and most positive/largest

@@ -66,6 +66,7 @@ public:
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
 	virtual double GetChannelVoltageRange(size_t i);
 	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual OscilloscopeChannel* GetExternalTrigger();
 
 	//Triggering
 	virtual void ResetTriggerConditions();
@@ -151,6 +152,10 @@ protected:
 	bool m_triggerTypeValid;
 	TriggerType m_triggerType;
 	std::map<size_t, double> m_channelVoltageRanges;
+
+	//External trigger input
+	OscilloscopeChannel* m_extTrigChannel;
+	std::vector<OscilloscopeChannel*> m_digitalChannels;
 };
 
 #endif

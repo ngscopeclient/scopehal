@@ -63,6 +63,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_procedural(false)
 	, m_index(index)
 	, m_physical(physical)
+	, m_refcount(0)
 {
 }
 
@@ -74,6 +75,20 @@ OscilloscopeChannel::~OscilloscopeChannel()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers for calling scope functions
+
+void OscilloscopeChannel::AddRef()
+{
+	if(m_refcount == 0)
+		Enable();
+	m_refcount ++;
+}
+
+void OscilloscopeChannel::Release()
+{
+	m_refcount --;
+	if(m_refcount == 0)
+		Disable();
+}
 
 bool OscilloscopeChannel::IsEnabled()
 {
