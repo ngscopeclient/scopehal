@@ -376,6 +376,7 @@ void LeCroyVICPOscilloscope::FlushConfigCache()
 	m_triggerType = TRIGGER_TYPE_DONTCARE;
 	m_triggerTypeValid = false;
 	m_channelVoltageRanges.clear();
+	m_channelOffsets.clear();
 }
 
 /**
@@ -1195,6 +1196,28 @@ void LeCroyVICPOscilloscope::SetTriggerForChannel(
 	OscilloscopeChannel* /*channel*/,
 	vector<TriggerType> /*triggerbits*/)
 {
+}
+
+double LeCroyVICPOscilloscope::GetChannelOffset(size_t i)
+{
+	if(m_channelOffsets.find(i) != m_channelOffsets.end())
+		return m_channelOffsets[i];
+
+	char cmd[] = "C1:OFFSET?";
+	cmd[1] += i;
+	SendCommand(cmd);
+
+	string reply = ReadSingleBlockString();
+	double offset;
+	sscanf(reply.c_str(), "%lf", &offset);
+
+	m_channelOffsets[i] = offset;
+	return offset;
+}
+
+void LeCroyVICPOscilloscope::SetChannelOffset(size_t i, double offset)
+{
+	//TODO
 }
 
 double LeCroyVICPOscilloscope::GetChannelVoltageRange(size_t i)

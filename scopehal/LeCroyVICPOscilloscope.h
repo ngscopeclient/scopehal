@@ -67,6 +67,8 @@ public:
 	virtual double GetChannelVoltageRange(size_t i);
 	virtual void SetChannelVoltageRange(size_t i, double range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual double GetChannelOffset(size_t i);
+	virtual void SetChannelOffset(size_t i, double offset);
 
 	//Triggering
 	virtual void ResetTriggerConditions();
@@ -152,6 +154,7 @@ protected:
 	bool m_triggerTypeValid;
 	TriggerType m_triggerType;
 	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<size_t, double> m_channelOffsets;
 
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;

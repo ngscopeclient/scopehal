@@ -88,6 +88,8 @@ public:
 	 */
 	virtual double GetChannelVoltageRange(size_t i) =0;
 	virtual void SetChannelVoltageRange(size_t i, double range) =0;
+	virtual double GetChannelOffset(size_t i) =0;
+	virtual void SetChannelOffset(size_t i, double offset) =0;
 
 	void AddChannel(OscilloscopeChannel* chan);
 

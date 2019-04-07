@@ -90,6 +90,16 @@ void OscilloscopeChannel::Release()
 		Disable();
 }
 
+double OscilloscopeChannel::GetOffset()
+{
+	return m_scope->GetChannelOffset(m_index);
+}
+
+void OscilloscopeChannel::SetOffset(double offset)
+{
+	m_scope->SetChannelOffset(m_index, offset);
+}
+
 bool OscilloscopeChannel::IsEnabled()
 {
 	return m_scope->IsChannelEnabled(m_index);

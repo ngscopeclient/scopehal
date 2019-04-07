@@ -135,6 +135,9 @@ public:
 	double GetVoltageRange();
 	void SetVoltageRange(double range);
 
+	double GetOffset();
+	void SetOffset(double offset);
+
 protected:
 
 	Oscilloscope* m_scope;
