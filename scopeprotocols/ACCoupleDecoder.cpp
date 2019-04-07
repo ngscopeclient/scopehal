@@ -36,9 +36,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACCoupleDecoder::ACCoupleDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+ACCoupleDecoder::ACCoupleDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -83,6 +82,14 @@ bool ACCoupleDecoder::NeedsConfig()
 {
 	//we auto-select the midpoint as our threshold
 	return false;
+}
+
+void ACCoupleDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/AC couple", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

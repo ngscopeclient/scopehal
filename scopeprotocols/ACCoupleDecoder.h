@@ -40,7 +40,7 @@
 class ACCoupleDecoder : public ProtocolDecoder
 {
 public:
-	ACCoupleDecoder(std::string hwname, std::string color);
+	ACCoupleDecoder(std::string color);
 
 	virtual void Refresh();
 	virtual ChannelRenderer* CreateRenderer();
@@ -49,6 +49,7 @@ public:
 	virtual bool IsOverlay();
 
 	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
 	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);

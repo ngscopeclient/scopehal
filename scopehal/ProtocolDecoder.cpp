@@ -130,11 +130,10 @@ void ProtocolDecoderParameter::SetFileName(string f)
 // Construction / destruction
 
 ProtocolDecoder::ProtocolDecoder(
-	string hwname,
 	OscilloscopeChannel::ChannelType type,
 	string color,
 	Category cat)
-	: OscilloscopeChannel(NULL, hwname, type, color, 0)	//TODO: handle this better?
+	: OscilloscopeChannel(NULL, "", type, color, 0)	//TODO: handle this better?
 	, m_category(cat)
 {
 	m_physical = false;
@@ -251,10 +250,10 @@ void ProtocolDecoder::EnumProtocols(vector<string>& names)
 		names.push_back(it->first);
 }
 
-ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string hwname, string color)
+ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
-		return m_createprocs[protocol](hwname, color);
+		return m_createprocs[protocol](color);
 
 	LogError("Invalid decoder name");
 	return NULL;

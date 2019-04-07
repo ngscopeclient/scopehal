@@ -37,9 +37,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeDecoder::EyeDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_ANALYSIS)
+EyeDecoder::EyeDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_ANALYSIS)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -67,6 +66,14 @@ bool EyeDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 string EyeDecoder::GetProtocolName()
 {
 	return "Eye pattern";
+}
+
+void EyeDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/Eye", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
 bool EyeDecoder::IsOverlay()
@@ -487,8 +494,8 @@ bool EyeDecoder::GenerateEyeData(AnalogCapture* din, EyeCapture* cap, map<int64_
 	for(auto sin : din->m_samples)
 	{
 		float f = sin;
-		vmin = std::min(vmin, f);
-		vmax = std::max(vmax, f);
+		vmin = min(vmin, f);
+		vmax = max(vmax, f);
 	}
 	float binsize = (vmax - vmin) / nbins;
 	LogDebug("bin size = %.3f mV (v=%.3f, %.3f)\n", binsize * 1000.0f, vmin, vmax);

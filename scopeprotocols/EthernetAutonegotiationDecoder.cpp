@@ -40,12 +40,13 @@
 #include "EthernetAutonegotiationRenderer.h"
 #include "EthernetAutonegotiationDecoder.h"
 
+using namespace std;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -72,9 +73,17 @@ bool EthernetAutonegotiationDecoder::ValidateChannel(size_t i, OscilloscopeChann
 	return false;
 }
 
-std::string EthernetAutonegotiationDecoder::GetProtocolName()
+string EthernetAutonegotiationDecoder::GetProtocolName()
 {
 	return "Ethernet Autonegotiation";
+}
+
+void EthernetAutonegotiationDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/Autonegotiation", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

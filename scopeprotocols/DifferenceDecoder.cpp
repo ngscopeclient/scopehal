@@ -36,9 +36,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DifferenceDecoder::DifferenceDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+DifferenceDecoder::DifferenceDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din_p");
@@ -66,6 +65,14 @@ bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
+
+void DifferenceDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s - %s", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
 string DifferenceDecoder::GetProtocolName()
 {

@@ -36,9 +36,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-NRZDecoder::NRZDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
+NRZDecoder::NRZDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -66,6 +65,14 @@ bool NRZDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 string NRZDecoder::GetProtocolName()
 {
 	return "Threshold";
+}
+
+void NRZDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/Threshold", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
 bool NRZDecoder::NeedsConfig()

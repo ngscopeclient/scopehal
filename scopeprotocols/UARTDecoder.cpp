@@ -39,12 +39,13 @@
 #include "../scopehal/AsciiRenderer.h"
 #include "UARTDecoder.h"
 
+using namespace std;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-UARTDecoder::UARTDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+UARTDecoder::UARTDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -76,9 +77,17 @@ bool UARTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 	return false;
 }
 
-std::string UARTDecoder::GetProtocolName()
+string UARTDecoder::GetProtocolName()
 {
 	return "UART";
+}
+
+void UARTDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/UART", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -56,9 +56,8 @@ float blackman(float x, float width)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SincInterpolationDecoder::SincInterpolationDecoder(
-	std::string hwname, std::string color)
-	: ProtocolDecoder(hwname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+SincInterpolationDecoder::SincInterpolationDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -82,6 +81,14 @@ bool SincInterpolationDecoder::ValidateChannel(size_t i, OscilloscopeChannel* ch
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
+
+void SincInterpolationDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/Upsample", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
 string SincInterpolationDecoder::GetProtocolName()
 {

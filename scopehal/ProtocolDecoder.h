@@ -89,13 +89,15 @@ public:
 		CAT_MISC		//anything not otherwise categorized
 	};
 
-	ProtocolDecoder(std::string hwname, OscilloscopeChannel::ChannelType type, std::string color, Category cat);
+	ProtocolDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
 	virtual ~ProtocolDecoder();
 
 	virtual void Refresh() =0;
 
 	virtual void AddRef();
 	virtual void Release();
+
+	virtual void SetDefaultName() =0;
 
 	//Channels
 	size_t GetInputCount();
@@ -141,11 +143,11 @@ protected:
 	Category m_category;
 
 public:
-	typedef ProtocolDecoder* (*CreateProcType)(std::string, std::string);
+	typedef ProtocolDecoder* (*CreateProcType)(std::string);
 	static void AddDecoderClass(std::string name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
-	static ProtocolDecoder* CreateDecoder(std::string protocol, std::string hwname, std::string color);
+	static ProtocolDecoder* CreateDecoder(std::string protocol, std::string color);
 
 protected:
 	//Class enumeration
@@ -154,9 +156,9 @@ protected:
 };
 
 #define PROTOCOL_DECODER_INITPROC(T) \
-	static ProtocolDecoder* CreateInstance(std::string hwname, std::string color) \
+	static ProtocolDecoder* CreateInstance(std::string color) \
 	{ \
-		return new T(hwname, color); \
+		return new T(color); \
 	}
 
 #endif

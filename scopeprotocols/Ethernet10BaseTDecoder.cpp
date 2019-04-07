@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,8 +39,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-Ethernet10BaseTDecoder::Ethernet10BaseTDecoder(string hwname, string color)
-	: EthernetProtocolDecoder(hwname, color)
+Ethernet10BaseTDecoder::Ethernet10BaseTDecoder(string color)
+	: EthernetProtocolDecoder(color)
 {
 
 }
@@ -55,6 +55,14 @@ string Ethernet10BaseTDecoder::GetProtocolName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+void Ethernet10BaseTDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s/10BaseT", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
 void Ethernet10BaseTDecoder::Refresh()
 {
