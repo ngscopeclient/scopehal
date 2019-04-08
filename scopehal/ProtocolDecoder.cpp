@@ -141,7 +141,11 @@ ProtocolDecoder::ProtocolDecoder(
 
 ProtocolDecoder::~ProtocolDecoder()
 {
-
+	for(auto c : m_channels)
+	{
+		if(c != NULL)
+			c->Release();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,6 +154,8 @@ ProtocolDecoder::~ProtocolDecoder()
 void ProtocolDecoder::AddRef()
 {
 	m_refcount ++;
+	for(auto c : m_channels)
+		c->AddRef();
 }
 
 void ProtocolDecoder::Release()
