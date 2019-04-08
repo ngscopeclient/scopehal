@@ -40,8 +40,8 @@ DifferenceDecoder::DifferenceDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
-	m_signalNames.push_back("din_p");
-	m_signalNames.push_back("din_n");
+	m_signalNames.push_back("IN+");
+	m_signalNames.push_back("IN-");
 	m_channels.push_back(NULL);
 	m_channels.push_back(NULL);
 }
@@ -89,6 +89,14 @@ bool DifferenceDecoder::NeedsConfig()
 {
 	//we have more than one input
 	return true;
+}
+
+double DifferenceDecoder::GetVoltageRange()
+{
+	//TODO: default, but allow overridnig
+	double v1 = m_channels[0]->GetVoltageRange();
+	double v2 = m_channels[1]->GetVoltageRange();
+	return max(v1, v2) * 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

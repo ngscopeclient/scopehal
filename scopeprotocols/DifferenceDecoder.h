@@ -51,6 +51,8 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	virtual double GetVoltageRange();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
 	PROTOCOL_DECODER_INITPROC(DifferenceDecoder)
