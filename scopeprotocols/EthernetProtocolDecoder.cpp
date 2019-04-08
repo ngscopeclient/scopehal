@@ -39,7 +39,7 @@ using namespace std;
 // Construction / destruction
 
 EthernetProtocolDecoder::EthernetProtocolDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -70,6 +70,15 @@ bool EthernetProtocolDecoder::NeedsConfig()
 	return false;
 }
 
+vector<string> EthernetProtocolDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Dest MAC");
+	ret.push_back("Src MAC");
+	ret.push_back("Ethertype");
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual protocol decoding
 
@@ -79,6 +88,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 		vector<uint64_t>& ends,
 		EthernetCapture* cap)
 {
+	Packet* pack = NULL;
+
 	EthernetFrameSegment garbage;
 	EthernetSample sample(-1, -1, garbage);	//ctor needs args even though we're gonna overwrite them
 	sample.m_sample.m_type = EthernetFrameSegment::TYPE_INVALID;
@@ -101,6 +112,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 					sample.m_sample.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
 					sample.m_sample.m_data.clear();
 					sample.m_sample.m_data.push_back(0x55);
+
+					//Start a new packet
+					pack = new Packet;
+					pack->m_start = (starts[i] * 1e-12) + cap->m_startTime;
 				}
 				break;
 
@@ -158,6 +173,17 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Reset for next block of the frame
 					sample.m_sample.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
 					sample.m_sample.m_data.clear();
+
+					//Format the content for display
+					char tmp[64];
+					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
+						sample.m_sample.m_data[0],
+						sample.m_sample.m_data[1],
+						sample.m_sample.m_data[2],
+						sample.m_sample.m_data[3],
+						sample.m_sample.m_data[4],
+						sample.m_sample.m_data[5]);
+					pack->m_headers["Dest MAC"] = tmp;
 				}
 
 				break;
@@ -180,6 +206,17 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Reset for next block of the frame
 					sample.m_sample.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
 					sample.m_sample.m_data.clear();
+
+					//Format the content for display
+					char tmp[64];
+					snprintf(tmp, sizeof(tmp),"%02x:%02x:%02x:%02x:%02x:%02x",
+						sample.m_sample.m_data[0],
+						sample.m_sample.m_data[1],
+						sample.m_sample.m_data[2],
+						sample.m_sample.m_data[3],
+						sample.m_sample.m_data[4],
+						sample.m_sample.m_data[5]);
+					pack->m_headers["Src MAC"] = tmp;
 				}
 
 				break;
@@ -202,6 +239,35 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Reset for next block of the frame
 					sample.m_sample.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
 					sample.m_sample.m_data.clear();
+
+					//Format the content for display
+					uint16_t ethertype = (sample.m_sample.m_data[0] << 8) | sample.m_sample.m_data[1];
+					char tmp[64];
+					switch(ethertype)
+					{
+						case 0x0800:
+							pack->m_headers["Ethertype"] = "IPv4";
+							break;
+
+						case 0x0806:
+							pack->m_headers["Ethertype"] = "ARP";
+							break;
+
+						case 0x8100:
+							pack->m_headers["Ethertype"] = "802.1q";
+							break;
+
+						case 0x86DD:
+							pack->m_headers["Ethertype"] = "IPv6";
+							break;
+
+						default:
+							snprintf(tmp, sizeof(tmp), "%02x%02x",
+							sample.m_sample.m_data[0],
+							sample.m_sample.m_data[1]);
+							pack->m_headers["Ethertype"] = tmp;
+							break;
+					}
 				}
 
 				break;
@@ -223,6 +289,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 					sample.m_sample.m_data.clear();
 					sample.m_sample.m_type = EthernetFrameSegment::TYPE_FCS;
 				}
+				else
+					pack->m_data.push_back(bytes[i]);
 				break;
 
 			case EthernetFrameSegment::TYPE_FCS:
@@ -239,6 +307,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 				{
 					sample.m_duration = (ends[i] / cap->m_timescale) - sample.m_offset;
 					cap->m_samples.push_back(sample);
+
+					pack->m_end = (ends[i] * 1e-12) + cap->m_startTime;
+					m_packets.push_back(pack);
 				}
 
 				break;

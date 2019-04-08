@@ -884,7 +884,7 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
 												//We might have multiple offsets
 			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-			//double trig_time = *reinterpret_cast<double*>(pdesc + 296);	//ps ref some arbitrary unit
+			cap->m_startTime = *reinterpret_cast<double*>(pdesc + 296);
 			//LogDebug("V: gain=%f off=%f\n", v_gain, v_off);
 			//LogDebug("    H: off=%lf\n", h_off);
 			//LogDebug("    Trigger time: %.0f ps\n", trig_time * 1e12f);

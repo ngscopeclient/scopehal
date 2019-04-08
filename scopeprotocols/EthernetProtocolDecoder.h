@@ -36,6 +36,7 @@
 #define EthernetProtocolDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 
 /**
 	@brief Part of an Ethernet frame (speed doesn't matter)
@@ -68,7 +69,7 @@ public:
 typedef OscilloscopeSample<EthernetFrameSegment> EthernetSample;
 typedef CaptureChannel<EthernetFrameSegment> EthernetCapture;
 
-class EthernetProtocolDecoder : public ProtocolDecoder
+class EthernetProtocolDecoder : public PacketDecoder
 {
 public:
 	EthernetProtocolDecoder(std::string color);
@@ -76,6 +77,8 @@ public:
 	virtual ChannelRenderer* CreateRenderer();
 	virtual bool NeedsConfig();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual std::vector<std::string> GetHeaders();
 
 protected:
 	void BytesToFrames(

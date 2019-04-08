@@ -50,7 +50,7 @@ Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(string color)
 void Ethernet100BaseTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/100BaseT", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "%s/100BaseTX", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -65,6 +65,8 @@ string Ethernet100BaseTDecoder::GetProtocolName()
 
 void Ethernet100BaseTDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Get the input data
 	if(m_channels[0] == NULL)
 	{
@@ -89,6 +91,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	EthernetCapture* cap = new EthernetCapture;
 	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
+	cap->m_startTime = din->m_startTime;
 
 	const int64_t ui_width 			= 8000;
 	const int64_t ui_width_samples	= ui_width / din->m_timescale;

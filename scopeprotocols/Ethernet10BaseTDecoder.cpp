@@ -66,6 +66,8 @@ void Ethernet10BaseTDecoder::SetDefaultName()
 
 void Ethernet10BaseTDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Get the input data
 	if(m_channels[0] == NULL)
 	{
@@ -90,6 +92,7 @@ void Ethernet10BaseTDecoder::Refresh()
 	EthernetCapture* cap = new EthernetCapture;
 	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
+	cap->m_startTime = din->m_startTime;
 
 	const int64_t ui_width 		= 100000;
 	const int64_t ui_halfwidth 	= 50000;

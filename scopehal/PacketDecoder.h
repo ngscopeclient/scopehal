@@ -27,116 +27,51 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "DifferenceDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
+#ifndef PacketDecoder_h
+#define PacketDecoder_h
 
-using namespace std;
+#include "ProtocolDecoder.h"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-DifferenceDecoder::DifferenceDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+/**
+	@class
+	@brief Generic display representation for arbitrary packetized data
+ */
+class Packet
 {
-	//Set up channels
-	m_signalNames.push_back("IN+");
-	m_signalNames.push_back("IN-");
-	m_channels.push_back(NULL);
-	m_channels.push_back(NULL);
-}
+public:
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	///Start time of the packet (seconds)
+	double m_start;
 
-ChannelRenderer* DifferenceDecoder::CreateRenderer()
+	///End time of the packet (seconds)
+	double m_end;
+
+	//Arbitrary header properties (human readable)
+	std::map<std::string, std::string> m_headers;
+
+	//Packet bytes
+	std::vector<uint8_t> m_data;
+};
+
+/**
+	@class
+	@brief A protocol decoder that outputs packetized data
+ */
+class PacketDecoder : public ProtocolDecoder
 {
-	return new AnalogRenderer(this);
-}
+public:
+	PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, ProtocolDecoder::Category cat);
+	virtual ~PacketDecoder();
 
-bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	return false;
-}
+	const std::vector<Packet*>& GetPackets()
+	{ return m_packets; }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual std::vector<std::string> GetHeaders() =0;
 
-void DifferenceDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s - %s", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
+protected:
+	void ClearPackets();
 
-string DifferenceDecoder::GetProtocolName()
-{
-	return "Subtract";
-}
+	std::vector<Packet*> m_packets;
+};
 
-bool DifferenceDecoder::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool DifferenceDecoder::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
-double DifferenceDecoder::GetVoltageRange()
-{
-	//TODO: default, but allow overridnig
-	double v1 = m_channels[0]->GetVoltageRange();
-	double v2 = m_channels[1]->GetVoltageRange();
-	return max(v1, v2) * 2;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void DifferenceDecoder::Refresh()
-{
-	//Get the input data
-	if(m_channels[0] == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
-	if( (din_p == NULL) || (din_n == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-
-	//We need meaningful data
-	if(din_p->GetDepth() == 0)
-	{
-		SetData(NULL);
-		return;
-	}
-
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din_p->m_samples.size(); i++)
-	{
-		AnalogSample sin_p = din_p->m_samples[i];
-		AnalogSample sin_n = din_n->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin_p.m_offset, sin_p.m_duration, sin_p.m_sample - sin_n.m_sample));
-	}
-	SetData(cap);
-
-	//Copy our time scales from the input
-	m_timescale = m_channels[0]->m_timescale;
-	cap->m_timescale = din_p->m_timescale;
-	cap->m_startTime = din_p->m_startTime;
-}
+#endif
