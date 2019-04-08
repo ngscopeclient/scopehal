@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,7 +92,7 @@ public:
 		int visright,
 		std::vector<time_range>& ranges);
 
-	void RenderComplexSignal(
+	static void RenderComplexSignal(
 		const Cairo::RefPtr<Cairo::Context>& cr,
 		int visleft, int visright,
 		float xstart, float xend, float xoff,
@@ -100,7 +100,7 @@ public:
 		std::string str,
 		Gdk::Color color);
 
-	void MakePathSignalBody(
+	static void MakePathSignalBody(
 		const Cairo::RefPtr<Cairo::Context>& cr,
 		float xstart, float xoff, float xend, float ybot, float ymid, float ytop);
 

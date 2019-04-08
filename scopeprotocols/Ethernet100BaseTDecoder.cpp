@@ -144,7 +144,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			if(!signal_ok)
 			{
 				signal_ok = true;
-				LogDebug("Carrier found at index %zu\n", i);
+				LogTrace("Carrier found at index %zu\n", i);
 				carrier_starts.push_back(i);
 			}
 
@@ -158,7 +158,7 @@ void Ethernet100BaseTDecoder::Refresh()
 				int64_t dt = (tchange - tstart) * din->m_timescale;
 				int num_uis = round(dt * 1.0f / ui_width);
 
-				/*LogDebug("Voltage changed to %2d at %10.6f us (%d UIs): ",
+				/*LogTrace("Voltage changed to %2d at %10.6f us (%d UIs): ",
 					voltages[i],
 					tchange * din->m_timescale * 1e-6f,
 					num_uis);*/
@@ -194,7 +194,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			{
 				signal_ok = false;
 				carrier_stops.push_back(i);
-				LogDebug("Carrier lost at index %zu\n", i);
+				LogTrace("Carrier lost at index %zu\n", i);
 			}
 		}
 	}
@@ -210,7 +210,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	//Run all remaining decode steps in blocks of valid signal
 	for(size_t nblock=0; nblock<carrier_starts.size(); nblock ++)
 	{
-		LogDebug("nblock = %zu\n", nblock);
+		LogTrace("nblock = %zu\n", nblock);
 		size_t istart = carrier_starts[nblock];
 		size_t istop = carrier_stops[nblock];
 
@@ -220,7 +220,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			size_t ilost = carrier_stops[nblock-1];
 			size_t tstart = din->m_samples[ilost].m_offset;
 			size_t tend = din->m_samples[istart].m_offset;
-			LogDebug("No carrier from %zu to %zu\n", tstart, tend);
+			LogTrace("No carrier from %zu to %zu\n", tstart, tend);
 			EthernetFrameSegment seg;
 			seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;
 			EthernetSample sample(tstart, tend-tstart, seg);
@@ -234,14 +234,14 @@ void Ethernet100BaseTDecoder::Refresh()
 		{
 			if(TrySync(bits, descrambled_bits, idle_offset, istop))
 			{
-				LogDebug("Got good LFSR sync at offset %zu\n", idle_offset);
+				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
 				synced = true;
 				break;
 			}
 		}
 		if(!synced)
 		{
-			LogError("Ethernet100BaseTDecoder: Unable to sync RX LFSR\n");
+			LogTrace("Ethernet100BaseTDecoder: Unable to sync RX LFSR\n");
 			descrambled_bits.clear();
 			continue;
 		}
@@ -267,10 +267,10 @@ void Ethernet100BaseTDecoder::Refresh()
 		}
 		if(!hit)
 		{
-			LogWarning("No SSD found\n");
+			LogTrace("No SSD found\n");
 			continue;
 		}
-		LogDebug("Found SSD at %zu\n", i);
+		LogTrace("Found SSD at %zu\n", i);
 
 		//Skip the J-K as we already parsed it
 		i += 10;
@@ -381,7 +381,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		}
 	}
 
-	LogDebug("%zu samples\n", cap->m_samples.size());
+	LogTrace("%zu samples\n", cap->m_samples.size());
 
 	//If we lost the signal before the end of the capture, add a sample for that
 	if(lost_before_end)
@@ -389,7 +389,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		size_t nindex = carrier_stops[carrier_stops.size()-1];
 		size_t tstart = din->m_samples[nindex].m_offset;
 		size_t tend = din->m_samples[din->m_samples.size()-1].m_offset;
-		LogDebug("No carrier from index %zu (time %zu) to %zu (end of capture)\n",
+		LogTrace("No carrier from index %zu (time %zu) to %zu (end of capture)\n",
 			nindex, tstart, tend);
 		EthernetFrameSegment seg;
 		seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;

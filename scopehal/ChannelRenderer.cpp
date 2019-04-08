@@ -81,7 +81,6 @@ void ChannelRenderer::MakePathSignalBody(
 	cr->line_to(xstart + xoff, ybot);
 	*/
 
-
 	cr->begin_new_sub_path();
 	cr->arc(xstart + rounding, ytop + rounding, rounding, M_PI, M_PI*1.5f);	//top left corner
 	cr->move_to(xstart + rounding, ytop);									//top edge
