@@ -884,12 +884,25 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
 												//We might have multiple offsets
 			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-			cap->m_startTime = *reinterpret_cast<double*>(pdesc + 296);
-			//LogDebug("V: gain=%f off=%f\n", v_gain, v_off);
-			//LogDebug("    H: off=%lf\n", h_off);
-			//LogDebug("    Trigger time: %.0f ps\n", trig_time * 1e12f);
-			//LogDebug("Sample interval: %.2f ps\n", interval);
-
+			
+			//Timestamp is a somewhat complex format that needs some shuffling around.
+			double fseconds = *reinterpret_cast<double*>(pdesc + 296);
+			uint8_t seconds = floor(fseconds);
+			cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
+			time_t tnow = time(NULL);
+			struct tm* now = localtime(&tnow);
+			struct tm tstruc;
+			tstruc.tm_sec = seconds;
+			tstruc.tm_min = pdesc[304];
+			tstruc.tm_hour = pdesc[305];
+			tstruc.tm_mday = pdesc[306];
+			tstruc.tm_mon = pdesc[307];
+			tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
+			tstruc.tm_wday = now->tm_wday;
+			tstruc.tm_yday = now->tm_yday;
+			tstruc.tm_isdst = now->tm_isdst;
+			cap->m_startTimestamp = mktime(&tstruc);
+			
 			double trigtime = 0;
 			if( (num_sequences > 1) && (j > 0) )
 			{

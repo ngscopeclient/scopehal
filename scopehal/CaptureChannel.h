@@ -57,9 +57,14 @@ public:
 	int64_t m_timescale;
 
 	/**
-		@brief The time of the acquistion (seconds with arbitrary reference)
+		@brief Start time of the acquisition, rounded to nearest second
 	 */
-	double m_startTime;
+	time_t	m_startTimestamp;
+
+	/**
+		@brief Fractional start time of the acquisition (picoseconds since m_startTimestamp)
+	 */
+	int64_t m_startPicoseconds;
 
 	/**
 		@brief Phase offset, in picoseconds, from the trigger to the sampling clock.
@@ -96,7 +101,8 @@ public:
 	CaptureChannel()
 	{
 		m_triggerPhase = 0;
-		m_startTime = 0;
+		m_startTimestamp = 0;
+		m_startPicoseconds = 0;
 	}
 
 	typedef std::vector< OscilloscopeSample<S> > vtype;

@@ -136,7 +136,9 @@ void DifferenceDecoder::Refresh()
 	SetData(cap);
 
 	//Copy our time scales from the input
+	//Use the first trace's timestamp as our start time if they differ
 	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din_p->m_timescale;
-	cap->m_startTime = din_p->m_startTime;
+	cap->m_startTimestamp = din_p->m_startTimestamp;
+	cap->m_startPicoseconds = din_p->m_startPicoseconds;
 }
