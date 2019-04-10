@@ -69,7 +69,7 @@ void DigitalRenderer::RenderSampleCallback(
 			return;
 
 		const DigitalSample& sample = capture->m_samples[i];
-		float tscale = m_channel->m_timescale * capture->m_timescale;
+		float tscale = /*m_channel->m_timescale **/ capture->m_timescale;
 		float rendered_uncertainty = tscale * 0.1;
 
 		//Move to initial position if first sample

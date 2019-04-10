@@ -116,7 +116,6 @@ void UARTDecoder::Refresh()
 
 	//UART processing
 	AsciiCapture* cap = new AsciiCapture;
-	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
 
 	//Time-domain processing to reflect potentially variable sampling rate for RLE captures

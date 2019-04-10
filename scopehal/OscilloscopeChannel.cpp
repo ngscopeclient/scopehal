@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	bool physical)
 	: m_displaycolor(color)
 	, m_displayname(hwname)
-	, m_timescale(1e-2)
 	, m_scope(scope)
 	, m_data(NULL)
 	, m_type(type)
@@ -183,6 +182,13 @@ void OscilloscopeChannel::SetVoltageRange(double range)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+CaptureChannelBase* OscilloscopeChannel::Detach()
+{
+	CaptureChannelBase* tmp = m_data;
+	m_data = NULL;
+	return tmp;
+}
+
 OscilloscopeChannel::ChannelType OscilloscopeChannel::GetType()
 {
 	return m_type;
@@ -200,7 +206,8 @@ CaptureChannelBase* OscilloscopeChannel::GetData()
 
 void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
 {
-	delete m_data;
+	if(m_data != NULL)
+		delete m_data;
 	m_data = pNew;
 }
 

@@ -106,7 +106,6 @@ void EthernetAutonegotiationDecoder::Refresh()
 
 	//Create the outbound data
 	auto* cap = new EthernetAutonegotiationCapture;
-	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
 
 	//Crunch it

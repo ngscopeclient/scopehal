@@ -182,7 +182,6 @@ void SincInterpolationDecoder::Refresh()
 	}
 
 	//Copy our time scales from the input, and correct for the upsampling
-	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale / upsample_factor;
 
 	SetData(cap);

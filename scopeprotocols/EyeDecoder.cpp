@@ -785,7 +785,6 @@ void EyeDecoder::Refresh()
 
 	//Initialize the capture
 	EyeCapture* cap = new EyeCapture;
-	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
 	cap->m_sampleCount = din->m_samples.size();
 

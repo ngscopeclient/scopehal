@@ -288,7 +288,7 @@ void ChannelRenderer::Render(
 	if( (capture != NULL) && !ranges.empty() )
 	{
 		//Save time scales
-		float tscale = m_channel->m_timescale * capture->m_timescale;
+		float tscale = /*m_channel->m_timescale * */ capture->m_timescale;
 		size_t nrange = 0;
 
 		//Render the actual data

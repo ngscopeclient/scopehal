@@ -83,15 +83,15 @@ public:
 	///Get the channel's data
 	CaptureChannelBase* GetData();
 
+	///Detach the capture data from this channel
+	CaptureChannelBase* Detach();
+
 	///Set new data, overwriting the old data as appropriate
 	void SetData(CaptureChannelBase* pNew);
 
 	virtual ChannelRenderer* CreateRenderer();
 
 	int GetWidth();
-
-	//Display time scale (normally the same for all channels)
-	float m_timescale;
 
 	Oscilloscope* GetScope()
 	{ return m_scope; }

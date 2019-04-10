@@ -10,7 +10,6 @@ set(SCOPEHAL_SOURCES
 	ChannelRenderer.cpp
 	DigitalRenderer.cpp
 	TextRenderer.cpp
-	TimescaleRenderer.cpp
 	Graph.cpp
 
 	Instrument.cpp

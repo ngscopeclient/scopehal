@@ -90,7 +90,6 @@ void Ethernet10BaseTDecoder::Refresh()
 
 	//Copy our time scales from the input
 	EthernetCapture* cap = new EthernetCapture;
-	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
