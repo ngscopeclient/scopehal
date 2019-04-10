@@ -92,7 +92,8 @@ void Ethernet10BaseTDecoder::Refresh()
 	EthernetCapture* cap = new EthernetCapture;
 	m_timescale = m_channels[0]->m_timescale;
 	cap->m_timescale = din->m_timescale;
-	cap->m_startTime = din->m_startTime;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	const int64_t ui_width 		= 100000;
 	const int64_t ui_halfwidth 	= 50000;

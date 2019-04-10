@@ -884,7 +884,7 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
 												//We might have multiple offsets
 			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-			
+
 			//Timestamp is a somewhat complex format that needs some shuffling around.
 			double fseconds = *reinterpret_cast<double*>(pdesc + 296);
 			uint8_t seconds = floor(fseconds);
@@ -902,7 +902,7 @@ bool LeCroyVICPOscilloscope::AcquireData(sigc::slot1<int, float> progress_callba
 			tstruc.tm_yday = now->tm_yday;
 			tstruc.tm_isdst = now->tm_isdst;
 			cap->m_startTimestamp = mktime(&tstruc);
-			
+
 			double trigtime = 0;
 			if( (num_sequences > 1) && (j > 0) )
 			{

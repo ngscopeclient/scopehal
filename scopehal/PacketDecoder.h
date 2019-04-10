@@ -40,11 +40,11 @@ class Packet
 {
 public:
 
-	///Start time of the packet (seconds)
-	double m_start;
+	///Offset of the packet from the start of the capture (picoseconds)
+	int64_t m_offset;
 
 	///End time of the packet (seconds)
-	double m_end;
+	int64_t m_len;
 
 	//Arbitrary header properties (human readable)
 	std::map<std::string, std::string> m_headers;

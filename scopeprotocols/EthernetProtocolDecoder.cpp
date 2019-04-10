@@ -115,7 +115,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 					//Start a new packet
 					pack = new Packet;
-					pack->m_start = (starts[i] * 1e-12) + cap->m_startTime;
+					pack->m_offset = starts[i];
 				}
 				break;
 
@@ -308,7 +308,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 					sample.m_duration = (ends[i] / cap->m_timescale) - sample.m_offset;
 					cap->m_samples.push_back(sample);
 
-					pack->m_end = (ends[i] * 1e-12) + cap->m_startTime;
+					pack->m_len = ends[i] - pack->m_offset;
 					m_packets.push_back(pack);
 				}
 
