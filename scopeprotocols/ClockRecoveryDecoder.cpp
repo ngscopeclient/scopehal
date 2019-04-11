@@ -171,7 +171,7 @@ void ClockRecoveryDecoder::Refresh()
 	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
 	float period = ps;
 	size_t nedge = 1;
-	LogDebug("n,period,phase_error\n");
+	//LogDebug("n,period,phase_error\n");
 	double edgepos = (edges[0] + period/2);
 	bool value = false;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
@@ -200,7 +200,7 @@ void ClockRecoveryDecoder::Refresh()
 				edgepos += 0.5;
 			}
 
-			LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);
+			//LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);
 			tnext = edges[++nedge];
 		}
 
