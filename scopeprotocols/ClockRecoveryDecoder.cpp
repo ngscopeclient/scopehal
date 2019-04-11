@@ -29,37 +29,39 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "DifferenceDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
+#include "ClockRecoveryDecoder.h"
+#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DifferenceDecoder::DifferenceDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("IN+");
-	m_signalNames.push_back("IN-");
+	m_signalNames.push_back("IN");
 	m_channels.push_back(NULL);
-	m_channels.push_back(NULL);
+
+	m_baudname = "Symbol rate";
+	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	//m_parameters[m_baudname].SetIntVal(1250000000);	//1250 MHz by default
+
+	m_parameters[m_baudname].SetIntVal(1240000000);	//1.24 GHz by default (to allow some drift)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* DifferenceDecoder::CreateRenderer()
+ChannelRenderer* ClockRecoveryDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return new DigitalRenderer(this);
 }
 
-bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool ClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
 }
@@ -67,78 +69,118 @@ bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DifferenceDecoder::SetDefaultName()
+void ClockRecoveryDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "(%s - %s)", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "CLOCK(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string DifferenceDecoder::GetProtocolName()
+string ClockRecoveryDecoder::GetProtocolName()
 {
-	return "Subtract";
+	return "Clock Recovery";
 }
 
-bool DifferenceDecoder::IsOverlay()
+bool ClockRecoveryDecoder::IsOverlay()
 {
-	//we create a new analog channel
-	return false;
-}
-
-bool DifferenceDecoder::NeedsConfig()
-{
-	//we have more than one input
+	//we're an overlaid digital channel
 	return true;
 }
 
-double DifferenceDecoder::GetVoltageRange()
+bool ClockRecoveryDecoder::NeedsConfig()
 {
-	//TODO: default, but allow overridnig
-	double v1 = m_channels[0]->GetVoltageRange();
-	double v2 = m_channels[1]->GetVoltageRange();
-	return max(v1, v2) * 2;
+	//we have need the base symbol rate configured
+	return true;
+}
+
+double ClockRecoveryDecoder::GetVoltageRange()
+{
+	//ignored
+	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DifferenceDecoder::Refresh()
+void ClockRecoveryDecoder::Refresh()
 {
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
-	if( (din_p == NULL) || (din_n == NULL) )
+	if(m_channels[0] == NULL)
 	{
 		SetData(NULL);
 		return;
 	}
 
-	//We need meaningful data
-	if(din_p->GetDepth() == 0)
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if( (din == NULL) || (din->GetDepth() == 0) )
 	{
 		SetData(NULL);
 		return;
 	}
 
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din_p->m_samples.size(); i++)
+	//Look up the nominal baud rate and convert to time
+	int64_t baud = m_parameters[m_baudname].GetIntVal();
+	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
+
+	//Create the output waveform and copy our timescales
+	DigitalCapture* cap = new DigitalCapture;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+	//cap->m_timescale = din->m_timescale;
+	//cap->m_triggerPhase = din->m_triggerPhase;
+	cap->m_triggerPhase = 0;
+	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
+
+	//Timestamps of the edges
+	vector<int64_t> edges;
+
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	const float threshold = 0;
+	for(size_t i=1; i<din->m_samples.size(); i++)
 	{
-		AnalogSample sin_p = din_p->m_samples[i];
-		AnalogSample sin_n = din_n->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin_p.m_offset, sin_p.m_duration, sin_p.m_sample - sin_n.m_sample));
+		auto sin = din->m_samples[i];
+		bool value = static_cast<float>(sin) > threshold;
+
+		//Start time of the sample, in picoseconds
+		int64_t t = din->m_triggerPhase + din->m_timescale * sin.m_offset;
+
+		//Move to the middle of the sample
+		t += din->m_timescale/2;
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		//Interpolate the time
+		t += din->m_timescale * Measurement::InterpolateTime(din, i-1, threshold);
+		edges.push_back(t);
+		last = value;
 	}
+
+	//The actual PLL
+	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
+	int64_t period = ps;
+	int64_t nedge = 0;
+	bool value = true;
+	for(int64_t edgepos = edges[0]; edgepos < tend; edgepos += period)
+	{
+		//Correct the frequency by looking at the edges
+
+		//Add the sample
+		value = !value;
+		cap->m_samples.push_back(DigitalSample(edgepos, period, value));
+	}
+
 	SetData(cap);
-
-	//Copy our time scales from the input
-	//Use the first trace's timestamp as our start time if they differ
-	cap->m_timescale = din_p->m_timescale;
-	cap->m_startTimestamp = din_p->m_startTimestamp;
-	cap->m_startPicoseconds = din_p->m_startPicoseconds;
 }

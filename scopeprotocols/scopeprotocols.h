@@ -41,6 +41,7 @@
 //#include "../scopehal/StateDecoder.h"
 
 #include "ACCoupleDecoder.h"
+#include "ClockRecoveryDecoder.h"
 #include "DifferenceDecoder.h"
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetProtocolDecoder.h"
