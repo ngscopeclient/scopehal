@@ -50,7 +50,7 @@ Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(string color)
 void Ethernet100BaseTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/100BaseTX", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "100BaseTX(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }

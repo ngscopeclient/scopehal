@@ -70,7 +70,7 @@ bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 void DifferenceDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "(%s - %s)", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "%s - %s", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }

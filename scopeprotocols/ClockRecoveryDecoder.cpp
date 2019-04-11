@@ -46,9 +46,7 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 
 	m_baudname = "Symbol rate";
 	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
-	//m_parameters[m_baudname].SetIntVal(1250000000);	//1250 MHz by default
-
-	m_parameters[m_baudname].SetIntVal(1240000000);	//1.24 GHz by default (to allow some drift)
+	m_parameters[m_baudname].SetIntVal(1250000000);	//1250 MHz by default
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +70,7 @@ bool ClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channe
 void ClockRecoveryDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "CLOCK(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "ClockRec(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -168,18 +166,36 @@ void ClockRecoveryDecoder::Refresh()
 		last = value;
 	}
 
-	//The actual PLL
+	//The actual PLL NCO
+	//TODO: use the real fibre channel PLL.
+	//For now, do a simple first-order error adjustment to lock the edges to the middle of the NCO period.
 	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
-	int64_t period = ps;
-	int64_t nedge = 0;
+	float period = ps;
+	size_t nedge = 1;
 	bool value = true;
-	for(int64_t edgepos = edges[0]; edgepos < tend; edgepos += period)
+	for(int64_t edgepos = (edges[0] + period/2); (edgepos < tend) && (nedge < edges.size()); edgepos += (int64_t)period)
 	{
-		//Correct the frequency by looking at the edges
+		float center = period/2;
+
+		//See if the next edge occurred in this UI.
+		//If not, just run the NCO open loop
+		int64_t tnext = edges[nedge];
+		if(tnext < edgepos)
+		{
+			int64_t delta = edgepos - tnext;
+			int64_t error = center - delta;
+
+			//Proportional control
+			float derror = error / 1667.0f;
+			period += derror;
+
+			//LogDebug("PLL: period = %.1f, delta = %ld, error = %ld, derror = %.2f\n", period, delta, error, derror);
+			nedge ++;
+		}
 
 		//Add the sample
 		value = !value;
-		cap->m_samples.push_back(DigitalSample(edgepos, period, value));
+		cap->m_samples.push_back(DigitalSample(edgepos, (int64_t)period, value));
 	}
 
 	SetData(cap);

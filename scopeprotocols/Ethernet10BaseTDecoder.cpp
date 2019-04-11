@@ -59,7 +59,7 @@ string Ethernet10BaseTDecoder::GetProtocolName()
 void Ethernet10BaseTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/10BaseT", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "10BaseT(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
