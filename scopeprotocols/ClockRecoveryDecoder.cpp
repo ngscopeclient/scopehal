@@ -173,7 +173,14 @@ void ClockRecoveryDecoder::Refresh()
 	float period = ps;
 	size_t nedge = 1;
 	bool value = true;
-	for(int64_t edgepos = (edges[0] + period/2); (edgepos < tend) && (nedge < edges.size()); edgepos += (int64_t)period)
+	LogDebug("n,period,phase_error,period_error,nomperiod\n");
+	int64_t edgepos = (edges[0] + period/2);
+
+	//DEBUG: start out-of-lock
+	period = 800;
+	edgepos = 0;
+
+	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += (int64_t)period)
 	{
 		float center = period/2;
 
@@ -182,14 +189,27 @@ void ClockRecoveryDecoder::Refresh()
 		int64_t tnext = edges[nedge];
 		if(tnext < edgepos)
 		{
+			//Proportional control for phase
 			int64_t delta = edgepos - tnext;
-			int64_t error = center - delta;
+			int64_t phase_error = center - delta;
+			period += phase_error * 0.001;
 
-			//Proportional control
-			float derror = error / 1667.0f;
-			period += derror;
+			//Find frequency error.
+			//We have to do some fun to handle missing edges!
+			//Assume our target baud rate is somewhat close
+			int64_t nomperiod = edges[nedge+1] - tnext;
+			int nbits = 1;
+			if(nomperiod > ps)
+			{
+				nbits = (int)round(nomperiod / (float)ps);
+				nomperiod /= nbits;
+			}
 
-			//LogDebug("PLL: period = %.1f, delta = %ld, error = %ld, derror = %.2f\n", period, delta, error, derror);
+			//Proportional control for frequency.
+			int64_t period_error = nomperiod - period;
+			period += period_error * 0.001;
+
+			LogDebug("%ld,%.2f,%ld,%ld,%ld\n", nedge, period, phase_error, period_error, nomperiod);
 			nedge ++;
 		}
 
