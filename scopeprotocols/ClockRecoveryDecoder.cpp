@@ -168,54 +168,45 @@ void ClockRecoveryDecoder::Refresh()
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	//For now, do a simple first-order error adjustment to lock the edges to the middle of the NCO period.
 	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
 	float period = ps;
 	size_t nedge = 1;
-	bool value = true;
-	LogDebug("n,period,phase_error,period_error,nomperiod\n");
-	int64_t edgepos = (edges[0] + period/2);
-
-	//DEBUG: start out-of-lock
-	period = 800;
-	edgepos = 0;
-
-	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += (int64_t)period)
+	LogDebug("n,period,phase_error\n");
+	double edgepos = (edges[0] + period/2);
+	bool value = false;
+	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
 
 		//See if the next edge occurred in this UI.
-		//If not, just run the NCO open loop
+		//If not, just run the NCO open loop.
+		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		if(tnext < edgepos)
+		while(tnext < edgepos)
 		{
-			//Proportional control for phase
+			//Find phase error
 			int64_t delta = edgepos - tnext;
 			int64_t phase_error = center - delta;
-			period += phase_error * 0.001;
 
-			//Find frequency error.
-			//We have to do some fun to handle missing edges!
-			//Assume our target baud rate is somewhat close
-			int64_t nomperiod = edges[nedge+1] - tnext;
-			int nbits = 1;
-			if(nomperiod > ps)
+			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
+			if(phase_error < 0)
 			{
-				nbits = (int)round(nomperiod / (float)ps);
-				nomperiod /= nbits;
+				period -= 0.02;
+				edgepos -= 0.5;
+			}
+			else
+			{
+				period += 0.02;
+				edgepos += 0.5;
 			}
 
-			//Proportional control for frequency.
-			int64_t period_error = nomperiod - period;
-			period += period_error * 0.001;
-
-			LogDebug("%ld,%.2f,%ld,%ld,%ld\n", nedge, period, phase_error, period_error, nomperiod);
-			nedge ++;
+			LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);
+			tnext = edges[++nedge];
 		}
 
 		//Add the sample
 		value = !value;
-		cap->m_samples.push_back(DigitalSample(edgepos, (int64_t)period, value));
+		cap->m_samples.push_back(DigitalSample((int64_t)edgepos, (int64_t)period, value));
 	}
 
 	SetData(cap);
