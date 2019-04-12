@@ -43,13 +43,19 @@ public:
 	virtual ~EyeCapture2();
 
 	float* GetData()
-	{ return m_data; }
+	{ return m_outdata; }
+
+	float* GetAccumData()
+	{ return m_accumdata; }
+
+	void Normalize();
 
 protected:
 	size_t m_width;
 	size_t m_height;
 
-	float* m_data;
+	float* m_outdata;
+	float* m_accumdata;
 
 public:
 	//Not really applicable for eye patterns, but...
@@ -80,10 +86,16 @@ public:
 	virtual double GetVoltageRange();
 
 	void SetWidth(size_t width)
-	{ m_width = width; }
+	{
+		m_width = width;
+		SetData(NULL);
+	}
 
 	void SetHeight(size_t height)
-	{ m_height = height; }
+	{
+		m_height = height;
+		SetData(NULL);
+	}
 
 	size_t GetWidth()
 	{ return m_width; }

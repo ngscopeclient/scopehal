@@ -96,7 +96,7 @@ void SincInterpolationDecoder::SetDefaultName()
 
 string SincInterpolationDecoder::GetProtocolName()
 {
-	return "Sin(x)/x Interpolation";
+	return "Upsample";
 }
 
 bool SincInterpolationDecoder::IsOverlay()

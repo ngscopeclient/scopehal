@@ -47,20 +47,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DifferenceDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder);
+	//AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(NRZDecoder);
+	//AddDecoderClass(NRZDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(UARTDecoder);
-
-	/*
-	AddDecoderClass(DigitalToAnalogDecoder);
-	AddDecoderClass(DMADecoder);
-	AddDecoderClass(RPCDecoder);
-	AddDecoderClass(RPCNameserverDecoder);
-	AddDecoderClass(SchmittTriggerDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(StateDecoder);
-	*/
+	//AddDecoderClass(UARTDecoder);
 }

@@ -42,15 +42,21 @@ EyeCapture2::EyeCapture2(size_t width, size_t height)
 	, m_height(height)
 {
 	size_t npix = width*height;
-	m_data = new float[npix];
+	m_accumdata = new float[npix];
+	m_outdata = new float[npix];
 	for(size_t i=0; i<npix; i++)
-		m_data[i] = 0;
+	{
+		m_outdata[i] = 0;
+		m_accumdata[i] = 0;
+	}
 }
 
 EyeCapture2::~EyeCapture2()
 {
-	delete[] m_data;
-	m_data = NULL;
+	delete[] m_accumdata;
+	m_accumdata = NULL;
+	delete[] m_outdata;
+	m_outdata = NULL;
 }
 
 size_t EyeCapture2::GetDepth() const
@@ -77,9 +83,22 @@ bool EyeCapture2::EqualityTest(size_t /*i*/, size_t /*j*/) const
 {
 	return false;
 }
+
 bool EyeCapture2::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
 {
 	return false;
+}
+
+void EyeCapture2::Normalize()
+{
+	//Normalize it
+	size_t len = m_width * m_height;
+	float nmax = 1;
+	for(size_t i=0; i<len; i++)
+		nmax = max(m_accumdata[i], nmax);
+	float norm = 2.0f / nmax;
+	for(size_t i=0; i<len; i++)
+		m_outdata[i] = m_accumdata[i] * norm;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +137,7 @@ bool EyeDecoder2::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 string EyeDecoder2::GetProtocolName()
 {
-	return "Eye pattern v2";
+	return "Eye pattern";
 }
 
 void EyeDecoder2::SetDefaultName()
@@ -178,14 +197,12 @@ void EyeDecoder2::Refresh()
 	//Initialize the capture
 	//TODO: allow integration across multiple acquisitions
 	//TODO: timestamps? do we need those?
-	EyeCapture2* cap = new EyeCapture2(m_width, m_height);
+	EyeCapture2* cap = dynamic_cast<EyeCapture2*>(m_data);
+	if(cap == NULL)
+		cap = new EyeCapture2(m_width, m_height);
+	m_data = cap;
 	cap->m_timescale = 1;
-
-	//Clear the capture to zero
-	float* data = cap->GetData();
-	size_t len = m_width * m_height;
-	for(size_t i=0; i<len; i++)
-		data[i] = 0;
+	float* data = cap->GetAccumData();
 
 	//Process the eye
 	size_t iwave = 0;
@@ -247,14 +264,5 @@ void EyeDecoder2::Refresh()
 		}
 	}
 
-	//Normalize it
-	float nmax = 1;
-	for(size_t i=0; i<len; i++)
-		nmax = max(data[i], nmax);
-	float norm = 2.0f / nmax;
-	for(size_t i=0; i<len; i++)
-		data[i] *= norm;
-
-	//Done, update the waveform
-	SetData(cap);
+	cap->Normalize();
 }
