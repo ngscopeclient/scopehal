@@ -48,6 +48,7 @@
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
 #include "EyeDecoder.h"
+#include "EyeDecoder2.h"
 #include "SincInterpolationDecoder.h"
 #include "NRZDecoder.h"
 #include "UARTDecoder.h"

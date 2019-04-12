@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,37 +30,96 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of EyeDecoder2
  */
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/CaptureChannel.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class EyeCapture2 : public CaptureChannelBase
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(NRZDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(UARTDecoder);
+public:
+	EyeCapture2(size_t width, size_t height);
+	virtual ~EyeCapture2();
+
+	size_t GetWidth()
+	{ return m_width; }
+
+	size_t GetHeight()
+	{ return m_height; }
+
+	float* GetData()
+	{ return m_data; }
+
+protected:
+	size_t m_width;
+	size_t m_height;
+
+	float* m_data;
+
+public:
+	//Not really applicable for eye patterns, but...
+	virtual size_t GetDepth() const;
+	virtual int64_t GetEndTime() const;
+	virtual int64_t GetSampleStart(size_t i) const;
+	virtual int64_t GetSampleLen(size_t i) const;
+	virtual bool EqualityTest(size_t i, size_t j) const;
+	virtual bool SamplesAdjacent(size_t i, size_t j) const;
+};
+
+class EyeDecoder2 : public ProtocolDecoder
+{
+public:
+	EyeDecoder2(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual double GetVoltageRange();
+
+	void SetWidth(size_t width)
+	{ m_width = width; }
+
+	void SetHeight(size_t height)
+	{ m_height = height; }
 
 	/*
-	AddDecoderClass(DigitalToAnalogDecoder);
-	AddDecoderClass(DMADecoder);
-	AddDecoderClass(RPCDecoder);
-	AddDecoderClass(RPCNameserverDecoder);
-	AddDecoderClass(SchmittTriggerDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(StateDecoder);
+	int64_t GetUIWidth()
+	{ return m_uiWidth; }
+
+	double GetUIWidthFractional()
+	{ return m_uiWidthFractional; }
 	*/
-}
+	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
+
+protected:
+	/*
+	int64_t m_uiWidth;				//integer samples
+	double m_uiWidthFractional;		//fractional samples, for more precision over long captures
+
+	bool DetectModulationLevels(AnalogCapture* din, EyeCapture* cap);
+	bool CalculateUIWidth(AnalogCapture* din, EyeCapture* cap);
+
+	bool MeasureEyeOpenings(
+		EyeCapture* cap,
+		std::map<int64_t, std::map<float, int64_t> >& pixmap);
+
+	bool GenerateEyeData(
+		AnalogCapture* din,
+		EyeCapture* cap,
+		std::map<int64_t, std::map<float, int64_t> >& pixmap);
+
+	bool MeasureRiseFallTimes(AnalogCapture* din, EyeCapture* cap);
+	int GetCodeForVoltage(float v, EyeCapture* cap);
+	*/
+	size_t m_width;
+	size_t m_height;
+};

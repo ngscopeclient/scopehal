@@ -134,6 +134,7 @@ void ClockRecoveryDecoder::Refresh()
 	vector<int64_t> edges;
 
 	//Find times of the zero crossings
+	//TODO: support adjustable thresholds and multiple crossing points for MLT-3 etc
 	bool first = true;
 	bool last = false;
 	const float threshold = 0;

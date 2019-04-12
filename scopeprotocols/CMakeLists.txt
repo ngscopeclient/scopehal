@@ -12,6 +12,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetProtocolDecoder.cpp
 	EthernetRenderer.cpp
 	EyeDecoder.cpp
+	EyeDecoder2.cpp
 	EyeRenderer.cpp
 	SincInterpolationDecoder.cpp
 	NRZDecoder.cpp
