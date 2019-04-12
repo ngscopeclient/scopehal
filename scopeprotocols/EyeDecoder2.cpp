@@ -159,6 +159,7 @@ void EyeDecoder2::Refresh()
 		SetData(NULL);
 		return;
 	}
+
 	auto waveform = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
 	auto clock = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
 	if( (waveform == NULL) || (clock == NULL) )
@@ -201,8 +202,9 @@ void EyeDecoder2::Refresh()
 		int64_t twidth = tend - tclock;
 
 		//Find time of this sample
-		int64_t tstart = waveform->GetSampleStart(iwave) * waveform->m_timescale;
-		float v = (*waveform)[iwave];
+		AnalogSample samp = (*waveform).m_samples[iwave];
+		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
+		float v = samp;
 
 		//If it's past the end of the current UI, increment the clock
 		int64_t offset = tstart - tclock;

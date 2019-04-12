@@ -125,8 +125,6 @@ void ClockRecoveryDecoder::Refresh()
 	DigitalCapture* cap = new DigitalCapture;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
-	//cap->m_timescale = din->m_timescale;
-	//cap->m_triggerPhase = din->m_triggerPhase;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
 
@@ -175,6 +173,7 @@ void ClockRecoveryDecoder::Refresh()
 	//LogDebug("n,period,phase_error\n");
 	double edgepos = (edges[0] + period/2);
 	bool value = false;
+	double total_error = 0;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -188,17 +187,18 @@ void ClockRecoveryDecoder::Refresh()
 			//Find phase error
 			int64_t delta = edgepos - tnext;
 			int64_t phase_error = center - delta;
+			total_error += fabs(phase_error);
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 			if(phase_error < 0)
 			{
-				period -= 0.05;
-				edgepos -= 0.2;
+				period -= 0.005;
+				edgepos -= 0.5;
 			}
 			else
 			{
-				period += 0.05;
-				edgepos += 0.2;
+				period += 0.005;
+				edgepos += 0.5;
 			}
 
 			//LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);
@@ -209,6 +209,8 @@ void ClockRecoveryDecoder::Refresh()
 		value = !value;
 		cap->m_samples.push_back(DigitalSample((int64_t)edgepos, (int64_t)period, value));
 	}
+	total_error /= edges.size();
+	LogTrace("ClockRecoveryDecoder: average phase error %.1f\n", total_error);
 
 	SetData(cap);
 }
