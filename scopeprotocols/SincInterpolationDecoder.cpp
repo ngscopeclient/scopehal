@@ -62,6 +62,10 @@ SincInterpolationDecoder::SincInterpolationDecoder(string color)
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
+
+	m_factorname = "Upsample factor";
+	m_parameters[m_factorname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_factorname].SetIntVal(10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,7 +89,7 @@ bool SincInterpolationDecoder::ValidateChannel(size_t i, OscilloscopeChannel* ch
 void SincInterpolationDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/Upsample", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "Upsample(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -103,8 +107,7 @@ bool SincInterpolationDecoder::IsOverlay()
 
 bool SincInterpolationDecoder::NeedsConfig()
 {
-	//for now, hard code to 10x upsampling
-	return false;
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +131,7 @@ void SincInterpolationDecoder::Refresh()
 	}
 
 	//Configuration parameters that eventually have to be user specified
-	size_t upsample_factor = 10;
+	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
 	const size_t window = 5;
 	const size_t kernel = window*upsample_factor;
 
@@ -183,6 +186,8 @@ void SincInterpolationDecoder::Refresh()
 
 	//Copy our time scales from the input, and correct for the upsampling
 	cap->m_timescale = din->m_timescale / upsample_factor;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	SetData(cap);
 }

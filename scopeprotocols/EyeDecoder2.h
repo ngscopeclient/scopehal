@@ -42,12 +42,6 @@ public:
 	EyeCapture2(size_t width, size_t height);
 	virtual ~EyeCapture2();
 
-	size_t GetWidth()
-	{ return m_width; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
 	float* GetData()
 	{ return m_data; }
 
@@ -91,35 +85,16 @@ public:
 	void SetHeight(size_t height)
 	{ m_height = height; }
 
-	/*
-	int64_t GetUIWidth()
-	{ return m_uiWidth; }
+	size_t GetWidth()
+	{ return m_width; }
 
-	double GetUIWidthFractional()
-	{ return m_uiWidthFractional; }
-	*/
+	size_t GetHeight()
+	{ return m_height; }
+
 	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
 
 protected:
-	/*
-	int64_t m_uiWidth;				//integer samples
-	double m_uiWidthFractional;		//fractional samples, for more precision over long captures
 
-	bool DetectModulationLevels(AnalogCapture* din, EyeCapture* cap);
-	bool CalculateUIWidth(AnalogCapture* din, EyeCapture* cap);
-
-	bool MeasureEyeOpenings(
-		EyeCapture* cap,
-		std::map<int64_t, std::map<float, int64_t> >& pixmap);
-
-	bool GenerateEyeData(
-		AnalogCapture* din,
-		EyeCapture* cap,
-		std::map<int64_t, std::map<float, int64_t> >& pixmap);
-
-	bool MeasureRiseFallTimes(AnalogCapture* din, EyeCapture* cap);
-	int GetCodeForVoltage(float v, EyeCapture* cap);
-	*/
 	size_t m_width;
 	size_t m_height;
 };

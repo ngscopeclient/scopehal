@@ -192,13 +192,13 @@ void ClockRecoveryDecoder::Refresh()
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 			if(phase_error < 0)
 			{
-				period -= 0.02;
-				edgepos -= 0.5;
+				period -= 0.05;
+				edgepos -= 0.2;
 			}
 			else
 			{
-				period += 0.02;
-				edgepos += 0.5;
+				period += 0.05;
+				edgepos += 0.2;
 			}
 
 			//LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);

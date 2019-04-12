@@ -56,6 +56,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SincInterpolationDecoder)
 
 protected:
+	std::string m_factorname;
 };
 
 #endif
