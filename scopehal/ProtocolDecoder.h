@@ -128,6 +128,12 @@ public:
 
 	virtual bool NeedsConfig() =0;	//false if we can automatically do the decode from the signal w/ no configuration
 
+	void RefreshIfDirty();
+	void RefreshInputsIfDirty();
+
+	void SetDirty()
+	{ m_dirty = true; }
+
 protected:
 
 	///Names of signals we take as input
@@ -141,6 +147,9 @@ protected:
 
 	///Group used for the display menu
 	Category m_category;
+
+	///Indicates if our output is out-of-sync with our input
+	bool m_dirty;
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);

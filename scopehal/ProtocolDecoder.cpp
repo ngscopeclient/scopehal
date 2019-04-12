@@ -135,6 +135,7 @@ ProtocolDecoder::ProtocolDecoder(
 	Category cat)
 	: OscilloscopeChannel(NULL, "", type, color, 0)	//TODO: handle this better?
 	, m_category(cat)
+	, m_dirty(true)
 {
 	m_physical = false;
 }
@@ -239,6 +240,31 @@ OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
 	{
 		LogError("Invalid channel index");
 		return NULL;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Refreshing
+
+void ProtocolDecoder::RefreshInputsIfDirty()
+{
+	for(auto c : m_channels)
+	{
+		if(!c)
+			continue;
+		auto decode = dynamic_cast<ProtocolDecoder*>(c);
+		if(decode)
+			decode->RefreshIfDirty();
+	}
+}
+
+void ProtocolDecoder::RefreshIfDirty()
+{
+	if(m_dirty)
+	{
+		RefreshInputsIfDirty();
+		Refresh();
+		m_dirty = false;
 	}
 }
 
