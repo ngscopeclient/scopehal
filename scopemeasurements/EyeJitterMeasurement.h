@@ -30,96 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeWidthMeasurement
+	@brief Declaration of EyeJitterMeasurement
  */
+#ifndef EyeJitterMeasurement_h
+#define EyeJitterMeasurement_h
 
-#include "scopemeasurements.h"
-#include "EyeWidthMeasurement.h"
-#include "../scopeprotocols/EyeDecoder2.h"
+#include "../scopehal/Measurement.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
-
-EyeWidthMeasurement::EyeWidthMeasurement()
-	: FloatMeasurement(TYPE_TIME)
+class EyeJitterMeasurement : public FloatMeasurement
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
-	m_channels.push_back(NULL);
-}
+public:
+	EyeJitterMeasurement();
+	virtual ~EyeJitterMeasurement();
 
-EyeWidthMeasurement::~EyeWidthMeasurement()
-{
-}
+	virtual bool Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-Measurement::MeasurementType EyeWidthMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_HORZ;
-}
+	virtual MeasurementType GetMeasurementType();
 
-string EyeWidthMeasurement::GetMeasurementName()
-{
-	return "Eye Width";
-}
+	MEASUREMENT_INITPROC(EyeJitterMeasurement)
+};
 
-bool EyeWidthMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
-		return true;
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
-
-bool EyeWidthMeasurement::Refresh()
-{
-	//Get the input data
-	if(m_channels[0] == NULL)
-		return false;
-	auto chan = dynamic_cast<EyeDecoder2*>(m_channels[0]);
-	auto din = dynamic_cast<EyeCapture2*>(chan->GetData());
-	if(din == NULL)
-		return false;
-
-	float* fdata = din->GetData();
-	int64_t w = chan->GetWidth();
-
-	//Measure center 5% of a UI
-	int64_t ycenter = chan->GetHeight() / 2;	//vertical midpoint of the eye
-	int64_t xcenter = w / 2;					//horizontal midpoint of the eye
-
-	int64_t rad = chan->GetHeight() / 20;		//1/20 of the eye height
-	int64_t bot = ycenter - rad/2;
-	int64_t top = ycenter + rad/2;
-
-	int64_t left = 0;
-	int64_t right = w-1;
-	for(int64_t y = bot; y <= top; y++)
-	{
-		for(int64_t dx = 0; dx < xcenter; dx ++)
-		{
-			//left
-			int64_t x = xcenter - dx;
-			if(fdata[y*w + x] > FLT_EPSILON)
-				left = max(left, x);
-
-			//right
-			x = xcenter + dx;
-			if(fdata[y*w + x] > FLT_EPSILON)
-				right = min(right, x);
-		}
-	}
-
-	int64_t dx = right - left;
-	double width_ps = 2 * chan->GetUIWidth();
-	double ps_per_pixel = width_ps / w;
-	int64_t ps = ps_per_pixel * dx;
-	m_value = 1.0e-12 * ps;
-	return true;
-}
+#endif

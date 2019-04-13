@@ -43,6 +43,7 @@
 #include "BaseMeasurement.h"
 #include "EyeBitRateMeasurement.h"
 #include "EyeHeightMeasurement.h"
+#include "EyeJitterMeasurement.h"
 #include "EyePeriodMeasurement.h"
 #include "EyeWidthMeasurement.h"
 #include "Fall1090Measurement.h"

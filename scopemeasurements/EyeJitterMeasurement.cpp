@@ -30,11 +30,11 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeWidthMeasurement
+	@brief Declaration of EyeJitterMeasurement
  */
 
 #include "scopemeasurements.h"
-#include "EyeWidthMeasurement.h"
+#include "EyeJitterMeasurement.h"
 #include "../scopeprotocols/EyeDecoder2.h"
 
 using namespace std;
@@ -42,7 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction/destruction
 
-EyeWidthMeasurement::EyeWidthMeasurement()
+EyeJitterMeasurement::EyeJitterMeasurement()
 	: FloatMeasurement(TYPE_TIME)
 {
 	//Configure for a single input
@@ -50,24 +50,24 @@ EyeWidthMeasurement::EyeWidthMeasurement()
 	m_channels.push_back(NULL);
 }
 
-EyeWidthMeasurement::~EyeWidthMeasurement()
+EyeJitterMeasurement::~EyeJitterMeasurement()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-Measurement::MeasurementType EyeWidthMeasurement::GetMeasurementType()
+Measurement::MeasurementType EyeJitterMeasurement::GetMeasurementType()
 {
 	return Measurement::MEAS_HORZ;
 }
 
-string EyeWidthMeasurement::GetMeasurementName()
+string EyeJitterMeasurement::GetMeasurementName()
 {
-	return "Eye Width";
+	return "Eye P-P Jitter";
 }
 
-bool EyeWidthMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EyeJitterMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
 		return true;
@@ -77,7 +77,7 @@ bool EyeWidthMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Measurement processing
 
-bool EyeWidthMeasurement::Refresh()
+bool EyeJitterMeasurement::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -90,7 +90,6 @@ bool EyeWidthMeasurement::Refresh()
 	float* fdata = din->GetData();
 	int64_t w = chan->GetWidth();
 
-	//Measure center 5% of a UI
 	int64_t ycenter = chan->GetHeight() / 2;	//vertical midpoint of the eye
 	int64_t xcenter = w / 2;					//horizontal midpoint of the eye
 
@@ -98,28 +97,44 @@ bool EyeWidthMeasurement::Refresh()
 	int64_t bot = ycenter - rad/2;
 	int64_t top = ycenter + rad/2;
 
-	int64_t left = 0;
-	int64_t right = w-1;
+	int64_t cleft = 0;		//left side of eye opening
+	int64_t cright = w-1;	//right side of eye opening
+
+	int64_t left = w-1;		//left side of eye edge
+	int64_t right = 0;		//right side of eye edge
 	for(int64_t y = bot; y <= top; y++)
 	{
+		float* row = fdata + y*w;
+
 		for(int64_t dx = 0; dx < xcenter; dx ++)
 		{
-			//left
+			//left of center
 			int64_t x = xcenter - dx;
-			if(fdata[y*w + x] > FLT_EPSILON)
-				left = max(left, x);
+			if(row[x] > FLT_EPSILON)
+			{
+				cleft = max(cleft, x);
+				left = min(left, x);
+			}
 
-			//right
+			//right of center
 			x = xcenter + dx;
-			if(fdata[y*w + x] > FLT_EPSILON)
-				right = min(right, x);
+			if(row[x] > FLT_EPSILON)
+			{
+				cright = min(cright, x);
+				right = max(right, x);
+			}
 		}
 	}
 
-	int64_t dx = right - left;
+	//
+	int64_t jitter_left = cleft - left;
+	int64_t jitter_right = cright - right;
+
+	int64_t max_jitter = max(jitter_left, jitter_right);
+
 	double width_ps = 2 * chan->GetUIWidth();
 	double ps_per_pixel = width_ps / w;
-	int64_t ps = ps_per_pixel * dx;
+	int64_t ps = ps_per_pixel * max_jitter;
 	m_value = 1.0e-12 * ps;
 	return true;
 }

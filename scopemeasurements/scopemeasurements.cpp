@@ -46,6 +46,7 @@ void ScopeMeasurementStaticInit()
 	AddMeasurementClass(BaseMeasurement);
 	AddMeasurementClass(EyeBitRateMeasurement);
 	AddMeasurementClass(EyeHeightMeasurement);
+	AddMeasurementClass(EyeJitterMeasurement);
 	AddMeasurementClass(EyePeriodMeasurement);
 	AddMeasurementClass(EyeWidthMeasurement);
 	AddMeasurementClass(Fall1090Measurement);
