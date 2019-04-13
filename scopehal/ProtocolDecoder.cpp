@@ -133,7 +133,7 @@ ProtocolDecoder::ProtocolDecoder(
 	OscilloscopeChannel::ChannelType type,
 	string color,
 	Category cat)
-	: OscilloscopeChannel(NULL, "", type, color, 0)	//TODO: handle this better?
+	: OscilloscopeChannel(NULL, "", type, color, 1)	//TODO: handle this better?
 	, m_category(cat)
 	, m_dirty(true)
 {

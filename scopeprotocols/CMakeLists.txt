@@ -14,6 +14,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeDecoder.cpp
 	EyeDecoder2.cpp
 	EyeRenderer.cpp
+	IBM8b10bDecoder.cpp
+	IBM8b10bRenderer.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp

@@ -30,37 +30,23 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of IBM8b10bRenderer
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef IBM8b10bRenderer_h
+#define IBM8b10bRenderer_h
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+#include "../scopehal/TextRenderer.h"
 
-#include "ACCoupleDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "IBM8b10bDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
-#include "ThresholdDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+/**
+	@brief Renderer for an ASCII channel
+ */
+class IBM8b10bRenderer : public TextRenderer
+{
+public:
+	IBM8b10bRenderer(OscilloscopeChannel* channel);
+protected:
+	virtual std::string GetText(int i);
+};
 
 #endif

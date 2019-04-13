@@ -30,37 +30,44 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of IBM8b10bRenderer
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
+#include "scopeprotocols.h"
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "IBM8b10bRenderer.h"
 
-#include "ACCoupleDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "IBM8b10bDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
-#include "ThresholdDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+using namespace std;
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+IBM8b10bRenderer::IBM8b10bRenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+string IBM8b10bRenderer::GetText(int i)
+{
+	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+
+		unsigned int right = s.m_data >> 5;
+		unsigned int left = s.m_data & 0x1F;
+
+		char tmp[32];
+		if(s.m_control)
+			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
+		else
+			snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
+		return string(tmp);
+	}
+	return "";
+}
