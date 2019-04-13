@@ -45,7 +45,7 @@ public:
 	float* GetData()
 	{ return m_outdata; }
 
-	float* GetAccumData()
+	int64_t* GetAccumData()
 	{ return m_accumdata; }
 
 	void Normalize();
@@ -55,7 +55,7 @@ protected:
 	size_t m_height;
 
 	float* m_outdata;
-	float* m_accumdata;
+	int64_t* m_accumdata;
 
 public:
 	//Not really applicable for eye patterns, but...

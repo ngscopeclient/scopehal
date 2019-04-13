@@ -42,7 +42,7 @@ EyeCapture2::EyeCapture2(size_t width, size_t height)
 	, m_height(height)
 {
 	size_t npix = width*height;
-	m_accumdata = new float[npix];
+	m_accumdata = new int64_t[npix];
 	m_outdata = new float[npix];
 	for(size_t i=0; i<npix; i++)
 	{
@@ -93,7 +93,7 @@ void EyeCapture2::Normalize()
 {
 	//Normalize it
 	size_t len = m_width * m_height;
-	float nmax = 1;
+	int64_t nmax = 1;
 	for(size_t i=0; i<len; i++)
 		nmax = max(m_accumdata[i], nmax);
 	float norm = 2.0f / nmax;
@@ -204,7 +204,7 @@ void EyeDecoder2::Refresh()
 		cap = new EyeCapture2(m_width, m_height);
 	m_data = cap;
 	cap->m_timescale = 1;
-	float* data = cap->GetAccumData();
+	int64_t* data = cap->GetAccumData();
 
 	//Process the eye
 	size_t iwave = 0;

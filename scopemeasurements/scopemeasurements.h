@@ -42,6 +42,7 @@
 #include "AvgVoltageMeasurement.h"
 #include "BaseMeasurement.h"
 #include "EyeBitRateMeasurement.h"
+#include "EyeHeightMeasurement.h"
 #include "EyePeriodMeasurement.h"
 #include "Fall1090Measurement.h"
 #include "Fall2080Measurement.h"

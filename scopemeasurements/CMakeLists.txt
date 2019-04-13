@@ -5,6 +5,7 @@ set(SCOPEMEASUREMENTS_SOURCES
 	AvgVoltageMeasurement.cpp
 	BaseMeasurement.cpp
 	EyeBitRateMeasurement.cpp
+	EyeHeightMeasurement.cpp
 	EyePeriodMeasurement.cpp
 	Fall1090Measurement.cpp
 	Fall2080Measurement.cpp

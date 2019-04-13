@@ -30,31 +30,94 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of EyeHeightMeasurement
  */
 
 #include "scopemeasurements.h"
+#include "EyeHeightMeasurement.h"
+#include "../scopeprotocols/EyeDecoder2.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+EyeHeightMeasurement::EyeHeightMeasurement()
+	: FloatMeasurement(TYPE_VOLTAGE)
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(EyeBitRateMeasurement);
-	AddMeasurementClass(EyeHeightMeasurement);
-	AddMeasurementClass(EyePeriodMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+EyeHeightMeasurement::~EyeHeightMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType EyeHeightMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
+string EyeHeightMeasurement::GetMeasurementName()
+{
+	return "Eye Height";
+}
+
+bool EyeHeightMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool EyeHeightMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	auto chan = dynamic_cast<EyeDecoder2*>(m_channels[0]);
+	auto din = dynamic_cast<EyeCapture2*>(chan->GetData());
+	if(din == NULL)
+		return false;
+
+	double range = chan->GetVoltageRange();
+	double pix = chan->GetHeight();
+	float* fdata = din->GetData();
+
+	//Measure center 10% of a UI (center 5% of the whole eye pattern)
+	int64_t w = chan->GetWidth();
+	int64_t center = w / 2;				//midpoint of the eye
+	int64_t rad = center / 10;			//1/10 of a UI
+	int64_t left = center - rad/2;
+	int64_t right = center + rad/2;
+
+	int64_t ymid = pix/2;
+	int64_t bot = 0;
+	int64_t top = pix-1;
+	for(int64_t x = left; x <= right; x++)
+	{
+		for(int64_t dy = 0; dy < ymid; dy ++)
+		{
+			//top
+			int64_t y = ymid + dy;
+			if(fdata[y*w + x] > FLT_EPSILON)
+				top = min(top, y);
+
+			//bottom
+			y = ymid - dy;
+			if(fdata[y*w + x] > FLT_EPSILON)
+				bot = max(bot, y);
+		}
+	}
+	int64_t dy = top - bot;
+	m_value = dy * range / pix;
+
+	return true;
 }
