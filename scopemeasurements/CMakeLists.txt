@@ -7,6 +7,7 @@ set(SCOPEMEASUREMENTS_SOURCES
 	EyeBitRateMeasurement.cpp
 	EyeHeightMeasurement.cpp
 	EyePeriodMeasurement.cpp
+	EyeWidthMeasurement.cpp
 	Fall1090Measurement.cpp
 	Fall2080Measurement.cpp
 	FrequencyMeasurement.cpp

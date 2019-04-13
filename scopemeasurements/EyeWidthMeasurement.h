@@ -30,32 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of EyeWidthMeasurement
  */
+#ifndef EyeWidthMeasurement_h
+#define EyeWidthMeasurement_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class EyeWidthMeasurement : public FloatMeasurement
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(EyeBitRateMeasurement);
-	AddMeasurementClass(EyeHeightMeasurement);
-	AddMeasurementClass(EyePeriodMeasurement);
-	AddMeasurementClass(EyeWidthMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
-}
+public:
+	EyeWidthMeasurement();
+	virtual ~EyeWidthMeasurement();
+
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual MeasurementType GetMeasurementType();
+
+	MEASUREMENT_INITPROC(EyeWidthMeasurement)
+};
+
+#endif

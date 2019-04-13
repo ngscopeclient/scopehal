@@ -44,6 +44,7 @@
 #include "EyeBitRateMeasurement.h"
 #include "EyeHeightMeasurement.h"
 #include "EyePeriodMeasurement.h"
+#include "EyeWidthMeasurement.h"
 #include "Fall1090Measurement.h"
 #include "Fall2080Measurement.h"
 #include "FrequencyMeasurement.h"
