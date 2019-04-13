@@ -113,6 +113,8 @@ EyeDecoder2::EyeDecoder2(string color)
 
 	m_signalNames.push_back("clk");
 	m_channels.push_back(NULL);
+
+	m_uiWidth = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,6 +209,8 @@ void EyeDecoder2::Refresh()
 	//Process the eye
 	size_t iwave = 0;
 	size_t iclock = 0;
+	double awidth = 0;
+	int64_t nwidth = 0;
 	for(; iwave < waveform->GetDepth(); iwave ++)
 	{
 		//Stop when we get to the end
@@ -217,6 +221,8 @@ void EyeDecoder2::Refresh()
 		int64_t tclock = clock->GetSampleStart(iclock) * clock->m_timescale;
 		int64_t tend = clock->GetSampleStart(iclock+1) * clock->m_timescale;
 		int64_t twidth = tend - tclock;
+		awidth += (tend - tclock);
+		nwidth ++;
 
 		//Find time of this sample
 		AnalogSample samp = (*waveform).m_samples[iwave];
@@ -231,9 +237,8 @@ void EyeDecoder2::Refresh()
 			offset = tstart - tend;
 		}
 
-		//DEBUG: move the pixel 2 samples right.
-		//Not sure where this offset is creeping in yet!
-		//offset += 2*waveform->m_timescale;
+		//TODO: figure out where this is creeping in
+		offset += 1.5*waveform->m_timescale;
 
 		//Sampling clock is the middle of the UI, not the start.
 		//Anything more than half a UI right of the clock is negative.
@@ -263,6 +268,7 @@ void EyeDecoder2::Refresh()
 			data[n] ++;
 		}
 	}
+	m_uiWidth = round(awidth / nwidth);
 
 	cap->Normalize();
 }

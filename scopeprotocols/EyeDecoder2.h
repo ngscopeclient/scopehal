@@ -85,6 +85,9 @@ public:
 
 	virtual double GetVoltageRange();
 
+	int64_t GetUIWidth()
+	{ return m_uiWidth; }
+
 	void SetWidth(size_t width)
 	{
 		m_width = width;
@@ -109,4 +112,6 @@ protected:
 
 	size_t m_width;
 	size_t m_height;
+
+	size_t m_uiWidth;
 };
