@@ -510,9 +510,6 @@ void LeCroyVICPOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	//FIXME
 }
 
-/**
-	@brief Gets the bandwidth limiter for the channel, or 0 if no limit
- */
 int LeCroyVICPOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if(i > m_analogChannelCount)

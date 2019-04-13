@@ -47,8 +47,12 @@ public:
 	/*
 		@brief Types of instrument.
 
-		Note that we can't use RTTI for this because of software options.
+		Note that we can't use RTTI for this because of software options that may or may not be present,
+		and we don't know at object instantiation time.
+
 		For example, some WaveSurfer 3000 devices have the function generator option and others don't.
+		While the WaveSurfer 3000 DMM option is now no-cost, there's no guarantee any given instrument's
+		owner has installed it!
 	 */
 	enum InstrumentTypes
 	{

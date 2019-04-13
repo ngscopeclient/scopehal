@@ -42,12 +42,11 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-//#include "RigolDS1000SeriesOscilloscope.h"
-
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
+
 Oscilloscope::Oscilloscope()
 {
 
@@ -81,7 +80,7 @@ OscilloscopeChannel* Oscilloscope::GetChannel(size_t i)
 		return NULL;
 }
 
-OscilloscopeChannel* Oscilloscope::GetChannel(std::string name)
+OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
 {
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
@@ -89,11 +88,6 @@ OscilloscopeChannel* Oscilloscope::GetChannel(std::string name)
 			return m_channels[i];
 	}
 	return NULL;
-}
-
-void Oscilloscope::AddChannel(OscilloscopeChannel* chan)
-{
-	m_channels.push_back(chan);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

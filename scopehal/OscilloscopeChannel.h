@@ -120,7 +120,7 @@ public:
 		COUPLE_AC_1M,		//1M ohm, AC coupled
 		COUPLE_DC_50,		//50 ohm, DC coupled
 		COUPLE_GND,			//tie to ground
-		COUPLE_SYNTHETIC	//channel is math or otherwise not a direct voltage measurement
+		COUPLE_SYNTHETIC	//channel is math, digital, or otherwise not a direct voltage measurement
 	};
 
 	virtual CouplingType GetCoupling();

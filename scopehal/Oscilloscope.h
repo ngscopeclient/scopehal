@@ -41,12 +41,14 @@ class Instrument;
 /**
 	@brief Generic representation of an oscilloscope or logic analyzer.
 
-	An Oscilloscope contains triggering logic and one or more ChannelSource's.
+	An Oscilloscope contains triggering logic and one or more OscilloscopeChannel objects.
  */
 class Oscilloscope : public virtual Instrument
 {
 public:
-	//Construction / destruction
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Construction / destruction
+
 	Oscilloscope();
 	virtual ~Oscilloscope();
 
@@ -56,25 +58,114 @@ public:
 		In order to see updates made by the user at the front panel, the cache must be flushed.
 
 		Cache flushing is recommended every second or so during interactive operation.
+		In scripted/ATE environments where nobody should be touching the instrument, longer intervals may be used.
+
+		The default implementation of this function does nothing since the base class provides no caching.
+		If a derived class caches configuration, it should override this function to clear any cached data.
 	 */
 	virtual void FlushConfigCache();
 
-	//Channel information
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Channel information
+
+	/**
+		@brief Gets the number of channels this instrument has.
+
+		Only hardware acquisition channels (analog or digital) are included, not math/memory.
+
+		Note that since external trigger inputs have some of the same settings as acquisition channels, they are
+		included in the channel count. Call OscilloscopeChannel::GetType() on a given channel to see what kind
+		of channel it is.
+	 */
 	size_t GetChannelCount();
+
+	/**
+		@brief Gets a channel by index
+
+		@param i Zero-based index of channel
+	 */
 	OscilloscopeChannel* GetChannel(size_t i);
-	OscilloscopeChannel* GetChannel(std::string name);
+
+	/**
+		@brief Gets a channel given the display name
+	 */
+	OscilloscopeChannel* GetChannelByDisplayName(std::string name);
+
+	/**
+		@brief Checks if a channel is enabled in hardware.
+	 */
 	virtual bool IsChannelEnabled(size_t i) =0;
+
+	/**
+		@brief Turn a channel on, given the index
+
+		@param i Zero-based index of channel
+	 */
 	virtual void EnableChannel(size_t i) =0;
+
+	/**
+		@brief Turn a channel off, given the index.
+
+		This function may optionally configure channel interleaving, if supported in hardware.
+
+		@param i Zero-based index of channel
+	 */
 	virtual void DisableChannel(size_t i) =0;
+
+	/**
+		@brief Gets the coupling used for an input channel
+
+		@param i Zero-based index of channel
+	 */
 	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) =0;
+
+	/**
+		@brief Sets the coupling used for an input channel
+
+		@param i Zero-based index of channel
+	 */
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) =0;
+
+	/**
+		@brief Gets the probe attenuation for an input channel.
+
+		Note that this function returns attenuation, not gain.
+		For example, a 10x probe would return 10 and not 0.1.
+
+		@param i Zero-based index of channel
+	 */
 	virtual double GetChannelAttenuation(size_t i) =0;
+
+	/**
+		@brief Sets the probe attenuation used for an input channel.
+
+		@param i		Zero-based index of channel
+		@param atten	Attenuation factor
+	 */
 	virtual void SetChannelAttenuation(size_t i, double atten) =0;
+
+	/**
+		@brief Gets the bandwidth limit for an input channel.
+
+		@param i Zero-based index of channel
+
+		@return Bandwidth limit, in MHz. Zero means "no bandwidth limit".
+	 */
 	virtual int GetChannelBandwidthLimit(size_t i) =0;
+
+	/**
+		@brief Sets the bandwidth limit for an input channel.
+
+		@param i			Zero-based index of channel
+		@param limit_mhz	Bandwidth limit, in MHz. Zero means "no bandwidth limit".
+	 */
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) =0;
 
 	/**
-		@brief Returns the external trigger input channel, if we have one
+		@brief Returns the external trigger input channel, if we have one.
+
+		Note that some very high end oscilloscopes have multiple external trigger inputs.
+		We do not currently support this.
 	 */
 	virtual OscilloscopeChannel* GetExternalTrigger() =0;
 
@@ -82,16 +173,43 @@ public:
 		@brief Gets the range of the current channel configuration.
 
 		The range is the distance, in volts, between the most negative/smallest and most positive/largest
-		voltage which the ADC can represent using the current vertical gain configuration.
+		voltage which the ADC can represent using the current vertical gain configuration. This can be calculated
+		as the number of vertical divisions times the number of volts per division.
 
 		The range does not depend on the offset.
+
+		@param i			Zero-based index of channel
 	 */
 	virtual double GetChannelVoltageRange(size_t i) =0;
-	virtual void SetChannelVoltageRange(size_t i, double range) =0;
-	virtual double GetChannelOffset(size_t i) =0;
-	virtual void SetChannelOffset(size_t i, double offset) =0;
 
-	void AddChannel(OscilloscopeChannel* chan);
+	/**
+		@brief Sets the range of the current channel configuration.
+
+		The range is the distance, in volts, between the most negative/smallest and most positive/largest
+		voltage which the ADC can represent using the current vertical gain configuration. This can be calculated
+		as the number of vertical divisions times the number of volts per division.
+
+		The range does not depend on the offset.
+
+		@param i			Zero-based index of channel
+		@param range		Voltage range
+	 */
+	virtual void SetChannelVoltageRange(size_t i, double range) =0;
+
+	/**
+		@brief Gets the offset, in volts, for a given channel
+
+		@param i			Zero-based index of channel
+	 */
+	virtual double GetChannelOffset(size_t i) =0;
+
+	/**
+		@brief Sets the offset for a given channel
+
+		@param i			Zero-based index of channel
+		@param offset		Offset, in volts
+	 */
+	virtual void SetChannelOffset(size_t i, double offset) =0;
 
 	//Triggering
 	enum TriggerMode
@@ -102,10 +220,10 @@ public:
 		///Triggered once, but not recently
 		TRIGGER_MODE_STOP,
 
-		///Just got triggered
+		///Just got triggered, data is ready to read
 		TRIGGER_MODE_TRIGGERED,
 
-		///WAIT - waiting for something (not sure what this means, Rigol scopes use it)
+		///WAIT - waiting for something (not sure what this means, some Rigol scopes use it?)
 		TRIGGER_MODE_WAIT,
 
 		///Auto trigger - waiting for auto-trigger
@@ -114,13 +232,23 @@ public:
 		///Placeholder
 		TRIGGER_MODE_COUNT
 	};
-	virtual Oscilloscope::TriggerMode PollTrigger() =0;
-	bool WaitForTrigger(int timeout);
 
 	/**
-		@brief Clear out all existing trigger conditions
+		@brief Checks the curent trigger status.
 	 */
-	virtual void ResetTriggerConditions() =0;
+	virtual Oscilloscope::TriggerMode PollTrigger() =0;
+
+	/**
+		@brief Block until a trigger happens or a timeout elapses.
+
+		Note that this function has no provision to dispatch any UI events etc.
+		It's intended as a convenience helper for non-interactive ATE applications only.
+
+		@param timeout	Timeout value, in milliseconds
+
+		@return True if triggered, false if timeout
+	 */
+	bool WaitForTrigger(int timeout);
 
 	enum TriggerType
 	{
@@ -132,27 +260,91 @@ public:
 		TRIGGER_TYPE_DONTCARE	= 5
 	};
 
-	//For simple triggering
+	/**
+		@brief Gets the index of the channel currently selected for trigger
+	 */
 	virtual size_t GetTriggerChannelIndex() =0;
+
+	/**
+		@brief Sets the scope to trigger on the selected channel
+
+		@param i	Zero-based index of channel to use as trigger
+	 */
 	virtual void SetTriggerChannelIndex(size_t i) =0;
+
+	/**
+		@brief Gets the threshold of the current trigger, in volts
+	 */
 	virtual float GetTriggerVoltage() =0;
+
+	 /**
+		@brief Sets the threshold of the current trigger
+
+		@param v	Trigger threshold, in volts
+	 */
 	virtual void SetTriggerVoltage(float v) =0;
+
+	/**
+		@brief Gets the type of trigger configured for the instrument.
+
+		Complex pattern, dropout, etc triggers are not yet supported.
+	 */
 	virtual Oscilloscope::TriggerType GetTriggerType() =0;
+
+	/**
+		@brief Sets the type of trigger configured for the instrument.
+
+		Complex pattern, dropout, etc triggers are not yet supported.
+	 */
 	virtual void SetTriggerType(Oscilloscope::TriggerType type) =0;
 
 	/**
+		@brief Clear out all existing trigger conditions
+
+		This function is used for complex LA triggers and isn't yet supported by glscopeclient.
+		Simple instruments should just override with an empty function.
+	 */
+	virtual void ResetTriggerConditions() =0;
+
+	/**
 		@brief Sets the trigger condition for a single channel
+
+		This function is used for complex LA triggers and isn't yet supported by glscopeclient.
+		Simple instruments should just override with an empty function.
 	 */
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits)=0;
 
+	/**
+		@brief Reads data for all enabled channels from the instrument.
+
+		@param progress_callback Callback function called during transfer of long waveforms.
+				May be used to update a progress bar, etc.
+	 */
 	virtual bool AcquireData(sigc::slot1<int, float> progress_callback) =0;
 
+	/**
+		@brief Starts the instrument in continuous trigger mode.
+
+		This is normally not used for data-download applications, because of the risk of race conditions where the
+		instrument triggers during AcquireData() leading to some channels having stale and some having new data.
+	 */
 	virtual void Start() =0;
+
+	/**
+		@brief Arms the trigger for a single acquistion.
+	 */
 	virtual void StartSingleTrigger() =0;
+
+	/**
+		@brief Stops triggering
+	 */
 	virtual void Stop() =0;
 
-	//Optional application-selected nickname of the scope
-	//(for display purposes if we have multiple scopes)
+	/**
+		@brief Optional application-selected nickname of the scope
+
+		(for display purposes if multiple scopes are in use)
+	 */
 	std::string m_nickname;
 
 protected:

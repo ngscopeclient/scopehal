@@ -70,7 +70,7 @@ RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(string hostname, un
 	m_model = model;
 	m_serial = serial;
 	m_fwVersion = swversion;
-	
+
 	m_mode = GetMeterMode();
 }
 
@@ -143,12 +143,13 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 		case DC_CURRENT:
 			SendCommand("SENSE:CURR:DC:RANGE:AUTO?");
 			break;
-			
+
 		//TODO
 		default:
+			LogError("GetMeterAutoRange not implemented yet for modes other than DC_CURRENT\n");
 			return false;
 	}
-	
+
 	string str = ReadReply();
 	return (str == "1");
 }
@@ -163,6 +164,9 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 			else
 				SendCommand("SENSE:CURR:DC:RANGE:AUTO 0");
 			break;
+
+		default:
+			LogError("SetMeterAutoRange not implemented yet for modes other than DC_CURRENT\n");
 	}
 }
 
@@ -240,16 +244,16 @@ Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetMeterMode()
 {
 	SendCommand("CONF?");
 	string str = ReadReply();
-	
+
 	char mode[32];
 	sscanf(str.c_str(), "\"%31[^,]", mode);
 	string smode = mode;
-	
+
 	if(smode == "CURR")
 		return DC_CURRENT;
 	else if(smode == "CURR:AC")
 		return AC_CURRENT;
-		
+
 	//unknown, pick something
 	else
 		return DC_VOLTAGE;
@@ -262,22 +266,22 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 		case DC_VOLTAGE:
 			SendCommand("MEAS:VOLT:DC?");
 			break;
-			
+
 		case DC_CURRENT:
 			SendCommand("MEAS:CURR:DC?");
 			break;
-			
+
 		case AC_CURRENT:
 			SendCommand("MEAS:CURR:AC?");
 			break;
-			
+
 		//whatever it is, not supported
 		default:
 			break;
 	}
-	
+
 	m_mode = type;
-	
+
 	//Wait for, and discard, the reply to make sure the change took effect
 	ReadReply();
 }
