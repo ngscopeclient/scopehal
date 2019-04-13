@@ -30,17 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of NRZDecoder
+	@brief Declaration of ThresholdDecoder
  */
-#ifndef NRZDecoder_h
-#define NRZDecoder_h
+#ifndef ThresholdDecoder_h
+#define ThresholdDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
 
-class NRZDecoder : public ProtocolDecoder
+class ThresholdDecoder : public ProtocolDecoder
 {
 public:
-	NRZDecoder(std::string color);
+	ThresholdDecoder(std::string color);
 
 	virtual void Refresh();
 	virtual ChannelRenderer* CreateRenderer();
@@ -52,9 +52,10 @@ public:
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	PROTOCOL_DECODER_INITPROC(NRZDecoder)
+	PROTOCOL_DECODER_INITPROC(ThresholdDecoder)
 
 protected:
+	std::string m_threshname;
 };
 
 #endif

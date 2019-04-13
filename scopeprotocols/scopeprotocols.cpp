@@ -49,7 +49,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(Ethernet100BaseTDecoder);
 	//AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeDecoder2);
-	//AddDecoderClass(NRZDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
+	AddDecoderClass(ThresholdDecoder);
 	//AddDecoderClass(UARTDecoder);
 }

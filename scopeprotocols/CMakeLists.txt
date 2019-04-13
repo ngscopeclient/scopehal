@@ -15,7 +15,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeDecoder2.cpp
 	EyeRenderer.cpp
 	SincInterpolationDecoder.cpp
-	NRZDecoder.cpp
+	ThresholdDecoder.cpp
 	UARTDecoder.cpp
 
 	scopeprotocols.cpp

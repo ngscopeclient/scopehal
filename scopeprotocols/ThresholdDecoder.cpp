@@ -28,7 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "NRZDecoder.h"
+#include "ThresholdDecoder.h"
 #include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
@@ -36,23 +36,27 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-NRZDecoder::NRZDecoder(string color)
+ThresholdDecoder::ThresholdDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
+
+	m_threshname = "Threshold";
+	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_threshname].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* NRZDecoder::CreateRenderer()
+ChannelRenderer* ThresholdDecoder::CreateRenderer()
 {
 	return new DigitalRenderer(this);
 }
 
-bool NRZDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool ThresholdDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -62,29 +66,28 @@ bool NRZDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string NRZDecoder::GetProtocolName()
+string ThresholdDecoder::GetProtocolName()
 {
 	return "Threshold";
 }
 
-void NRZDecoder::SetDefaultName()
+void ThresholdDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/Threshold", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "Threshold(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-bool NRZDecoder::NeedsConfig()
+bool ThresholdDecoder::NeedsConfig()
 {
-	//we auto-select the midpoint as our threshold
-	return false;
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void NRZDecoder::Refresh()
+void ThresholdDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -99,29 +102,15 @@ void NRZDecoder::Refresh()
 		return;
 	}
 
-	//Can't do scaling if we have no samples to work with
+	//Can't do much if we have no samples to work with
 	if(din->GetDepth() == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
-	//Find the min/max values of the samples
-	//TODO: pick saner threshold, like median or something? Better glitch resistance
-	float min = 999;
-	float max = -999;
-	for(auto sample : *din)
-	{
-		if((float)sample > max)
-			max = sample;
-		if((float)sample < min)
-			min = sample;
-	}
-	float range = max - min;
-	float midpoint = range/2 + min;
-	LogDebug("NRZDecoder: range is [%.3f, %.3f], threshold is %.3f\n", min, max, midpoint);
-
 	//Threshold all of our samples
+	float midpoint = m_parameters[m_threshname].GetFloatVal();
 	DigitalCapture* cap = new DigitalCapture;
 	for(size_t i=0; i<din->m_samples.size(); i++)
 	{
@@ -133,4 +122,6 @@ void NRZDecoder::Refresh()
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

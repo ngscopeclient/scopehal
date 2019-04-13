@@ -50,8 +50,8 @@
 #include "EyeDecoder.h"
 #include "EyeDecoder2.h"
 #include "SincInterpolationDecoder.h"
-#include "NRZDecoder.h"
 #include "UARTDecoder.h"
+#include "ThresholdDecoder.h"
 /*
 #include "DigitalToAnalogDecoder.h"
 #include "DMADecoder.h"
