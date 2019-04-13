@@ -520,7 +520,6 @@ string FloatMeasurement::GetValueAsString()
 			else
 				snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
 			break;
-
 		case TYPE_TIME:
 			if(fabs(m_value) < 1e-9)
 				snprintf(tmp, sizeof(tmp), "%.3f ps", m_value * 1e12);
@@ -539,6 +538,17 @@ string FloatMeasurement::GetValueAsString()
 				snprintf(tmp, sizeof(tmp), "%.3f kHz", m_value * 1e-3);
 			else
 				snprintf(tmp, sizeof(tmp), "%.2f Hz", m_value);
+			break;
+
+		case TYPE_BAUD:
+			if(m_value > 1e9)
+				snprintf(tmp, sizeof(tmp), "%.3f Gbps", m_value * 1e-9);
+			else if(m_value > 1e6)
+				snprintf(tmp, sizeof(tmp), "%.3f Mbps", m_value * 1e-6);
+			else if(m_value > 1e3)
+				snprintf(tmp, sizeof(tmp), "%.3f kbps", m_value * 1e-3);
+			else
+				snprintf(tmp, sizeof(tmp), "%.2f bps", m_value);
 			break;
 	}
 

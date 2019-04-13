@@ -4,6 +4,8 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEMEASUREMENTS_SOURCES
 	AvgVoltageMeasurement.cpp
 	BaseMeasurement.cpp
+	EyeBitRateMeasurement.cpp
+	EyePeriodMeasurement.cpp
 	Fall1090Measurement.cpp
 	Fall2080Measurement.cpp
 	FrequencyMeasurement.cpp
@@ -20,6 +22,9 @@ set(SCOPEMEASUREMENTS_SOURCES
 
 add_library(scopemeasurements SHARED
 	${SCOPEMEASUREMENTS_SOURCES})
+
+target_link_libraries(scopemeasurements
+	scopeprotocols)
 
 target_include_directories(scopemeasurements
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

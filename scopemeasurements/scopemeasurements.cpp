@@ -44,6 +44,8 @@ void ScopeMeasurementStaticInit()
 {
 	AddMeasurementClass(AvgVoltageMeasurement);
 	AddMeasurementClass(BaseMeasurement);
+	AddMeasurementClass(EyeBitRateMeasurement);
+	AddMeasurementClass(EyePeriodMeasurement);
 	AddMeasurementClass(Fall1090Measurement);
 	AddMeasurementClass(Fall2080Measurement);
 	AddMeasurementClass(FrequencyMeasurement);

@@ -113,7 +113,8 @@ public:
 	{
 		TYPE_VOLTAGE,
 		TYPE_TIME,
-		TYPE_FREQUENCY
+		TYPE_FREQUENCY,
+		TYPE_BAUD
 	};
 
 	FloatMeasurement(FloatMeasurementType type);

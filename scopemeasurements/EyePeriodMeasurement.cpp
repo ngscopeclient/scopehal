@@ -30,30 +30,63 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of EyePeriodMeasurement
  */
 
-#ifndef scopemeasurements_h
-#define scopemeasurements_h
-
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Measurement.h"
-
-#include "AvgVoltageMeasurement.h"
-#include "BaseMeasurement.h"
-#include "EyeBitRateMeasurement.h"
+#include "scopemeasurements.h"
 #include "EyePeriodMeasurement.h"
-#include "Fall1090Measurement.h"
-#include "Fall2080Measurement.h"
-#include "FrequencyMeasurement.h"
-#include "MaxVoltageMeasurement.h"
-#include "MinVoltageMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PkPkVoltageMeasurement.h"
-#include "Rise1090Measurement.h"
-#include "Rise2080Measurement.h"
-#include "TopMeasurement.h"
+#include "../scopeprotocols/EyeDecoder2.h"
 
-void ScopeMeasurementStaticInit();
+using namespace std;
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+EyePeriodMeasurement::EyePeriodMeasurement()
+	: FloatMeasurement(TYPE_TIME)
+{
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+EyePeriodMeasurement::~EyePeriodMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType EyePeriodMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_HORZ;
+}
+
+string EyePeriodMeasurement::GetMeasurementName()
+{
+	return "Eye Period";
+}
+
+bool EyePeriodMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool EyePeriodMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	auto chan = dynamic_cast<EyeDecoder2*>(m_channels[0]);
+	auto din = dynamic_cast<EyeCapture2*>(chan->GetData());
+	if(din == NULL)
+		return false;
+
+	m_value = chan->GetUIWidth() * 1e-12f;
+	return true;
+}
