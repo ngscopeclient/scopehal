@@ -47,6 +47,10 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_baudname = "Symbol rate";
 	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
 	m_parameters[m_baudname].SetIntVal(1250000000);	//1250 MHz by default
+
+	m_threshname = "Threshold";
+	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_threshname].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,10 +136,9 @@ void ClockRecoveryDecoder::Refresh()
 	vector<int64_t> edges;
 
 	//Find times of the zero crossings
-	//TODO: support adjustable thresholds and multiple crossing points for MLT-3 etc
 	bool first = true;
 	bool last = false;
-	const float threshold = 0;
+	const float threshold = m_parameters[m_threshname].GetFloatVal();
 	for(size_t i=1; i<din->m_samples.size(); i++)
 	{
 		auto sin = din->m_samples[i];
