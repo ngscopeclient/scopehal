@@ -112,82 +112,228 @@ void IBM8b10bDecoder::Refresh()
 
 	//Create the capture
 	IBM8b10bCapture* cap = new IBM8b10bCapture;
-	cap->m_timescale = din->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
-	//Create a few dummy test samples
-	cap->m_samples.push_back(IBM8b10bSample(200, 100, IBM8b10bSymbol(true, 0xff)));
-	cap->m_samples.push_back(IBM8b10bSample(100, 100, IBM8b10bSymbol(false, 0x55)));
-
-	/*
-	//Get the bit period
-	float bit_period = 1.0f / m_parameters[m_baudname].GetFloatVal();
-	bit_period *= 1E12;
-	int64_t ibitper = bit_period;
-	int64_t scaledbitper = ibitper / din->m_timescale;
-
-	//IBM8b10b processing
-	AsciiCapture* cap = new AsciiCapture;
-	cap->m_timescale = din->m_timescale;
-
-	//Time-domain processing to reflect potentially variable sampling rate for RLE captures
-	int64_t next_value = 0;
-	size_t isample = 0;
-	while(isample < din->m_samples.size())
+	//Record the value of the data stream at each clock edge
+	vector<DigitalSample> data;
+	size_t ndata = 0;
+	bool old_clk = false;
+	for(size_t i=0; i<clkin->m_samples.size(); i++)
 	{
-		//Wait for signal to go high (idle state)
-		while( (isample < din->m_samples.size()) && !din->m_samples[isample].m_sample)
-			isample ++;
-		if(isample >= din->m_samples.size())
+		//Throw away clock samples until we find an edge
+		//For now, reference clock is always DDR.
+		//TODO: support single rate reference clocks
+		auto csample = clkin->m_samples[i];
+		if(old_clk == csample.m_sample)
+			break;
+		old_clk = csample.m_sample;
+
+		//Throw away data samples until the data is synced with us
+		int64_t clkstart = csample.m_offset * clkin->m_timescale;
+		while( (ndata < din->m_samples.size()) && (din->m_samples[ndata].m_offset * din->m_timescale < clkstart) )
+			ndata ++;
+		if(ndata >= din->m_samples.size())
 			break;
 
-		//Wait for a falling edge (start bit)
-		while( (isample < din->m_samples.size()) && din->m_samples[isample].m_sample)
-			isample ++;
-		if(isample >= din->m_samples.size())
-			break;
+		data.push_back(DigitalSample(clkstart, 1, din->m_samples[ndata].m_sample));
+	}
 
-		//Time of the start bit
-		int64_t tstart = din->m_samples[isample].m_offset;
-
-		//The next data bit should be measured 1.5 bit periods after the falling edge
-		next_value = tstart + scaledbitper + scaledbitper/2;
-
-		//Read eight data bits
-		unsigned char dval = 0;
-		for(int ibit=0; ibit<8; ibit++)
+	//Look for commas in the data stream
+	//TODO: make this more efficient?
+	size_t max_commas = 0;
+	size_t max_offset = 0;
+	for(size_t offset=0; offset < 10; offset ++)
+	{
+		size_t num_commas = 0;
+		for(size_t i=0; i<data.size() - 20; i += 10)
 		{
-			//Find the sample of interest
-			while( (isample < din->m_samples.size()) && ((din->m_samples[isample].m_offset + din->m_samples[isample].m_duration) < next_value))
-				isample ++;
-			if(isample >= din->m_samples.size())
-				break;
+			//Check if we have a comma (five identical bits) anywhere in the data stream
+			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
+			bool comma = true;
+			for(int j=3; j<=6; j++)
+			{
+				if(data[i+offset+j].m_sample != data[i+offset+2].m_sample)
+				{
+					comma = false;
+					break;
+				}
+			}
+			if(comma)
+				num_commas ++;
+		}
+		if(num_commas > max_commas)
+		{
+			max_commas = num_commas;
+			max_offset = offset;
+		}
+		//LogDebug("Found %zu commas at offset %zu\n", num_commas, offset);
+	}
 
-			//Got the sample
-			dval = (dval >> 1) | (din->m_samples[isample].m_sample ? 0x80 : 0);
+	//Decode the actual data
+	bool first = true;
+	int last_disp = -1;
+	for(size_t i=max_offset; i<data.size()-11; i+= 10)
+	{
+		//5b/6b decode
+		uint8_t code6 =
+			(data[i].m_sample << 5) |
+			(data[i+1].m_sample << 4) |
+			(data[i+2].m_sample << 3) |
+			(data[i+3].m_sample << 2) |
+			(data[i+4].m_sample << 1) |
+			(data[i+5].m_sample << 0);
 
-			//Go on to the next bit
-			next_value += scaledbitper;
+		static const int code5_table[64] =
+		{
+			 0,  0,  0,  0,  0, 23,  8,  7,	//00-07
+			 0, 27,  4, 20, 24, 12, 28, 28, //08-0f
+			 0, 29,  2, 18, 31, 10, 26, 15, //10-17
+			 0,  6, 22, 16, 14,  1, 30,  0,	//18-1f
+			 0, 30, 1,  17, 16,  9, 25,  0,	//20-27
+			15,  5, 21, 31, 13,  2, 29,  0,	//28-2f
+			28,  3, 19, 24, 11,  4, 27,  0,	//30-37
+			 7,  8, 23,  0,  0,  0,  0,  0  //38-3f
+		};
+
+		static const int disp5_table[64] =
+		{
+			 0,  0,  0, 0,  0, -2, -2, 0,	//00-07
+			 0, -2, -2, 0, -2,  0,  0, 2,	//08-0f
+			 0, -2, -2, 0, -2,  0,  0, 2,	//10-17
+			-2,  0,  0, 2,  0,  2,  2, 0,	//18-1f
+			 0, -2, -2, 0, -2,  0,  0, 2,	//20-27
+			-2,  0,  0, 2,  0,  2,  2, 0,	//28-2f
+			-2,  0,  0, 2,  0,  2,  2, 0,	//30-37
+			 0,  2,  2, 0,  0,  0,  0, 0 	//38-3f
+		};
+
+		static const bool err5_table[64] =
+		{
+			 true,  true,  true,  true,  true, false, false, false,	//00-07
+			 true, false, false, false, false, false, false, false, //08-0f
+			 true, false, false, false, false, false, false, false, //10-17
+			false, false, false, false, false, false, false,  true,	//18-1f
+			 true, false, false, false, false, false, false, false,	//20-27
+			false, false, false, false, false, false, false,  true,	//28-2f
+			false, false, false, false, false, false, false,  true,	//30-37
+			false, false, false,  true,  true,  true,  true,  true  //38-3f
+		};
+
+		static const bool ctl5_table[64] =
+		{
+			false, false, false, false, false, false, false, false,	//00-07
+			false, false, false, false, false, false, false, true,  //08-0f
+			false, false, false, false, false, false, false, false, //10-17
+			false, false, false, false, false, false, false, false,	//18-1f
+			false, false, false, false, false, false, false, false,	//20-27
+			false, false, false, false, false, false, false, false,	//28-2f
+			true,  false, false, false, false, false, false, false,	//30-37
+			false, false, false, false, false, false, false, false  //38-3f
+		};
+
+		int code5 = code5_table[code6];
+		int disp5 = disp5_table[code6];
+		bool err5 = err5_table[code6];
+		bool ctl5 = ctl5_table[code6];
+
+		//3b/4b decode
+		uint8_t code4 =
+			(data[i+6].m_sample << 3) |
+			(data[i+7].m_sample << 2) |
+			(data[i+8].m_sample << 1) |
+			(data[i+9].m_sample << 0);
+
+		static const bool err3_ctl_table[16] =
+		{
+			 true,  true, false, false, false, false, false, false,
+			false, false, false, false, false, false,  true,  true
+		};
+
+		static const int code3_pos_ctl_table[16] =	//if disp5 positive
+		{
+			0, 0, 4, 3, 0, 2, 6, 7,
+			7, 1, 5, 0, 3, 4, 0, 0,
+		};
+
+		static const int code3_neg_ctl_table[16] =	//if disp5 negative
+		{
+			0, 0, 4, 3, 0, 5, 1, 7,
+			7, 6, 2, 0, 3, 4, 0, 0
+		};
+
+		static const int disp3_ctl_table[16] =
+		{
+			 0, 0, -2, 0, -2, 0, 0, 2,
+			-2, 0,  0, 2,  0, 2, 0, 0
+		};
+
+		static const bool err3_table[16] =
+		{
+			 true,  true, false, false, false, false, false, false,
+			false, false, false, false, false, false, false,  true
+		};
+
+		static const int code3_table[16] =
+		{
+			0, 0, 4, 3, 0, 2, 6, 7,
+			7, 1, 5, 0, 3, 4, 7, 0
+		};
+
+		static const int disp3_table[16] =
+		{
+			 0, 0, -2, 0, -2, 0, 0, 2,
+			-2, 0,  0, 2,  0, 2, 2, 0
+		};
+
+		int code3 = false;
+		int disp3 = 0;
+		int err3 = false;
+		if(ctl5)
+		{
+			if(disp5)
+				code3 = code3_pos_ctl_table[code4];
+			else
+				code3 = code3_neg_ctl_table[code4];
+			disp3 = disp3_ctl_table[code4];
+			err3 = err3_ctl_table[code4];
+		}
+		else
+		{
+			code3 = code3_table[code4];
+			disp3 = disp3_table[code4];
+			err3 = err3_table[code4];
 		}
 
-		//If we ran out of space before we hit the end of the buffer, abort
-		if(isample >= din->m_samples.size())
-			break;
+		//Disparity tracking
+		int total_disp = disp3 + disp5;
+		if(first)
+		{
+			if(total_disp < 0)
+				last_disp = -1;
+			else
+				last_disp = 1;
+			first = false;
+		}
 
-		//All good, read the stop bit
-		while( (isample < din->m_samples.size()) && ((din->m_samples[isample].m_offset + din->m_samples[isample].m_duration) < next_value))
-			isample ++;
-		if(isample >= din->m_samples.size())
-			break;
+		bool disperr = false;
+		if(total_disp > 0 && last_disp > 0)
+			disperr = true;
+		else if(total_disp < 0 && last_disp < 0)
+			disperr = true;
+		total_disp += last_disp;
 
-		//Save the sample
-		int64_t tend = next_value + (scaledbitper/2);
-		cap->m_samples.push_back(AsciiSample(
-			tstart,
-			tend-tstart,
-			(char)dval));
-	}*/
+
+		cap->m_samples.push_back(IBM8b10bSample(
+			data[i].m_offset,
+			data[i+10].m_offset - data[i].m_offset,
+			IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5)));
+	}
+
+	//Create a few dummy test samples
+	//cap->m_samples.push_back(IBM8b10bSample(200, 100, IBM8b10bSymbol(true, 0xff)));
+	//cap->m_samples.push_back(IBM8b10bSample(100, 100, IBM8b10bSymbol(false, 0x55)));
 
 	SetData(cap);
 }

@@ -41,17 +41,19 @@
 class IBM8b10bSymbol
 {
 public:
-	IBM8b10bSymbol(bool b, uint8_t d)
+	IBM8b10bSymbol(bool b, bool e,uint8_t d)
 	 : m_control(b)
+	 , m_error(e)
 	 , m_data(d)
 	{}
 
 	bool m_control;
+	bool m_error;
 	uint8_t m_data;
 
 	bool operator== (const IBM8b10bSymbol& s) const
 	{
-		return (m_control == s.m_control) && (m_data == s.m_data);
+		return (m_control == s.m_control) && (m_error == s.m_error) && (m_data == s.m_data);
 	}
 };
 

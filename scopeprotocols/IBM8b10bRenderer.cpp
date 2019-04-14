@@ -52,6 +52,30 @@ IBM8b10bRenderer::IBM8b10bRenderer(OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Rendering
 
+Gdk::Color IBM8b10bRenderer::GetColor(int i)
+{
+	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+
+		//errors are red
+		if(s.m_error)
+			return Gdk::Color("#ff0000");
+
+		//control characters are purple
+		else if(s.m_control)
+			return Gdk::Color("#c000a0");
+
+		//Data characters are green
+		else
+			return Gdk::Color("#008000");
+	}
+
+	//error
+	return Gdk::Color("red");
+}
+
 string IBM8b10bRenderer::GetText(int i)
 {
 	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(m_channel->GetData());
@@ -65,6 +89,8 @@ string IBM8b10bRenderer::GetText(int i)
 		char tmp[32];
 		if(s.m_control)
 			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
+		else if(s.m_error)
+			snprintf(tmp, sizeof(tmp), "ERR");
 		else
 			snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
 		return string(tmp);

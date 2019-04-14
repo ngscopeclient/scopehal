@@ -45,8 +45,10 @@ class IBM8b10bRenderer : public TextRenderer
 {
 public:
 	IBM8b10bRenderer(OscilloscopeChannel* channel);
+
 protected:
 	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
 };
 
 #endif
