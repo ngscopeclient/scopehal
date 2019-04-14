@@ -686,21 +686,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	//if(num_sequences > 1)
 	//	LogDebug("Capturing %u sequences\n", num_sequences);
 
-	//Figure out the trigger delay in the capture (nominal zero is MIDDLE of capture!)
-	SendCommand("TRDL?");
-	string sdelay = ReadSingleBlockString();
-	float delay;
-	sscanf(sdelay.c_str(), "%f", &delay);
-
-	//Convert to offset from START of capture (add 5 divisions)
-	SendCommand("TDIV?");
-	string stdiv = ReadSingleBlockString();
-	float tdiv;
-	sscanf(stdiv.c_str(), "%f", &tdiv);
-	float trigoff = tdiv*5 + delay;
-	LogTrace("    Trigger offset from start of capture: %.3f ns (delay %f ns, tdiv %f ns)\n", trigoff * 1e9,
-		delay * 1e9, tdiv * 1e9);
-
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		//If the channel is invisible, don't waste time capturing data
