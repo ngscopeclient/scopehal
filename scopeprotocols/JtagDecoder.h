@@ -37,6 +37,7 @@
 #define JtagDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 
 class JtagSymbol
 {
@@ -67,24 +68,34 @@ public:
 		UNKNOWN_4,
 	};
 
-	JtagSymbol(JtagSymbol::JtagState state)
+	JtagSymbol(JtagSymbol::JtagState state, uint8_t idata, uint8_t odata, uint8_t len)
 		: m_state(state)
+		, m_idata(idata)
+		, m_odata(odata)
+		, m_len(len)
 	{}
 
 	static const char* GetName(JtagSymbol::JtagState state);
 
 	bool operator== (const JtagSymbol& s) const
 	{
-		return (m_state == s.m_state);
+		return
+			(m_state == s.m_state) &&
+			(m_idata == s.m_idata) &&
+			(m_odata == s.m_odata) &&
+			(m_len == s.m_len);
 	}
 
 	JtagState m_state;
+	uint8_t m_idata;
+	uint8_t m_odata;
+	uint8_t m_len;
 };
 
 typedef OscilloscopeSample<JtagSymbol> JtagSample;
 typedef CaptureChannel<JtagSymbol> JtagCapture;
 
-class JtagDecoder : public ProtocolDecoder
+class JtagDecoder : public PacketDecoder
 {
 public:
 	JtagDecoder(std::string color);
@@ -95,6 +106,8 @@ public:
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
+
+	virtual std::vector<std::string> GetHeaders();
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 

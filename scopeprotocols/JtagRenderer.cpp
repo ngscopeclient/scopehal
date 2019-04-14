@@ -54,26 +54,31 @@ JtagRenderer::JtagRenderer(OscilloscopeChannel* channel)
 
 Gdk::Color JtagRenderer::GetColor(int i)
 {
-	return Gdk::Color("green");
-
-	/*
 	JtagCapture* capture = dynamic_cast<JtagCapture*>(m_channel->GetData());
 	if(capture != NULL)
 	{
 		const JtagSymbol& s = capture->m_samples[i].m_sample;
 
-		//errors are red
-		if(s.m_error)
-			return Gdk::Color("#ff0000");
+		switch(capture->m_samples[i].m_sample.m_state)
+		{
+			//Unknown states are red
+			case JtagSymbol::UNKNOWN_0:
+			case JtagSymbol::UNKNOWN_1:
+			case JtagSymbol::UNKNOWN_2:
+			case JtagSymbol::UNKNOWN_3:
+			case JtagSymbol::UNKNOWN_4:
+				return Gdk::Color("#ff0000");
 
-		//control characters are purple
-		else if(s.m_control)
-			return Gdk::Color("#c000a0");
+			//Data characters are green
+			case JtagSymbol::SHIFT_IR:
+			case JtagSymbol::SHIFT_DR:
+				return Gdk::Color("#008000");
 
-		//Data characters are green
-		else
-			return Gdk::Color("#008000");
-	}*/
+			//intermediate states are purple
+			default:
+				return Gdk::Color("#c000a0");
+		}
+	}
 
 	//error
 	return Gdk::Color("red");
@@ -86,8 +91,21 @@ string JtagRenderer::GetText(int i)
 	{
 		const JtagSymbol& s = capture->m_samples[i].m_sample;
 
-		//for now just chain state
-		return JtagSymbol::GetName(s.m_state);
+		char tmp[128];
+		const char* sstate = JtagSymbol::GetName(s.m_state);
+		if(s.m_len == 0)
+			return sstate;
+		else if(s.m_len == 8)
+		{
+			snprintf(tmp, sizeof(tmp), "%02x / %02x", s.m_idata, s.m_odata);
+			return tmp;
+		}
+		else
+		{
+			snprintf(tmp, sizeof(tmp), "%d'h%02x / %d'h%02x", s.m_len, s.m_idata, s.m_len, s.m_odata);
+			return tmp;
+		}
+
 	}
 	return "";
 }
