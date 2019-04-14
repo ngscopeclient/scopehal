@@ -686,6 +686,8 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	//if(num_sequences > 1)
 	//	LogDebug("Capturing %u sequences\n", num_sequences);
 
+	double start = GetTime();
+
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		//If the channel is invisible, don't waste time capturing data
@@ -708,11 +710,15 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			progress_callback(fbase);
 
 			//Ask for the segment of interest
+			//(segment number is ignored for non-segmented waveforms)
 			string cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
-			char tmp[128];
-			snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
-			cmd += tmp;
-			SendCommand(cmd);
+			if(num_sequences > 1)
+			{
+				char tmp[128];
+				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
+				cmd += tmp;
+				SendCommand(cmd);
+			}
 
 			//Ask for the wavedesc (in raw binary)
 			cmd = "C1:WF? DESC";
@@ -817,9 +823,13 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		m_channels[i]->SetData(cap);
 	}
 
+	double dt = GetTime() - start;
+	LogDebug("Waveform download took %.3f ms\n", dt * 1000);
+
 	if(num_sequences > 1)
 	{
 		//LeCroy's LA is derpy and doesn't support sequenced capture!
+		//(at least in wavesurfer 3000 series)
 		for(unsigned int i=0; i<m_digitalChannelCount; i++)
 			m_channels[m_analogChannelCount + i]->SetData(NULL);
 	}
