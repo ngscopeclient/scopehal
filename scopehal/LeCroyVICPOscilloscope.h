@@ -32,133 +32,29 @@
 
 #include "../xptools/Socket.h"
 
+#include "LeCroyOscilloscope.h"
+
 /**
 	@brief A LeCroy VICP oscilloscope
 
 	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
  */
 class LeCroyVICPOscilloscope
-	: public virtual Oscilloscope
-	, public virtual Multimeter
+	: public LeCroyOscilloscope
 {
 public:
 	LeCroyVICPOscilloscope(std::string hostname, unsigned short port);
 	virtual ~LeCroyVICPOscilloscope();
 
-	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-	virtual unsigned int GetInstrumentTypes();
-	virtual unsigned int GetMeasurementTypes();
-
-	virtual void FlushConfigCache();
-
-	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
-
-	//Triggering
-	virtual void ResetTriggerConditions();
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback);
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
-	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
-
-	//VICP constant helpers
-	enum HEADER_OPS
-	{
-		OP_DATA		= 0x80,
-		OP_REMOTE	= 0x40,
-		OP_LOCKOUT	= 0x20,
-		OP_CLEAR	= 0x10,
-		OP_SRQ		= 0x8,
-		OP_REQ		= 0x4,
-		OP_EOI		= 0x1
-	};
-
-	//DMM acquisition
-	virtual double GetVoltage();
-	virtual double GetPeakToPeak();
-	virtual double GetFrequency();
-	virtual double GetCurrent();
-
-	//DMM configuration
-	virtual int GetMeterChannelCount();
-	virtual std::string GetMeterChannelName(int chan);
-	virtual int GetCurrentMeterChannel();
-	virtual void SetCurrentMeterChannel(int chan);
-	virtual void StartMeter();
-	virtual void StopMeter();
-	virtual void SetMeterAutoRange(bool enable);
-	virtual bool GetMeterAutoRange();
-
-	virtual Multimeter::MeasurementTypes GetMeterMode();
-	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
-
 protected:
-	Socket m_socket;
-
-	bool SendCommand(std::string cmd, bool eoi=true);
-	std::string ReadData();
-	std::string ReadMultiBlockString();
-	std::string ReadSingleBlockString(bool trimNewline = false);
-	bool ReadWaveformBlock(std::string& data);
+	virtual bool SendCommand(std::string cmd, bool eoi=true);
+	virtual std::string ReadData();
+	virtual std::string ReadMultiBlockString();
+	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
 	uint8_t GetNextSequenceNumber(bool eoi);
-
-	std::string m_hostname;
-	unsigned short m_port;
-
 	uint8_t m_nextSequence;
 	uint8_t m_lastSequence;
-
-	//hardware analog channel count, independent of LA option or protocol decodes
-	unsigned int m_analogChannelCount;
-	unsigned int m_digitalChannelCount;
-
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_fwVersion;
-
-	//set of SW/HW options we have
-	bool m_hasLA;
-	bool m_hasDVM;
-
-	//Cached configuration
-	bool m_triggerChannelValid;
-	size_t m_triggerChannel;
-	bool m_triggerLevelValid;
-	float m_triggerLevel;
-	bool m_triggerTypeValid;
-	TriggerType m_triggerType;
-	std::map<size_t, double> m_channelVoltageRanges;
-	std::map<size_t, double> m_channelOffsets;
-
-	//External trigger input
-	OscilloscopeChannel* m_extTrigChannel;
-	std::vector<OscilloscopeChannel*> m_digitalChannels;
 };
 
 #endif
