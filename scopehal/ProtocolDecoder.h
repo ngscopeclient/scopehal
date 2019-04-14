@@ -151,6 +151,11 @@ protected:
 	///Indicates if our output is out-of-sync with our input
 	bool m_dirty;
 
+protected:
+	//Samples a digital channel on the rising edges of another channel.
+	//The two channels need not be the same sample rate.
+	void SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
+
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);
 	static void AddDecoderClass(std::string name, CreateProcType proc);

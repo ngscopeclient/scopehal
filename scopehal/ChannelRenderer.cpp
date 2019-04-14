@@ -221,6 +221,8 @@ void ChannelRenderer::RenderComplexSignal(
 	}
 
 	//Draw the body outline after any filler so it shows up on top
+	if(xend > visright)
+		xend = visright;
 	cr->set_source_rgb(color.get_red_p(), color.get_green_p(), color.get_blue_p());
 	MakePathSignalBody(cr, xstart, xoff, xend, ybot, ymid, ytop);
 	cr->stroke();

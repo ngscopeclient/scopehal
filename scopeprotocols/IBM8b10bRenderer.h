@@ -39,7 +39,7 @@
 #include "../scopehal/TextRenderer.h"
 
 /**
-	@brief Renderer for an ASCII channel
+	@brief Renderer for an 8B/10B channel
  */
 class IBM8b10bRenderer : public TextRenderer
 {

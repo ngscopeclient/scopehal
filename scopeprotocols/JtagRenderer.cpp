@@ -30,38 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Implementation of JtagRenderer
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
+#include "scopeprotocols.h"
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "JtagRenderer.h"
 
-#include "ACCoupleDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "IBM8b10bDecoder.h"
-#include "JtagDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
-#include "ThresholdDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+using namespace std;
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+JtagRenderer::JtagRenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color JtagRenderer::GetColor(int i)
+{
+	return Gdk::Color("green");
+
+	/*
+	JtagCapture* capture = dynamic_cast<JtagCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const JtagSymbol& s = capture->m_samples[i].m_sample;
+
+		//errors are red
+		if(s.m_error)
+			return Gdk::Color("#ff0000");
+
+		//control characters are purple
+		else if(s.m_control)
+			return Gdk::Color("#c000a0");
+
+		//Data characters are green
+		else
+			return Gdk::Color("#008000");
+	}*/
+
+	//error
+	return Gdk::Color("red");
+}
+
+string JtagRenderer::GetText(int i)
+{
+	JtagCapture* capture = dynamic_cast<JtagCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const JtagSymbol& s = capture->m_samples[i].m_sample;
+
+		//for now just chain state
+		return JtagSymbol::GetName(s.m_state);
+	}
+	return "";
+}

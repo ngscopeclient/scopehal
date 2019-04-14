@@ -50,6 +50,7 @@ void ScopeProtocolStaticInit()
 	//AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeDecoder2);
 	AddDecoderClass(IBM8b10bDecoder);
+	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(ThresholdDecoder);
 	//AddDecoderClass(UARTDecoder);

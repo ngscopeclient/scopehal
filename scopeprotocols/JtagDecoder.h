@@ -30,38 +30,77 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of JtagDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef JtagDecoder_h
+#define JtagDecoder_h
 
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-#include "ACCoupleDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "IBM8b10bDecoder.h"
-#include "JtagDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
-#include "ThresholdDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+class JtagSymbol
+{
+public:
+	enum JtagState
+	{
+		TEST_LOGIC_RESET,
+		RUN_TEST_IDLE,
+		SELECT_DR_SCAN,
+		SELECT_IR_SCAN,
+		CAPTURE_DR,
+		CAPTURE_IR,
+		SHIFT_DR,
+		SHIFT_IR,
+		EXIT1_DR,
+		EXIT1_IR,
+		PAUSE_DR,
+		PAUSE_IR,
+		EXIT2_DR,
+		EXIT2_IR,
+		UPDATE_DR,
+		UPDATE_IR,
+
+		UNKNOWN_0,
+		UNKNOWN_1,
+		UNKNOWN_2,
+		UNKNOWN_3,
+		UNKNOWN_4,
+	};
+
+	JtagSymbol(JtagSymbol::JtagState state)
+		: m_state(state)
+	{}
+
+	static const char* GetName(JtagSymbol::JtagState state);
+
+	bool operator== (const JtagSymbol& s) const
+	{
+		return (m_state == s.m_state);
+	}
+
+	JtagState m_state;
+};
+
+typedef OscilloscopeSample<JtagSymbol> JtagSample;
+typedef CaptureChannel<JtagSymbol> JtagCapture;
+
+class JtagDecoder : public ProtocolDecoder
+{
+public:
+	JtagDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(JtagDecoder)
+
+protected:
+};
 
 #endif
