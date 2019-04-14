@@ -730,7 +730,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			SendCommand(cmd);
 
 			//Ask for the wavedesc (in raw binary)
-			cmd = "C1:WF? 'DESC'";
+			cmd = "C1:WF? DESC";
 			cmd[1] += i;
 			SendCommand(cmd);
 			string wavedesc;
@@ -779,7 +779,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			if( (num_sequences > 1) && (j > 0) )
 			{
 				//If a multi-segment capture, ask for the trigger time data
-				cmd = "C1:WF? 'TIME'";
+				cmd = "C1:WF? TIME";
 				cmd[1] += i;
 				SendCommand(cmd);
 				string wavetime;
@@ -804,7 +804,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 				cap->m_timescale = round(interval);
 
 			//Ask for the actual data (in raw binary)
-			cmd = "C1:WF? 'DAT1'";
+			cmd = "C1:WF? DAT1";
 			cmd[1] += i;
 			SendCommand(cmd);
 			string data;
