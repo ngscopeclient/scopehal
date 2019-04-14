@@ -126,6 +126,8 @@ public:
 protected:
 	Socket m_socket;
 
+	void BulkCheckChannelEnableState();
+
 	virtual bool SendCommand(std::string cmd, bool eoi=true) = 0;
 	virtual std::string ReadData() =0;
 	virtual std::string ReadMultiBlockString() =0;
@@ -158,6 +160,7 @@ protected:
 	TriggerType m_triggerType;
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<size_t, double> m_channelOffsets;
+	std::map<int, bool> m_channelsEnabled;
 
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;

@@ -252,6 +252,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_triggerTypeValid = false;
 	m_channelVoltageRanges.clear();
 	m_channelOffsets.clear();
+	m_channelsEnabled.clear();
 }
 
 /**
@@ -300,9 +301,11 @@ string LeCroyOscilloscope::GetSerial()
 // Channel configuration
 
 //TODO: None of these 3 functions support LA stuff
-//TODO: cache enable state, at least for a while?
 bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 {
+	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+		return m_channelsEnabled[i];
+
 	//ext trigger should never be displayed
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
@@ -317,8 +320,15 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	SendCommand(cmd);
 	string reply = ReadSingleBlockString(true);
 	if(reply == "OFF")
+	{
+		m_channelsEnabled[i] = false;
 		return false;
-	return true;
+	}
+	else
+	{
+		m_channelsEnabled[i] = true;
+		return true;
+	}
 }
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
@@ -670,17 +680,65 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	return true;
 }
 
+/**
+	@brief Optimized function for checking channel enable status en masse with less round trips to the scope
+ */
+void LeCroyOscilloscope::BulkCheckChannelEnableState()
+{
+	char tmp[128];
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		snprintf(tmp, sizeof(tmp), "C%d:TRACE?", i+1);
+		SendCommand(tmp);
+	}
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		string reply = ReadSingleBlockString();
+		if(reply == "OFF")
+			m_channelsEnabled[i] = false;
+		else
+			m_channelsEnabled[i] = true;
+	}
+}
+
 bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 {
 	//LogDebug("Acquire data\n");
 
 	double start = GetTime();
 
+	//Read the wavedesc for every enabled channel in batch mode first
+	//(With VICP framing we cannot use semicolons to separate commands)
+	vector<string> wavedescs;
+	char tmp[128];
+	string cmd;
+	bool enabled[4] = {false};
+	BulkCheckChannelEnableState();
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+		enabled[i] = IsChannelEnabled(i);
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		wavedescs.push_back("");
+		if(enabled[i])
+		{
+			snprintf(tmp, sizeof(tmp), "C%d:WF? DESC", i+1);
+			cmd = tmp;
+			SendCommand(cmd);
+		}
+	}
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(enabled[i])
+			ReadWaveformBlock(wavedescs[i]);
+	}
+
+	//TODO: WFSU in outer loop and WF in inner loop
 	unsigned int num_sequences = 1;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		//If the channel is invisible, don't waste time capturing data
-		if(!m_channels[i]->IsEnabled())
+		string wavedesc = wavedescs[i];
+		if(wavedesc.empty())
 		{
 			m_channels[i]->SetData(NULL);
 			continue;
@@ -688,22 +746,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 		//Set up the capture we're going to store our data into
 		AnalogCapture* cap = new AnalogCapture;
-
-		//Ask for the wavedesc (in raw binary).
-		//Send the request for the waveform itself right after to save a round-trip time.
-		//(With VICP framing we cannot use semicolons to separate commands)
-		string cmd = "C1:WF? DESC";
-		cmd[1] += i;
-		SendCommand(cmd);
-		if(num_sequences == 1)
-		{
-			cmd = "C1:WF? DAT1";
-			cmd[1] += i;
-			SendCommand(cmd);
-		}
-		string wavedesc;
-		if(!ReadWaveformBlock(wavedesc))
-			break;
 
 		//TODO: get sequence count from wavedesc
 		//TODO: sequence mode should be multiple captures, one per sequence, with some kind of fifo or something?
@@ -763,19 +805,15 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
-				char tmp[128];
 				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
 				cmd += tmp;
 				SendCommand(cmd);
 			}
 
 			//Read the actual waveform data
-			if(num_sequences != 1)
-			{
-				cmd = "C1:WF? DAT1";
-				cmd[1] += i;
-				SendCommand(cmd);
-			}
+			cmd = "C1:WF? DAT1";
+			cmd[1] += i;
+			SendCommand(cmd);
 			string data;
 			if(!ReadWaveformBlock(data))
 				break;
