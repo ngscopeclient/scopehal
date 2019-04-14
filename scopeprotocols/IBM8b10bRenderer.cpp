@@ -87,10 +87,10 @@ string IBM8b10bRenderer::GetText(int i)
 		unsigned int left = s.m_data & 0x1F;
 
 		char tmp[32];
-		if(s.m_control)
-			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
-		else if(s.m_error)
+		if(s.m_error)
 			snprintf(tmp, sizeof(tmp), "ERR");
+		else if(s.m_control)
+			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
 		else
 			snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
 		return string(tmp);

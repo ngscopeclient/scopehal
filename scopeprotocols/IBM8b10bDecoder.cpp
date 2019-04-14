@@ -311,18 +311,25 @@ void IBM8b10bDecoder::Refresh()
 		if(first)
 		{
 			if(total_disp < 0)
-				last_disp = -1;
-			else
 				last_disp = 1;
+			else
+				last_disp = -1;
 			first = false;
 		}
 
 		bool disperr = false;
 		if(total_disp > 0 && last_disp > 0)
+		{
 			disperr = true;
+			last_disp = 1;
+		}
 		else if(total_disp < 0 && last_disp < 0)
+		{
 			disperr = true;
-		total_disp += last_disp;
+			last_disp = -1;
+		}
+		else
+			last_disp += total_disp;
 
 
 		cap->m_samples.push_back(IBM8b10bSample(
@@ -330,10 +337,6 @@ void IBM8b10bDecoder::Refresh()
 			data[i+10].m_offset - data[i].m_offset,
 			IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5)));
 	}
-
-	//Create a few dummy test samples
-	//cap->m_samples.push_back(IBM8b10bSample(200, 100, IBM8b10bSymbol(true, 0xff)));
-	//cap->m_samples.push_back(IBM8b10bSample(100, 100, IBM8b10bSymbol(false, 0x55)));
 
 	SetData(cap);
 }
