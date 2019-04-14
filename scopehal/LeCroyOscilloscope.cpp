@@ -674,20 +674,9 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 {
 	//LogDebug("Acquire data\n");
 
-	//See how many captures we have (if using sequence mode)
-	SendCommand("SEQUENCE?");
-	string seqinfo = ReadSingleBlockString();
-	unsigned int num_sequences = 1;
-	if(seqinfo.find("ON") != string::npos)
-	{
-		float max_samples;
-		sscanf(seqinfo.c_str(), "ON,%u,%f", &num_sequences, &max_samples);
-	}
-	//if(num_sequences > 1)
-	//	LogDebug("Capturing %u sequences\n", num_sequences);
-
 	double start = GetTime();
 
+	unsigned int num_sequences = 1;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		//If the channel is invisible, don't waste time capturing data
@@ -700,6 +689,66 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		//Set up the capture we're going to store our data into
 		AnalogCapture* cap = new AnalogCapture;
 
+		//Ask for the wavedesc (in raw binary).
+		//Send the request for the waveform itself right after to save a round-trip time.
+		//(With VICP framing we cannot use semicolons to separate commands)
+		string cmd = "C1:WF? DESC";
+		cmd[1] += i;
+		SendCommand(cmd);
+		if(num_sequences == 1)
+		{
+			cmd = "C1:WF? DAT1";
+			cmd[1] += i;
+			SendCommand(cmd);
+		}
+		string wavedesc;
+		if(!ReadWaveformBlock(wavedesc))
+			break;
+
+		//TODO: get sequence count from wavedesc
+		//TODO: sequence mode should be multiple captures, one per sequence, with some kind of fifo or something?
+
+		//Parse the wavedesc headers
+		//Ref: http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
+		unsigned char* pdesc = (unsigned char*)(&wavedesc[0]);
+		//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
+		//LogDebug("    Wavedesc len: %d\n", wavedesc_len);
+		//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+		//LogDebug("    Usertext len: %d\n", usertext_len);
+		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
+		//LogDebug("    Trigtime len: %d\n", trigtime_len);
+		if(trigtime_len != 0)
+			num_sequences = trigtime_len;
+		float v_gain = *reinterpret_cast<float*>(pdesc + 156);
+		float v_off = *reinterpret_cast<float*>(pdesc + 160);
+		float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+		double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+		double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+		if(h_off_frac < 0)
+			h_off_frac = interval + h_off_frac;
+		cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
+											//We might have multiple offsets
+		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
+
+		//Timestamp is a somewhat complex format that needs some shuffling around.
+		double fseconds = *reinterpret_cast<double*>(pdesc + 296);
+		uint8_t seconds = floor(fseconds);
+		cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
+		time_t tnow = time(NULL);
+		struct tm* now = localtime(&tnow);
+		struct tm tstruc;
+		tstruc.tm_sec = seconds;
+		tstruc.tm_min = pdesc[304];
+		tstruc.tm_hour = pdesc[305];
+		tstruc.tm_mday = pdesc[306];
+		tstruc.tm_mon = pdesc[307];
+		tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
+		tstruc.tm_wday = now->tm_wday;
+		tstruc.tm_yday = now->tm_yday;
+		tstruc.tm_isdst = now->tm_isdst;
+		cap->m_startTimestamp = mktime(&tstruc);
+		cap->m_timescale = round(interval);
+
 		for(unsigned int j=0; j<num_sequences; j++)
 		{
 			//LogDebug("Channel %u block %u\n", i, j);
@@ -711,7 +760,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
-			string cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
+			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
 				char tmp[128];
@@ -720,51 +769,18 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 				SendCommand(cmd);
 			}
 
-			//Ask for the wavedesc (in raw binary)
-			cmd = "C1:WF? DESC";
-			cmd[1] += i;
-			SendCommand(cmd);
-			string wavedesc;
-			if(!ReadWaveformBlock(wavedesc))
+			//Read the actual waveform data
+			if(num_sequences != 1)
+			{
+				cmd = "C1:WF? DAT1";
+				cmd[1] += i;
+				SendCommand(cmd);
+			}
+			string data;
+			if(!ReadWaveformBlock(data))
 				break;
-
-			//Parse the wavedesc headers
-			//Ref: http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
-			unsigned char* pdesc = (unsigned char*)(&wavedesc[0]);
-			//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-			//LogDebug("    Wavedesc len: %d\n", wavedesc_len);
-			//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
-			//LogDebug("    Usertext len: %d\n", usertext_len);
-			//uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
-			//LogDebug("    Trigtime len: %d\n", trigtime_len);
-			float v_gain = *reinterpret_cast<float*>(pdesc + 156);
-			float v_off = *reinterpret_cast<float*>(pdesc + 160);
-			float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
-			double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
-			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
-			if(h_off_frac < 0)
-				h_off_frac = interval + h_off_frac;
-			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
-												//We might have multiple offsets
-			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-
-			//Timestamp is a somewhat complex format that needs some shuffling around.
-			double fseconds = *reinterpret_cast<double*>(pdesc + 296);
-			uint8_t seconds = floor(fseconds);
-			cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
-			time_t tnow = time(NULL);
-			struct tm* now = localtime(&tnow);
-			struct tm tstruc;
-			tstruc.tm_sec = seconds;
-			tstruc.tm_min = pdesc[304];
-			tstruc.tm_hour = pdesc[305];
-			tstruc.tm_mday = pdesc[306];
-			tstruc.tm_mon = pdesc[307];
-			tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
-			tstruc.tm_wday = now->tm_wday;
-			tstruc.tm_yday = now->tm_yday;
-			tstruc.tm_isdst = now->tm_isdst;
-			cap->m_startTimestamp = mktime(&tstruc);
+			//dt = GetTime() - start;
+			//LogDebug("RX took %.3f ms\n", dt * 1000);
 
 			double trigtime = 0;
 			if( (num_sequences > 1) && (j > 0) )
@@ -787,23 +803,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			//LogDebug("    Trigger time: %.3f sec (%lu samples)\n", trigtime, trigtime_samples);
 			//LogDebug("    Trigger offset: %.3f sec (%lu samples)\n", trigoff, trigoff_samples);
 
-			//double dt = GetTime() - start;
-			//start = GetTime();
-			//LogDebug("Headers took %.3f ms\n", dt * 1000);
-
-			if(j == 0)
-				cap->m_timescale = round(interval);
-
-			//Ask for the actual data (in raw binary)
-			cmd = "C1:WF? DAT1";
-			cmd[1] += i;
-			SendCommand(cmd);
-			string data;
-			if(!ReadWaveformBlock(data))
-				break;
-			//dt = GetTime() - start;
-			//LogDebug("RX took %.3f ms\n", dt * 1000);
-
 			//If we have samples already in the capture, stretch the final one to our trigger offset
 			if(cap->m_samples.size())
 			{
@@ -824,7 +823,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	}
 
 	double dt = GetTime() - start;
-	LogDebug("Waveform download took %.3f ms\n", dt * 1000);
+	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
 
 	if(num_sequences > 1)
 	{
