@@ -155,6 +155,7 @@ protected:
 	//Samples a digital channel on the rising edges of another channel.
 	//The two channels need not be the same sample rate.
 	void SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
+	void SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);

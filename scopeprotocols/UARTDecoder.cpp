@@ -45,7 +45,7 @@ using namespace std;
 // Construction / destruction
 
 UARTDecoder::UARTDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -58,6 +58,14 @@ UARTDecoder::UARTDecoder(string color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
+
+vector<string> UARTDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Length");
+	ret.push_back("ASCII");
+	return ret;
+}
 
 bool UARTDecoder::NeedsConfig()
 {
@@ -85,7 +93,7 @@ string UARTDecoder::GetProtocolName()
 void UARTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/UART", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "UART(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -117,10 +125,14 @@ void UARTDecoder::Refresh()
 	//UART processing
 	AsciiCapture* cap = new AsciiCapture;
 	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Time-domain processing to reflect potentially variable sampling rate for RLE captures
 	int64_t next_value = 0;
 	size_t isample = 0;
+	int64_t tlast = 0;
+	Packet* pack = NULL;
 	while(isample < din->m_samples.size())
 	{
 		//Wait for signal to go high (idle state)
@@ -174,7 +186,53 @@ void UARTDecoder::Refresh()
 			tstart,
 			tend-tstart,
 			(char)dval));
+
+		//If the last packet was more than 3 byte times ago, start a new one
+		if(pack != NULL)
+		{
+			int64_t delta = tstart - tlast;
+			if(delta > 30 * scaledbitper)
+			{
+				pack->m_len = (tend * din->m_timescale) - pack->m_offset;
+				FinishPacket(pack);
+				pack = NULL;
+			}
+		}
+
+		//If we don't have a packet yet, start one
+		if(pack == NULL)
+		{
+			pack = new Packet;
+			pack->m_offset = tstart * din->m_timescale;
+		}
+
+		//Append to the existing packet
+		pack->m_data.push_back(dval);
+		tlast = tstart;
+	}
+
+	//If we have a packet in progress, add it
+	if(pack)
+	{
+		pack->m_len = (din->m_samples[din->m_samples.size()-1].m_offset * din->m_timescale) - pack->m_offset;
+		FinishPacket(pack);
 	}
 
 	SetData(cap);
+}
+
+void UARTDecoder::FinishPacket(Packet* pack)
+{
+	//length header
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+	pack->m_headers["Length"] = tmp;
+
+	//ascii packet contents
+	string s;
+	for(auto b : pack->m_data)
+		s += (char)b;
+	pack->m_headers["ASCII"] = s;
+
+	m_packets.push_back(pack);
 }

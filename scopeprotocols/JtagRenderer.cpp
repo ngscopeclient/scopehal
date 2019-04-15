@@ -59,7 +59,7 @@ Gdk::Color JtagRenderer::GetColor(int i)
 	{
 		const JtagSymbol& s = capture->m_samples[i].m_sample;
 
-		switch(capture->m_samples[i].m_sample.m_state)
+		switch(s.m_state)
 		{
 			//Unknown states are red
 			case JtagSymbol::UNKNOWN_0:

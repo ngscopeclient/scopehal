@@ -314,6 +314,7 @@ void JtagDecoder::Refresh()
 
 				ibytes.clear();
 				obytes.clear();
+				nbits = 0;
 			}
 
 			//Start a new packet
@@ -344,7 +345,7 @@ void JtagDecoder::Refresh()
 		}
 	}
 
-	LogDebug("%zu packets\n", m_packets.size());
+	//LogDebug("%zu packets\n", m_packets.size());
 
 	SetData(cap);
 }

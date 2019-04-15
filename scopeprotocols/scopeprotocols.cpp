@@ -53,5 +53,5 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(ThresholdDecoder);
-	//AddDecoderClass(UARTDecoder);
+	AddDecoderClass(UARTDecoder);
 }
