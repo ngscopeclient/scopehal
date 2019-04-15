@@ -21,6 +21,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp
+	UartClockRecoveryDecoder.cpp
 
 	scopeprotocols.cpp
 	)

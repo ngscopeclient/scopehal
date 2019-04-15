@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -28,31 +29,39 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ACCoupleDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
+#include "UartClockRecoveryDecoder.h"
+#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACCoupleDecoder::ACCoupleDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CONVERSION)
+UartClockRecoveryDecoder::UartClockRecoveryDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("din");
+	m_signalNames.push_back("IN");
 	m_channels.push_back(NULL);
+
+	m_baudname = "Baud rate";
+	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_baudname].SetIntVal(115200);	//115.2 Kbps by default
+
+	m_threshname = "Threshold";
+	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_threshname].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ACCoupleDecoder::CreateRenderer()
+ChannelRenderer* UartClockRecoveryDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return new DigitalRenderer(this);
 }
 
-bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool UartClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -62,40 +71,41 @@ bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleDecoder::GetVoltageRange()
-{
-	return m_channels[0]->GetVoltageRange();
-}
-
-string ACCoupleDecoder::GetProtocolName()
-{
-	return "AC Couple";
-}
-
-bool ACCoupleDecoder::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool ACCoupleDecoder::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
-void ACCoupleDecoder::SetDefaultName()
+void UartClockRecoveryDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/AC couple", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "UartClockRec(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
+}
+
+string UartClockRecoveryDecoder::GetProtocolName()
+{
+	return "UART Clock Recovery";
+}
+
+bool UartClockRecoveryDecoder::IsOverlay()
+{
+	//we're an overlaid digital channel
+	return true;
+}
+
+bool UartClockRecoveryDecoder::NeedsConfig()
+{
+	//we have need the base symbol rate configured
+	return true;
+}
+
+double UartClockRecoveryDecoder::GetVoltageRange()
+{
+	//ignored
+	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACCoupleDecoder::Refresh()
+void UartClockRecoveryDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -103,35 +113,95 @@ void ACCoupleDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
 
-	//We need meaningful data
-	if(din->GetDepth() == 0)
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if( (din == NULL) || (din->GetDepth() == 0) )
 	{
 		SetData(NULL);
 		return;
 	}
 
-	//Find the average of our samples (assume data is DC balanced)
-	double sum = 0;
-	int64_t count = 0;
-	for(auto sample : *din)
-	{
-		sum += sample;
-		count ++;
-	}
-	double offset = sum / count;
-	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	//Look up the nominal baud rate and convert to time
+	int64_t baud = m_parameters[m_baudname].GetIntVal();
+	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
 
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	//Create the output waveform and copy our timescales
+	DigitalCapture* cap = new DigitalCapture;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_triggerPhase = 0;
+	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
+
+	//Timestamps of the edges
+	vector<int64_t> edges;
+
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	const float threshold = m_parameters[m_threshname].GetFloatVal();
+	for(size_t i=1; i<din->m_samples.size(); i++)
 	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample - offset));
+		auto sin = din->m_samples[i];
+		bool value = static_cast<float>(sin) > threshold;
+
+		//Start time of the sample, in picoseconds
+		int64_t t = din->m_triggerPhase + din->m_timescale * sin.m_offset;
+
+		//Move to the middle of the sample
+		t += din->m_timescale/2;
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		//Interpolate the time
+		t += din->m_timescale * Measurement::InterpolateTime(din, i-1, threshold);
+		edges.push_back(t);
+		last = value;
 	}
+
+	//Actual DLL logic
+	//TODO: recover from glitches better?
+	size_t nedge = 0;
+	int64_t bcenter = 0;
+	int64_t tlast = 0;
+	bool value = false;
+	for(; nedge < edges.size();)
+	{
+		//The current bit starts half a baud period after the start bit edge
+		bcenter = edges[nedge] + ps/2;
+		nedge ++;
+
+		//We have ten start/ data/stop bits after this
+		for(int i=0; i<10; i++)
+		{
+			if(nedge >= edges.size())
+				break;
+
+			//If the next edge is around the time of this bit, re-sync to it
+			if(edges[nedge] < bcenter + ps/4)
+			{
+				//bcenter = edges[nedge] + ps/2;
+				nedge ++;
+			}
+
+			//Emit a sample for this data bit
+			cap->m_samples.push_back(DigitalSample(bcenter, ps, value));
+			value = !value;
+			tlast = bcenter;
+
+			//Next bit starts one baud period later
+			bcenter  += ps;
+		}
+	}
+
 	SetData(cap);
-
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
 }

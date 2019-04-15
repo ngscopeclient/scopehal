@@ -30,39 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of UartClockRecoveryDecoder
  */
+#ifndef UartClockRecoveryDecoder_h
+#define UartClockRecoveryDecoder_h
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-#include "ACCoupleDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "IBM8b10bDecoder.h"
-#include "JtagDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
-#include "ThresholdDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+class UartClockRecoveryDecoder : public ProtocolDecoder
+{
+public:
+	UartClockRecoveryDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(UartClockRecoveryDecoder)
+
+protected:
+	std::string m_baudname;
+	std::string m_threshname;
+};
 
 #endif

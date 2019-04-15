@@ -54,4 +54,5 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(ThresholdDecoder);
 	AddDecoderClass(UARTDecoder);
+	AddDecoderClass(UartClockRecoveryDecoder);
 }
