@@ -93,10 +93,14 @@ void EyeCapture2::Normalize()
 {
 	//Normalize it
 	size_t len = m_width * m_height;
-	int64_t nmax = 1;
+
+	int64_t nmax = 0;
 	for(size_t i=0; i<len; i++)
 		nmax = max(m_accumdata[i], nmax);
+	if(nmax == 0)
+		nmax = 1;
 	float norm = 2.0f / nmax;
+
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = m_accumdata[i] * norm;
 }
@@ -172,6 +176,9 @@ double EyeDecoder2::GetVoltageRange()
 
 void EyeDecoder2::Refresh()
 {
+	static double total_time = 0;
+	static double total_frames = 0;
+
 	LogIndenter li;
 
 	//Get the input data
@@ -196,6 +203,8 @@ void EyeDecoder2::Refresh()
 		return;
 	}
 
+	double start = GetTime();
+
 	//Initialize the capture
 	//TODO: allow integration across multiple acquisitions
 	//TODO: timestamps? do we need those?
@@ -207,11 +216,14 @@ void EyeDecoder2::Refresh()
 	int64_t* data = cap->GetAccumData();
 
 	//Process the eye
-	size_t iwave = 0;
 	size_t iclock = 0;
 	double awidth = 0;
 	int64_t nwidth = 0;
-	for(; iwave < waveform->GetDepth(); iwave ++)
+	float yscale = m_height / m_channels[0]->GetVoltageRange();
+	float tfix = 1.5 * waveform->m_timescale;
+	float fwidth = m_width / 2.0f;
+	float ymid = m_height / 2;
+	for(auto& samp : waveform->m_samples)
 	{
 		//Stop when we get to the end
 		if(iclock + 1 >= clock->GetDepth())
@@ -221,13 +233,11 @@ void EyeDecoder2::Refresh()
 		int64_t tclock = clock->GetSampleStart(iclock) * clock->m_timescale;
 		int64_t tend = clock->GetSampleStart(iclock+1) * clock->m_timescale;
 		int64_t twidth = tend - tclock;
-		awidth += (tend - tclock);
+		awidth += twidth;
 		nwidth ++;
 
 		//Find time of this sample
-		AnalogSample samp = (*waveform).m_samples[iwave];
 		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
-		float v = samp;
 
 		//If it's past the end of the current UI, increment the clock
 		int64_t offset = tstart - tclock;
@@ -238,7 +248,13 @@ void EyeDecoder2::Refresh()
 		}
 
 		//TODO: figure out where this is creeping in
-		offset += 1.5*waveform->m_timescale;
+		offset += tfix;
+
+		//Find (and sanity check) the Y coordinate
+		size_t pixel_y = (samp.m_sample * yscale) + ymid;
+		if(pixel_y >= m_height)
+			continue;
+		int64_t* row = data + pixel_y*m_width;
 
 		//Sampling clock is the middle of the UI, not the start.
 		//Anything more than half a UI right of the clock is negative.
@@ -249,26 +265,22 @@ void EyeDecoder2::Refresh()
 			continue;
 
 		//Plot each point 3 times for center/left/right portions of the eye
-		int64_t xpos[] = {offset, offset + twidth, -twidth + offset };
-
 		//Map -twidth to +twidth to 0...m_width
-		float scale = (m_width * 1.0f) / (2 * twidth);
-		float yscale = m_height / m_channels[0]->GetVoltageRange();
-		float ymid = m_height / 2;
+		int64_t xpos[] = {offset, offset + twidth, -twidth + offset };
+		float scale = fwidth / twidth;
 		for(auto x : xpos)
 		{
 			size_t pixel_x = round((x + twidth) * scale);
-			if(pixel_x >= m_width)
-				continue;
-			size_t pixel_y = (v * yscale) + ymid;
-			if(pixel_y >= m_height)
-				continue;
-
-			size_t n = pixel_y * m_width + pixel_x;
-			data[n] ++;
+			if(pixel_x < m_width)
+				row[pixel_x] ++;
 		}
 	}
 	m_uiWidth = round(awidth / nwidth);
 
 	cap->Normalize();
+
+	double dt = GetTime() - start;
+	total_frames ++;
+	total_time += dt;
+	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
 }

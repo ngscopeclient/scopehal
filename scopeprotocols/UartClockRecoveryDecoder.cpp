@@ -38,7 +38,7 @@ using namespace std;
 // Construction / destruction
 
 UartClockRecoveryDecoder::UartClockRecoveryDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
 {
 	//Set up channels
 	m_signalNames.push_back("IN");
@@ -81,7 +81,7 @@ void UartClockRecoveryDecoder::SetDefaultName()
 
 string UartClockRecoveryDecoder::GetProtocolName()
 {
-	return "UART Clock Recovery";
+	return "Clock Recovery (UART)";
 }
 
 bool UartClockRecoveryDecoder::IsOverlay()

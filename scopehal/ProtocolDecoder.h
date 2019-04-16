@@ -83,6 +83,7 @@ public:
 	enum Category
 	{
 		CAT_ANALYSIS,	//Signal analysis (histograms, eye patterns, etc)
+		CAT_CLOCK,		//Clock stuff
 		CAT_CONVERSION,	//Type conversion
 		CAT_MATH,		//Basic math functions
 		CAT_SERIAL,		//Serial communications

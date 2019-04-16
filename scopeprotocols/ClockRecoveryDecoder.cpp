@@ -38,7 +38,7 @@ using namespace std;
 // Construction / destruction
 
 ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
 {
 	//Set up channels
 	m_signalNames.push_back("IN");
@@ -81,7 +81,7 @@ void ClockRecoveryDecoder::SetDefaultName()
 
 string ClockRecoveryDecoder::GetProtocolName()
 {
-	return "Clock Recovery";
+	return "Clock Recovery (PLL)";
 }
 
 bool ClockRecoveryDecoder::IsOverlay()
@@ -132,6 +132,8 @@ void ClockRecoveryDecoder::Refresh()
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
 
+	double start = GetTime();
+
 	//Timestamps of the edges
 	vector<int64_t> edges;
 
@@ -167,6 +169,10 @@ void ClockRecoveryDecoder::Refresh()
 		edges.push_back(t);
 		last = value;
 	}
+
+	double dt = GetTime() - start;
+	start = GetTime();
+	LogTrace("Zero crossing: %.3f ms\n", dt * 1000);
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
@@ -212,8 +218,13 @@ void ClockRecoveryDecoder::Refresh()
 		value = !value;
 		cap->m_samples.push_back(DigitalSample((int64_t)edgepos, (int64_t)period, value));
 	}
+
+	dt = GetTime() - start;
+	start = GetTime();
+	LogTrace("NCO: %.3f ms\n", dt * 1000);
+
 	total_error /= edges.size();
-	LogTrace("ClockRecoveryDecoder: average phase error %.1f\n", total_error);
+	LogTrace("average phase error %.1f\n", total_error);
 
 	SetData(cap);
 }
