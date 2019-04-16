@@ -732,88 +732,94 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			ReadWaveformBlock(wavedescs[i]);
 	}
 
-	//TODO: WFSU in outer loop and WF in inner loop
+	//TODO: parse num_sequences out of first valid wavedesc
 	unsigned int num_sequences = 1;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+
+	for(unsigned int j=0; j<num_sequences; j++)
 	{
-		//If the channel is invisible, don't waste time capturing data
-		string wavedesc = wavedescs[i];
-		if(wavedesc.empty())
+		//Ask for the segment of interest
+		//(segment number is ignored for non-segmented waveforms)
+		if(num_sequences > 1)
 		{
-			m_channels[i]->SetData(NULL);
-			continue;
+			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
+			snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
+			cmd += tmp;
+			SendCommand(cmd);
 		}
 
-		//Set up the capture we're going to store our data into
-		AnalogCapture* cap = new AnalogCapture;
-
-		//TODO: get sequence count from wavedesc
-		//TODO: sequence mode should be multiple captures, one per sequence, with some kind of fifo or something?
-
-		//Parse the wavedesc headers
-		//Ref: http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
-		unsigned char* pdesc = (unsigned char*)(&wavedesc[0]);
-		//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-		//LogDebug("    Wavedesc len: %d\n", wavedesc_len);
-		//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
-		//LogDebug("    Usertext len: %d\n", usertext_len);
-		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
-		//LogDebug("    Trigtime len: %d\n", trigtime_len);
-		if(trigtime_len != 0)
-			num_sequences = trigtime_len;
-		float v_gain = *reinterpret_cast<float*>(pdesc + 156);
-		float v_off = *reinterpret_cast<float*>(pdesc + 160);
-		float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
-		double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
-		double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
-		if(h_off_frac < 0)
-			h_off_frac = interval + h_off_frac;
-		cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
-											//We might have multiple offsets
-		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-
-		//Timestamp is a somewhat complex format that needs some shuffling around.
-		double fseconds = *reinterpret_cast<double*>(pdesc + 296);
-		uint8_t seconds = floor(fseconds);
-		cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
-		time_t tnow = time(NULL);
-		struct tm* now = localtime(&tnow);
-		struct tm tstruc;
-		tstruc.tm_sec = seconds;
-		tstruc.tm_min = pdesc[304];
-		tstruc.tm_hour = pdesc[305];
-		tstruc.tm_mday = pdesc[306];
-		tstruc.tm_mon = pdesc[307];
-		tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
-		tstruc.tm_wday = now->tm_wday;
-		tstruc.tm_yday = now->tm_yday;
-		tstruc.tm_isdst = now->tm_isdst;
-		cap->m_startTimestamp = mktime(&tstruc);
-		cap->m_timescale = round(interval);
-
-		for(unsigned int j=0; j<num_sequences; j++)
+		//Ask for every enabled chanenl up front, so the scope can generate the next while we process the first
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
-			//LogDebug("Channel %u block %u\n", i, j);
-
-			float fbase = i*1.0f / m_analogChannelCount;
-
-			fbase += (j*1.0f / num_sequences) / m_analogChannelCount;
-			progress_callback(fbase);
-
-			//Ask for the segment of interest
-			//(segment number is ignored for non-segmented waveforms)
-			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
-			if(num_sequences > 1)
+			if(enabled[i])
 			{
-				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
-				cmd += tmp;
+				cmd = "C1:WF? DAT1";
+				cmd[1] += i;
 				SendCommand(cmd);
 			}
+		}
+
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			//If the channel is invisible, don't waste time capturing data
+			string wavedesc = wavedescs[i];
+			if(wavedesc.empty())
+			{
+				m_channels[i]->SetData(NULL);
+				continue;
+			}
+
+			float fbase = i*1.0f / m_analogChannelCount;
+			//fbase += (j*1.0f / num_sequences) / m_analogChannelCount;
+			progress_callback(fbase);
+
+			//Set up the capture we're going to store our data into
+			AnalogCapture* cap = new AnalogCapture;
+
+			//TODO: get sequence count from wavedesc
+			//TODO: sequence mode should be multiple captures, one per sequence, with some kind of fifo or something?
+
+			//Parse the wavedesc headers
+			//Ref: http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
+			unsigned char* pdesc = (unsigned char*)(&wavedesc[0]);
+			//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
+			//LogDebug("    Wavedesc len: %d\n", wavedesc_len);
+			//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+			//LogDebug("    Usertext len: %d\n", usertext_len);
+			uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
+			//LogDebug("    Trigtime len: %d\n", trigtime_len);
+			if(trigtime_len != 0)
+				num_sequences = trigtime_len;
+			float v_gain = *reinterpret_cast<float*>(pdesc + 156);
+			float v_off = *reinterpret_cast<float*>(pdesc + 160);
+			float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+			double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+			if(h_off_frac < 0)
+				h_off_frac = interval + h_off_frac;
+			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
+												//We might have multiple offsets
+			//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
+
+			//Timestamp is a somewhat complex format that needs some shuffling around.
+			double fseconds = *reinterpret_cast<double*>(pdesc + 296);
+			uint8_t seconds = floor(fseconds);
+			cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
+			time_t tnow = time(NULL);
+			struct tm* now = localtime(&tnow);
+			struct tm tstruc;
+			tstruc.tm_sec = seconds;
+			tstruc.tm_min = pdesc[304];
+			tstruc.tm_hour = pdesc[305];
+			tstruc.tm_mday = pdesc[306];
+			tstruc.tm_mon = pdesc[307];
+			tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
+			tstruc.tm_wday = now->tm_wday;
+			tstruc.tm_yday = now->tm_yday;
+			tstruc.tm_isdst = now->tm_isdst;
+			cap->m_startTimestamp = mktime(&tstruc);
+			cap->m_timescale = round(interval);
 
 			//Read the actual waveform data
-			cmd = "C1:WF? DAT1";
-			cmd[1] += i;
-			SendCommand(cmd);
 			string data;
 			if(!ReadWaveformBlock(data))
 				break;
@@ -821,6 +827,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			//LogDebug("RX took %.3f ms\n", dt * 1000);
 
 			double trigtime = 0;
+			/*
 			if( (num_sequences > 1) && (j > 0) )
 			{
 				//If a multi-segment capture, ask for the trigger time data
@@ -835,29 +842,25 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 				trigtime = ptrigtime[0];
 				//double trigoff = ptrigtime[1];	//offset to point 0 from trigger time
 			}
+			*/
 
-			int64_t trigtime_samples = trigtime * 1e12f / interval;
+			//int64_t trigtime_samples = trigtime * 1e12f / interval;
 			//int64_t trigoff_samples = trigoff * 1e12f / interval;
 			//LogDebug("    Trigger time: %.3f sec (%lu samples)\n", trigtime, trigtime_samples);
 			//LogDebug("    Trigger offset: %.3f sec (%lu samples)\n", trigoff, trigoff_samples);
-
-			//If we have samples already in the capture, stretch the final one to our trigger offset
-			if(cap->m_samples.size())
-			{
-				auto& last_sample = cap->m_samples[cap->m_samples.size()-1];
-				last_sample.m_duration = trigtime_samples - last_sample.m_offset;
-			}
 
 			//Decode the samples
 			unsigned int num_samples = data.size()/2;
 			//LogDebug("Got %u samples\n", num_samples);
 			int16_t* wdata = (int16_t*)&data[0];
+			cap->m_samples.resize(num_samples);
 			for(unsigned int i=0; i<num_samples; i++)
-				cap->m_samples.push_back(AnalogSample(i + trigtime_samples, 1, wdata[i] * v_gain - v_off));
-		}
+				cap->m_samples[i] = AnalogSample(i/* + trigtime_samples*/, 1, wdata[i] * v_gain - v_off);
 
-		//Done, update the data
-		m_channels[i]->SetData(cap);
+			//Done, update the data
+			//TODO: for segmented captures, push all but #0 into some kind of fifo
+			m_channels[i]->SetData(cap);
+		}
 	}
 
 	double dt = GetTime() - start;

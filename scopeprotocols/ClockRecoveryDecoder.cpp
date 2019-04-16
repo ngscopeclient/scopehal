@@ -183,6 +183,7 @@ void ClockRecoveryDecoder::Refresh()
 	double edgepos = (edges[0] + period/2);
 	bool value = false;
 	double total_error = 0;
+	cap->m_samples.reserve(edges.size());
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
