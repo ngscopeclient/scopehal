@@ -128,12 +128,17 @@ void DifferenceDecoder::Refresh()
 
 	//Subtract all of our samples
 	AnalogCapture* cap = new AnalogCapture;
+	cap->m_samples.resize(din_p->m_samples.size());
+	#pragma omp parallel for num_threads(4)
 	for(size_t i=0; i<din_p->m_samples.size(); i++)
 	{
-		AnalogSample sin_p = din_p->m_samples[i];
-		AnalogSample sin_n = din_n->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin_p.m_offset, sin_p.m_duration, sin_p.m_sample - sin_n.m_sample));
+		const AnalogSample& sin_p = din_p->m_samples[i];
+		cap->m_samples[i] = AnalogSample(
+			sin_p.m_offset,
+			sin_p.m_duration,
+			sin_p.m_sample - din_n->m_samples[i].m_sample);
 	}
+
 	SetData(cap);
 
 	//Copy our time scales from the input
