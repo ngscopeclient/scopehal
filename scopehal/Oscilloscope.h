@@ -347,6 +347,17 @@ public:
 	 */
 	std::string m_nickname;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sequenced triggering
+
+public:
+	virtual Oscilloscope::TriggerMode PollTriggerFifo();
+	virtual bool AcquireDataFifo(sigc::slot1<int, float> progress_callback);
+
+protected:
+	typedef std::map<OscilloscopeChannel*, CaptureChannelBase*> SequenceSet;
+	std::list<SequenceSet> m_pendingWaveforms;
+
 protected:
 
 	///The channels

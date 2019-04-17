@@ -98,9 +98,40 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 	bool trig = false;
 	for(int i=0; i<timeout*100 && !trig; i++)
 	{
-		trig = (PollTrigger() == Oscilloscope::TRIGGER_MODE_TRIGGERED);
+		trig = (PollTriggerFifo() == Oscilloscope::TRIGGER_MODE_TRIGGERED);
 		usleep(10 * 1000);
 	}
 
 	return trig;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequenced capture
+
+/**
+	@brief Just like PollTrigger(), but checks if we have pending data in the sequence buffer first
+ */
+Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
+{
+	if(m_pendingWaveforms.size())
+		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
+	else
+		return PollTrigger();
+}
+
+/**
+	@brief Just like AcquireData(), but checks if we have pending data in the sequence buffer first
+ */
+bool Oscilloscope::AcquireDataFifo(sigc::slot1<int, float> progress_callback)
+{
+	if(m_pendingWaveforms.size())
+	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			it.first->SetData(it.second);
+		m_pendingWaveforms.pop_front();
+		return true;
+	}
+	else
+		return AcquireData(progress_callback);
 }
