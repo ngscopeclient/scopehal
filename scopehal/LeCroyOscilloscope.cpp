@@ -182,6 +182,14 @@ void LeCroyOscilloscope::IdentifyHardware()
 	m_model = model;
 	m_serial = serial;
 	m_fwVersion = version;
+
+	//Look up model info
+	if(m_model.find("WS3") == 0)
+		m_modelid = MODEL_WAVESURFER_3K;
+	else if(model.find("WAVERUNNER8") == 0)
+		m_modelid = MODEL_WAVERUNNER_8K;
+	else
+		m_modelid = MODEL_UNKNOWN;
 }
 
 void LeCroyOscilloscope::DetectAnalogChannels()
@@ -1145,4 +1153,117 @@ void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), vdiv);
 	SendCommand(cmd);
+}
+
+vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
+{
+	vector<uint64_t> ret
+
+	//Not all scopes can go this slow
+	if(m_modelid == MODEL_WAVERUNNER_8K)
+		ret.push_back(1000);
+
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+	const int64_t g = k*m;
+
+	//These rates are supported by all known scopes
+	ret.push_back(2 * k);
+	ret.push_back(5 * k);
+	ret.push_back(10 * k);
+	ret.push_back(20 * k);
+	ret.push_back(50 * k);
+	ret.push_back(100 * k);
+	ret.push_back(200 * k);
+	ret.push_back(500 * k);
+
+	ret.push_back(1 * m);
+	ret.push_back(2 * m);
+	ret.push_back(5 * m);
+	ret.push_back(10 * m);
+	ret.push_back(20 * m);
+	ret.push_back(50 * m);
+	ret.push_back(100 * m);
+	ret.push_back(200 * m);
+	ret.push_back(500 * m);
+
+	ret.push_back(1 * g);
+	ret.push_back(2 * g);
+
+	//Some scopes can go faster
+	if(m_modelid == MODEL_WAVERUNNER_8K)
+	{
+		ret.push_back(5 * g);
+		ret.push_back(10 * g);
+	}
+
+	return ret;
+}
+
+vector<uint64_t> LeCroyOscilloscope::GetSampleRatesInterleaved()
+{
+	//Same as non-interleaved, plus double, for all known scopes
+	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
+	ret.push_back(ret[ret.size()-1] * 2);
+	return ret;
+}
+
+vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
+{
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+
+	vector<uint64_t> ret;
+
+	//Standard sample depths for everything.
+	//The front panel allows going as low as 2 samples on some instruments, but don't allow that here.
+	//Going below 1K has no measurable perfomance boost.
+	ret.push_back(1 * k);
+	ret.push_back(5 * k);
+	ret.push_back(10 * k);
+	ret.push_back(50 * k);
+	ret.push_back(100 * k);
+	ret.push_back(500 * k);
+
+	ret.push_back(1 * m);
+	ret.push_back(5 * m);
+	ret.push_back(10 * m);
+
+	//Waverunner 8K has deeper memory.
+	//TODO: even deeper memory support for 8K-M series
+	if(m_modelid == MODEL_WAVERUNNER_8K)
+		ret.push_back(16 * m);
+}
+
+vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
+{
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+
+	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
+
+	//Waverunner 8K allows merging buffers from C2/C3 to get deeper memory
+	if(m_modelid == MODEL_WAVERUNNER_8K)
+		ret.push_back(32 * m);
+}
+
+set<InterleaveConflict> LeCroyOscilloscope::GetInterleaveConflicts()
+{
+	set<InterleaveConflict> ret;
+
+	//All scopes normally interleave channels 1/2 and 3/4.
+	//If both channels in either pair is in use, that's a problem.
+	ret.push_back(InterleaveConflict(m_channels[0], m_channels[1]));
+	if(m_analogChannelCount > 2)
+		ret.emplace(InterleaveConflict(m_channels[2], m_channels[3]));
+
+	//Waverunner 8 only allows interleaving of 2 and 3.
+	//Any use of 1 or 4 disqualifies interleaving.
+	if(m_modelid == MODEL_WAVERUNNER_8K)
+	{
+		ret.emplace(InterleaveConflict(m_channels[0], m_channels[0]));
+		ret.emplace(InterleaveConflict(m_channels[3], m_channels[3]));
+	}
+
+	return ret;
 }

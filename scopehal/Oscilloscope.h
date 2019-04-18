@@ -347,6 +347,38 @@ public:
 	 */
 	std::string m_nickname;
 
+public:
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Memory depth / sample rate control.
+
+	/**
+		@brief Get the legal sampling rates (in Hz) for this scope in all-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() =0;
+
+	/**
+		@brief Get the legal sampling rates (in Hz) for this scope in combined-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() =0;
+
+	/**
+		@brief Get the set of conflicting channels.
+
+		If any pair of channels in this list is enabled, channel interleaving is not possible.
+	 */
+	typedef std::pair<OscilloscopeChannel*, OscilloscopeChannel* > InterleaveConflict;
+	virtual std::set< InterleaveConflict > GetInterleaveConflicts() =0;
+
+	/**
+		@brief Get the legal memory depths for this scope in all-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() =0;
+
+	/**
+		@brief Get the legal memory depths for this scope in combined-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering
 

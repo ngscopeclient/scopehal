@@ -123,6 +123,25 @@ public:
 	virtual Multimeter::MeasurementTypes GetMeterMode();
 	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
 
+	//Scope models.
+	//We only distinguish down to the series of scope, exact SKU is irrelevant.
+	enum Model
+	{
+		MODEL_WAVESURFER_3K,
+		MODEL_WAVERUNNER_8K,
+
+		MODEL_UNKNOWN
+	};
+
+	Model GetModelID()
+	{ return m_modelid; }
+
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+
 protected:
 	Socket m_socket;
 
@@ -146,6 +165,7 @@ protected:
 	std::string m_model;
 	std::string m_serial;
 	std::string m_fwVersion;
+	Model m_modelid;
 
 	//set of SW/HW options we have
 	bool m_hasLA;
