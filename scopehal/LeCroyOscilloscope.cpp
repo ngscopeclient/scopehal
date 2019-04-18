@@ -53,7 +53,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Add the external trigger input
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
-		"EXT",
+		"EX",
 		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
 		1,
@@ -191,8 +191,8 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 	for(int i=0; i<nchans; i++)
 	{
 		//Hardware name of the channel
-		string chname = string("CH1");
-		chname[2] += i;
+		string chname = string("C1");
+		chname[1] += i;
 
 		//Color the channels based on LeCroy's standard color sequence (yellow-pink-cyan-green)
 		string color = "#ffffff";
@@ -315,8 +315,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		return false;
 
 	//See if the channel is enabled, hide it if not
-	string cmd = "C1:TRACE?";
-	cmd[1] += i;
+	string cmd = m_channels[i]->GetHwname() + ":TRACE?";
 	SendCommand(cmd);
 	string reply = ReadSingleBlockString(true);
 	if(reply == "OFF")
@@ -333,16 +332,12 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
 {
-	string cmd = "C1:TRACE ON";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 }
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
-	string cmd = "C1:TRACE OFF";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
 }
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
@@ -350,9 +345,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	if(i > m_analogChannelCount)
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
-	string cmd = "C1:COUPLING?";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
 	string reply = ReadSingleBlockString(true);
 
 	if(reply == "A1M")
@@ -364,9 +357,8 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	else if(reply == "GND")
 		return OscilloscopeChannel::COUPLE_GND;
 
-	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
-
 	//invalid
+	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
 	return OscilloscopeChannel::COUPLE_SYNTHETIC;
 }
 
@@ -380,9 +372,7 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	if(i > m_analogChannelCount)
 		return 1;
 
-	string cmd = "C1:ATTENUATION?";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
 	string reply = ReadSingleBlockString(true);
 
 	double d;
@@ -404,9 +394,7 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 	SendCommand(cmd);
 	string reply = ReadSingleBlockString(true);
 
-	string search = "C1";
-	search[1] += i;
-	size_t index = reply.find(search);
+	size_t index = reply.find(m_channels[i]->GetHwname());
 	if(index == string::npos)
 		return 0;
 
@@ -443,9 +431,9 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 {
 	char cmd[128];
 	if(limit_mhz == 0)
-		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT C%zu,OFF", i+1);
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", m_channels[i]->GetHwname().c_str());
 	else
-		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT C%zu,%uMHZ", i+1, limit_mhz);
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
 	SendCommand(cmd);
 }
@@ -687,10 +675,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
 	char tmp[128];
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		snprintf(tmp, sizeof(tmp), "C%d:TRACE?", i+1);
-		SendCommand(tmp);
-	}
+		SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		string reply = ReadSingleBlockString();
@@ -720,11 +705,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	{
 		wavedescs.push_back("");
 		if(enabled[i])
-		{
-			snprintf(tmp, sizeof(tmp), "C%d:WF? DESC", i+1);
-			cmd = tmp;
-			SendCommand(cmd);
-		}
+			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 	}
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
@@ -761,16 +742,12 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			//If a multi-segment capture, ask for the trigger time data
 			if( (num_sequences > 1) && !sent_wavetime)
 			{
-				cmd = "C1:WF? TIME";
-				cmd[1] += i;
-				SendCommand(cmd);
+				SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
 				sent_wavetime = true;
 			}
 
 			//Ask for the data
-			cmd = "C1:WF? DAT1";
-			cmd[1] += i;
-			SendCommand(cmd);
+			SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
 		}
 	}
 
@@ -909,8 +886,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 		if(enabled)
 		{
-			SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
-
 			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
 			string cmd = "Digital1:WF?";
 			SendCommand(cmd);
@@ -1036,17 +1011,7 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 {
 	//For now, always set trigger mode to edge
-	char cmd[128];
-	if(i < m_analogChannelCount)
-		snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,C%zu", i+1);
-	else if(i == m_extTrigChannel->GetIndex())
-		snprintf(cmd, sizeof(cmd), "TRIG_SELECT EDGE,SR,EX");
-	else
-	{
-		LogError("Invalid trigger channel\n");
-		return;
-	}
-	SendCommand(cmd);
+	SendCommand(string("TRIG_SELECT EDGE,SR,") + m_channels[i]->GetHwname());
 
 	//TODO: support digital channels
 
@@ -1071,7 +1036,7 @@ float LeCroyOscilloscope::GetTriggerVoltage()
 void LeCroyOscilloscope::SetTriggerVoltage(float v)
 {
 	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "C%zu:TRLV %.3f V", m_triggerChannel + 1, v);
+	snprintf(tmp, sizeof(tmp), "%s:TRLV %.3f V", m_channels[m_triggerChannel]->GetHwname().c_str(), v);
 	SendCommand(tmp);
 
 	//Update cache
@@ -1108,28 +1073,24 @@ void LeCroyOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 	m_triggerType = type;
 	m_triggerTypeValid = true;
 
-	char tmp[32] = "";
-
 	switch(type)
 	{
 		case Oscilloscope::TRIGGER_TYPE_RISING:
-			snprintf(tmp, sizeof(tmp), "C%zu:TRSL POS", m_triggerChannel + 1);
+			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL POS");
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			snprintf(tmp, sizeof(tmp), "C%zu:TRSL NEG", m_triggerChannel + 1);
+			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL NEG");
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			snprintf(tmp, sizeof(tmp), "C%zu:TRSL EIT", m_triggerChannel + 1);
+			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL EIT");
 			break;
 
 		default:
 			LogWarning("Unsupported trigger type\n");
 			break;
 	}
-
-	SendCommand(tmp);
 }
 
 void LeCroyOscilloscope::SetTriggerForChannel(
@@ -1143,9 +1104,7 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	if(m_channelOffsets.find(i) != m_channelOffsets.end())
 		return m_channelOffsets[i];
 
-	char cmd[] = "C1:OFFSET?";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
 
 	string reply = ReadSingleBlockString();
 	double offset;
@@ -1165,9 +1124,7 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 	if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
 		return m_channelVoltageRanges[i];
 
-	char cmd[] = "C1:VOLT_DIV?";
-	cmd[1] += i;
-	SendCommand(cmd);
+	SendCommand(m_channels[i]->GetHwname() + ":VOLT_DIV?");
 
 	string reply = ReadSingleBlockString();
 	double volts_per_div;
@@ -1184,6 +1141,6 @@ void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	m_channelVoltageRanges[i] = range;
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "C%zu:VOLT_DIV %.4f", i+1, vdiv);
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), vdiv);
 	SendCommand(cmd);
 }
