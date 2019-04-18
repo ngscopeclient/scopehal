@@ -141,6 +141,8 @@ vector<string> JtagDecoder::GetHeaders()
 
 void JtagDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Get the input data
 	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) || (m_channels[2] == NULL) || (m_channels[3] == NULL) )
 	{

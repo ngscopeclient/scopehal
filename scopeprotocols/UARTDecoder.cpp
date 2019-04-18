@@ -103,6 +103,8 @@ void UARTDecoder::SetDefaultName()
 
 void UARTDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Get the input data
 	if(m_channels[0] == NULL)
 	{

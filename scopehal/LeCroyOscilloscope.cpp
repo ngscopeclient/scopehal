@@ -790,6 +790,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		//Timestamp is a somewhat complex format that needs some shuffling around.
 		double fseconds = *reinterpret_cast<double*>(pdesc + 296);
 		uint8_t seconds = floor(fseconds);
+		double basetime = fseconds - seconds;
 		time_t tnow = time(NULL);
 		struct tm* now = localtime(&tnow);
 		struct tm tstruc;
@@ -831,9 +832,10 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 				double trigger_delta = pwtime[j*2];
 				//double trigger_offset = pwtime[j*2 + 1];
 				//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
-				double basetime = fseconds - seconds;
 				cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
 			}
+			else
+				cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
 			//Decode the samples
 			cap->m_samples.resize(num_per_segment);
