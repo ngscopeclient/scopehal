@@ -186,7 +186,7 @@ void LeCroyOscilloscope::IdentifyHardware()
 	//Look up model info
 	if(m_model.find("WS3") == 0)
 		m_modelid = MODEL_WAVESURFER_3K;
-	else if(model.find("WAVERUNNER8") == 0)
+	else if(m_model.find("WAVERUNNER8") == 0)
 		m_modelid = MODEL_WAVERUNNER_8K;
 	else
 		m_modelid = MODEL_UNKNOWN;
@@ -681,7 +681,6 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
  */
 void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
-	char tmp[128];
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 		SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -703,7 +702,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	//Read the wavedesc for every enabled channel in batch mode first
 	//(With VICP framing we cannot use semicolons to separate commands)
 	vector<string> wavedescs;
-	char tmp[128];
 	string cmd;
 	bool enabled[4] = {false};
 	BulkCheckChannelEnableState();
@@ -859,10 +857,10 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
-	for(int i=0; i<num_sequences-1; i++)
+	for(size_t i=0; i<num_sequences-1; i++)
 	{
 		SequenceSet s;
-		for(auto j=0; j<m_analogChannelCount; j++)
+		for(size_t j=0; j<m_analogChannelCount; j++)
 		{
 			if(enabled[j])
 				s[m_channels[j]] = pending_waveforms[j][i];
@@ -1157,7 +1155,7 @@ void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 {
-	vector<uint64_t> ret
+	vector<uint64_t> ret;
 
 	//Not all scopes can go this slow
 	if(m_modelid == MODEL_WAVERUNNER_8K)
@@ -1233,6 +1231,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	//TODO: even deeper memory support for 8K-M series
 	if(m_modelid == MODEL_WAVERUNNER_8K)
 		ret.push_back(16 * m);
+
+	return ret;
 }
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
@@ -1245,15 +1245,17 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 	//Waverunner 8K allows merging buffers from C2/C3 to get deeper memory
 	if(m_modelid == MODEL_WAVERUNNER_8K)
 		ret.push_back(32 * m);
+
+	return ret;
 }
 
-set<InterleaveConflict> LeCroyOscilloscope::GetInterleaveConflicts()
+set<LeCroyOscilloscope::InterleaveConflict> LeCroyOscilloscope::GetInterleaveConflicts()
 {
 	set<InterleaveConflict> ret;
 
 	//All scopes normally interleave channels 1/2 and 3/4.
 	//If both channels in either pair is in use, that's a problem.
-	ret.push_back(InterleaveConflict(m_channels[0], m_channels[1]));
+	ret.emplace(InterleaveConflict(m_channels[0], m_channels[1]));
 	if(m_analogChannelCount > 2)
 		ret.emplace(InterleaveConflict(m_channels[2], m_channels[3]));
 
