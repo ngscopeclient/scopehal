@@ -14,6 +14,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeDecoder.cpp
 	EyeDecoder2.cpp
 	EyeRenderer.cpp
+	FFTDecoder.cpp
 	IBM8b10bDecoder.cpp
 	IBM8b10bRenderer.cpp
 	JtagDecoder.cpp
@@ -28,6 +29,9 @@ set(SCOPEPROTOCOLS_SOURCES
 
 add_library(scopeprotocols SHARED
 	${SCOPEPROTOCOLS_SOURCES})
+
+target_link_libraries(scopeprotocols
+	ffts)
 
 target_include_directories(scopeprotocols
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
