@@ -72,7 +72,7 @@ bool FFTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 double FFTDecoder::GetOffset()
 {
-	return -0.5;
+	return 0;
 }
 
 double FFTDecoder::GetVoltageRange()
