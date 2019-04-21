@@ -148,15 +148,16 @@ void FFTDecoder::Refresh()
 	ffts_execute(plan, &rdin[0], &rdout[0]);
 	ffts_free(plan);
 
-	//Get the sampling frequency
-	double ps = din->m_timescale * (din->GetSampleStart(1) - din->GetSampleStart(0));
-	//double sample_ghz = 1000 / ps;
-
 	//Set up output and copy timestamps
 	FFTCapture* cap = new FFTCapture;
-	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
+
+	//Calculate size of each bin
+	double ps = din->m_timescale * (din->GetSampleStart(1) - din->GetSampleStart(0));
+	double sample_ghz = 1000 / ps;
+	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
+	cap->m_timescale = bin_hz;
 
 	//Normalize magnitudes
 	vector<float> mags;
