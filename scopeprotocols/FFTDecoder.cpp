@@ -176,7 +176,7 @@ void FFTDecoder::Refresh()
 	}
 
 	for(size_t i=1; i<nouts; i++)
-		cap->m_samples.push_back(AnalogSample(i, 1, mags[i] / maxmag));
+		cap->m_samples.push_back(AnalogSample(i, 1, mags[i-1] / maxmag));
 
 	SetData(cap);
 
