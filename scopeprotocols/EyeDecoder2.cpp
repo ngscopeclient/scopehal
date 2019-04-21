@@ -206,12 +206,10 @@ void EyeDecoder2::Refresh()
 	double start = GetTime();
 
 	//Initialize the capture
-	//TODO: allow integration across multiple acquisitions
 	//TODO: timestamps? do we need those?
 	EyeCapture2* cap = dynamic_cast<EyeCapture2*>(m_data);
 	if(cap == NULL)
 		cap = new EyeCapture2(m_width, m_height);
-	m_data = cap;
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
 
