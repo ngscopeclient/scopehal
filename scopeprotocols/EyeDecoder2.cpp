@@ -276,6 +276,7 @@ void EyeDecoder2::Refresh()
 	m_uiWidth = round(awidth / nwidth);
 
 	cap->Normalize();
+	SetData(cap);
 
 	double dt = GetTime() - start;
 	total_frames ++;
