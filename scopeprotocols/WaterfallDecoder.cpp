@@ -27,214 +27,184 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of OscilloscopeChannel
- */
-
-#include "scopehal.h"
-#include "OscilloscopeChannel.h"
-#include "ChannelRenderer.h"
-#include "AnalogRenderer.h"
-#include "DigitalRenderer.h"
+#include "../scopehal/scopehal.h"
+#include "WaterfallDecoder.h"
+#include "FFTDecoder.h"
+#include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-OscilloscopeChannel::OscilloscopeChannel(
-	Oscilloscope* scope,
-	string hwname,
-	OscilloscopeChannel::ChannelType type,
-	string color,
-	int width,
-	size_t index,
-	bool physical)
-	: m_displaycolor(color)
-	, m_displayname(hwname)
-	, m_scope(scope)
-	, m_data(NULL)
-	, m_type(type)
-	, m_hwname(hwname)
-	, m_width(width)
-	, m_procedural(false)
-	, m_index(index)
-	, m_physical(physical)
-	, m_refcount(0)
+WaterfallCapture::WaterfallCapture(size_t width, size_t height)
+	: m_width(width)
+	, m_height(height)
 {
+	size_t npix = width*height;
+	m_outdata = new float[npix];
+	for(size_t i=0; i<npix; i++)
+		m_outdata[i] = 0;
 }
 
-OscilloscopeChannel::~OscilloscopeChannel()
+WaterfallCapture::~WaterfallCapture()
 {
-	delete m_data;
-	m_data = NULL;
+	delete[] m_outdata;
+	m_outdata = NULL;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers for calling scope functions
-
-void OscilloscopeChannel::AddRef()
+size_t WaterfallCapture::GetDepth() const
 {
-	if(m_refcount == 0)
-		Enable();
-	m_refcount ++;
+	return 0;
 }
 
-void OscilloscopeChannel::Release()
+int64_t WaterfallCapture::GetEndTime() const
 {
-	m_refcount --;
-	if(m_refcount == 0)
-		Disable();
+	return 0;
 }
 
-double OscilloscopeChannel::GetOffset()
+int64_t WaterfallCapture::GetSampleStart(size_t /*i*/) const
 {
-	if(m_scope != NULL)
-		return m_scope->GetChannelOffset(m_index);
-	else
-		return 0;	//todo: if protocol decoder use root channel offset or similar?
+	return 0;
 }
 
-void OscilloscopeChannel::SetOffset(double offset)
+int64_t WaterfallCapture::GetSampleLen(size_t /*i*/) const
 {
-	if(m_scope != NULL)
-		m_scope->SetChannelOffset(m_index, offset);
+	return 0;
 }
 
-bool OscilloscopeChannel::IsEnabled()
+bool WaterfallCapture::EqualityTest(size_t /*i*/, size_t /*j*/) const
 {
-	if(m_scope != NULL)
-		return m_scope->IsChannelEnabled(m_index);
-	else
-		return true;
+	return false;
 }
 
-void OscilloscopeChannel::Enable()
+bool WaterfallCapture::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
 {
-	if(m_scope != NULL)
-		m_scope->EnableChannel(m_index);
-}
-
-void OscilloscopeChannel::Disable()
-{
-	if(m_scope != NULL)
-		m_scope->DisableChannel(m_index);
-}
-
-OscilloscopeChannel::CouplingType OscilloscopeChannel::GetCoupling()
-{
-	if(m_scope)
-		return m_scope->GetChannelCoupling(m_index);
-	else
-		return OscilloscopeChannel::COUPLE_SYNTHETIC;
-}
-
-void OscilloscopeChannel::SetCoupling(CouplingType type)
-{
-	if(m_scope)
-		m_scope->SetChannelCoupling(m_index, type);
-}
-
-double OscilloscopeChannel::GetAttenuation()
-{
-	if(m_scope)
-		return m_scope->GetChannelAttenuation(m_index);
-	else
-		return 1;
-}
-
-void OscilloscopeChannel::SetAttenuation(double atten)
-{
-	if(m_scope)
-		m_scope->SetChannelAttenuation(m_index, atten);
-}
-
-int OscilloscopeChannel::GetBandwidthLimit()
-{
-	if(m_scope)
-		return m_scope->GetChannelBandwidthLimit(m_index);
-	else
-		return 0;
-}
-
-void OscilloscopeChannel::SetBandwidthLimit(int mhz)
-{
-	if(m_scope)
-		m_scope->SetChannelBandwidthLimit(m_index, mhz);
-}
-
-double OscilloscopeChannel::GetVoltageRange()
-{
-	if(m_scope)
-		return m_scope->GetChannelVoltageRange(m_index);
-	else
-		return 1;	//TODO: get from input
-}
-
-void OscilloscopeChannel::SetVoltageRange(double range)
-{
-	if(m_scope)
-		return m_scope->SetChannelVoltageRange(m_index, range);
+	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Construction / destruction
 
-CaptureChannelBase* OscilloscopeChannel::Detach()
+WaterfallDecoder::WaterfallDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	, m_pixelsPerHz(0.001)
+	, m_width(1)
+	, m_height(1)
 {
-	CaptureChannelBase* tmp = m_data;
-	m_data = NULL;
-	return tmp;
-}
-
-OscilloscopeChannel::ChannelType OscilloscopeChannel::GetType()
-{
-	return m_type;
-}
-
-string OscilloscopeChannel::GetHwname()
-{
-	return m_hwname;
-}
-
-CaptureChannelBase* OscilloscopeChannel::GetData()
-{
-	return m_data;
-}
-
-void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
-{
-	if(m_data == pNew)
-		return;
-
-	if(m_data != NULL)
-		delete m_data;
-	m_data = pNew;
-}
-
-int OscilloscopeChannel::GetWidth()
-{
-	return m_width;
+	//Set up channels
+	m_signalNames.push_back("din");
+	m_channels.push_back(NULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* OscilloscopeChannel::CreateRenderer()
+ChannelRenderer* WaterfallDecoder::CreateRenderer()
 {
-	switch(m_type)
+	return new AnalogRenderer(this);
+}
+
+bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (dynamic_cast<FFTDecoder*>(channel) != NULL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+double WaterfallDecoder::GetOffset()
+{
+	return 0;
+}
+
+double WaterfallDecoder::GetVoltageRange()
+{
+	return 1;
+}
+
+string WaterfallDecoder::GetProtocolName()
+{
+	return "Waterfall";
+}
+
+bool WaterfallDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool WaterfallDecoder::NeedsConfig()
+{
+	//we auto-select the midpoint as our threshold
+	return false;
+}
+
+void WaterfallDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Waterfall(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void WaterfallDecoder::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
 	{
-	case CHANNEL_TYPE_DIGITAL:
-		return new DigitalRenderer(this);
-
-	case CHANNEL_TYPE_ANALOG:
-		return new AnalogRenderer(this);
-
-	//complex channels must be procedural (and override this)
-	default:
-	case CHANNEL_TYPE_COMPLEX:
-		return NULL;
+		SetData(NULL);
+		return;
 	}
+	FFTCapture* din = dynamic_cast<FFTCapture*>(m_channels[0]->GetData());
+
+	//We need meaningful data
+	if(din->GetDepth() == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Initialize the capture
+	//TODO: timestamps? do we need those?qui
+	WaterfallCapture* cap = dynamic_cast<WaterfallCapture*>(m_data);
+	if(cap == NULL)
+		cap = new WaterfallCapture(m_width, m_height);
+	cap->m_timescale = 1;
+	float* data = cap->GetData();
+
+	//Move the whole waterfall down by one row
+	for(size_t y=0; y < m_height-1 ; y++)
+	{
+		for(size_t x=0; x<m_width; x++)
+			data[y*m_width + x] = data[(y+1)*m_width + x];
+	}
+
+	//Add the new data
+	double hz_per_bin = din->m_timescale;
+	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
+	double vmin = 1.0 / 255.0;
+	for(size_t x=0; x<m_width; x++)
+	{
+		//Look up the frequency bin for this position
+		//For now, just do nearest neighbor interpolation
+		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x));
+
+		float value = 0;
+		if(nbin < din->GetDepth())
+			value = (-70 - 20 * log10(din->m_samples[nbin].m_sample)) / -70;
+
+		//Cap values to prevent going off-scale-low with our color ramps
+		if(value < vmin)
+			value = vmin;
+
+		data[(m_height-1)*m_width + x] = value;
+	}
+
+	SetData(cap);
 }

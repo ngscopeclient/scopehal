@@ -23,6 +23,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
+	WaterfallDecoder.cpp
 
 	scopeprotocols.cpp
 	)

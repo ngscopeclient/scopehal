@@ -56,4 +56,5 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ThresholdDecoder);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryDecoder);
+	AddDecoderClass(WaterfallDecoder);
 }
