@@ -89,6 +89,7 @@ bool WaterfallCapture::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
 WaterfallDecoder::WaterfallDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 	, m_pixelsPerHz(0.001)
+	, m_offsetHz(0)
 	, m_width(1)
 	, m_height(1)
 {
@@ -188,12 +189,13 @@ void WaterfallDecoder::Refresh()
 	//Add the new data
 	double hz_per_bin = din->m_timescale;
 	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
+	double bin_offset = m_offsetHz / hz_per_bin;
 	double vmin = 1.0 / 255.0;
 	for(size_t x=0; x<m_width; x++)
 	{
 		//Look up the frequency bin for this position
 		//For now, just do nearest neighbor interpolation
-		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x));
+		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x + bin_offset));
 
 		float value = 0;
 		if(nbin < din->GetDepth())

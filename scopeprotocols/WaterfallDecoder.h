@@ -95,6 +95,9 @@ public:
 	void SetTimeScale(double pixelsPerHz)
 	{ m_pixelsPerHz = pixelsPerHz; }
 
+	void SetTimeOffset(double offsetHz)
+	{ m_offsetHz = offsetHz; }
+
 	size_t GetWidth()
 	{ return m_width; }
 
@@ -105,6 +108,7 @@ public:
 
 protected:
 	double m_pixelsPerHz;
+	double m_offsetHz;
 
 	size_t m_width;
 	size_t m_height;
