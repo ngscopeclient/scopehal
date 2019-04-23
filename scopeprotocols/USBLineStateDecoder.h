@@ -28,34 +28,68 @@
 ***********************************************************************************************************************/
 
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief A single bit on a USB 1.x/2.x differential bus
  */
+class USBLineSymbol
+{
+public:
 
-#include "scopeprotocols.h"
+	enum SegmentType
+	{
+		TYPE_J,
+		TYPE_K,
+		TYPE_SE0,
+		TYPE_SE1
+	};
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+	USBLineSymbol(SegmentType type = TYPE_SE1)
+	 : m_type(type)
+	{
+	}
+
+	SegmentType m_type;
+
+	bool operator==(const USBLineSymbol& rhs) const
+	{
+		return (m_type == rhs.m_type);
+	}
+};
+
+typedef OscilloscopeSample<USBLineSymbol> USBLineSample;
+typedef CaptureChannel<USBLineSymbol> USBLineStateCapture;
 
 /**
-	@brief Static initialization for protocol list
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of USBLineStateDecoder
  */
-void ScopeProtocolStaticInit()
+#ifndef USBLineStateDecoder_h
+#define USBLineStateDecoder_h
+
+#include "../scopehal/ProtocolDecoder.h"
+
+class USBLineStateDecoder : public ProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USBLineStateDecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	USBLineStateDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(USBLineStateDecoder)
+
+protected:
+	std::string m_speedname;
+};
+
+#endif

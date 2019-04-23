@@ -53,9 +53,10 @@
 #include "IBM8b10bDecoder.h"
 #include "JtagDecoder.h"
 #include "SincInterpolationDecoder.h"
-#include "UARTDecoder.h"
 #include "ThresholdDecoder.h"
+#include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
+#include "USBLineStateDecoder.h"
 #include "WaterfallDecoder.h"
 /*
 #include "DigitalToAnalogDecoder.h"

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,32 +30,75 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Implementation of USBLineStateRenderer
  */
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "USBLineStateRenderer.h"
+#include "USBLineStateDecoder.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+USBLineStateRenderer::USBLineStateRenderer(OscilloscopeChannel* channel)
+	: TextRenderer(channel)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USBLineStateDecoder);
-	AddDecoderClass(WaterfallDecoder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color USBLineStateRenderer::GetColor(int i)
+{
+	USBLineStateCapture* data = dynamic_cast<USBLineStateCapture*>(m_channel->GetData());
+	if(data == NULL)
+		return Gdk::Color("#000000");
+	if(i >= (int)data->m_samples.size())
+		return Gdk::Color("#000000");
+
+	//TODO: have a set of standard colors we use everywhere?
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USBLineSymbol::TYPE_J:
+		case USBLineSymbol::TYPE_K:
+			return Gdk::Color("#008000");
+
+		case USBLineSymbol::TYPE_SE0:
+			return Gdk::Color("#808080");
+
+		//invalid state, should never happen
+		case USBLineSymbol::TYPE_SE1:
+		default:
+			return Gdk::Color("#ff0000");
+	}
+}
+
+string USBLineStateRenderer::GetText(int i)
+{
+	USBLineStateCapture* data = dynamic_cast<USBLineStateCapture*>(m_channel->GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USBLineSymbol::TYPE_J:
+			return "J";
+		case USBLineSymbol::TYPE_K:
+			return "K";
+		case USBLineSymbol::TYPE_SE0:
+			return "SE0";
+		case USBLineSymbol::TYPE_SE1:
+			return "SE1";
+	}
+
+	return "";
 }

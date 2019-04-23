@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,32 +30,24 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of USBLineStateRenderer
  */
 
-#include "scopeprotocols.h"
+#ifndef USBLineStateRenderer_h
+#define USBLineStateRenderer_h
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/TextRenderer.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief Renderer for a USBLineState channel
  */
-void ScopeProtocolStaticInit()
+class USBLineStateRenderer : public TextRenderer
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USBLineStateDecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	USBLineStateRenderer(OscilloscopeChannel* channel);
+protected:
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+};
+
+#endif
