@@ -43,6 +43,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_port(port)
 	, m_hasLA(false)
 	, m_hasDVM(false)
+	, m_hasFunctionGen(false)
 {
 }
 
@@ -105,11 +106,15 @@ void LeCroyOscilloscope::SharedCtorInit()
 				//Only add the channels if we're showing them
 				//TODO: better way of doing this!!!
 				SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
-				string cmd = "Digital1:WF?";
-				SendCommand(cmd);
+				SendCommand("Digital1:WF?");
 				string data;
 				if(!ReadWaveformBlock(data))
 					return;
+				if(data == "")
+				{
+					LogDebug("No logic analyzer probe connected\n");
+					continue;
+				}
 				string tmp = data.substr(data.find("SelectedLines=") + 14);
 				tmp = tmp.substr(0, 16);
 				if(tmp == "0000000000000000")
@@ -146,6 +151,19 @@ void LeCroyOscilloscope::SharedCtorInit()
 				LogDebug("* DVM (digital voltmeter / frequency counter)\n");
 
 				SetMeterAutoRange(false);
+			}
+
+			//If we have the function generator installed, remember that
+			else if(o == "AFG")
+			{
+				m_hasFunctionGen = true;
+				LogDebug("* AFG (function generator)\n");
+			}
+
+			//Ignore protocol decodes, we do those ourselves
+			else if( (o == "I2C") || (o == "UART") || (o == "SPI") )
+			{
+				LogDebug("* %s (protocol decode, ignoring)\n", o.c_str());
 			}
 
 			//No idea what it is
@@ -287,6 +305,8 @@ unsigned int LeCroyOscilloscope::GetInstrumentTypes()
 	unsigned int type = INST_OSCILLOSCOPE;
 	if(m_hasDVM)
 		type |= INST_DMM;
+	if(m_hasFunctionGen)
+		type |= INST_FUNCTION;
 	return type;
 }
 
@@ -593,6 +613,110 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "VBS 'app.acquisition.DVM.DvmMode = \"%s\"'", stype.c_str());
 	SendCommand(cmd);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator mode
+
+int LeCroyOscilloscope::GetFunctionChannelCount()
+{
+	if(m_hasFunctionGen)
+		return 1;
+	else
+		return 0;
+}
+
+string LeCroyOscilloscope::GetFunctionChannelName(int /*chan*/)
+{
+	return "FUNC";
+}
+
+bool LeCroyOscilloscope::GetFunctionChannelActive(int /*chan*/)
+{
+}
+
+void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
+{
+	if(on)
+		SendCommand("VBS 'app.wavesource.enable=True'");
+	else
+		SendCommand("VBS 'app.wavesource.enable=False'");
+}
+
+float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
+{
+	//app.wavesource.dutycycle
+}
+
+void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
+{
+	//app.wavesource.dutycycle
+}
+
+float LeCroyOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
+{
+	//app.wavesource.amplitude
+}
+
+void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+{
+	//app.wavesource.amplitude
+}
+
+float LeCroyOscilloscope::GetFunctionChannelOffset(int /*chan*/)
+{
+	//app.wavesource.offset
+}
+
+void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
+{
+	//app.wavesource.offset
+}
+
+float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
+{
+	//app.wavesource.frequency
+}
+
+void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
+{
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.frequency = %f'", hz);
+	SendCommand(tmp);
+}
+
+FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*chan*/)
+{
+	//app.wavesource.shape
+}
+
+void LeCroyOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+{
+	//app.wavesource.shape
+}
+
+float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//app.wavesource.risetime
+}
+
+void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
+{
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", sec);
+	SendCommand(tmp);
+}
+
+float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//app.wavesource.falltime
+}
+
+void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
+{
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
+	SendCommand(tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

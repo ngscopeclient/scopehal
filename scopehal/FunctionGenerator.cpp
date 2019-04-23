@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,54 +27,13 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Instrument
- */
+#include "scopehal.h"
+#include "FunctionGenerator.h"
 
-#ifndef Instrument_h
-#define Instrument_h
-
-/**
-	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
- */
-class Instrument
+FunctionGenerator::FunctionGenerator()
 {
-public:
-	virtual ~Instrument();
+}
 
-	/*
-		@brief Types of instrument.
-
-		Note that we can't use RTTI for this because of software options that may or may not be present,
-		and we don't know at object instantiation time.
-
-		For example, some WaveSurfer 3000 devices have the function generator option and others don't.
-		While the WaveSurfer 3000 DMM option is now no-cost, there's no guarantee any given instrument's
-		owner has installed it!
-	 */
-	enum InstrumentTypes
-	{
-		//An oscilloscope or logic analyzer
-		INST_OSCILLOSCOPE 		= 1,
-
-		//A multimeter (query to see what measurements it supports)
-		INST_DMM 				= 2,
-
-		//A power supply
-		INST_PSU				= 4,
-
-		//A function generator
-		INST_FUNCTION			= 8
-	};
-
-	virtual unsigned int GetInstrumentTypes() =0;
-
-	//Device information
-	virtual std::string GetName() =0;
-	virtual std::string GetVendor() =0;
-	virtual std::string GetSerial() =0;
-};
-
-#endif
+FunctionGenerator::~FunctionGenerator()
+{
+}

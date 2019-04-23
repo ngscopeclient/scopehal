@@ -26,55 +26,57 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
+#ifndef FunctionGenerator_h
+#define FunctionGenerator_h
 
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Instrument
+	@brief A generic waveform generator
  */
-
-#ifndef Instrument_h
-#define Instrument_h
-
-/**
-	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
- */
-class Instrument
+class FunctionGenerator : public virtual Instrument
 {
 public:
-	virtual ~Instrument();
+	FunctionGenerator();
+	virtual ~FunctionGenerator();
 
-	/*
-		@brief Types of instrument.
-
-		Note that we can't use RTTI for this because of software options that may or may not be present,
-		and we don't know at object instantiation time.
-
-		For example, some WaveSurfer 3000 devices have the function generator option and others don't.
-		While the WaveSurfer 3000 DMM option is now no-cost, there's no guarantee any given instrument's
-		owner has installed it!
-	 */
-	enum InstrumentTypes
+	enum WaveShape
 	{
-		//An oscilloscope or logic analyzer
-		INST_OSCILLOSCOPE 		= 1,
-
-		//A multimeter (query to see what measurements it supports)
-		INST_DMM 				= 2,
-
-		//A power supply
-		INST_PSU				= 4,
-
-		//A function generator
-		INST_FUNCTION			= 8
+		SHAPE_SINE,
+		SHAPE_SQUARE,
+		SHAPE_TRIANGLE,
+		SHAPE_PULSE,
+		SHAPE_DC,
+		SHAPE_NOISE,
+		SHAPE_ARB
 	};
 
-	virtual unsigned int GetInstrumentTypes() =0;
+	//Channel info
+	virtual int GetFunctionChannelCount() =0;
+	virtual std::string GetFunctionChannelName(int chan) =0;
 
-	//Device information
-	virtual std::string GetName() =0;
-	virtual std::string GetVendor() =0;
-	virtual std::string GetSerial() =0;
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan) =0;
+	virtual void SetFunctionChannelActive(int chan, bool on) =0;
+
+	virtual float GetFunctionChannelDutyCycle(int chan) =0;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) =0;
+
+	virtual float GetFunctionChannelAmplitude(int chan) =0;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) =0;
+
+	virtual float GetFunctionChannelOffset(int chan) =0;
+	virtual void SetFunctionChannelOffset(int chan, float offset) =0;
+
+	virtual float GetFunctionChannelFrequency(int chan) =0;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) =0;
+
+	virtual WaveShape GetFunctionChannelShape(int chan) =0;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) =0;
+
+	virtual float GetFunctionChannelRiseTime(int chan) =0;
+	virtual void SetFunctionChannelRiseTime(int chan, float sec) =0;
+
+	virtual float GetFunctionChannelFallTime(int chan) =0;
+	virtual void SetFunctionChannelFallTime(int chan, float sec) =0;
 };
 
 #endif

@@ -40,6 +40,7 @@
 class LeCroyOscilloscope
 	: public virtual Oscilloscope
 	, public virtual Multimeter
+	, public virtual FunctionGenerator
 {
 public:
 	LeCroyOscilloscope(std::string hostname, unsigned short port);
@@ -123,6 +124,26 @@ public:
 	virtual Multimeter::MeasurementTypes GetMeterMode();
 	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
 
+	//Function generator
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is irrelevant.
 	enum Model
@@ -170,6 +191,7 @@ protected:
 	//set of SW/HW options we have
 	bool m_hasLA;
 	bool m_hasDVM;
+	bool m_hasFunctionGen;
 
 	//Cached configuration
 	bool m_triggerChannelValid;
