@@ -29,15 +29,15 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "USBLineStateDecoder.h"
-#include "USBLineStateRenderer.h"
+#include "USB2PMADecoder.h"
+#include "USB2PMARenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-USBLineStateDecoder::USBLineStateDecoder(string color)
+USB2PMADecoder::USB2PMADecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
@@ -55,12 +55,12 @@ USBLineStateDecoder::USBLineStateDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* USBLineStateDecoder::CreateRenderer()
+ChannelRenderer* USB2PMADecoder::CreateRenderer()
 {
-	return new USBLineStateRenderer(this);
+	return new USB2PMARenderer(this);
 }
 
-bool USBLineStateDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2PMADecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -72,31 +72,31 @@ bool USBLineStateDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void USBLineStateDecoder::SetDefaultName()
+void USB2PMADecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USBLine(%s,%s)",
+	snprintf(hwname, sizeof(hwname), "USB2PMA(%s,%s)",
 		m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string USBLineStateDecoder::GetProtocolName()
+string USB2PMADecoder::GetProtocolName()
 {
-	return "USB 1.x Line State";
+	return "USB 1.x/2.x PMA";
 }
 
-bool USBLineStateDecoder::IsOverlay()
-{
-	return true;
-}
-
-bool USBLineStateDecoder::NeedsConfig()
+bool USB2PMADecoder::IsOverlay()
 {
 	return true;
 }
 
-double USBLineStateDecoder::GetVoltageRange()
+bool USB2PMADecoder::NeedsConfig()
+{
+	return true;
+}
+
+double USB2PMADecoder::GetVoltageRange()
 {
 	return 1;
 }
@@ -104,7 +104,7 @@ double USBLineStateDecoder::GetVoltageRange()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void USBLineStateDecoder::Refresh()
+void USB2PMADecoder::Refresh()
 {
 	//Get the input data
 	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
@@ -131,7 +131,7 @@ void USBLineStateDecoder::Refresh()
 	int speed = m_parameters[m_speedname].GetIntVal();
 
 	//Figure out the line state for each input (no clock recovery yet)
-	USBLineStateCapture* cap = new USBLineStateCapture;
+	USB2PMACapture* cap = new USB2PMACapture;
 	for(size_t i=0; i<din_p->m_samples.size(); i++)
 	{
 		const AnalogSample& sin_p = din_p->m_samples[i];
@@ -141,26 +141,26 @@ void USBLineStateDecoder::Refresh()
 		bool bp = (sin_p.m_sample > 0.4);
 		bool bn = (sin_n.m_sample > 0.4);
 
-		USBLineSymbol::SegmentType type = USBLineSymbol::TYPE_SE1;
+		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
 		if(bp && bn)
-			type = USBLineSymbol::TYPE_SE1;
+			type = USB2PMASymbol::TYPE_SE1;
 		else if(!bp && !bn)
-			type = USBLineSymbol::TYPE_SE0;
+			type = USB2PMASymbol::TYPE_SE0;
 		else
 		{
 			if(speed == 1)
 			{
 				if(bp && !bn)
-					type = USBLineSymbol::TYPE_J;
+					type = USB2PMASymbol::TYPE_J;
 				else
-					type = USBLineSymbol::TYPE_K;
+					type = USB2PMASymbol::TYPE_K;
 			}
 			else
 			{
 				if(bp && !bn)
-					type = USBLineSymbol::TYPE_K;
+					type = USB2PMASymbol::TYPE_K;
 				else
-					type = USBLineSymbol::TYPE_J;
+					type = USB2PMASymbol::TYPE_J;
 			}
 		}
 
@@ -176,7 +176,7 @@ void USBLineStateDecoder::Refresh()
 
 		//Type match? Extend the existing sample
 		USBLineSample& oldsample = cap->m_samples[cap->m_samples.size()-1];
-		USBLineSymbol::SegmentType &oldtype = oldsample.m_sample.m_type;
+		USB2PMASymbol::SegmentType &oldtype = oldsample.m_sample.m_type;
 		if(oldtype == type)
 		{
 			oldsample.m_duration += sin_p.m_duration;
@@ -186,7 +186,7 @@ void USBLineStateDecoder::Refresh()
 		//Ignore SE0/SE1 states during transitions.
 		int64_t last_ps = oldsample.m_duration * din_p->m_timescale;
 		if(
-			( (oldtype == USBLineSymbol::TYPE_SE0) || (oldtype == USBLineSymbol::TYPE_SE1) ) &&
+			( (oldtype == USB2PMASymbol::TYPE_SE0) || (oldtype == USB2PMASymbol::TYPE_SE1) ) &&
 			(last_ps < 100000))
 		{
 			oldsample.m_sample.m_type = type;

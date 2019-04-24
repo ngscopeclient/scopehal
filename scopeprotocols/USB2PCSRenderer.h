@@ -30,89 +30,24 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of USB2PacketRenderer
+	@brief Declaration of USB2PCSRenderer
  */
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
+#ifndef USB2PCSRenderer_h
+#define USB2PCSRenderer_h
+
 #include "../scopehal/TextRenderer.h"
-#include "USB2PacketRenderer.h"
-#include "USB2PacketDecoder.h"
-#include "USBLineStateDecoder.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-USB2PacketRenderer::USB2PacketRenderer(OscilloscopeChannel* channel)
-	: TextRenderer(channel)
+/**
+	@brief Renderer for a USBLineState channel
+ */
+class USB2PCSRenderer : public TextRenderer
 {
-}
+public:
+	USB2PCSRenderer(OscilloscopeChannel* channel);
+protected:
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Rendering
-
-Gdk::Color USB2PacketRenderer::GetColor(int i)
-{
-	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(m_channel->GetData());
-	if(data == NULL)
-		return Gdk::Color("#000000");
-	if(i >= (int)data->m_samples.size())
-		return Gdk::Color("#000000");
-
-	//TODO: have a set of standard colors we use everywhere?
-
-	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
-	{
-		case USB2PacketSymbol::TYPE_IDLE:
-			return Gdk::Color("#404040");
-		case USB2PacketSymbol::TYPE_SYNC:
-			return Gdk::Color("#808080");
-		case USB2PacketSymbol::TYPE_EOP:
-			return Gdk::Color("#808080");
-		case USB2PacketSymbol::TYPE_RESET:
-			return Gdk::Color("#ffa000");
-		case USB2PacketSymbol::TYPE_DATA:
-			return Gdk::Color("#336699");
-
-		//invalid state, should never happen
-		case USB2PacketSymbol::TYPE_ERROR:
-		default:
-			return Gdk::Color("#ff0000");
-	}
-}
-
-string USB2PacketRenderer::GetText(int i)
-{
-	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(m_channel->GetData());
-	if(data == NULL)
-		return "";
-	if(i >= (int)data->m_samples.size())
-		return "";
-
-	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
-	{
-		case USB2PacketSymbol::TYPE_IDLE:
-			return "IDLE";
-		case USB2PacketSymbol::TYPE_SYNC:
-			return "SYNC";
-		case USB2PacketSymbol::TYPE_EOP:
-			return "EOP";
-		case USB2PacketSymbol::TYPE_RESET:
-			return "RESET";
-		case USB2PacketSymbol::TYPE_DATA:
-		{
-			char tmp[16];
-			snprintf(tmp, sizeof(tmp), "%02x", sample.m_sample.m_data);
-			return string(tmp);
-		}
-		case USB2PacketSymbol::TYPE_ERROR:
-		default:
-			return "ERROR";
-	}
-
-	return "";
-}
+#endif

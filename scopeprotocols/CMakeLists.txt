@@ -23,10 +23,10 @@ set(SCOPEPROTOCOLS_SOURCES
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
-	USBLineStateDecoder.cpp
-	USBLineStateRenderer.cpp
-	USB2PacketDecoder.cpp
-	USB2PacketRenderer.cpp
+	USB2PMADecoder.cpp
+	USB2PMARenderer.cpp
+	USB2PCSDecoder.cpp
+	USB2PCSRenderer.cpp
 	WaterfallDecoder.cpp
 
 	scopeprotocols.cpp

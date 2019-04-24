@@ -30,66 +30,75 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of USBLineStateDecoder
+	@brief Implementation of USB2PMARenderer
  */
-#ifndef USBLineStateDecoder_h
-#define USBLineStateDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "USB2PMARenderer.h"
+#include "USB2PMADecoder.h"
 
-/**
-	@brief A single bit on a USB 1.x/2.x differential bus
- */
-class USBLineSymbol
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+USB2PMARenderer::USB2PMARenderer(OscilloscopeChannel* channel)
+	: TextRenderer(channel)
 {
-public:
+}
 
-	enum SegmentType
-	{
-		TYPE_J,
-		TYPE_K,
-		TYPE_SE0,
-		TYPE_SE1
-	};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
 
-	USBLineSymbol(SegmentType type = TYPE_SE1)
-	 : m_type(type)
+Gdk::Color USB2PMARenderer::GetColor(int i)
+{
+	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(m_channel->GetData());
+	if(data == NULL)
+		return Gdk::Color("#000000");
+	if(i >= (int)data->m_samples.size())
+		return Gdk::Color("#000000");
+
+	//TODO: have a set of standard colors we use everywhere?
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
 	{
+		case USB2PMASymbol::TYPE_J:
+		case USB2PMASymbol::TYPE_K:
+			return Gdk::Color("#008000");
+
+		case USB2PMASymbol::TYPE_SE0:
+			return Gdk::Color("#808080");
+
+		//invalid state, should never happen
+		case USB2PMASymbol::TYPE_SE1:
+		default:
+			return Gdk::Color("#ff0000");
+	}
+}
+
+string USB2PMARenderer::GetText(int i)
+{
+	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(m_channel->GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PMASymbol::TYPE_J:
+			return "J";
+		case USB2PMASymbol::TYPE_K:
+			return "K";
+		case USB2PMASymbol::TYPE_SE0:
+			return "SE0";
+		case USB2PMASymbol::TYPE_SE1:
+			return "SE1";
 	}
 
-	SegmentType m_type;
-
-	bool operator==(const USBLineSymbol& rhs) const
-	{
-		return (m_type == rhs.m_type);
-	}
-};
-
-typedef OscilloscopeSample<USBLineSymbol> USBLineSample;
-typedef CaptureChannel<USBLineSymbol> USBLineStateCapture;
-
-class USBLineStateDecoder : public ProtocolDecoder
-{
-public:
-	USBLineStateDecoder(std::string color);
-
-	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
-
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual double GetVoltageRange();
-
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
-
-	PROTOCOL_DECODER_INITPROC(USBLineStateDecoder)
-
-protected:
-	std::string m_speedname;
-};
-
-#endif
+	return "";
+}

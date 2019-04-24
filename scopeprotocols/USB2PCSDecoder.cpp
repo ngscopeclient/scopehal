@@ -29,15 +29,15 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PacketRenderer.h"
+#include "USB2PCSDecoder.h"
+#include "USB2PCSRenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-USB2PacketDecoder::USB2PacketDecoder(string color)
+USB2PCSDecoder::USB2PCSDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
@@ -48,14 +48,14 @@ USB2PacketDecoder::USB2PacketDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* USB2PacketDecoder::CreateRenderer()
+ChannelRenderer* USB2PCSDecoder::CreateRenderer()
 {
-	return new USB2PacketRenderer(this);
+	return new USB2PCSRenderer(this);
 }
 
-bool USB2PacketDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2PCSDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (dynamic_cast<USBLineStateDecoder*>(channel) != NULL) )
+	if( (i == 0) && (dynamic_cast<USB2PMADecoder*>(channel) != NULL) )
 		return true;
 	return false;
 }
@@ -63,30 +63,30 @@ bool USB2PacketDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void USB2PacketDecoder::SetDefaultName()
+void USB2PCSDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USB2Packet(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "USB2PCS(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string USB2PacketDecoder::GetProtocolName()
+string USB2PCSDecoder::GetProtocolName()
 {
-	return "USB 1.x/2.0 Packet";
+	return "USB 1.x/2.0 PCS";
 }
 
-bool USB2PacketDecoder::IsOverlay()
-{
-	return true;
-}
-
-bool USB2PacketDecoder::NeedsConfig()
+bool USB2PCSDecoder::IsOverlay()
 {
 	return true;
 }
 
-double USB2PacketDecoder::GetVoltageRange()
+bool USB2PCSDecoder::NeedsConfig()
+{
+	return true;
+}
+
+double USB2PCSDecoder::GetVoltageRange()
 {
 	return 1;
 }
@@ -94,7 +94,7 @@ double USB2PacketDecoder::GetVoltageRange()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void USB2PacketDecoder::Refresh()
+void USB2PCSDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -102,7 +102,7 @@ void USB2PacketDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	USBLineStateCapture* din = dynamic_cast<USBLineStateCapture*>(m_channels[0]->GetData());
+	USB2PMACapture* din = dynamic_cast<USB2PMACapture*>(m_channels[0]->GetData());
 	if( (din == NULL) || (din->GetDepth() == 0) )
 	{
 		SetData(NULL);
@@ -110,14 +110,14 @@ void USB2PacketDecoder::Refresh()
 	}
 
 	//Make the capture and copy our time scales from the input
-	USB2PacketCapture* cap = new USB2PacketCapture;
+	USB2PCSCapture* cap = new USB2PCSCapture;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Initialize the current sample to idle at the start of the capture
-	USB2PacketSample current_sample;
-	current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_IDLE;
+	USB2PCSSample current_sample;
+	current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_IDLE;
 	current_sample.m_offset = 0;
 	current_sample.m_duration = 0;
 
@@ -157,15 +157,15 @@ void USB2PacketDecoder::Refresh()
 	SetData(cap);
 }
 
-void USB2PacketDecoder::RefreshIterationIdle(
+void USB2PCSDecoder::RefreshIterationIdle(
 	const USBLineSample& sin,
 	DecodeState& state,
 	BusSpeed& speed,
 	size_t& ui_width,
-	USB2PacketCapture* cap,
-	USBLineStateCapture* din,
+	USB2PCSCapture* cap,
+	USB2PMACapture* din,
 	size_t& count,
-	USB2PacketSample& current_sample)
+	USB2PCSSample& current_sample)
 {
 	const size_t ui_width_480 = 2083;
 	const size_t ui_width_12 = 83333;
@@ -177,12 +177,12 @@ void USB2PacketDecoder::RefreshIterationIdle(
 	{
 		//If the line state is J again, we're still idle.
 		//Extend the current sample's length.
-		case USBLineSymbol::TYPE_J:
+		case USB2PMASymbol::TYPE_J:
 			current_sample.m_duration =	sin.m_offset + sin.m_duration - current_sample.m_offset;
 			break;
 
 		//If we go to K, it's the start of a sync symbol.
-		case USBLineSymbol::TYPE_K:
+		case USB2PMASymbol::TYPE_K:
 
 			//Save the current sample
 			cap->m_samples.push_back(current_sample);
@@ -191,7 +191,7 @@ void USB2PacketDecoder::RefreshIterationIdle(
 			count = 0;
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_SYNC;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_SYNC;
 
 			//The length of the K indicates our clock speed
 			if(sample_ps < (2 * ui_width_480) )
@@ -213,12 +213,12 @@ void USB2PacketDecoder::RefreshIterationIdle(
 			state = STATE_SYNC;
 			break;
 
-		case USBLineSymbol::TYPE_SE0:
+		case USB2PMASymbol::TYPE_SE0:
 			//TODO: This is either a detach, a reset, or a keepalive (EOP)
 			break;
 
 		//SE1 should never occur (error)
-		case USBLineSymbol::TYPE_SE1:
+		case USB2PMASymbol::TYPE_SE1:
 
 			//Save the previous idle symbol
 			cap->m_samples.push_back(current_sample);
@@ -226,25 +226,25 @@ void USB2PacketDecoder::RefreshIterationIdle(
 			//Add the error symbol
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 			cap->m_samples.push_back(current_sample);
 
 			//Start a new idle symbol
 			current_sample.m_offset = sin.m_offset + sin.m_duration;
 			current_sample.m_duration = 0;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_IDLE;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_IDLE;
 			break;
 	}
 }
 
-void USB2PacketDecoder::RefreshIterationSync(
+void USB2PCSDecoder::RefreshIterationSync(
 	const USBLineSample& sin,
 	DecodeState& state,
 	size_t& ui_width,
-	USB2PacketCapture* cap,
-	USBLineStateCapture* din,
+	USB2PCSCapture* cap,
+	USB2PMACapture* din,
 	size_t& count,
-	USB2PacketSample& current_sample)
+	USB2PCSSample& current_sample)
 {
 	size_t sample_ps = sin.m_duration * din->m_timescale;
 	float sample_width_ui = sample_ps * 1.0f / ui_width;
@@ -257,7 +257,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 	{
 		//Should be one UI long, and a J. Complain if not.
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
-			(sin.m_sample.m_type != USBLineSymbol::TYPE_J))
+			(sin.m_sample.m_type != USB2PMASymbol::TYPE_J))
 		{
 			//Save the previous (partial) sync symbol
 			cap->m_samples.push_back(current_sample);
@@ -265,7 +265,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 			//Add the error symbol
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 			cap->m_samples.push_back(current_sample);
 
 			//Go back
@@ -283,7 +283,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 	{
 		//Should be one UI long, and a K. Complain if not.
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
-			(sin.m_sample.m_type != USBLineSymbol::TYPE_K) )
+			(sin.m_sample.m_type != USB2PMASymbol::TYPE_K) )
 		{
 			//Save the previous (partial) sync symbol
 			cap->m_samples.push_back(current_sample);
@@ -291,7 +291,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 			//Add the error symbol
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 			cap->m_samples.push_back(current_sample);
 
 			state = STATE_IDLE;
@@ -307,7 +307,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 	else
 	{
 		//Should be a K and at least two UIs long
-		if( (sample_width_ui < 1.5) || (sin.m_sample.m_type != USBLineSymbol::TYPE_K) )
+		if( (sample_width_ui < 1.5) || (sin.m_sample.m_type != USB2PMASymbol::TYPE_K) )
 		{
 			//Save the previous (partial) sync symbol
 			cap->m_samples.push_back(current_sample);
@@ -315,7 +315,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 			//Add the error symbol
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 			cap->m_samples.push_back(current_sample);
 
 			state = STATE_IDLE;
@@ -331,7 +331,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 			cap->m_samples.push_back(current_sample);
 
 			//New sample starts right after us and contains no data so far
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_DATA;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_DATA;
 			current_sample.m_offset = sin.m_offset + sin.m_duration;
 			current_sample.m_duration = 0;
 			current_sample.m_sample.m_data = 0;
@@ -355,13 +355,13 @@ void USB2PacketDecoder::RefreshIterationSync(
 			current_sample.m_duration = sin.m_duration - old_width;
 			if(num_ones >= 7)
 			{
-				current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+				current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 				cap->m_samples.push_back(current_sample);
 				count = 0;
 			}
 			else
 			{
-				current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_DATA;
+				current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_DATA;
 				current_sample.m_sample.m_data = 0;
 
 				//Add the ones, LSB to MSB
@@ -375,15 +375,15 @@ void USB2PacketDecoder::RefreshIterationSync(
 	}
 }
 
-void USB2PacketDecoder::RefreshIterationData(
+void USB2PCSDecoder::RefreshIterationData(
 	const USBLineSample& sin,
 	const USBLineSample& slast,
 	DecodeState& state,
 	size_t& ui_width,
-	USB2PacketCapture* cap,
-	USBLineStateCapture* din,
+	USB2PCSCapture* cap,
+	USB2PMACapture* din,
 	size_t& count,
-	USB2PacketSample& current_sample)
+	USB2PCSSample& current_sample)
 {
 	size_t sample_ps = sin.m_duration * din->m_timescale;
 	size_t last_sample_ps = slast.m_duration * din->m_timescale;
@@ -391,7 +391,7 @@ void USB2PacketDecoder::RefreshIterationData(
 	float last_sample_width_ui = last_sample_ps * 1.0f / ui_width;
 
 	//If this is a SE0, we're done
-	if(sin.m_sample.m_type == USBLineSymbol::TYPE_SE0)
+	if(sin.m_sample.m_type == USB2PMASymbol::TYPE_SE0)
 	{
 		//If we're not two UIs long, we have a problem
 		//TODO: handle reset
@@ -399,7 +399,7 @@ void USB2PacketDecoder::RefreshIterationData(
 		{
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 			cap->m_samples.push_back(current_sample);
 		}
 
@@ -409,13 +409,13 @@ void USB2PacketDecoder::RefreshIterationData(
 			//Add the end symbol
 			current_sample.m_offset = sin.m_offset;
 			current_sample.m_duration = sin.m_duration + ui_width/din->m_timescale;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_EOP;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_EOP;
 			cap->m_samples.push_back(current_sample);
 
 			//Start the idle symbol
 			current_sample.m_offset = sin.m_offset + sin.m_duration + ui_width/din->m_timescale;
 			current_sample.m_duration = 0;
-			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_IDLE;
+			current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_IDLE;
 		}
 		state = STATE_IDLE;
 		count = 0;
@@ -423,12 +423,12 @@ void USB2PacketDecoder::RefreshIterationData(
 	}
 
 	//SE1 means error
-	else if(sin.m_sample.m_type == USBLineSymbol::TYPE_SE1)
+	else if(sin.m_sample.m_type == USB2PMASymbol::TYPE_SE1)
 	{
 		//Add the error symbol
 		current_sample.m_offset = sin.m_offset;
 		current_sample.m_duration = sin.m_duration;
-		current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+		current_sample.m_sample.m_type = USB2PCSSymbol::TYPE_ERROR;
 		cap->m_samples.push_back(current_sample);
 
 		state = STATE_IDLE;

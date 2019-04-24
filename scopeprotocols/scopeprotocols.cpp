@@ -56,7 +56,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ThresholdDecoder);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USBLineStateDecoder);
-	AddDecoderClass(USB2PacketDecoder);
+	AddDecoderClass(USB2PMADecoder);
+	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(WaterfallDecoder);
 }
