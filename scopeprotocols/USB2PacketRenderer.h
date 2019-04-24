@@ -30,21 +30,21 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of USBLineStateRenderer
+	@brief Declaration of USB2PacketRenderer
  */
 
-#ifndef USBLineStateRenderer_h
-#define USBLineStateRenderer_h
+#ifndef USB2PacketRenderer_h
+#define USB2PacketRenderer_h
 
 #include "../scopehal/TextRenderer.h"
 
 /**
 	@brief Renderer for a USBLineState channel
  */
-class USBLineStateRenderer : public TextRenderer
+class USB2PacketRenderer : public TextRenderer
 {
 public:
-	USBLineStateRenderer(OscilloscopeChannel* channel);
+	USB2PacketRenderer(OscilloscopeChannel* channel);
 protected:
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

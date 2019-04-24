@@ -30,24 +30,114 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of USBLineStateRenderer
+	@brief Declaration of USB2PacketDecoder
  */
+#ifndef USB2PacketDecoder_h
+#define USB2PacketDecoder_h
 
-#ifndef USBLineStateRenderer_h
-#define USBLineStateRenderer_h
-
-#include "../scopehal/TextRenderer.h"
+#include "../scopehal/ProtocolDecoder.h"
+#include "USBLineStateDecoder.h"
 
 /**
-	@brief Renderer for a USBLineState channel
+	@brief Part of a packet a USB 1.x/2.x differential bus
  */
-class USBLineStateRenderer : public TextRenderer
+class USB2PacketSymbol
 {
 public:
-	USBLineStateRenderer(OscilloscopeChannel* channel);
+
+	enum SymbolType
+	{
+		TYPE_IDLE,
+		TYPE_SYNC,
+		TYPE_EOP,
+		TYPE_RESET,
+		//TODO: handle suspend (idle for >3 ms)
+		//TODO: handle resume
+		TYPE_DATA,
+		TYPE_ERROR
+	};
+
+	USB2PacketSymbol(SymbolType type = TYPE_IDLE)
+	 : m_type(type)
+	{
+	}
+
+	SymbolType m_type;
+	uint8_t m_data;
+
+	bool operator==(const USB2PacketSymbol& rhs) const
+	{
+		return (m_type == rhs.m_type);
+	}
+};
+
+typedef OscilloscopeSample<USB2PacketSymbol> USB2PacketSample;
+typedef CaptureChannel<USB2PacketSymbol> USB2PacketCapture;
+
+class USB2PacketDecoder : public ProtocolDecoder
+{
+public:
+	USB2PacketDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
+
 protected:
-	virtual std::string GetText(int i);
-	virtual Gdk::Color GetColor(int i);
+	enum BusSpeed
+	{
+		SPEED_1M,
+		SPEED_12M,
+		SPEED_480M
+	};
+
+	enum DecodeState
+	{
+		STATE_IDLE,
+		STATE_SYNC,
+		STATE_DATA,
+		STATE_END
+	};
+
+	void RefreshIteration(
+		const USBLineSample& sin,
+		DecodeState& state,
+		BusSpeed& speed,
+		size_t& ui_width,
+		USB2PacketCapture* cap,
+		USBLineStateCapture* din,
+		size_t& count,
+		USB2PacketSample& current_sample);
+
+	void RefreshIterationIdle(
+		const USBLineSample& sin,
+		DecodeState& state,
+		BusSpeed& speed,
+		size_t& ui_width,
+		USB2PacketCapture* cap,
+		USBLineStateCapture* din,
+		size_t& count,
+		USB2PacketSample& current_sample);
+
+	void RefreshIterationSync(
+		const USBLineSample& sin,
+		DecodeState& state,
+		size_t& ui_width,
+		USB2PacketCapture* cap,
+		USBLineStateCapture* din,
+		size_t& count,
+		USB2PacketSample& current_sample);
 };
 
 #endif

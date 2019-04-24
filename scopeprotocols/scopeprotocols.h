@@ -57,6 +57,7 @@
 #include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
 #include "USBLineStateDecoder.h"
+#include "USB2PacketDecoder.h"
 #include "WaterfallDecoder.h"
 /*
 #include "DigitalToAnalogDecoder.h"

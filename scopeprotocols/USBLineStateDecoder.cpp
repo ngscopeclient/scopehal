@@ -137,10 +137,9 @@ void USBLineStateDecoder::Refresh()
 		const AnalogSample& sin_p = din_p->m_samples[i];
 		const AnalogSample& sin_n = din_n->m_samples[i];
 
-		//TODO: handle this better. For now, we assume a strong signal.
-		//This doesn't work well with attenuation, but buys headroom for super-ringy probes!
-		bool bp = (sin_p.m_sample > 1.65);
-		bool bn = (sin_n.m_sample > 1.65);
+		//TODO: handle this better.
+		bool bp = (sin_p.m_sample > 0.4);
+		bool bn = (sin_n.m_sample > 0.4);
 
 		USBLineSymbol::SegmentType type = USBLineSymbol::TYPE_SE1;
 		if(bp && bn)

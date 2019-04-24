@@ -28,6 +28,16 @@
 ***********************************************************************************************************************/
 
 /**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of USBLineStateDecoder
+ */
+#ifndef USBLineStateDecoder_h
+#define USBLineStateDecoder_h
+
+#include "../scopehal/ProtocolDecoder.h"
+
+/**
 	@brief A single bit on a USB 1.x/2.x differential bus
  */
 class USBLineSymbol
@@ -57,16 +67,6 @@ public:
 
 typedef OscilloscopeSample<USBLineSymbol> USBLineSample;
 typedef CaptureChannel<USBLineSymbol> USBLineStateCapture;
-
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of USBLineStateDecoder
- */
-#ifndef USBLineStateDecoder_h
-#define USBLineStateDecoder_h
-
-#include "../scopehal/ProtocolDecoder.h"
 
 class USBLineStateDecoder : public ProtocolDecoder
 {

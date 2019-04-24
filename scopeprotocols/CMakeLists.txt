@@ -25,6 +25,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	UartClockRecoveryDecoder.cpp
 	USBLineStateDecoder.cpp
 	USBLineStateRenderer.cpp
+	USB2PacketDecoder.cpp
+	USB2PacketRenderer.cpp
 	WaterfallDecoder.cpp
 
 	scopeprotocols.cpp
