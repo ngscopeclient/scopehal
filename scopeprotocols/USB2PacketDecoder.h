@@ -106,19 +106,8 @@ protected:
 	{
 		STATE_IDLE,
 		STATE_SYNC,
-		STATE_DATA,
-		STATE_END
+		STATE_DATA
 	};
-
-	void RefreshIteration(
-		const USBLineSample& sin,
-		DecodeState& state,
-		BusSpeed& speed,
-		size_t& ui_width,
-		USB2PacketCapture* cap,
-		USBLineStateCapture* din,
-		size_t& count,
-		USB2PacketSample& current_sample);
 
 	void RefreshIterationIdle(
 		const USBLineSample& sin,
@@ -132,6 +121,16 @@ protected:
 
 	void RefreshIterationSync(
 		const USBLineSample& sin,
+		DecodeState& state,
+		size_t& ui_width,
+		USB2PacketCapture* cap,
+		USBLineStateCapture* din,
+		size_t& count,
+		USB2PacketSample& current_sample);
+
+	void RefreshIterationData(
+		const USBLineSample& sin,
+		const USBLineSample& slast,
 		DecodeState& state,
 		size_t& ui_width,
 		USB2PacketCapture* cap,

@@ -128,32 +128,33 @@ void USB2PacketDecoder::Refresh()
 	//Decode stuff
 	size_t count = 0;
 	for(size_t i=0; i<din->m_samples.size(); i++)
-		RefreshIteration(din->m_samples[i], state, speed, ui_width, cap, din, count, current_sample);
+	{
+		switch(state)
+		{
+			case STATE_IDLE:
+				RefreshIterationIdle(din->m_samples[i], state, speed, ui_width, cap, din, count, current_sample);
+				break;
+
+			case STATE_SYNC:
+				RefreshIterationSync(din->m_samples[i], state, ui_width, cap, din, count, current_sample);
+				break;
+
+			case STATE_DATA:
+				RefreshIterationData(
+					din->m_samples[i],
+					din->m_samples[i-1],
+					state,
+					ui_width,
+					cap,
+					din,
+					count,
+					current_sample);
+				break;
+		}
+	}
 
 	//Done
 	SetData(cap);
-}
-
-void USB2PacketDecoder::RefreshIteration(
-	const USBLineSample& sin,
-	DecodeState& state,
-	BusSpeed& speed,
-	size_t& ui_width,
-	USB2PacketCapture* cap,
-	USBLineStateCapture* din,
-	size_t& count,
-	USB2PacketSample& current_sample)
-{
-	switch(state)
-	{
-		case STATE_IDLE:
-			RefreshIterationIdle(sin, state, speed, ui_width, cap, din, count, current_sample);
-			break;
-
-		case STATE_SYNC:
-			RefreshIterationSync(sin, state, ui_width, cap, din, count, current_sample);
-			break;
-	}
 }
 
 void USB2PacketDecoder::RefreshIterationIdle(
@@ -248,8 +249,7 @@ void USB2PacketDecoder::RefreshIterationSync(
 	size_t sample_ps = sin.m_duration * din->m_timescale;
 	float sample_width_ui = sample_ps * 1.0f / ui_width;
 
-	//Expect the next state
-	//If it's wrong, go back to idle and complain
+	//Keep track of our position in the sync sequence
 	count ++;
 
 	//Odd numbered position
@@ -336,6 +336,8 @@ void USB2PacketDecoder::RefreshIterationSync(
 			current_sample.m_duration = 0;
 			current_sample.m_sample.m_data = 0;
 			count = 0;
+
+			LogDebug("Start\n");
 		}
 
 		//Packet begins with a "1" bit.
@@ -363,12 +365,117 @@ void USB2PacketDecoder::RefreshIterationSync(
 				current_sample.m_sample.m_data = 0;
 
 				//Add the ones, LSB to MSB
-				for(size_t j=0; j<num_ones; j--)
+				for(size_t j=0; j<num_ones; j++)
 					current_sample.m_sample.m_data = (current_sample.m_sample.m_data >> 1) | 0x80;
 				count = num_ones;
 			}
 		}
 
 		state = STATE_DATA;
+	}
+}
+
+void USB2PacketDecoder::RefreshIterationData(
+	const USBLineSample& sin,
+	const USBLineSample& slast,
+	DecodeState& state,
+	size_t& ui_width,
+	USB2PacketCapture* cap,
+	USBLineStateCapture* din,
+	size_t& count,
+	USB2PacketSample& current_sample)
+{
+	size_t sample_ps = sin.m_duration * din->m_timescale;
+	size_t last_sample_ps = slast.m_duration * din->m_timescale;
+	float sample_width_ui = sample_ps * 1.0f / ui_width;
+	float last_sample_width_ui = last_sample_ps * 1.0f / ui_width;
+
+	//If this is a SE0, we're done
+	if(sin.m_sample.m_type == USBLineSymbol::TYPE_SE0)
+	{
+		//If we're not two UIs long, we have a problem
+		//TODO: handle reset
+		if(round(sample_width_ui) != 2)
+		{
+			current_sample.m_offset = sin.m_offset;
+			current_sample.m_duration = sin.m_duration;
+			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+			cap->m_samples.push_back(current_sample);
+		}
+
+		//All good
+		else
+		{
+			//Add the end symbol
+			current_sample.m_offset = sin.m_offset;
+			current_sample.m_duration = sin.m_duration + ui_width/din->m_timescale;
+			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_EOP;
+			cap->m_samples.push_back(current_sample);
+
+			//Start the idle symbol
+			current_sample.m_offset = sin.m_offset + sin.m_duration + ui_width/din->m_timescale;
+			current_sample.m_duration = 0;
+			current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_IDLE;
+		}
+		state = STATE_IDLE;
+		count = 0;
+		return;
+	}
+
+	//SE1 means error
+	else if(sin.m_sample.m_type == USBLineSymbol::TYPE_SE1)
+	{
+		//Add the error symbol
+		current_sample.m_offset = sin.m_offset;
+		current_sample.m_duration = sin.m_duration;
+		current_sample.m_sample.m_type = USB2PacketSymbol::TYPE_ERROR;
+		cap->m_samples.push_back(current_sample);
+
+		state = STATE_IDLE;
+		count = 0;
+		return;
+	}
+
+	//Process the actual data
+	size_t num_bits = round(sample_width_ui);
+	for(size_t i=0; i<num_bits; i++)
+	{
+		//First bit is either a bitstuff or 0 bit
+		if(i == 0)
+		{
+			//If not a bitstuff, add the data bit
+			if(round(last_sample_width_ui) < 6)
+				current_sample.m_sample.m_data = (current_sample.m_sample.m_data >> 1);
+
+			//else no action needed, it was a bit-stuff.
+		}
+
+		//All other bits are 1 bits
+		else
+			current_sample.m_sample.m_data = (current_sample.m_sample.m_data >> 1) | 0x80;
+
+		//If this is the last bit, align our end so it looks nice
+		if(i+1 == num_bits)
+			current_sample.m_duration = sin.m_offset + sin.m_duration - current_sample.m_offset;
+
+		//No, just move one UI after the current start
+		else
+			current_sample.m_duration += ui_width / din->m_timescale;
+
+		count ++;
+
+		//If we just finished a byte, save the sample
+		if(count == 8)
+		{
+			cap->m_samples.push_back(current_sample);
+
+			//Start the new sample
+			count = 0;
+			if(i+1 == num_bits)
+				current_sample.m_offset = sin.m_offset + sin.m_duration;
+			else
+				current_sample.m_offset = sin.m_offset + (i+1)*ui_width/din->m_timescale;
+			current_sample.m_sample.m_data = 0;
+		}
 	}
 }
