@@ -41,7 +41,7 @@ USB2PCSDecoder::USB2PCSDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("State");
+	m_signalNames.push_back("PMA");
 	m_channels.push_back(NULL);
 }
 
@@ -336,8 +336,6 @@ void USB2PCSDecoder::RefreshIterationSync(
 			current_sample.m_duration = 0;
 			current_sample.m_sample.m_data = 0;
 			count = 0;
-
-			LogDebug("Start\n");
 		}
 
 		//Packet begins with a "1" bit.
@@ -349,7 +347,7 @@ void USB2PCSDecoder::RefreshIterationSync(
 			cap->m_samples.push_back(current_sample);
 
 			//Start the new sample and add the 1 bit(s)
-			size_t num_ones = round(sample_width_ui - 2);
+			size_t num_ones = round(sample_width_ui) - 2;
 			size_t old_width = 2 * ui_width / din->m_timescale;
 			current_sample.m_offset = sin.m_offset + old_width;
 			current_sample.m_duration = sin.m_duration - old_width;
@@ -438,16 +436,19 @@ void USB2PCSDecoder::RefreshIterationData(
 
 	//Process the actual data
 	size_t num_bits = round(sample_width_ui);
+	size_t last_num_bits = round(last_sample_width_ui);
 	for(size_t i=0; i<num_bits; i++)
 	{
 		//First bit is either a bitstuff or 0 bit
 		if(i == 0)
 		{
 			//If not a bitstuff, add the data bit
-			if(round(last_sample_width_ui) < 6)
+			if(last_num_bits < 7)
 				current_sample.m_sample.m_data = (current_sample.m_sample.m_data >> 1);
 
 			//else no action needed, it was a bit-stuff.
+			else
+				continue;
 		}
 
 		//All other bits are 1 bits

@@ -39,7 +39,7 @@
 #include "USB2PMADecoder.h"
 
 /**
-	@brief Part of a packet a USB 1.x/2.x differential bus
+	@brief A single symbol at the PCS layer (byte or command)
  */
 class USB2PCSSymbol
 {
