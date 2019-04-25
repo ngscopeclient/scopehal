@@ -30,34 +30,24 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of USB2PacketRenderer
  */
 
-#include "scopeprotocols.h"
+#ifndef USB2PacketRenderer_h
+#define USB2PacketRenderer_h
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/TextRenderer.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief Renderer for a USBLineState channel
  */
-void ScopeProtocolStaticInit()
+class USB2PacketRenderer : public TextRenderer
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	USB2PacketRenderer(OscilloscopeChannel* channel);
+protected:
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+};
+
+#endif
