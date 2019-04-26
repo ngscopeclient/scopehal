@@ -39,7 +39,7 @@ using namespace std;
 // Construction / destruction
 
 USB2PacketDecoder::USB2PacketDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("PCS");
@@ -90,6 +90,22 @@ bool USB2PacketDecoder::NeedsConfig()
 double USB2PacketDecoder::GetVoltageRange()
 {
 	return 1;
+}
+
+bool USB2PacketDecoder::GetShowDataColumn()
+{
+	return false;
+}
+
+vector<string> USB2PacketDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Device");
+	ret.push_back("Endpoint");
+	ret.push_back("Length");
+	ret.push_back("Details");
+	return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,4 +354,373 @@ void USB2PacketDecoder::Refresh()
 
 	//Done
 	SetData(cap);
+
+	//Decode packets in the capture
+	FindPackets(cap);
+}
+
+void USB2PacketDecoder::FindPackets(USB2PacketCapture* cap)
+{
+	ClearPackets();
+
+	//Stop when we have no chance of fitting a full packet
+	for(size_t i=0; i<cap->m_samples.size() - 2;)
+	{
+		//Every packet should start with a PID. Discard unknown garbage.
+		auto& psample = cap->m_samples[i];
+		if(psample.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+		{
+			i++;
+			continue;
+		}
+		uint8_t pid = psample.m_sample.m_data & 0xf;
+		i++;
+
+		//See what the PID is
+		switch(pid)
+		{
+			case USB2PacketSymbol::PID_SOF:
+				DecodeSof(cap, psample, i);
+				break;
+
+			case USB2PacketSymbol::PID_SETUP:
+				DecodeSetup(cap, psample, i);
+				break;
+
+			case USB2PacketSymbol::PID_IN:
+			case USB2PacketSymbol::PID_OUT:
+				DecodeData(cap, psample, i);
+				break;
+
+			default:
+				LogDebug("Unexpected PID %x\n", pid);
+		}
+	}
+}
+
+void USB2PacketDecoder::DecodeSof(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+{
+	//A SOF should contain a TYPE_NFRAME and a TYPE_CRC5
+	//Bail out if we only have part of the packet
+	if(i+2 >= cap->m_samples.size())
+		return;
+
+	//TODO: better display for invalid/malformed packets
+	USB2PacketSample& snframe = cap->m_samples[i++];
+	USB2PacketSample& scrc = cap->m_samples[i++];
+	if(snframe.m_sample.m_type != USB2PacketSymbol::TYPE_NFRAME)
+		return;
+	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+		return;
+
+	//Make the packet
+	Packet* pack = new Packet;
+	pack->m_offset = start.m_offset * cap->m_timescale;
+	pack->m_headers["Type"] = "SOF";
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "Sequence = %u", snframe.m_sample.m_data);
+	pack->m_headers["Details"] = tmp;
+	pack->m_len = ((scrc.m_offset + scrc.m_duration) * cap->m_timescale) - pack->m_offset;
+	m_packets.push_back(pack);
+
+	pack->m_headers["Device"] = "--";
+	pack->m_headers["Endpoint"] = "--";
+	pack->m_headers["Length"] = "2";
+}
+
+void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+{
+	//A SETUP packet should contain ADDR, ENDP, CRC5
+	//Bail out if we only have part of the packet.
+	if(i+3 >= cap->m_samples.size())
+		return;
+	USB2PacketSample& saddr = cap->m_samples[i++];
+	USB2PacketSample& sendp = cap->m_samples[i++];
+	USB2PacketSample& scrc = cap->m_samples[i++];
+
+	//TODO: better display for invalid/malformed packets
+	if(saddr.m_sample.m_type != USB2PacketSymbol::TYPE_ADDR)
+	{
+		LogError("not TYPE_ADDR\n");
+		return;
+	}
+	if(sendp.m_sample.m_type != USB2PacketSymbol::TYPE_ENDP)
+	{
+		LogError("not TYPE_ENDP\n");
+		return;
+	}
+	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+	{
+		LogError("not TYPE_CRC5\n");
+		return;
+	}
+
+	//Expect a DATA0 packet next
+	//Should be PID, 8 bytes, CRC16.
+	//Bail out if we only have part of the packet.
+	if(i+10 >= cap->m_samples.size())
+		return;
+	USB2PacketSample& sdatpid = cap->m_samples[i++];
+	if(sdatpid.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+	{
+		LogError("Not PID\n");
+		return;
+	}
+	if( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA0)
+	{
+		LogError("not DATA0\n");
+		return;
+	}
+	uint16_t data[8] = {0};
+	for(int j=0; j<8; j++)
+	{
+		USB2PacketSample& sdat = cap->m_samples[i++];
+		if(sdat.m_sample.m_type != USB2PacketSymbol::TYPE_DATA)
+		{
+			LogError("not data\n");
+			return;
+		}
+		data[j] = sdat.m_sample.m_data;
+	}
+	USB2PacketSample& sdcrc = cap->m_samples[i++];
+	if(sdcrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC16)
+	{
+		LogError("not CRC16\n");
+		return;
+	}
+
+	//Expect ACK/NAK
+	string ack = "";
+	USB2PacketSample& sack = cap->m_samples[i++];
+	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
+	{
+		if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
+			ack = "ACK";
+		else if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+			ack = "NAK";
+		else
+			ack = "Unknown end PID";
+	}
+
+	//Make the packet
+	Packet* pack = new Packet;
+	pack->m_offset = start.m_offset * cap->m_timescale;
+	pack->m_headers["Type"] = "SETUP";
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+	pack->m_headers["Device"] = tmp;
+	snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+	pack->m_headers["Endpoint"] = tmp;
+	pack->m_headers["Length"] = "8";	//constant
+
+	//Decode setup details
+	uint8_t bmRequestType = data[0];
+	uint8_t bRequest = data[1];
+	uint16_t wValue = (data[3] << 8) | data[2];
+	uint16_t wIndex = (data[5] << 8) | data[4];
+	uint16_t wLength = (data[7] << 8) | data[6];
+	bool out = bmRequestType >> 7;
+	uint8_t type = (bmRequestType  >> 5) & 3;
+	uint8_t dest = bmRequestType & 0x1f;
+	string stype;
+	switch(type)
+	{
+		case 0:
+			stype = "Standard";
+			break;
+		case 1:
+			stype = "Class";
+			break;
+		case 2:
+			stype = "Vendor";
+			break;
+		case 3:
+		default:
+			stype = "Reserved";
+			break;
+	}
+	string sdest;
+	switch(dest)
+	{
+		case 0:
+			sdest = "device";
+			break;
+		case 1:
+			sdest = "interface";
+			break;
+		case 2:
+			sdest = "endpoint";
+			break;
+		case 3:
+		default:
+			sdest = "reserved";
+			break;
+	}
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"%s %s req to %s bRequest=%x wValue=%x wIndex=%x wLength=%u %s",
+		out ? "Host:" : "Dev:",
+		stype.c_str(),
+		sdest.c_str(),
+		bRequest,
+		wValue,
+		wIndex,
+		wLength,
+		ack.c_str());
+	pack->m_headers["Details"] = tmp;
+
+	//Done
+	pack->m_len = ((sdcrc.m_offset + sdcrc.m_duration) * cap->m_timescale) - pack->m_offset;
+	m_packets.push_back(pack);
+}
+
+void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+{
+	//The IN/OUT packet should contain ADDR, ENDP, CRC5
+	//Bail out if we only have part of the packet.
+	if(i+3 >= cap->m_samples.size())
+		return;
+	USB2PacketSample& saddr = cap->m_samples[i++];
+	USB2PacketSample& sendp = cap->m_samples[i++];
+	USB2PacketSample& scrc = cap->m_samples[i++];
+
+	//TODO: better display for invalid/malformed packets
+	if(saddr.m_sample.m_type != USB2PacketSymbol::TYPE_ADDR)
+	{
+		LogError("not TYPE_ADDR\n");
+		return;
+	}
+	if(sendp.m_sample.m_type != USB2PacketSymbol::TYPE_ENDP)
+	{
+		LogError("not TYPE_ENDP\n");
+		return;
+	}
+	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+	{
+		LogError("not TYPE_CRC5\n");
+		return;
+	}
+
+	//Expect minimum DATA, 0 or more data bytes, ACK
+	if(i+2 >= cap->m_samples.size())
+		return;
+
+	char tmp[256];
+
+	//Look for the DATA packet after the IN/OUT
+	USB2PacketSample& sdatpid = cap->m_samples[i];
+	if(sdatpid.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+	{
+		LogError("Not PID\n");
+		return;
+	}
+	//We can get a SOF thrown in anywhere, handle that first
+	if( (sdatpid.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_SOF)
+	{
+		LogDebug("Random SOF in data stream (i=%zu)\n", i);
+		DecodeSof(cap, sdatpid, i);
+		sdatpid = cap->m_samples[i];
+	}
+	else if( (sdatpid.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+	{
+		i++;
+
+		//Add a line for the aborted transaction
+		Packet* pack = new Packet;
+		pack->m_offset = start.m_offset * cap->m_timescale;
+		if( (start.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_IN)
+			pack->m_headers["Type"] = "IN";
+		else
+			pack->m_headers["Type"] = "OUT";
+		char tmp[256];
+		snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+		pack->m_headers["Device"] = tmp;
+		snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+		pack->m_headers["Endpoint"] = tmp;
+		pack->m_headers["Details"] = "NAK";
+		m_packets.push_back(pack);
+		return;
+	}
+	else	//normal data
+		i++;
+	if( ( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA0) &&
+		( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA1) )
+	{
+		LogError("Not data PID (%x, i=%zu)\n", sdatpid.m_sample.m_data, i);
+
+		//DEBUG
+		Packet* pack = new Packet;
+		pack->m_offset = start.m_offset * cap->m_timescale;
+		pack->m_headers["Details"] = "ERROR";
+		m_packets.push_back(pack);
+		return;
+	}
+
+	//Create the new packet
+	Packet* pack = new Packet;
+	pack->m_offset = start.m_offset * cap->m_timescale;
+	if( (start.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_IN)
+		pack->m_headers["Type"] = "IN";
+	else
+		pack->m_headers["Type"] = "OUT";
+	snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+	pack->m_headers["Device"] = tmp;
+	snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+	pack->m_headers["Endpoint"] = tmp;
+
+	//Read the data
+	while(i < cap->m_samples.size())
+	{
+		USB2PacketSample& s = cap->m_samples[i++];
+
+		//Keep adding data
+		if(s.m_sample.m_type == USB2PacketSymbol::TYPE_DATA)
+		{
+			pack->m_data.push_back(s.m_sample.m_data);
+			pack->m_len = ((s.m_offset + s.m_duration) * cap->m_timescale) - pack->m_offset;
+		}
+
+		//Next should be a CRC16
+		else if(s.m_sample.m_type == USB2PacketSymbol::TYPE_CRC16)
+		{
+			//TODO: verify the CRC
+			break;
+		}
+	}
+
+	//Expect ACK/NAK
+	string ack = "";
+	USB2PacketSample& sack = cap->m_samples[i++];
+	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
+	{
+		if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
+			ack = "";
+		else if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+			ack = "NAK";
+		else
+			ack = "Unknown end PID";
+	}
+
+	//TODO: handle errors better
+	else
+	{
+		LogDebug("DecodeData got type %x instead of ACK/NAK\n", sack.m_sample.m_type);
+		ack = "Not a PID";
+	}
+
+	//Format the data
+	string details = "";
+	for(auto b : pack->m_data)
+	{
+		snprintf(tmp, sizeof(tmp), "%02x ", b);
+		details += tmp;
+	}
+	details += ack;
+	pack->m_headers["Details"] = details;
+
+	snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+	pack->m_headers["Length"] = tmp;
+
+	m_packets.push_back(pack);
 }

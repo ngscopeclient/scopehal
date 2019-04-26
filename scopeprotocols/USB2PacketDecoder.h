@@ -35,7 +35,7 @@
 #ifndef USB2PacketDecoder_h
 #define USB2PacketDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 #include "USB2PMADecoder.h"
 
 /**
@@ -96,7 +96,7 @@ public:
 typedef OscilloscopeSample<USB2PacketSymbol> USB2PacketSample;
 typedef CaptureChannel<USB2PacketSymbol> USB2PacketCapture;
 
-class USB2PacketDecoder : public ProtocolDecoder
+class USB2PacketDecoder : public PacketDecoder
 {
 public:
 	USB2PacketDecoder(std::string color);
@@ -112,11 +112,18 @@ public:
 
 	virtual double GetVoltageRange();
 
+	virtual std::vector<std::string> GetHeaders();
+	virtual bool GetShowDataColumn();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
 	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
 
 protected:
+	void FindPackets(USB2PacketCapture* cap);
+	void DecodeSof(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+	void DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+	void DecodeData(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
 };
 
 #endif
