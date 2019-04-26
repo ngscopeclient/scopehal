@@ -44,6 +44,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
+	, m_highDefinition(false)
 {
 }
 
@@ -173,7 +174,11 @@ void LeCroyOscilloscope::SharedCtorInit()
 	}
 
 	//Desired format for waveform data
-	SendCommand("COMM_FORMAT DEF9,WORD,BIN");
+	//Only use increased bit depth if the scope actually puts content there!
+	if(m_highDefinition)
+		SendCommand("COMM_FORMAT DEF9,WORD,BIN");
+	else
+		SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
@@ -208,6 +213,10 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_WAVERUNNER_8K;
 	else
 		m_modelid = MODEL_UNKNOWN;
+
+	//TODO: better way of doing this?
+	if(m_model.find("HD") != string::npos)
+		m_highDefinition = true;
 }
 
 void LeCroyOscilloscope::DetectAnalogChannels()
@@ -943,9 +952,14 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		}
 
 		//Raw waveform data
-		int16_t* wdata = (int16_t*)&data[0];
-		size_t num_samples = data.size()/2;
+		size_t num_samples;
+		if(m_highDefinition)
+			num_samples = data.size()/2;
+		else
+			num_samples = data.size();
 		size_t num_per_segment = num_samples / num_sequences;
+		int16_t* wdata = (int16_t*)&data[0];
+		int8_t* bdata = (int8_t*)&data[0];
 
 		for(size_t j=0; j<num_sequences; j++)
 		{
@@ -970,7 +984,12 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			//Decode the samples
 			cap->m_samples.resize(num_per_segment);
 			for(unsigned int i=0; i<num_per_segment; i++)
-				cap->m_samples[i] = AnalogSample(i, 1, wdata[i + j*num_per_segment] * v_gain - v_off);
+			{
+				if(m_highDefinition)
+					cap->m_samples[i] = AnalogSample(i, 1, wdata[i + j*num_per_segment] * v_gain - v_off);
+				else
+					cap->m_samples[i] = AnalogSample(i, 1, bdata[i + j*num_per_segment] * v_gain - v_off);
+			}
 
 			//Done, update the data
 			if(j == 0)

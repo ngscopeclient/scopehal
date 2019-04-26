@@ -204,6 +204,9 @@ protected:
 	std::map<size_t, double> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
 
+	//True if we have >8 bit capture depth
+	bool m_highDefinition;
+
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
