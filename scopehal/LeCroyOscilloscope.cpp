@@ -814,9 +814,17 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
  */
 void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
+	//Check enable state in the cache.
+	vector<int> uncached;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
+			uncached.push_back(i);
+	}
+
+	for(auto i : uncached)
 		SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	for(auto i : uncached)
 	{
 		string reply = ReadSingleBlockString();
 		if(reply == "OFF")

@@ -62,6 +62,11 @@ Oscilloscope::~Oscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device properties
 
+bool Oscilloscope::HasPendingWaveforms()
+{
+	return (m_pendingWaveforms.size() != 0);
+}
+
 void Oscilloscope::FlushConfigCache()
 {
 	//nothing to do, base class has no caching

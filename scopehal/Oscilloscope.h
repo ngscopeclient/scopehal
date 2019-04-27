@@ -383,6 +383,7 @@ public:
 	// Sequenced triggering
 
 public:
+	bool HasPendingWaveforms();
 	virtual Oscilloscope::TriggerMode PollTriggerFifo();
 	virtual bool AcquireDataFifo(sigc::slot1<int, float> progress_callback);
 

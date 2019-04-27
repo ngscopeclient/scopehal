@@ -193,7 +193,7 @@ void USB2PacketDecoder::Refresh()
 					continue;
 				}
 
-				//If the low bits don't match the complement of the high bits, we have a baed PID
+				//If the low bits don't match the complement of the high bits, we have a bad PID
 				if( (sin.m_sample.m_data >> 4) != (0xf & ~sin.m_sample.m_data) )
 				{
 					cap->m_samples.push_back(USB2PacketSample(
@@ -402,8 +402,11 @@ void USB2PacketDecoder::DecodeSof(USB2PacketCapture* cap, USB2PacketSample& star
 {
 	//A SOF should contain a TYPE_NFRAME and a TYPE_CRC5
 	//Bail out if we only have part of the packet
-	if(i+2 >= cap->m_samples.size())
+	if(i+1 >= cap->m_samples.size())
+	{
+		LogDebug("Truncated SOF\n");
 		return;
+	}
 
 	//TODO: better display for invalid/malformed packets
 	USB2PacketSample& snframe = cap->m_samples[i++];
@@ -432,8 +435,11 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 {
 	//A SETUP packet should contain ADDR, ENDP, CRC5
 	//Bail out if we only have part of the packet.
-	if(i+3 >= cap->m_samples.size())
+	if(i+2 >= cap->m_samples.size())
+	{
+		LogDebug("Truncated SETUP\n");
 		return;
+	}
 	USB2PacketSample& saddr = cap->m_samples[i++];
 	USB2PacketSample& sendp = cap->m_samples[i++];
 	USB2PacketSample& scrc = cap->m_samples[i++];
@@ -458,8 +464,11 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 	//Expect a DATA0 packet next
 	//Should be PID, 8 bytes, CRC16.
 	//Bail out if we only have part of the packet.
-	if(i+10 >= cap->m_samples.size())
+	if(i+9 >= cap->m_samples.size())
+	{
+		LogDebug("Truncated data\n");
 		return;
+	}
 	USB2PacketSample& sdatpid = cap->m_samples[i++];
 	if(sdatpid.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
 	{
@@ -491,6 +500,11 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 
 	//Expect ACK/NAK
 	string ack = "";
+	if(i >= cap->m_samples.size())
+	{
+		LogDebug("Truncated ACK\n");
+		return;
+	}
 	USB2PacketSample& sack = cap->m_samples[i++];
 	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
 	{
@@ -579,7 +593,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 {
 	//The IN/OUT packet should contain ADDR, ENDP, CRC5
 	//Bail out if we only have part of the packet.
-	if(i+3 >= cap->m_samples.size())
+	if(i+2 >= cap->m_samples.size())
 		return;
 	USB2PacketSample& saddr = cap->m_samples[i++];
 	USB2PacketSample& sendp = cap->m_samples[i++];
@@ -603,8 +617,11 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	}
 
 	//Expect minimum DATA, 0 or more data bytes, ACK
-	if(i+2 >= cap->m_samples.size())
+	if(i >= cap->m_samples.size())
+	{
+		LogDebug("Truncated DATA\n");
 		return;
+	}
 
 	char tmp[256];
 
@@ -690,6 +707,11 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	}
 
 	//Expect ACK/NAK
+	if(i >= cap->m_samples.size())
+	{
+		LogDebug("Truncated ACK\n");
+		return;
+	}
 	string ack = "";
 	USB2PacketSample& sack = cap->m_samples[i++];
 	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
