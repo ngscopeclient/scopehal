@@ -1049,7 +1049,10 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	for(size_t i=0; i<num_sequences-1; i++)
+	size_t num_pending = num_sequences-1;
+	if(toQueue)				//if saving to queue, the 0'th segment counts too
+		num_pending ++;
+	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;
 		for(size_t j=0; j<m_analogChannelCount; j++)

@@ -121,35 +121,29 @@ bool Oscilloscope::HasPendingWaveforms()
 }
 
 /**
-	@brief Just like PollTrigger(), but checks if we have pending data in the sequence buffer first
+	@brief Just like PollTrigger(), but checks the fifo instead
  */
 Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
 {
-	lock_guard<mutex> lock(m_pendingWaveformsMutex);
-	if(m_pendingWaveforms.size())
+	if(HasPendingWaveforms())
 		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
 	else
-		return PollTrigger();
+		return Oscilloscope::TRIGGER_MODE_RUN;
 }
 
 /**
-	@brief Just like AcquireData(), but checks if we have pending data in the sequence buffer first
+	@brief Just like AcquireData(), but only pulls from the fifo
  */
 bool Oscilloscope::AcquireDataFifo()
 {
-	m_pendingWaveformsMutex.lock();
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
 	if(m_pendingWaveforms.size())
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
 			it.first->SetData(it.second);
 		m_pendingWaveforms.pop_front();
-		m_pendingWaveformsMutex.unlock();
 		return true;
 	}
-	else
-	{
-		m_pendingWaveformsMutex.unlock();
-		return AcquireData();
-	}
+	return false;
 }
