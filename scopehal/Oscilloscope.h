@@ -317,10 +317,11 @@ public:
 	/**
 		@brief Reads data for all enabled channels from the instrument.
 
-		@param progress_callback Callback function called during transfer of long waveforms.
-				May be used to update a progress bar, etc.
+		@parameter toQueue	If true, acquire the waveform into the pending-waveform queue for future analysis.
+							If false, the waveform (or first segment in sequenced captures), is acquired into
+							the current channel state and any additional segments are queued.
 	 */
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback) =0;
+	virtual bool AcquireData(bool toQueue = false) =0;
 
 	/**
 		@brief Starts the instrument in continuous trigger mode.
@@ -392,7 +393,7 @@ public:
 	size_t GetPendingWaveformCount()
 	{ return m_pendingWaveforms.size(); }
 	virtual Oscilloscope::TriggerMode PollTriggerFifo();
-	virtual bool AcquireDataFifo(sigc::slot1<int, float> progress_callback);
+	virtual bool AcquireDataFifo();
 
 protected:
 	typedef std::map<OscilloscopeChannel*, CaptureChannelBase*> SequenceSet;

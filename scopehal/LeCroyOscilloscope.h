@@ -82,7 +82,7 @@ public:
 	//Triggering
 	virtual void ResetTriggerConditions();
 	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback);
+	virtual bool AcquireData(bool toQueue = false);
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
@@ -196,6 +196,7 @@ protected:
 	bool m_hasFunctionGen;
 
 	bool m_triggerArmed;
+	bool m_triggerOneShot;
 
 	//Cached configuration
 	bool m_triggerChannelValid;
@@ -217,6 +218,7 @@ protected:
 
 	//Mutexing for thread safety
 	std::recursive_mutex m_mutex;
+	std::recursive_mutex m_cacheMutex;
 };
 
 #endif

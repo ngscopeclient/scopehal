@@ -128,7 +128,7 @@ Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
 /**
 	@brief Just like AcquireData(), but checks if we have pending data in the sequence buffer first
  */
-bool Oscilloscope::AcquireDataFifo(sigc::slot1<int, float> progress_callback)
+bool Oscilloscope::AcquireDataFifo()
 {
 	m_pendingWaveformsMutex.lock();
 	if(m_pendingWaveforms.size())
@@ -143,6 +143,6 @@ bool Oscilloscope::AcquireDataFifo(sigc::slot1<int, float> progress_callback)
 	else
 	{
 		m_pendingWaveformsMutex.unlock();
-		return AcquireData(progress_callback);
+		return AcquireData();
 	}
 }

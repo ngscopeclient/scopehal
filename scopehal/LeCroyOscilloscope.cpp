@@ -46,6 +46,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_hasFunctionGen(false)
 	, m_highDefinition(false)
 	, m_triggerArmed(false)
+	, m_triggerOneShot(false)
 {
 }
 
@@ -280,11 +281,9 @@ OscilloscopeChannel* LeCroyOscilloscope::GetExternalTrigger()
 
 void LeCroyOscilloscope::FlushConfigCache()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	m_triggerChannel = 0;
 	m_triggerChannelValid = false;
-	m_triggerLevel = 0;
 	m_triggerLevelValid = false;
 	m_triggerType = TRIGGER_TYPE_DONTCARE;
 	m_triggerTypeValid = false;
@@ -343,11 +342,6 @@ string LeCroyOscilloscope::GetSerial()
 //TODO: None of these 3 functions support LA stuff
 bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-		return m_channelsEnabled[i];
-
 	//ext trigger should never be displayed
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
@@ -355,6 +349,13 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	//TODO: handle digital channels, for now just claim they're off
 	if(i >= m_analogChannelCount)
 		return false;
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+		return m_channelsEnabled[i];
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	//See if the channel is enabled, hide it if not
 	string cmd = m_channels[i]->GetHwname() + ":TRACE?";
@@ -386,10 +387,10 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	if(i > m_analogChannelCount)
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
 	string reply = ReadSingleBlockString(true);
@@ -817,19 +818,6 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 		ReadData();
 		return true;
 	}
-	//LogDebug("Expecting %d bytes (%d samples)\n", num_bytes, num_samples);
-
-	//Done with headers, data comes next
-	//TODO: do progress feedback eventually
-	/*
-	float base_progress = i*1.0f / m_analogChannelCount;
-	float expected_header_time = 0.25;
-	float expected_data_time = 0.09f * num_samples / 1000;
-	float expected_total_time = expected_header_time + expected_data_time;
-	float header_fraction = expected_header_time / expected_total_time;
-	base_progress += header_fraction / m_analogChannelCount;
-	progress_callback(base_progress);
-	*/
 
 	//Read the data
 	data.clear();
@@ -860,7 +848,7 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
  */
 void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 	//Check enable state in the cache.
 	vector<int> uncached;
@@ -869,6 +857,8 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 		if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
 			uncached.push_back(i);
 	}
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	for(auto i : uncached)
 		SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
@@ -882,9 +872,9 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	}
 }
 
-bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
+bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	m_mutex.lock();
 
 	//LogDebug("Acquire data\n");
 
@@ -965,12 +955,10 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	{
 		if(!enabled[i])
 		{
-			m_channels[i]->SetData(NULL);
+			if(!toQueue)
+				m_channels[i]->SetData(NULL);
 			continue;
 		}
-
-		float fbase = i*1.0f / m_analogChannelCount;
-		progress_callback(fbase);
 
 		//Parse the wavedesc headers
 		unsigned char* pdesc = (unsigned char*)(&wavedescs[i][0]);
@@ -1050,12 +1038,14 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			}
 
 			//Done, update the data
-			if(j == 0)
+			if(j == 0 && !toQueue)
 				m_channels[i]->SetData(cap);
 			else
 				pending_waveforms[i].push_back(cap);
 		}
 	}
+
+	m_mutex.unlock();
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
@@ -1076,14 +1066,20 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 	if(num_sequences > 1)
 	{
+		m_mutex.lock();
+
 		//LeCroy's LA is derpy and doesn't support sequenced capture!
 		//(at least in wavesurfer 3000 series)
 		for(unsigned int i=0; i<m_digitalChannelCount; i++)
 			m_channels[m_analogChannelCount + i]->SetData(NULL);
+
+		m_mutex.unlock();
 	}
 
 	else if(m_digitalChannelCount > 0)
 	{
+		m_mutex.lock();
+
 		//If no digital channels are enabled, skip this step
 		bool enabled = false;
 		for(size_t i=0; i<m_digitalChannels.size(); i++)
@@ -1160,6 +1156,15 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 			delete[] block;
 		}
+
+		m_mutex.unlock();
+	}
+
+	//Re-arm the trigger if not in one-shot mode
+	if(!m_triggerOneShot)
+	{
+		SendCommand("TRIG_MODE SINGLE");
+		m_triggerArmed = true;
 	}
 
 	return true;
@@ -1168,8 +1173,10 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 void LeCroyOscilloscope::Start()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("TRIG_MODE NORM");
+	//SendCommand("TRIG_MODE NORM");
+	SendCommand("TRIG_MODE SINGLE");	//always do single captures, just re-trigger
 	m_triggerArmed = true;
+	m_triggerOneShot = false;
 }
 
 void LeCroyOscilloscope::StartSingleTrigger()
@@ -1178,6 +1185,7 @@ void LeCroyOscilloscope::StartSingleTrigger()
 	//LogDebug("Start single trigger\n");
 	SendCommand("TRIG_MODE SINGLE");
 	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void LeCroyOscilloscope::Stop()
@@ -1185,15 +1193,21 @@ void LeCroyOscilloscope::Stop()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("TRIG_MODE STOP");
 	m_triggerArmed = false;
+
+	//Clear out any pending data (the user doesn't want it, and we don't want stale stuff hanging around)
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.clear();
+	m_pendingWaveformsMutex.unlock();
 }
 
 size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Check cache
+	//No locking, worst case we return a result a few seconds old
 	if(m_triggerChannelValid)
 		return m_triggerChannel;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand("TRIG_SELECT?");
 	string reply = ReadSingleBlockString();
@@ -1235,12 +1249,12 @@ void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 
 float LeCroyOscilloscope::GetTriggerVoltage()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Check cache
+	//Check cache.
+	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
 	if(m_triggerLevelValid)
 		return m_triggerLevel;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("TRLV?");
 	string reply = ReadSingleBlockString();
 	sscanf(reply.c_str(), "%f", &m_triggerLevel);
@@ -1322,10 +1336,14 @@ void LeCroyOscilloscope::SetTriggerForChannel(
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	if(m_channelOffsets.find(i) != m_channelOffsets.end())
-		return m_channelOffsets[i];
+		if(m_channelOffsets.find(i) != m_channelOffsets.end())
+			return m_channelOffsets[i];
+	}
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
 
@@ -1333,6 +1351,7 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
 
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
@@ -1344,10 +1363,13 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
+			return m_channelVoltageRanges[i];
+	}
 
-	if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
-		return m_channelVoltageRanges[i];
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":VOLT_DIV?");
 
@@ -1356,6 +1378,7 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 	sscanf(reply.c_str(), "%lf", &volts_per_div);
 
 	double v = volts_per_div * 8;	//plot is 8 divisions high on all MAUI scopes
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = v;
 	return v;
 }
