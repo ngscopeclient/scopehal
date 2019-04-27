@@ -1193,6 +1193,7 @@ void LeCroyOscilloscope::Stop()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("TRIG_MODE STOP");
 	m_triggerArmed = false;
+	m_triggerOneShot = true;
 
 	//Clear out any pending data (the user doesn't want it, and we don't want stale stuff hanging around)
 	m_pendingWaveformsMutex.lock();

@@ -62,11 +62,6 @@ Oscilloscope::~Oscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device properties
 
-bool Oscilloscope::HasPendingWaveforms()
-{
-	return (m_pendingWaveforms.size() != 0);
-}
-
 void Oscilloscope::FlushConfigCache()
 {
 	//nothing to do, base class has no caching
@@ -112,6 +107,18 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sequenced capture
+
+size_t Oscilloscope::GetPendingWaveformCount()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	return m_pendingWaveforms.size();
+}
+
+bool Oscilloscope::HasPendingWaveforms()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	return (m_pendingWaveforms.size() != 0);
+}
 
 /**
 	@brief Just like PollTrigger(), but checks if we have pending data in the sequence buffer first
