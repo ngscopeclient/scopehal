@@ -118,6 +118,7 @@ bool Oscilloscope::WaitForTrigger(int timeout)
  */
 Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
 {
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
 	if(m_pendingWaveforms.size())
 		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
 	else
@@ -129,14 +130,19 @@ Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
  */
 bool Oscilloscope::AcquireDataFifo(sigc::slot1<int, float> progress_callback)
 {
+	m_pendingWaveformsMutex.lock();
 	if(m_pendingWaveforms.size())
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
 			it.first->SetData(it.second);
 		m_pendingWaveforms.pop_front();
+		m_pendingWaveformsMutex.unlock();
 		return true;
 	}
 	else
+	{
+		m_pendingWaveformsMutex.unlock();
 		return AcquireData(progress_callback);
+	}
 }

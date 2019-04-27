@@ -397,6 +397,7 @@ public:
 protected:
 	typedef std::map<OscilloscopeChannel*, CaptureChannelBase*> SequenceSet;
 	std::list<SequenceSet> m_pendingWaveforms;
+	std::mutex m_pendingWaveformsMutex;
 
 protected:
 

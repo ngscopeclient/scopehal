@@ -1058,6 +1058,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
+	m_pendingWaveformsMutex.lock();
 	for(size_t i=0; i<num_sequences-1; i++)
 	{
 		SequenceSet s;
@@ -1068,6 +1069,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		}
 		m_pendingWaveforms.push_back(s);
 	}
+	m_pendingWaveformsMutex.unlock();
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
@@ -1158,14 +1160,6 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 			delete[] block;
 		}
-	}
-
-	//Refresh protocol decoders
-	for(size_t i=0; i<m_channels.size(); i++)
-	{
-		ProtocolDecoder* decoder = dynamic_cast<ProtocolDecoder*>(m_channels[i]);
-		if(decoder != NULL)
-			decoder->Refresh();
 	}
 
 	return true;
