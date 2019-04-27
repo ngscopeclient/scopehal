@@ -341,6 +341,11 @@ public:
 	virtual void Stop() =0;
 
 	/**
+		@brief Checks if the trigger is currently armed
+	 */
+	virtual bool IsTriggerArmed() =0;
+
+	/**
 		@brief Optional application-selected nickname of the scope
 
 		(for display purposes if multiple scopes are in use)
@@ -384,6 +389,8 @@ public:
 
 public:
 	bool HasPendingWaveforms();
+	size_t GetPendingWaveformCount()
+	{ return m_pendingWaveforms.size(); }
 	virtual Oscilloscope::TriggerMode PollTriggerFifo();
 	virtual bool AcquireDataFifo(sigc::slot1<int, float> progress_callback);
 

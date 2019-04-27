@@ -45,6 +45,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
 	, m_highDefinition(false)
+	, m_triggerArmed(false)
 {
 }
 
@@ -736,6 +737,11 @@ void LeCroyOscilloscope::ResetTriggerConditions()
 	//FIXME
 }
 
+bool LeCroyOscilloscope::IsTriggerArmed()
+{
+	return m_triggerArmed;
+}
+
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
 	//LogDebug("Polling trigger\n");
@@ -747,11 +753,17 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 	//See if we got a waveform
 	if(inr & 0x0001)
+	{
+		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
+	}
 
 	//No waveform, but ready for one?
 	if(inr & 0x2000)
+	{
+		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
+	}
 
 	//Stopped, no data available
 	//TODO: how to handle auto / normal trigger mode?
@@ -1124,17 +1136,20 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 void LeCroyOscilloscope::Start()
 {
 	SendCommand("TRIG_MODE NORM");
+	m_triggerArmed = true;
 }
 
 void LeCroyOscilloscope::StartSingleTrigger()
 {
 	//LogDebug("Start single trigger\n");
 	SendCommand("TRIG_MODE SINGLE");
+	m_triggerArmed = true;
 }
 
 void LeCroyOscilloscope::Stop()
 {
 	SendCommand("TRIG_MODE STOP");
+	m_triggerArmed = false;
 }
 
 size_t LeCroyOscilloscope::GetTriggerChannelIndex()

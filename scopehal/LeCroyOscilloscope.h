@@ -85,6 +85,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual bool IsTriggerArmed();
 	virtual size_t GetTriggerChannelIndex();
 	virtual void SetTriggerChannelIndex(size_t i);
 	virtual float GetTriggerVoltage();
@@ -192,6 +193,8 @@ protected:
 	bool m_hasLA;
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
+
+	bool m_triggerArmed;
 
 	//Cached configuration
 	bool m_triggerChannelValid;
