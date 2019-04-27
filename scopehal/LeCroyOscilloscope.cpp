@@ -280,6 +280,8 @@ OscilloscopeChannel* LeCroyOscilloscope::GetExternalTrigger()
 
 void LeCroyOscilloscope::FlushConfigCache()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	m_triggerChannel = 0;
 	m_triggerChannelValid = false;
 	m_triggerLevel = 0;
@@ -341,6 +343,8 @@ string LeCroyOscilloscope::GetSerial()
 //TODO: None of these 3 functions support LA stuff
 bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 		return m_channelsEnabled[i];
 
@@ -370,16 +374,20 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 }
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
 }
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(i > m_analogChannelCount)
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
@@ -410,6 +418,8 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	if(i > m_analogChannelCount)
 		return 1;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
 	string reply = ReadSingleBlockString(true);
 
@@ -427,6 +437,8 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if(i > m_analogChannelCount)
 		return 0;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
 
 	string cmd = "BANDWIDTH_LIMIT?";
 	SendCommand(cmd);
@@ -467,6 +479,8 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	char cmd[128];
 	if(limit_mhz == 0)
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", m_channels[i]->GetHwname().c_str());
@@ -481,6 +495,8 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 
 bool LeCroyOscilloscope::GetMeterAutoRange()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	SendCommand("VBS? 'return = app.acquisition.DVM.AutoRange'");
 	string str = ReadSingleBlockString();
 	int ret;
@@ -490,6 +506,8 @@ bool LeCroyOscilloscope::GetMeterAutoRange()
 
 void LeCroyOscilloscope::SetMeterAutoRange(bool enable)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(enable)
 		SendCommand("VBS 'app.acquisition.DVM.AutoRange = 1'");
 	else
@@ -498,16 +516,19 @@ void LeCroyOscilloscope::SetMeterAutoRange(bool enable)
 
 void LeCroyOscilloscope::StartMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 1'");
 }
 
 void LeCroyOscilloscope::StopMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 0'");
 }
 
 double LeCroyOscilloscope::GetVoltage()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
 	string str = ReadSingleBlockString();
 	double ret;
@@ -523,6 +544,7 @@ double LeCroyOscilloscope::GetCurrent()
 
 double LeCroyOscilloscope::GetPeakToPeak()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
 	string str = ReadSingleBlockString();
 	double ret;
@@ -532,6 +554,7 @@ double LeCroyOscilloscope::GetPeakToPeak()
 
 double LeCroyOscilloscope::GetFrequency()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
 	string str = ReadSingleBlockString();
 	double ret;
@@ -546,11 +569,13 @@ int LeCroyOscilloscope::GetMeterChannelCount()
 
 string LeCroyOscilloscope::GetMeterChannelName(int chan)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	return m_channels[chan]->m_displayname;
 }
 
 int LeCroyOscilloscope::GetCurrentMeterChannel()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS? 'return = app.acquisition.DVM.DvmSource'");
 	string str = ReadSingleBlockString();
 	int i;
@@ -560,6 +585,7 @@ int LeCroyOscilloscope::GetCurrentMeterChannel()
 
 void LeCroyOscilloscope::SetCurrentMeterChannel(int chan)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
 	snprintf(
 		cmd,
@@ -571,6 +597,7 @@ void LeCroyOscilloscope::SetCurrentMeterChannel(int chan)
 
 Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("VBS? 'return = app.acquisition.DVM.DvmMode'");
 	string str = ReadSingleBlockString();
 
@@ -595,6 +622,7 @@ Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 
 void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	string stype;
 	switch(type)
 	{
@@ -647,6 +675,7 @@ bool LeCroyOscilloscope::GetFunctionChannelActive(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	if(on)
 		SendCommand("VBS 'app.wavesource.enable=True'");
 	else
@@ -690,6 +719,7 @@ float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.frequency = %f'", hz);
 	SendCommand(tmp);
@@ -712,6 +742,7 @@ float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", sec);
 	SendCommand(tmp);
@@ -724,6 +755,7 @@ float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
 	SendCommand(tmp);
@@ -744,6 +776,8 @@ bool LeCroyOscilloscope::IsTriggerArmed()
 
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//LogDebug("Polling trigger\n");
 
 	//Read the Internal State Change Register
@@ -826,6 +860,8 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
  */
 void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//Check enable state in the cache.
 	vector<int> uncached;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -848,6 +884,8 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//LogDebug("Acquire data\n");
 
 	double start = GetTime();
@@ -1135,12 +1173,14 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 void LeCroyOscilloscope::Start()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("TRIG_MODE NORM");
 	m_triggerArmed = true;
 }
 
 void LeCroyOscilloscope::StartSingleTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("Start single trigger\n");
 	SendCommand("TRIG_MODE SINGLE");
 	m_triggerArmed = true;
@@ -1148,12 +1188,15 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("TRIG_MODE STOP");
 	m_triggerArmed = false;
 }
 
 size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//Check cache
 	if(m_triggerChannelValid)
 		return m_triggerChannel;
@@ -1184,6 +1227,8 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 
 void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//For now, always set trigger mode to edge
 	SendCommand(string("TRIG_SELECT EDGE,SR,") + m_channels[i]->GetHwname());
 
@@ -1196,6 +1241,8 @@ void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 
 float LeCroyOscilloscope::GetTriggerVoltage()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	//Check cache
 	if(m_triggerLevelValid)
 		return m_triggerLevel;
@@ -1209,6 +1256,8 @@ float LeCroyOscilloscope::GetTriggerVoltage()
 
 void LeCroyOscilloscope::SetTriggerVoltage(float v)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	char tmp[32];
 	snprintf(tmp, sizeof(tmp), "%s:TRLV %.3f V", m_channels[m_triggerChannel]->GetHwname().c_str(), v);
 	SendCommand(tmp);
@@ -1220,6 +1269,8 @@ void LeCroyOscilloscope::SetTriggerVoltage(float v)
 
 Oscilloscope::TriggerType LeCroyOscilloscope::GetTriggerType()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(m_triggerTypeValid)
 		return m_triggerType;
 
@@ -1244,6 +1295,8 @@ Oscilloscope::TriggerType LeCroyOscilloscope::GetTriggerType()
 
 void LeCroyOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	m_triggerType = type;
 	m_triggerTypeValid = true;
 
@@ -1275,6 +1328,8 @@ void LeCroyOscilloscope::SetTriggerForChannel(
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(m_channelOffsets.find(i) != m_channelOffsets.end())
 		return m_channelOffsets[i];
 
@@ -1295,6 +1350,8 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
 		return m_channelVoltageRanges[i];
 
@@ -1311,6 +1368,8 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 
 void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	double vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 

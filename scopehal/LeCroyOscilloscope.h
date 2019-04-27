@@ -30,6 +30,7 @@
 #ifndef LeCroyOscilloscope_h
 #define LeCroyOscilloscope_h
 
+#include <mutex>
 #include "../xptools/Socket.h"
 
 /**
@@ -213,6 +214,9 @@ protected:
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	//Mutexing for thread safety
+	std::recursive_mutex m_mutex;
 };
 
 #endif
