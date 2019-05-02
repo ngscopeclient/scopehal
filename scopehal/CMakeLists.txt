@@ -17,6 +17,7 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	LeCroyOscilloscope.cpp
 	LeCroyVICPOscilloscope.cpp
+	SiglentSCPIOscilloscope.cpp
 	RedTinLogicAnalyzer.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp

@@ -62,6 +62,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 	m_channels.push_back(m_extTrigChannel);
 
 	//Look at options and see if we have digital channels too
+	/*
 	SendCommand("*OPT?", true);
 	string reply = ReadSingleBlockString(true);
 	if(reply.length() > 3)
@@ -156,7 +157,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 
 	//Desired format for waveform data
 	SendCommand("COMM_FORMAT DEF9,WORD,BIN");
-
+*/
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
 }
@@ -333,14 +334,14 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
 {
-	string cmd = "C1:TRACE ON";
+	string cmd = "C1:TRA ON";
 	cmd[1] += i;
 	SendCommand(cmd);
 }
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
-	string cmd = "C1:TRACE OFF";
+	string cmd = "C1:TRA OFF";
 	cmd[1] += i;
 	SendCommand(cmd);
 }
@@ -637,12 +638,13 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Second blocks is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
 	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
+	LogDebug("lhdr: %s\n", lhdr.c_str());
 	if(num_bytes == 0)
 	{
 		ReadData();
 		return true;
 	}
-	//LogDebug("Expecting %d bytes (%d samples)\n", num_bytes, num_samples);
+//	LogDebug("Expecting %d bytes (%d samples)\n", num_bytes, num_samples);
 
 	//Done with headers, data comes next
 	//TODO: do progress feedback eventually
@@ -703,7 +705,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 {
-	//LogDebug("Acquire data\n");
+	LogDebug("Acquire data\n");
 
 	double start = GetTime();
 
@@ -724,13 +726,19 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 			snprintf(tmp, sizeof(tmp), "C%d:WF? DESC", i+1);
 			cmd = tmp;
 			SendCommand(cmd);
+			LogDebug("wrote: %s\n",cmd.c_str());
+			ReadWaveformBlock(wavedescs[i]);
+			LogDebug("got: %s\n",wavedescs[i].c_str());
+
 		}
 	}
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	/*for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])
 			ReadWaveformBlock(wavedescs[i]);
+		//LogDebug("got: %s\n", wavedescs[i].c_str());
 	}
+	*/
 
 	//TODO: WFSU in outer loop and WF in inner loop
 	unsigned int num_sequences = 1;
@@ -753,12 +761,12 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 		//Parse the wavedesc headers
 		//Ref: http://qtwork.tudelft.nl/gitdata/users/guen/qtlabanalysis/analysis_modules/general/lecroy.py
 		unsigned char* pdesc = (unsigned char*)(&wavedesc[0]);
-		//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-		//LogDebug("    Wavedesc len: %d\n", wavedesc_len);
-		//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
-		//LogDebug("    Usertext len: %d\n", usertext_len);
+		uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
+		LogDebug("    Wavedesc len: %d\n", wavedesc_len);
+		uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+		LogDebug("    Usertext len: %d\n", usertext_len);
 		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
-		//LogDebug("    Trigtime len: %d\n", trigtime_len);
+		LogDebug("    Trigtime len: %d\n", trigtime_len);
 		if(trigtime_len != 0)
 			num_sequences = trigtime_len;
 		float v_gain = *reinterpret_cast<float*>(pdesc + 156);
@@ -793,7 +801,7 @@ bool LeCroyOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
 
 		for(unsigned int j=0; j<num_sequences; j++)
 		{
-			//LogDebug("Channel %u block %u\n", i, j);
+			LogDebug("Channel %u block %u\n", i, j);
 
 			float fbase = i*1.0f / m_analogChannelCount;
 
@@ -971,7 +979,7 @@ void LeCroyOscilloscope::Start()
 
 void LeCroyOscilloscope::StartSingleTrigger()
 {
-	//LogDebug("Start single trigger\n");
+	LogDebug("Start single trigger\n");
 	SendCommand("TRIG_MODE SINGLE");
 }
 
