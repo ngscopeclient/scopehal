@@ -813,6 +813,7 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Second blocks is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
 	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
+	LogDebug("lhdr: %s\n", lhdr.c_str());
 	if(num_bytes == 0)
 	{
 		ReadData();
@@ -894,11 +895,13 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(enabled[i])
 			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 	}
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	/*for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])
 			ReadWaveformBlock(wavedescs[i]);
+		//LogDebug("got: %s\n", wavedescs[i].c_str());
 	}
+	*/
 
 	//Figure out how many sequences we have
 	unsigned char* pdesc = NULL;

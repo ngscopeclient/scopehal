@@ -50,7 +50,7 @@ public:
 protected:
 	void IdentifyHardware();
 	void SharedCtorInit();
-	void DetectAnalogChannels();
+	virtual void DetectAnalogChannels();
 
 public:
 
