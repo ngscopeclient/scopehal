@@ -30,6 +30,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "DifferenceDecoder.h"
+#include "FFTDecoder.h"
 #include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
@@ -120,17 +121,26 @@ void DifferenceDecoder::Refresh()
 	}
 
 	//We need meaningful data
-	if(din_p->GetDepth() == 0)
+	size_t len = din_p->m_samples.size();
+	if(din_n->m_samples.size() < len)
+		len = din_n->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
+	//Create the output
+	AnalogCapture* cap;
+	if(dynamic_cast<FFTCapture*>(din_p) != NULL)
+		cap = new FFTCapture;
+	else
+		cap = new AnalogCapture;
+
 	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	cap->m_samples.resize(din_p->m_samples.size());
+	cap->m_samples.resize(len);
 	#pragma omp parallel for num_threads(4)
-	for(size_t i=0; i<din_p->m_samples.size(); i++)
+	for(size_t i=0; i<len; i++)
 	{
 		const AnalogSample& sin_p = din_p->m_samples[i];
 		cap->m_samples[i] = AnalogSample(
