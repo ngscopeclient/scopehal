@@ -98,6 +98,12 @@ protected:
 	//Mutexing for thread safety
 	std::recursive_mutex m_mutex;
 	std::recursive_mutex m_cacheMutex;
+
+	//hardware analog channel count, independent of LA option etc
+	unsigned int m_analogChannelCount;
+
+	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, double> m_channelVoltageRanges;
 };
 
 #endif

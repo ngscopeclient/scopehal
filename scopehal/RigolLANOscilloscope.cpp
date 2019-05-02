@@ -40,6 +40,19 @@ RigolLANOscilloscope::RigolLANOscilloscope(string hostname, unsigned short port)
 	, m_hostname(hostname)
 	, m_port(port)
 {
+	LogDebug("Connecting to Rigol oscilloscope at %s:%d\n", hostname.c_str(), port);
+
+	if(!m_socket.Connect(hostname, port))
+	{
+		LogError("Couldn't connect to socket\n");
+		return;
+	}
+	if(!m_socket.DisableNagle())
+	{
+		LogError("Couldn't disable Nagle\n");
+		return;
+	}
+
 	SharedCtorInit();
 }
 
@@ -50,10 +63,25 @@ RigolLANOscilloscope::~RigolLANOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LAN I/O
 
-void RigolLANOscilloscope::SendCommand(std::string cmd)
+void RigolLANOscilloscope::SendCommand(string cmd)
 {
+	string tempbuf = cmd + "\n";
+	m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
 }
 
 string RigolLANOscilloscope::ReadReply()
 {
-};
+	//FIXME: there *has* to be a more efficient way to do this...
+	char tmp = ' ';
+	string ret;
+	while(true)
+	{
+		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
+			break;
+		if(tmp == '\n')
+			break;
+		else
+			ret += tmp;
+	}
+	return ret;
+}

@@ -180,7 +180,7 @@ protected:
 	std::string m_hostname;
 	unsigned short m_port;
 
-	//hardware analog channel count, independent of LA option or protocol decodes
+	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
 
