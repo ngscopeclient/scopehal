@@ -36,6 +36,8 @@ using namespace std;
 // Construction / destruction
 
 RigolOscilloscope::RigolOscilloscope()
+	: m_triggerArmed(false)
+	, m_triggerOneShot(false)
 {
 	//nothing in base class
 }
@@ -113,6 +115,10 @@ void RigolOscilloscope::SharedCtorInit()
 			true));
 	}
 	m_analogChannelCount = nchans;
+
+	//Configure acquisition modes
+	SendCommand("WAV:FORM BYTE");
+	SendCommand("WAV:MODE RAW");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -282,40 +288,168 @@ void RigolOscilloscope::ResetTriggerConditions()
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
-	//FIXME
-	return Oscilloscope::TRIGGER_MODE_RUN;
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	SendCommand("TRIG:STAT?");
+	string stat = ReadReply();
+
+	if(stat == "TD")
+		return TRIGGER_MODE_TRIGGERED;
+	else if(stat == "RUN")
+		return TRIGGER_MODE_RUN;
+	else if(stat == "WAIT")
+		return TRIGGER_MODE_WAIT;
+	else if(stat == "AUTO")
+		return TRIGGER_MODE_AUTO;
+	else
+	{
+		//The "TD" state is not sticky on Rigol scopes, unlike the equivalent LeCroy status register bit.
+		//The scope will go from "run" to "stop" state on trigger with only a momentary pass through "TD".
+		//If we armed the trigger recently and we're now stopped, this means we must have triggered.
+		if(m_triggerArmed)
+		{
+			m_triggerArmed = false;
+			return TRIGGER_MODE_TRIGGERED;
+		}
+
+		//Nope, we're actually stopped
+		return TRIGGER_MODE_STOP;
+	}
 }
 
 bool RigolOscilloscope::AcquireData(bool toQueue)
 {
-	//FIXME
-	return false;
+	//workaround for high latency links to let the UI thread get the mutex
+	usleep(1000);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	LogDebug("Acquiring data\n");
+	LogIndenter li;
+
+	//Grab the analog waveform data
+	int unused1;
+	int unused2;
+	int npoints;
+	int unused3;
+	double sec_per_sample;
+	double xorigin;
+	double unused4;
+	double yincrement;
+	double yreference;
+	size_t maxpoints = 250*1000;
+	unsigned char* temp_buf = new unsigned char[maxpoints];
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		LogDebug("Channel %zu\n", i);
+
+		SendCommand(string("WAV:SOUR ") + m_channels[i]->GetHwname());
+
+		//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
+		SendCommand("WAV:PRE?");
+		string reply = ReadReply();
+		sscanf(reply.c_str(), "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
+			&unused1,
+			&unused2,
+			&npoints,
+			&unused3,
+			&sec_per_sample,
+			&xorigin,
+			&unused4,
+			&yincrement,
+			&yreference);
+		int64_t ps_per_sample = round(sec_per_sample * 1e12f);
+		LogDebug("%ld ps per sample\n", ps_per_sample);
+		LogDebug("%d points\n", npoints);
+
+		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
+		for(size_t npoint=0; npoint < maxpoints; npoint += maxpoints)
+		{
+			//Ask for the data
+			char tmp[128];
+			snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	//ONE based indexing WTF
+			SendCommand(tmp);
+			size_t end = npoint + maxpoints;
+			if(end > npoints)
+				end = npoints;
+			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end + 1);
+			SendCommand(tmp);
+
+			//Read the data block
+			size_t blocksize = end - npoints;
+			SendCommand("WAV:DATA?");
+			ReadRawData(blocksize, temp_buf);
+
+			LogDebug("%02x %02x %02x %02x",
+				temp_buf[0],
+				temp_buf[1],
+				temp_buf[2],
+				temp_buf[3]);
+		}
+	}
+
+	//Clean up
+	delete[] temp_buf;
+
+	//TODO: support digital channels
+
+	//Re-arm the trigger if not in one-shot mode
+	if(!m_triggerOneShot)
+	{
+		SendCommand("TRIG_MODE SINGLE");
+		m_triggerArmed = true;
+	}
+
+	return true;
 }
 
 void RigolOscilloscope::Start()
 {
-	//FIXME
+	LogDebug("Start single trigger\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	SendCommand("SING");
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
 }
 
 void RigolOscilloscope::StartSingleTrigger()
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	SendCommand("SING");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void RigolOscilloscope::Stop()
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	SendCommand("STOP");
+	m_triggerArmed = false;
+	m_triggerOneShot = true;
 }
 
 bool RigolOscilloscope::IsTriggerArmed()
 {
-	//FIXME
-	return true;
+	return m_triggerArmed;
 }
 
 size_t RigolOscilloscope::GetTriggerChannelIndex()
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//This is nasty because there are separate commands to see what the trigger source is
+	//depending on what the trigger type is!!!
+	//FIXME: For now assume edge
+	SendCommand("TRIG:EDG:SOUR?");
+	string ret = ReadReply();
+
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		if(m_channels[i]->GetHwname() == ret)
+			return i;
+	}
+
+	LogWarning("Unknown trigger source %s\n", ret.c_str());
 	return 0;
 }
 
@@ -326,8 +460,19 @@ void RigolOscilloscope::SetTriggerChannelIndex(size_t i)
 
 float RigolOscilloscope::GetTriggerVoltage()
 {
-	//FIXME
-	return 0;
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//This is nasty because there are separate commands to see what the trigger source is
+	//depending on what the trigger type is!!!
+	//FIXME: For now assume edge
+	SendCommand("TRIG:EDG:LEV?");
+	string ret = ReadReply();
+
+	double level;
+	sscanf(ret.c_str(), "%lf", &level);
+	//lock_guard<recursive_mutex> lock(m_cacheMutex);
+	//m_channelOffsets[i] = offset;
+	return level;
 }
 
 void RigolOscilloscope::SetTriggerVoltage(float v)

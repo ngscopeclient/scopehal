@@ -78,10 +78,15 @@ string RigolLANOscilloscope::ReadReply()
 	{
 		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
 			break;
-		if(tmp == '\n')
+		if( (tmp == '\n') || (tmp == ';') )
 			break;
 		else
 			ret += tmp;
 	}
 	return ret;
+}
+
+void RigolLANOscilloscope::ReadRawData(size_t len, unsigned char* buf)
+{
+	m_socket.RecvLooped(buf, len);
 }

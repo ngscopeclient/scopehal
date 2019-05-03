@@ -88,6 +88,7 @@ protected:
 
 	virtual void SendCommand(std::string cmd) =0;
 	virtual std::string ReadReply() =0;
+	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
 
 protected:
 	std::string m_vendor;
@@ -104,6 +105,9 @@ protected:
 
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
+
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 };
 
 #endif

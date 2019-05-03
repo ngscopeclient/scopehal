@@ -50,6 +50,7 @@ protected:
 
 	virtual void SendCommand(std::string cmd);
 	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
 };
 
 #endif
