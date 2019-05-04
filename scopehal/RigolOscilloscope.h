@@ -103,8 +103,14 @@ protected:
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 
+	//config cache
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<int, bool> m_channelsEnabled;
+	bool m_triggerChannelValid;
+	size_t m_triggerChannel;
+	bool m_triggerLevelValid;
+	float m_triggerLevel;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

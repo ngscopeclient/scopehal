@@ -151,20 +151,42 @@ void RigolOscilloscope::FlushConfigCache()
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	//no caching yet
 	m_channelOffsets.clear();
+	m_channelVoltageRanges.clear();
+	m_channelsEnabled.clear();
+	m_triggerChannelValid = false;
+	m_triggerLevelValid = false;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	//ext trigger should never be displayed
+	/*if(i == m_extTrigChannel->GetIndex())
+		return false;*/
+
+	//TODO: handle digital channels, for now just claim they're off
+	if(i >= m_analogChannelCount)
+		return false;
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+		return m_channelsEnabled[i];
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":DISP?");
 	string reply = ReadReply();
 	if(reply == "0")
+	{
+		m_channelsEnabled[i] = false;
 		return false;
+	}
 	else
+	{
+		m_channelsEnabled[i] = true;
 		return true;
+	}
 }
 
 void RigolOscilloscope::EnableChannel(size_t i)
@@ -288,6 +310,9 @@ void RigolOscilloscope::ResetTriggerConditions()
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
+	//workaround for high latency links to let the UI thread get the mutex
+	usleep(1000);
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand("TRIG:STAT?");
@@ -319,12 +344,15 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 
 bool RigolOscilloscope::AcquireData(bool toQueue)
 {
+	//LogDebug("Acquiring data\n");
+
+	//TODO
+	bool enabled[4] = {true, true, true, true};
+
 	//workaround for high latency links to let the UI thread get the mutex
 	usleep(1000);
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-
-	LogDebug("Acquiring data\n");
 	LogIndenter li;
 
 	//Grab the analog waveform data
@@ -334,20 +362,30 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	int unused3;
 	double sec_per_sample;
 	double xorigin;
-	double unused4;
+	double xreference;
 	double yincrement;
+	double yorigin;
 	double yreference;
 	size_t maxpoints = 250*1000;
 	unsigned char* temp_buf = new unsigned char[maxpoints];
+	map<int, vector<AnalogCapture*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
-		LogDebug("Channel %zu\n", i);
+		if(!enabled[i])
+		{
+			if(!toQueue)
+				m_channels[i]->SetData(NULL);
+			continue;
+		}
+
+		//LogDebug("Channel %zu\n", i);
 
 		SendCommand(string("WAV:SOUR ") + m_channels[i]->GetHwname());
 
 		//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 		SendCommand("WAV:PRE?");
 		string reply = ReadReply();
+		//LogDebug("Preamble = %s\n", reply.c_str());
 		sscanf(reply.c_str(), "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 			&unused1,
 			&unused2,
@@ -355,12 +393,21 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			&unused3,
 			&sec_per_sample,
 			&xorigin,
-			&unused4,
+			&xreference,
 			&yincrement,
+			&yorigin,
 			&yreference);
 		int64_t ps_per_sample = round(sec_per_sample * 1e12f);
-		LogDebug("%ld ps per sample\n", ps_per_sample);
-		LogDebug("%d points\n", npoints);
+		//LogDebug("X: %d points, %f origin, ref %f ps/sample %ld\n", npoints, xorigin, xreference, ps_per_sample);
+		//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
+
+		//Set up the capture we're going to store our data into
+		AnalogCapture* cap = new AnalogCapture;
+		cap->m_timescale = ps_per_sample;
+		cap->m_triggerPhase = 0;
+		cap->m_startTimestamp = time(NULL);
+		double t = GetTime();
+		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
 		for(size_t npoint=0; npoint < maxpoints; npoint += maxpoints)
@@ -375,18 +422,55 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end + 1);
 			SendCommand(tmp);
 
-			//Read the data block
-			size_t blocksize = end - npoints;
+			//Ask for the data block
 			SendCommand("WAV:DATA?");
-			ReadRawData(blocksize, temp_buf);
 
-			LogDebug("%02x %02x %02x %02x",
-				temp_buf[0],
-				temp_buf[1],
-				temp_buf[2],
-				temp_buf[3]);
+			//Read block header
+			unsigned char header[12] = {0};
+			ReadRawData(11, header);
+
+			//Look up the block size
+			//size_t blocksize = end - npoints;
+			//LogDebug("Block size = %zu\n", blocksize);
+			size_t header_blocksize;
+			sscanf((char*)header, "#9%zu", &header_blocksize);
+			//LogDebug("Header block size = %zu\n", header_blocksize);
+
+			//Read actual block content and decode it
+			//Scale: (value - Yorigin - Yref) * Yinc
+			ReadRawData(header_blocksize + 1, temp_buf);	//why is there a trailing byte here??
+			double ydelta = yorigin + yreference;
+			for(size_t j=0; j<header_blocksize; j++)
+			{
+				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
+				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
+				cap->m_samples.push_back(AnalogSample(npoint+j, 1, v));
+			}
+
+			//Done, update the data
+			if(npoint == 0 && !toQueue)
+				m_channels[i]->SetData(cap);
+			else
+				pending_waveforms[i].push_back(cap);
 		}
 	}
+
+	//Now that we have all of the pending waveforms, save them in sets across all channels
+	m_pendingWaveformsMutex.lock();
+	size_t num_pending = 0;
+	if(toQueue)				//if saving to queue, the 0'th segment counts too
+		num_pending ++;
+	for(size_t i=0; i<num_pending; i++)
+	{
+		SequenceSet s;
+		for(size_t j=0; j<m_analogChannelCount; j++)
+		{
+			if(enabled[j])
+				s[m_channels[j]] = pending_waveforms[j][i];
+		}
+		m_pendingWaveforms.push_back(s);
+	}
+	m_pendingWaveformsMutex.unlock();
 
 	//Clean up
 	delete[] temp_buf;
@@ -400,12 +484,13 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		m_triggerArmed = true;
 	}
 
+	//LogDebug("Acquisition done\n");
 	return true;
 }
 
 void RigolOscilloscope::Start()
 {
-	LogDebug("Start single trigger\n");
+	//LogDebug("Start single trigger\n");
 	lock_guard<recursive_mutex> lock(m_mutex);
 	SendCommand("SING");
 	m_triggerArmed = true;
@@ -435,6 +520,11 @@ bool RigolOscilloscope::IsTriggerArmed()
 
 size_t RigolOscilloscope::GetTriggerChannelIndex()
 {
+	//Check cache
+	//No locking, worst case we return a result a few seconds old
+	if(m_triggerChannelValid)
+		return m_triggerChannel;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//This is nasty because there are separate commands to see what the trigger source is
@@ -446,7 +536,11 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
 		if(m_channels[i]->GetHwname() == ret)
+		{
+			m_triggerChannel = i;
+			m_triggerChannelValid = true;
 			return i;
+		}
 	}
 
 	LogWarning("Unknown trigger source %s\n", ret.c_str());
@@ -460,6 +554,11 @@ void RigolOscilloscope::SetTriggerChannelIndex(size_t i)
 
 float RigolOscilloscope::GetTriggerVoltage()
 {
+	//Check cache.
+	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
+	if(m_triggerLevelValid)
+		return m_triggerLevel;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//This is nasty because there are separate commands to see what the trigger source is
@@ -470,8 +569,8 @@ float RigolOscilloscope::GetTriggerVoltage()
 
 	double level;
 	sscanf(ret.c_str(), "%lf", &level);
-	//lock_guard<recursive_mutex> lock(m_cacheMutex);
-	//m_channelOffsets[i] = offset;
+	m_triggerLevel = level;
+	m_triggerLevelValid = true;
 	return level;
 }
 
