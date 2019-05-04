@@ -329,3 +329,39 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* 
 		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
 	}
 }
+
+/**
+	@brief Samples a digital waveform on the falling edges of a clock
+
+	The sampling rate of the data and clock signals need not be equal or uniform.
+
+	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+
+	@param data		The data signal to sample
+	@param clock	The clock signal to use
+	@param samples	Output waveform
+ */
+void ProtocolDecoder::SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, vector<DigitalSample>& samples)
+{
+	samples.clear();
+
+	size_t ndata = 0;
+	for(size_t i=1; i<clock->m_samples.size(); i++)
+	{
+		//Throw away clock samples until we find a falling edge
+		auto csample = clock->m_samples[i];
+		auto ocsample = clock->m_samples[i-1];
+		if(!(!csample.m_sample && ocsample.m_sample))
+			continue;
+
+		//Throw away data samples until the data is synced with us
+		int64_t clkstart = csample.m_offset * clock->m_timescale;
+		while( (ndata < data->m_samples.size()) && (data->m_samples[ndata].m_offset * data->m_timescale < clkstart) )
+			ndata ++;
+		if(ndata >= data->m_samples.size())
+			break;
+
+		//TODO: should we specify duration here?
+		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
+	}
+}

@@ -30,34 +30,113 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of USB2PCSDecoder
  */
+#ifndef USB2PCSDecoder_h
+#define USB2PCSDecoder_h
 
-#include "scopeprotocols.h"
-
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/ProtocolDecoder.h"
+#include "USB2PMADecoder.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief A single symbol at the PCS layer (byte or command)
  */
-void ScopeProtocolStaticInit()
+class USB2PCSSymbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+
+	enum SymbolType
+	{
+		TYPE_IDLE,
+		TYPE_SYNC,
+		TYPE_EOP,
+		TYPE_RESET,
+		//TODO: handle suspend (idle for >3 ms)
+		//TODO: handle resume
+		TYPE_DATA,
+		TYPE_ERROR
+	};
+
+	USB2PCSSymbol(SymbolType type = TYPE_IDLE)
+	 : m_type(type)
+	{
+	}
+
+	SymbolType m_type;
+	uint8_t m_data;
+
+	bool operator==(const USB2PCSSymbol& rhs) const
+	{
+		return (m_type == rhs.m_type);
+	}
+};
+
+typedef OscilloscopeSample<USB2PCSSymbol> USB2PCSSample;
+typedef CaptureChannel<USB2PCSSymbol> USB2PCSCapture;
+
+class USB2PCSDecoder : public ProtocolDecoder
+{
+public:
+	USB2PCSDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(USB2PCSDecoder)
+
+protected:
+	enum BusSpeed
+	{
+		SPEED_1M,
+		SPEED_12M,
+		SPEED_480M
+	};
+
+	enum DecodeState
+	{
+		STATE_IDLE,
+		STATE_SYNC,
+		STATE_DATA
+	};
+
+	void RefreshIterationIdle(
+		const USBLineSample& sin,
+		DecodeState& state,
+		BusSpeed& speed,
+		size_t& ui_width,
+		USB2PCSCapture* cap,
+		USB2PMACapture* din,
+		size_t& count,
+		USB2PCSSample& current_sample);
+
+	void RefreshIterationSync(
+		const USBLineSample& sin,
+		DecodeState& state,
+		size_t& ui_width,
+		USB2PCSCapture* cap,
+		USB2PMACapture* din,
+		size_t& count,
+		USB2PCSSample& current_sample);
+
+	void RefreshIterationData(
+		const USBLineSample& sin,
+		const USBLineSample& slast,
+		DecodeState& state,
+		size_t& ui_width,
+		USB2PCSCapture* cap,
+		USB2PMACapture* din,
+		size_t& count,
+		USB2PCSSample& current_sample);
+};
+
+#endif

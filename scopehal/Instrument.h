@@ -64,6 +64,9 @@ public:
 
 		//A power supply
 		INST_PSU				= 4,
+
+		//A function generator
+		INST_FUNCTION			= 8
 	};
 
 	virtual unsigned int GetInstrumentTypes() =0;

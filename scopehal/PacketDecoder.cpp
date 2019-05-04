@@ -49,3 +49,8 @@ void PacketDecoder::ClearPackets()
 		delete p;
 	m_packets.clear();
 }
+
+bool PacketDecoder::GetShowDataColumn()
+{
+	return true;
+}

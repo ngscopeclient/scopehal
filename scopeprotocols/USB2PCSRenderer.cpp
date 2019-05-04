@@ -30,34 +30,89 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Implementation of USB2PCSRenderer
  */
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "USB2PCSRenderer.h"
+#include "USB2PCSDecoder.h"
+#include "USB2PMADecoder.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+USB2PCSRenderer::USB2PCSRenderer(OscilloscopeChannel* channel)
+	: TextRenderer(channel)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color USB2PCSRenderer::GetColor(int i)
+{
+	USB2PCSCapture* data = dynamic_cast<USB2PCSCapture*>(m_channel->GetData());
+	if(data == NULL)
+		return Gdk::Color("#000000");
+	if(i >= (int)data->m_samples.size())
+		return Gdk::Color("#000000");
+
+	//TODO: have a set of standard colors we use everywhere?
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PCSSymbol::TYPE_IDLE:
+			return Gdk::Color("#404040");
+		case USB2PCSSymbol::TYPE_SYNC:
+			return Gdk::Color("#808080");
+		case USB2PCSSymbol::TYPE_EOP:
+			return Gdk::Color("#808080");
+		case USB2PCSSymbol::TYPE_RESET:
+			return Gdk::Color("#ffa000");
+		case USB2PCSSymbol::TYPE_DATA:
+			return Gdk::Color("#336699");
+
+		//invalid state, should never happen
+		case USB2PCSSymbol::TYPE_ERROR:
+		default:
+			return Gdk::Color("#ff0000");
+	}
+}
+
+string USB2PCSRenderer::GetText(int i)
+{
+	USB2PCSCapture* data = dynamic_cast<USB2PCSCapture*>(m_channel->GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PCSSymbol::TYPE_IDLE:
+			return "IDLE";
+		case USB2PCSSymbol::TYPE_SYNC:
+			return "SYNC";
+		case USB2PCSSymbol::TYPE_EOP:
+			return "EOP";
+		case USB2PCSSymbol::TYPE_RESET:
+			return "RESET";
+		case USB2PCSSymbol::TYPE_DATA:
+		{
+			char tmp[16];
+			snprintf(tmp, sizeof(tmp), "%02x", sample.m_sample.m_data);
+			return string(tmp);
+		}
+		case USB2PCSSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
+	}
+
+	return "";
 }

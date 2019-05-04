@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -26,38 +26,57 @@
 * POSSIBILITY OF SUCH DAMAGE.                                                                                          *
 *                                                                                                                      *
 ***********************************************************************************************************************/
+#ifndef FunctionGenerator_h
+#define FunctionGenerator_h
 
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief A generic waveform generator
  */
-
-#include "scopeprotocols.h"
-
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class FunctionGenerator : public virtual Instrument
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	FunctionGenerator();
+	virtual ~FunctionGenerator();
+
+	enum WaveShape
+	{
+		SHAPE_SINE,
+		SHAPE_SQUARE,
+		SHAPE_TRIANGLE,
+		SHAPE_PULSE,
+		SHAPE_DC,
+		SHAPE_NOISE,
+		SHAPE_ARB
+	};
+
+	//Channel info
+	virtual int GetFunctionChannelCount() =0;
+	virtual std::string GetFunctionChannelName(int chan) =0;
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan) =0;
+	virtual void SetFunctionChannelActive(int chan, bool on) =0;
+
+	virtual float GetFunctionChannelDutyCycle(int chan) =0;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) =0;
+
+	virtual float GetFunctionChannelAmplitude(int chan) =0;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) =0;
+
+	virtual float GetFunctionChannelOffset(int chan) =0;
+	virtual void SetFunctionChannelOffset(int chan, float offset) =0;
+
+	virtual float GetFunctionChannelFrequency(int chan) =0;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) =0;
+
+	virtual WaveShape GetFunctionChannelShape(int chan) =0;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) =0;
+
+	virtual float GetFunctionChannelRiseTime(int chan) =0;
+	virtual void SetFunctionChannelRiseTime(int chan, float sec) =0;
+
+	virtual float GetFunctionChannelFallTime(int chan) =0;
+	virtual void SetFunctionChannelFallTime(int chan, float sec) =0;
+};
+
+#endif

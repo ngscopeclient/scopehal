@@ -28,16 +28,24 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ACCoupleDecoder.h"
+#include "FFTDecoder.h"
 #include "../scopehal/AnalogRenderer.h"
+#include <ffts/ffts.h>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FFTCapture
+
+FFTCapture::~FFTCapture()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACCoupleDecoder::ACCoupleDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CONVERSION)
+FFTDecoder::FFTDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -47,12 +55,12 @@ ACCoupleDecoder::ACCoupleDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ACCoupleDecoder::CreateRenderer()
+ChannelRenderer* FFTDecoder::CreateRenderer()
 {
 	return new AnalogRenderer(this);
 }
 
-bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool FFTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -62,32 +70,37 @@ bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleDecoder::GetVoltageRange()
+double FFTDecoder::GetOffset()
 {
-	return m_channels[0]->GetVoltageRange();
+	return 0;
 }
 
-string ACCoupleDecoder::GetProtocolName()
+double FFTDecoder::GetVoltageRange()
 {
-	return "AC Couple";
+	return 1;//m_channels[0]->GetVoltageRange();
 }
 
-bool ACCoupleDecoder::IsOverlay()
+string FFTDecoder::GetProtocolName()
+{
+	return "FFT";
+}
+
+bool FFTDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool ACCoupleDecoder::NeedsConfig()
+bool FFTDecoder::NeedsConfig()
 {
 	//we auto-select the midpoint as our threshold
 	return false;
 }
 
-void ACCoupleDecoder::SetDefaultName()
+void FFTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "AC(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "FFT(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -95,7 +108,7 @@ void ACCoupleDecoder::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACCoupleDecoder::Refresh()
+void FFTDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -112,26 +125,62 @@ void ACCoupleDecoder::Refresh()
 		return;
 	}
 
-	//Find the average of our samples (assume data is DC balanced)
-	double sum = 0;
-	int64_t count = 0;
-	for(auto sample : *din)
-	{
-		sum += sample;
-		count ++;
-	}
-	double offset = sum / count;
-	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	LogTrace("FFTDecoder: processing %zu raw points\n", din->m_samples.size());
 
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	//Truncate to next power of 2 down
+	const size_t npoints_raw = din->m_samples.size();
+	const size_t npoints = pow(2,floor(log2(npoints_raw)));
+	LogTrace("Rounded to %zu\n", npoints);
+
+	//Format the input data as raw samples for the FFT
+	//TODO: handle non-uniform sample rates
+	float* rdin;
+	posix_memalign((void**)&rdin, 32, npoints * sizeof(float));
+	for(size_t i=0; i<npoints; i++)
+		rdin[i] 		= din->m_samples[i];
+
+	float* rdout;
+	const size_t nouts = npoints/2 + 1;
+	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
+
+	//Calculate the FFT
+	auto plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+	ffts_execute(plan, &rdin[0], &rdout[0]);
+	ffts_free(plan);
+
+	//Set up output and copy timestamps
+	FFTCapture* cap = new FFTCapture;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+
+	//Calculate size of each bin
+	double ps = din->m_timescale * (din->GetSampleStart(1) - din->GetSampleStart(0));
+	double sample_ghz = 1000 / ps;
+	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
+	cap->m_timescale = bin_hz;
+
+	//Normalize magnitudes
+	vector<float> mags;
+	float maxmag = 1;
+	for(size_t i=1; i<nouts; i++)	//don't print (DC offset?) term 0
+									//real fft has symmetric output, ignore the redundant image of the data
 	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample - offset));
+		float a = rdout[i*2];
+		float b = rdout[i*2 + 1];
+		float mag = sqrtf(a*a + b*b);
+		//float freq = (0.5f * i * sample_ghz * 1000) / nouts;
+
+		mags.push_back(mag);
+		if(mag > maxmag)
+			maxmag = mag;
 	}
+
+	for(size_t i=1; i<nouts; i++)
+		cap->m_samples.push_back(AnalogSample(i, 1, mags[i-1] / maxmag));
+
 	SetData(cap);
 
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
+	//Clean up
+	free(rdin);
+	free(rdout);
 }

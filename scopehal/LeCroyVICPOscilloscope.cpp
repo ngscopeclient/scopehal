@@ -47,7 +47,7 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 
 	if(!m_socket.Connect(hostname, port))
 	{
-		LogError("Couldn't connect to socket");
+		LogError("Couldn't connect to socket\n");
 		return;
 	}
 	if(!m_socket.DisableNagle())
@@ -61,11 +61,14 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 	IdentifyHardware();
 	DetectAnalogChannels();
 	SharedCtorInit();
+
+	//TODO: make this switchable
+	SendCommand("DISP ON");
 }
 
 LeCroyVICPOscilloscope::~LeCroyVICPOscilloscope()
 {
-
+	//SendCommand("DISP ON");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

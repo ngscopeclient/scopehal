@@ -13,6 +13,7 @@ set(SCOPEHAL_SOURCES
 	Graph.cpp
 
 	Instrument.cpp
+	FunctionGenerator.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
 	LeCroyOscilloscope.cpp

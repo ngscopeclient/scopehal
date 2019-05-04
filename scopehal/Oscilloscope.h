@@ -317,10 +317,11 @@ public:
 	/**
 		@brief Reads data for all enabled channels from the instrument.
 
-		@param progress_callback Callback function called during transfer of long waveforms.
-				May be used to update a progress bar, etc.
+		@parameter toQueue	If true, acquire the waveform into the pending-waveform queue for future analysis.
+							If false, the waveform (or first segment in sequenced captures), is acquired into
+							the current channel state and any additional segments are queued.
 	 */
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback) =0;
+	virtual bool AcquireData(bool toQueue = false) =0;
 
 	/**
 		@brief Starts the instrument in continuous trigger mode.
@@ -341,11 +342,62 @@ public:
 	virtual void Stop() =0;
 
 	/**
+		@brief Checks if the trigger is currently armed
+	 */
+	virtual bool IsTriggerArmed() =0;
+
+	/**
 		@brief Optional application-selected nickname of the scope
 
 		(for display purposes if multiple scopes are in use)
 	 */
 	std::string m_nickname;
+
+public:
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Memory depth / sample rate control.
+
+	/**
+		@brief Get the legal sampling rates (in Hz) for this scope in all-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() =0;
+
+	/**
+		@brief Get the legal sampling rates (in Hz) for this scope in combined-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved() =0;
+
+	/**
+		@brief Get the set of conflicting channels.
+
+		If any pair of channels in this list is enabled, channel interleaving is not possible.
+	 */
+	typedef std::pair<OscilloscopeChannel*, OscilloscopeChannel* > InterleaveConflict;
+	virtual std::set< InterleaveConflict > GetInterleaveConflicts() =0;
+
+	/**
+		@brief Get the legal memory depths for this scope in all-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() =0;
+
+	/**
+		@brief Get the legal memory depths for this scope in combined-channels mode
+	 */
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sequenced triggering
+
+public:
+	bool HasPendingWaveforms();
+	size_t GetPendingWaveformCount();
+	virtual Oscilloscope::TriggerMode PollTriggerFifo();
+	virtual bool AcquireDataFifo();
+
+protected:
+	typedef std::map<OscilloscopeChannel*, CaptureChannelBase*> SequenceSet;
+	std::list<SequenceSet> m_pendingWaveforms;
+	std::mutex m_pendingWaveformsMutex;
 
 protected:
 

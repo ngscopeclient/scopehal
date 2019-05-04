@@ -68,6 +68,8 @@ public:
 
 	virtual std::vector<std::string> GetHeaders() =0;
 
+	virtual bool GetShowDataColumn();
+
 protected:
 	void ClearPackets();
 

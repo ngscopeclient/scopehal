@@ -36,9 +36,9 @@
 #ifndef UARTDecoder_h
 #define UARTDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 
-class UARTDecoder : public ProtocolDecoder
+class UARTDecoder : public PacketDecoder
 {
 public:
 	UARTDecoder(std::string color);
@@ -50,11 +50,14 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	virtual std::vector<std::string> GetHeaders();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
 	PROTOCOL_DECODER_INITPROC(UARTDecoder)
 
 protected:
+	void FinishPacket(Packet* pack);
 	std::string m_baudname;
 };
 

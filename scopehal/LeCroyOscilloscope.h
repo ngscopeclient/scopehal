@@ -30,6 +30,7 @@
 #ifndef LeCroyOscilloscope_h
 #define LeCroyOscilloscope_h
 
+#include <mutex>
 #include "../xptools/Socket.h"
 
 /**
@@ -40,6 +41,7 @@
 class LeCroyOscilloscope
 	: public virtual Oscilloscope
 	, public virtual Multimeter
+	, public virtual FunctionGenerator
 {
 public:
 	LeCroyOscilloscope(std::string hostname, unsigned short port);
@@ -80,10 +82,11 @@ public:
 	//Triggering
 	virtual void ResetTriggerConditions();
 	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback);
+	virtual bool AcquireData(bool toQueue = false);
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual bool IsTriggerArmed();
 	virtual size_t GetTriggerChannelIndex();
 	virtual void SetTriggerChannelIndex(size_t i);
 	virtual float GetTriggerVoltage();
@@ -123,6 +126,45 @@ public:
 	virtual Multimeter::MeasurementTypes GetMeterMode();
 	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
 
+	//Function generator
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+	//Scope models.
+	//We only distinguish down to the series of scope, exact SKU is irrelevant.
+	enum Model
+	{
+		MODEL_WAVESURFER_3K,
+		MODEL_WAVERUNNER_8K,
+
+		MODEL_UNKNOWN
+	};
+
+	Model GetModelID()
+	{ return m_modelid; }
+
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+
 protected:
 	Socket m_socket;
 
@@ -146,10 +188,15 @@ protected:
 	std::string m_model;
 	std::string m_serial;
 	std::string m_fwVersion;
+	Model m_modelid;
 
 	//set of SW/HW options we have
 	bool m_hasLA;
 	bool m_hasDVM;
+	bool m_hasFunctionGen;
+
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 
 	//Cached configuration
 	bool m_triggerChannelValid;
@@ -162,9 +209,16 @@ protected:
 	std::map<size_t, double> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
 
+	//True if we have >8 bit capture depth
+	bool m_highDefinition;
+
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	//Mutexing for thread safety
+	std::recursive_mutex m_mutex;
+	std::recursive_mutex m_cacheMutex;
 };
 
 #endif

@@ -206,6 +206,9 @@ CaptureChannelBase* OscilloscopeChannel::GetData()
 
 void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
 {
+	if(m_data == pNew)
+		return;
+
 	if(m_data != NULL)
 		delete m_data;
 	m_data = pNew;

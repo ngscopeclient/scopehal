@@ -30,34 +30,66 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of USB2PMADecoder
  */
+#ifndef USB2PMADecoder_h
+#define USB2PMADecoder_h
 
-#include "scopeprotocols.h"
-
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/ProtocolDecoder.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief A single bit on a USB 1.x/2.x differential bus
  */
-void ScopeProtocolStaticInit()
+class USB2PMASymbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+
+	enum SegmentType
+	{
+		TYPE_J,
+		TYPE_K,
+		TYPE_SE0,
+		TYPE_SE1
+	};
+
+	USB2PMASymbol(SegmentType type = TYPE_SE1)
+	 : m_type(type)
+	{
+	}
+
+	SegmentType m_type;
+
+	bool operator==(const USB2PMASymbol& rhs) const
+	{
+		return (m_type == rhs.m_type);
+	}
+};
+
+typedef OscilloscopeSample<USB2PMASymbol> USBLineSample;
+typedef CaptureChannel<USB2PMASymbol> USB2PMACapture;
+
+class USB2PMADecoder : public ProtocolDecoder
+{
+public:
+	USB2PMADecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(USB2PMADecoder)
+
+protected:
+	std::string m_speedname;
+};
+
+#endif

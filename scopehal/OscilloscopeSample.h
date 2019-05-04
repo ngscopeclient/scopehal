@@ -44,7 +44,7 @@
 class OscilloscopeSampleBase
 {
 public:
-	OscilloscopeSampleBase(int64_t off, int64_t dur)
+	OscilloscopeSampleBase(int64_t off = 0, int64_t dur = 0)
 	: m_offset(off)
 	, m_duration(dur)
 	{}
@@ -72,6 +72,9 @@ template<class T>
 class OscilloscopeSample : public OscilloscopeSampleBase
 {
 public:
+	OscilloscopeSample()	//for STL
+	{}
+
 	OscilloscopeSample(int64_t off, int64_t dur, const T& sample)
 	: OscilloscopeSampleBase(off, dur)
 	, m_sample(sample)

@@ -28,7 +28,8 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ACCoupleDecoder.h"
+#include "WaterfallDecoder.h"
+#include "FFTDecoder.h"
 #include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
@@ -36,8 +37,61 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACCoupleDecoder::ACCoupleDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CONVERSION)
+WaterfallCapture::WaterfallCapture(size_t width, size_t height)
+	: m_width(width)
+	, m_height(height)
+{
+	size_t npix = width*height;
+	m_outdata = new float[npix];
+	for(size_t i=0; i<npix; i++)
+		m_outdata[i] = 0;
+}
+
+WaterfallCapture::~WaterfallCapture()
+{
+	delete[] m_outdata;
+	m_outdata = NULL;
+}
+
+size_t WaterfallCapture::GetDepth() const
+{
+	return 0;
+}
+
+int64_t WaterfallCapture::GetEndTime() const
+{
+	return 0;
+}
+
+int64_t WaterfallCapture::GetSampleStart(size_t /*i*/) const
+{
+	return 0;
+}
+
+int64_t WaterfallCapture::GetSampleLen(size_t /*i*/) const
+{
+	return 0;
+}
+
+bool WaterfallCapture::EqualityTest(size_t /*i*/, size_t /*j*/) const
+{
+	return false;
+}
+
+bool WaterfallCapture::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
+{
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+WaterfallDecoder::WaterfallDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	, m_pixelsPerHz(0.001)
+	, m_offsetHz(0)
+	, m_width(1)
+	, m_height(1)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -47,14 +101,14 @@ ACCoupleDecoder::ACCoupleDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ACCoupleDecoder::CreateRenderer()
+ChannelRenderer* WaterfallDecoder::CreateRenderer()
 {
 	return new AnalogRenderer(this);
 }
 
-bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (dynamic_cast<FFTDecoder*>(channel) != NULL) )
 		return true;
 	return false;
 }
@@ -62,32 +116,37 @@ bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleDecoder::GetVoltageRange()
+double WaterfallDecoder::GetOffset()
 {
-	return m_channels[0]->GetVoltageRange();
+	return 0;
 }
 
-string ACCoupleDecoder::GetProtocolName()
+double WaterfallDecoder::GetVoltageRange()
 {
-	return "AC Couple";
+	return 1;
 }
 
-bool ACCoupleDecoder::IsOverlay()
+string WaterfallDecoder::GetProtocolName()
+{
+	return "Waterfall";
+}
+
+bool WaterfallDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool ACCoupleDecoder::NeedsConfig()
+bool WaterfallDecoder::NeedsConfig()
 {
 	//we auto-select the midpoint as our threshold
 	return false;
 }
 
-void ACCoupleDecoder::SetDefaultName()
+void WaterfallDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "AC(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "Waterfall(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -95,7 +154,7 @@ void ACCoupleDecoder::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACCoupleDecoder::Refresh()
+void WaterfallDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -103,7 +162,7 @@ void ACCoupleDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	FFTCapture* din = dynamic_cast<FFTCapture*>(m_channels[0]->GetData());
 
 	//We need meaningful data
 	if(din->GetDepth() == 0)
@@ -112,26 +171,42 @@ void ACCoupleDecoder::Refresh()
 		return;
 	}
 
-	//Find the average of our samples (assume data is DC balanced)
-	double sum = 0;
-	int64_t count = 0;
-	for(auto sample : *din)
-	{
-		sum += sample;
-		count ++;
-	}
-	double offset = sum / count;
-	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	//Initialize the capture
+	//TODO: timestamps? do we need those?qui
+	WaterfallCapture* cap = dynamic_cast<WaterfallCapture*>(m_data);
+	if(cap == NULL)
+		cap = new WaterfallCapture(m_width, m_height);
+	cap->m_timescale = 1;
+	float* data = cap->GetData();
 
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	//Move the whole waterfall down by one row
+	for(size_t y=0; y < m_height-1 ; y++)
 	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample - offset));
+		for(size_t x=0; x<m_width; x++)
+			data[y*m_width + x] = data[(y+1)*m_width + x];
 	}
+
+	//Add the new data
+	double hz_per_bin = din->m_timescale;
+	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
+	double bin_offset = m_offsetHz / hz_per_bin;
+	double vmin = 1.0 / 255.0;
+	for(size_t x=0; x<m_width; x++)
+	{
+		//Look up the frequency bin for this position
+		//For now, just do nearest neighbor interpolation
+		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x + bin_offset));
+
+		float value = 0;
+		if(nbin < din->GetDepth())
+			value = (-70 - 20 * log10(din->m_samples[nbin].m_sample)) / -70;
+
+		//Cap values to prevent going off-scale-low with our color ramps
+		if(value < vmin)
+			value = vmin;
+
+		data[(m_height-1)*m_width + x] = value;
+	}
+
 	SetData(cap);
-
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
 }

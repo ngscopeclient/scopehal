@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -28,33 +29,42 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ACCoupleDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
+#include "USB2PMADecoder.h"
+#include "USB2PMARenderer.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACCoupleDecoder::ACCoupleDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CONVERSION)
+USB2PMADecoder::USB2PMADecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("din");
+	m_signalNames.push_back("D+");
+	m_signalNames.push_back("D-");
 	m_channels.push_back(NULL);
+	m_channels.push_back(NULL);
+
+	//TODO: make this an enum
+	m_speedname = "Full Speed";
+	m_parameters[m_speedname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_speedname].SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ACCoupleDecoder::CreateRenderer()
+ChannelRenderer* USB2PMADecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return new USB2PMARenderer(this);
 }
 
-bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2PMADecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
 	return false;
 }
@@ -62,76 +72,140 @@ bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleDecoder::GetVoltageRange()
-{
-	return m_channels[0]->GetVoltageRange();
-}
-
-string ACCoupleDecoder::GetProtocolName()
-{
-	return "AC Couple";
-}
-
-bool ACCoupleDecoder::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool ACCoupleDecoder::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
-void ACCoupleDecoder::SetDefaultName()
+void USB2PMADecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "AC(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "USB2PMA(%s,%s)",
+		m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
+}
+
+string USB2PMADecoder::GetProtocolName()
+{
+	return "USB 1.x/2.x PMA";
+}
+
+bool USB2PMADecoder::IsOverlay()
+{
+	return true;
+}
+
+bool USB2PMADecoder::NeedsConfig()
+{
+	return true;
+}
+
+double USB2PMADecoder::GetVoltageRange()
+{
+	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACCoupleDecoder::Refresh()
+void USB2PMADecoder::Refresh()
 {
 	//Get the input data
-	if(m_channels[0] == NULL)
+	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
 	{
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
+	if( (din_p == NULL) || (din_n == NULL) )
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	if(din_p->GetDepth() == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
-	//Find the average of our samples (assume data is DC balanced)
-	double sum = 0;
-	int64_t count = 0;
-	for(auto sample : *din)
-	{
-		sum += sample;
-		count ++;
-	}
-	double offset = sum / count;
-	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	//Figure out our speed so we know what's going on
+	int speed = m_parameters[m_speedname].GetIntVal();
 
-	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	//Figure out the line state for each input (no clock recovery yet)
+	USB2PMACapture* cap = new USB2PMACapture;
+	for(size_t i=0; i<din_p->m_samples.size(); i++)
 	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample - offset));
+		const AnalogSample& sin_p = din_p->m_samples[i];
+		const AnalogSample& sin_n = din_n->m_samples[i];
+
+		//TODO: handle this better.
+		bool bp = (sin_p.m_sample > 0.4);
+		bool bn = (sin_n.m_sample > 0.4);
+
+		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
+		if(bp && bn)
+			type = USB2PMASymbol::TYPE_SE1;
+		else if(!bp && !bn)
+			type = USB2PMASymbol::TYPE_SE0;
+		else
+		{
+			if(speed == 1)
+			{
+				if(bp && !bn)
+					type = USB2PMASymbol::TYPE_J;
+				else
+					type = USB2PMASymbol::TYPE_K;
+			}
+			else
+			{
+				if(bp && !bn)
+					type = USB2PMASymbol::TYPE_K;
+				else
+					type = USB2PMASymbol::TYPE_J;
+			}
+		}
+
+		//First sample goes as-is
+		if(cap->m_samples.empty())
+		{
+			cap->m_samples.push_back(USBLineSample(
+				sin_p.m_offset,
+				sin_p.m_duration,
+				type));
+			continue;
+		}
+
+		//Type match? Extend the existing sample
+		USBLineSample& oldsample = cap->m_samples[cap->m_samples.size()-1];
+		USB2PMASymbol::SegmentType &oldtype = oldsample.m_sample.m_type;
+		if(oldtype == type)
+		{
+			oldsample.m_duration += sin_p.m_duration;
+			continue;
+		}
+
+		//Ignore SE0/SE1 states during transitions.
+		int64_t last_ps = oldsample.m_duration * din_p->m_timescale;
+		if(
+			( (oldtype == USB2PMASymbol::TYPE_SE0) || (oldtype == USB2PMASymbol::TYPE_SE1) ) &&
+			(last_ps < 100000))
+		{
+			oldsample.m_sample.m_type = type;
+			oldsample.m_duration += sin_p.m_duration;
+			continue;
+		}
+
+		//Not a match. Add a new sample.
+		cap->m_samples.push_back(USBLineSample(
+			sin_p.m_offset,
+			sin_p.m_duration,
+			type));
 	}
+
 	SetData(cap);
 
 	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
+	//Use the first trace's timestamp as our start time if they differ
+	cap->m_timescale = din_p->m_timescale;
+	cap->m_startTimestamp = din_p->m_startTimestamp;
+	cap->m_startPicoseconds = din_p->m_startPicoseconds;
 }

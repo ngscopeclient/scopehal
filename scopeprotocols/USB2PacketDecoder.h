@@ -30,34 +30,100 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of USB2PacketDecoder
  */
+#ifndef USB2PacketDecoder_h
+#define USB2PacketDecoder_h
 
-#include "scopeprotocols.h"
-
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/PacketDecoder.h"
+#include "USB2PMADecoder.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief Part of a packet
  */
-void ScopeProtocolStaticInit()
+class USB2PacketSymbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+
+	enum SymbolType
+	{
+		TYPE_PID,
+		TYPE_ADDR,
+		TYPE_ENDP,
+		TYPE_CRC5,
+		TYPE_CRC16,
+		TYPE_NFRAME,
+		TYPE_DATA,
+		TYPE_ERROR
+	};
+
+	enum Pids
+	{
+		PID_RESERVED	= 0x0,
+		PID_OUT			= 0x1,
+		PID_ACK 		= 0x2,
+		PID_DATA0		= 0x3,
+		PID_PING 		= 0x4,
+		PID_SOF			= 0x5,
+		PID_NYET		= 0x6,
+		PID_DATA2		= 0x7,
+		PID_SPLIT 		= 0x8,
+		PID_IN			= 0x9,
+		PID_NAK			= 0xa,
+		PID_DATA1		= 0xb,
+		PID_PRE_ERR 	= 0xc,
+		PID_SETUP		= 0xd,
+		PID_STALL		= 0xe,
+		PID_MDATA		= 0xf
+	};
+
+	USB2PacketSymbol(SymbolType type = TYPE_PID, uint16_t data=0)
+	 : m_type(type)
+	 , m_data(data)
+	{
+	}
+
+	SymbolType m_type;
+	uint16_t m_data;	//frame number is >1 byte
+						//in all other cases only low byte is meaningful
+
+	bool operator==(const USB2PacketSymbol& rhs) const
+	{
+		return (m_type == rhs.m_type);
+	}
+};
+
+typedef OscilloscopeSample<USB2PacketSymbol> USB2PacketSample;
+typedef CaptureChannel<USB2PacketSymbol> USB2PacketCapture;
+
+class USB2PacketDecoder : public PacketDecoder
+{
+public:
+	USB2PacketDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual std::vector<std::string> GetHeaders();
+	virtual bool GetShowDataColumn();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
+
+protected:
+	void FindPackets(USB2PacketCapture* cap);
+	void DecodeSof(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+	void DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+	void DecodeData(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+};
+
+#endif

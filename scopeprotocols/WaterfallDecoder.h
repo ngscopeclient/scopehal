@@ -30,34 +30,88 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of WaterfallDecoder
  */
+#ifndef WaterfallDecoder_h
+#define WaterfallDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class WaterfallCapture : public CaptureChannelBase
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	WaterfallCapture(size_t width, size_t height);
+	virtual ~WaterfallCapture();
+
+	float* GetData()
+	{ return m_outdata; }
+
+protected:
+	size_t m_width;
+	size_t m_height;
+
+	float* m_outdata;
+
+public:
+	//Not really applicable for waterfall plots
+	virtual size_t GetDepth() const;
+	virtual int64_t GetEndTime() const;
+	virtual int64_t GetSampleStart(size_t i) const;
+	virtual int64_t GetSampleLen(size_t i) const;
+	virtual bool EqualityTest(size_t i, size_t j) const;
+	virtual bool SamplesAdjacent(size_t i, size_t j) const;
+};
+
+class WaterfallDecoder : public ProtocolDecoder
+{
+public:
+	WaterfallDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	void SetWidth(size_t width)
+	{
+		m_width = width;
+		SetData(NULL);
+	}
+
+	void SetHeight(size_t height)
+	{
+		m_height = height;
+		SetData(NULL);
+	}
+
+	void SetTimeScale(double pixelsPerHz)
+	{ m_pixelsPerHz = pixelsPerHz; }
+
+	void SetTimeOffset(double offsetHz)
+	{ m_offsetHz = offsetHz; }
+
+	size_t GetWidth()
+	{ return m_width; }
+
+	size_t GetHeight()
+	{ return m_height; }
+
+	PROTOCOL_DECODER_INITPROC(WaterfallDecoder)
+
+protected:
+	double m_pixelsPerHz;
+	double m_offsetHz;
+
+	size_t m_width;
+	size_t m_height;
+};
+
+#endif

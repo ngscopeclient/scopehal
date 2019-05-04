@@ -98,9 +98,52 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 	bool trig = false;
 	for(int i=0; i<timeout*100 && !trig; i++)
 	{
-		trig = (PollTrigger() == Oscilloscope::TRIGGER_MODE_TRIGGERED);
+		trig = (PollTriggerFifo() == Oscilloscope::TRIGGER_MODE_TRIGGERED);
 		usleep(10 * 1000);
 	}
 
 	return trig;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sequenced capture
+
+size_t Oscilloscope::GetPendingWaveformCount()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	return m_pendingWaveforms.size();
+}
+
+bool Oscilloscope::HasPendingWaveforms()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	return (m_pendingWaveforms.size() != 0);
+}
+
+/**
+	@brief Just like PollTrigger(), but checks the fifo instead
+ */
+Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
+{
+	if(HasPendingWaveforms())
+		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
+	else
+		return Oscilloscope::TRIGGER_MODE_RUN;
+}
+
+/**
+	@brief Just like AcquireData(), but only pulls from the fifo
+ */
+bool Oscilloscope::AcquireDataFifo()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	if(m_pendingWaveforms.size())
+	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			it.first->SetData(it.second);
+		m_pendingWaveforms.pop_front();
+		return true;
+	}
+	return false;
 }
