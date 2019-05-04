@@ -61,6 +61,7 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 	IdentifyHardware();
 	DetectAnalogChannels();
 	SharedCtorInit();
+	DetectOptions();
 
 	//TODO: make this switchable
 	SendCommand("DISP ON");

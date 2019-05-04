@@ -49,7 +49,7 @@ public:
 	SiglentSCPIOscilloscope(std::string hostname, unsigned short port);
 	virtual ~SiglentSCPIOscilloscope();
 
-	virtual bool AcquireData(sigc::slot1<int, float> progress_callback);
+	virtual bool AcquireData(bool toQueue);
 
 protected:
 	virtual void DetectAnalogChannels();

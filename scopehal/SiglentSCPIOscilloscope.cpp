@@ -70,11 +70,12 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 {
 	//Siglent likes variably long model names (x, x-e, etc)
 	int nchans = m_model[strlen("sds120")] - '0';
+	//nchans = 1;
 	for(int i=0; i<nchans; i++)
 	{
 		//Hardware name of the channel
-		string chname = string("CH1");
-		chname[2] += i;
+		string chname = string("C1");
+		chname[1] += i;
 
 		//Color the channels based on LeCroy's standard color sequence (yellow-pink-cyan-green)
 		string color = "#ffffff";
@@ -119,6 +120,7 @@ bool SiglentSCPIOscilloscope::SendCommand(string cmd, bool eoi)
 	(void)eoi;
 	cmd += "\n";
 	//Actually send it
+	LogDebug("sending: %s", cmd.c_str());
 	if(!m_socket.SendLooped((const unsigned char*)cmd.c_str(), cmd.size()))
 		return false;
 
@@ -219,11 +221,16 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 	ReadData();
 }
 
-bool SiglentSCPIOscilloscope::AcquireData(sigc::slot1<int, float> progress_callback)
+
+
+bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 {
+	m_mutex.lock();
+
 	LogDebug("Acquire data\n");
 
 	double start = GetTime();
+
 
 	//Read the wavedesc for every enabled channel in batch mode first
 	vector<struct SiglentWaveformDesc_t*> wavedescs;
@@ -305,15 +312,9 @@ bool SiglentSCPIOscilloscope::AcquireData(sigc::slot1<int, float> progress_callb
 		tstruc.tm_isdst = now->tm_isdst;
 		cap->m_startTimestamp = mktime(&tstruc);
 		cap->m_timescale = round(interval);
-
 		for(unsigned int j=0; j<num_sequences; j++)
 		{
 			LogDebug("Channel %u block %u\n", i, j);
-
-			float fbase = i*1.0f / m_analogChannelCount;
-
-			fbase += (j*1.0f / num_sequences) / m_analogChannelCount;
-			progress_callback(fbase);
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
@@ -382,97 +383,7 @@ bool SiglentSCPIOscilloscope::AcquireData(sigc::slot1<int, float> progress_callb
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
-
-	if(num_sequences > 1)
-	{
-		//LeCroy's LA is derpy and doesn't support sequenced capture!
-		//(at least in wavesurfer 3000 series)
-		for(unsigned int i=0; i<m_digitalChannelCount; i++)
-			m_channels[m_analogChannelCount + i]->SetData(NULL);
-	}
-
-	else if(m_digitalChannelCount > 0)
-	{
-		//If no digital channels are enabled, skip this step
-		bool enabled = false;
-		for(size_t i=0; i<m_digitalChannels.size(); i++)
-		{
-			if(m_digitalChannels[i]->IsEnabled())
-			{
-				enabled = true;
-				break;
-			}
-		}
-
-		if(enabled)
-		{
-			SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
-
-			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
-			string cmd = "Digital1:WF?";
-			SendCommand(cmd);
-			string data;
-			if(!ReadWaveformBlock(data))
-				return false;
-
-			//See what channels are enabled
-			string tmp = data.substr(data.find("SelectedLines=") + 14);
-			tmp = tmp.substr(0, 16);
-			bool enabledChannels[16];
-			for(int i=0; i<16; i++)
-				enabledChannels[i] = (tmp[i] == '1');
-
-			//Quick and dirty string searching. We only care about a small fraction of the XML
-			//so no sense bringing in a full parser.
-			tmp = data.substr(data.find("<HorPerStep>") + 12);
-			tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
-			float interval = atof(tmp.c_str()) * 1e12f;
-			//LogDebug("Sample interval: %.2f ps\n", interval);
-
-			tmp = data.substr(data.find("<NumSamples>") + 12);
-			tmp = tmp.substr(0, tmp.find("</NumSamples>"));
-			int num_samples = atoi(tmp.c_str());
-			//LogDebug("Expecting %d samples\n", num_samples);
-
-			//Pull out the actual binary data (Base64 coded)
-			tmp = data.substr(data.find("<BinaryData>") + 12);
-			tmp = tmp.substr(0, tmp.find("</BinaryData>"));
-
-			//Decode the base64
-			base64_decodestate state;
-			base64_init_decodestate(&state);
-			unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
-			base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &state);
-
-			//We have each channel's data from start to finish before the next (no interleaving).
-			unsigned int icapchan = 0;
-			for(unsigned int i=0; i<m_digitalChannelCount; i++)
-			{
-				if(enabledChannels[icapchan])
-				{
-					DigitalCapture* cap = new DigitalCapture;
-					cap->m_timescale = interval;
-
-					for(int j=0; j<num_samples; j++)
-						cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
-
-					//Done, update the data
-					m_digitalChannels[i]->SetData(cap);
-
-					//Go to next channel in the capture
-					icapchan ++;
-				}
-				else
-				{
-					//No data here for us!
-					m_digitalChannels[i]->SetData(NULL);
-				}
-			}
-
-			delete[] block;
-		}
-	}
-
+	m_mutex.unlock();
 	//Refresh protocol decoders
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
