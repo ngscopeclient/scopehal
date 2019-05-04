@@ -38,9 +38,10 @@ add_library(scopeprotocols SHARED
 	${SCOPEPROTOCOLS_SOURCES})
 
 target_link_libraries(scopeprotocols
-	ffts)
+	${LIBFFTS_LIBRARIES})
 
 target_include_directories(scopeprotocols
-PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+PRIVATE ${LIBFFTS_INCLUDE_DIR})
 
 install(TARGETS scopeprotocols LIBRARY DESTINATION /usr/lib)
