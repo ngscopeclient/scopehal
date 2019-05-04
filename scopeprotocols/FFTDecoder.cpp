@@ -30,7 +30,7 @@
 #include "../scopehal/scopehal.h"
 #include "FFTDecoder.h"
 #include "../scopehal/AnalogRenderer.h"
-#include <ffts/ffts.h>
+#include <ffts.h>
 
 using namespace std;
 
