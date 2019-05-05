@@ -65,7 +65,54 @@ void LeCroyOscilloscope::SharedCtorInit()
 		true);
 	m_channels.push_back(m_extTrigChannel);
 
-	//Look at options and see if we have digital channels too
+	//Desired format for waveform data
+	//Only use increased bit depth if the scope actually puts content there!
+	if(m_highDefinition)
+		SendCommand("COMM_FORMAT DEF9,WORD,BIN");
+	else
+		SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
+
+	//Clear the state-change register to we get rid of any history we don't care about
+	PollTrigger();
+}
+
+void LeCroyOscilloscope::IdentifyHardware()
+{
+	//Turn off headers (complicate parsing and add fluff to the packets)
+	SendCommand("CHDR OFF", true);
+
+	//Ask for the ID
+	SendCommand("*IDN?", true);
+	string reply = ReadSingleBlockString();
+	char vendor[128] = "";
+	char model[128] = "";
+	char serial[128] = "";
+	char version[128] = "";
+	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+	{
+		LogError("Bad IDN response %s\n", reply.c_str());
+		return;
+	}
+	m_vendor = vendor;
+	m_model = model;
+	m_serial = serial;
+	m_fwVersion = version;
+
+	//Look up model info
+	if(m_model.find("WS3") == 0)
+		m_modelid = MODEL_WAVESURFER_3K;
+	else if(m_model.find("WAVERUNNER8") == 0)
+		m_modelid = MODEL_WAVERUNNER_8K;
+	else
+		m_modelid = MODEL_UNKNOWN;
+
+	//TODO: better way of doing this?
+	if(m_model.find("HD") != string::npos)
+		m_highDefinition = true;
+}
+
+void LeCroyOscilloscope::DetectOptions()
+{
 	SendCommand("*OPT?", true);
 	string reply = ReadSingleBlockString(true);
 	if(reply.length() > 3)
@@ -174,51 +221,6 @@ void LeCroyOscilloscope::SharedCtorInit()
 				LogDebug("* %s (not yet implemented)\n", o.c_str());
 		}
 	}
-
-	//Desired format for waveform data
-	//Only use increased bit depth if the scope actually puts content there!
-	if(m_highDefinition)
-		SendCommand("COMM_FORMAT DEF9,WORD,BIN");
-	else
-		SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
-
-	//Clear the state-change register to we get rid of any history we don't care about
-	PollTrigger();
-}
-
-void LeCroyOscilloscope::IdentifyHardware()
-{
-	//Turn off headers (complicate parsing and add fluff to the packets)
-	SendCommand("CHDR OFF", true);
-
-	//Ask for the ID
-	SendCommand("*IDN?", true);
-	string reply = ReadSingleBlockString();
-	char vendor[128] = "";
-	char model[128] = "";
-	char serial[128] = "";
-	char version[128] = "";
-	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
-	{
-		LogError("Bad IDN response %s\n", reply.c_str());
-		return;
-	}
-	m_vendor = vendor;
-	m_model = model;
-	m_serial = serial;
-	m_fwVersion = version;
-
-	//Look up model info
-	if(m_model.find("WS3") == 0)
-		m_modelid = MODEL_WAVESURFER_3K;
-	else if(m_model.find("WAVERUNNER8") == 0)
-		m_modelid = MODEL_WAVERUNNER_8K;
-	else
-		m_modelid = MODEL_UNKNOWN;
-
-	//TODO: better way of doing this?
-	if(m_model.find("HD") != string::npos)
-		m_highDefinition = true;
 }
 
 void LeCroyOscilloscope::DetectAnalogChannels()
@@ -813,6 +815,7 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Second blocks is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
 	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
+	LogDebug("lhdr: %s\n", lhdr.c_str());
 	if(num_bytes == 0)
 	{
 		ReadData();
@@ -894,11 +897,13 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(enabled[i])
 			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 	}
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	/*for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])
 			ReadWaveformBlock(wavedescs[i]);
+		//LogDebug("got: %s\n", wavedescs[i].c_str());
 	}
+	*/
 
 	//Figure out how many sequences we have
 	unsigned char* pdesc = NULL;

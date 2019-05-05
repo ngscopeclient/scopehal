@@ -18,6 +18,7 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	LeCroyOscilloscope.cpp
 	LeCroyVICPOscilloscope.cpp
+	SiglentSCPIOscilloscope.cpp
 	RedTinLogicAnalyzer.cpp
 	RigolOscilloscope.cpp
 	RigolLANOscilloscope.cpp
