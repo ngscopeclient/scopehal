@@ -70,7 +70,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 {
 	//Siglent likes variably long model names (x, x-e, etc)
 	int nchans = m_model[strlen("sds120")] - '0';
-	//nchans = 1;
+	nchans = 1;
 	for(int i=0; i<nchans; i++)
 	{
 		//Hardware name of the channel
@@ -225,7 +225,7 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 
 bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 {
-	m_mutex.lock();
+	lock_guard<recursive_mutex> lock(m_mutex);
 
 	LogDebug("Acquire data\n");
 
@@ -246,9 +246,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		wavedescs.push_back(new struct SiglentWaveformDesc_t);
 		if(enabled[i])
 		{
-			snprintf(tmp, sizeof(tmp), "C%d:WF? DESC", i+1);
-			cmd = tmp;
-			SendCommand(cmd);
+			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 			ReadWaveDescriptorBlock(wavedescs[i], i);
 			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName, 
 				wavedescs[i]->InstrumentNumber);
@@ -383,7 +381,6 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
-	m_mutex.unlock();
 	//Refresh protocol decoders
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
