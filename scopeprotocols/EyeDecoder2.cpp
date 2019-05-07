@@ -218,7 +218,6 @@ void EyeDecoder2::Refresh()
 	double awidth = 0;
 	int64_t nwidth = 0;
 	float yscale = m_height / m_channels[0]->GetVoltageRange();
-	float tfix = 1.5 * waveform->m_timescale;
 	float fwidth = m_width / 2.0f;
 	float ymid = m_height / 2;
 	for(auto& samp : waveform->m_samples)
@@ -244,9 +243,6 @@ void EyeDecoder2::Refresh()
 			iclock ++;
 			offset = tstart - tend;
 		}
-
-		//TODO: figure out where this is creeping in
-		offset += tfix;
 
 		//Find (and sanity check) the Y coordinate
 		size_t pixel_y = (samp.m_sample * yscale) + ymid;
