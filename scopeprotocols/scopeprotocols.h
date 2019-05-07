@@ -42,6 +42,7 @@
 
 #include "ACCoupleDecoder.h"
 #include "ClockRecoveryDecoder.h"
+#include "DCOffsetDecoder.h"
 #include "DifferenceDecoder.h"
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetProtocolDecoder.h"
