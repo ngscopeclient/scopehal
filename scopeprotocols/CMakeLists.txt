@@ -24,6 +24,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
+	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
 	USB2PacketRenderer.cpp
 	USB2PCSDecoder.cpp
