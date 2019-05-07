@@ -46,6 +46,7 @@ public:
 	{
 		TYPE_FLOAT,
 		TYPE_INT,
+		TYPE_BOOL,
 		TYPE_FILENAME
 	};
 
@@ -54,10 +55,15 @@ public:
 	void ParseString(std::string str);
 	std::string ToString();
 
+	bool GetBoolVal()
+	{ return (m_intval != 0); }
+
 	int GetIntVal();
 	float GetFloatVal();
 	std::string GetFileName();
 
+	void SetBoolVal(bool b)
+	{ m_intval = b; }
 	void SetIntVal(int i);
 	void SetFloatVal(float f);
 	void SetFileName(std::string f);
