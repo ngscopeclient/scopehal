@@ -51,6 +51,10 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_threshname].SetFloatVal(0);
+
+	m_gatename = "Gate after";
+	m_parameters[m_gatename] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_gatename].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,6 +141,8 @@ void ClockRecoveryDecoder::Refresh()
 	//Timestamps of the edges
 	vector<int64_t> edges;
 
+	int gateAfter = m_parameters[m_gatename].GetIntVal();
+
 	//Find times of the zero crossings
 	bool first = true;
 	bool last = false;
@@ -172,52 +178,76 @@ void ClockRecoveryDecoder::Refresh()
 
 	double dt = GetTime() - start;
 	start = GetTime();
-	LogTrace("Zero crossing: %.3f ms\n", dt * 1000);
+	//LogTrace("Zero crossing: %.3f ms\n", dt * 1000);
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
 	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
 	float period = ps;
 	size_t nedge = 1;
-	//LogDebug("n,period,phase_error\n");
-	double edgepos = (edges[0] + period/2);
+	//LogDebug("n,delta,period\n");
+	double edgepos = edges[0];
 	bool value = false;
 	double total_error = 0;
 	cap->m_samples.reserve(edges.size());
+	int cycles_since_edge = 0;
+	bool gating = false;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
+		double edgepos_orig = edgepos;
 
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		while(tnext < edgepos)
+		bool has_edge = false;
+		while(tnext + center < edgepos)
 		{
 			//Find phase error
-			int64_t delta = edgepos - tnext;
-			int64_t phase_error = center - delta;
-			total_error += fabs(phase_error);
+			int64_t delta = (edgepos - tnext) - period;
+			total_error += fabs(delta);
+
+			//If the clock is currently gated, re-sync to the center of the UI
+			cycles_since_edge = 0;
+			if(gating)
+			{
+				gating = false;
+				edgepos = tnext + period;
+				delta = 0;
+			}
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
-			if(phase_error < 0)
+			else if(delta > 0)
 			{
-				period -= 0.005;
-				edgepos -= 0.5;
+				period  -= 0.00005 * period;
+				edgepos -= 0.005 * period;
 			}
 			else
 			{
-				period += 0.005;
-				edgepos += 0.5;
+				period  += 0.00005 * period;
+				edgepos += 0.005 * period;
 			}
 
-			//LogDebug("%ld,%.2f,%ld\n", nedge, period, phase_error);
+			//LogDebug("%ld,%ld,%.2f\n", nedge, delta, period);
 			tnext = edges[++nedge];
+			has_edge = true;
 		}
 
-		//Add the sample
-		value = !value;
-		cap->m_samples.push_back(DigitalSample((int64_t)edgepos, (int64_t)period, value));
+		//Keep count of idle time with no edges
+		if(!has_edge)
+			cycles_since_edge ++;
+
+		//Add the sample. Gate if it's been a while and the user requested gating
+		if(gateAfter && cycles_since_edge >= gateAfter)
+			gating = true;
+		else if(!gating)
+		{
+			value = !value;
+			cap->m_samples.push_back(DigitalSample(
+				static_cast<int64_t>(round(edgepos_orig + period/2 - din->m_timescale*1.5)),
+				(int64_t)period, value));
+		}
 	}
 
 	dt = GetTime() - start;
