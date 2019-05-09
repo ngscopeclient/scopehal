@@ -121,8 +121,8 @@ void USB2ActivityDecoder::Refresh()
 
 		if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_EOP)
 		{
-			cap->m_samples.push_back(DigitalSample(last, sin.m_offset - last, true));
-			last = sin.m_offset;
+			cap->m_samples.push_back(DigitalSample(last, sin.m_offset + sin.m_duration - last, true));
+			last = sin.m_offset + sin.m_duration;
 		}
 	}
 
