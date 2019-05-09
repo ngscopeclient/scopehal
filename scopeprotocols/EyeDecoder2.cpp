@@ -103,6 +103,30 @@ void EyeCapture2::Normalize()
 
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = m_accumdata[i] * norm;
+
+	//Once the output is normalized, check for any rows with no bin hits due to roundoff and interpolate into them.
+	for(size_t y=1; y+1 < m_height; y++)
+	{
+		bool empty = true;
+		for(size_t x=0; x<m_width; x++)
+		{
+			if(m_accumdata[y*m_width + x])
+			{
+				empty = false;
+				break;
+			}
+		}
+
+		if(empty)
+		{
+			for(size_t x=0; x<m_width; x++)
+			{
+				float out1 = m_outdata[(y-1)*m_width + x];
+				float out2 = m_outdata[(y+1)*m_width + x];
+				m_outdata[y*m_width + x] = (out1 + out2) / 2;
+			}
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,8 +252,8 @@ void EyeDecoder2::Refresh()
 
 		//Look up time of the starting and ending clock edges
 		int64_t tclock = clock->GetSampleStart(iclock) * clock->m_timescale;
-		int64_t tend = clock->GetSampleStart(iclock+1) * clock->m_timescale;
-		int64_t twidth = tend - tclock;
+		//int64_t tend = clock->GetSampleStart(iclock+1) * clock->m_timescale;
+		int64_t twidth = clock->GetSampleLen(iclock);
 		awidth += twidth;
 		nwidth ++;
 
@@ -238,14 +262,17 @@ void EyeDecoder2::Refresh()
 
 		//If it's past the end of the current UI, increment the clock
 		int64_t offset = tstart - tclock;
+		if(offset < 0)
+			continue;
 		if(offset > twidth)
 		{
 			iclock ++;
-			offset = tstart - tend;
+			offset -= twidth;
 		}
+		//LogDebug("offset = %ld, twidth = %ld\n",offset, twidth);
 
 		//Find (and sanity check) the Y coordinate
-		size_t pixel_y = (samp.m_sample * yscale) + ymid;
+		size_t pixel_y = round( (samp.m_sample * yscale) + ymid );
 		if(pixel_y >= m_height)
 			continue;
 		int64_t* row = data + pixel_y*m_width;
