@@ -44,6 +44,9 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_signalNames.push_back("IN");
 	m_channels.push_back(NULL);
 
+	m_signalNames.push_back("Gate");	//leave null if not gating
+	m_channels.push_back(NULL);
+
 	m_baudname = "Symbol rate";
 	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
 	m_parameters[m_baudname].SetIntVal(1250000000);	//1250 MHz by default
@@ -51,10 +54,6 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_threshname].SetFloatVal(0);
-
-	m_gatename = "Gate after";
-	m_parameters[m_gatename] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
-	m_parameters[m_gatename].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,9 +66,17 @@ ChannelRenderer* ClockRecoveryDecoder::CreateRenderer()
 
 bool ClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	return false;
+	switch(i)
+	{
+		case 0:
+			return (channel != NULL) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+
+		case 1:
+			return ( (channel == NULL) || (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) );
+
+		default:
+			return false;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,6 +132,10 @@ void ClockRecoveryDecoder::Refresh()
 		return;
 	}
 
+	DigitalCapture* gate = NULL;
+	if(m_channels[1] != NULL)
+		gate = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
 	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
@@ -140,8 +151,6 @@ void ClockRecoveryDecoder::Refresh()
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-
-	int gateAfter = m_parameters[m_gatename].GetIntVal();
 
 	//Find times of the zero crossings
 	bool first = true;
@@ -176,6 +185,12 @@ void ClockRecoveryDecoder::Refresh()
 		last = value;
 	}
 
+	if(edges.empty())
+	{
+		SetData(NULL);
+		return;
+	}
+
 	double dt = GetTime() - start;
 	start = GetTime();
 	//LogTrace("Zero crossing: %.3f ms\n", dt * 1000);
@@ -190,29 +205,55 @@ void ClockRecoveryDecoder::Refresh()
 	bool value = false;
 	double total_error = 0;
 	cap->m_samples.reserve(edges.size());
-	int cycles_since_edge = 0;
+	size_t igate = 0;
 	bool gating = false;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
 		double edgepos_orig = edgepos;
 
+		//See if the current edge position is within a gating region
+		bool was_gating = gating;
+		if(gate != NULL)
+		{
+			while(igate < edges.size()-1)
+			{
+				//See if this edge is within the region
+				int64_t a = gate->m_samples[igate].m_offset;
+				int64_t b = a + gate->m_samples[igate].m_duration;
+				a *= gate->m_timescale;
+				b *= gate->m_timescale;
+
+				//We went too far, stop
+				if(edgepos < a)
+					break;
+
+				//Keep looking
+				else if(edgepos > b)
+					igate ++;
+
+				//Good alignment
+				else
+				{
+					gating = !gate->m_samples[igate].m_sample;
+					break;
+				}
+			}
+		}
+
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		bool has_edge = false;
 		while(tnext + center < edgepos)
 		{
 			//Find phase error
 			int64_t delta = (edgepos - tnext) - period;
 			total_error += fabs(delta);
 
-			//If the clock is currently gated, re-sync to the center of the UI
-			cycles_since_edge = 0;
-			if(gating)
+			//If the clock is currently gated, re-sync to the edge
+			if(was_gating && !gating)
 			{
-				gating = false;
 				edgepos = tnext + period;
 				delta = 0;
 			}
@@ -231,17 +272,10 @@ void ClockRecoveryDecoder::Refresh()
 
 			//LogDebug("%ld,%ld,%.2f\n", nedge, delta, period);
 			tnext = edges[++nedge];
-			has_edge = true;
 		}
 
-		//Keep count of idle time with no edges
-		if(!has_edge)
-			cycles_since_edge ++;
-
-		//Add the sample. Gate if it's been a while and the user requested gating
-		if(gateAfter && cycles_since_edge >= gateAfter)
-			gating = true;
-		else if(!gating)
+		//Add the sample
+		if(!gating)
 		{
 			value = !value;
 			cap->m_samples.push_back(DigitalSample(

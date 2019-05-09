@@ -60,7 +60,6 @@ public:
 protected:
 	std::string m_baudname;
 	std::string m_threshname;
-	std::string m_gatename;
 };
 
 #endif
