@@ -153,44 +153,23 @@ void LeCroyOscilloscope::DetectOptions()
 				LogDebug("* MSXX (logic analyzer)\n");
 				LogIndenter li;
 
-				//Only add the channels if we're showing them
-				//TODO: better way of doing this!!!
-				SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,0");
-				SendCommand("Digital1:WF?");
-				string data;
-				if(!ReadWaveformBlock(data))
-					return;
-				if(data == "")
-				{
-					LogDebug("No logic analyzer probe connected\n");
-					continue;
-				}
-				string tmp = data.substr(data.find("SelectedLines=") + 14);
-				tmp = tmp.substr(0, 16);
-				if(tmp == "0000000000000000")
-				{
-					LogDebug("No digital channels enabled\n");
-					//TODO: allow turning them on/off dynamically
-				}
+				//TODO: send command to enable all digital channels if we use any?
 
-				else
-				{
-					m_digitalChannelCount = 16;
+				m_digitalChannelCount = 16;
 
-					char chn[8];
-					for(int i=0; i<16; i++)
-					{
-						snprintf(chn, sizeof(chn), "D%d", i);
-						auto chan = new OscilloscopeChannel(
-							this,
-							chn,
-							OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-							GetDefaultChannelColor(m_channels.size()),
-							1,
-							m_channels.size());
-						m_channels.push_back(chan);
-						m_digitalChannels.push_back(chan);
-					}
+				char chn[8];
+				for(int i=0; i<16; i++)
+				{
+					snprintf(chn, sizeof(chn), "D%d", i);
+					auto chan = new OscilloscopeChannel(
+						this,
+						chn,
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						GetDefaultChannelColor(m_channels.size()),
+						1,
+						m_channels.size());
+					m_channels.push_back(chan);
+					m_digitalChannels.push_back(chan);
 				}
 			}
 
@@ -377,7 +356,9 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
 {
+	//LogDebug("enable channel %d\n", i);
 	lock_guard<recursive_mutex> lock(m_mutex);
+	//LogDebug("got mutex\n");
 	SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 }
 
@@ -779,13 +760,14 @@ bool LeCroyOscilloscope::IsTriggerArmed()
 
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//LogDebug("Polling trigger\n");
 
 	//Read the Internal State Change Register
+	m_mutex.lock();
 	SendCommand("INR?");
 	string sinr = ReadSingleBlockString();
+	m_mutex.unlock();
+	//LogDebug("Got trigger state\n");
 	int inr = atoi(sinr.c_str());
 
 	//See if we got a waveform
@@ -877,6 +859,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
+	//LogDebug("acquire\n");
 	m_mutex.lock();
 
 	//LogDebug("Acquire data\n");
@@ -1048,6 +1031,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		}
 	}
 
+	//LogDebug("unlock mutex\n");
 	m_mutex.unlock();
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
