@@ -14,6 +14,7 @@ set(SCOPEHAL_SOURCES
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
+	SCPIDevice.cpp
 
 	Instrument.cpp
 	FunctionGenerator.cpp
@@ -25,6 +26,7 @@ set(SCOPEHAL_SOURCES
 	SiglentSCPIOscilloscope.cpp
 	RedTinLogicAnalyzer.cpp
 	RigolOscilloscope.cpp
+	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
 	Multimeter.cpp

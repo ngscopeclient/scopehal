@@ -27,47 +27,85 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#ifndef RohdeSchwarzOscilloscope_h
+#define RohdeSchwarzOscilloscope_h
 
-#ifndef scopehal_h
-#define scopehal_h
+class RohdeSchwarzOscilloscope : public SCPIOscilloscope
+{
+public:
+	RohdeSchwarzOscilloscope(SCPITransport* transport);
+	virtual ~RohdeSchwarzOscilloscope();
 
-#include "../log/log.h"
+public:
+	//Device information
+	virtual unsigned int GetInstrumentTypes();
 
-#include <sigc++/sigc++.h>
+	virtual void FlushConfigCache();
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	//Channel configuration
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual double GetChannelAttenuation(size_t i);
+	virtual void SetChannelAttenuation(size_t i, double atten);
+	virtual int GetChannelBandwidthLimit(size_t i);
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
+	virtual double GetChannelVoltageRange(size_t i);
+	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual double GetChannelOffset(size_t i);
+	virtual void SetChannelOffset(size_t i, double offset);
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPIDevice.h"
+	//Triggering
+	virtual void ResetTriggerConditions();
+	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool AcquireData(bool toQueue = false);
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void Stop();
+	virtual bool IsTriggerArmed();
+	virtual size_t GetTriggerChannelIndex();
+	virtual void SetTriggerChannelIndex(size_t i);
+	virtual float GetTriggerVoltage();
+	virtual void SetTriggerVoltage(float v);
+	virtual Oscilloscope::TriggerType GetTriggerType();
+	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
-#include "Measurement.h"
+protected:
+	std::string m_vendor;
+	std::string m_model;
+	std::string m_serial;
+	std::string m_fwVersion;
 
-#include <cairomm/context.h>
+	OscilloscopeChannel* m_extTrigChannel;
 
-#include "Graph.h"
+	//Mutexing for thread safety
+	std::recursive_mutex m_mutex;
+	std::recursive_mutex m_cacheMutex;
 
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
+	//hardware analog channel count, independent of LA option etc
+	unsigned int m_analogChannelCount;
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	//config cache
+	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<int, bool> m_channelsEnabled;
+	bool m_triggerChannelValid;
+	size_t m_triggerChannel;
+	bool m_triggerLevelValid;
+	float m_triggerLevel;
 
-std::string GetDefaultChannelColor(int i);
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+};
 
 #endif
