@@ -47,7 +47,7 @@ public:
 	SCPISocketTransport(std::string hostname, unsigned short port);
 	virtual ~SCPISocketTransport();
 
-	virtual void SendCommand(std::string cmd);
+	virtual bool SendCommand(std::string cmd);
 	virtual std::string ReadReply();
 	virtual void ReadRawData(size_t len, unsigned char* buf);
 

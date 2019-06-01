@@ -66,11 +66,11 @@ SCPISocketTransport::~SCPISocketTransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
-void SCPISocketTransport::SendCommand(string cmd)
+bool SCPISocketTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";
-	m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
+	return m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
 }
 
 string SCPISocketTransport::ReadReply()
