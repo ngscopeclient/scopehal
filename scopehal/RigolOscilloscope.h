@@ -38,9 +38,6 @@ public:
 
 public:
 	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
 	virtual unsigned int GetInstrumentTypes();
 
 	virtual void FlushConfigCache();
@@ -84,11 +81,6 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
 protected:
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_fwVersion;
-
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//Mutexing for thread safety

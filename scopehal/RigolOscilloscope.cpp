@@ -40,26 +40,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	//Ask for the ID
-	m_transport->SendCommand("*IDN?");
-	string reply = m_transport->ReadReply();
-	char vendor[128] = "";
-	char model[128] = "";
-	char serial[128] = "";
-	char version[128] = "";
-	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
-	{
-		LogError("Bad IDN response %s\n", reply.c_str());
-		return;
-	}
-	m_vendor = vendor;
-	m_model = model;
-	m_serial = serial;
-	m_fwVersion = version;
-
 	//Last digit of the model number is the number of channels
 	int model_number;
-	if(1 != sscanf(model, "DS%d", &model_number))
+	if(1 != sscanf(m_model.c_str(), "DS%d", &model_number))
 	{
 		LogError("Bad model number\n");
 		return;
@@ -127,21 +110,6 @@ RigolOscilloscope::~RigolOscilloscope()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-string RigolOscilloscope::GetName()
-{
-	return m_model;
-}
-
-string RigolOscilloscope::GetVendor()
-{
-	return m_vendor;
-}
-
-string RigolOscilloscope::GetSerial()
-{
-	return m_serial;
-}
 
 unsigned int RigolOscilloscope::GetInstrumentTypes()
 {
