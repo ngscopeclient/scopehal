@@ -203,13 +203,39 @@ void RigolOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i)
 {
-	//FIXME
-	return OscilloscopeChannel::COUPLE_DC_1M;
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+	string reply = ReadReply();
+
+	if(reply == "AC")
+		return OscilloscopeChannel::COUPLE_AC_1M;
+	else if(reply == "DC")
+		return OscilloscopeChannel::COUPLE_DC_1M;
+	else /* if(reply == "GND") */
+		return OscilloscopeChannel::COUPLE_GND;
 }
 
 void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(type)
+	{
+		case OscilloscopeChannel::COUPLE_AC_1M:
+			SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_1M:
+			SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+			break;
+
+		case OscilloscopeChannel::COUPLE_GND:
+			SendCommand(m_channels[i]->GetHwname() + ":COUP GND");
+			break;
+
+		default:
+			LogError("Invalid coupling for channel\n");
+	}
 }
 
 double RigolOscilloscope::GetChannelAttenuation(size_t i)
