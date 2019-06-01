@@ -30,43 +30,15 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Implementation of SCPITransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopehal.h"
 
-#include "../log/log.h"
+SCPITransport::SCPITransport()
+{
+}
 
-#include <sigc++/sigc++.h>
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-#endif
+SCPITransport::~SCPITransport()
+{
+}

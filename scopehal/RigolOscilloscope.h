@@ -30,10 +30,10 @@
 #ifndef RigolOscilloscope_h
 #define RigolOscilloscope_h
 
-class RigolOscilloscope : public Oscilloscope
+class RigolOscilloscope : public SCPIOscilloscope
 {
 public:
-	RigolOscilloscope();
+	RigolOscilloscope(SCPITransport* transport);
 	virtual ~RigolOscilloscope();
 
 public:
@@ -84,17 +84,12 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
 protected:
-	void SharedCtorInit();
-
-	virtual void SendCommand(std::string cmd) =0;
-	virtual std::string ReadReply() =0;
-	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
-
-protected:
 	std::string m_vendor;
 	std::string m_model;
 	std::string m_serial;
 	std::string m_fwVersion;
+
+	OscilloscopeChannel* m_extTrigChannel;
 
 	//Mutexing for thread safety
 	std::recursive_mutex m_mutex;

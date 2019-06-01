@@ -30,43 +30,24 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SCPITransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef SCPITransport_h
+#define SCPITransport_h
 
-#include "../log/log.h"
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPITransport
+{
+public:
+	SCPITransport();
+	virtual ~SCPITransport();
 
-#include <sigc++/sigc++.h>
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
+	virtual void SendCommand(std::string cmd) =0;
+	virtual std::string ReadReply() =0;
+	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
+};
 
 #endif

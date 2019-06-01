@@ -27,46 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopehal.h"
 
-#ifndef scopehal_h
-#define scopehal_h
+using namespace std;
 
-#include "../log/log.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <sigc++/sigc++.h>
+SCPIOscilloscope::SCPIOscilloscope(SCPITransport* transport)
+	: m_transport(transport)
+{
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+}
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-#endif
+SCPIOscilloscope::~SCPIOscilloscope()
+{
+	delete m_transport;
+}

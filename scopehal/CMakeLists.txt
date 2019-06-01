@@ -12,16 +12,19 @@ set(SCOPEHAL_SOURCES
 	TextRenderer.cpp
 	Graph.cpp
 
+	SCPITransport.cpp
+	SCPISocketTransport.cpp
+
 	Instrument.cpp
 	FunctionGenerator.cpp
 	Oscilloscope.cpp
+	SCPIOscilloscope.cpp
 	OscilloscopeChannel.cpp
 	LeCroyOscilloscope.cpp
 	LeCroyVICPOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
 	RedTinLogicAnalyzer.cpp
 	RigolOscilloscope.cpp
-	RigolLANOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
 	Multimeter.cpp

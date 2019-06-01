@@ -27,66 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "RigolLANOscilloscope.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SCPISocketTransport
+ */
 
-using namespace std;
+#ifndef SCPISocketTransport_h
+#define SCPISocketTransport_h
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
+#include "../xptools/Socket.h"
 
-RigolLANOscilloscope::RigolLANOscilloscope(string hostname, unsigned short port)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-	, m_hostname(hostname)
-	, m_port(port)
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPISocketTransport : public SCPITransport
 {
-	LogDebug("Connecting to Rigol oscilloscope at %s:%d\n", hostname.c_str(), port);
+public:
+	SCPISocketTransport(std::string hostname, unsigned short port);
+	virtual ~SCPISocketTransport();
 
-	if(!m_socket.Connect(hostname, port))
-	{
-		LogError("Couldn't connect to socket\n");
-		return;
-	}
-	if(!m_socket.DisableNagle())
-	{
-		LogError("Couldn't disable Nagle\n");
-		return;
-	}
+	virtual void SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
 
-	SharedCtorInit();
-}
+protected:
+	Socket m_socket;
 
-RigolLANOscilloscope::~RigolLANOscilloscope()
-{
-}
+	std::string m_hostname;
+	unsigned short m_port;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// LAN I/O
-
-void RigolLANOscilloscope::SendCommand(string cmd)
-{
-	string tempbuf = cmd + "\n";
-	m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
-}
-
-string RigolLANOscilloscope::ReadReply()
-{
-	//FIXME: there *has* to be a more efficient way to do this...
-	char tmp = ' ';
-	string ret;
-	while(true)
-	{
-		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
-			break;
-		if( (tmp == '\n') || (tmp == ';') )
-			break;
-		else
-			ret += tmp;
-	}
-	return ret;
-}
-
-void RigolLANOscilloscope::ReadRawData(size_t len, unsigned char* buf)
-{
-	m_socket.RecvLooped(buf, len);
-}
+#endif

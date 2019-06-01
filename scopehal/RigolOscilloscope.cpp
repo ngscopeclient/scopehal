@@ -35,25 +35,14 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-RigolOscilloscope::RigolOscilloscope()
-	: m_triggerArmed(false)
+RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
+	: SCPIOscilloscope(transport)
+	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	//nothing in base class
-}
-
-RigolOscilloscope::~RigolOscilloscope()
-{
-}
-
-/**
-	@brief Connect to the scope and figure out what's going on
- */
-void RigolOscilloscope::SharedCtorInit()
-{
 	//Ask for the ID
-	SendCommand("*IDN?");
-	string reply = ReadReply();
+	m_transport->SendCommand("*IDN?");
+	string reply = m_transport->ReadReply();
 	char vendor[128] = "";
 	char model[128] = "";
 	char serial[128] = "";
@@ -116,9 +105,24 @@ void RigolOscilloscope::SharedCtorInit()
 	}
 	m_analogChannelCount = nchans;
 
+	//Add the external trigger input
+	m_extTrigChannel = new OscilloscopeChannel(
+		this,
+		"EX",
+		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
+		"",
+		1,
+		m_channels.size(),
+		true);
+	m_channels.push_back(m_extTrigChannel);
+
 	//Configure acquisition modes
-	SendCommand("WAV:FORM BYTE");
-	SendCommand("WAV:MODE RAW");
+	m_transport->SendCommand("WAV:FORM BYTE");
+	m_transport->SendCommand("WAV:MODE RAW");
+}
+
+RigolOscilloscope::~RigolOscilloscope()
+{
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,8 +165,8 @@ void RigolOscilloscope::FlushConfigCache()
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	/*if(i == m_extTrigChannel->GetIndex())
-		return false;*/
+	if(i == m_extTrigChannel->GetIndex())
+		return false;
 
 	//TODO: handle digital channels, for now just claim they're off
 	if(i >= m_analogChannelCount)
@@ -175,8 +179,8 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":DISP?");
-	string reply = ReadReply();
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP?");
+	string reply = m_transport->ReadReply();
 	if(reply == "0")
 	{
 		m_channelsEnabled[i] = false;
@@ -192,21 +196,21 @@ bool RigolOscilloscope::IsChannelEnabled(size_t i)
 void RigolOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
 }
 
 void RigolOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
 }
 
 OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":COUP?");
-	string reply = ReadReply();
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+	string reply = m_transport->ReadReply();
 
 	if(reply == "AC")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -222,15 +226,15 @@ void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupli
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
-			SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
-			SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
 			break;
 
 		case OscilloscopeChannel::COUPLE_GND:
-			SendCommand(m_channels[i]->GetHwname() + ":COUP GND");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP GND");
 			break;
 
 		default:
@@ -242,9 +246,9 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
 
-	string reply = ReadReply();
+	string reply = m_transport->ReadReply();
 	double atten;
 	sscanf(reply.c_str(), "%lf", &atten);
 	return atten;
@@ -259,8 +263,8 @@ int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":BWL?");
-	string reply = ReadReply();
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
+	string reply = m_transport->ReadReply();
 	if(reply == "20M")
 		return 20;
 	else
@@ -282,9 +286,9 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
 
-	string reply = ReadReply();
+	string reply = m_transport->ReadReply();
 	double range;
 	sscanf(reply.c_str(), "%lf", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -314,9 +318,9 @@ double RigolOscilloscope::GetChannelOffset(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
 
-	string reply = ReadReply();
+	string reply = m_transport->ReadReply();
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -341,8 +345,8 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand("TRIG:STAT?");
-	string stat = ReadReply();
+	m_transport->SendCommand("TRIG:STAT?");
+	string stat = m_transport->ReadReply();
 
 	if(stat == "TD")
 		return TRIGGER_MODE_TRIGGERED;
@@ -406,11 +410,11 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 		//LogDebug("Channel %zu\n", i);
 
-		SendCommand(string("WAV:SOUR ") + m_channels[i]->GetHwname());
+		m_transport->SendCommand(string("WAV:SOUR ") + m_channels[i]->GetHwname());
 
 		//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
-		SendCommand("WAV:PRE?");
-		string reply = ReadReply();
+		m_transport->SendCommand("WAV:PRE?");
+		string reply = m_transport->ReadReply();
 		//LogDebug("Preamble = %s\n", reply.c_str());
 		sscanf(reply.c_str(), "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 			&unused1,
@@ -441,19 +445,19 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			//Ask for the data
 			char tmp[128];
 			snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	//ONE based indexing WTF
-			SendCommand(tmp);
+			m_transport->SendCommand(tmp);
 			size_t end = npoint + maxpoints;
 			if(end > npoints)
 				end = npoints;
 			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end + 1);
-			SendCommand(tmp);
+			m_transport->SendCommand(tmp);
 
 			//Ask for the data block
-			SendCommand("WAV:DATA?");
+			m_transport->SendCommand("WAV:DATA?");
 
 			//Read block header
 			unsigned char header[12] = {0};
-			ReadRawData(11, header);
+			m_transport->ReadRawData(11, header);
 
 			//Look up the block size
 			//size_t blocksize = end - npoints;
@@ -464,7 +468,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			ReadRawData(header_blocksize + 1, temp_buf);	//why is there a trailing byte here??
+			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	//why is there a trailing byte here??
 			double ydelta = yorigin + yreference;
 			for(size_t j=0; j<header_blocksize; j++)
 			{
@@ -506,7 +510,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		SendCommand("TRIG_MODE SINGLE");
+		m_transport->SendCommand("TRIG_MODE SINGLE");
 		m_triggerArmed = true;
 	}
 
@@ -518,7 +522,7 @@ void RigolOscilloscope::Start()
 {
 	//LogDebug("Start single trigger\n");
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("SING");
+	m_transport->SendCommand("SING");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -526,7 +530,7 @@ void RigolOscilloscope::Start()
 void RigolOscilloscope::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("SING");
+	m_transport->SendCommand("SING");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -534,7 +538,7 @@ void RigolOscilloscope::StartSingleTrigger()
 void RigolOscilloscope::Stop()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("STOP");
+	m_transport->SendCommand("STOP");
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
@@ -556,8 +560,9 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 	//This is nasty because there are separate commands to see what the trigger source is
 	//depending on what the trigger type is!!!
 	//FIXME: For now assume edge
-	SendCommand("TRIG:EDG:SOUR?");
-	string ret = ReadReply();
+	m_transport->SendCommand("TRIG:EDG:SOUR?");
+	string ret = m_transport->ReadReply();
+	LogDebug("Trigger source: %s\n", ret.c_str());
 
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
@@ -590,8 +595,8 @@ float RigolOscilloscope::GetTriggerVoltage()
 	//This is nasty because there are separate commands to see what the trigger source is
 	//depending on what the trigger type is!!!
 	//FIXME: For now assume edge
-	SendCommand("TRIG:EDG:LEV?");
-	string ret = ReadReply();
+	m_transport->SendCommand("TRIG:EDG:LEV?");
+	string ret = m_transport->ReadReply();
 
 	double level;
 	sscanf(ret.c_str(), "%lf", &level);

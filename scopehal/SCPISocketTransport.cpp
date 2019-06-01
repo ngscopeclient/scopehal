@@ -27,30 +27,71 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef RigolLANOscilloscope_h
-#define RigolLANOscilloscope_h
-
-#include "../xptools/Socket.h"
-#include "RigolOscilloscope.h"
-
 /**
-	@brief A TCP/IP connected Rigol oscilloscope
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of SCPISocketTransport
  */
-class RigolLANOscilloscope : public RigolOscilloscope
+
+#include "scopehal.h"
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPISocketTransport::SCPISocketTransport(string hostname, unsigned short port)
+	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	, m_hostname(hostname)
+	, m_port(port)
 {
-public:
-	RigolLANOscilloscope(std::string hostname, unsigned short port);
-	virtual ~RigolLANOscilloscope();
+	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", hostname.c_str(), port);
 
-protected:
-	Socket m_socket;
+	if(!m_socket.Connect(hostname, port))
+	{
+		LogError("Couldn't connect to socket\n");
+		return;
+	}
+	if(!m_socket.DisableNagle())
+	{
+		LogError("Couldn't disable Nagle\n");
+		return;
+	}
+}
 
-	std::string m_hostname;
-	unsigned short m_port;
+SCPISocketTransport::~SCPISocketTransport()
+{
+}
 
-	virtual void SendCommand(std::string cmd);
-	virtual std::string ReadReply();
-	virtual void ReadRawData(size_t len, unsigned char* buf);
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
 
-#endif
+void SCPISocketTransport::SendCommand(string cmd)
+{
+	LogTrace("Sending %s\n", cmd.c_str());
+	string tempbuf = cmd + "\n";
+	m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
+}
+
+string SCPISocketTransport::ReadReply()
+{
+	//FIXME: there *has* to be a more efficient way to do this...
+	char tmp = ' ';
+	string ret;
+	while(true)
+	{
+		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
+			break;
+		if( (tmp == '\n') || (tmp == ';') )
+			break;
+		else
+			ret += tmp;
+	}
+	LogTrace("Got %s\n", ret.c_str());
+	return ret;
+}
+
+void SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf)
+{
+	m_socket.RecvLooped(buf, len);
+}
