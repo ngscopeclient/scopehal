@@ -33,7 +33,8 @@
 /**
 	@brief An SCPI-based oscilloscope
  */
-class SCPIOscilloscope : public Oscilloscope
+class SCPIOscilloscope 	: public Oscilloscope
+						, public SCPIDevice
 {
 public:
 	SCPIOscilloscope(SCPITransport* transport);
@@ -42,15 +43,6 @@ public:
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
-
-protected:
-	SCPITransport* m_transport;
-
-	//standard *IDN? fields
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_fwVersion;
 };
 
 #endif

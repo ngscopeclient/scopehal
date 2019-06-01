@@ -34,31 +34,28 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIOscilloscope::SCPIOscilloscope(SCPITransport* transport)
-	: SCPIDevice(transport)
+SCPIDevice::SCPIDevice(SCPITransport* transport)
+	: m_transport(transport)
 {
-
+	//Ask for the ID
+	m_transport->SendCommand("*IDN?");
+	string reply = m_transport->ReadReply();
+	char vendor[128] = "";
+	char model[128] = "";
+	char serial[128] = "";
+	char version[128] = "";
+	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+	{
+		LogError("Bad IDN response %s\n", reply.c_str());
+		return;
+	}
+	m_vendor = vendor;
+	m_model = model;
+	m_serial = serial;
+	m_fwVersion = version;
 }
 
-SCPIOscilloscope::~SCPIOscilloscope()
+SCPIDevice::~SCPIDevice()
 {
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string SCPIOscilloscope::GetName()
-{
-	return m_model;
-}
-
-string SCPIOscilloscope::GetVendor()
-{
-	return m_vendor;
-}
-
-string SCPIOscilloscope::GetSerial()
-{
-	return m_serial;
+	delete m_transport;
 }

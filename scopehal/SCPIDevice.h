@@ -27,38 +27,26 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
+#ifndef SCPIDevice_h
+#define SCPIDevice_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPIOscilloscope::SCPIOscilloscope(SCPITransport* transport)
-	: SCPIDevice(transport)
+/**
+	@brief An SCPI-based device
+ */
+class SCPIDevice
 {
+public:
+	SCPIDevice(SCPITransport* transport);
+	virtual ~SCPIDevice();
 
-}
+protected:
+	SCPITransport* m_transport;
 
-SCPIOscilloscope::~SCPIOscilloscope()
-{
+	//standard *IDN? fields
+	std::string m_vendor;
+	std::string m_model;
+	std::string m_serial;
+	std::string m_fwVersion;
+};
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string SCPIOscilloscope::GetName()
-{
-	return m_model;
-}
-
-string SCPIOscilloscope::GetVendor()
-{
-	return m_vendor;
-}
-
-string SCPIOscilloscope::GetSerial()
-{
-	return m_serial;
-}
+#endif
