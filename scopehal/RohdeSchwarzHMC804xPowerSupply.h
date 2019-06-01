@@ -30,17 +30,15 @@
 #ifndef RohdeSchwarzHMC804xPowerSupply_h
 #define RohdeSchwarzHMC804xPowerSupply_h
 
-
-#include "../xptools/Socket.h"
-
 /**
 	@brief A Rohde & Schwarz HMC804x power supply
  */
 class RohdeSchwarzHMC804xPowerSupply
 	: public virtual PowerSupply
+	, public SCPIDevice
 {
 public:
-	RohdeSchwarzHMC804xPowerSupply(std::string hostname, unsigned short port);
+	RohdeSchwarzHMC804xPowerSupply(SCPITransport* transport);
 	virtual ~RohdeSchwarzHMC804xPowerSupply();
 
 	//Device information
@@ -77,24 +75,10 @@ public:
 protected:
 	int GetStatusRegister(int chan);
 
-	Socket m_socket;
-
-	std::string m_hostname;
-	unsigned short m_port;
-
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_hwVersion;
-	std::string m_fwVersion;
-
 	//Helpers for controlling stuff
 	bool SelectChannel(int chan);
 
 	int m_channelCount;
-
-	bool SendCommand(std::string cmd);
-	std::string ReadReply();
 
 	int m_activeChannel;
 };
