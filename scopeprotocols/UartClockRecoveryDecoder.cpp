@@ -172,7 +172,6 @@ void UartClockRecoveryDecoder::Refresh()
 	//TODO: recover from glitches better?
 	size_t nedge = 0;
 	int64_t bcenter = 0;
-	int64_t tlast = 0;
 	bool value = false;
 	for(; nedge < edges.size();)
 	{
@@ -196,7 +195,6 @@ void UartClockRecoveryDecoder::Refresh()
 			//Emit a sample for this data bit
 			cap->m_samples.push_back(DigitalSample(bcenter, ps, value));
 			value = !value;
-			tlast = bcenter;
 
 			//Next bit starts one baud period later
 			bcenter  += ps;
