@@ -35,74 +35,15 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(string hostname, unsigned short port)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-	, m_hostname(hostname)
-	, m_port(port)
+RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* transport)
+	: SCPIDevice(transport)
 {
-	LogDebug("Connecting to R&S HMC8012 DMM at %s:%d\n", hostname.c_str(), port);
-
-	if(!m_socket.Connect(hostname, port))
-	{
-		LogError("Couldn't connect to socket");
-		return;
-	}
-	if(!m_socket.DisableNagle())
-	{
-		LogError("Couldn't disable Nagle\n");
-		return;
-	}
-
-	//Ask for the ID
-	SendCommand("*IDN?");
-	string reply = ReadReply();
-	char vendor[128] = "";
-	char model[128] = "";
-	char serial[128] = "";
-	char swversion[128] = "";
-	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s",
-		vendor, model, serial, swversion))
-	{
-		LogError("Bad IDN response %s\n", reply.c_str());
-		return;
-	}
-	m_vendor = vendor;
-	m_model = model;
-	m_serial = serial;
-	m_fwVersion = swversion;
-
 	m_mode = GetMeterMode();
 }
 
 RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()
 {
 
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Command helpers
-
-bool RohdeSchwarzHMC8012Multimeter::SendCommand(string cmd)
-{
-	cmd += "\n";
-	return m_socket.SendLooped((unsigned char*)cmd.c_str(), cmd.length());
-}
-
-string RohdeSchwarzHMC8012Multimeter::ReadReply()
-{
-	string ret;
-	unsigned char tmp;
-
-	while(1)
-	{
-		if(!m_socket.RecvLooped(&tmp, 1))
-			return "";
-
-		if(tmp == '\n')
-			return ret;
-		else
-			ret += tmp;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +82,7 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 	switch(m_mode)
 	{
 		case DC_CURRENT:
-			SendCommand("SENSE:CURR:DC:RANGE:AUTO?");
+			m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO?");
 			break;
 
 		//TODO
@@ -150,7 +91,7 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 			return false;
 	}
 
-	string str = ReadReply();
+	string str = m_transport->ReadReply();
 	return (str == "1");
 }
 
@@ -160,9 +101,9 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 	{
 		case DC_CURRENT:
 			if(enable)
-				SendCommand("SENSE:CURR:DC:RANGE:AUTO 1");
+				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 1");
 			else
-				SendCommand("SENSE:CURR:DC:RANGE:AUTO 0");
+				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 0");
 			break;
 
 		default:
@@ -183,8 +124,8 @@ void RohdeSchwarzHMC8012Multimeter::StopMeter()
 double RohdeSchwarzHMC8012Multimeter::GetVoltage()
 {
 	//assume we're in the right mode for now
-	SendCommand("READ?");
-	string str = ReadReply();
+	m_transport->SendCommand("READ?");
+	string str = m_transport->ReadReply();
 	double d;
 	sscanf(str.c_str(), "%lf", &d);
 	return d;
@@ -193,8 +134,8 @@ double RohdeSchwarzHMC8012Multimeter::GetVoltage()
 double RohdeSchwarzHMC8012Multimeter::GetPeakToPeak()
 {
 	//assume we're in the right mode for now
-	SendCommand("READ?");
-	string str = ReadReply();
+	m_transport->SendCommand("READ?");
+	string str = m_transport->ReadReply();
 	double d;
 	sscanf(str.c_str(), "%lf", &d);
 	return d;
@@ -203,8 +144,8 @@ double RohdeSchwarzHMC8012Multimeter::GetPeakToPeak()
 double RohdeSchwarzHMC8012Multimeter::GetFrequency()
 {
 	//assume we're in the right mode for now
-	SendCommand("READ?");
-	string str = ReadReply();
+	m_transport->SendCommand("READ?");
+	string str = m_transport->ReadReply();
 	double d;
 	sscanf(str.c_str(), "%lf", &d);
 	return d;
@@ -213,8 +154,8 @@ double RohdeSchwarzHMC8012Multimeter::GetFrequency()
 double RohdeSchwarzHMC8012Multimeter::GetCurrent()
 {
 	//assume we're in the right mode for now
-	SendCommand("READ?");
-	string str = ReadReply();
+	m_transport->SendCommand("READ?");
+	string str = m_transport->ReadReply();
 	double d;
 	sscanf(str.c_str(), "%lf", &d);
 	return d;
@@ -242,8 +183,8 @@ void RohdeSchwarzHMC8012Multimeter::SetCurrentMeterChannel(int /*chan*/)
 
 Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetMeterMode()
 {
-	SendCommand("CONF?");
-	string str = ReadReply();
+	m_transport->SendCommand("CONF?");
+	string str = m_transport->ReadReply();
 
 	char mode[32];
 	sscanf(str.c_str(), "\"%31[^,]", mode);
@@ -264,15 +205,15 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 	switch(type)
 	{
 		case DC_VOLTAGE:
-			SendCommand("MEAS:VOLT:DC?");
+			m_transport->SendCommand("MEAS:VOLT:DC?");
 			break;
 
 		case DC_CURRENT:
-			SendCommand("MEAS:CURR:DC?");
+			m_transport->SendCommand("MEAS:CURR:DC?");
 			break;
 
 		case AC_CURRENT:
-			SendCommand("MEAS:CURR:AC?");
+			m_transport->SendCommand("MEAS:CURR:AC?");
 			break;
 
 		//whatever it is, not supported
@@ -283,5 +224,5 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 	m_mode = type;
 
 	//Wait for, and discard, the reply to make sure the change took effect
-	ReadReply();
+	m_transport->ReadReply();
 }

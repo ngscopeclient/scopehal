@@ -30,17 +30,15 @@
 #ifndef RohdeSchwarzHMC8012Multimeter_h
 #define RohdeSchwarzHMC8012Multimeter_h
 
-
-#include "../xptools/Socket.h"
-
 /**
 	@brief A Rohde & Schwarz HMC8012 multimeter
  */
 class RohdeSchwarzHMC8012Multimeter
 	: public virtual Multimeter
+	, public SCPIDevice
 {
 public:
-	RohdeSchwarzHMC8012Multimeter(std::string hostname, unsigned short port);
+	RohdeSchwarzHMC8012Multimeter(SCPITransport* transport);
 	virtual ~RohdeSchwarzHMC8012Multimeter();
 
 	//Device information
@@ -49,7 +47,7 @@ public:
 	virtual std::string GetSerial();
 
 	virtual unsigned int GetInstrumentTypes();
-	
+
 	virtual unsigned int GetMeasurementTypes();
 
 	//Channel info
@@ -75,19 +73,6 @@ public:
 	virtual double GetCurrent();
 
 protected:
-	Socket m_socket;
-
-	std::string m_hostname;
-	unsigned short m_port;
-
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_fwVersion;
-
-	bool SendCommand(std::string cmd);
-	std::string ReadReply();
-	
 	MeasurementTypes m_mode;
 };
 
