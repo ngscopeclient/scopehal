@@ -37,6 +37,8 @@ using namespace std;
 
 RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
+	, m_triggerChannelValid(false)
+	, m_triggerLevelValid(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
