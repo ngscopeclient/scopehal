@@ -346,13 +346,6 @@ public:
 	 */
 	virtual bool IsTriggerArmed() =0;
 
-	/**
-		@brief Optional application-selected nickname of the scope
-
-		(for display purposes if multiple scopes are in use)
-	 */
-	std::string m_nickname;
-
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Memory depth / sample rate control.

@@ -147,6 +147,14 @@ bool RohdeSchwarzHMC804xPowerSupply::GetPowerChannelActive(int chan)
 	return atoi(ret.c_str()) ? true : false;
 }
 
+bool RohdeSchwarzHMC804xPowerSupply::IsSoftStartEnabled(int chan)
+{
+	SelectChannel(chan);
+	m_transport->SendCommand("volt:ramp?");
+	string ret = m_transport->ReadReply();
+	return atoi(ret.c_str()) ? true : false;
+}
+
 void RohdeSchwarzHMC804xPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
 	SelectChannel(chan);

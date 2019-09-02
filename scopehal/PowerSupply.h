@@ -62,6 +62,9 @@ public:
 
 	virtual bool GetMasterPowerEnable() =0;
 	virtual void SetMasterPowerEnable(bool enable) = 0;
+
+	//Soft start
+	virtual bool IsSoftStartEnabled(int chan) =0;
 };
 
 #endif
