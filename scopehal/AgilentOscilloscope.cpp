@@ -445,7 +445,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 
 		//Format the capture
 		for(size_t i=0; i<length; i++)
-			cap->m_samples.push_back(AnalogSample(i, 1, yincrement * ((float)temp_buf[i] - yreference)));
+			cap->m_samples.push_back(AnalogSample(i, 1, yincrement * (temp_buf[i] - yreference) + yorigin));
 
 		//Done, update the data
 		if(!toQueue)
