@@ -87,6 +87,14 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 
 		//Request all points when we download
 		m_transport->SendCommand(chname + ":DATA:POIN MAX");
+
+		//Configure transport format to raw 16-bit int, little endian
+		//TODO: if instrument internal is big endian, skipping the bswap might improve download performance?
+		//Might be faster to do it on a beefy x86 than the embedded side of things.
+		m_transport->SendCommand(":WAV:SOUR " + chname);
+		m_transport->SendCommand(":WAV:FORM WORD");
+		m_transport->SendCommand(":WAV:BYT LSBFirst");
+
 	}
 	m_analogChannelCount = nchans;
 
@@ -100,12 +108,6 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_channels.size(),
 		true);
 	m_channels.push_back(m_extTrigChannel);
-
-	//Configure transport format to raw 16-bit int, little endian
-	//TODO: if instrument internal is big endian, skipping the bswap might improve download performance?
-	//Might be faster to do it on a beefy x86 than the embedded side of things.
-	m_transport->SendCommand(":WAV:FORM:DATA WORD");
-	m_transport->SendCommand(":WAV:FORM:BYT LSBFirst");
 
 	//See what options we have
 	m_transport->SendCommand("*OPT?");
@@ -417,7 +419,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		//LogDebug("%ld ps/sample\n", ps_per_sample);
 
 		//LogDebug("length = %d\n", length);
-		unsigned char* temp_buf = new unsigned char[length];
+		uint16_t* temp_buf = new uint16_t[length];
 
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
 		AnalogCapture* cap = new AnalogCapture;
@@ -440,7 +442,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		//LogDebug("actual_len = %d", actual_len);
 
 		//Read the actual data
-		m_transport->ReadRawData(length*sizeof(unsigned char), (unsigned char*)temp_buf);
+		m_transport->ReadRawData(length*sizeof(uint16_t), (unsigned char*)temp_buf);
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
 
 		//Format the capture
