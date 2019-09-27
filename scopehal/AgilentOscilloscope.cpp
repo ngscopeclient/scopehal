@@ -430,7 +430,6 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		//Ask for the data
 		m_transport->SendCommand(":WAV:DATA?");
 
-//		m_transport->ReadReply();
 		//Read and discard the length header
 		char tmp[16] = {0};
 		m_transport->ReadRawData(2, (unsigned char*)tmp);
@@ -527,17 +526,13 @@ size_t AgilentOscilloscope::GetTriggerChannelIndex()
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//Look it up
-	//m_transport->SendCommand("TRIG:A:SOUR?");
-	//string ret = m_transport->ReadReply();
+	m_transport->SendCommand("TRIG:SOUR?");
+	string ret = m_transport->ReadReply();
 
-	m_triggerChannelValid = true;
-	m_triggerChannel = 0;
-	return m_triggerChannel;
-	//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
-	/*if(ret.find("CH") == 0)
+	if(ret.find("CHAN") == 0)
 	{
 		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+2) - 1;
+		m_triggerChannel = atoi(ret.c_str()+4) - 1;
 		return m_triggerChannel;
 	}
 	else if(ret == "EXT")
@@ -551,7 +546,7 @@ size_t AgilentOscilloscope::GetTriggerChannelIndex()
 		m_triggerChannelValid = false;
 		LogWarning("Unknown trigger source %s\n", ret.c_str());
 		return 0;
-	}*/
+	}
 }
 
 void AgilentOscilloscope::SetTriggerChannelIndex(size_t i)
