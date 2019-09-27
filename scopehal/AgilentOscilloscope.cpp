@@ -568,9 +568,7 @@ float AgilentOscilloscope::GetTriggerVoltage()
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	return 0.0f;
-
-	m_transport->SendCommand("TRIG:A:LEV?");
+	m_transport->SendCommand("TRIG:LEV?");
 	string ret = m_transport->ReadReply();
 
 	double level;
