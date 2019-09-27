@@ -361,14 +361,15 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand(":TER?");
-	string stat = m_transport->ReadReply();
+	m_transport->SendCommand("*STB?");
+	string stb_reply = m_transport->ReadReply();
+	int stb = atoi(stb_reply.c_str());
 
-	if(stat == "+1")
+	//return TRIGGER_MODE_TRIGGERED;
+
+	if(stb & 0x01)
 		return TRIGGER_MODE_RUN;
-	else if( (stat == "STOP") || (stat == "BRE") )
-		return TRIGGER_MODE_STOP;
-	else if(stat == "+0")
+	else
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
