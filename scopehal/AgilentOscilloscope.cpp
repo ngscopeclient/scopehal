@@ -358,11 +358,10 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand("*STB?");
-	string stb_reply = m_transport->ReadReply();
-	int stb = atoi(stb_reply.c_str());
+	m_transport->SendCommand("TER?");
+	string ter = m_transport->ReadReply();
 
-	if(stb & 0x01)
+	if(ter == "+1")
 		return TRIGGER_MODE_RUN;
 	else
 	{
