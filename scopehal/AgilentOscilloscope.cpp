@@ -259,7 +259,6 @@ void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coup
 
 double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
@@ -268,7 +267,6 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 	double atten;
 	sscanf(reply.c_str(), "%lf", &atten);
 	return atten;
-	*/
 }
 
 void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
@@ -278,16 +276,14 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
 	string reply = m_transport->ReadReply();
-	if(reply == "20M")
-		return 20;
+	if(reply == "1")
+		return 25;
 	else
 		return 0;
-	*/
 }
 
 void AgilentOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
@@ -365,8 +361,6 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	m_transport->SendCommand("*STB?");
 	string stb_reply = m_transport->ReadReply();
 	int stb = atoi(stb_reply.c_str());
-
-	//return TRIGGER_MODE_TRIGGERED;
 
 	if(stb & 0x01)
 		return TRIGGER_MODE_RUN;
