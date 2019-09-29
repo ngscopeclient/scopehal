@@ -569,7 +569,16 @@ float AgilentOscilloscope::GetTriggerVoltage()
 
 void AgilentOscilloscope::SetTriggerVoltage(float v)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", v);
+	m_transport->SendCommand(tmp);
+
+	//Update cache
+	m_triggerLevelValid = true;
+	m_triggerLevel = v;
+
 }
 
 Oscilloscope::TriggerType AgilentOscilloscope::GetTriggerType()
