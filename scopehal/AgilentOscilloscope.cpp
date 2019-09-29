@@ -223,11 +223,11 @@ OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t
 
 	if(coup_reply == "AC")
 		return OscilloscopeChannel::COUPLE_AC_1M;
-	else if(coup_reply == "DC")
+	else /*if(coup_reply == "DC")*/
 	{
 		if(imp_reply == "ONEM")
 			return OscilloscopeChannel::COUPLE_DC_1M;
-		else if(imp_reply == "FIFT")
+		else /*if(imp_reply == "FIFT")*/
 			return OscilloscopeChannel::COUPLE_DC_50;
 	}
 }
@@ -269,7 +269,7 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 	return atten;
 }
 
-void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
+void AgilentOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
 {
 	//FIXME
 }
@@ -286,7 +286,7 @@ int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 0;
 }
 
-void AgilentOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
 {
 	//FIXME
 }
@@ -311,7 +311,7 @@ double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void AgilentOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void AgilentOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
 {
 	//FIXME
 }
@@ -344,7 +344,7 @@ double AgilentOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void AgilentOscilloscope::SetChannelOffset(size_t i, double offset)
+void AgilentOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 {
 	//FIXME
 }
@@ -387,7 +387,6 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 	double yincrement;
 	double yorigin;
 	double yreference;
-	int ignored;
 	map<int, vector<AnalogCapture*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -430,11 +429,12 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		int num_digits = atoi(tmp+1);
 		//LogDebug("num_digits = %d", num_digits);
 		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		int actual_len = atoi(tmp);
+		//int actual_len = atoi(tmp);
 		//LogDebug("actual_len = %d", actual_len);
 
 		//Read the actual data
 		m_transport->ReadRawData(length*sizeof(uint16_t), (unsigned char*)temp_buf);
+		//Discard trailing newline
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
 
 		//Format the capture
@@ -543,7 +543,7 @@ size_t AgilentOscilloscope::GetTriggerChannelIndex()
 	}
 }
 
-void AgilentOscilloscope::SetTriggerChannelIndex(size_t i)
+void AgilentOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
 {
 	//FIXME
 }
@@ -587,7 +587,7 @@ Oscilloscope::TriggerType AgilentOscilloscope::GetTriggerType()
 	return Oscilloscope::TRIGGER_TYPE_RISING;
 }
 
-void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
+void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
 {
 	//FIXME
 }
