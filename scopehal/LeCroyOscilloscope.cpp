@@ -526,6 +526,12 @@ double LeCroyOscilloscope::GetCurrent()
 	return 0;
 }
 
+double LeCroyOscilloscope::GetTemperature()
+{
+	//DMM does not support current
+	return 0;
+}
+
 double LeCroyOscilloscope::GetPeakToPeak()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);

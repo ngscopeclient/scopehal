@@ -71,6 +71,7 @@ public:
 	virtual double GetPeakToPeak();
 	virtual double GetFrequency();
 	virtual double GetCurrent();
+	virtual double GetTemperature();
 
 protected:
 	MeasurementTypes m_mode;

@@ -71,7 +71,7 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes()
 
 unsigned int RohdeSchwarzHMC8012Multimeter::GetMeasurementTypes()
 {
-	return DC_VOLTAGE | FREQUENCY | DC_CURRENT | AC_CURRENT;
+	return DC_VOLTAGE | FREQUENCY | DC_CURRENT | AC_CURRENT | TEMPERATURE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +161,16 @@ double RohdeSchwarzHMC8012Multimeter::GetCurrent()
 	return d;
 }
 
+double RohdeSchwarzHMC8012Multimeter::GetTemperature()
+{
+	//assume we're in the right mode for now
+	m_transport->SendCommand("READ?");
+	string str = m_transport->ReadReply();
+	double d;
+	sscanf(str.c_str(), "%lf", &d);
+	return d;
+}
+
 int RohdeSchwarzHMC8012Multimeter::GetMeterChannelCount()
 {
 	return 1;
@@ -194,6 +204,8 @@ Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetMeterMode()
 		return DC_CURRENT;
 	else if(smode == "CURR:AC")
 		return AC_CURRENT;
+	else if(smode == "SENS")
+		return TEMPERATURE;
 
 	//unknown, pick something
 	else
@@ -214,6 +226,10 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 
 		case AC_CURRENT:
 			m_transport->SendCommand("MEAS:CURR:AC?");
+			break;
+
+		case TEMPERATURE:
+			m_transport->SendCommand("MEAS:TEMP:?");
 			break;
 
 		//whatever it is, not supported

@@ -42,7 +42,8 @@ public:
 		AC_RMS_AMPLITUDE	= 0x04,
 		FREQUENCY			= 0x08,
 		DC_CURRENT			= 0x10,
-		AC_CURRENT			= 0x20
+		AC_CURRENT			= 0x20,
+		TEMPERATURE			= 0x40
 
 		//TODO: other types
 	};
@@ -70,6 +71,7 @@ public:
 	virtual double GetPeakToPeak() =0;
 	virtual double GetFrequency() =0;
 	virtual double GetCurrent() =0;
+	virtual double GetTemperature() =0;
 };
 
 #endif

@@ -113,6 +113,7 @@ public:
 	virtual double GetPeakToPeak();
 	virtual double GetFrequency();
 	virtual double GetCurrent();
+	virtual double GetTemperature();
 
 	//DMM configuration
 	virtual int GetMeterChannelCount();

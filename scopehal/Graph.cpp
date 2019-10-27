@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2018 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -78,6 +78,9 @@ Graph::Graph()
 	m_scaleBump = 10;
 	m_units = "%";
 	m_unitScale = 1;
+	m_timeScale = 10;
+	m_timeTick = 10;
+	m_drawLegend = true;
 
 	//Redlines default to off scale
 	m_minRedline = -1;
@@ -167,7 +170,7 @@ bool Graph::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 			vector<double> dashes;
 			dashes.push_back(1);
 			float pos = m_right;
-			for(int dt=0; ; dt += 10)	//Vertical grid lines
+			for(int dt=0; ; dt += m_timeTick)	//Vertical grid lines
 			{
 				//Get current position
 				pos = timeToPosition(m_now - dt);
@@ -189,7 +192,7 @@ bool Graph::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 				cr->set_line_width(1.0);
 				DrawString(pos - 20, m_bottom + 5, cr, buf, false);
 			}
-			for(float i=m_scaleBump; i<=m_maxScale; i += m_scaleBump)		//Horizontal grid lines
+			for(float i=m_minScale + m_scaleBump; i<=m_maxScale; i += m_scaleBump)		//Horizontal grid lines
 			{
 				//Get current position
 				float pos = valueToPosition(i);
@@ -207,11 +210,11 @@ bool Graph::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 				//Draw text
 				char buf[32];
 				sprintf(buf, "%.0f %s", i * m_unitScale, m_units.c_str());
-				if(m_unitScale < 0.1)
+				if(m_unitScale <= 0.1)
 					sprintf(buf, "%.1f %s", i * m_unitScale, m_units.c_str());
-				if(m_unitScale < 0.01)
+				if(m_unitScale <= 0.01)
 					sprintf(buf, "%.2f %s", i * m_unitScale, m_units.c_str());
-				if(m_unitScale < 0.001)
+				if(m_unitScale <= 0.001)
 					sprintf(buf, "%.3f %s", i * m_unitScale, m_units.c_str());
 				cr->set_line_width(1.0);
 				DrawString(m_left - 60, pos - 5, cr, buf, false);
@@ -228,33 +231,36 @@ bool Graph::on_draw(const Cairo::RefPtr<Cairo::Context>& cr)
 					DrawSeries(pNode->m_series[m_seriesName], cr, pNode->m_color);
 			}
 
-			//Draw legend background
-			int legendmargin = 2;
-			int legendoffset = 2;
-			int legendright = m_left + legendw + 2*legendmargin + legendoffset;
-			cr->set_source_rgb(1, 1, 1);
-			cr->move_to(m_left + legendoffset,	m_top + legendoffset);
-			cr->line_to(m_left + legendoffset,	legendh + 2*legendmargin + m_top + legendoffset);
-			cr->line_to(legendright, 			legendh + 2*legendmargin + m_top + legendoffset);
-			cr->line_to(legendright,			m_top + legendoffset);
-			cr->fill();
-
-			//Draw text
-			int y = legendmargin + lineheight + legendoffset;
-			for(size_t i=0; i<m_series.size(); i++)
+			if(m_drawLegend)
 			{
-				Graphable* pSeries = m_series[i];
-				Gdk::Color& color = pSeries->m_color;
-				cr->set_source_rgb(color.get_red_p(), color.get_green_p(), color.get_blue_p());
+				//Draw legend background
+				int legendmargin = 2;
+				int legendoffset = 2;
+				int legendright = m_left + legendw + 2*legendmargin + legendoffset;
+				cr->set_source_rgb(1, 1, 1);
+				cr->move_to(m_left + legendoffset,	m_top + legendoffset);
+				cr->line_to(m_left + legendoffset,	legendh + 2*legendmargin + m_top + legendoffset);
+				cr->line_to(legendright, 			legendh + 2*legendmargin + m_top + legendoffset);
+				cr->line_to(legendright,			m_top + legendoffset);
+				cr->fill();
 
-				DrawString(
-					m_left + legendmargin + legendoffset,
-					y,
-					cr,
-					pSeries->m_name,
-					false);
+				//Draw text
+				int y = legendmargin + lineheight + legendoffset;
+				for(size_t i=0; i<m_series.size(); i++)
+				{
+					Graphable* pSeries = m_series[i];
+					Gdk::Color& color = pSeries->m_color;
+					cr->set_source_rgb(color.get_red_p(), color.get_green_p(), color.get_blue_p());
 
-				y += lineheight;
+					DrawString(
+						m_left + legendmargin + legendoffset,
+						y,
+						cr,
+						pSeries->m_name,
+						false);
+
+					y += lineheight;
+				}
 			}
 
 		cr->restore();
@@ -304,12 +310,14 @@ void Graph::DrawSeries(Series* pSeries, const Cairo::RefPtr<Cairo::Context>& cr,
 
 float Graph::valueToPosition(float val)
 {
-	return m_top + (m_maxScale - val)*m_pheight;
+	float range = m_maxScale - m_minScale;		//units of plot height
+	float scale = m_bodyheight / range;			//pixels per unit
+	return m_top + m_bodyheight - (val - m_minScale)*scale;
 }
 
 float Graph::timeToPosition(double time)
 {
-	return m_right - ((m_now - time) * 10);
+	return m_right - ((m_now - time) * m_timeScale);
 }
 
 bool Graph::OnTimer(int nTimer)
