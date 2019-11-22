@@ -30,37 +30,63 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of I2CDecoder
  */
 
-#include "scopeprotocols.h"
+#ifndef I2CDecoder_h
+#define I2CDecoder_h
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/ProtocolDecoder.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class I2CSymbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	enum stype
+	{
+		TYPE_START,
+		TYPE_RESTART,
+		TYPE_STOP,
+		TYPE_DATA,
+		TYPE_ACK,
+		TYPE_ERROR,
+		TYPE_ADDRESS,
+		TYPE_NONE
+	};
+
+	I2CSymbol(stype t,uint8_t d)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint8_t m_data;
+
+	bool operator== (const I2CSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef OscilloscopeSample<I2CSymbol> I2CSample;
+typedef CaptureChannel<I2CSymbol> I2CCapture;
+
+class I2CDecoder : public ProtocolDecoder
+{
+public:
+	I2CDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(I2CDecoder)
+
+protected:
+};
+
+#endif

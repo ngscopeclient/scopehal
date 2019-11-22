@@ -16,6 +16,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeDecoder2.cpp
 	EyeRenderer.cpp
 	FFTDecoder.cpp
+	I2CDecoder.cpp
+	I2CRenderer.cpp
 	IBM8b10bDecoder.cpp
 	IBM8b10bRenderer.cpp
 	JtagDecoder.cpp

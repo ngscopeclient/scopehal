@@ -30,37 +30,96 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of I2CRenderer
  */
 
 #include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "I2CRenderer.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+I2CRenderer::I2CRenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color I2CRenderer::GetColor(int i)
+{
+	I2CCapture* capture = dynamic_cast<I2CCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const I2CSymbol& s = capture->m_samples[i].m_sample;
+
+		//errors are red
+		if(s.m_stype == I2CSymbol::TYPE_ERROR)
+			return Gdk::Color("#ff0000");
+
+		//addresses are yellow
+		else if(s.m_stype == I2CSymbol::TYPE_ADDRESS)
+			return Gdk::Color("#ffff00");
+
+		//control characters are purple
+		else if(s.m_stype != I2CSymbol::TYPE_DATA)
+			return Gdk::Color("#c000a0");
+
+		//Data characters are green
+		else
+			return Gdk::Color("#008000");
+	}
+
+	//error
+	return Gdk::Color("red");
+}
+
+string I2CRenderer::GetText(int i)
+{
+	I2CCapture* capture = dynamic_cast<I2CCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const I2CSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_stype)
+		{
+			case I2CSymbol::TYPE_NONE:
+			case I2CSymbol::TYPE_ERROR:
+				snprintf(tmp, sizeof(tmp), "ERR");
+				break;
+			case I2CSymbol::TYPE_START:
+				snprintf(tmp, sizeof(tmp), "START");
+				break;
+			case I2CSymbol::TYPE_RESTART:
+				snprintf(tmp, sizeof(tmp), "RESTART");
+				break;
+			case I2CSymbol::TYPE_STOP:
+				snprintf(tmp, sizeof(tmp), "STOP");
+				break;
+			case I2CSymbol::TYPE_ACK:
+				if(s.m_data)
+					snprintf(tmp, sizeof(tmp), "NAK");
+				else
+					snprintf(tmp, sizeof(tmp), "ACK");
+				break;
+			case I2CSymbol::TYPE_ADDRESS:
+				if(s.m_data & 1)
+					snprintf(tmp, sizeof(tmp), "R:%02x", s.m_data & 0xfe);
+				else
+					snprintf(tmp, sizeof(tmp), "W:%02x", s.m_data & 0xfe);
+				break;
+			case I2CSymbol::TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				break;
+		}
+		return string(tmp);
+	}
+	return "";
 }

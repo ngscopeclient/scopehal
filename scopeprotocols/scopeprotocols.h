@@ -52,6 +52,7 @@
 #include "EyeDecoder2.h"
 #include "FFTDecoder.h"
 #include "IBM8b10bDecoder.h"
+#include "I2CDecoder.h"
 #include "JtagDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "ThresholdDecoder.h"
