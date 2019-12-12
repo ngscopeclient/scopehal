@@ -39,6 +39,18 @@
 
 using namespace std;
 
+Gdk::Color ChannelRenderer::m_standardColors[STANDARD_COLOR_COUNT] =
+{
+	Gdk::Color("#336699"),	//COLOR_DATA
+	Gdk::Color("#c000a0"),	//COLOR_CONTROL
+	Gdk::Color("#ffff00"),	//COLOR_ADDRESS
+	Gdk::Color("#808080"),	//COLOR_PREAMBLE
+	Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
+	Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
+	Gdk::Color("#ff0000"),	//COLOR_ERROR
+	Gdk::Color("#404040")	//COLOR_IDLE
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 

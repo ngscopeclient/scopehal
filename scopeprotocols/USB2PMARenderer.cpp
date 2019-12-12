@@ -56,9 +56,9 @@ Gdk::Color USB2PMARenderer::GetColor(int i)
 {
 	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(m_channel->GetData());
 	if(data == NULL)
-		return Gdk::Color("#000000");
+		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
-		return Gdk::Color("#000000");
+		return m_standardColors[COLOR_ERROR];
 
 	//TODO: have a set of standard colors we use everywhere?
 
@@ -67,15 +67,15 @@ Gdk::Color USB2PMARenderer::GetColor(int i)
 	{
 		case USB2PMASymbol::TYPE_J:
 		case USB2PMASymbol::TYPE_K:
-			return Gdk::Color("#008000");
+			return m_standardColors[COLOR_DATA];
 
 		case USB2PMASymbol::TYPE_SE0:
-			return Gdk::Color("#808080");
+			return m_standardColors[COLOR_PREAMBLE];
 
 		//invalid state, should never happen
 		case USB2PMASymbol::TYPE_SE1:
 		default:
-			return Gdk::Color("#ff0000");
+			return m_standardColors[COLOR_ERROR];
 	}
 }
 

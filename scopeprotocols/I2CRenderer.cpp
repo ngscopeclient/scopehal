@@ -59,25 +59,21 @@ Gdk::Color I2CRenderer::GetColor(int i)
 	{
 		const I2CSymbol& s = capture->m_samples[i].m_sample;
 
-		//errors are red
-		if(s.m_stype == I2CSymbol::TYPE_ERROR)
-			return Gdk::Color("#ff0000");
-
-		//addresses are yellow
-		else if(s.m_stype == I2CSymbol::TYPE_ADDRESS)
-			return Gdk::Color("#ffff00");
-
-		//control characters are purple
-		else if(s.m_stype != I2CSymbol::TYPE_DATA)
-			return Gdk::Color("#c000a0");
-
-		//Data characters are green
-		else
-			return Gdk::Color("#008000");
+		switch(s.m_stype)
+		{
+			case I2CSymbol::TYPE_ERROR:
+				return m_standardColors[COLOR_ERROR];
+			case I2CSymbol::TYPE_ADDRESS:
+				return m_standardColors[COLOR_ADDRESS];
+			case I2CSymbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+			default:
+				return m_standardColors[COLOR_CONTROL];
+		}
 	}
 
 	//error
-	return Gdk::Color("red");
+	return m_standardColors[COLOR_ERROR];
 }
 
 string I2CRenderer::GetText(int i)

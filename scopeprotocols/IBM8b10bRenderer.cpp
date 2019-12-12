@@ -59,21 +59,16 @@ Gdk::Color IBM8b10bRenderer::GetColor(int i)
 	{
 		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
 
-		//errors are red
 		if(s.m_error)
-			return Gdk::Color("#ff0000");
-
-		//control characters are purple
+			return m_standardColors[COLOR_ERROR];
 		else if(s.m_control)
-			return Gdk::Color("#c000a0");
-
-		//Data characters are green
+			return m_standardColors[COLOR_CONTROL];
 		else
-			return Gdk::Color("#008000");
+			return m_standardColors[COLOR_DATA];
 	}
 
 	//error
-	return Gdk::Color("red");
+	return m_standardColors[COLOR_ERROR];
 }
 
 string IBM8b10bRenderer::GetText(int i)

@@ -56,45 +56,40 @@ Gdk::Color EthernetRenderer::GetColor(int i)
 {
 	EthernetCapture* data = dynamic_cast<EthernetCapture*>(m_channel->GetData());
 	if(data == NULL)
-		return Gdk::Color("#000000");
+		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
-		return Gdk::Color("#000000");
-
-	//TODO: have a set of standard colors we use everywhere?
+		return m_standardColors[COLOR_ERROR];
 
 	auto sample = data->m_samples[i];
 	switch(sample.m_sample.m_type)
 	{
-		//Preamble: gray (not interesting)
+		//Preamble/SFD: gray (not interesting)
 		case EthernetFrameSegment::TYPE_PREAMBLE:
-			return Gdk::Color("#808080");
-
-		//SFD: yellow
+			return m_standardColors[COLOR_PREAMBLE];
 		case EthernetFrameSegment::TYPE_SFD:
-			return Gdk::Color("#ffff80");
+			return m_standardColors[COLOR_PREAMBLE];
 
-		//MAC addresses (src or dest): cyan
+		//MAC addresses (src or dest)
 		case EthernetFrameSegment::TYPE_DST_MAC:
 		case EthernetFrameSegment::TYPE_SRC_MAC:
-			return Gdk::Color("#80ffff");
+			return m_standardColors[COLOR_ADDRESS];
 
-		//Ethertype: Pink
+		//Control codes
 		case EthernetFrameSegment::TYPE_ETHERTYPE:
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
-			return Gdk::Color("#ffcccc");
+			return m_standardColors[COLOR_CONTROL];
 
-		//Checksum: Green or red depending on if it's correct or not
-		//For now, always green b/c we don't implement the FCS :D
+		//TODO: verify checksum
 		case EthernetFrameSegment::TYPE_FCS:
-			return Gdk::Color("#00ff00");
+			return m_standardColors[COLOR_CHECKSUM_OK];
 
 		//Signal has entirely disappeared
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
-			return Gdk::Color("#FF0000");
+			return m_standardColors[COLOR_ERROR];
 
-		//Payload: dark blue
+		//Payload
 		default:
-			return Gdk::Color("#336699");
+			return m_standardColors[COLOR_DATA];
 	}
 }
 

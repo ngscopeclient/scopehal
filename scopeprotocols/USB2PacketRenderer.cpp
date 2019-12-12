@@ -57,11 +57,9 @@ Gdk::Color USB2PacketRenderer::GetColor(int i)
 {
 	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(m_channel->GetData());
 	if(data == NULL)
-		return Gdk::Color("#000000");
+		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
-		return Gdk::Color("#000000");
-
-	//TODO: have a set of standard colors we use everywhere?
+		return m_standardColors[COLOR_ERROR];
 
 	auto sample = data->m_samples[i];
 	switch(sample.m_sample.m_type)
@@ -69,30 +67,30 @@ Gdk::Color USB2PacketRenderer::GetColor(int i)
 		case USB2PacketSymbol::TYPE_PID:
 			if( (sample.m_sample.m_data == USB2PacketSymbol::PID_RESERVED) ||
 				(sample.m_sample.m_data == USB2PacketSymbol::PID_STALL) )
-				return Gdk::Color("#ff0000");
+				return m_standardColors[COLOR_ERROR];
 			else
-				return Gdk::Color("#808080");
+				return m_standardColors[COLOR_PREAMBLE];
 
 		case USB2PacketSymbol::TYPE_ADDR:
-			return Gdk::Color("#ff0080");
+			return m_standardColors[COLOR_ADDRESS];
 
 		case USB2PacketSymbol::TYPE_ENDP:
-			return Gdk::Color("#ffff00");
+			return m_standardColors[COLOR_ADDRESS];
 
 		case USB2PacketSymbol::TYPE_NFRAME:
-			return Gdk::Color("#336699");
+			return m_standardColors[COLOR_DATA];
 
 		case USB2PacketSymbol::TYPE_CRC5:
 		case USB2PacketSymbol::TYPE_CRC16:
-			return Gdk::Color("#008000");	//TODO: color code good/bad
+			return m_standardColors[COLOR_CHECKSUM_OK];	//TODO: verify checksum
 
 		case USB2PacketSymbol::TYPE_DATA:
-			return Gdk::Color("#336699");
+			return m_standardColors[COLOR_DATA];
 
 		//invalid state, should never happen
 		case USB2PacketSymbol::TYPE_ERROR:
 		default:
-			return Gdk::Color("#ff0000");
+			return m_standardColors[COLOR_ERROR];
 	}
 }
 

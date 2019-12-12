@@ -108,6 +108,28 @@ public:
 	float m_maxsamplewidth;
 
 protected:
+	/**
+		@brief Standard colors for protocol decoder decode overlays.
+
+		Do not change ordering, add new items to the end only.
+	 */
+	enum
+	{
+		COLOR_DATA,			//protocol data
+		COLOR_CONTROL,		//generic control sequences
+		COLOR_ADDRESS,		//addresses or device IDs
+		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
+		COLOR_CHECKSUM_OK,	//valid CRC/checksum
+		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
+		COLOR_ERROR,		//malformed traffic
+		COLOR_IDLE,			//downtime between frames
+
+		STANDARD_COLOR_COUNT
+	} standard_color;
+
+	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
+
+protected:
 	OscilloscopeChannel* m_channel;
 };
 

@@ -61,27 +61,27 @@ Gdk::Color JtagRenderer::GetColor(int i)
 
 		switch(s.m_state)
 		{
-			//Unknown states are red
+			//Unknown states
 			case JtagSymbol::UNKNOWN_0:
 			case JtagSymbol::UNKNOWN_1:
 			case JtagSymbol::UNKNOWN_2:
 			case JtagSymbol::UNKNOWN_3:
 			case JtagSymbol::UNKNOWN_4:
-				return Gdk::Color("#ff0000");
+				return m_standardColors[COLOR_ERROR];
 
-			//Data characters are green
+			//Data characters
 			case JtagSymbol::SHIFT_IR:
 			case JtagSymbol::SHIFT_DR:
-				return Gdk::Color("#008000");
+				return m_standardColors[COLOR_DATA];
 
-			//intermediate states are purple
+			//intermediate states
 			default:
-				return Gdk::Color("#c000a0");
+				return m_standardColors[COLOR_CONTROL];
 		}
 	}
 
 	//error
-	return Gdk::Color("red");
+	return m_standardColors[COLOR_ERROR];
 }
 
 string JtagRenderer::GetText(int i)
