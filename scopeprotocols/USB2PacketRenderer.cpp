@@ -102,6 +102,8 @@ string USB2PacketRenderer::GetText(int i)
 	if(i >= (int)data->m_samples.size())
 		return "";
 
+	char tmp[32];
+
 	auto sample = data->m_samples[i];
 	switch(sample.m_sample.m_type)
 	{
@@ -141,44 +143,30 @@ string USB2PacketRenderer::GetText(int i)
 					return "STALL";
 				case USB2PacketSymbol::PID_MDATA:
 					return "MDATA";
+
+				default:
+					return "INVALID PID";
 			}
+			break;
 		}
 		case USB2PacketSymbol::TYPE_ADDR:
-		{
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "Dev %d", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_NFRAME:
-		{
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "Frame %d", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_ENDP:
-		{
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "EP %d", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_CRC5:
-		{
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "CRC %02x", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_CRC16:
-		{
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "CRC %04x", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_DATA:
-		{
-			char tmp[16];
 			snprintf(tmp, sizeof(tmp), "%02x", sample.m_sample.m_data);
 			return string(tmp);
-		}
 		case USB2PacketSymbol::TYPE_ERROR:
 		default:
 			return "ERROR";
