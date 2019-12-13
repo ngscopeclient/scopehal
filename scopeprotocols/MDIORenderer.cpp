@@ -30,38 +30,107 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of MDIORenderer
  */
 
 #include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "MDIORenderer.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+MDIORenderer::MDIORenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color MDIORenderer::GetColor(int i)
+{
+	MDIOCapture* capture = dynamic_cast<MDIOCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const MDIOSymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case MDIOSymbol::TYPE_PREAMBLE:
+			case MDIOSymbol::TYPE_START:
+			case MDIOSymbol::TYPE_TURN:
+				return m_standardColors[COLOR_PREAMBLE];
+
+			case MDIOSymbol::TYPE_OP:
+				if( (s.m_data == 1) || (s.m_data == 2) )
+					return m_standardColors[COLOR_CONTROL];
+				else
+					return m_standardColors[COLOR_ERROR];
+
+			case MDIOSymbol::TYPE_PHYADDR:
+			case MDIOSymbol::TYPE_REGADDR:
+				return m_standardColors[COLOR_ADDRESS];
+
+			case MDIOSymbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+
+			case MDIOSymbol::TYPE_ERROR:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return Gdk::Color("red");
+}
+
+string MDIORenderer::GetText(int i)
+{
+	MDIOCapture* capture = dynamic_cast<MDIOCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const MDIOSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_stype)
+		{
+			case MDIOSymbol::TYPE_PREAMBLE:
+				return "PREAMBLE";
+			case MDIOSymbol::TYPE_START:
+				return "SOF";
+			case MDIOSymbol::TYPE_TURN:
+				return "TURN";
+
+			case MDIOSymbol::TYPE_OP:
+				if(s.m_data == 1)
+					return "WR";
+				else if(s.m_data == 2)
+					return "RD";
+				else
+					return "BAD OP";
+
+			case MDIOSymbol::TYPE_PHYADDR:
+				snprintf(tmp, sizeof(tmp), "PHY %02x", s.m_data);
+				break;
+
+			case MDIOSymbol::TYPE_REGADDR:
+				snprintf(tmp, sizeof(tmp), "REG %02x", s.m_data);
+				break;
+
+			case MDIOSymbol::TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
+				break;
+
+			case MDIOSymbol::TYPE_ERROR:
+			default:
+				return "ERROR";
+		}
+		return string(tmp);
+	}
+
+	return "";
 }

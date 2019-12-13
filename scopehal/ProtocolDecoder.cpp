@@ -54,6 +54,14 @@ void ProtocolDecoderParameter::ParseString(string str)
 {
 	switch(m_type)
 	{
+		case TYPE_BOOL:
+			m_filename = "";
+			if( (str == "1") || (str == "true") )
+				m_intval = 1;
+			else
+				m_intval = 0;
+			m_floatval = m_intval;
+			break;
 		case TYPE_FLOAT:
 			sscanf(str.c_str(), "%20f", &m_floatval);
 			m_intval = m_floatval;
@@ -80,6 +88,7 @@ string ProtocolDecoderParameter::ToString()
 		case TYPE_FLOAT:
 			snprintf(str_out, sizeof(str_out), "%f", m_floatval);
 			break;
+		case TYPE_BOOL:
 		case TYPE_INT:
 			snprintf(str_out, sizeof(str_out), "%d", m_intval);
 			break;
@@ -328,7 +337,14 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* 
 		if(ndata >= data->m_samples.size())
 			break;
 
-		//TODO: should we specify duration here?
+		//Extend the previous sample's duration (if any) to our start
+		if(samples.size())
+		{
+			auto& s = samples[samples.size() - 1];
+			s.m_duration = clkstart - s.m_offset;
+		}
+
+		//Add the new sample
 		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
 	}
 }
@@ -364,7 +380,13 @@ void ProtocolDecoder::SampleOnFallingEdges(DigitalCapture* data, DigitalCapture*
 		if(ndata >= data->m_samples.size())
 			break;
 
-		//TODO: should we specify duration here?
+		//Extend the previous sample's duration (if any) to our start
+		if(samples.size())
+		{
+			auto& s = samples[samples.size() - 1];
+			s.m_duration = clkstart - s.m_offset;
+		}
+
 		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
 	}
 }

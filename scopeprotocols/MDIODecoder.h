@@ -30,38 +30,63 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of MDIODecoder
  */
 
-#include "scopeprotocols.h"
+#ifndef MDIODecoder_h
+#define MDIODecoder_h
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/ProtocolDecoder.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class MDIOSymbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	enum stype
+	{
+		TYPE_PREAMBLE,
+		TYPE_START,
+		TYPE_OP,
+		TYPE_PHYADDR,
+		TYPE_REGADDR,
+		TYPE_TURN,
+		TYPE_DATA,
+		TYPE_ERROR,
+	};
+
+	MDIOSymbol(stype t, uint16_t d = 0)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint16_t m_data;
+
+	bool operator== (const MDIOSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef OscilloscopeSample<MDIOSymbol> MDIOSample;
+typedef CaptureChannel<MDIOSymbol> MDIOCapture;
+
+class MDIODecoder : public ProtocolDecoder
+{
+public:
+	MDIODecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(MDIODecoder)
+
+protected:
+};
+
+#endif

@@ -22,6 +22,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	IBM8b10bRenderer.cpp
 	JtagDecoder.cpp
 	JtagRenderer.cpp
+	MDIODecoder.cpp
+	MDIORenderer.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp
