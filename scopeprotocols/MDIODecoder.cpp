@@ -95,6 +95,9 @@ void MDIODecoder::SetDefaultName()
 
 void MDIODecoder::Refresh()
 {
+	//Remove old packets from previous decode passes
+	ClearPackets();
+
 	//Get the input data
 	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
 	{
