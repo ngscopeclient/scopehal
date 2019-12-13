@@ -298,6 +298,7 @@ void MDIODecoder::Refresh()
 			pack->m_headers["Value"] = tmp;
 
 			//Add extra information to the decode if it's a known register
+			//TODO: share this between clause 22 and 45 decoders
 			string info;
 			switch(addr)
 			{
@@ -359,6 +360,109 @@ void MDIODecoder::Refresh()
 						info += ", Link down";
 
 					break;
+
+				//PHY ID
+				case 0x2:
+					info = "PHY ID 1";
+					break;
+				case 0x3:
+					info = "PHY ID 2";
+					break;
+
+				//Autonegotiation
+				case 0x4:
+					info = "ANEG Advertisement";
+					break;
+				case 0x5:
+					info = "ANEG Partner Ability";
+					break;
+				case 0x6:
+					info = "ANEG Expansion";
+					break;
+				case 0x7:
+					info = "ANEG Next Page";
+					break;
+				case 0x8:
+					info = "ANEG Partner Next Page";
+					break;
+
+				//1000base-T
+				case 0x9:
+					info = "1000base-T Control: ";
+					if( (value >> 13) != 0)
+					{
+						char tmp[128];
+						snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
+						info += tmp;
+					}
+
+					if(value & 0x1000)
+					{
+						if(value & 0x0800)
+							info += "Force master";
+						else
+							info += "Force slave";
+					}
+					else
+					{
+						if(value & 0x0400)
+							info += "Prefer master";
+						else
+							info += "Prefer slave";
+					}
+					break;
+
+				case 0xa:
+					info = "1000base-T Status: ";
+
+					if(value & 0x4000)
+						info += "Master, ";
+					else
+						info += "Slave, ";
+
+					//TODO: other fields
+
+					{
+						char tmp[32];
+						snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
+						info += tmp;
+					}
+
+					break;
+
+				//MMD stuff
+				case 0xd:
+					info = "MMD Access: ";
+
+					switch(value >> 14)
+					{
+						case 0:
+							info += "Register";
+							break;
+
+						case 1:
+							info += "Data";
+							break;
+
+						case 2:
+							info += "Data R/W increment";
+							break;
+
+						case 3:
+							info += "Data W increment";
+							break;
+					}
+					break;
+
+				case 0xe:
+					info = "MMD Addr/Data";
+					break;
+
+				case 0xf:
+					info = "Extended Status";
+					break;
+
+				//TODO: support for PHY vendor specific registers if we know the PHY ID (or are told)
 			}
 			pack->m_headers["Info"] = info;
 
@@ -379,6 +483,7 @@ void MDIODecoder::Refresh()
 				dmdio[i].m_offset,
 				(dmdio[i+1].m_offset - dmdio[i].m_offset) + dmdio[i+1].m_duration,
 				MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0)));
+			continue;
 		}
 	}
 
