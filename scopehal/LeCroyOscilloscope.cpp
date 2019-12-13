@@ -359,12 +359,14 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 	//LogDebug("enable channel %d\n", i);
 	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("got mutex\n");
+	m_channelsEnabled[i] = true;
 	SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 }
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
+	m_channelsEnabled[i] = false;
 	SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
 }
 
