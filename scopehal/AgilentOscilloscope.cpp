@@ -410,7 +410,6 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		//LogDebug("%ld ps/sample\n", ps_per_sample);
 
 		//LogDebug("length = %d\n", length);
-		uint16_t* temp_buf = new uint16_t[length];
 
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
 		AnalogCapture* cap = new AnalogCapture;
@@ -423,17 +422,19 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		//Ask for the data
 		m_transport->SendCommand(":WAV:DATA?");
 
-		//Read and discard the length header
+		//Read the length header
 		char tmp[16] = {0};
 		m_transport->ReadRawData(2, (unsigned char*)tmp);
 		int num_digits = atoi(tmp+1);
 		//LogDebug("num_digits = %d", num_digits);
 		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		//int actual_len = atoi(tmp);
+		int actual_len = atoi(tmp);
 		//LogDebug("actual_len = %d", actual_len);
 
+		uint16_t* temp_buf = new uint16_t[actual_len / sizeof(uint16_t)];
+
 		//Read the actual data
-		m_transport->ReadRawData(length*sizeof(uint16_t), (unsigned char*)temp_buf);
+		m_transport->ReadRawData(actual_len, (unsigned char*)temp_buf);
 		//Discard trailing newline
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
 
