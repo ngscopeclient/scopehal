@@ -36,7 +36,7 @@
 #ifndef MDIODecoder_h
 #define MDIODecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 
 class MDIOSymbol
 {
@@ -70,7 +70,7 @@ public:
 typedef OscilloscopeSample<MDIOSymbol> MDIOSample;
 typedef CaptureChannel<MDIOSymbol> MDIOCapture;
 
-class MDIODecoder : public ProtocolDecoder
+class MDIODecoder : public PacketDecoder
 {
 public:
 	MDIODecoder(std::string color);
@@ -81,6 +81,8 @@ public:
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
+
+	virtual std::vector<std::string> GetHeaders();
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 

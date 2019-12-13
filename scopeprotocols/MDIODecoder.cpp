@@ -45,7 +45,7 @@ using namespace std;
 // Construction / destruction
 
 MDIODecoder::MDIODecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("mdio");
@@ -160,11 +160,18 @@ void MDIODecoder::Refresh()
 			len,
 			MDIOSymbol(MDIOSymbol::TYPE_PREAMBLE, 0)));
 
+		//Create the packet
+		Packet* pack = new Packet;
+		pack->m_offset = start;
+
 		//TODO: safely ignore extra preamble bits
 
 		//Next 2 bits are start delimiter
 		if(i+2 >= dmdio.size())
+		{
+			delete pack;
 			break;
+		}
 		uint16_t sof = 0;
 		if(dmdio[i].m_sample)
 			sof |= 2;
@@ -174,6 +181,8 @@ void MDIODecoder::Refresh()
 		//MDIO Clause 22 frame
 		if(sof == 0x01)
 		{
+			pack->m_headers["Clause"] = "22";
+
 			//Add the start symbol
 			cap->m_samples.push_back(MDIOSample(
 				dmdio[i].m_offset,
@@ -183,12 +192,22 @@ void MDIODecoder::Refresh()
 
 			//Next 2 bits are opcode
 			if(i+2 >= dmdio.size())
+			{
+				delete pack;
 				break;
+			}
 			uint16_t op = 0;
 			if(dmdio[i].m_sample)
 				op |= 2;
 			if(dmdio[i+1].m_sample)
 				op |= 1;
+
+			if(op == 1)
+				pack->m_headers["Op"] = "Write";
+			else if(op == 2)
+				pack->m_headers["Op"] = "Read";
+			else
+				pack->m_headers["Op"] = "ERROR";
 
 			cap->m_samples.push_back(MDIOSample(
 				dmdio[i].m_offset,
@@ -214,9 +233,16 @@ void MDIODecoder::Refresh()
 				MDIOSymbol(MDIOSymbol::TYPE_PHYADDR, addr)));
 			i += 5;
 
+			char tmp[32];
+			snprintf(tmp, sizeof(tmp), "%02x", addr);
+			pack->m_headers["PHY"] = tmp;
+
 			//Next 5 bits are reg address
 			if(i+5 >= dmdio.size())
+			{
+				delete pack;
 				break;
+			}
 			addr = 0;
 			start = dmdio[i].m_offset;
 			for(size_t j=0; j<5; j++)
@@ -232,6 +258,9 @@ void MDIODecoder::Refresh()
 				MDIOSymbol(MDIOSymbol::TYPE_REGADDR, addr)));
 			i += 5;
 
+			snprintf(tmp, sizeof(tmp), "%02x", addr);
+			pack->m_headers["Reg"] = tmp;
+
 			//Next 2 bits are bus turnaround
 			if(i+2 >= dmdio.size())
 				break;
@@ -243,7 +272,10 @@ void MDIODecoder::Refresh()
 
 			//Next 16 bits are frame data
 			if(i+16 >= dmdio.size())
+			{
+				delete pack;
 				break;
+			}
 			uint16_t value = 0;
 			start = dmdio[i].m_offset;
 			for(size_t j=0; j<16; j++)
@@ -258,6 +290,77 @@ void MDIODecoder::Refresh()
 				len,
 				MDIOSymbol(MDIOSymbol::TYPE_DATA, value)));
 			i += 16;
+
+			snprintf(tmp, sizeof(tmp), "%04x", value);
+			pack->m_headers["Value"] = tmp;
+
+			//Add extra information to the decode if it's a known register
+			string info;
+			switch(addr)
+			{
+				//802.3 Basic Control
+				case 0x00:
+					{
+						info = "Basic Status: ";
+
+						uint8_t speed = 0;
+						if(value & 0x0040)
+							speed |= 2;
+						if(value & 0x2000)
+							speed |= 1;
+
+						switch(speed)
+						{
+							case 0:
+								info += "Speed 10M";
+								break;
+
+							case 1:
+								info += "Speed 100M";
+								break;
+
+							case 2:
+								info += "Speed 1G";
+								break;
+
+							default:
+								info += "Speed invalid";
+								break;
+						}
+
+						if( (value & 0x0100) == 0)
+							info += "/full";
+						else
+							info += "/half";
+
+						if( (value & 0x1000) == 0)
+							info += ", Aneg disable";
+
+						if( (value & 0x0800) == 0)
+							info += ", Power down";
+					}
+					break;
+
+				//802.3 Basic Status
+				case 0x1:
+					info = "Basic Status: ";
+
+					if(value & 0x20)
+						info += "Aneg complete";
+					else
+						info += "Aneg not complete";
+
+					if(value & 0x4)
+						info += ", Link up";
+					else
+						info += ", Link down";
+
+					break;
+			}
+			pack->m_headers["Info"] = info;
+
+			//Done, add the packet
+			m_packets.push_back(pack);
 		}
 
 		//MDIO Clause 45 frame
@@ -277,4 +380,16 @@ void MDIODecoder::Refresh()
 	}
 
 	SetData(cap);
+}
+
+vector<string> MDIODecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Clause");
+	ret.push_back("Op");
+	ret.push_back("PHY");
+	ret.push_back("Reg");
+	ret.push_back("Value");
+	ret.push_back("Info");
+	return ret;
 }
