@@ -228,6 +228,12 @@ OscilloscopeChannel::CouplingType RohdeSchwarzOscilloscope::GetChannelCoupling(s
 		return OscilloscopeChannel::COUPLE_GND;
 	else if(reply == "DC")
 		return OscilloscopeChannel::COUPLE_DC_50;
+
+	else
+	{
+		LogWarning("invalid coupling value\n");
+		return OscilloscopeChannel::COUPLE_DC_50;
+	}
 }
 
 void RohdeSchwarzOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
@@ -256,7 +262,7 @@ void RohdeSchwarzOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 	}
 }
 
-double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t i)
+double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t /*i*/)
 {
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -268,14 +274,19 @@ double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t i)
 	sscanf(reply.c_str(), "%lf", &atten);
 	return atten;
 	*/
+
+	LogWarning("RohdeSchwarzOscilloscope::GetChannelAttenuation unimplemented\n");
+	return 1;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
+void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
 {
 	//FIXME
+
+	LogWarning("RohdeSchwarzOscilloscope::SetChannelAttenuation unimplemented\n");
 }
 
-int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t i)
+int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -287,11 +298,14 @@ int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t i)
 	else
 		return 0;
 	*/
+
+	LogWarning("RohdeSchwarzOscilloscope::GetChannelBandwidthLimit unimplemented\n");
+	return 0;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+void RohdeSchwarzOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
 {
-	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
 double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
@@ -314,14 +328,16 @@ double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetChannelVoltageRange unimplemented\n");
 }
 
 OscilloscopeChannel* RohdeSchwarzOscilloscope::GetExternalTrigger()
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::GetExternalTrigger unimplemented\n");
 	return NULL;
 }
 
@@ -347,14 +363,16 @@ double RohdeSchwarzOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelOffset(size_t i, double offset)
+void RohdeSchwarzOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetChannelOffset unimplemented\n");
 }
 
 void RohdeSchwarzOscilloscope::ResetTriggerConditions()
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::ResetTriggerConditions unimplemented\n");
 }
 
 Oscilloscope::TriggerMode RohdeSchwarzOscilloscope::PollTrigger()
@@ -537,9 +555,10 @@ size_t RohdeSchwarzOscilloscope::GetTriggerChannelIndex()
 	}
 }
 
-void RohdeSchwarzOscilloscope::SetTriggerChannelIndex(size_t i)
+void RohdeSchwarzOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetTriggerChannelIndex unimplemented\n");
 }
 
 float RohdeSchwarzOscilloscope::GetTriggerVoltage()
@@ -561,29 +580,35 @@ float RohdeSchwarzOscilloscope::GetTriggerVoltage()
 	return level;
 }
 
-void RohdeSchwarzOscilloscope::SetTriggerVoltage(float v)
+void RohdeSchwarzOscilloscope::SetTriggerVoltage(float /*v*/)
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetTriggerVoltage unimplemented\n");
 }
 
 Oscilloscope::TriggerType RohdeSchwarzOscilloscope::GetTriggerType()
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::GetTriggerType unimplemented\n");
 	return Oscilloscope::TRIGGER_TYPE_RISING;
 }
 
-void RohdeSchwarzOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
+void RohdeSchwarzOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
 {
 	//FIXME
+	LogWarning("RohdeSchwarzOscilloscope::SetTriggerType unimplemented\n");
 }
 
 void RohdeSchwarzOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
 {
 	//unimplemented, no LA support
+	LogWarning("RohdeSchwarzOscilloscope::SetTriggerForChannel unimplemented\n");
 }
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesNonInterleaved()
 {
+	LogWarning("RohdeSchwarzOscilloscope::GetSampleRatesNonInterleaved unimplemented\n");
+
 	//FIXME
 	vector<uint64_t> ret;
 	return ret;
@@ -591,6 +616,8 @@ vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesInterleaved()
 {
+	LogWarning("RohdeSchwarzOscilloscope::GetSampleRatesInterleaved unimplemented\n");
+
 	//FIXME
 	vector<uint64_t> ret;
 	return ret;
@@ -598,6 +625,8 @@ vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> RohdeSchwarzOscilloscope::GetInterleaveConflicts()
 {
+	LogWarning("RohdeSchwarzOscilloscope::GetInterleaveConflicts unimplemented\n");
+
 	//FIXME
 	set<Oscilloscope::InterleaveConflict> ret;
 	return ret;
@@ -605,6 +634,8 @@ set<Oscilloscope::InterleaveConflict> RohdeSchwarzOscilloscope::GetInterleaveCon
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleDepthsNonInterleaved()
 {
+	LogWarning("RohdeSchwarzOscilloscope::GetSampleDepthsNonInterleaved unimplemented\n");
+
 	//FIXME
 	vector<uint64_t> ret;
 	return ret;
@@ -612,6 +643,8 @@ vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleDepthsInterleaved()
 {
+	LogWarning("RohdeSchwarzOscilloscope::GetSampleDepthsInterleaved unimplemented\n");
+
 	//FIXME
 	vector<uint64_t> ret;
 	return ret;

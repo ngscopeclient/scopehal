@@ -44,9 +44,9 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
-	, m_highDefinition(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_highDefinition(false)
 {
 }
 
@@ -392,7 +392,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	return OscilloscopeChannel::COUPLE_SYNTHETIC;
 }
 
-void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
+void LeCroyOscilloscope::SetChannelCoupling(size_t /*i*/, OscilloscopeChannel::CouplingType /*type*/)
 {
 	//FIXME
 }
@@ -412,7 +412,7 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	return d;
 }
 
-void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
+void LeCroyOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
 {
 	//FIXME
 }
@@ -616,11 +616,6 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 	string stype;
 	switch(type)
 	{
-		//not implemented, disable
-		case Multimeter::AC_CURRENT:
-		case Multimeter::DC_CURRENT:
-			return;
-
 		case Multimeter::DC_VOLTAGE:
 			stype = "DC";
 			break;
@@ -636,6 +631,14 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 		case Multimeter::FREQUENCY:
 			stype = "Frequency";
 			break;
+
+		//not implemented, disable
+		case Multimeter::AC_CURRENT:
+		case Multimeter::DC_CURRENT:
+		case Multimeter::TEMPERATURE:
+			LogWarning("unsupported multimeter mode\n");
+			return;
+
 	}
 
 	char cmd[128];
@@ -661,6 +664,8 @@ string LeCroyOscilloscope::GetFunctionChannelName(int /*chan*/)
 
 bool LeCroyOscilloscope::GetFunctionChannelActive(int /*chan*/)
 {
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelActive unimplemented\n");
+	return false;
 }
 
 void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
@@ -675,9 +680,11 @@ void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
 {
 	//app.wavesource.dutycycle
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelDutyCycle unimplemented\n");
+	return false;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
+void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float /*duty*/)
 {
 	//app.wavesource.dutycycle
 }
@@ -685,9 +692,11 @@ void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
 float LeCroyOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
 {
 	//app.wavesource.amplitude
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelAmplitude unimplemented\n");
+	return 0;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float /*amplitude*/)
 {
 	//app.wavesource.amplitude
 }
@@ -695,9 +704,11 @@ void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitu
 float LeCroyOscilloscope::GetFunctionChannelOffset(int /*chan*/)
 {
 	//app.wavesource.offset
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelOffset unimplemented\n");
+	return 0;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
+void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float /*offset*/)
 {
 	//app.wavesource.offset
 }
@@ -705,6 +716,8 @@ void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
 float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 {
 	//app.wavesource.frequency
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelFrequency unimplemented\n");
+	return 0;
 }
 
 void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
@@ -718,9 +731,12 @@ void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*chan*/)
 {
 	//app.wavesource.shape
+
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelShape unimplemented\n");
+	return FunctionGenerator::SHAPE_SINE;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+void LeCroyOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape /*shape*/)
 {
 	//app.wavesource.shape
 }
@@ -728,6 +744,8 @@ void LeCroyOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
 float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
 {
 	//app.wavesource.risetime
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelRiseTime unimplemented\n");
+	return 0;
 }
 
 void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
@@ -741,6 +759,8 @@ void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
 float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
 {
 	//app.wavesource.falltime
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelFallTime unimplemented\n");
+	return 0;
 }
 
 void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
@@ -1353,9 +1373,10 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
+void LeCroyOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 {
 	//TODO
+	LogWarning("LeCroyOscilloscope::SetChannelOffset unimplemented\n");
 }
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
