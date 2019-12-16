@@ -30,36 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of OvershootMeasurement
  */
+#ifndef OvershootMeasurement_h
+#define OvershootMeasurement_h
 
-#ifndef scopemeasurements_h
-#define scopemeasurements_h
-
-#include "../scopehal/scopehal.h"
 #include "../scopehal/Measurement.h"
 
-#include "AvgVoltageMeasurement.h"
-#include "BaseMeasurement.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "Fall1090Measurement.h"
-#include "Fall2080Measurement.h"
-#include "FrequencyMeasurement.h"
-#include "MaxVoltageMeasurement.h"
-#include "MinVoltageMeasurement.h"
-#include "OvershootMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PkPkVoltageMeasurement.h"
-#include "Rise1090Measurement.h"
-#include "Rise2080Measurement.h"
-#include "TopMeasurement.h"
-#include "UndershootMeasurement.h"
+class OvershootMeasurement : public FloatMeasurement
+{
+public:
+	OvershootMeasurement();
+	virtual ~OvershootMeasurement();
 
-void ScopeMeasurementStaticInit();
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual MeasurementType GetMeasurementType();
+
+	MEASUREMENT_INITPROC(OvershootMeasurement)
+};
 
 #endif

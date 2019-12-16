@@ -514,12 +514,17 @@ string FloatMeasurement::GetValueAsString()
 
 	switch(m_type)
 	{
+		case TYPE_PERCENTAGE:
+			snprintf(tmp, sizeof(tmp), "%.2f %%", m_value * 100);
+			break;
+
 		case TYPE_VOLTAGE:
 			if(fabs(m_value) > 1)
 				snprintf(tmp, sizeof(tmp), "%.3f V", m_value);
 			else
 				snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
 			break;
+			
 		case TYPE_TIME:
 			if(fabs(m_value) < 1e-9)
 				snprintf(tmp, sizeof(tmp), "%.3f ps", m_value * 1e12);

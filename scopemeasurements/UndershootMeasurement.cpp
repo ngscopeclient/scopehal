@@ -30,36 +30,65 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of UndershootMeasurement
  */
 
-#ifndef scopemeasurements_h
-#define scopemeasurements_h
-
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Measurement.h"
-
-#include "AvgVoltageMeasurement.h"
-#include "BaseMeasurement.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "Fall1090Measurement.h"
-#include "Fall2080Measurement.h"
-#include "FrequencyMeasurement.h"
-#include "MaxVoltageMeasurement.h"
-#include "MinVoltageMeasurement.h"
-#include "OvershootMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PeriodMeasurement.h"
-#include "PkPkVoltageMeasurement.h"
-#include "Rise1090Measurement.h"
-#include "Rise2080Measurement.h"
-#include "TopMeasurement.h"
+#include "scopemeasurements.h"
 #include "UndershootMeasurement.h"
 
-void ScopeMeasurementStaticInit();
+using namespace std;
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+UndershootMeasurement::UndershootMeasurement()
+	: FloatMeasurement(TYPE_PERCENTAGE)
+{
+	//Configure for a single input
+	m_signalNames.push_back("Vin");
+	m_channels.push_back(NULL);
+}
+
+UndershootMeasurement::~UndershootMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType UndershootMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_VERT;
+}
+
+string UndershootMeasurement::GetMeasurementName()
+{
+	return "Undershoot";
+}
+
+bool UndershootMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool UndershootMeasurement::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	//Calculate the worst case undershoot
+	float min = GetMinVoltage(din);
+	float top = GetTopVoltage(din);
+	float base = GetBaseVoltage(din);
+	m_value = (base-min) / (top-base);
+	return true;
+}

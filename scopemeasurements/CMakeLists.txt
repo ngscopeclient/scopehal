@@ -14,11 +14,13 @@ set(SCOPEMEASUREMENTS_SOURCES
 	FrequencyMeasurement.cpp
 	MaxVoltageMeasurement.cpp
 	MinVoltageMeasurement.cpp
+	OvershootMeasurement.cpp
 	PeriodMeasurement.cpp
 	PkPkVoltageMeasurement.cpp
 	Rise1090Measurement.cpp
 	Rise2080Measurement.cpp
 	TopMeasurement.cpp
+	UndershootMeasurement.cpp
 
 	scopemeasurements.cpp
 	)
