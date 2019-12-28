@@ -53,6 +53,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FFTDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(I2CDecoder);
+	AddDecoderClass(CANDecoder);
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(SincInterpolationDecoder);
