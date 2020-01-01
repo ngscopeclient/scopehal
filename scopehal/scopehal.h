@@ -61,10 +61,7 @@
 
 #include <cairomm/context.h>
 
-#include "Graph.h"
-
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig);
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height);
+#include "../graphwidget/Graph.h"
 
 uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 

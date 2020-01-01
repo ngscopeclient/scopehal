@@ -10,7 +10,6 @@ set(SCOPEHAL_SOURCES
 	ChannelRenderer.cpp
 	DigitalRenderer.cpp
 	TextRenderer.cpp
-	Graph.cpp
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
@@ -39,8 +38,7 @@ set(SCOPEHAL_SOURCES
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
-target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES})
-target_link_libraries(scopehal xptools log)
+target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget)
 
 target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

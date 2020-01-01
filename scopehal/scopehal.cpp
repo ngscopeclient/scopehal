@@ -60,48 +60,6 @@ string GetDefaultChannelColor(int i)
 }
 
 /**
-	@brief Draws a string
-
-	@param x X coordinate
-	@param y Y position
-	@param cr Cairo context
-	@param str String to draw
-	@param bBig Font size selector (small or large)
- */
-void DrawString(float x, float y, const Cairo::RefPtr<Cairo::Context>& cr, string str, bool bBig)
-{
-	cr->save();
-
-		Glib::RefPtr<Pango::Layout> tlayout = Pango::Layout::create (cr);
-		cr->move_to(x, y);
-		string desc = "sans normal 8";
-		if(bBig)
-			desc = "sans normal 10";
-		Pango::FontDescription font(desc);
-		font.set_weight(Pango::WEIGHT_NORMAL);
-		tlayout->set_font_description(font);
-		tlayout->set_text(str);
-		tlayout->update_from_cairo_context(cr);
-		tlayout->show_in_cairo_context(cr);
-
-	cr->restore();
-}
-
-void GetStringWidth(const Cairo::RefPtr<Cairo::Context>& cr, std::string str, bool bBig, int& width, int& height)
-{
-	Glib::RefPtr<Pango::Layout> tlayout = Pango::Layout::create (cr);
-	string desc = "sans normal 8";
-	if(bBig)
-		desc = "sans normal 10";
-	Pango::FontDescription font(desc);
-	font.set_weight(Pango::WEIGHT_NORMAL);
-	tlayout->set_font_description(font);
-	tlayout->set_text(str);
-
-	tlayout->get_pixel_size(width, height);
-}
-
-/**
 	@brief Converts a vector bus signal into a scalar (up to 64 bits wide)
  */
 uint64_t ConvertVectorSignalToScalar(vector<bool> bits)

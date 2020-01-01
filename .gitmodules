@@ -4,3 +4,6 @@
 [submodule "log"]
 	path = log
 	url = https://github.com/azonenberg/logtools.git
+[submodule "graphwidget"]
+	path = graphwidget
+	url = git@github.com:azonenberg/graphwidget.git
