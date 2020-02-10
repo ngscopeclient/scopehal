@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -89,6 +89,11 @@ string SCPISocketTransport::ReadReply()
 	}
 	LogTrace("Got %s\n", ret.c_str());
 	return ret;
+}
+
+void SCPISocketTransport::SendRawData(size_t len, const unsigned char* buf)
+{
+	m_socket.SendLooped(buf, len);
 }
 
 void SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf)

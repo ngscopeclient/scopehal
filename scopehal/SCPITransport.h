@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -48,6 +48,7 @@ public:
 	virtual bool SendCommand(std::string cmd) =0;
 	virtual std::string ReadReply() =0;
 	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
+	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
 };
 
 #endif
