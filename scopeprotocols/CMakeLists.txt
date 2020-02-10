@@ -18,6 +18,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	FFTDecoder.cpp
 	I2CDecoder.cpp
 	I2CRenderer.cpp
+	CANDecoder.cpp
+	CANRenderer.cpp
 	IBM8b10bDecoder.cpp
 	IBM8b10bRenderer.cpp
 	JtagDecoder.cpp
