@@ -257,7 +257,8 @@ public:
 		TRIGGER_TYPE_FALLING	= 2,
 		TRIGGER_TYPE_RISING		= 3,
 		TRIGGER_TYPE_CHANGE		= 4,
-		TRIGGER_TYPE_DONTCARE	= 5
+		TRIGGER_TYPE_DONTCARE	= 5,
+		TRIGGER_TYPE_COMPLEX	= 6	//complex pattern/protocol trigger
 	};
 
 	/**
