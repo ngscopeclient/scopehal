@@ -20,6 +20,7 @@ set(SCOPEHAL_SOURCES
 	Oscilloscope.cpp
 	SCPIOscilloscope.cpp
 	OscilloscopeChannel.cpp
+	AntikernelLogicAnalyzer.cpp
 	LeCroyOscilloscope.cpp
 	LeCroyVICPOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
