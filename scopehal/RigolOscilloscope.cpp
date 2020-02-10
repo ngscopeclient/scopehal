@@ -44,8 +44,11 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	int model_number;
 	if(1 != sscanf(m_model.c_str(), "DS%d", &model_number))
 	{
-		LogError("Bad model number\n");
-		return;
+		if(1 != sscanf(m_model.c_str(), "MSO%d", &model_number))
+		{
+			LogError("Bad model number\n");
+			return;
+		}
 	}
 	int nchans = model_number % 10;
 	for(int i=0; i<nchans; i++)
