@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,52 +27,128 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
- */
-
 #include "scopeprotocols.h"
+#include "../scopehal/AnalogRenderer.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+MovingAverageDecoder::MovingAverageDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+	//Set up channels
+	m_signalNames.push_back("din");
+	m_channels.push_back(NULL);
+
+	m_depthname = "Depth";
+	m_parameters[m_depthname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_depthname].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Dummy destructors for RTTI
+// Factory methods
 
-TimeCapture::~TimeCapture()
+ChannelRenderer* MovingAverageDecoder::CreateRenderer()
 {
+	return new AnalogRenderer(this);
+}
+
+bool MovingAverageDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+double MovingAverageDecoder::GetVoltageRange()
+{
+	return m_channels[0]->GetVoltageRange();
+}
+
+double MovingAverageDecoder::GetOffset()
+{
+	return m_channels[0]->GetOffset();
+}
+
+string MovingAverageDecoder::GetProtocolName()
+{
+	return "Moving average";
+}
+
+bool MovingAverageDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool MovingAverageDecoder::NeedsConfig()
+{
+	//we need the depth to be specified, duh
+	return true;
+}
+
+void MovingAverageDecoder::SetDefaultName()
+{
+	char hwname[256];
+	int depth = m_parameters[m_depthname].GetIntVal();
+	snprintf(hwname, sizeof(hwname), "MovingAvg(%s, %d)", m_channels[0]->m_displayname.c_str(), depth);
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void MovingAverageDecoder::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+
+	//We need meaningful data
+	if(din->GetDepth() == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	size_t depth = m_parameters[m_depthname].GetIntVal();
+
+	//Do the average
+	AnalogCapture* cap = NULL;
+	if(dynamic_cast<TimeCapture*>(din) != NULL)
+		cap = new TimeCapture;
+	else
+		cap = new AnalogCapture;
+
+	for(size_t i=0; i<din->m_samples.size(); i++)
+	{
+		float v = 0;
+		size_t navg = 0;
+		for(size_t j=0; j<depth; j++)
+		{
+			if(j > i)
+				break;
+
+			v += din->m_samples[i-j].m_sample;
+			navg ++;
+		}
+		v /= navg;
+
+		cap->m_samples.push_back(AnalogSample(
+			din->m_samples[i].m_offset, din->m_samples[i].m_duration, v));
+	}
+	SetData(cap);
+
+	//Copy our time scales from the input
+	cap->m_timescale = din->m_timescale;
 }

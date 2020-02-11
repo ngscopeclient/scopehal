@@ -66,6 +66,7 @@ public:
 #include "I2CDecoder.h"
 #include "JtagDecoder.h"
 #include "MDIODecoder.h"
+#include "MovingAverageDecoder.h"
 #include "PeriodMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "ThresholdDecoder.h"
