@@ -30,40 +30,44 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of ClockJitterDecoder
  */
+#ifndef ClockJitterDecoder_h
+#define ClockJitterDecoder_h
 
-#include "scopeprotocols.h"
-
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#include "../scopehal/ProtocolDecoder.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief An analog capture whose vertical scale is picoseconds instead of volts
  */
-void ScopeProtocolStaticInit()
+class TimeCapture : public AnalogCapture
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	virtual ~TimeCapture();
+};
+
+class ClockJitterDecoder : public ProtocolDecoder
+{
+public:
+	ClockJitterDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(ClockJitterDecoder)
+
+protected:
+	double m_maxTie;
+};
+
+#endif

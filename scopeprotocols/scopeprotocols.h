@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,6 +41,7 @@
 //#include "../scopehal/StateDecoder.h"
 
 #include "ACCoupleDecoder.h"
+#include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
 #include "DCOffsetDecoder.h"
 #include "DifferenceDecoder.h"
