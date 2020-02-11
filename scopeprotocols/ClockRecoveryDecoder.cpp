@@ -152,7 +152,7 @@ void ClockRecoveryDecoder::Refresh()
 	//Timestamps of the edges
 	vector<int64_t> edges;
 
-	//Find times of the zero crossings
+	//Find times of the zero crossings (TODO: extract this into reusable function)
 	bool first = true;
 	bool last = false;
 	const float threshold = m_parameters[m_threshname].GetFloatVal();
