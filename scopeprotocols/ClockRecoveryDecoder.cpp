@@ -3,7 +3,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -151,39 +151,7 @@ void ClockRecoveryDecoder::Refresh()
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-
-	//Find times of the zero crossings (TODO: extract this into reusable function)
-	bool first = true;
-	bool last = false;
-	const float threshold = m_parameters[m_threshname].GetFloatVal();
-	for(size_t i=1; i<din->m_samples.size(); i++)
-	{
-		auto sin = din->m_samples[i];
-		bool value = static_cast<float>(sin) > threshold;
-
-		//Start time of the sample, in picoseconds
-		int64_t t = din->m_triggerPhase + din->m_timescale * sin.m_offset;
-
-		//Move to the middle of the sample
-		t += din->m_timescale/2;
-
-		//Save the last value
-		if(first)
-		{
-			last = value;
-			first = false;
-			continue;
-		}
-
-		//Skip samples with no transition
-		if(last == value)
-			continue;
-
-		//Interpolate the time
-		t += din->m_timescale * Measurement::InterpolateTime(din, i-1, threshold);
-		edges.push_back(t);
-		last = value;
-	}
+	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
 
 	if(edges.empty())
 	{

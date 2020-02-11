@@ -142,39 +142,7 @@ void ClockJitterDecoder::Refresh()
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-
-	//Find times of the zero crossings on the input clock
-	bool first = true;
-	bool last = false;
-	const float threshold = 0;
-	for(size_t i=1; i<clk->m_samples.size(); i++)
-	{
-		auto sin = clk->m_samples[i];
-		bool value = static_cast<float>(sin) > threshold;
-
-		//Start time of the sample, in picoseconds
-		int64_t t = clk->m_triggerPhase + clk->m_timescale * sin.m_offset;
-
-		//Move to the middle of the sample
-		t += clk->m_timescale/2;
-
-		//Save the last value
-		if(first)
-		{
-			last = value;
-			first = false;
-			continue;
-		}
-
-		//Skip samples with no transition
-		if(last == value)
-			continue;
-
-		//Interpolate the time
-		t += clk->m_timescale * Measurement::InterpolateTime(clk, i-1, threshold);
-		edges.push_back(t);
-		last = value;
-	}
+	FindZeroCrossings(clk, 0, edges);
 
 	m_maxTie = 1;
 
@@ -182,6 +150,9 @@ void ClockJitterDecoder::Refresh()
 	size_t iedge = 0;
 	for(auto atime : edges)
 	{
+		if(iedge >= len)
+			break;
+
 		int64_t prev_edge = golden->m_samples[iedge].m_offset * golden->m_timescale;
 		int64_t next_edge = prev_edge;
 		size_t jedge = iedge;
@@ -205,12 +176,12 @@ void ClockJitterDecoder::Refresh()
 				break;
 			}
 
+			//No, keep looking
+			jedge ++;
+
 			//End of capture
 			if(jedge >= len)
 				break;
-
-			//No, keep looking
-			jedge ++;
 		}
 
 		//No interval error possible without a reference clock edge.

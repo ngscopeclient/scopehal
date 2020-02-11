@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -159,10 +159,14 @@ protected:
 	bool m_dirty;
 
 protected:
+
 	//Samples a digital channel on the rising edges of another channel.
 	//The two channels need not be the same sample rate.
 	void SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
 	void SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
+
+	//Find interpolated zero crossings of a signal
+	void FindZeroCrossings(AnalogCapture* data, float threshold, std::vector<int64_t>& edges);
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);
