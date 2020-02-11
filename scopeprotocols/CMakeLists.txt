@@ -27,6 +27,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	JtagRenderer.cpp
 	MDIODecoder.cpp
 	MDIORenderer.cpp
+	PeriodMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	UARTDecoder.cpp

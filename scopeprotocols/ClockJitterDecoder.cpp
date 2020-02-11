@@ -28,19 +28,10 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "ClockJitterDecoder.h"
-#include "FFTDecoder.h"
+#include "scopeprotocols.h"
 #include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TimeCapture
-
-TimeCapture::~TimeCapture()
-{
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction

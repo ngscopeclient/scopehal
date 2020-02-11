@@ -40,7 +40,17 @@
 #include "../scopehal/ProtocolDecoder.h"
 //#include "../scopehal/StateDecoder.h"
 
+/**
+	@brief An analog capture whose vertical scale is picoseconds instead of volts
+ */
+class TimeCapture : public AnalogCapture
+{
+public:
+	virtual ~TimeCapture();
+};
+
 #include "ACCoupleDecoder.h"
+#include "CANDecoder.h"
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
 #include "DCOffsetDecoder.h"
@@ -54,9 +64,9 @@
 #include "FFTDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
-#include "CANDecoder.h"
 #include "JtagDecoder.h"
 #include "MDIODecoder.h"
+#include "PeriodMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "ThresholdDecoder.h"
 #include "UARTDecoder.h"

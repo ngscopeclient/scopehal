@@ -88,12 +88,13 @@ public:
 
 	enum Category
 	{
-		CAT_ANALYSIS,	//Signal analysis (histograms, eye patterns, etc)
-		CAT_CLOCK,		//Clock stuff
-		CAT_CONVERSION,	//Type conversion
-		CAT_MATH,		//Basic math functions
-		CAT_SERIAL,		//Serial communications
-		CAT_MISC		//anything not otherwise categorized
+		CAT_ANALYSIS,		//Signal analysis (histograms, eye patterns, etc)
+		CAT_CLOCK,			//Clock stuff
+		CAT_CONVERSION,		//Type conversion
+		CAT_MATH,			//Basic math functions
+		CAT_MEASUREMENT,	//Measurement functions
+		CAT_SERIAL,			//Serial communications
+		CAT_MISC			//anything not otherwise categorized
 	};
 
 	ProtocolDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat);

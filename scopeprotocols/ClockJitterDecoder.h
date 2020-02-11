@@ -37,15 +37,6 @@
 
 #include "../scopehal/ProtocolDecoder.h"
 
-/**
-	@brief An analog capture whose vertical scale is picoseconds instead of volts
- */
-class TimeCapture : public AnalogCapture
-{
-public:
-	virtual ~TimeCapture();
-};
-
 class ClockJitterDecoder : public ProtocolDecoder
 {
 public:
