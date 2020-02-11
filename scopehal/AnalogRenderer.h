@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -77,7 +77,7 @@ protected:
 	float volts_to_pixels(float v, bool offset = true);
 
 public:
-	static float PickStepSize(float volts_per_half_span, int min_steps = 2, int max_steps = 4);
+	static float PickStepSize(float volts_per_half_span, int min_steps = 2, int max_steps = 5);
 
 	static void DrawVerticalAxisLabels(
 		const Cairo::RefPtr<Cairo::Context>& cr,
