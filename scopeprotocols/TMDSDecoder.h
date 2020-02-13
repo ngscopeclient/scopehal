@@ -30,62 +30,59 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of TMDSDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef TMDSDecoder_h
+#define TMDSDecoder_h
 
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-/**
-	@brief An analog capture whose vertical scale is picoseconds instead of volts
- */
-class TimeCapture : public AnalogCapture
+class TMDSSymbol
 {
 public:
-	virtual ~TimeCapture();
+	enum TMDSType
+	{
+		TMDS_TYPE_CONTROL,
+		TMDS_TYPE_GUARD,
+		TMDS_TYPE_ERROR,
+		TMDS_TYPE_DATA
+	};
+
+	TMDSSymbol(TMDSType type,uint8_t d)
+	 : m_type(type)
+	 , m_data(d)
+	{}
+
+	TMDSType m_type;
+	uint8_t m_data;
+
+	bool operator== (const TMDSSymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_data == s.m_data);
+	}
 };
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+typedef OscilloscopeSample<TMDSSymbol> TMDSSample;
+typedef CaptureChannel<TMDSSymbol> TMDSCapture;
+
+class TMDSDecoder : public ProtocolDecoder
+{
+public:
+	TMDSDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(TMDSDecoder)
+
+protected:
+};
 
 #endif

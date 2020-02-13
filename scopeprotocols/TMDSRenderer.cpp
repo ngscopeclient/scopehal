@@ -30,62 +30,85 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of TMDSRenderer
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
+#include "scopeprotocols.h"
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "TMDSRenderer.h"
 
-/**
-	@brief An analog capture whose vertical scale is picoseconds instead of volts
- */
-class TimeCapture : public AnalogCapture
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+TMDSRenderer::TMDSRenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
 {
-public:
-	virtual ~TimeCapture();
-};
+}
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
 
-#endif
+Gdk::Color TMDSRenderer::GetColor(int i)
+{
+	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_type)
+		{
+			case TMDSSymbol::TMDS_TYPE_CONTROL:
+				return m_standardColors[COLOR_CONTROL];
+
+			case TMDSSymbol::TMDS_TYPE_GUARD:
+				return m_standardColors[COLOR_PREAMBLE];
+
+			case TMDSSymbol::TMDS_TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+
+			case TMDSSymbol::TMDS_TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string TMDSRenderer::GetText(int i)
+{
+	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_type)
+		{
+			case TMDSSymbol::TMDS_TYPE_CONTROL:
+				snprintf(tmp, sizeof(tmp), "C%d", s.m_data);
+				break;
+
+			case TMDSSymbol::TMDS_TYPE_GUARD:
+				snprintf(tmp, sizeof(tmp), "GB (%d)", s.m_data);
+				break;
+
+			case TMDSSymbol::TMDS_TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				break;
+
+			case TMDSSymbol::TMDS_TYPE_ERROR:
+			default:
+				snprintf(tmp, sizeof(tmp), "ERROR");
+				break;
+
+		}
+		return string(tmp);
+	}
+	return "";
+}

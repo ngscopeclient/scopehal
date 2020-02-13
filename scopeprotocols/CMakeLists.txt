@@ -31,6 +31,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeriodMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
+	TMDSDecoder.cpp
+	TMDSRenderer.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
 	USB2ActivityDecoder.cpp
