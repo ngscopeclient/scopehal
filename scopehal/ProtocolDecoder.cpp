@@ -52,6 +52,23 @@ ProtocolDecoderParameter::ProtocolDecoderParameter(ParameterTypes type)
 
 void ProtocolDecoderParameter::ParseString(string str)
 {
+	//Look up the last character of the string and see if there's a SI scaling factor
+	float scale = 1;
+	if(str != "")
+	{
+		char suffix = str[str.size()-1];
+		if(suffix == 'G')
+			scale = 1000000000.0f;
+		else if(suffix == 'M')
+			scale = 1000000.0f;
+		else if(suffix == 'K')
+			scale = 1000.0f;
+		else if(suffix == 'm')
+			scale = 0.001f;
+		else if(suffix == 'u')	//TODO: handle μ
+			scale = 0.000001f;
+	}
+
 	switch(m_type)
 	{
 		case TYPE_BOOL:
@@ -78,6 +95,9 @@ void ProtocolDecoderParameter::ParseString(string str)
 			m_filename = str;
 			break;
 	}
+
+	m_intval *= scale;
+	m_floatval *= scale;
 }
 
 string ProtocolDecoderParameter::ToString()
@@ -86,11 +106,26 @@ string ProtocolDecoderParameter::ToString()
 	switch(m_type)
 	{
 		case TYPE_FLOAT:
-			snprintf(str_out, sizeof(str_out), "%f", m_floatval);
+			if(fabs(m_floatval) > 1000000000.0f)
+				snprintf(str_out, sizeof(str_out), "%f G", m_floatval / 1000000000.0f);
+			else if(fabs(m_floatval) > 1000000.0f)
+				snprintf(str_out, sizeof(str_out), "%f M", m_floatval / 1000000.0f);
+			else if(fabs(m_floatval) > 1000.0f)
+				snprintf(str_out, sizeof(str_out), "%f k", m_floatval / 1000.0f);
+			else
+				snprintf(str_out, sizeof(str_out), "%f", m_floatval);
 			break;
 		case TYPE_BOOL:
 		case TYPE_INT:
-			snprintf(str_out, sizeof(str_out), "%d", m_intval);
+			if(fabs(m_intval) > 1000000000.0f)
+				snprintf(str_out, sizeof(str_out), "%f G", m_intval / 1000000000.0f);
+			else if(fabs(m_intval) > 1000000.0f)
+				snprintf(str_out, sizeof(str_out), "%f M", m_intval / 1000000.0f);
+			else if(fabs(m_intval) > 1000.0f)
+				snprintf(str_out, sizeof(str_out), "%f k", m_intval / 1000.0f);
+			else
+				snprintf(str_out, sizeof(str_out), "%d", m_intval);
+			break;
 			break;
 		case TYPE_FILENAME:
 			return m_filename;
