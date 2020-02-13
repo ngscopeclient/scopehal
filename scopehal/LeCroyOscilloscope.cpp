@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -819,10 +819,14 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 {
-	//First packet is just a header "DAT1,\n". Throw it away.
-	ReadData();
+	//First packet is just a header "DAT1,\n" or "DESC,\n". Throw it away.
+	//In some rare circumstances, such as when the user touches front panel controls,
+	//it appears we can get a blank line before this. Ignore that.
+	string header = ReadData();
+	while(header == "\n")
+		header = ReadData();
 
-	//Second blocks is a header including the message length. Parse that.
+	//Second block is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
 	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
 	//LogDebug("lhdr: %s\n", lhdr.c_str());
@@ -837,6 +841,7 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	while(true)
 	{
 		string payload = ReadData();
+		//LogDebug("got %zu payload bytes\n", payload.size());
 		data += payload;
 		if(data.size() >= num_bytes)
 			break;
@@ -911,7 +916,22 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])
-			ReadWaveformBlock(wavedescs[i]);
+		{
+			if(!ReadWaveformBlock(wavedescs[i]))
+				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+		}
+	}
+
+	//Check length, complain if a wavedesc comes back too short
+	size_t expected_wavedesc_size = 346;
+	for(auto& w : wavedescs)
+	{
+		if(w.size() < expected_wavedesc_size)
+		{
+			LogError("Got wavedesc of %zu bytes (expected %zu)\n", w.size(), expected_wavedesc_size);
+			m_mutex.unlock();
+			return false;
+		}
 	}
 
 	//Figure out how many sequences we have
