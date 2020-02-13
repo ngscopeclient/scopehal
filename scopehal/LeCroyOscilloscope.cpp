@@ -920,11 +920,14 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 	//Check length, complain if a wavedesc comes back too short
 	size_t expected_wavedesc_size = 346;
-	for(auto& w : wavedescs)
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		if(w.size() < expected_wavedesc_size)
+		if(!enabled[i])
+			continue;
+
+		if(wavedescs[i].size() < expected_wavedesc_size)
 		{
-			LogError("Got wavedesc of %zu bytes (expected %zu)\n", w.size(), expected_wavedesc_size);
+			LogError("Got wavedesc of %zu bytes (expected %zu)\n", wavedescs[i].size(), expected_wavedesc_size);
 			m_mutex.unlock();
 			return false;
 		}
