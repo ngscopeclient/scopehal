@@ -829,7 +829,6 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Second block is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
 	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
-	//LogDebug("lhdr: %s\n", lhdr.c_str());
 	if(num_bytes == 0)
 	{
 		ReadData();
@@ -841,12 +840,9 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	while(true)
 	{
 		string payload = ReadData();
-		//LogDebug("got %zu payload bytes\n", payload.size());
 		data += payload;
 		if(data.size() >= num_bytes)
 			break;
-		//float local_progress = data.size() * 1.0f / num_bytes;
-		//progress_callback(base_progress + local_progress / m_analogChannelCount);
 	}
 
 	//Throw away the newline at the end
