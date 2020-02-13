@@ -177,6 +177,13 @@ void TMDSDecoder::Refresh()
 
 	//TODO: TERC4 (5.4.3)
 
+	enum
+	{
+		TYPE_DATA,
+		TYPE_PREAMBLE,
+		TYPE_GUARD
+	} last_symbol_type = TYPE_DATA;
+
 	//Decode the actual data
 	for(size_t i=max_offset; i<sampdata.size()-11; i+= 10)
 	{
@@ -198,6 +205,7 @@ void TMDSDecoder::Refresh()
 					sampdata[i].m_offset,
 					sampdata[i+10].m_offset - sampdata[i].m_offset,
 					TMDSSymbol(TMDSSymbol::TMDS_TYPE_CONTROL, j)));
+				last_symbol_type = TYPE_PREAMBLE;
 				break;
 			}
 		}
@@ -206,22 +214,26 @@ void TMDSDecoder::Refresh()
 			continue;
 
 		//Check for HDMI video/control leading guard band
-		for(size_t j=0; j<2; j++)
+		if( (last_symbol_type == TYPE_PREAMBLE) || (last_symbol_type == TYPE_GUARD) )
 		{
-			match = true;
-			for(size_t k=0; k<10; k++)
+			for(size_t j=0; j<2; j++)
 			{
-				if(sampdata[i+k].m_sample != video_guard[j][k])
-					match = false;
-			}
+				match = true;
+				for(size_t k=0; k<10; k++)
+				{
+					if(sampdata[i+k].m_sample != video_guard[j][k])
+						match = false;
+				}
 
-			if(match)
-			{
-				cap->m_samples.push_back(TMDSSample(
-					sampdata[i].m_offset,
-					sampdata[i+10].m_offset - sampdata[i].m_offset,
-					TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, j)));
-				break;
+				if(match)
+				{
+					cap->m_samples.push_back(TMDSSample(
+						sampdata[i].m_offset,
+						sampdata[i+10].m_offset - sampdata[i].m_offset,
+						TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, j)));
+					last_symbol_type = TYPE_GUARD;
+					break;
+				}
 			}
 		}
 
@@ -253,6 +265,7 @@ void TMDSDecoder::Refresh()
 			sampdata[i].m_offset,
 			sampdata[i+10].m_offset - sampdata[i].m_offset,
 			TMDSSymbol(TMDSSymbol::TMDS_TYPE_DATA, d)));
+		last_symbol_type = TYPE_DATA;
 	}
 
 	SetData(cap);
