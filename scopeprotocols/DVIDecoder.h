@@ -36,7 +36,7 @@
 #ifndef DVIDecoder_h
 #define DVIDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "../scopehal/PacketDecoder.h"
 
 class DVISymbol
 {
@@ -68,10 +68,16 @@ public:
 	}
 };
 
+class VideoScanlinePacket : public Packet
+{
+public:
+	virtual ~VideoScanlinePacket();
+};
+
 typedef OscilloscopeSample<DVISymbol> DVISample;
 typedef CaptureChannel<DVISymbol> DVICapture;
 
-class DVIDecoder : public ProtocolDecoder
+class DVIDecoder : public PacketDecoder
 {
 public:
 	DVIDecoder(std::string color);
@@ -82,6 +88,8 @@ public:
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
+
+	virtual std::vector<std::string> GetHeaders();
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 

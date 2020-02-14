@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,11 +39,12 @@
 class Packet
 {
 public:
+	virtual ~Packet();
 
 	///Offset of the packet from the start of the capture (picoseconds)
 	int64_t m_offset;
 
-	///End time of the packet (seconds)
+	///Duration time of the packet (picoseconds)
 	int64_t m_len;
 
 	//Arbitrary header properties (human readable)

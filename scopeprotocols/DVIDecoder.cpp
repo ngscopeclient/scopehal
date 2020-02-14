@@ -43,10 +43,16 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+VideoScanlinePacket::~VideoScanlinePacket()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 DVIDecoder::DVIDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("D0 (blue)");
@@ -97,6 +103,14 @@ void DVIDecoder::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
+vector<string> DVIDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Width");
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -130,6 +144,9 @@ void DVIDecoder::Refresh()
 
 	TMDSSymbol::TMDSType last_type = TMDSSymbol::TMDS_TYPE_ERROR;
 
+	VideoScanlinePacket* current_packet = NULL;
+	int current_pixels = 0;
+
 	//Decode the actual data
 	for(iblue = 0; (iblue < dblue->size()) && (igreen < dgreen->size()) && (ired < dred->size()); )
 	{
@@ -138,6 +155,19 @@ void DVIDecoder::Refresh()
 		//Control code in master channel? Decode it
 		if(sblue.m_sample.m_type == TMDSSymbol::TMDS_TYPE_CONTROL)
 		{
+			//If the last sample was data, save the packet for the scanline or data island
+			if( (last_type == TMDSSymbol::TMDS_TYPE_DATA) && (current_packet != NULL) )
+			{
+				current_packet->m_len = sblue.m_offset + sblue.m_duration - current_packet->m_offset;
+				char tmp[32];
+				snprintf(tmp, sizeof(tmp), "%d", current_pixels);
+				current_packet->m_headers["Width"] = tmp;
+				m_packets.push_back(current_packet);
+
+				current_pixels = 0;
+				current_packet = NULL;
+			}
+
 			//Extract synchronization signals from blue channel
 			//Red/green have status signals that aren't used in DVI.
 			bool hsync = (sblue.m_sample.m_data & 1) ? true : false;
@@ -215,6 +245,12 @@ void DVIDecoder::Refresh()
 					ired += delta;
 					break;
 				}
+
+				//Start a new packet
+				current_packet = new VideoScanlinePacket;
+				current_packet->m_offset = sblue.m_offset;
+				current_packet->m_headers["Type"] = "Video";
+				current_pixels = 0;
 			}
 
 			auto sgreen = dgreen->m_samples[igreen];
@@ -226,6 +262,15 @@ void DVIDecoder::Refresh()
 				sred.m_sample.m_data,
 				sgreen.m_sample.m_data,
 				sblue.m_sample.m_data)));
+
+			//may be null if waveform starts halfway through a scan line. Don't make a packet for that.
+			if(current_packet != NULL)
+			{
+				current_packet->m_data.push_back(sred.m_sample.m_data);
+				current_packet->m_data.push_back(sgreen.m_sample.m_data);
+				current_packet->m_data.push_back(sblue.m_sample.m_data);
+				current_pixels ++;
+			}
 		}
 
 		//Save the previous type of sample
@@ -236,6 +281,9 @@ void DVIDecoder::Refresh()
 		igreen ++;
 		ired ++;
 	}
+
+	if(current_packet)
+		delete current_packet;
 
 	SetData(cap);
 }
