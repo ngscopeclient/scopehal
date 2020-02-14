@@ -31,6 +31,7 @@
 #include "LeCroyOscilloscope.h"
 #include "ProtocolDecoder.h"
 #include "base64.h"
+#include <locale>
 
 using namespace std;
 
@@ -1005,22 +1006,47 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(h_off_frac < 0)
 			h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
 
-		//Timestamp is a somewhat complex format that needs some shuffling around.
+		/*
+			Timestamp is a somewhat complex format that needs some shuffling around.
+			Timestamp starts at offset 296 bytes in the wavedesc
+			(296-303)	double seconds
+			(304)		byte minutes
+			(305)		byte hours
+			(306)		byte days
+			(307)		byte months
+			(308-309)	uint16 year
+		 */
 		double fseconds = *reinterpret_cast<double*>(pdesc + 296);
 		uint8_t seconds = floor(fseconds);
 		double basetime = fseconds - seconds;
+
+		//TODO: during startup, query instrument for its current time zone
+		//since the wavedesc reports instment local time
+
+		//Get the current time
 		time_t tnow = time(NULL);
-		struct tm* now = localtime(&tnow);
 		struct tm tstruc;
-		tstruc.tm_sec = seconds;
-		tstruc.tm_min = pdesc[304];
-		tstruc.tm_hour = pdesc[305];
-		tstruc.tm_mday = pdesc[306];
-		tstruc.tm_mon = pdesc[307];
-		tstruc.tm_year = *reinterpret_cast<uint16_t*>(pdesc+308);
-		tstruc.tm_wday = now->tm_wday;
-		tstruc.tm_yday = now->tm_yday;
-		tstruc.tm_isdst = now->tm_isdst;
+		localtime_r(&tnow, &tstruc);
+
+		//Convert the instrument time to a string, then back to a tm
+		//Is there a better way to do this???
+		//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
+		//Maybe because tm_yday is inconsistent?
+		char tblock[64] = {0};
+		snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
+			*reinterpret_cast<uint16_t*>(pdesc+308),
+			pdesc[307],
+			pdesc[306],
+			pdesc[305],
+			pdesc[304],
+			seconds);
+		locale cur_locale;
+		auto& tget = use_facet< time_get<char> >(cur_locale);
+		istringstream stream(tblock);
+		ios::iostate state;
+		char format[] = "%F %T";
+		tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
+		time_t ttime = mktime(&tstruc);
 
 		//Read the actual waveform data
 		string data;
@@ -1047,7 +1073,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			cap->m_timescale = round(interval);
 
 			cap->m_triggerPhase = h_off_frac;
-			cap->m_startTimestamp = mktime(&tstruc);
+			cap->m_startTimestamp = ttime;
 
 			//Parse the time
 			if(num_sequences > 1)
