@@ -30,63 +30,90 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of DVIRenderer
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
+#include "scopeprotocols.h"
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "DVIRenderer.h"
 
-/**
-	@brief An analog capture whose vertical scale is picoseconds instead of volts
- */
-class TimeCapture : public AnalogCapture
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+DVIRenderer::DVIRenderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
 {
-public:
-	virtual ~TimeCapture();
-};
+}
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
 
-#endif
+Gdk::Color DVIRenderer::GetColor(int i)
+{
+	DVICapture* capture = dynamic_cast<DVICapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const DVISymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_type)
+		{
+			case DVISymbol::DVI_TYPE_PREAMBLE:
+				return m_standardColors[COLOR_PREAMBLE];
+
+			case DVISymbol::DVI_TYPE_HSYNC:
+			case DVISymbol::DVI_TYPE_VSYNC:
+				return m_standardColors[COLOR_CONTROL];
+
+			case DVISymbol::DVI_TYPE_VIDEO:
+				{
+					Gdk::Color ret;
+					ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
+					return ret;
+				}
+
+			case DVISymbol::DVI_TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string DVIRenderer::GetText(int i)
+{
+	DVICapture* capture = dynamic_cast<DVICapture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const DVISymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_type)
+		{
+			case DVISymbol::DVI_TYPE_PREAMBLE:
+				return "BLANK";
+
+			case DVISymbol::DVI_TYPE_HSYNC:
+				return "HSYNC";
+
+			case DVISymbol::DVI_TYPE_VSYNC:
+				return "VSYNC";
+
+			case DVISymbol::DVI_TYPE_VIDEO:
+				snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
+				break;
+
+			case DVISymbol::DVI_TYPE_ERROR:
+			default:
+				return "ERROR";
+
+		}
+		return string(tmp);
+	}
+	return "";
+}

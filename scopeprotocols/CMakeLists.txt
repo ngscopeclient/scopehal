@@ -7,6 +7,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClockRecoveryDecoder.cpp
 	DCOffsetDecoder.cpp
 	DifferenceDecoder.cpp
+	DVIDecoder.cpp
+	DVIRenderer.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
 	EthernetAutonegotiationDecoder.cpp

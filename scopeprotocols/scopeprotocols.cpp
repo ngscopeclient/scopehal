@@ -48,6 +48,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ClockJitterDecoder);
 	AddDecoderClass(DCOffsetDecoder);
 	AddDecoderClass(DifferenceDecoder);
+	AddDecoderClass(DVIDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
 	//AddDecoderClass(EthernetAutonegotiationDecoder);

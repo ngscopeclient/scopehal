@@ -30,63 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of DVIDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef DVIDecoder_h
+#define DVIDecoder_h
 
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-/**
-	@brief An analog capture whose vertical scale is picoseconds instead of volts
- */
-class TimeCapture : public AnalogCapture
+class DVISymbol
 {
 public:
-	virtual ~TimeCapture();
+	enum DVIType
+	{
+		DVI_TYPE_PREAMBLE,
+		DVI_TYPE_HSYNC,
+		DVI_TYPE_VSYNC,
+		DVI_TYPE_VIDEO,
+		DVI_TYPE_ERROR
+	};
+
+	DVISymbol(DVIType type, uint8_t r = 0, uint8_t g = 0, uint8_t b = 0)
+	 : m_type(type)
+	 , m_red(r)
+	 , m_green(g)
+	 , m_blue(b)
+	{}
+
+	DVIType m_type;
+	uint8_t m_red;
+	uint8_t m_green;
+	uint8_t m_blue;
+
+	bool operator== (const DVISymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_red == s.m_red) && (m_green == s.m_green) && (m_blue == s.m_blue);
+	}
 };
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+typedef OscilloscopeSample<DVISymbol> DVISample;
+typedef CaptureChannel<DVISymbol> DVICapture;
+
+class DVIDecoder : public ProtocolDecoder
+{
+public:
+	DVIDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(DVIDecoder)
+
+protected:
+};
 
 #endif
