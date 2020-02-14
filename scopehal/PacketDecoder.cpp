@@ -58,3 +58,8 @@ bool PacketDecoder::GetShowDataColumn()
 {
 	return true;
 }
+
+bool PacketDecoder::GetShowImageColumn()
+{
+	return false;
+}

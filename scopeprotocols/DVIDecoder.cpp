@@ -111,6 +111,11 @@ vector<string> DVIDecoder::GetHeaders()
 	return ret;
 }
 
+bool DVIDecoder::GetShowImageColumn()
+{
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -263,6 +268,7 @@ void DVIDecoder::Refresh()
 				sgreen.m_sample.m_data,
 				sblue.m_sample.m_data)));
 
+			//In-memory packet data is RGB order for compatibility with Gdk::Pixbuf
 			//may be null if waveform starts halfway through a scan line. Don't make a packet for that.
 			if(current_packet != NULL)
 			{

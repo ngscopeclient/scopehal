@@ -70,6 +70,7 @@ public:
 	virtual std::vector<std::string> GetHeaders() =0;
 
 	virtual bool GetShowDataColumn();
+	virtual bool GetShowImageColumn();
 
 protected:
 	void ClearPackets();
