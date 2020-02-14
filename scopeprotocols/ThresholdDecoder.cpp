@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -112,11 +112,13 @@ void ThresholdDecoder::Refresh()
 	//Threshold all of our samples
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
 	DigitalCapture* cap = new DigitalCapture;
+	cap->m_samples.resize(din->m_samples.size());
+	#pragma omp parallel for
 	for(size_t i=0; i<din->m_samples.size(); i++)
 	{
 		AnalogSample sin = din->m_samples[i];
 		bool b = (float)sin > midpoint;
-		cap->m_samples.push_back(DigitalSample(sin.m_offset, sin.m_duration, b));
+		cap->m_samples[i] = DigitalSample(sin.m_offset, sin.m_duration, b);
 	}
 	SetData(cap);
 
