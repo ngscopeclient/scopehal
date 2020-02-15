@@ -29,7 +29,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ClockRecoveryDecoder.h"
+#include "scopeprotocols.h"
 #include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
@@ -54,6 +54,9 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_threshname].SetFloatVal(0);
+
+	m_phaseErrorCapture = NULL;
+	m_nominalPeriod = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +142,7 @@ void ClockRecoveryDecoder::Refresh()
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
 	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
+	m_nominalPeriod = ps;
 
 	//Create the output waveform and copy our timescales
 	DigitalCapture* cap = new DigitalCapture;
@@ -146,6 +150,15 @@ void ClockRecoveryDecoder::Refresh()
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
+
+	//Create debug capture
+	if(m_phaseErrorCapture != NULL)
+		m_phaseErrorCapture = NULL;
+	m_phaseErrorCapture = new TimeCapture;
+	m_phaseErrorCapture->m_startTimestamp = din->m_startTimestamp;
+	m_phaseErrorCapture->m_startPicoseconds = din->m_startPicoseconds;
+	m_phaseErrorCapture->m_triggerPhase = 0;
+	m_phaseErrorCapture->m_timescale = 1;
 
 	double start = GetTime();
 
@@ -175,6 +188,7 @@ void ClockRecoveryDecoder::Refresh()
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 	bool gating = false;
+	int cycles_open_loop = 0;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -213,11 +227,23 @@ void ClockRecoveryDecoder::Refresh()
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
+		cycles_open_loop ++;
 		while(tnext + center < edgepos)
 		{
 			//Find phase error
 			int64_t delta = (edgepos - tnext) - period;
 			total_error += fabs(delta);
+
+			//Extend the previous debug sample to now
+			if(!m_phaseErrorCapture->m_samples.empty())
+			{
+				auto& last = m_phaseErrorCapture->m_samples[m_phaseErrorCapture->size() - 1];
+				last.m_duration = tnext - last.m_offset;
+			}
+
+			//Record the current phase error
+			m_phaseErrorCapture->m_samples.push_back(AnalogSample(
+				tnext, period, delta));
 
 			//If the clock is currently gated, re-sync to the edge
 			if(was_gating && !gating)
@@ -227,16 +253,19 @@ void ClockRecoveryDecoder::Refresh()
 			}
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
+			//If we skipped some edges, apply a larger correction
 			else if(delta > 0)
 			{
-				period  -= 0.00005 * period;
-				edgepos -= 0.005 * period;
+				period  -= 0.000025 * period * cycles_open_loop;
+				edgepos -= 0.0025 * period * cycles_open_loop;
 			}
 			else
 			{
-				period  += 0.00005 * period;
-				edgepos += 0.005 * period;
+				period  += 0.000025 * period * cycles_open_loop;
+				edgepos += 0.0025 * period * cycles_open_loop;
 			}
+
+			cycles_open_loop = 0;
 
 			//LogDebug("%ld,%ld,%.2f\n", nedge, delta, period);
 			tnext = edges[++nedge];
