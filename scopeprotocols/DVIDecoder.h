@@ -72,9 +72,6 @@ class VideoScanlinePacket : public Packet
 {
 public:
 	virtual ~VideoScanlinePacket();
-
-	//scanline data stretched to be several pixels high
-	std::vector<uint8_t>	m_image;
 };
 
 typedef OscilloscopeSample<DVISymbol> DVISample;

@@ -121,6 +121,8 @@ bool DVIDecoder::GetShowImageColumn()
 
 void DVIDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Get the input data
 	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) || (m_channels[2] == NULL) )
 	{
@@ -188,6 +190,11 @@ void DVIDecoder::Refresh()
 
 			else if(vsync)
 			{
+				auto pack = new Packet;
+				pack->m_offset = sblue.m_offset;
+				pack->m_headers["Type"] = "VSYNC";
+				m_packets.push_back(pack);
+
 				cap->m_samples.push_back(DVISample(
 					sblue.m_offset, sblue.m_duration,
 					DVISymbol(DVISymbol::DVI_TYPE_VSYNC)));
