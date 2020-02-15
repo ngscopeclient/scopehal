@@ -95,8 +95,7 @@ string TMDSRenderer::GetText(int i)
 				break;
 
 			case TMDSSymbol::TMDS_TYPE_GUARD:
-				snprintf(tmp, sizeof(tmp), "GB (%d)", s.m_data);
-				break;
+				return "GB";
 
 			case TMDSSymbol::TMDS_TYPE_DATA:
 				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
@@ -104,8 +103,7 @@ string TMDSRenderer::GetText(int i)
 
 			case TMDSSymbol::TMDS_TYPE_ERROR:
 			default:
-				snprintf(tmp, sizeof(tmp), "ERROR");
-				break;
+				return "ERROR";
 
 		}
 		return string(tmp);

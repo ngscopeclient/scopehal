@@ -83,6 +83,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(TMDSDecoder)
 
 protected:
+	std::string m_lanename;
 };
 
 #endif

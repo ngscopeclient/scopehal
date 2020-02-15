@@ -53,6 +53,10 @@ TMDSDecoder::TMDSDecoder(string color)
 
 	m_signalNames.push_back("clk");
 	m_channels.push_back(NULL);
+
+	m_lanename = "Lane number";
+	m_parameters[m_lanename] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_lanename].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,11 +172,14 @@ void TMDSDecoder::Refresh()
 		}
 	}
 
+	int lane = m_parameters[m_lanename].GetIntVal();
+
 	//HDMI Video guard band (HDMI 1.4 spec 5.2.2.1)
-	static const bool video_guard[2][10] =
+	static const bool video_guard[3][10] =
 	{
 		{ 0, 0, 1, 1, 0, 0, 1, 1, 0, 1 },
-		{ 1, 1, 0, 0, 1, 1, 0, 0, 1, 0 }		//also used for data guard band, 5.2.3.3
+		{ 1, 1, 0, 0, 1, 1, 0, 0, 1, 0 },		//also used for data guard band, 5.2.3.3
+		{ 0, 0, 1, 1, 0, 0, 1, 1, 0, 1 },
 	};
 
 	//TODO: TERC4 (5.4.3)
@@ -216,24 +223,21 @@ void TMDSDecoder::Refresh()
 		//Check for HDMI video/control leading guard band
 		if( (last_symbol_type == TYPE_PREAMBLE) || (last_symbol_type == TYPE_GUARD) )
 		{
-			for(size_t j=0; j<2; j++)
+			match = true;
+			for(size_t k=0; k<10; k++)
 			{
-				match = true;
-				for(size_t k=0; k<10; k++)
-				{
-					if(sampdata[i+k].m_sample != video_guard[j][k])
-						match = false;
-				}
+				if(sampdata[i+k].m_sample != video_guard[lane][k])
+					match = false;
+			}
 
-				if(match)
-				{
-					cap->m_samples.push_back(TMDSSample(
-						sampdata[i].m_offset,
-						sampdata[i+10].m_offset - sampdata[i].m_offset,
-						TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, j)));
-					last_symbol_type = TYPE_GUARD;
-					break;
-				}
+			if(match)
+			{
+				cap->m_samples.push_back(TMDSSample(
+					sampdata[i].m_offset,
+					sampdata[i+10].m_offset - sampdata[i].m_offset,
+					TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, 0)));
+				last_symbol_type = TYPE_GUARD;
+				break;
 			}
 		}
 
@@ -259,7 +263,7 @@ void TMDSDecoder::Refresh()
 		if(d8)
 			d ^= (d << 1);
 		else
-			d = ~(d << 1);
+			d ^= (d << 1) ^ 0xfe;
 
 		cap->m_samples.push_back(TMDSSample(
 			sampdata[i].m_offset,
