@@ -5,6 +5,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
+	ClockRecoveryDebugDecoder.cpp
 	DCOffsetDecoder.cpp
 	DifferenceDecoder.cpp
 	DVIDecoder.cpp

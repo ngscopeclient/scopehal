@@ -1,3 +1,4 @@
+
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -27,55 +28,88 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
- */
-
+#include "../scopehal/scopehal.h"
 #include "scopeprotocols.h"
+#include "../scopehal/AnalogRenderer.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ClockRecoveryDebugDecoder::ClockRecoveryDebugDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+	//Set up channels
+	m_signalNames.push_back("PLL");
+	m_channels.push_back(NULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Dummy destructors for RTTI
+// Factory methods
 
-TimeCapture::~TimeCapture()
+ChannelRenderer* ClockRecoveryDebugDecoder::CreateRenderer()
 {
+	return new AnalogRenderer(this);
+}
+
+bool ClockRecoveryDebugDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (dynamic_cast<ClockRecoveryDecoder*>(channel) != NULL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+void ClockRecoveryDebugDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "ClockRecPhase(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+string ClockRecoveryDebugDecoder::GetProtocolName()
+{
+	return "Clock Recovery Phase";
+}
+
+bool ClockRecoveryDebugDecoder::IsOverlay()
+{
+	return false;
+}
+
+bool ClockRecoveryDebugDecoder::NeedsConfig()
+{
+	return false;
+}
+
+double ClockRecoveryDebugDecoder::GetVoltageRange()
+{
+	auto chin = dynamic_cast<ClockRecoveryDecoder*>(m_channels[0]);
+	if(chin == NULL)
+		return 100;
+	return chin->m_nominalPeriod;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void ClockRecoveryDebugDecoder::Refresh()
+{
+	auto chin = dynamic_cast<ClockRecoveryDecoder*>(m_channels[0]);
+
+	//Get the input data
+	if(chin == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	SetData(chin->m_phaseErrorCapture);
+	chin->m_phaseErrorCapture = NULL;
+	return;
+
 }

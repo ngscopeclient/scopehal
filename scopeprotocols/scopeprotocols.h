@@ -53,6 +53,7 @@ public:
 #include "CANDecoder.h"
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
+#include "ClockRecoveryDebugDecoder.h"
 #include "DCOffsetDecoder.h"
 #include "DifferenceDecoder.h"
 #include "DVIDecoder.h"
