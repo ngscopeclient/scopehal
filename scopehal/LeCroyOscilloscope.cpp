@@ -1286,7 +1286,7 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 	//Update cache
 	if(isdigit(source[1]))
 		m_triggerChannel = source[1] - '1';
-	else if(!strcmp(source, "EX"))
+	else if(strstr(source, "EX") == source)	//EX or EX10 for /1 or /10
 		m_triggerChannel = m_extTrigChannel->GetIndex();
 	else
 	{
