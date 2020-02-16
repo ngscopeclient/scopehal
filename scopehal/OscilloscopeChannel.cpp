@@ -63,6 +63,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_index(index)
 	, m_physical(physical)
 	, m_refcount(0)
+	, m_yAxisUnit(Unit::UNIT_VOLTS)
 {
 }
 

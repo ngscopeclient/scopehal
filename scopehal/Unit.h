@@ -30,55 +30,51 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of Unit
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef Unit_h
+#define Unit_h
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+/**
+	@brief A unit of measurement, plus conversion to pretty-printed output
+ */
+class Unit
+{
+public:
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "ClockRecoveryDebugDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+	enum UnitType
+	{
+		UNIT_PS,		//Time. Note that this is not a SI base unit.
+						//Using picoseconds allows integer math for most timebases, which keeps things nice and simple.
+		UNIT_HZ,		//Frequency
+		UNIT_VOLTS,		//Voltage
+		UNIT_AMPS,		//Current
+		UNIT_OHMS,		//Resistance
+		UNIT_BITRATE,	//Bits per second
+		UNIT_PERCENT,	//Dimensionless ratio
+		UNIT_DB			//Dimensionless ratio
+
+		//TODO: more here
+	};
+
+	Unit(Unit::UnitType t)
+	: m_type(t)
+	{}
+
+	std::string PrettyPrint(double value);
+
+	UnitType GetType()
+	{ return m_type; }
+
+	bool operator==(const Unit& rhs)
+	{ return m_type == rhs.m_type; }
+
+	bool operator!=(const Unit& rhs)
+	{ return m_type != rhs.m_type; }
+
+protected:
+	UnitType m_type;
+};
 
 #endif

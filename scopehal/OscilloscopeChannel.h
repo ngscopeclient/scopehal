@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -141,6 +141,9 @@ public:
 	virtual double GetOffset();
 	virtual void SetOffset(double offset);
 
+	virtual Unit GetYAxisUnits()
+	{ return m_yAxisUnit; }
+
 protected:
 
 	Oscilloscope* m_scope;
@@ -168,6 +171,9 @@ protected:
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;
+
+	///Unit of measurement for our vertical axis
+	Unit m_yAxisUnit;
 };
 
 #endif

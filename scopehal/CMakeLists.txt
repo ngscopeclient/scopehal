@@ -5,6 +5,8 @@ set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
 
+	Unit.cpp
+
 	AnalogRenderer.cpp
 	AsciiRenderer.cpp
 	ChannelRenderer.cpp

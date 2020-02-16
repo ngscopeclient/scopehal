@@ -39,6 +39,8 @@ using namespace std;
 ClockJitterDecoder::ClockJitterDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 {
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
+
 	//Set up channels
 	m_signalNames.push_back("Clock");
 	m_signalNames.push_back("Golden");
@@ -129,7 +131,7 @@ void ClockJitterDecoder::Refresh()
 	}
 
 	//Create the output
-	TimeCapture* cap = new TimeCapture;
+	AnalogCapture* cap = new AnalogCapture;
 
 	//Timestamps of the edges
 	vector<int64_t> edges;

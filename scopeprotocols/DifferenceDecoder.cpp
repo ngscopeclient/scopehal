@@ -3,7 +3,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -115,6 +115,14 @@ void DifferenceDecoder::Refresh()
 	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
 	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
 	if( (din_p == NULL) || (din_n == NULL) )
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Set up units and complain if they're inconsistent
+	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
+	if(m_yAxisUnit != m_channels[1]->GetYAxisUnits())
 	{
 		SetData(NULL);
 		return;

@@ -40,6 +40,8 @@ using namespace std;
 PeriodMeasurementDecoder::PeriodMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
+
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
@@ -127,12 +129,17 @@ void PeriodMeasurementDecoder::Refresh()
 		return;
 	}
 
-	//Create the output
-	TimeCapture* cap = new TimeCapture;
-
 	//Timestamps of the edges
 	vector<int64_t> edges;
 	FindZeroCrossings(din, 0, edges);
+	if(edges.size() < 2)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Create the output
+	AnalogCapture* cap = new AnalogCapture;
 
 	double rmin = FLT_MAX;
 	double rmax = 0;

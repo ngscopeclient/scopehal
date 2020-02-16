@@ -72,10 +72,3 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PMADecoder);
 	AddDecoderClass(WaterfallDecoder);
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Dummy destructors for RTTI
-
-TimeCapture::~TimeCapture()
-{
-}

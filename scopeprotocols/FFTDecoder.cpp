@@ -47,6 +47,8 @@ FFTCapture::~FFTCapture()
 FFTDecoder::FFTDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
+	m_yAxisUnit = Unit(Unit::UNIT_DB);
+
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);

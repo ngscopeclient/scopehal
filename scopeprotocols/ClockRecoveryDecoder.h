@@ -58,7 +58,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryDecoder)
 
 	//Debug
-	TimeCapture* m_phaseErrorCapture;
+	AnalogCapture* m_phaseErrorCapture;
 	int64_t m_nominalPeriod;
 
 protected:

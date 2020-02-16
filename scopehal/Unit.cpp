@@ -27,58 +27,120 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopehal.h"
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+using namespace std;
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+string Unit::PrettyPrint(double value)
+{
+	const char* scale = "";
+	const char* unit = "";
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "ClockRecoveryDebugDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetProtocolDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+	double value_rescaled = value;
 
-#endif
+	//Default scaling and prefixes for SI base units
+	if(fabs(value) > 1e9)
+	{
+		value_rescaled /= 1e9;
+		scale = "G";
+	}
+	if(fabs(value) > 1e6)
+	{
+		value_rescaled /= 1e6;
+		scale = "M";
+	}
+	else if(fabs(value) > 1e3)
+	{
+		value_rescaled /= 1e3;
+		scale = "k";
+	}
+	else if(fabs(value) < 1e-3)
+	{
+		value_rescaled *= 1e3;
+		scale = "m";
+	}
+	else if(fabs(value) < 1e-6)
+	{
+		value_rescaled *= 1e6;
+		scale = "μ";
+	}
+	else if(fabs(value) < 1e-9)
+	{
+		value_rescaled *= 1e9;
+		scale = "p";
+	}
+
+	switch(m_type)
+	{
+		//Special handling needed since it's not a SI base unit
+		case UNIT_PS:
+			unit = "s";
+
+			if(fabs(value) >= 1e12)
+			{
+				value_rescaled = value / 1e12;
+				scale = "";
+			}
+			else if(fabs(value) >= 1e9)
+			{
+				value_rescaled = value / 1e9;
+				scale = "m";
+			}
+			else if(fabs(value) >= 1e6)
+			{
+				value_rescaled = value / 1e6;
+				scale = "μ";
+			}
+			else if(fabs(value) >= 1e3)
+			{
+				LogDebug("value = %.4f ps\n", value);
+				value_rescaled = value / 1e3;
+				scale = "n";
+			}
+			else
+			{
+				value_rescaled = value;
+				scale = "p";
+			}
+			break;
+
+		case UNIT_HZ:
+			unit = "Hz";
+			break;
+
+		case UNIT_VOLTS:
+			unit = "V";
+			break;
+
+		case UNIT_AMPS:
+			unit = "A";
+			break;
+
+		case UNIT_OHMS:
+			unit = "Ω";
+			break;
+
+		case UNIT_BITRATE:
+			unit = "bps";
+			break;
+
+		//Dimensionless unit, no scaling applied
+		case UNIT_PERCENT:
+			unit = "%";
+			scale = "";
+			value_rescaled = value;
+			break;
+		case UNIT_DB:
+			unit = "dB";
+			scale = "";
+			value_rescaled = value;
+			break;
+
+		default:
+			return "Invalid unit";
+	}
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+	return string(tmp);
+}

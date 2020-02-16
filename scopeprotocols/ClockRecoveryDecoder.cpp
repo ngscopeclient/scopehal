@@ -154,7 +154,7 @@ void ClockRecoveryDecoder::Refresh()
 	//Create debug capture
 	if(m_phaseErrorCapture != NULL)
 		m_phaseErrorCapture = NULL;
-	m_phaseErrorCapture = new TimeCapture;
+	m_phaseErrorCapture = new AnalogCapture;
 	m_phaseErrorCapture->m_startTimestamp = din->m_startTimestamp;
 	m_phaseErrorCapture->m_startPicoseconds = din->m_startPicoseconds;
 	m_phaseErrorCapture->m_triggerPhase = 0;

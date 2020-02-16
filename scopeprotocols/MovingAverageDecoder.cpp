@@ -123,12 +123,10 @@ void MovingAverageDecoder::Refresh()
 
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 
+	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
+
 	//Do the average
-	AnalogCapture* cap = NULL;
-	if(dynamic_cast<TimeCapture*>(din) != NULL)
-		cap = new TimeCapture;
-	else
-		cap = new AnalogCapture;
+	AnalogCapture* cap = new AnalogCapture;
 
 	for(size_t i=0; i<din->m_samples.size(); i++)
 	{
