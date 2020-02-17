@@ -93,7 +93,6 @@ string Unit::PrettyPrint(double value)
 			}
 			else if(fabs(value) >= 1e3)
 			{
-				LogDebug("value = %.4f ps\n", value);
 				value_rescaled = value / 1e3;
 				scale = "n";
 			}

@@ -141,6 +141,9 @@ public:
 	virtual double GetOffset();
 	virtual void SetOffset(double offset);
 
+	virtual Unit GetXAxisUnits()
+	{ return m_xAxisUnit; }
+
 	virtual Unit GetYAxisUnits()
 	{ return m_yAxisUnit; }
 
@@ -171,6 +174,9 @@ protected:
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;
+
+	///Unit of measurement for our horizontal axis
+	Unit m_xAxisUnit;
 
 	///Unit of measurement for our vertical axis
 	Unit m_yAxisUnit;
