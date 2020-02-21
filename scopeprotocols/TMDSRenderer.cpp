@@ -91,7 +91,7 @@ string TMDSRenderer::GetText(int i)
 		switch(s.m_type)
 		{
 			case TMDSSymbol::TMDS_TYPE_CONTROL:
-				snprintf(tmp, sizeof(tmp), "C%d", s.m_data);
+				snprintf(tmp, sizeof(tmp), "CTL%d", s.m_data);
 				break;
 
 			case TMDSSymbol::TMDS_TYPE_GUARD:
