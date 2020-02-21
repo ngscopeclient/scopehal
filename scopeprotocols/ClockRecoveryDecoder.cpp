@@ -228,7 +228,7 @@ void ClockRecoveryDecoder::Refresh()
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
 		cycles_open_loop ++;
-		while(tnext + center < edgepos)
+		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
 			//Find phase error
 			int64_t delta = (edgepos - tnext) - period;
