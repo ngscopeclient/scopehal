@@ -39,12 +39,12 @@ string Unit::PrettyPrint(double value)
 	double value_rescaled = value;
 
 	//Default scaling and prefixes for SI base units
-	if(fabs(value) > 1e9)
+	if(fabs(value) > 1e9f)
 	{
 		value_rescaled /= 1e9;
 		scale = "G";
 	}
-	if(fabs(value) > 1e6)
+	else if(fabs(value) > 1e6)
 	{
 		value_rescaled /= 1e6;
 		scale = "M";
