@@ -390,10 +390,14 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand("TER?");
+	// Based on example from 6000 Series Programmer's Guide
+	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
+	m_transport->SendCommand(":OPER:COND?");
 	string ter = m_transport->ReadReply();
+	int cond = atoi(ter.c_str());
 
-	if(ter == "+1")
+	// Check bit 3 ('Run' bit)
+	if((cond & (1 << 3)) != 0)
 		return TRIGGER_MODE_RUN;
 	else
 	{
