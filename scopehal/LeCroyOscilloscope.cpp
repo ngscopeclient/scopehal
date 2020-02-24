@@ -102,6 +102,10 @@ void LeCroyOscilloscope::IdentifyHardware()
 	//Look up model info
 	if(m_model.find("WS3") == 0)
 		m_modelid = MODEL_WAVESURFER_3K;
+	else if(m_model.find("HDO9") == 0)
+		m_modelid = MODEL_HDO_9K;
+	else if(m_model.find("DDA5") == 0)
+		m_modelid = MODEL_DDA_5K;
 	else if(m_model.find("WAVERUNNER8") == 0)
 		m_modelid = MODEL_WAVERUNNER_8K;
 	else
@@ -205,8 +209,14 @@ void LeCroyOscilloscope::DetectOptions()
 
 void LeCroyOscilloscope::DetectAnalogChannels()
 {
-	//Last digit of the model number is the number of channels
+	//Last digit of the model number is normally the number of channels
 	int nchans = m_model[m_model.length() - 1] - '0';
+
+	//DDA5005 and similar have 4 channels despite a model number ending in 5
+	if(m_modelid == MODEL_DDA_5K)
+		nchans = 4;
+
+
 	for(int i=0; i<nchans; i++)
 	{
 		//Hardware name of the channel
