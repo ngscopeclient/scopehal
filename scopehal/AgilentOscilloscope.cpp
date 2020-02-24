@@ -164,6 +164,7 @@ void AgilentOscilloscope::FlushConfigCache()
 
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
+	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
 	m_triggerChannelValid = false;
 	m_triggerLevelValid = false;
@@ -214,22 +215,31 @@ void AgilentOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelCouplings.find(i) != m_channelCouplings.end())
+			return m_channelCouplings[i];
+	}
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
 	string coup_reply = m_transport->ReadReply();
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP?");
 	string imp_reply = m_transport->ReadReply();
 
+	OscilloscopeChannel::CouplingType coupling;
 	if(coup_reply == "AC")
-		return OscilloscopeChannel::COUPLE_AC_1M;
+		coupling = OscilloscopeChannel::COUPLE_AC_1M;
 	else /*if(coup_reply == "DC")*/
 	{
 		if(imp_reply == "ONEM")
-			return OscilloscopeChannel::COUPLE_DC_1M;
+			coupling = OscilloscopeChannel::COUPLE_DC_1M;
 		else /*if(imp_reply == "FIFT")*/
-			return OscilloscopeChannel::COUPLE_DC_50;
+			coupling = OscilloscopeChannel::COUPLE_DC_50;
 	}
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelCouplings[i] = coupling;
+	return coupling;
 }
 
 void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
@@ -255,10 +265,19 @@ void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coup
 		default:
 			LogError("Invalid coupling for channel\n");
 	}
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelCouplings[i] = type;
 }
 
 double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 {
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelAttenuations.find(i) != m_channelAttenuations.end())
+			return m_channelAttenuations[i];
+	}
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
@@ -266,6 +285,9 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 	string reply = m_transport->ReadReply();
 	double atten;
 	sscanf(reply.c_str(), "%lf", &atten);
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelAttenuations[i] = atten;
 	return atten;
 }
 
@@ -276,14 +298,24 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
 
 int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
+			return m_channelBandwidthLimits[i];
+	}
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
 	string reply = m_transport->ReadReply();
+	int bwl;
 	if(reply == "1")
-		return 25;
+		bwl = 25;
 	else
-		return 0;
+		bwl = 0;
+
+	m_channelBandwidthLimits[i] = bwl;
+	return bwl;
 }
 
 void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
