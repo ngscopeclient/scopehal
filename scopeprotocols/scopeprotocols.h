@@ -52,7 +52,6 @@
 #include "EthernetProtocolDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder.h"
 #include "EyeDecoder2.h"
 #include "FFTDecoder.h"
 #include "IBM8b10bDecoder.h"

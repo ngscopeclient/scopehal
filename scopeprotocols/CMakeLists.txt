@@ -16,9 +16,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetAutonegotiationRenderer.cpp
 	EthernetProtocolDecoder.cpp
 	EthernetRenderer.cpp
-	EyeDecoder.cpp
 	EyeDecoder2.cpp
-	EyeRenderer.cpp
 	FFTDecoder.cpp
 	I2CDecoder.cpp
 	I2CRenderer.cpp
