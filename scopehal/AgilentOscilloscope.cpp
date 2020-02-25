@@ -420,10 +420,10 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
-	int format;
-	int type;
+	unsigned int format;
+	unsigned int type;
 	size_t length;
-	int average_count;
+	unsigned int average_count;
 	double xincrement;
 	double xorigin;
 	double xreference;
@@ -482,8 +482,8 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
 
 		//Format the capture
-		for(size_t i=0; i<length; i++)
-			cap->m_samples.push_back(AnalogSample(i, 1, yincrement * (temp_buf[i] - yreference) + yorigin));
+		for(size_t j=0; j<length; j++)
+			cap->m_samples.push_back(AnalogSample(j, 1, yincrement * (temp_buf[j] - yreference) + yorigin));
 
 		//Done, update the data
 		if(!toQueue)
