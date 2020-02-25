@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,20 +79,6 @@ void ChannelRenderer::MakePathSignalBody(
 	if(xstart + 2*rounding > xend)
 		rounding = (xend - xstart) / 2;
 
-	/*
-	//If the signal is really tiny, shrink the offset so we dont make Xs
-	if( (xstart + xoff)  > xend)
-		xoff = (xend - xstart) / 2;
-
-	cr->move_to(xstart + xoff, ybot);
-	cr->line_to(xstart,        ymid);
-	cr->line_to(xstart + xoff, ytop);
-	cr->line_to(xend - xoff,   ytop);
-	cr->line_to(xend,          ymid);
-	cr->line_to(xend - xoff,   ybot);
-	cr->line_to(xstart + xoff, ybot);
-	*/
-
 	cr->begin_new_sub_path();
 	cr->arc(xstart + rounding, ytop + rounding, rounding, M_PI, M_PI*1.5f);	//top left corner
 	cr->move_to(xstart + rounding, ytop);									//top edge
@@ -116,8 +102,9 @@ void ChannelRenderer::RenderComplexSignal(
 		string str,
 		Gdk::Color color)
 {
+	Pango::FontDescription font("sans normal 10");
 	int width = 0, sheight = 0;
-	GetStringWidth(cr, str, true, width, sheight);
+	GetStringWidth(cr, str, width, sheight, font);
 
 	//First-order guess of position: center of the value
 	float xp = xstart + (xend-xstart)/2;
@@ -199,7 +186,7 @@ void ChannelRenderer::RenderComplexSignal(
 					str_render = "..." + str.substr(str.length() - len - 1);
 
 				int twidth = 0, theight = 0;
-				GetStringWidth(cr, str_render, true, twidth, theight);
+				GetStringWidth(cr, str_render, twidth, theight, font);
 				if(twidth < available_width)
 				{
 					//Re-center text in available space
@@ -215,7 +202,6 @@ void ChannelRenderer::RenderComplexSignal(
 		cr->save();
 			Glib::RefPtr<Pango::Layout> tlayout = Pango::Layout::create (cr);
 			cr->move_to(xp, ymid - sheight/2);
-			Pango::FontDescription font("sans normal 10");
 			font.set_weight(Pango::WEIGHT_NORMAL);
 			tlayout->set_font_description(font);
 			tlayout->set_text(str_render);
