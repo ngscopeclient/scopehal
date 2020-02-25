@@ -394,6 +394,9 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
+	if (!m_triggerArmed)
+		return TRIGGER_MODE_STOP;
+
 	// Based on example from 6000 Series Programmer's Guide
 	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
 	m_transport->SendCommand(":OPER:COND?");
