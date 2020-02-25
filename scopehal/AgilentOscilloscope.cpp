@@ -52,8 +52,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		string chname = string("CHAN1");
 		chname[4] += i;
 
-		// FIXME: ch4 should be pink & check other colours are correct
-		//Color the channels based on R&S's standard color sequence (yellow-green-orange-bluegray)
+		//Color the channels based on Agilent's standard color sequence (yellow-green-violet-pink)
 		string color = "#ffffff";
 		switch(i)
 		{
@@ -62,15 +61,15 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 				break;
 
 			case 1:
-				color = "#00ff00";
+				color = "#32ff00";
 				break;
 
 			case 2:
-				color = "#ff8000";
+				color = "#5578ff";
 				break;
 
 			case 3:
-				color = "#8080ff";
+				color = "#ff0084";
 				break;
 		}
 
