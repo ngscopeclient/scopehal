@@ -92,7 +92,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_transport->SendCommand(":WAV:BYT LSBFirst");
 
 		//Request all points when we download
-		m_transport->SendCommand(":WAV:POIN MAX");
+		m_transport->SendCommand(":WAV:POIN:MODE MAX");
 	}
 	m_analogChannelCount = nchans;
 
