@@ -201,12 +201,18 @@ void AgilentOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelsEnabled[i] = true;
 }
 
 void AgilentOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelsEnabled[i] = false;
 }
 
 OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t i)
