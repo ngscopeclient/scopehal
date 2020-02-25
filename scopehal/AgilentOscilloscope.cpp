@@ -84,12 +84,9 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			i,
 			true));
 
-		//Configure transport format to raw 16-bit int, little endian
-		//TODO: if instrument internal is big endian, skipping the bswap might improve download performance?
-		//Might be faster to do it on a beefy x86 than the embedded side of things.
+		//Configure transport format to raw 8-bit int
 		m_transport->SendCommand(":WAV:SOUR " + chname);
-		m_transport->SendCommand(":WAV:FORM WORD");
-		m_transport->SendCommand(":WAV:BYT LSBFirst");
+		m_transport->SendCommand(":WAV:FORM BYTE");
 
 		//Request all points when we download
 		m_transport->SendCommand(":WAV:POIN:MODE MAX");
@@ -466,7 +463,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		int actual_len = atoi(tmp);
 		//LogDebug("actual_len = %d", actual_len);
 
-		uint16_t* temp_buf = new uint16_t[actual_len / sizeof(uint16_t)];
+		uint8_t* temp_buf = new uint8_t[actual_len / sizeof(uint8_t)];
 
 		//Read the actual data
 		m_transport->ReadRawData(actual_len, (unsigned char*)temp_buf);
