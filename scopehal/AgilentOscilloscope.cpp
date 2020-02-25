@@ -43,8 +43,16 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	int model_number = atoi(m_model.c_str() + 3);	//FIXME: are all series IDs 3 chars e.g. "RTM"?
-	int nchans = model_number % 10;
+	std::string model_number = m_model;
+	model_number.erase(
+		std::remove_if(
+			model_number.begin(),
+			model_number.end(),
+			[]( char const& c ) -> bool { return !std::isdigit(c); }
+		),
+		model_number.end()
+	);
+	int nchans = std::stoi(model_number) % 10;
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -107,27 +115,21 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	//See what options we have
 	m_transport->SendCommand("*OPT?");
 	string reply = m_transport->ReadReply();
+
 	vector<string> options;
-	string opt;
-	for(unsigned int i=0; i<reply.length(); i++)
+
+	for (std::string::size_type prev_pos=0, pos=0;
+	     (pos = reply.find(',', pos)) != std::string::npos;
+	     prev_pos=++pos)
 	{
-		if(reply[i] == 0)
-		{
-			options.push_back(opt);
-			break;
-		}
+		std::string opt( reply.substr(prev_pos, pos-prev_pos) );
+		if (opt == "0")
+			continue;
+		if (opt.substr(opt.length()-3, 3) == "(d)")
+			opt.erase(opt.length()-3);
 
-		else if(reply[i] == ',')
-		{
-			options.push_back(opt);
-			opt = "";
-		}
-
-		else
-			opt += reply[i];
-	}
-	if(opt != "")
 		options.push_back(opt);
+	}
 
 	//Print out the option list and do processing for each
 	LogDebug("Installed options:\n");
@@ -391,6 +393,9 @@ void AgilentOscilloscope::ResetTriggerConditions()
 Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if (!m_triggerArmed)
+		return TRIGGER_MODE_STOP;
 
 	// Based on example from 6000 Series Programmer's Guide
 	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
