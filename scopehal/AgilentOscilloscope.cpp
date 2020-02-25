@@ -43,8 +43,16 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	int model_number = atoi(m_model.c_str() + 3);	//FIXME: are all series IDs 3 chars e.g. "RTM"?
-	int nchans = model_number % 10;
+	std::string model_number = m_model;
+	model_number.erase(
+		std::remove_if(
+			model_number.begin(),
+			model_number.end(),
+			[]( char const& c ) -> bool { return !std::isdigit(c); }
+		),
+		model_number.end()
+	);
+	int nchans = std::stoi(model_number) % 10;
 
 	for(int i=0; i<nchans; i++)
 	{
