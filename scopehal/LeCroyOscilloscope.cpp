@@ -205,51 +205,6 @@ void LeCroyOscilloscope::DetectOptions()
 				LogDebug("* %s (not yet implemented)\n", o.c_str());
 		}
 	}
-
-	//Desired format for waveform data
-	//Only use increased bit depth if the scope actually puts content there!
-	if(m_highDefinition)
-		SendCommand("COMM_FORMAT DEF9,WORD,BIN");
-	else
-		SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
-
-	//Clear the state-change register to we get rid of any history we don't care about
-	PollTrigger();
-}
-
-void LeCroyOscilloscope::IdentifyHardware()
-{
-	//Turn off headers (complicate parsing and add fluff to the packets)
-	SendCommand("CHDR OFF", true);
-
-	//Ask for the ID
-	SendCommand("*IDN?", true);
-	string reply = ReadSingleBlockString();
-	char vendor[128] = "";
-	char model[128] = "";
-	char serial[128] = "";
-	char version[128] = "";
-	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
-	{
-		LogError("Bad IDN response %s\n", reply.c_str());
-		return;
-	}
-	m_vendor = vendor;
-	m_model = model;
-	m_serial = serial;
-	m_fwVersion = version;
-
-	//Look up model info
-	if(m_model.find("WS3") == 0)
-		m_modelid = MODEL_WAVESURFER_3K;
-	else if(m_model.find("WAVERUNNER8") == 0)
-		m_modelid = MODEL_WAVERUNNER_8K;
-	else
-		m_modelid = MODEL_UNKNOWN;
-
-	//TODO: better way of doing this?
-	if(m_model.find("HD") != string::npos)
-		m_highDefinition = true;
 }
 
 void LeCroyOscilloscope::DetectAnalogChannels()
