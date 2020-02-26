@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "EyeDecoder2.h"
-#include "EyeRenderer.h"
 #include <algorithm>
 
 using namespace std;
@@ -150,7 +149,7 @@ EyeDecoder2::EyeDecoder2(string color)
 
 ChannelRenderer* EyeDecoder2::CreateRenderer()
 {
-	return new EyeRenderer(this);
+	return NULL;
 }
 
 bool EyeDecoder2::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -197,6 +196,154 @@ double EyeDecoder2::GetVoltageRange()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+/*
+
+bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
+{
+	LogDebug("Detecting modulation levels\n");
+	LogIndenter li;
+
+	//Find the min/max voltage of the signal (used to set default bounds for the render).
+	//Additionally, generate a histogram of voltages. We need this to configure the trigger(s) correctly
+	//and do measurements on the eye opening(s) - since MLT-3, PAM-x, etc have multiple openings.
+	cap->m_minVoltage = 999;
+	cap->m_maxVoltage = -999;
+	map<int, int64_t> vhist;							//1 mV bins
+	for(size_t i=0; i<din->m_samples.size(); i++)
+	{
+		AnalogSample sin = din->m_samples[i];
+		float f = sin;
+
+		vhist[f * 1000] ++;
+
+		if(f > cap->m_maxVoltage)
+			cap->m_maxVoltage = f;
+		if(f < cap->m_minVoltage)
+			cap->m_minVoltage = f;
+	}
+	LogDebug("Voltage range is %.3f to %.3f V\n", cap->m_minVoltage, cap->m_maxVoltage);
+
+	//Crunch the histogram to find the number of signal levels in use.
+	//We're looking for peaks of significant height (25% of maximum or more) and not too close to another peak.
+	float dv = cap->m_maxVoltage - cap->m_minVoltage;
+	int neighborhood = floor(dv * 50);	//dV/20 converted to mV
+	LogDebug("Looking for levels at least %d mV apart\n", neighborhood);
+	int64_t maxpeak = 0;
+	for(auto it : vhist)
+	{
+		if(it.second > maxpeak)
+			maxpeak = it.second;
+	}
+	LogDebug("Highest histogram peak is %ld points\n", maxpeak);
+
+	int64_t peakthresh = maxpeak/8;
+	int64_t second_peak = 0;
+	double second_weighted = 0;
+	for(auto it : vhist)
+	{
+		int64_t count = it.second;
+		//If we're pretty close to a taller peak (within neighborhood mV) then don't do anything
+		int mv = it.first;
+		bool bigger = false;
+		for(int v=mv-neighborhood; v<=mv+neighborhood; v++)
+		{
+			auto jt = vhist.find(v);
+			if(jt == vhist.end())
+				continue;
+			if(jt->second > count)
+			{
+				bigger = true;
+				continue;
+			}
+		}
+
+		if(bigger)
+			continue;
+
+		//Search the neighborhood around us and do a weighted average to find the center of the bin
+		int64_t weighted = 0;
+		int64_t wcount = 0;
+		for(int v=mv-neighborhood; v<=mv+neighborhood; v++)
+		{
+			auto jt = vhist.find(v);
+			if(jt == vhist.end())
+				continue;
+
+			int64_t c = jt->second;
+			wcount += c;
+			weighted += c*v;
+		}
+
+		if(count < peakthresh)
+		{
+			//Skip peaks that aren't tall enough... but still save the second highest
+			if(count > second_peak)
+			{
+				second_peak = count;
+				second_weighted = weighted * 1e-3f / wcount;
+			}
+			continue;
+		}
+
+		cap->m_signalLevels.push_back(weighted * 1e-3f / wcount);
+	}
+
+	//Special case: if the signal has only one level it might be NRZ with a really low duty cycle
+	//Add the second highest peak in this case
+	if(cap->m_signalLevels.size() == 1)
+		cap->m_signalLevels.push_back(second_weighted);
+
+	sort(cap->m_signalLevels.begin(), cap->m_signalLevels.end());
+	LogDebug("    Signal appears to be using %d-level modulation\n", (int)cap->m_signalLevels.size());
+	for(auto v : cap->m_signalLevels)
+		LogDebug("        %6.3f V\n", v);
+
+	//Now that signal levels are sorted, make sure they're spaced well.
+	//If we have levels that are too close to each other, skip them
+	for(size_t i=0; i<cap->m_signalLevels.size()-1; i++)
+	{
+		float delta = fabs(cap->m_signalLevels[i] - cap->m_signalLevels[i+1]);
+		LogDebug("Delta at i=%zu is %.3f\n", i, delta);
+
+		//TODO: fine tune this threshold adaptively based on overall signal amplitude?
+		if(delta < 0.175)
+		{
+			LogIndenter li;
+			LogDebug("Too small\n");
+
+			//Remove the innermost point (closer to zero)
+			//This is us if we're positive, but the next one if negative!
+			if(cap->m_signalLevels[i] < 0)
+				cap->m_signalLevels.erase(cap->m_signalLevels.begin() + (i+1) );
+			else
+				cap->m_signalLevels.erase(cap->m_signalLevels.begin() + i);
+		}
+	}
+
+	//Figure out decision points (eye centers)
+	//FIXME: This doesn't work well for PAM! Only MLT*
+	for(size_t i=0; i<cap->m_signalLevels.size()-1; i++)
+	{
+		float vlo = cap->m_signalLevels[i];
+		float vhi = cap->m_signalLevels[i+1];
+		cap->m_decisionPoints.push_back(vlo + (vhi-vlo)/2);
+	}
+	//LogDebug("    Decision points:\n");
+	//for(auto v : cap->m_decisionPoints)
+	//	LogDebug("        %6.3f V\n", v);
+
+	//Sanity check
+	if(cap->m_signalLevels.size() < 2)
+	{
+		LogDebug("Couldn't find at least two distinct symbol voltages\n");
+		delete cap;
+		return false;
+	}
+
+	return true;
+}
+*/
 
 void EyeDecoder2::Refresh()
 {

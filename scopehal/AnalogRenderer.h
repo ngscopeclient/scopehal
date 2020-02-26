@@ -71,21 +71,8 @@ public:
 	float m_yscale;
 	float m_yoffset;
 
-protected:
-	std::map<float, float> m_gridmap;
-	float pixels_to_volts(float p, bool offset = true);
-	float volts_to_pixels(float v, bool offset = true);
-
 public:
 	static float PickStepSize(float volts_per_half_span, int min_steps = 2, int max_steps = 5);
-
-	static void DrawVerticalAxisLabels(
-		const Cairo::RefPtr<Cairo::Context>& cr,
-		int visright,
-		float ytop,
-		float plotheight,
-		std::map<float, float>& gridmap,
-		bool show_units = true);
 };
 
 #endif

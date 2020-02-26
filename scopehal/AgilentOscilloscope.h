@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg, Mike Walters                                                            *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,60 +27,83 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EyeDecoder
- */
-#ifndef EyeDecoder_h
-#define EyeDecoder_h
+#ifndef AgilentOscilloscope_h
+#define AgilentOscilloscope_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
-class EyeCapture;
-
-class EyeDecoder : public ProtocolDecoder
+class AgilentOscilloscope : public SCPIOscilloscope
 {
 public:
-	EyeDecoder(std::string color);
+	AgilentOscilloscope(SCPITransport* transport);
+	virtual ~AgilentOscilloscope();
 
-	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
+public:
+	//Device information
+	virtual unsigned int GetInstrumentTypes();
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+	virtual void FlushConfigCache();
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	//Channel configuration
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual double GetChannelAttenuation(size_t i);
+	virtual void SetChannelAttenuation(size_t i, double atten);
+	virtual int GetChannelBandwidthLimit(size_t i);
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
+	virtual double GetChannelVoltageRange(size_t i);
+	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual double GetChannelOffset(size_t i);
+	virtual void SetChannelOffset(size_t i, double offset);
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	//Triggering
+	virtual void ResetTriggerConditions();
+	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool AcquireData(bool toQueue = false);
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void Stop();
+	virtual bool IsTriggerArmed();
+	virtual size_t GetTriggerChannelIndex();
+	virtual void SetTriggerChannelIndex(size_t i);
+	virtual float GetTriggerVoltage();
+	virtual void SetTriggerVoltage(float v);
+	virtual Oscilloscope::TriggerType GetTriggerType();
+	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
-	int64_t GetUIWidth()
-	{ return m_uiWidth; }
-
-	double GetUIWidthFractional()
-	{ return m_uiWidthFractional; }
-
-	PROTOCOL_DECODER_INITPROC(EyeDecoder)
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
 protected:
-	int64_t m_uiWidth;				//integer samples
-	double m_uiWidthFractional;		//fractional samples, for more precision over long captures
+	OscilloscopeChannel* m_extTrigChannel;
 
-	bool DetectModulationLevels(AnalogCapture* din, EyeCapture* cap);
-	bool CalculateUIWidth(AnalogCapture* din, EyeCapture* cap);
+	//Mutexing for thread safety
+	std::recursive_mutex m_mutex;
+	std::recursive_mutex m_cacheMutex;
 
-	bool MeasureEyeOpenings(
-		EyeCapture* cap,
-		std::map<int64_t, std::map<float, int64_t> >& pixmap);
+	//hardware analog channel count, independent of LA option etc
+	unsigned int m_analogChannelCount;
 
-	bool GenerateEyeData(
-		AnalogCapture* din,
-		EyeCapture* cap,
-		std::map<int64_t, std::map<float, int64_t> >& pixmap);
+	//config cache
+	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+	std::map<size_t, double> m_channelAttenuations;
+	std::map<size_t, int> m_channelBandwidthLimits;
+	std::map<int, bool> m_channelsEnabled;
+	bool m_triggerChannelValid;
+	size_t m_triggerChannel;
+	bool m_triggerLevelValid;
+	float m_triggerLevel;
 
-	bool MeasureRiseFallTimes(AnalogCapture* din, EyeCapture* cap);
-	int GetCodeForVoltage(float v, EyeCapture* cap);
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 };
 
 #endif
