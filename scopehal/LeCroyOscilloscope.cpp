@@ -415,6 +415,10 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	if(i > m_analogChannelCount)
 		return 1;
 
+	//TODO: support ext/10
+	if(i == m_extTrigChannel->GetIndex())
+		return 1;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
