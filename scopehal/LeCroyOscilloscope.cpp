@@ -1414,6 +1414,10 @@ void LeCroyOscilloscope::SetTriggerForChannel(
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
 {
+	//not meaningful for trigger channels
+	if(i == m_extTrigChannel->GetIndex())
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -1442,6 +1446,10 @@ void LeCroyOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 {
+	//not meaningful for trigger channels
+	if(i == m_extTrigChannel->GetIndex())
+		return 1;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
