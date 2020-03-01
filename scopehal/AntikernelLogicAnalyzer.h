@@ -97,6 +97,8 @@ protected:
 	void SendCommand(uint8_t opcode, uint8_t chan);
 	uint8_t Read1ByteReply();
 
+	void ArmTrigger();
+
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
@@ -106,6 +108,8 @@ protected:
 	std::vector<size_t> m_highIndexes;
 
 	uint32_t m_samplePeriod;
+	uint32_t m_memoryDepth;
+	uint32_t m_memoryWidth;
 };
 
 #endif

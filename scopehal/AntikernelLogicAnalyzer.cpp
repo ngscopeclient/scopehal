@@ -135,10 +135,6 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	LogDebug("Logic analyzer: loading channel metadata\n");
 	LogIndenter li;
 
-	//Send a long string of nops to reset the LA out of whatever state it might be in
-	for(int i=0; i<32; i++)
-		SendCommand(CMD_NOP);
-
 	//Get the number of channels
 	SendCommand(CMD_GET_CHANNEL_COUNT);
 	uint8_t nchans = Read1ByteReply();
@@ -146,7 +142,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	//Get the length of the names
 	SendCommand(CMD_GET_NAME_LEN);
 	uint8_t namelen = Read1ByteReply();
-	LogDebug("We have %d channels, %d chars per name\n", nchans, namelen);
+	//LogDebug("We have %d channels, %d chars per name\n", nchans, namelen);
 
 	char* namebuf = new char[namelen + 1];
 
@@ -187,11 +183,13 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		m_highIndexes.push_back(index + width - 1);
 		index += width;
 
+		/*
 		LogDebug("Channel: %s (%d bits wide, from %zu to %zu)\n",
 			realname.c_str(),
 			width,
 			m_lowIndexes[i],
 			m_highIndexes[i]);
+		*/
 	}
 
 	delete[] namebuf;
@@ -200,8 +198,18 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	SendCommand(CMD_GET_SAMPLE_PERIOD);
 	m_transport->ReadRawData(3, (unsigned char*)rawperiod);
 	m_samplePeriod = (rawperiod[0] << 16) | (rawperiod[1] << 8) | rawperiod[2];
-	LogDebug("Sample period is %u ps\n", m_samplePeriod);
+	//LogDebug("Sample period is %u ps\n", m_samplePeriod);
 
+	//Get memory aspect ratio info
+	uint8_t rawlen[3];
+	uint8_t rawwidth[3];
+	SendCommand(CMD_GET_DEPTH);
+	m_transport->ReadRawData(3, (unsigned char*)rawlen);
+	SendCommand(CMD_GET_TOTAL_WIDTH);
+	m_transport->ReadRawData(3, (unsigned char*)rawwidth);
+	m_memoryDepth = (rawlen[0] << 16) | (rawlen[1] << 8) | rawlen[2];
+	m_memoryWidth = (rawwidth[0] << 16) | (rawwidth[1] << 8) | rawwidth[2];
+	//LogDebug("Capture memory is %u samples long\n", depth);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,25 +250,16 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	LogDebug("Acquiring data...\n");
+	//LogDebug("Acquiring data...\n");
 	LogIndenter li;
 
-	//Get memory aspect ratio info
-	uint8_t rawlen[3];
-	uint8_t rawwidth[3];
-	SendCommand(CMD_GET_DEPTH);
-	m_transport->ReadRawData(3, (unsigned char*)rawlen);
-	SendCommand(CMD_GET_TOTAL_WIDTH);
-	m_transport->ReadRawData(3, (unsigned char*)rawwidth);
-	uint32_t depth = (rawlen[0] << 16) | (rawlen[1] << 8) | rawlen[2];
-	uint32_t width = (rawwidth[0] << 16) | (rawwidth[1] << 8) | rawwidth[2];
-	LogDebug("Capture memory is %u samples long\n", depth);
-	uint32_t bytewidth = width/8;
-	if(width & 7)
+	//Calculate some memory dimensions
+	uint32_t bytewidth = m_memoryWidth/8;
+	if(m_memoryWidth & 7)
 		bytewidth ++;
-	LogDebug("Capture memory is %u bits (%u bytes) wide\n", width, bytewidth);
-	uint32_t memsize = bytewidth*depth;
-	LogDebug("Total capture is %u bytes\n", memsize);
+	//LogDebug("Capture memory is %u bits (%u bytes) wide\n", m_memoryWidth, bytewidth);
+	uint32_t memsize = bytewidth*m_memoryDepth;
+	//LogDebug("Total capture is %u bytes\n", memsize);
 
 	//Read the actual data
 	vector<uint8_t> data;
@@ -288,10 +287,11 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_samples.resize(depth);
+			cap->m_startPicoseconds = (time - floor(time)) * 1e12f;
+			cap->m_samples.resize(m_memoryDepth);
 
 			//Pull the data
-			for(size_t j=0; j<depth; j++)
+			for(size_t j=0; j<m_memoryDepth; j++)
 			{
 				uint8_t s = data[j*bytewidth + nbyte];
 				cap->m_samples[j] = DigitalSample(j, 1, (s >> nbit) & 1 ? true : false);
@@ -311,9 +311,10 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_samples.resize(depth);
+			cap->m_startPicoseconds = (time - floor(time)) * 1e12f;
+			cap->m_samples.resize(m_memoryDepth);
 
-			for(size_t j=0; j<depth; j++)
+			for(size_t j=0; j<m_memoryDepth; j++)
 			{
 				vector<bool> bits;
 				for(size_t k=0; k<cwidth; k++)
@@ -339,40 +340,32 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 	m_pendingWaveformsMutex.unlock();
 
 	//Re-arm the trigger if not in one-shot mode
-	/*if(!m_triggerOneShot)
-	{
-		SendCommand(CMD_ARM);
-		m_triggerArmed = true;
-
-		//DEBUG: force a trigger
-		SendCommand(CMD_FORCE);
-	}*/
-	m_triggerArmed = false;
+	if(!m_triggerOneShot)
+		ArmTrigger();
+	else
+		m_triggerArmed = false;
 
 	return true;
 }
 
+void AntikernelLogicAnalyzer::ArmTrigger()
+{
+	SendCommand(CMD_ARM);
+	m_triggerArmed = true;
+
+	SendCommand(CMD_FORCE);
+}
+
 void AntikernelLogicAnalyzer::StartSingleTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	SendCommand(CMD_ARM);
-
-	m_triggerArmed = true;
 	m_triggerOneShot = true;
+	ArmTrigger();
 }
 
 void AntikernelLogicAnalyzer::Start()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	SendCommand(CMD_ARM);
-
-	m_triggerArmed = true;
 	m_triggerOneShot = false;
-
-	//DEBUG: force a trigger event (until we have a proper UI for configuring triggers)
-	SendCommand(CMD_FORCE);
+	ArmTrigger();
 }
 
 void AntikernelLogicAnalyzer::Stop()
