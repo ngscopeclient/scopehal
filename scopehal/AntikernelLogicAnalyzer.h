@@ -96,6 +96,16 @@ protected:
 	void SendCommand(uint8_t opcode);
 	void SendCommand(uint8_t opcode, uint8_t chan);
 	uint8_t Read1ByteReply();
+
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+
+	std::recursive_mutex m_mutex;
+
+	std::vector<size_t> m_lowIndexes;
+	std::vector<size_t> m_highIndexes;
+
+	uint32_t m_samplePeriod;
 };
 
 #endif

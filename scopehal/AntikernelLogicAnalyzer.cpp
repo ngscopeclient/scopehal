@@ -54,7 +54,11 @@ enum opcodes_t
 	CMD_GET_NAME_LEN,
 	CMD_GET_CHANNEL_COUNT,
 	CMD_GET_NAME,
-	CMD_GET_WIDTH
+	CMD_GET_WIDTH,
+	CMD_GET_DATA,
+	CMD_GET_DEPTH,
+	CMD_GET_TOTAL_WIDTH,
+	CMD_GET_SAMPLE_PERIOD
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +71,14 @@ AntikernelLogicAnalyzer::AntikernelLogicAnalyzer(SCPITransport* transport)
 {
 	m_transport = transport;
 
-	//TODO: read IDN info some other way, since it's not really scpi
+	m_triggerArmed = false;
+	m_triggerOneShot = false;
+
+	//Populate IDN info
+	m_vendor = "Antikernel Labs";
+	m_model = "ILA";
+	m_fwVersion = "1.0";
+	m_serial = "NoSerial";
 
 	LoadChannels();
 	ResetTriggerConditions();
@@ -124,6 +135,10 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	LogDebug("Logic analyzer: loading channel metadata\n");
 	LogIndenter li;
 
+	//Send a long string of nops to reset the LA out of whatever state it might be in
+	for(int i=0; i<32; i++)
+		SendCommand(CMD_NOP);
+
 	//Get the number of channels
 	SendCommand(CMD_GET_CHANNEL_COUNT);
 	uint8_t nchans = Read1ByteReply();
@@ -136,6 +151,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	char* namebuf = new char[namelen + 1];
 
 	//Read each name
+	size_t index = 0;
 	for(size_t i=0; i<nchans; i++)
 	{
 		//Get the width of this channel
@@ -156,11 +172,36 @@ void AntikernelLogicAnalyzer::LoadChannels()
 			realname += namebuf[j];
 		}
 
-		//Invert the order
-		LogDebug("Channel: %s (%d bits wide)\n", realname.c_str(), width);
+		//Add the channel
+		auto chan = new OscilloscopeChannel(
+			this,
+			realname,
+			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			GetDefaultChannelColor(m_channels.size()),
+			width,
+			m_channels.size(),
+			true);
+		m_channels.push_back(chan);
+
+		m_lowIndexes.push_back(index);
+		m_highIndexes.push_back(index + width - 1);
+		index += width;
+
+		LogDebug("Channel: %s (%d bits wide, from %zu to %zu)\n",
+			realname.c_str(),
+			width,
+			m_lowIndexes[i],
+			m_highIndexes[i]);
 	}
 
 	delete[] namebuf;
+
+	uint8_t rawperiod[3];
+	SendCommand(CMD_GET_SAMPLE_PERIOD);
+	m_transport->ReadRawData(3, (unsigned char*)rawperiod);
+	m_samplePeriod = (rawperiod[0] << 16) | (rawperiod[1] << 8) | rawperiod[2];
+	LogDebug("Sample period is %u ps\n", m_samplePeriod);
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,35 +219,173 @@ void AntikernelLogicAnalyzer::SetTriggerType(Oscilloscope::TriggerType /*type*/)
 
 Oscilloscope::TriggerMode AntikernelLogicAnalyzer::PollTrigger()
 {
-	return TRIGGER_MODE_RUN;
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	SendCommand(CMD_GET_STATUS);
+	uint8_t status = Read1ByteReply();
+
+	switch(status)
+	{
+		case 1:	//armed
+		case 2:	//triggered but data not ready to read yet
+			return TRIGGER_MODE_RUN;
+		case 3:
+			return TRIGGER_MODE_TRIGGERED;
+
+		case 0:
+		default:
+			return TRIGGER_MODE_STOP;
+	}
 }
 
 bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	LogDebug("Acquiring data...\n");
 	LogIndenter li;
+
+	//Get memory aspect ratio info
+	uint8_t rawlen[3];
+	uint8_t rawwidth[3];
+	SendCommand(CMD_GET_DEPTH);
+	m_transport->ReadRawData(3, (unsigned char*)rawlen);
+	SendCommand(CMD_GET_TOTAL_WIDTH);
+	m_transport->ReadRawData(3, (unsigned char*)rawwidth);
+	uint32_t depth = (rawlen[0] << 16) | (rawlen[1] << 8) | rawlen[2];
+	uint32_t width = (rawwidth[0] << 16) | (rawwidth[1] << 8) | rawwidth[2];
+	LogDebug("Capture memory is %u samples long\n", depth);
+	uint32_t bytewidth = width/8;
+	if(width & 7)
+		bytewidth ++;
+	LogDebug("Capture memory is %u bits (%u bytes) wide\n", width, bytewidth);
+	uint32_t memsize = bytewidth*depth;
+	LogDebug("Total capture is %u bytes\n", memsize);
+
+	//Read the actual data
+	vector<uint8_t> data;
+	data.resize(memsize);
+	SendCommand(CMD_GET_DATA);
+	m_transport->ReadRawData(memsize, &data[0]);
+
+	//Crunch the waveform data (note, LS byte first in each row)
+	SequenceSet pending_waveforms;
+	double time = GetTime();
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto chan = m_channels[i];
+
+		size_t nlow = m_lowIndexes[i];
+		size_t cwidth = chan->GetWidth();
+
+		if(cwidth == 1)
+		{
+			size_t nbyte = nlow / 8;
+			size_t nbit = nlow % 8;
+
+			//Create the channel
+			DigitalCapture* cap = new DigitalCapture;
+			cap->m_timescale = m_samplePeriod;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time;
+			cap->m_samples.resize(depth);
+
+			//Pull the data
+			for(size_t j=0; j<depth; j++)
+			{
+				uint8_t s = data[j*bytewidth + nbyte];
+				cap->m_samples[j] = DigitalSample(j, 1, (s >> nbit) & 1 ? true : false);
+			}
+
+			//Done, update the data
+			if(!toQueue)
+				chan->SetData(cap);
+			else
+				pending_waveforms[chan] = cap;
+		}
+
+		else
+		{
+			//Create the channel
+			DigitalBusCapture* cap = new DigitalBusCapture;
+			cap->m_timescale = m_samplePeriod;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time;
+			cap->m_samples.resize(depth);
+
+			for(size_t j=0; j<depth; j++)
+			{
+				vector<bool> bits;
+				for(size_t k=0; k<cwidth; k++)
+				{
+					size_t off = nlow + k;
+					size_t nbyte = off / 8;
+					size_t nbit = off % 8;
+					uint8_t s = data[j*bytewidth + nbyte];
+					bits.push_back((s >> nbit) & 1 ? true : false);
+				}
+				cap->m_samples[j] = DigitalBusSample(j, 1, bits);
+			}
+
+			//Done, update the data
+			if(!toQueue)
+				chan->SetData(cap);
+			else
+				pending_waveforms[chan] = cap;
+		}
+	}
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(pending_waveforms);
+	m_pendingWaveformsMutex.unlock();
+
+	//Re-arm the trigger if not in one-shot mode
+	/*if(!m_triggerOneShot)
+	{
+		SendCommand(CMD_ARM);
+		m_triggerArmed = true;
+
+		//DEBUG: force a trigger
+		SendCommand(CMD_FORCE);
+	}*/
+	m_triggerArmed = false;
 
 	return true;
 }
 
 void AntikernelLogicAnalyzer::StartSingleTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 
+	SendCommand(CMD_ARM);
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void AntikernelLogicAnalyzer::Start()
 {
-	//printf("continuous capture not implemented\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	SendCommand(CMD_ARM);
+
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
+
+	//DEBUG: force a trigger event (until we have a proper UI for configuring triggers)
+	SendCommand(CMD_FORCE);
 }
 
 void AntikernelLogicAnalyzer::Stop()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 
+	SendCommand(CMD_STOP);
+	m_triggerArmed = false;
 }
 
 bool AntikernelLogicAnalyzer::IsTriggerArmed()
 {
-	return true;
+	return m_triggerArmed;
 }
 
 void AntikernelLogicAnalyzer::ResetTriggerConditions()
