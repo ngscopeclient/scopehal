@@ -95,6 +95,7 @@ protected:
 
 	void SendCommand(uint8_t opcode);
 	void SendCommand(uint8_t opcode, uint8_t chan);
+	void SendCommand(uint8_t opcode, uint8_t chan, uint8_t arg);
 	uint8_t Read1ByteReply();
 
 	void ArmTrigger();
@@ -110,6 +111,7 @@ protected:
 	uint32_t m_samplePeriod;
 	uint32_t m_memoryDepth;
 	uint32_t m_memoryWidth;
+	uint32_t m_maxWidth;
 };
 
 #endif

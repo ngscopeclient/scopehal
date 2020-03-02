@@ -58,7 +58,8 @@ enum opcodes_t
 	CMD_GET_DATA,
 	CMD_GET_DEPTH,
 	CMD_GET_TOTAL_WIDTH,
-	CMD_GET_SAMPLE_PERIOD
+	CMD_GET_SAMPLE_PERIOD,
+	CMD_GET_MAX_WIDTH
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +102,12 @@ void AntikernelLogicAnalyzer::SendCommand(uint8_t opcode, uint8_t chan)
 {
 	uint8_t buf[2] = {opcode, chan};
 	m_transport->SendRawData(2, buf);
+}
+
+void AntikernelLogicAnalyzer::SendCommand(uint8_t opcode, uint8_t chan, uint8_t arg)
+{
+	uint8_t buf[3] = {opcode, chan, arg};
+	m_transport->SendRawData(3, buf);
 }
 
 uint8_t AntikernelLogicAnalyzer::Read1ByteReply()
@@ -146,6 +153,20 @@ void AntikernelLogicAnalyzer::LoadChannels()
 
 	char* namebuf = new char[namelen + 1];
 
+	//Create a new channel 0 for the capture clock
+	//(since some protocol decoders need rising edges to trigger on, etc)
+	auto chan = new OscilloscopeChannel(
+		this,
+		"clk",
+		OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+		GetDefaultChannelColor(m_channels.size()),
+		1,
+		m_channels.size(),
+		true);
+	m_channels.push_back(chan);
+	m_highIndexes.push_back(0);	//not used, just pad stuff to fit
+	m_lowIndexes.push_back(0);
+
 	//Read each name
 	size_t index = 0;
 	for(size_t i=0; i<nchans; i++)
@@ -169,7 +190,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		}
 
 		//Add the channel
-		auto chan = new OscilloscopeChannel(
+		chan = new OscilloscopeChannel(
 			this,
 			realname,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
@@ -210,6 +231,13 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	m_memoryDepth = (rawlen[0] << 16) | (rawlen[1] << 8) | rawlen[2];
 	m_memoryWidth = (rawwidth[0] << 16) | (rawwidth[1] << 8) | rawwidth[2];
 	//LogDebug("Capture memory is %u samples long\n", depth);
+	SendCommand(CMD_GET_MAX_WIDTH);
+	m_maxWidth = Read1ByteReply();
+
+	//Round sampling period down to be an even number of picoseconds
+	//(this is needed so the clock can be double-rate and not lose sync)
+	if(m_samplePeriod & 1)
+		m_samplePeriod --;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,10 +295,36 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 	SendCommand(CMD_GET_DATA);
 	m_transport->ReadRawData(memsize, &data[0]);
 
-	//Crunch the waveform data (note, LS byte first in each row)
 	SequenceSet pending_waveforms;
+
+	//Synthesize the clock
 	double time = GetTime();
-	for(size_t i=0; i<m_channels.size(); i++)
+	double ps = (time - floor(time)) * 1e12f;
+	{
+		DigitalCapture* cap = new DigitalCapture;
+		cap->m_timescale = m_samplePeriod / 2;
+		cap->m_triggerPhase = 0;
+		cap->m_startTimestamp = time;
+		cap->m_startPicoseconds = ps;
+		cap->m_samples.resize(m_memoryDepth * 2);
+
+		auto chan = m_channels[0];
+
+		for(size_t i=0; i<m_memoryDepth; i++)
+		{
+			cap->m_samples[i*2] 	= DigitalSample(i*2, 1, 0);
+			cap->m_samples[i*2 + 1] = DigitalSample(i*2 + 1, 1, 1);
+		}
+
+		//Done, update the data
+		if(!toQueue)
+			chan->SetData(cap);
+		else
+			pending_waveforms[chan] = cap;
+	}
+
+	//Crunch the waveform data (note, LS byte first in each row)
+	for(size_t i=1; i<m_channels.size(); i++)
 	{
 		auto chan = m_channels[i];
 
@@ -287,7 +341,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_startPicoseconds = (time - floor(time)) * 1e12f;
+			cap->m_startPicoseconds = ps;
 			cap->m_samples.resize(m_memoryDepth);
 
 			//Pull the data
@@ -311,8 +365,8 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_startPicoseconds = (time - floor(time)) * 1e12f;
-			cap->m_samples.resize(m_memoryDepth);
+			cap->m_startPicoseconds = ps;
+			cap->m_samples.reserve(m_memoryDepth);
 
 			for(size_t j=0; j<m_memoryDepth; j++)
 			{
@@ -325,7 +379,18 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 					uint8_t s = data[j*bytewidth + nbyte];
 					bits.push_back((s >> nbit) & 1 ? true : false);
 				}
-				cap->m_samples[j] = DigitalBusSample(j, 1, bits);
+
+				//If this sample has the same value as the last one, just extend it
+				if(j == 0)
+					cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
+				else
+				{
+					auto& last = cap->m_samples[cap->m_samples.size()-1];
+					if(bits == last.m_sample)
+						last.m_duration ++;
+					else
+						cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
+				}
 			}
 
 			//Done, update the data
@@ -353,7 +418,7 @@ void AntikernelLogicAnalyzer::ArmTrigger()
 	SendCommand(CMD_ARM);
 	m_triggerArmed = true;
 
-	SendCommand(CMD_FORCE);
+	//SendCommand(CMD_FORCE);
 }
 
 void AntikernelLogicAnalyzer::StartSingleTrigger()
@@ -383,6 +448,19 @@ bool AntikernelLogicAnalyzer::IsTriggerArmed()
 
 void AntikernelLogicAnalyzer::ResetTriggerConditions()
 {
+	//Set the trigger to be ch1 equal
+	SendCommand(CMD_SET_TRIG_MODE, 0, 2);
+
+	//Set target to 1
+	unsigned char tmp[6] =
+	{ CMD_SET_COMPARE_TARGET, 0, 0,0,0,1 };
+	m_transport->SendRawData(sizeof(tmp), tmp);
+
+	//Set offset to 32 samples
+	SendCommand(CMD_SET_TRIG_OFFSET, 0, 32);
+
+	//SendCommand(CMD_SET_COMPARE_TARGET, 0, 1);
+
 	/*
 	for(size_t i=0; i<m_triggers.size(); i++)
 		m_triggers[i] = TRIGGER_TYPE_DONTCARE;
