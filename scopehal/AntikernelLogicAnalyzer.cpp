@@ -162,7 +162,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		GetDefaultChannelColor(m_channels.size()),
 		1,
 		m_channels.size(),
-		true);
+		false);	//not a physical channel
 	m_channels.push_back(chan);
 	m_highIndexes.push_back(0);	//not used, just pad stuff to fit
 	m_lowIndexes.push_back(0);
