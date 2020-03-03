@@ -91,7 +91,8 @@ public:
 
 	virtual ChannelRenderer* CreateRenderer();
 
-	int GetWidth();
+	int GetWidth()
+	{ return m_width; }
 
 	Oscilloscope* GetScope()
 	{ return m_scope; }
