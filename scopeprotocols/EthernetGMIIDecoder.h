@@ -30,46 +30,25 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of EthernetGMIIDecoder
  */
+#ifndef EthernetGMIIDecoder_h
+#define EthernetGMIIDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class EthernetGMIIDecoder : public EthernetProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	EthernetGMIIDecoder(std::string color);
+
+	virtual void Refresh();
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(EthernetGMIIDecoder)
+};
+
+#endif
