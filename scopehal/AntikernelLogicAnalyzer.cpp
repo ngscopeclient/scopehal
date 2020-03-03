@@ -380,17 +380,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 					bits.push_back((s >> nbit) & 1 ? true : false);
 				}
 
-				//If this sample has the same value as the last one, just extend it
-				if(j == 0)
-					cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
-				else
-				{
-					auto& last = cap->m_samples[cap->m_samples.size()-1];
-					if(bits == last.m_sample)
-						last.m_duration ++;
-					else
-						cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
-				}
+				cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
 			}
 
 			//Done, update the data
