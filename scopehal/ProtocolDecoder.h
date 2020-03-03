@@ -165,6 +165,7 @@ protected:
 	//The two channels need not be the same sample rate.
 	void SampleOnAnyEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
 	void SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
+	void SampleOnRisingEdges(DigitalBusCapture* data, DigitalCapture* clock, std::vector<DigitalBusSample>& samples);
 	void SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
 
 	//Find interpolated zero crossings of a signal
