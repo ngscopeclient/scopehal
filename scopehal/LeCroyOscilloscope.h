@@ -39,9 +39,9 @@
 	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
  */
 class LeCroyOscilloscope
-	: public virtual Oscilloscope
-	, public virtual Multimeter
-	, public virtual FunctionGenerator
+	: public Oscilloscope
+	, public Multimeter
+	, public FunctionGenerator
 {
 public:
 	LeCroyOscilloscope(std::string hostname, unsigned short port);
