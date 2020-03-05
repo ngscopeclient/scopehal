@@ -378,6 +378,8 @@ float Measurement::GetRiseTime(AnalogCapture* cap, float low, float high)
 			case STATE_UNKNOWN:
 				if(v > end)
 					state = STATE_FALLING;
+				if(v < start)
+					state = STATE_LOW;
 				break;
 
 			//Waiting for falling edge
@@ -524,7 +526,7 @@ string FloatMeasurement::GetValueAsString()
 			else
 				snprintf(tmp, sizeof(tmp), "%.2f mV", m_value * 1000);
 			break;
-			
+
 		case TYPE_TIME:
 			if(fabs(m_value) < 1e-9)
 				snprintf(tmp, sizeof(tmp), "%.3f ps", m_value * 1e12);
