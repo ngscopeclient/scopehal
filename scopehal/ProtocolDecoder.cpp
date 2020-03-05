@@ -549,3 +549,36 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 		last = value;
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int& nextID)
+{
+	//Name ourself
+	int id = nextID ++;
+	idmap[this] = id;
+
+	//Save basic decode info
+	char tmp[1024];
+	snprintf(tmp, sizeof(tmp), "    : %%\n");
+	string config = tmp;
+	snprintf(tmp, sizeof(tmp), "        id:          %d\n", id);
+	config += tmp;
+
+	//Channel info
+	//snprintf(tmp, sizeof(tmp), "        protocol:    \"%s\"\n", GetProtocolName().c_str());
+	//config += tmp;
+	snprintf(tmp, sizeof(tmp), "        color:       \"%s\"\n", m_displaycolor.c_str());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        nick:        \"%s\"\n", m_displayname.c_str());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        name:        \"%s\"\n", GetHwname().c_str());
+	config += tmp;
+
+	//Inputs
+
+	//Parameters
+
+	return config;
+}

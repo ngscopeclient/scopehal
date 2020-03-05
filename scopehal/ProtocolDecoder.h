@@ -142,6 +142,11 @@ public:
 	void SetDirty()
 	{ m_dirty = true; }
 
+	/**
+		@brief Serialize this decoder's configuration to a string
+	 */
+	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID);
+
 protected:
 
 	///Names of signals we take as input
