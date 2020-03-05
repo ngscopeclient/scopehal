@@ -567,8 +567,8 @@ string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int&
 	config += tmp;
 
 	//Channel info
-	//snprintf(tmp, sizeof(tmp), "        protocol:    \"%s\"\n", GetProtocolName().c_str());
-	//config += tmp;
+	snprintf(tmp, sizeof(tmp), "        protocol:    \"%s\"\n", GetProtocolDisplayName().c_str());
+	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        color:       \"%s\"\n", m_displaycolor.c_str());
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        nick:        \"%s\"\n", m_displayname.c_str());

@@ -143,6 +143,11 @@ public:
 	{ m_dirty = true; }
 
 	/**
+		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
+	 */
+	virtual std::string GetProtocolDisplayName() =0;
+
+	/**
 		@brief Serialize this decoder's configuration to a string
 	 */
 	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID);
@@ -193,6 +198,8 @@ protected:
 	static ProtocolDecoder* CreateInstance(std::string color) \
 	{ \
 		return new T(color); \
-	}
+	} \
+	virtual std::string GetProtocolDisplayName() \
+	{ return GetProtocolName(); }
 
 #endif
