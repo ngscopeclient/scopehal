@@ -555,9 +555,16 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 
 string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int& nextID)
 {
-	//Name ourself
-	int id = nextID ++;
-	idmap[this] = id;
+	//Name ourself. Note that serialization may not be topologically sorted!
+	//It's possible another decoder may depend on us, and allocate an ID for us in advance
+	int id;
+	if(idmap.find(this) == idmap.end())
+	{
+		id = nextID ++;
+		idmap[this] = id;
+	}
+	else
+		id = idmap[this];
 
 	//Save basic decode info
 	char tmp[1024];
@@ -577,8 +584,37 @@ string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int&
 	config += tmp;
 
 	//Inputs
+	snprintf(tmp, sizeof(tmp), "        inputs: %%\n");
+	config += tmp;
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto chan = m_channels[i];
+		if(chan == NULL)
+			snprintf(tmp, sizeof(tmp), "            %s: 0\n", m_signalNames[i].c_str());
+		else
+		{
+			if(idmap.find(chan) == idmap.end())
+			{
+				id = nextID ++;
+				idmap[chan] = id;
+			}
+			else
+				id = idmap[chan];
+
+			snprintf(tmp, sizeof(tmp), "            %-20s %d\n", (m_signalNames[i] + ":").c_str(), id);
+		}
+
+		config += tmp;
+	}
 
 	//Parameters
+	snprintf(tmp, sizeof(tmp), "        parameters: %%\n");
+	config += tmp;
+	for(auto it : m_parameters)
+	{
+		snprintf(tmp, sizeof(tmp), "            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+		config += tmp;
+	}
 
 	return config;
 }
