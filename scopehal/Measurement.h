@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,6 +64,16 @@ public:
 	};
 
 	virtual MeasurementType GetMeasurementType() =0;
+
+	/**
+		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
+	 */
+	virtual std::string GetMeasurementDisplayName() =0;
+
+	/**
+		@brief Serialize this measurement's configuration to a string
+	 */
+	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID, std::string nick);
 
 protected:
 
@@ -137,6 +147,8 @@ protected:
 
 #define MEASUREMENT_INITPROC(T) \
 	static Measurement* CreateInstance() \
-	{ return new T; }
+	{ return new T; } \
+	virtual std::string GetMeasurementDisplayName() \
+	{ return GetMeasurementName(); }
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -560,4 +560,72 @@ string FloatMeasurement::GetValueAsString()
 	}
 
 	return tmp;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+string Measurement::SerializeConfiguration(std::map<void*, int>& idmap, int& nextID, string nick)
+{
+	//Name ourself. Note that serialization may not be topologically sorted!
+	//It's possible another measurement may depend on us, and allocate an ID for us in advance
+	int id;
+	if(idmap.find(this) == idmap.end())
+	{
+		id = nextID ++;
+		idmap[this] = id;
+	}
+	else
+		id = idmap[this];
+
+	//Save basic info
+	char tmp[1024];
+	snprintf(tmp, sizeof(tmp), "                : %%\n");
+	string config = tmp;
+	snprintf(tmp, sizeof(tmp), "                    id:          %d\n", id);
+	config += tmp;
+
+	//Config
+	snprintf(tmp, sizeof(tmp), "                    measurement: \"%s\"\n", GetMeasurementDisplayName().c_str());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "                    nick:        \"%s\"\n", nick.c_str());
+	config += tmp;
+
+	//Inputs
+	snprintf(tmp, sizeof(tmp), "                    inputs: %%\n");
+	config += tmp;
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto chan = m_channels[i];
+		if(chan == NULL)
+			snprintf(tmp, sizeof(tmp), "                        %s: 0\n", m_signalNames[i].c_str());
+		else
+		{
+			if(idmap.find(chan) == idmap.end())
+			{
+				id = nextID ++;
+				idmap[chan] = id;
+			}
+			else
+				id = idmap[chan];
+
+			snprintf(tmp, sizeof(tmp), "                        %-20s %d\n", (m_signalNames[i] + ":").c_str(), id);
+		}
+
+		config += tmp;
+	}
+
+	/*
+	//Parameters
+	snprintf(tmp, sizeof(tmp), "                    parameters: %%\n");
+	config += tmp;
+	for(auto it : m_parameters)
+	{
+		snprintf(tmp, sizeof(tmp), "                        %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+		config += tmp;
+	}
+	*/
+
+	return config;
 }
