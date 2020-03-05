@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -381,6 +381,21 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Configuration storage
+
+	/**
+		@brief Serializes this oscilloscope's configuration to a YAML string.
+
+		Both idmap and nextID are expected to be modified by this function.
+
+		@param idmap	Map of pointers to integer IDs
+		@param nextID	The next ID value to use
+
+		@return YAML block with this oscilloscope's configuration
+	 */
+	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID);
 
 public:
 	bool HasPendingWaveforms();
