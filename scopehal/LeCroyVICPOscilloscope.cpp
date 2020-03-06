@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -162,17 +162,24 @@ string LeCroyVICPOscilloscope::ReadData()
 
 string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
 {
-	string payload = ReadData();
-
-	if(trimNewline && (payload.length() > 0) )
+	while(true)
 	{
-		int iend = payload.length() - 1;
-		if(trimNewline && (payload[iend] == '\n'))
-			payload.resize(iend);
-	}
+		string payload = ReadData();
 
-	payload += "\0";
-	return payload;
+		//Skip empty blocks
+		if(payload.empty() || payload == "\n")
+			continue;
+
+		if(trimNewline && (payload.length() > 0) )
+		{
+			int iend = payload.length() - 1;
+			if(trimNewline && (payload[iend] == '\n'))
+				payload.resize(iend);
+		}
+
+		payload += "\0";
+		return payload;
+	}
 }
 
 string LeCroyVICPOscilloscope::ReadMultiBlockString()

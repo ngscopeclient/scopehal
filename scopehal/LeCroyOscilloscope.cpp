@@ -205,14 +205,12 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	m_hasLA = true;
 	LogIndenter li;
 
-	//TODO: send command to enable all digital channels if we use any?
-
 	m_digitalChannelCount = count;
 
-	char chn[8];
+	char chn[32];
 	for(unsigned int i=0; i<count; i++)
 	{
-		snprintf(chn, sizeof(chn), "D%d", i);
+		snprintf(chn, sizeof(chn), "Digital%d", i);
 		auto chan = new OscilloscopeChannel(
 			this,
 			chn,
@@ -223,6 +221,8 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 		m_channels.push_back(chan);
 		m_digitalChannels.push_back(chan);
 	}
+
+	//Enable all of them
 }
 
 /**
@@ -376,38 +376,47 @@ string LeCroyOscilloscope::GetSerial()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Channel configuration
 
-//TODO: None of these 3 functions support LA stuff
 bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//TODO: handle digital channels, for now just claim they're off
-	if(i >= m_analogChannelCount)
-		return false;
-
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-		return m_channelsEnabled[i];
-
-	lock_guard<recursive_mutex> lock2(m_mutex);
-
-	//See if the channel is enabled, hide it if not
-	string cmd = m_channels[i]->GetHwname() + ":TRACE?";
-	SendCommand(cmd);
-	string reply = ReadSingleBlockString(true);
-	if(reply == "OFF")
+	//Analog
+	if(i < m_analogChannelCount)
 	{
-		m_channelsEnabled[i] = false;
-		return false;
+		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+			return m_channelsEnabled[i];
+
+		lock_guard<recursive_mutex> lock2(m_mutex);
+
+		//See if the channel is enabled, hide it if not
+		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
+		SendCommand(cmd);
+		string reply = ReadSingleBlockString(true);
+		if(reply == "OFF")
+			m_channelsEnabled[i] = false;
+		else
+			m_channelsEnabled[i] = true;
 	}
+
+	//Digital
 	else
 	{
-		m_channelsEnabled[i] = true;
-		return true;
+		lock_guard<recursive_mutex> lock2(m_mutex);
+
+		//See if the channel is on
+		SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + "'");
+		string str = ReadSingleBlockString();
+		if(str == "0")
+			m_channelsEnabled[i] = false;
+		else
+			m_channelsEnabled[i] = true;
 	}
+
+	return m_channelsEnabled[i];
 }
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
@@ -415,15 +424,81 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 	//LogDebug("enable channel %d\n", i);
 	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("got mutex\n");
+
+	//If this is an analog channel, just toggle it
+	if(i < m_analogChannelCount)
+		SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+
+	//Trigger can't be enabled
+	else if(i == m_extTrigChannel->GetIndex())
+	{
+	}
+
+	//Digital channel
+	else
+	{
+		//If we have NO digital channels enabled, enable the first digital bus
+		bool anyDigitalEnabled = false;
+		for(auto c : m_digitalChannels)
+		{
+			if(m_channelsEnabled[c->GetIndex()])
+			{
+				anyDigitalEnabled = true;
+				break;
+			}
+		}
+
+		if(!anyDigitalEnabled)
+			SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
+
+		//Enable this channel on the hardware
+		SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
+		char tmp[128];
+		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
+		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
+		SendCommand(tmp);
+	}
+
 	m_channelsEnabled[i] = true;
-	SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 }
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
+	//LogDebug("enable channel %d\n", i);
 	lock_guard<recursive_mutex> lock(m_mutex);
+	//LogDebug("got mutex\n");
+
 	m_channelsEnabled[i] = false;
-	SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
+
+	//If this is an analog channel, just toggle it
+	if(i < m_analogChannelCount)
+		SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+
+	//Trigger can't be enabled
+	else if(i == m_extTrigChannel->GetIndex())
+	{
+	}
+
+	//Digital channel
+	else
+	{
+		//If we have NO digital channels enabled, disable the first digital bus
+		bool anyDigitalEnabled = false;
+		for(auto c : m_digitalChannels)
+		{
+			if(m_channelsEnabled[c->GetIndex()])
+			{
+				anyDigitalEnabled = true;
+				break;
+			}
+		}
+
+		if(!anyDigitalEnabled)
+			SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
+
+		//Disable this channel
+		SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
+	}
 }
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
@@ -883,8 +958,6 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//In some rare circumstances, such as when the user touches front panel controls,
 	//it appears we can get a blank line before this. Ignore that.
 	string header = ReadData();
-	while(header == "\n")
-		header = ReadData();
 
 	//Second block is a header including the message length. Parse that.
 	string lhdr = ReadSingleBlockString();
@@ -944,6 +1017,23 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 		else
 			m_channelsEnabled[i] = true;
 	}
+
+	/*
+	//Check digital status
+	//TODO: better per-lane queries
+	SendCommand("Digital1:TRACE?");
+
+	string reply = ReadSingleBlockString();
+	if(reply == "OFF")
+	{
+		for(size_t i=0; i<m_digitalChannelCount; i++)
+			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
+	}
+	else
+	{
+		for(size_t i=0; i<m_digitalChannelCount; i++)
+			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
+	}*/
 }
 
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
@@ -1043,7 +1133,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	}
 	double* pwtime = reinterpret_cast<double*>(&wavetime[0]);
 
-	map<int, vector<AnalogCapture*> > pending_waveforms;
+	map<int, vector<CaptureChannelBase*> > pending_waveforms;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
@@ -1166,60 +1256,44 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	//LogDebug("unlock mutex\n");
 	m_mutex.unlock();
 
-	//Now that we have all of the pending waveforms, save them in sets across all channels
-	m_pendingWaveformsMutex.lock();
-	size_t num_pending = num_sequences-1;
-	if(toQueue)				//if saving to queue, the 0'th segment counts too
-		num_pending ++;
-	for(size_t i=0; i<num_pending; i++)
-	{
-		SequenceSet s;
-		for(size_t j=0; j<m_analogChannelCount; j++)
-		{
-			if(enabled[j])
-				s[m_channels[j]] = pending_waveforms[j][i];
-		}
-		m_pendingWaveforms.push_back(s);
-	}
-	m_pendingWaveformsMutex.unlock();
-
-	double dt = GetTime() - start;
-	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
-
 	if(num_sequences > 1)
 	{
 		m_mutex.lock();
 
 		//LeCroy's LA is derpy and doesn't support sequenced capture!
-		//(at least in wavesurfer 3000 series)
+		//(at least in wavesurfer 3000 series, need to test waverunner8-ms)
 		for(unsigned int i=0; i<m_digitalChannelCount; i++)
-			m_channels[m_analogChannelCount + i]->SetData(NULL);
+			m_digitalChannels[i]->SetData(NULL);
 
 		m_mutex.unlock();
 	}
 
 	else if(m_digitalChannelCount > 0)
 	{
-		m_mutex.lock();
-
 		//If no digital channels are enabled, skip this step
 		bool denabled = false;
+		m_cacheMutex.lock();
 		for(size_t i=0; i<m_digitalChannels.size(); i++)
 		{
-			if(m_digitalChannels[i]->IsEnabled())
+			if(m_channelsEnabled[m_digitalChannels[i]->GetIndex()])
 			{
 				denabled = true;
 				break;
 			}
 		}
+		m_cacheMutex.unlock();
 
+		lock_guard<recursive_mutex> lock(m_mutex);
 		if(denabled)
 		{
 			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
 			SendCommand("Digital1:WF?");
 			string data;
 			if(!ReadWaveformBlock(data))
+			{
+				LogDebug("failed to download digital waveform\n");
 				return false;
+			}
 
 			//See what channels are enabled
 			string tmp = data.substr(data.find("SelectedLines=") + 14);
@@ -1263,7 +1337,10 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 						cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
 
 					//Done, update the data
-					m_digitalChannels[i]->SetData(cap);
+					if(!toQueue)
+						m_channels[m_digitalChannels[i]->GetIndex()]->SetData(cap);
+					else
+						pending_waveforms[m_digitalChannels[i]->GetIndex()].push_back(cap);
 
 					//Go to next channel in the capture
 					icapchan ++;
@@ -1271,15 +1348,35 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				else
 				{
 					//No data here for us!
-					m_digitalChannels[i]->SetData(NULL);
+					if(!toQueue)
+						m_channels[m_digitalChannels[i]->GetIndex()]->SetData(NULL);
+					else
+						pending_waveforms[m_digitalChannels[i]->GetIndex()].push_back(NULL);
 				}
 			}
-
 			delete[] block;
 		}
-
-		m_mutex.unlock();
 	}
+
+	//Now that we have all of the pending waveforms, save them in sets across all channels
+	m_pendingWaveformsMutex.lock();
+	size_t num_pending = num_sequences-1;
+	if(toQueue)				//if saving to queue, the 0'th segment counts too
+		num_pending ++;
+	for(size_t i=0; i<num_pending; i++)
+	{
+		SequenceSet s;
+		for(size_t j=0; j<m_channels.size(); j++)
+		{
+			if(pending_waveforms.find(j) != pending_waveforms.end())
+				s[m_channels[j]] = pending_waveforms[j][i];
+		}
+		m_pendingWaveforms.push_back(s);
+	}
+	m_pendingWaveformsMutex.unlock();
+
+	double dt = GetTime() - start;
+	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
 
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
@@ -1359,7 +1456,7 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 		m_triggerChannel = m_extTrigChannel->GetIndex();
 	else
 	{
-		LogError("Unknown source %s\n", source);
+		LogError("Unknown source %s (reply %s)\n", source, reply.c_str());
 		m_triggerChannel = 0;
 	}
 	m_triggerChannelValid = true;
@@ -1382,6 +1479,10 @@ void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 
 float LeCroyOscilloscope::GetTriggerVoltage()
 {
+	//Digital channels don't have a meaningful trigger voltage
+	if(GetTriggerChannelIndex() > m_extTrigChannel->GetIndex())
+		return 0;
+
 	//Check cache.
 	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
 	if(m_triggerLevelValid)
