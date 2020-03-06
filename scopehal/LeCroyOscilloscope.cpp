@@ -1036,7 +1036,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Parse the wavedesc headers
-		unsigned char* pdesc = (unsigned char*)(&wavedescs[i][0]);
+		pdesc = (unsigned char*)(&wavedescs[i][0]);
 		//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
 		//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
 		float v_gain = *reinterpret_cast<float*>(pdesc + 156);
@@ -1129,12 +1129,12 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 			//Decode the samples
 			cap->m_samples.resize(num_per_segment);
-			for(unsigned int i=0; i<num_per_segment; i++)
+			for(unsigned int k=0; k<num_per_segment; k++)
 			{
 				if(m_highDefinition)
-					cap->m_samples[i] = AnalogSample(i, 1, wdata[i + j*num_per_segment] * v_gain - v_off);
+					cap->m_samples[k] = AnalogSample(k, 1, wdata[i + j*num_per_segment] * v_gain - v_off);
 				else
-					cap->m_samples[i] = AnalogSample(i, 1, bdata[i + j*num_per_segment] * v_gain - v_off);
+					cap->m_samples[k] = AnalogSample(k, 1, bdata[i + j*num_per_segment] * v_gain - v_off);
 			}
 
 			//Done, update the data
@@ -1185,21 +1185,20 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		m_mutex.lock();
 
 		//If no digital channels are enabled, skip this step
-		bool enabled = false;
+		bool denabled = false;
 		for(size_t i=0; i<m_digitalChannels.size(); i++)
 		{
 			if(m_digitalChannels[i]->IsEnabled())
 			{
-				enabled = true;
+				denabled = true;
 				break;
 			}
 		}
 
-		if(enabled)
+		if(denabled)
 		{
 			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
-			string cmd = "Digital1:WF?";
-			SendCommand(cmd);
+			SendCommand("Digital1:WF?");
 			string data;
 			if(!ReadWaveformBlock(data))
 				return false;
@@ -1326,7 +1325,7 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 	if(source[0] == 'D')					//Digital channel numbers are 0 based
 	{
 		int digitalChannelNum = atoi(source+1);
-		if(digitalChannelNum >= m_digitalChannelCount)
+		if((unsigned)digitalChannelNum >= m_digitalChannelCount)
 		{
 			m_triggerChannel = 0;
 			LogWarning("Trigger is configured for digital channel %s, but we only have %u digital channels\n",
