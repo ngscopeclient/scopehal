@@ -151,7 +151,7 @@ void LeCroyOscilloscope::DetectOptions()
 			LogDebug("* None\n");
 		for(auto o : options)
 		{
-			//If we have the LA module installed, add the digital channels
+			//If we have an LA module installed, add the digital channels
 			if(o == "MSXX")
 			{
 				m_hasLA = true;
@@ -207,15 +207,42 @@ void LeCroyOscilloscope::DetectOptions()
 	}
 }
 
+/**
+	@brief Figures out how many analog channels we have, and add them to the device
+
+	If you're lucky, the last digit of the model number will be the number of channels (HDO9204)
+
+	But, since we can't have nice things, theres are plenty of exceptions. Known formats so far:
+	* WAVERUNNER8104-MS has 4 channels (plus 16 digital)
+	* DDA5005 / DDA5005A have 4 channels
+ */
 void LeCroyOscilloscope::DetectAnalogChannels()
 {
-	//Last digit of the model number is normally the number of channels
-	int nchans = m_model[m_model.length() - 1] - '0';
+	//General model format is family, number, suffix. Not all are always present.
+	//Trim off alphabetic characters from the start of the model number
+	size_t pos;
+	for(pos=0; pos < m_model.length(); pos++)
+	{
+		if(isalpha(m_model[pos]))
+			continue;
+		else if(isdigit(m_model[pos]))
+			break;
+		else
+		{
+			LogError("Unrecognized character (not alphanumeric) in model number %s\n", m_model.c_str());
+			return;
+		}
+	}
+
+	//Now we should be able to read the model number
+	int modelNum = atoi(m_model.c_str() + pos);
+
+	//Last digit of the model number is normally the number of channels (WAVESURFER3022, HDO8108)
+	int nchans = modelNum % 10;
 
 	//DDA5005 and similar have 4 channels despite a model number ending in 5
 	if(m_modelid == MODEL_DDA_5K)
 		nchans = 4;
-
 
 	for(int i=0; i<nchans; i++)
 	{
