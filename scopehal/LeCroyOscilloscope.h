@@ -51,6 +51,7 @@ protected:
 	void IdentifyHardware();
 	void SharedCtorInit();
 	virtual void DetectAnalogChannels();
+	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
 
 public:

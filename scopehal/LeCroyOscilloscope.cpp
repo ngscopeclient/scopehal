@@ -152,30 +152,10 @@ void LeCroyOscilloscope::DetectOptions()
 		for(auto o : options)
 		{
 			//If we have an LA module installed, add the digital channels
-			if(o == "MSXX")
+			if( (o == "MSXX") && !m_hasLA)
 			{
-				m_hasLA = true;
 				LogDebug("* MSXX (logic analyzer)\n");
-				LogIndenter li;
-
-				//TODO: send command to enable all digital channels if we use any?
-
-				m_digitalChannelCount = 16;
-
-				char chn[8];
-				for(int i=0; i<16; i++)
-				{
-					snprintf(chn, sizeof(chn), "D%d", i);
-					auto chan = new OscilloscopeChannel(
-						this,
-						chn,
-						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-						GetDefaultChannelColor(m_channels.size()),
-						1,
-						m_channels.size());
-					m_channels.push_back(chan);
-					m_digitalChannels.push_back(chan);
-				}
+				AddDigitalChannels(16);
 			}
 
 			//If we have the voltmeter installed, make a note of that
@@ -200,10 +180,48 @@ void LeCroyOscilloscope::DetectOptions()
 				LogDebug("* %s (protocol decode, ignoring)\n", o.c_str());
 			}
 
+			//Ignore UI options
+			else if(o == "XWEB")
+			{
+				LogDebug("* %s (UI option, ignoring)\n", o.c_str());
+			}
+
 			//No idea what it is
 			else
 				LogDebug("* %s (not yet implemented)\n", o.c_str());
 		}
+	}
+
+	//If we don't have a code for the LA software option, but are a -MS scope, add the LA
+	if(!m_hasLA && (m_model.find("-MS") != string::npos))
+		AddDigitalChannels(16);
+}
+
+/**
+	@brief Creates digital channels for the oscilloscope
+ */
+void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
+{
+	m_hasLA = true;
+	LogIndenter li;
+
+	//TODO: send command to enable all digital channels if we use any?
+
+	m_digitalChannelCount = count;
+
+	char chn[8];
+	for(unsigned int i=0; i<count; i++)
+	{
+		snprintf(chn, sizeof(chn), "D%d", i);
+		auto chan = new OscilloscopeChannel(
+			this,
+			chn,
+			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			GetDefaultChannelColor(m_channels.size()),
+			1,
+			m_channels.size());
+		m_channels.push_back(chan);
+		m_digitalChannels.push_back(chan);
 	}
 }
 
@@ -1451,8 +1469,8 @@ void LeCroyOscilloscope::SetTriggerForChannel(
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
 {
-	//not meaningful for trigger channels
-	if(i == m_extTrigChannel->GetIndex())
+	//not meaningful for trigger or digital channels
+	if(i > m_analogChannelCount)
 		return 0;
 
 	{
@@ -1483,8 +1501,8 @@ void LeCroyOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 {
-	//not meaningful for trigger channels
-	if(i == m_extTrigChannel->GetIndex())
+	//not meaningful for trigger or digital channels
+	if(i > m_analogChannelCount)
 		return 1;
 
 	{
