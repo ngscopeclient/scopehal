@@ -1322,10 +1322,21 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 	char source[32] = "";
 	sscanf(reply.c_str(), "%31[^,],%31[^,],%31[^,],\n", ignored1, ignored2, source);
 
-	//TODO: support digital channels
-
 	//Update cache
-	if(isdigit(source[1]))
+	if(source[0] == 'D')					//Digital channel numbers are 0 based
+	{
+		int digitalChannelNum = atoi(source+1);
+		if(digitalChannelNum >= m_digitalChannelCount)
+		{
+			m_triggerChannel = 0;
+			LogWarning("Trigger is configured for digital channel %s, but we only have %u digital channels\n",
+				source, m_digitalChannelCount);
+		}
+
+		else
+			m_triggerChannel = m_digitalChannels[digitalChannelNum]->GetIndex();
+	}
+	else if(isdigit(source[1]))				//but analog are 1 based, yay!
 		m_triggerChannel = source[1] - '1';
 	else if(strstr(source, "EX") == source)	//EX or EX10 for /1 or /10
 		m_triggerChannel = m_extTrigChannel->GetIndex();
