@@ -30,56 +30,32 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of ParallelBusDecoder
  */
+#ifndef ParallelBusDecoder_h
+#define ParallelBusDecoder_h
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "ClockRecoveryDebugDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "ParallelBusDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+class ParallelBusDecoder : public ProtocolDecoder
+{
+public:
+	ParallelBusDecoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(ParallelBusDecoder)
+
+protected:
+	std::string m_widthname;
+};
 
 #endif

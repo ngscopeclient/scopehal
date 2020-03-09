@@ -30,6 +30,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MDIODecoder.cpp
 	MDIORenderer.cpp
 	MovingAverageDecoder.cpp
+	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp

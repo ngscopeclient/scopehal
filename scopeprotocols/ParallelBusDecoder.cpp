@@ -27,59 +27,133 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
-
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
-
-#include "ACCoupleDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "ClockRecoveryDebugDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeDecoder2.h"
-#include "FFTDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
 #include "ParallelBusDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
-*/
-void ScopeProtocolStaticInit();
+#include "../scopehal/DigitalRenderer.h"
 
-#endif
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ParallelBusDecoder::ParallelBusDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
+{
+	//Set up channels
+	char tmp[32];
+	for(size_t i=0; i<16; i++)
+	{
+		snprintf(tmp, sizeof(tmp), "din%zu", i);
+		m_signalNames.push_back(tmp);
+		m_channels.push_back(NULL);
+	}
+
+	m_widthname = "Width";
+	m_parameters[m_widthname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_widthname].SetIntVal(0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+ChannelRenderer* ParallelBusDecoder::CreateRenderer()
+{
+	return new DigitalRenderer(this);
+}
+
+bool ParallelBusDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i < 16) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string ParallelBusDecoder::GetProtocolName()
+{
+	return "Parallel Bus";
+}
+
+void ParallelBusDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "ParallelBus(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+bool ParallelBusDecoder::NeedsConfig()
+{
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void ParallelBusDecoder::Refresh()
+{
+	//Figure out how wide our input is
+	int width = m_parameters[m_widthname].GetIntVal();
+
+	//Make sure we have an input for each channel in use
+	vector<DigitalCapture*> inputs;
+	for(int i=0; i<width; i++)
+	{
+		if(m_channels[i] == NULL)
+		{
+			LogDebug("err 1\n");
+			SetData(NULL);
+			return;
+		}
+		DigitalCapture* din = dynamic_cast<DigitalCapture*>(m_channels[i]->GetData());
+		if(din == NULL)
+		{
+			LogDebug("err 2\n");
+			SetData(NULL);
+			return;
+		}
+		inputs.push_back(din);
+	}
+	if(inputs.empty())
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Merge all of our samples
+	//TODO: handle variable sample rates etc
+	DigitalBusCapture* cap = new DigitalBusCapture;
+	cap->m_samples.resize(inputs[0]->m_samples.size());
+	#pragma omp parallel for
+	for(size_t i=0; i<inputs[0]->m_samples.size(); i++)
+	{
+		vector<bool> data;
+		bool end = false;
+		for(int j=0; j<width; j++)
+		{
+			if(inputs[j]->GetDepth() >= i)
+			{
+				end = true;
+				break;
+			}
+
+			data.push_back(inputs[j]->m_samples[i].m_sample);
+		}
+
+		if(!end)
+		{
+			cap->m_samples[i] = DigitalBusSample(
+				inputs[0]->m_samples[i].m_offset,
+				inputs[0]->m_samples[i].m_duration,
+				data);
+		}
+	}
+	SetData(cap);
+
+	//Copy our time scales from the input
+	cap->m_timescale = inputs[0]->m_timescale;
+	cap->m_startTimestamp = inputs[0]->m_startTimestamp;
+	cap->m_startPicoseconds = inputs[0]->m_startPicoseconds;
+}
