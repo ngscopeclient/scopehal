@@ -49,6 +49,7 @@ public:
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
+	virtual bool IsOverlay();
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 

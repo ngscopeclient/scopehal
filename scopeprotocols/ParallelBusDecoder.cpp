@@ -89,6 +89,12 @@ bool ParallelBusDecoder::NeedsConfig()
 	return true;
 }
 
+bool ParallelBusDecoder::IsOverlay()
+{
+	//Probably doesn't make sense to be an overlay since we're not tied to the single bit we started decoding on
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -133,7 +139,7 @@ void ParallelBusDecoder::Refresh()
 		bool end = false;
 		for(int j=0; j<width; j++)
 		{
-			if(inputs[j]->GetDepth() >= i)
+			if(inputs[j]->GetDepth() <= i)
 			{
 				end = true;
 				break;
