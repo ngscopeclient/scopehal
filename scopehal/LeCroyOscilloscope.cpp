@@ -217,7 +217,8 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
 			1,
-			m_channels.size());
+			m_channels.size(),
+			true);
 		m_channels.push_back(chan);
 		m_digitalChannels.push_back(chan);
 	}
@@ -1050,18 +1051,31 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	vector<string> wavedescs;
 	string cmd;
 	bool enabled[4] = {false};
+	bool any_enabled = true;
 	BulkCheckChannelEnableState();
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-		enabled[i] = IsChannelEnabled(i);
+	unsigned int firstEnabledChannel = UINT_MAX;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		wavedescs.push_back("");
+		enabled[i] = IsChannelEnabled(i);
 		if(enabled[i])
-			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			any_enabled = true;
 	}
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		if(enabled[i])
+		wavedescs.push_back("");
+
+		//If NO channels are enabled, query channel 1's WAVEDESC.
+		//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
+		if(enabled[i] || (!any_enabled && i==0))
+		{
+			if(firstEnabledChannel == UINT_MAX)
+				firstEnabledChannel = i;
+			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+		}
+	}
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(enabled[i] || (!any_enabled && i==0))
 		{
 			if(!ReadWaveformBlock(wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
@@ -1072,7 +1086,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	size_t expected_wavedesc_size = 346;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		if(!enabled[i])
+		if(!enabled[i] && !(!any_enabled && i==0))
 			continue;
 
 		if(wavedescs[i].size() < expected_wavedesc_size)
@@ -1087,7 +1101,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	unsigned char* pdesc = NULL;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		if(enabled[i])
+		if(enabled[i] || (!any_enabled && i==0))
 		{
 			pdesc = (unsigned char*)(&wavedescs[i][0]);
 			break;
@@ -1120,6 +1134,46 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
 		}
 	}
+
+	/*
+		Timestamp is a somewhat complex format that needs some shuffling around.
+		Timestamp starts at offset 296 bytes in the wavedesc
+		(296-303)	double seconds
+		(304)		byte minutes
+		(305)		byte hours
+		(306)		byte days
+		(307)		byte months
+		(308-309)	uint16 year
+
+		TODO: during startup, query instrument for its current time zone
+		since the wavedesc reports instment local time
+	 */
+	double fseconds = *reinterpret_cast<const double*>(wavedescs[firstEnabledChannel].c_str() + 296);
+	uint8_t seconds = floor(fseconds);
+	double basetime = fseconds - seconds;
+	time_t tnow = time(NULL);
+	struct tm tstruc;
+	localtime_r(&tnow, &tstruc);
+
+	//Convert the instrument time to a string, then back to a tm
+	//Is there a better way to do this???
+	//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
+	//Maybe because tm_yday is inconsistent?
+	char tblock[64] = {0};
+	snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
+		*reinterpret_cast<uint16_t*>(pdesc+308),
+		pdesc[307],
+		pdesc[306],
+		pdesc[305],
+		pdesc[304],
+		seconds);
+	locale cur_locale;
+	auto& tget = use_facet< time_get<char> >(cur_locale);
+	istringstream stream(tblock);
+	ios::iostate state;
+	char format[] = "%F %T";
+	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
+	time_t ttime = mktime(&tstruc);
 
 	//Read the timestamps if we're doing segmented capture
 	string wavetime;
@@ -1154,48 +1208,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
 		if(h_off_frac < 0)
 			h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-
-		/*
-			Timestamp is a somewhat complex format that needs some shuffling around.
-			Timestamp starts at offset 296 bytes in the wavedesc
-			(296-303)	double seconds
-			(304)		byte minutes
-			(305)		byte hours
-			(306)		byte days
-			(307)		byte months
-			(308-309)	uint16 year
-		 */
-		double fseconds = *reinterpret_cast<double*>(pdesc + 296);
-		uint8_t seconds = floor(fseconds);
-		double basetime = fseconds - seconds;
-
-		//TODO: during startup, query instrument for its current time zone
-		//since the wavedesc reports instment local time
-
-		//Get the current time
-		time_t tnow = time(NULL);
-		struct tm tstruc;
-		localtime_r(&tnow, &tstruc);
-
-		//Convert the instrument time to a string, then back to a tm
-		//Is there a better way to do this???
-		//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
-		//Maybe because tm_yday is inconsistent?
-		char tblock[64] = {0};
-		snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
-			*reinterpret_cast<uint16_t*>(pdesc+308),
-			pdesc[307],
-			pdesc[306],
-			pdesc[305],
-			pdesc[304],
-			seconds);
-		locale cur_locale;
-		auto& tget = use_facet< time_get<char> >(cur_locale);
-		istringstream stream(tblock);
-		ios::iostate state;
-		char format[] = "%F %T";
-		tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
-		time_t ttime = mktime(&tstruc);
 
 		//Read the actual waveform data
 		string data;
@@ -1314,15 +1326,21 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			int num_samples = atoi(tmp.c_str());
 			//LogDebug("Expecting %d samples\n", num_samples);
 
+			//TODO: how do we parse this??
+			/*
+			tmp = data.substr(data.find("<FirstEventTime>") + 16);
+			tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
+			*/
+
 			//Pull out the actual binary data (Base64 coded)
 			tmp = data.substr(data.find("<BinaryData>") + 12);
 			tmp = tmp.substr(0, tmp.find("</BinaryData>"));
 
 			//Decode the base64
-			base64_decodestate state;
-			base64_init_decodestate(&state);
+			base64_decodestate bstate;
+			base64_init_decodestate(&bstate);
 			unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
-			base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &state);
+			base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &bstate);
 
 			//We have each channel's data from start to finish before the next (no interleaving).
 			unsigned int icapchan = 0;
@@ -1332,6 +1350,10 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				{
 					DigitalCapture* cap = new DigitalCapture;
 					cap->m_timescale = interval;
+
+					//Capture timestamp
+					cap->m_startTimestamp = ttime;
+					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
 					for(int j=0; j<num_samples; j++)
 						cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
