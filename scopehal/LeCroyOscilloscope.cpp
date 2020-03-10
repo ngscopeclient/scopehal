@@ -1326,8 +1326,8 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			int num_samples = atoi(tmp.c_str());
 			//LogDebug("Expecting %d samples\n", num_samples);
 
-			//TODO: how do we parse this??
 			/*
+			Nanoseconds since Jan 1 2000. Use this instead?
 			tmp = data.substr(data.find("<FirstEventTime>") + 16);
 			tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
 			*/

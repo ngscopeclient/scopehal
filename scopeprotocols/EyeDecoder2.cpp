@@ -173,8 +173,8 @@ void EyeDecoder2::SetDefaultName()
 {
 	char hwname[256];
 	snprintf(hwname, sizeof(hwname), "Eye(%s, %s)",
-		m_channels[0]->m_displayname.c_str(),
-		m_channels[1]->m_displayname.c_str());
+		(m_channels[0] == NULL) ? "NULL" : m_channels[0]->m_displayname.c_str(),
+		(m_channels[1] == NULL) ? "NULL" : m_channels[1]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
