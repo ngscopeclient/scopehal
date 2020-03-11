@@ -41,11 +41,11 @@ using namespace std;
 // Construction / destruction
 
 VICPSocketTransport::VICPSocketTransport(string hostname, unsigned short port)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	: m_nextSequence(1)
+	, m_lastSequence(1)
+	, m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 	, m_hostname(hostname)
 	, m_port(port)
-	, m_nextSequence(1)
-	, m_lastSequence(1)
 {
 	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", hostname.c_str(), port);
 
@@ -111,39 +111,50 @@ bool VICPSocketTransport::SendCommand(string cmd)
 
 string VICPSocketTransport::ReadReply()
 {
-	//Read the header
-	unsigned char header[8];
-	ReadRawData(8, header);
-
-	uint8_t op = header[0];
-	//OP_EOI terminates a block
-
-	//Sanity check
-	if(header[1] != 1)
+	string payload;
+	while(true)
 	{
-		LogError("Bad VICP protocol version\n");
-		return "";
-	}
-	if(header[2] != m_lastSequence)
-	{
-		//LogError("Bad VICP sequence number %d (expected %d)\n", header[2], m_lastSequence);
-		//return "";
-	}
-	if(header[3] != 0)
-	{
-		LogError("Bad VICP reserved field\n");
-		return "";
+		//Read the header
+		unsigned char header[8];
+		ReadRawData(8, header);
+
+		//Sanity check
+		if(header[1] != 1)
+		{
+			LogError("Bad VICP protocol version\n");
+			return "";
+		}
+		if(header[2] != m_lastSequence)
+		{
+			//LogError("Bad VICP sequence number %d (expected %d)\n", header[2], m_lastSequence);
+			//return "";
+		}
+		if(header[3] != 0)
+		{
+			LogError("Bad VICP reserved field\n");
+			return "";
+		}
+
+		//Read the message data
+		uint32_t len = (header[4] << 24) | (header[5] << 16) | (header[6] << 8) | header[7];
+		string rxbuf;
+		rxbuf.resize(len);
+		ReadRawData(len, (unsigned char*)&rxbuf[0]);
+
+		//Skip empty blocks, or just newlines
+		if( (len == 0) || (rxbuf == "\n"))
+		{}
+
+		//Actual frame data
+		else
+			payload += rxbuf;
+
+		//Check EOI flag
+		if(header[0] & OP_EOI)
+			break;
 	}
 
-	//TODO: pay attention to header?
-
-	//Read the message data
-	uint32_t len = (header[4] << 24) | (header[5] << 16) | (header[6] << 8) | header[7];
-	string ret;
-	ret.resize(len);
-	ReadRawData(len, (unsigned char*)&ret[0]);
-
-	return ret;
+	return payload;
 }
 
 void VICPSocketTransport::SendRawData(size_t len, const unsigned char* buf)

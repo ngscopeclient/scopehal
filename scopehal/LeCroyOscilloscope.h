@@ -164,7 +164,6 @@ protected:
 	void BulkCheckChannelEnableState();
 
 	virtual bool SendCommand(std::string cmd, bool eoi=true) = 0;
-	virtual std::string ReadData() =0;
 	virtual std::string ReadSingleBlockString(bool trimNewline = false) =0;
 
 	bool ReadWaveformBlock(std::string& data);

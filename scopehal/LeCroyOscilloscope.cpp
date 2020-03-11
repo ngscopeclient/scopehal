@@ -955,38 +955,14 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 {
-	//First packet is just a header "DAT1,\n" or "DESC,\n". Throw it away.
-	//In some rare circumstances, such as when the user touches front panel controls,
-	//it appears we can get a blank line before this. Ignore that.
-	string header = ReadData();
+	//Prefix "DESC,\n" or "DAT1,\n". Always seems to be 6 chars and start with a D.
+	//Next is the length header. Looks like #9000000346. #9 followed by nine ASCII length digits.
+	//Ignore that too.
+	string tmp = ReadSingleBlockString();
+	size_t offset = tmp.find("D");
 
-	//Second block is a header including the message length. Parse that.
-	string lhdr = ReadSingleBlockString();
-	unsigned int num_bytes = atoi(lhdr.c_str() + 2);
-	if(num_bytes == 0)
-	{
-		ReadData();
-		return true;
-	}
-
-	//Read the data
-	data.clear();
-	while(true)
-	{
-		string payload = ReadData();
-		data += payload;
-		if(data.size() >= num_bytes)
-			break;
-	}
-
-	//Throw away the newline at the end
-	ReadData();
-
-	if(data.size() != num_bytes)
-	{
-		LogError("bad rx block size (got %zu, expected %u)\n", data.size(), num_bytes);
-		return false;
-	}
+	//Copy the rest of the block
+	data = tmp.substr(offset + 16);
 
 	return true;
 }

@@ -65,32 +65,17 @@ bool LeCroyVICPOscilloscope::SendCommand(string cmd, bool eoi)
 	return true;
 }
 
-/**
-	@brief Read exactly one packet from the socket
- */
-string LeCroyVICPOscilloscope::ReadData()
-{
-	return m_transport->ReadReply();
-}
-
 string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
 {
-	while(true)
+	string payload = m_transport->ReadReply();
+
+	if(trimNewline && (payload.length() > 0) )
 	{
-		string payload = ReadData();
-
-		//Skip empty blocks
-		if(payload.empty() || payload == "\n")
-			continue;
-
-		if(trimNewline && (payload.length() > 0) )
-		{
-			int iend = payload.length() - 1;
-			if(trimNewline && (payload[iend] == '\n'))
-				payload.resize(iend);
-		}
-
-		payload += "\0";
-		return payload;
+		int iend = payload.length() - 1;
+		if(trimNewline && (payload[iend] == '\n'))
+			payload.resize(iend);
 	}
+
+	payload += "\0";
+	return payload;
 }

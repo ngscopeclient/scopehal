@@ -55,7 +55,7 @@ public:
 protected:
 	virtual void DetectAnalogChannels();
 	virtual bool SendCommand(std::string cmd, bool eoi=true);
-	virtual std::string ReadData();
+	std::string ReadData();
 	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);

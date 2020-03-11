@@ -48,7 +48,6 @@ public:
 
 protected:
 	virtual bool SendCommand(std::string cmd, bool eoi=true);
-	virtual std::string ReadData();
 	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
 	VICPSocketTransport* m_transport;
