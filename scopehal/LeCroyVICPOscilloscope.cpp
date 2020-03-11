@@ -67,15 +67,5 @@ bool LeCroyVICPOscilloscope::SendCommand(string cmd, bool eoi)
 
 string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
 {
-	string payload = m_transport->ReadReply();
-
-	if(trimNewline && (payload.length() > 0) )
-	{
-		int iend = payload.length() - 1;
-		if(trimNewline && (payload[iend] == '\n'))
-			payload.resize(iend);
-	}
-
-	payload += "\0";
-	return payload;
+	return m_transport->ReadReply();
 }

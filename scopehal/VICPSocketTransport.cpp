@@ -154,6 +154,9 @@ string VICPSocketTransport::ReadReply()
 			break;
 	}
 
+	//make sure there's a null terminator
+	payload += "\0";
+
 	return payload;
 }
 

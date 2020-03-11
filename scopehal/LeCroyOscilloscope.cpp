@@ -119,7 +119,7 @@ void LeCroyOscilloscope::IdentifyHardware()
 void LeCroyOscilloscope::DetectOptions()
 {
 	SendCommand("*OPT?", true);
-	string reply = ReadSingleBlockString(true);
+	string reply = ReadSingleBlockString();
 	if(reply.length() > 3)
 	{
 		//Read options until we hit a null
@@ -138,6 +138,10 @@ void LeCroyOscilloscope::DetectOptions()
 				options.push_back(opt);
 				opt = "";
 			}
+
+			//skip newlines
+			else if(reply[i] == '\n')
+				continue;
 
 			else
 				opt += reply[i];
@@ -396,8 +400,8 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		//See if the channel is enabled, hide it if not
 		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
 		SendCommand(cmd);
-		string reply = ReadSingleBlockString(true);
-		if(reply == "OFF")
+		string reply = ReadSingleBlockString();
+		if(reply.find("OFF") == 0)	//may have a trailing newline, ignore that
 			m_channelsEnabled[i] = false;
 		else
 			m_channelsEnabled[i] = true;
@@ -510,7 +514,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
-	string reply = ReadSingleBlockString(true);
+	string reply = ReadSingleBlockString().substr(0,3);	//trim off trailing newline, all coupling codes are 3 chars
 
 	if(reply == "A1M")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -543,7 +547,7 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
-	string reply = ReadSingleBlockString(true);
+	string reply = ReadSingleBlockString();
 
 	double d;
 	sscanf(reply.c_str(), "%lf", &d);
@@ -564,14 +568,14 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	string cmd = "BANDWIDTH_LIMIT?";
 	SendCommand(cmd);
-	string reply = ReadSingleBlockString(true);
+	string reply = ReadSingleBlockString();
 
 	size_t index = reply.find(m_channels[i]->GetHwname());
 	if(index == string::npos)
 		return 0;
 
 	char chbw[16];
-	sscanf(reply.c_str() + index + 3, "%15[^,]", chbw);	//offset 3 for "Cn,"
+	sscanf(reply.c_str() + index + 3, "%15[^,\n]", chbw);	//offset 3 for "Cn,"
 	string sbw(chbw);
 
 	if(sbw == "OFF")
