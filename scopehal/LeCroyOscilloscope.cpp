@@ -1252,9 +1252,9 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			for(unsigned int k=0; k<num_per_segment; k++)
 			{
 				if(m_highDefinition)
-					cap->m_samples[k] = AnalogSample(k, 1, wdata[i + j*num_per_segment] * v_gain - v_off);
+					cap->m_samples[k] = AnalogSample(k, 1, wdata[k + j*num_per_segment] * v_gain - v_off);
 				else
-					cap->m_samples[k] = AnalogSample(k, 1, bdata[i + j*num_per_segment] * v_gain - v_off);
+					cap->m_samples[k] = AnalogSample(k, 1, bdata[k + j*num_per_segment] * v_gain - v_off);
 			}
 
 			//Done, update the data
