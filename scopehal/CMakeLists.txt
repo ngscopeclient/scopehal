@@ -15,6 +15,7 @@ set(SCOPEHAL_SOURCES
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
+	VICPSocketTransport.cpp
 	SCPIDevice.cpp
 
 	Instrument.cpp

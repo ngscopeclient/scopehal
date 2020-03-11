@@ -30,44 +30,125 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Implementation of VICPSocketTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopehal.h"
 
-#include "../log/log.h"
+using namespace std;
 
-#include <sigc++/sigc++.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+VICPSocketTransport::VICPSocketTransport(string hostname, unsigned short port)
+	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	, m_hostname(hostname)
+	, m_port(port)
+	, m_nextSequence(1)
+	, m_lastSequence(1)
+{
+	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", hostname.c_str(), port);
 
-#include "Unit.h"
+	if(!m_socket.Connect(hostname, port))
+	{
+		LogError("Couldn't connect to socket\n");
+		return;
+	}
+	if(!m_socket.DisableNagle())
+	{
+		LogError("Couldn't disable Nagle\n");
+		return;
+	}
+}
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+VICPSocketTransport::~VICPSocketTransport()
+{
+}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
 
-#include "Measurement.h"
 
-#include <cairomm/context.h>
+uint8_t VICPSocketTransport::GetNextSequenceNumber()
+{
+	m_lastSequence = m_nextSequence;
 
-#include "../graphwidget/Graph.h"
+	//EOI increments the sequence number.
+	//Wrap mod 256, but skip zero!
+	m_nextSequence ++;
+	if(m_nextSequence == 0)
+		m_nextSequence = 1;
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	return m_lastSequence;
+}
 
-std::string GetDefaultChannelColor(int i);
+bool VICPSocketTransport::SendCommand(string cmd)
+{
+	//Operation and flags header
+	string payload;
+	uint8_t op 	= OP_DATA | OP_EOI;
 
-#endif
+	//TODO: remote, clear, poll flags
+	payload += op;
+	payload += 0x01;							//protocol version number
+	payload += GetNextSequenceNumber();
+	payload += '\0';							//reserved
+
+	//Next 4 header bytes are the message length (network byte order)
+	uint32_t len = cmd.length();
+	payload += (len >> 24) & 0xff;
+	payload += (len >> 16) & 0xff;
+	payload += (len >> 8)  & 0xff;
+	payload += (len >> 0)  & 0xff;
+
+	//Add message data
+	payload += cmd;
+
+	//Actually send it
+	SendRawData(payload.size(), (const unsigned char*)payload.c_str());
+	return true;
+}
+
+string VICPSocketTransport::ReadReply()
+{
+	//Read the header
+	unsigned char header[8];
+	ReadRawData(8, header);
+
+	//Sanity check
+	if(header[1] != 1)
+	{
+		LogError("Bad VICP protocol version\n");
+		return "";
+	}
+	if(header[2] != m_lastSequence)
+	{
+		//LogError("Bad VICP sequence number %d (expected %d)\n", header[2], m_lastSequence);
+		//return "";
+	}
+	if(header[3] != 0)
+	{
+		LogError("Bad VICP reserved field\n");
+		return "";
+	}
+
+	//TODO: pay attention to header?
+
+	//Read the message data
+	uint32_t len = (header[4] << 24) | (header[5] << 16) | (header[6] << 8) | header[7];
+	string ret;
+	ret.resize(len);
+	ReadRawData(len, (unsigned char*)&ret[0]);
+
+	return ret;
+}
+
+void VICPSocketTransport::SendRawData(size_t len, const unsigned char* buf)
+{
+	m_socket.SendLooped(buf, len);
+}
+
+void VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf)
+{
+	m_socket.RecvLooped(buf, len);
+}

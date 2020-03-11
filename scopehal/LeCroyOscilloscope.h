@@ -97,18 +97,6 @@ public:
 	virtual void SetTriggerType(Oscilloscope::TriggerType type);
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
-	//VICP constant helpers
-	enum HEADER_OPS
-	{
-		OP_DATA		= 0x80,
-		OP_REMOTE	= 0x40,
-		OP_LOCKOUT	= 0x20,
-		OP_CLEAR	= 0x10,
-		OP_SRQ		= 0x8,
-		OP_REQ		= 0x4,
-		OP_EOI		= 0x1
-	};
-
 	//DMM acquisition
 	virtual double GetVoltage();
 	virtual double GetPeakToPeak();

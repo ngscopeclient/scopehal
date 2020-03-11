@@ -40,21 +40,8 @@ using namespace std;
 
 LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short port)
 	: LeCroyOscilloscope(hostname, port)
-	, m_nextSequence(1)
-	, m_lastSequence(1)
 {
-	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", hostname.c_str(), port);
-
-	if(!m_socket.Connect(hostname, port))
-	{
-		LogError("Couldn't connect to socket\n");
-		return;
-	}
-	if(!m_socket.DisableNagle())
-	{
-		LogError("Couldn't disable Nagle\n");
-		return;
-	}
+	m_transport = new VICPSocketTransport(hostname, port);
 
 	//standard initialization
 	FlushConfigCache();
@@ -62,62 +49,19 @@ LeCroyVICPOscilloscope::LeCroyVICPOscilloscope(string hostname, unsigned short p
 	DetectAnalogChannels();
 	SharedCtorInit();
 	DetectOptions();
-
-	//TODO: make this switchable
-	SendCommand("DISP ON");
 }
 
 LeCroyVICPOscilloscope::~LeCroyVICPOscilloscope()
 {
-	//SendCommand("DISP ON");
+	delete m_transport;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VICP protocol logic
 
-uint8_t LeCroyVICPOscilloscope::GetNextSequenceNumber(bool eoi)
-{
-	m_lastSequence = m_nextSequence;
-
-	//EOI increments the sequence number.
-	//Wrap mod 256, but skip zero!
-	if(eoi)
-	{
-		m_nextSequence ++;
-		if(m_nextSequence == 0)
-			m_nextSequence = 1;
-	}
-
-	return m_lastSequence;
-}
-
 bool LeCroyVICPOscilloscope::SendCommand(string cmd, bool eoi)
 {
-	//Operation and flags header
-	string payload;
-	uint8_t op 	= OP_DATA;
-	if(eoi)
-		op |= OP_EOI;
-	//TODO: remote, clear, poll flags
-	payload += op;
-	payload += 0x01;							//protocol version number
-	payload += GetNextSequenceNumber(eoi);
-	payload += '\0';							//reserved
-
-	//Next 4 header bytes are the message length (network byte order)
-	uint32_t len = cmd.length();
-	payload += (len >> 24) & 0xff;
-	payload += (len >> 16) & 0xff;
-	payload += (len >> 8)  & 0xff;
-	payload += (len >> 0)  & 0xff;
-
-	//Add message data
-	payload += cmd;
-
-	//Actually send it
-	if(!m_socket.SendLooped((const unsigned char*)payload.c_str(), payload.size()))
-		return false;
-
+	m_transport->SendCommand(cmd);
 	return true;
 }
 
@@ -126,38 +70,7 @@ bool LeCroyVICPOscilloscope::SendCommand(string cmd, bool eoi)
  */
 string LeCroyVICPOscilloscope::ReadData()
 {
-	//Read the header
-	unsigned char header[8];
-	if(!m_socket.RecvLooped(header, 8))
-		return "";
-
-	//Sanity check
-	if(header[1] != 1)
-	{
-		LogError("Bad VICP protocol version\n");
-		return "";
-	}
-	if(header[2] != m_lastSequence)
-	{
-		//LogError("Bad VICP sequence number %d (expected %d)\n", header[2], m_lastSequence);
-		//return "";
-	}
-	if(header[3] != 0)
-	{
-		LogError("Bad VICP reserved field\n");
-		return "";
-	}
-
-	//TODO: pay attention to header?
-
-	//Read the message data
-	uint32_t len = (header[4] << 24) | (header[5] << 16) | (header[6] << 8) | header[7];
-	string ret;
-	ret.resize(len);
-	if(!m_socket.RecvLooped((unsigned char*)&ret[0], len))
-		return "";
-
-	return ret;
+	return m_transport->ReadReply();
 }
 
 string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)

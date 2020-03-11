@@ -30,44 +30,50 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of VICPSocketTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef VICPSocketTransport_h
+#define VICPSocketTransport_h
 
-#include "../log/log.h"
+#include "../xptools/Socket.h"
 
-#include <sigc++/sigc++.h>
+/**
+	@brief A SCPI transport tunneled over LeCroy's Virtual Instrument Control Protocol
+ */
+class VICPSocketTransport : public SCPITransport
+{
+public:
+	VICPSocketTransport(std::string hostname, unsigned short port);
+	virtual ~VICPSocketTransport();
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-#include "Unit.h"
+	//VICP constant helpers
+	enum HEADER_OPS
+	{
+		OP_DATA		= 0x80,
+		OP_REMOTE	= 0x40,
+		OP_LOCKOUT	= 0x20,
+		OP_CLEAR	= 0x10,
+		OP_SRQ		= 0x8,
+		OP_REQ		= 0x4,
+		OP_EOI		= 0x1
+	};
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+protected:
+	uint8_t GetNextSequenceNumber();
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	uint8_t m_nextSequence;
+	uint8_t m_lastSequence;
 
-#include "Measurement.h"
+	Socket m_socket;
 
-#include <cairomm/context.h>
-
-#include "../graphwidget/Graph.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
+	std::string m_hostname;
+	unsigned short m_port;
+};
 
 #endif

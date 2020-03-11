@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,9 +52,7 @@ protected:
 	virtual std::string ReadMultiBlockString();
 	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
-	uint8_t GetNextSequenceNumber(bool eoi);
-	uint8_t m_nextSequence;
-	uint8_t m_lastSequence;
+	VICPSocketTransport* m_transport;
 };
 
 #endif
