@@ -44,15 +44,18 @@
 class SCPISocketTransport : public SCPITransport
 {
 public:
-	SCPISocketTransport(std::string hostname, unsigned short port);
+	SCPISocketTransport(std::string args);
 	virtual ~SCPISocketTransport();
 
 	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
 	virtual bool SendCommand(std::string cmd);
 	virtual std::string ReadReply();
 	virtual void ReadRawData(size_t len, unsigned char* buf);
 	virtual void SendRawData(size_t len, const unsigned char* buf);
+
+	TRANSPORT_INITPROC(SCPISocketTransport)
 
 protected:
 	Socket m_socket;

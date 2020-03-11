@@ -44,10 +44,11 @@
 class VICPSocketTransport : public SCPITransport
 {
 public:
-	VICPSocketTransport(std::string hostname, unsigned short port);
+	VICPSocketTransport(std::string args);
 	virtual ~VICPSocketTransport();
 
 	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
 	virtual bool SendCommand(std::string cmd);
 	virtual std::string ReadReply();
@@ -65,6 +66,8 @@ public:
 		OP_REQ		= 0x4,
 		OP_EOI		= 0x1
 	};
+
+	TRANSPORT_INITPROC(VICPSocketTransport)
 
 protected:
 	uint8_t GetNextSequenceNumber();

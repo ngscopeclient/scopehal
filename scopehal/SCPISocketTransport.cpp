@@ -40,14 +40,26 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPISocketTransport::SCPISocketTransport(string hostname, unsigned short port)
+SCPISocketTransport::SCPISocketTransport(string args)
 	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-	, m_hostname(hostname)
-	, m_port(port)
 {
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", hostname.c_str(), port);
+	char hostname[128];
+	unsigned int port = 0;
+	if(2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	{
+		//default if port not specified
+		m_hostname = args;
+		m_port = 1861;
+	}
+	else
+	{
+		m_hostname = hostname;
+		m_port = port;
+	}
 
-	if(!m_socket.Connect(hostname, port))
+	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
+
+	if(!m_socket.Connect(m_hostname, m_port))
 	{
 		LogError("Couldn't connect to socket\n");
 		return;
@@ -65,6 +77,11 @@ SCPISocketTransport::~SCPISocketTransport()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
+
+string SCPISocketTransport::GetTransportName()
+{
+	return "lan";
+}
 
 string SCPISocketTransport::GetConnectionString()
 {

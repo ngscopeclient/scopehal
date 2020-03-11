@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,6 +36,15 @@
 #include <gtkmm/drawingarea.h>
 
 using namespace std;
+
+/**
+	@brief Static initialization forSCPI transports
+ */
+void TransportStaticInit()
+{
+	AddTransportClass(SCPISocketTransport);
+	AddTransportClass(VICPSocketTransport);
+}
 
 string GetDefaultChannelColor(int i)
 {

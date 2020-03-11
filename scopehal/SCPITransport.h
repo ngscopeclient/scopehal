@@ -51,6 +51,26 @@ public:
 	virtual std::string ReadReply() =0;
 	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
 	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
+
+public:
+	typedef SCPITransport* (*CreateProcType)(std::string args);
+	static void DoAddTransportClass(std::string name, CreateProcType proc);
+
+	static void EnumTransports(std::vector<std::string>& names);
+	static SCPITransport* CreateTransport(std::string transport, std::string args);
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
 };
+
+#define TRANSPORT_INITPROC(T) \
+	static SCPITransport* CreateInstance(std::string args) \
+	{ \
+		return new T(args); \
+	}
+
+#define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance)
 
 #endif

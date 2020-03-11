@@ -70,4 +70,6 @@ uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 
 std::string GetDefaultChannelColor(int i);
 
+void TransportStaticInit();
+
 #endif

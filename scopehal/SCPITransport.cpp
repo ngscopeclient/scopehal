@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,10 +35,37 @@
 
 #include "scopehal.h"
 
+using namespace std;
+
+SCPITransport::CreateMapType SCPITransport::m_createprocs;
+
 SCPITransport::SCPITransport()
 {
 }
 
 SCPITransport::~SCPITransport()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
+
+void SCPITransport::DoAddTransportClass(string name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
+
+void SCPITransport::EnumTransports(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+SCPITransport* SCPITransport::CreateTransport(string transport, string args)
+{
+	if(m_createprocs.find(transport) != m_createprocs.end())
+		return m_createprocs[transport](args);
+
+	LogError("Invalid transport name");
+	return NULL;
 }
