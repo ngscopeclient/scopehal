@@ -37,28 +37,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(string hostname, unsigned short port)
-	: LeCroyOscilloscope(hostname, port)
+SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
+	: LeCroyOscilloscope(transport)
 {
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", hostname.c_str(), port);
-
-	if(!m_socket.Connect(hostname, port))
-	{
-		LogError("Couldn't connect to socket");
-		return;
-	}
-	if(!m_socket.DisableNagle())
-	{
-		LogError("Couldn't disable Nagle\n");
-		return;
-	}
-
-	//standard initialization
-	FlushConfigCache();
-	IdentifyHardware();
-	DetectAnalogChannels();
-	SharedCtorInit();
-
 }
 
 SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
@@ -66,108 +47,8 @@ SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
 
 }
 
-void SiglentSCPIOscilloscope::DetectAnalogChannels()
-{
-	//Siglent likes variably long model names (x, x-e, etc)
-	int nchans = m_model[strlen("sds120")] - '0';
-	nchans = 1;
-	for(int i=0; i<nchans; i++)
-	{
-		//Hardware name of the channel
-		string chname = string("C1");
-		chname[1] += i;
-
-		//Color the channels based on LeCroy's standard color sequence (yellow-pink-cyan-green)
-		string color = "#ffffff";
-		switch(i)
-		{
-			case 0:
-				color = "#ffff80";
-				break;
-
-			case 1:
-				color = "#ff8080";
-				break;
-
-			case 2:
-				color = "#80ffff";
-				break;
-
-			case 3:
-				color = "#80ff80";
-				break;
-		}
-
-		//Create the channel
-		m_channels.push_back(
-			new OscilloscopeChannel(
-			this,
-			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-			color,
-			1,
-			i,
-			true));
-	}
-	m_analogChannelCount = nchans;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SCPI protocol logic
-
-bool SiglentSCPIOscilloscope::SendCommand(string cmd, bool eoi)
-{
-	(void)eoi;
-	cmd += "\n";
-	//Actually send it
-	LogDebug("sending: %s", cmd.c_str());
-	if(!m_socket.SendLooped((const unsigned char*)cmd.c_str(), cmd.size()))
-		return false;
-
-	return true;
-}
-
-/**
-	@brief Read exactly one packet from the socket, trims newlines
- */
-string SiglentSCPIOscilloscope::ReadData()
-{
-	string ret;
-	unsigned char tmp;
-
-	while(1)
-	{
-		if(!m_socket.RecvLooped(&tmp, 1))
-			return "";
-
-		if(tmp == '\n')
-			return ret;
-		else
-			ret += tmp;
-	}
-}
-
-string SiglentSCPIOscilloscope::ReadSingleBlockString(bool trimNewline)
-{
-	string ret;
-	unsigned char tmp;
-
-	while(1)
-	{
-		if(!m_socket.RecvLooped(&tmp, 1))
-			return "";
-
-		if(tmp == '\n')
-		{
-			if(trimNewline)
-				return ret;
-			ret += tmp;
-			return ret;
-		}
-		else
-			ret += tmp;
-	}
-}
 
 // parses out length, does no other validation. requires 17 bytes at header.
 uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
@@ -175,12 +56,7 @@ uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 
 	int r = 0;
 
-	r = recv(m_socket, header, 16, 0);
-	if (r != 16)
-	{
-		LogError("Error recving descriptor header\n");
-		return 0;
-	}
+	m_transport->ReadRawData(16, (unsigned char*)header);
 
 	if (strlen(header) != 16)
 	{
@@ -204,18 +80,11 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 		LogError("Unexpected header length: %u\n", headerLength);
 	}
 
-	r = recv(m_socket, descriptor, sizeof(struct SiglentWaveformDesc_t), 0);
-	if (r != sizeof(struct SiglentWaveformDesc_t))
-	{
-		LogError("Error recving descriptor( recv'd %u, asked for %u)\n", r, sizeof(struct SiglentWaveformDesc_t));
-		return;
-	}
+	m_transport->ReadRawData(sizeof(struct SiglentWaveformDesc_t), (unsigned char*)descriptor);
 
 	// grab the \n
-	ReadData();
+	m_transport->ReadReply();
 }
-
-
 
 bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 {
@@ -240,7 +109,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		wavedescs.push_back(new struct SiglentWaveformDesc_t);
 		if(enabled[i])
 		{
-			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 			ReadWaveDescriptorBlock(wavedescs[i], i);
 			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName,
 				wavedescs[i]->InstrumentNumber);
@@ -315,26 +184,20 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			{
 				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
 				cmd += tmp;
-				SendCommand(cmd);
+				m_transport->SendCommand(cmd);
 			}
 
 			//Read the actual waveform data
 			cmd = "C1:WF? DAT2";
 			cmd[1] += i;
-			SendCommand(cmd);
+			m_transport->SendCommand(cmd);
 			char header[17] = {0};
 			size_t wavesize = ReadWaveHeader(header);
 			uint8_t *data = new uint8_t[wavesize];
-			int to_read = wavesize;
-			do
-			{
-				int r = recv(m_socket, data, to_read, 0);
-				to_read-=r;
-			} while(to_read > 0);
+			m_transport->ReadRawData(wavesize, data);
 			// two \n...
-			ReadData();
-			ReadData();
-			// TODO remove recvs
+			m_transport->ReadReply();
+			m_transport->ReadReply();
 
 			double trigtime = 0;
 			if( (num_sequences > 1) && (j > 0) )
@@ -342,11 +205,11 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 				//If a multi-segment capture, ask for the trigger time data
 				cmd = "C1:WF? TIME";
 				cmd[1] += i;
-				SendCommand(cmd);
+				m_transport->SendCommand(cmd);
 
 				trigtime = ReadWaveHeader(header);
 				// \n
-				ReadData();
+				m_transport->ReadReply();
 				//double trigoff = ptrigtime[1];	//offset to point 0 from trigger time
 			}
 

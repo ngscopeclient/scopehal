@@ -26,7 +26,6 @@ set(SCOPEHAL_SOURCES
 	AgilentOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	LeCroyOscilloscope.cpp
-	LeCroyVICPOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
 	RedTinLogicAnalyzer.cpp
 	RigolOscilloscope.cpp

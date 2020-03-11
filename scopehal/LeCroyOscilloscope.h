@@ -39,12 +39,12 @@
 	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
  */
 class LeCroyOscilloscope
-	: public Oscilloscope
+	: public SCPIOscilloscope
 	, public Multimeter
 	, public FunctionGenerator
 {
 public:
-	LeCroyOscilloscope(std::string hostname, unsigned short port);
+	LeCroyOscilloscope(SCPITransport* transport);
 	virtual ~LeCroyOscilloscope();
 
 protected:
@@ -159,17 +159,9 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
 protected:
-	Socket m_socket;
-
 	void BulkCheckChannelEnableState();
 
-	virtual bool SendCommand(std::string cmd, bool eoi=true) = 0;
-	virtual std::string ReadSingleBlockString(bool trimNewline = false) =0;
-
 	bool ReadWaveformBlock(std::string& data);
-
-	std::string m_hostname;
-	unsigned short m_port;
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

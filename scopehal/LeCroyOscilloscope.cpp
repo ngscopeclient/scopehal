@@ -38,10 +38,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-	, m_hostname(hostname)
-	, m_port(port)
+LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
+	: SCPIOscilloscope(transport)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
@@ -49,6 +47,12 @@ LeCroyOscilloscope::LeCroyOscilloscope(string hostname, unsigned short port)
 	, m_triggerOneShot(false)
 	, m_highDefinition(false)
 {
+	//standard initialization
+	FlushConfigCache();
+	IdentifyHardware();
+	DetectAnalogChannels();
+	SharedCtorInit();
+	DetectOptions();
 }
 
 void LeCroyOscilloscope::SharedCtorInit()
@@ -69,9 +73,9 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Desired format for waveform data
 	//Only use increased bit depth if the scope actually puts content there!
 	if(m_highDefinition)
-		SendCommand("COMM_FORMAT DEF9,WORD,BIN");
+		m_transport->SendCommand("COMM_FORMAT DEF9,WORD,BIN");
 	else
-		SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
+		m_transport->SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
@@ -80,11 +84,11 @@ void LeCroyOscilloscope::SharedCtorInit()
 void LeCroyOscilloscope::IdentifyHardware()
 {
 	//Turn off headers (complicate parsing and add fluff to the packets)
-	SendCommand("CHDR OFF", true);
+	m_transport->SendCommand("CHDR OFF");
 
 	//Ask for the ID
-	SendCommand("*IDN?", true);
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand("*IDN?");
+	string reply = m_transport->ReadReply();
 	char vendor[128] = "";
 	char model[128] = "";
 	char serial[128] = "";
@@ -118,8 +122,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 
 void LeCroyOscilloscope::DetectOptions()
 {
-	SendCommand("*OPT?", true);
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand("*OPT?");
+	string reply = m_transport->ReadReply();
 	if(reply.length() > 3)
 	{
 		//Read options until we hit a null
@@ -399,8 +403,8 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 		//See if the channel is enabled, hide it if not
 		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
-		SendCommand(cmd);
-		string reply = ReadSingleBlockString();
+		m_transport->SendCommand(cmd);
+		string reply = m_transport->ReadReply();
 		if(reply.find("OFF") == 0)	//may have a trailing newline, ignore that
 			m_channelsEnabled[i] = false;
 		else
@@ -413,8 +417,8 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		lock_guard<recursive_mutex> lock2(m_mutex);
 
 		//See if the channel is on
-		SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + "'");
-		string str = ReadSingleBlockString();
+		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + "'");
+		string str = m_transport->ReadReply();
 		if(str == "0")
 			m_channelsEnabled[i] = false;
 		else
@@ -432,7 +436,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
@@ -454,14 +458,14 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
+			m_transport->SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
 
 		//Enable this channel on the hardware
-		SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
+		m_transport->SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
 		char tmp[128];
 		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
-		SendCommand(tmp);
+		m_transport->SendCommand(tmp);
 	}
 
 	m_channelsEnabled[i] = true;
@@ -477,7 +481,7 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
@@ -499,10 +503,10 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
+			m_transport->SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
 
 		//Disable this channel
-		SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
+		m_transport->SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
 	}
 }
 
@@ -513,8 +517,8 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
-	string reply = ReadSingleBlockString().substr(0,3);	//trim off trailing newline, all coupling codes are 3 chars
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
+	string reply = m_transport->ReadReply().substr(0,3);	//trim off trailing newline, all coupling codes are 3 chars
 
 	if(reply == "A1M")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -546,8 +550,8 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
+	string reply = m_transport->ReadReply();
 
 	double d;
 	sscanf(reply.c_str(), "%lf", &d);
@@ -567,8 +571,8 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	string cmd = "BANDWIDTH_LIMIT?";
-	SendCommand(cmd);
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand(cmd);
+	string reply = m_transport->ReadReply();
 
 	size_t index = reply.find(m_channels[i]->GetHwname());
 	if(index == string::npos)
@@ -613,7 +617,7 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 	else
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
-	SendCommand(cmd);
+	m_transport->SendCommand(cmd);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -623,8 +627,8 @@ bool LeCroyOscilloscope::GetMeterAutoRange()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand("VBS? 'return = app.acquisition.DVM.AutoRange'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.AutoRange'");
+	string str = m_transport->ReadReply();
 	int ret;
 	sscanf(str.c_str(), "%d", &ret);
 	return ret ? true : false;
@@ -635,28 +639,28 @@ void LeCroyOscilloscope::SetMeterAutoRange(bool enable)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	if(enable)
-		SendCommand("VBS 'app.acquisition.DVM.AutoRange = 1'");
+		m_transport->SendCommand("VBS 'app.acquisition.DVM.AutoRange = 1'");
 	else
-		SendCommand("VBS 'app.acquisition.DVM.AutoRange = 0'");
+		m_transport->SendCommand("VBS 'app.acquisition.DVM.AutoRange = 0'");
 }
 
 void LeCroyOscilloscope::StartMeter()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 1'");
+	m_transport->SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 1'");
 }
 
 void LeCroyOscilloscope::StopMeter()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 0'");
+	m_transport->SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 0'");
 }
 
 double LeCroyOscilloscope::GetVoltage()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
+	string str = m_transport->ReadReply();
 	double ret;
 	sscanf(str.c_str(), "%lf", &ret);
 	return ret;
@@ -677,8 +681,8 @@ double LeCroyOscilloscope::GetTemperature()
 double LeCroyOscilloscope::GetPeakToPeak()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
+	string str = m_transport->ReadReply();
 	double ret;
 	sscanf(str.c_str(), "%lf", &ret);
 	return ret;
@@ -687,8 +691,8 @@ double LeCroyOscilloscope::GetPeakToPeak()
 double LeCroyOscilloscope::GetFrequency()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
+	string str = m_transport->ReadReply();
 	double ret;
 	sscanf(str.c_str(), "%lf", &ret);
 	return ret;
@@ -708,8 +712,8 @@ string LeCroyOscilloscope::GetMeterChannelName(int chan)
 int LeCroyOscilloscope::GetCurrentMeterChannel()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS? 'return = app.acquisition.DVM.DvmSource'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.DvmSource'");
+	string str = m_transport->ReadReply();
 	int i;
 	sscanf(str.c_str(), "C%d", &i);
 	return i - 1;	//scope channels are 1 based
@@ -724,14 +728,14 @@ void LeCroyOscilloscope::SetCurrentMeterChannel(int chan)
 		sizeof(cmd),
 		"VBS 'app.acquisition.DVM.DvmSource = \"C%d\"",
 		chan + 1);	//scope channels are 1 based
-	SendCommand(cmd);
+	m_transport->SendCommand(cmd);
 }
 
 Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("VBS? 'return = app.acquisition.DVM.DvmMode'");
-	string str = ReadSingleBlockString();
+	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.DvmMode'");
+	string str = m_transport->ReadReply();
 
 	//trim off trailing whitespace
 	while(isspace(str[str.length()-1]))
@@ -785,7 +789,7 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "VBS 'app.acquisition.DVM.DvmMode = \"%s\"'", stype.c_str());
-	SendCommand(cmd);
+	m_transport->SendCommand(cmd);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -814,9 +818,9 @@ void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	if(on)
-		SendCommand("VBS 'app.wavesource.enable=True'");
+		m_transport->SendCommand("VBS 'app.wavesource.enable=True'");
 	else
-		SendCommand("VBS 'app.wavesource.enable=False'");
+		m_transport->SendCommand("VBS 'app.wavesource.enable=False'");
 }
 
 float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
@@ -867,7 +871,7 @@ void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.frequency = %f'", hz);
-	SendCommand(tmp);
+	m_transport->SendCommand(tmp);
 }
 
 FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*chan*/)
@@ -895,7 +899,7 @@ void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", sec);
-	SendCommand(tmp);
+	m_transport->SendCommand(tmp);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
@@ -910,7 +914,7 @@ void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
-	SendCommand(tmp);
+	m_transport->SendCommand(tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -932,8 +936,8 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 	//Read the Internal State Change Register
 	m_mutex.lock();
-	SendCommand("INR?");
-	string sinr = ReadSingleBlockString();
+	m_transport->SendCommand("INR?");
+	string sinr = m_transport->ReadReply();
 	m_mutex.unlock();
 	//LogDebug("Got trigger state\n");
 	int inr = atoi(sinr.c_str());
@@ -962,7 +966,7 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Prefix "DESC,\n" or "DAT1,\n". Always seems to be 6 chars and start with a D.
 	//Next is the length header. Looks like #9000000346. #9 followed by nine ASCII length digits.
 	//Ignore that too.
-	string tmp = ReadSingleBlockString();
+	string tmp = m_transport->ReadReply();
 	size_t offset = tmp.find("D");
 
 	//Copy the rest of the block
@@ -989,10 +993,10 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	for(auto i : uncached)
-		SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
 	for(auto i : uncached)
 	{
-		string reply = ReadSingleBlockString();
+		string reply = m_transport->ReadReply();
 		if(reply == "OFF")
 			m_channelsEnabled[i] = false;
 		else
@@ -1002,9 +1006,9 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	/*
 	//Check digital status
 	//TODO: better per-lane queries
-	SendCommand("Digital1:TRACE?");
+	m_transport->SendCommand("Digital1:TRACE?");
 
-	string reply = ReadSingleBlockString();
+	string reply = m_transport->ReadReply();
 	if(reply == "OFF")
 	{
 		for(size_t i=0; i<m_digitalChannelCount; i++)
@@ -1050,7 +1054,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		{
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
-			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 		}
 	}
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -1106,12 +1110,12 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			//If a multi-segment capture, ask for the trigger time data
 			if( (num_sequences > 1) && !sent_wavetime)
 			{
-				SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
 				sent_wavetime = true;
 			}
 
 			//Ask for the data
-			SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
 		}
 	}
 
@@ -1279,7 +1283,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(denabled)
 		{
 			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
-			SendCommand("Digital1:WF?");
+			m_transport->SendCommand("Digital1:WF?");
 			string data;
 			if(!ReadWaveformBlock(data))
 			{
@@ -1383,7 +1387,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		SendCommand("TRIG_MODE SINGLE");
+		m_transport->SendCommand("TRIG_MODE SINGLE");
 		m_triggerArmed = true;
 	}
 
@@ -1393,8 +1397,8 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 void LeCroyOscilloscope::Start()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//SendCommand("TRIG_MODE NORM");
-	SendCommand("TRIG_MODE SINGLE");	//always do single captures, just re-trigger
+	//m_transport->SendCommand("TRIG_MODE NORM");
+	m_transport->SendCommand("TRIG_MODE SINGLE");	//always do single captures, just re-trigger
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -1403,7 +1407,7 @@ void LeCroyOscilloscope::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("Start single trigger\n");
-	SendCommand("TRIG_MODE SINGLE");
+	m_transport->SendCommand("TRIG_MODE SINGLE");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -1411,7 +1415,7 @@ void LeCroyOscilloscope::StartSingleTrigger()
 void LeCroyOscilloscope::Stop()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("TRIG_MODE STOP");
+	m_transport->SendCommand("TRIG_MODE STOP");
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 
@@ -1430,8 +1434,8 @@ size_t LeCroyOscilloscope::GetTriggerChannelIndex()
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	SendCommand("TRIG_SELECT?");
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand("TRIG_SELECT?");
+	string reply = m_transport->ReadReply();
 
 	char ignored1[32];
 	char ignored2[32];
@@ -1470,7 +1474,7 @@ void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//For now, always set trigger mode to edge
-	SendCommand(string("TRIG_SELECT EDGE,SR,") + m_channels[i]->GetHwname());
+	m_transport->SendCommand(string("TRIG_SELECT EDGE,SR,") + m_channels[i]->GetHwname());
 
 	//TODO: support digital channels
 
@@ -1491,8 +1495,8 @@ float LeCroyOscilloscope::GetTriggerVoltage()
 		return m_triggerLevel;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	SendCommand("TRLV?");
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand("TRLV?");
+	string reply = m_transport->ReadReply();
 	sscanf(reply.c_str(), "%f", &m_triggerLevel);
 	m_triggerLevelValid = true;
 	return m_triggerLevel;
@@ -1504,7 +1508,7 @@ void LeCroyOscilloscope::SetTriggerVoltage(float v)
 
 	char tmp[32];
 	snprintf(tmp, sizeof(tmp), "%s:TRLV %.3f V", m_channels[m_triggerChannel]->GetHwname().c_str(), v);
-	SendCommand(tmp);
+	m_transport->SendCommand(tmp);
 
 	//Update cache
 	m_triggerLevelValid = true;
@@ -1518,8 +1522,8 @@ Oscilloscope::TriggerType LeCroyOscilloscope::GetTriggerType()
 	if(m_triggerTypeValid)
 		return m_triggerType;
 
-	SendCommand("TRIG_SLOPE?");
-	string reply = ReadSingleBlockString();
+	m_transport->SendCommand("TRIG_SLOPE?");
+	string reply = m_transport->ReadReply();
 
 	m_triggerTypeValid = true;
 
@@ -1547,15 +1551,15 @@ void LeCroyOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 	switch(type)
 	{
 		case Oscilloscope::TRIGGER_TYPE_RISING:
-			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL POS");
+			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL POS");
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL NEG");
+			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL NEG");
 			break;
 
 		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL EIT");
+			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL EIT");
 			break;
 
 		default:
@@ -1585,9 +1589,9 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
 
-	string reply = ReadSingleBlockString();
+	string reply = m_transport->ReadReply();
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
 
@@ -1616,9 +1620,9 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	SendCommand(m_channels[i]->GetHwname() + ":VOLT_DIV?");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":VOLT_DIV?");
 
-	string reply = ReadSingleBlockString();
+	string reply = m_transport->ReadReply();
 	double volts_per_div;
 	sscanf(reply.c_str(), "%lf", &volts_per_div);
 
@@ -1637,7 +1641,7 @@ void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
 
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), vdiv);
-	SendCommand(cmd);
+	m_transport->SendCommand(cmd);
 }
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()

@@ -47,16 +47,12 @@ class SiglentSCPIOscilloscope
 	: public LeCroyOscilloscope
 {
 public:
-	SiglentSCPIOscilloscope(std::string hostname, unsigned short port);
+	SiglentSCPIOscilloscope(SCPITransport* transport);
 	virtual ~SiglentSCPIOscilloscope();
 
 	virtual bool AcquireData(bool toQueue);
 
 protected:
-	virtual void DetectAnalogChannels();
-	virtual bool SendCommand(std::string cmd, bool eoi=true);
-	std::string ReadData();
-	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
 	uint32_t ReadWaveHeader(char *header);
