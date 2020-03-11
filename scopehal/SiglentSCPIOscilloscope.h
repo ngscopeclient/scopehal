@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,8 @@ struct SiglentWaveformDesc_t;
 /**
 	@brief A Siglent SCPI (SCPI/TCP) oscilloscope
 
-	Protocol layer is based on Siglent's reference manual, implementation here modeled off of the LeCroy support in LeCroyVICPOscilloscope.cpp
+	Protocol layer is based on Siglent's reference manual
+	Implementation here modeled off of the LeCroy support in LeCroyVICPOscilloscope.cpp
  */
 class SiglentSCPIOscilloscope
 	: public LeCroyOscilloscope
@@ -55,7 +56,6 @@ protected:
 	virtual void DetectAnalogChannels();
 	virtual bool SendCommand(std::string cmd, bool eoi=true);
 	virtual std::string ReadData();
-	virtual std::string ReadMultiBlockString();
 	virtual std::string ReadSingleBlockString(bool trimNewline = false);
 
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
@@ -64,7 +64,7 @@ protected:
 
 #pragma pack(1)
 
-struct SignalWaveformTimestamp_t 
+struct SignalWaveformTimestamp_t
 {
 	double Seconds;
 	uint8_t Minutes;

@@ -115,6 +115,9 @@ string VICPSocketTransport::ReadReply()
 	unsigned char header[8];
 	ReadRawData(8, header);
 
+	uint8_t op = header[0];
+	//OP_EOI terminates a block
+
 	//Sanity check
 	if(header[1] != 1)
 	{

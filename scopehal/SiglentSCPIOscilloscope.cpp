@@ -169,12 +169,6 @@ string SiglentSCPIOscilloscope::ReadSingleBlockString(bool trimNewline)
 	}
 }
 
-string SiglentSCPIOscilloscope::ReadMultiBlockString()
-{
-	return ReadData();	
-}
-
-
 // parses out length, does no other validation. requires 17 bytes at header.
 uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 {
@@ -188,7 +182,7 @@ uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 		return 0;
 	}
 
-	if (strlen(header) != 16) 
+	if (strlen(header) != 16)
 	{
 		LogError("Unexpected descriptor header %s\n", header);
 		return 0;
@@ -197,7 +191,7 @@ uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 	return atoi(&header[8]);
 }
 
-void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel) 
+void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel)
 {
 	char header[17] = {0};
 	ssize_t r = 0;
@@ -205,7 +199,7 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 
 	headerLength = ReadWaveHeader(header);
 
-	if(headerLength != sizeof(struct SiglentWaveformDesc_t)) 
+	if(headerLength != sizeof(struct SiglentWaveformDesc_t))
 	{
 		LogError("Unexpected header length: %u\n", headerLength);
 	}
@@ -248,7 +242,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		{
 			SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
 			ReadWaveDescriptorBlock(wavedescs[i], i);
-			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName, 
+			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName,
 				wavedescs[i]->InstrumentNumber);
 
 		}

@@ -94,19 +94,3 @@ string LeCroyVICPOscilloscope::ReadSingleBlockString(bool trimNewline)
 		return payload;
 	}
 }
-
-string LeCroyVICPOscilloscope::ReadMultiBlockString()
-{
-	//Read until we get the closing quote
-	string data;
-	bool first  = true;
-	while(true)
-	{
-		string payload = ReadSingleBlockString();
-		data += payload;
-		if(!first && payload.find("\"") != string::npos)
-			break;
-		first = false;
-	}
-	return data;
-}
