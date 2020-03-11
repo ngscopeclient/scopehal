@@ -160,7 +160,7 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 
 	//Save basic scope info
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : %%\n");
+	snprintf(tmp, sizeof(tmp), "    : \n");
 	string config = tmp;
 	snprintf(tmp, sizeof(tmp), "        id:             %d\n", id);
 	config += tmp;
@@ -176,7 +176,7 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 	config += tmp;
 
 	//Save channels
-	config += "        channels: @\n";
+	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		auto chan = GetChannel(i);
@@ -187,7 +187,7 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 		idmap[chan] = id;
 
 		//Basic channel info
-		snprintf(tmp, sizeof(tmp), "            : %%\n");
+		snprintf(tmp, sizeof(tmp), "            : \n");
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                id:          %d\n", id);
 		config += tmp;

@@ -568,29 +568,29 @@ string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int&
 
 	//Save basic decode info
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : %%\n");
+	snprintf(tmp, sizeof(tmp), "    : \n");
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:          %d\n", id);
+	snprintf(tmp, sizeof(tmp), "        id:              %d\n", id);
 	config += tmp;
 
 	//Channel info
-	snprintf(tmp, sizeof(tmp), "        protocol:    \"%s\"\n", GetProtocolDisplayName().c_str());
+	snprintf(tmp, sizeof(tmp), "        protocol:        \"%s\"\n", GetProtocolDisplayName().c_str());
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        color:       \"%s\"\n", m_displaycolor.c_str());
+	snprintf(tmp, sizeof(tmp), "        color:           \"%s\"\n", m_displaycolor.c_str());
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        nick:        \"%s\"\n", m_displayname.c_str());
+	snprintf(tmp, sizeof(tmp), "        nick:            \"%s\"\n", m_displayname.c_str());
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        name:        \"%s\"\n", GetHwname().c_str());
+	snprintf(tmp, sizeof(tmp), "        name:            \"%s\"\n", GetHwname().c_str());
 	config += tmp;
 
 	//Inputs
-	snprintf(tmp, sizeof(tmp), "        inputs: %%\n");
+	snprintf(tmp, sizeof(tmp), "        inputs: \n");
 	config += tmp;
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
 		auto chan = m_channels[i];
 		if(chan == NULL)
-			snprintf(tmp, sizeof(tmp), "            %s: 0\n", m_signalNames[i].c_str());
+			snprintf(tmp, sizeof(tmp), "            %-20s 0\n", (m_signalNames[i] + ":").c_str());
 		else
 		{
 			if(idmap.find(chan) == idmap.end())
@@ -608,7 +608,7 @@ string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int&
 	}
 
 	//Parameters
-	snprintf(tmp, sizeof(tmp), "        parameters: %%\n");
+	snprintf(tmp, sizeof(tmp), "        parameters: \n");
 	config += tmp;
 	for(auto it : m_parameters)
 	{
