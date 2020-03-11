@@ -27,7 +27,6 @@ set(SCOPEHAL_SOURCES
 	AntikernelLogicAnalyzer.cpp
 	LeCroyOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
-	RedTinLogicAnalyzer.cpp
 	RigolOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
