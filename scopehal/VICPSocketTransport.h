@@ -47,6 +47,8 @@ public:
 	VICPSocketTransport(std::string hostname, unsigned short port);
 	virtual ~VICPSocketTransport();
 
+	virtual std::string GetConnectionString();
+
 	virtual bool SendCommand(std::string cmd);
 	virtual std::string ReadReply();
 	virtual void ReadRawData(size_t len, unsigned char* buf);

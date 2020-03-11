@@ -93,6 +93,16 @@ AntikernelLogicAnalyzer::~AntikernelLogicAnalyzer()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
+string AntikernelLogicAnalyzer::GetTransportConnectionString()
+{
+	return m_transport->GetConnectionString();
+}
+
+string AntikernelLogicAnalyzer::GetDriverName()
+{
+	return "akila";
+}
+
 void AntikernelLogicAnalyzer::SendCommand(uint8_t opcode)
 {
 	m_transport->SendRawData(1, &opcode);

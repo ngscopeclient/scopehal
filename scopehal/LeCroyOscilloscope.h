@@ -55,6 +55,7 @@ protected:
 	void DetectOptions();
 
 public:
+	virtual std::string GetDriverName();
 
 	//Device information
 	virtual std::string GetName();

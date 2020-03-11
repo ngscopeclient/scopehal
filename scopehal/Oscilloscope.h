@@ -347,6 +347,16 @@ public:
 	 */
 	virtual bool IsTriggerArmed() =0;
 
+	/**
+		@brief Gets the connection string for our transport
+	 */
+	virtual std::string GetTransportConnectionString() =0;
+
+	/**
+		@brief Gets the registered name of this driver
+	 */
+	virtual std::string GetDriverName() =0;
+
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Memory depth / sample rate control.

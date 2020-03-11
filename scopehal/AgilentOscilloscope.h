@@ -37,6 +37,8 @@ public:
 	virtual ~AgilentOscilloscope();
 
 public:
+	virtual std::string GetDriverName();
+
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
 

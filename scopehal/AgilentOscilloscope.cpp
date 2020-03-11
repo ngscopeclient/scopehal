@@ -148,6 +148,11 @@ AgilentOscilloscope::~AgilentOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+string AgilentOscilloscope::GetDriverName()
+{
+	return "agilent";
+}
+
 unsigned int AgilentOscilloscope::GetInstrumentTypes()
 {
 	return Instrument::INST_OSCILLOSCOPE;

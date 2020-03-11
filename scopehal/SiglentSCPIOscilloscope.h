@@ -50,6 +50,8 @@ public:
 	SiglentSCPIOscilloscope(SCPITransport* transport);
 	virtual ~SiglentSCPIOscilloscope();
 
+	virtual std::string GetDriverName();
+
 	virtual bool AcquireData(bool toQueue);
 
 protected:

@@ -68,6 +68,12 @@ VICPSocketTransport::~VICPSocketTransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
+string VICPSocketTransport::GetConnectionString()
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "vicp:%s:%u", m_hostname.c_str(), m_port);
+	return string(tmp);
+}
 
 uint8_t VICPSocketTransport::GetNextSequenceNumber()
 {

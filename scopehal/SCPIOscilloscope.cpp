@@ -48,6 +48,11 @@ SCPIOscilloscope::~SCPIOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+string SCPIOscilloscope::GetTransportConnectionString()
+{
+	return m_transport->GetConnectionString();
+}
+
 string SCPIOscilloscope::GetName()
 {
 	return m_model;

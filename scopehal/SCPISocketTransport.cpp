@@ -66,6 +66,13 @@ SCPISocketTransport::~SCPISocketTransport()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 
+string SCPISocketTransport::GetConnectionString()
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "lan:%s:%u", m_hostname.c_str(), m_port);
+	return string(tmp);
+}
+
 bool SCPISocketTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());

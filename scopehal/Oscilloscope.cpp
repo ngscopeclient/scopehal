@@ -172,7 +172,9 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        serial:         \"%s\"\n", GetSerial().c_str());
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        path:           \"%s\"\n", "connection_string_not_yet_implemented");
+	snprintf(tmp, sizeof(tmp), "        transport:      \"%s\"\n", GetTransportConnectionString().c_str());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        driver:         \"%s\"\n", GetDriverName().c_str());
 	config += tmp;
 
 	//Save channels

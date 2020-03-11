@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -150,6 +150,11 @@ RohdeSchwarzOscilloscope::~RohdeSchwarzOscilloscope()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
+
+string RohdeSchwarzOscilloscope::GetDriverName()
+{
+	return "rs";
+}
 
 unsigned int RohdeSchwarzOscilloscope::GetInstrumentTypes()
 {

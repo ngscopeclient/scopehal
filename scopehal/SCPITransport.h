@@ -45,6 +45,8 @@ public:
 	SCPITransport();
 	virtual ~SCPITransport();
 
+	virtual std::string GetConnectionString() =0;
+
 	virtual bool SendCommand(std::string cmd) =0;
 	virtual std::string ReadReply() =0;
 	virtual void ReadRawData(size_t len, unsigned char* buf) =0;

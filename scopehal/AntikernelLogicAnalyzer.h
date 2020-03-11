@@ -44,6 +44,9 @@ public:
 	AntikernelLogicAnalyzer(SCPITransport* transport);
 	virtual ~AntikernelLogicAnalyzer();
 
+	virtual std::string GetTransportConnectionString();
+	virtual std::string GetDriverName();
+
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();

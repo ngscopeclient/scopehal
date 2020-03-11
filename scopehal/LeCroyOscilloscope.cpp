@@ -320,6 +320,11 @@ LeCroyOscilloscope::~LeCroyOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device information
 
+string LeCroyOscilloscope::GetDriverName()
+{
+	return "lecroy";
+}
+
 OscilloscopeChannel* LeCroyOscilloscope::GetExternalTrigger()
 {
 	return m_extTrigChannel;
