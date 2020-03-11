@@ -45,6 +45,7 @@ public:
 	virtual ~AntikernelLogicAnalyzer();
 
 	virtual std::string GetTransportConnectionString();
+	virtual std::string GetTransportName();
 	virtual std::string GetDriverName();
 
 	virtual std::string GetName();

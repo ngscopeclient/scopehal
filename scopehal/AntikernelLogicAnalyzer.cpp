@@ -93,6 +93,11 @@ AntikernelLogicAnalyzer::~AntikernelLogicAnalyzer()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
+string AntikernelLogicAnalyzer::GetTransportName()
+{
+	return m_transport->GetName();
+}
+
 string AntikernelLogicAnalyzer::GetTransportConnectionString()
 {
 	return m_transport->GetConnectionString();

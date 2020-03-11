@@ -46,6 +46,7 @@ public:
 	virtual ~SCPITransport();
 
 	virtual std::string GetConnectionString() =0;
+	virtual std::string GetName() =0;
 
 	virtual bool SendCommand(std::string cmd) =0;
 	virtual std::string ReadReply() =0;
@@ -69,7 +70,9 @@ protected:
 	static SCPITransport* CreateInstance(std::string args) \
 	{ \
 		return new T(args); \
-	}
+	} \
+	virtual std::string GetName() \
+	{ return GetTransportName(); }
 
 #define AddTransportClass(T) SCPITransport::DoAddTransportClass(T::GetTransportName(), T::CreateInstance)
 

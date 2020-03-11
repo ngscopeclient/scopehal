@@ -86,7 +86,7 @@ string VICPSocketTransport::GetTransportName()
 string VICPSocketTransport::GetConnectionString()
 {
 	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "vicp:%s:%u", m_hostname.c_str(), m_port);
+	snprintf(tmp, sizeof(tmp), "%s:%u", m_hostname.c_str(), m_port);
 	return string(tmp);
 }
 

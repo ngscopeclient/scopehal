@@ -353,6 +353,11 @@ public:
 	virtual std::string GetTransportConnectionString() =0;
 
 	/**
+		@brief Gets the name of our transport
+	 */
+	virtual std::string GetTransportName() =0;
+
+	/**
 		@brief Gets the registered name of this driver
 	 */
 	virtual std::string GetDriverName() =0;
