@@ -50,7 +50,7 @@ SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SCPI protocol logic
 
-string SiglentSCPIOscilloscope::GetDriverName()
+string SiglentSCPIOscilloscope::GetDriverNameInternal()
 {
 	return "siglent";
 }

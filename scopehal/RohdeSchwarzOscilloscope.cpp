@@ -151,7 +151,7 @@ RohdeSchwarzOscilloscope::~RohdeSchwarzOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string RohdeSchwarzOscilloscope::GetDriverName()
+string RohdeSchwarzOscilloscope::GetDriverNameInternal()
 {
 	return "rs";
 }

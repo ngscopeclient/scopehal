@@ -122,7 +122,7 @@ unsigned int RigolOscilloscope::GetInstrumentTypes()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device interface functions
 
-string RigolOscilloscope::GetDriverName()
+string RigolOscilloscope::GetDriverNameInternal()
 {
 	return "rigol";
 }

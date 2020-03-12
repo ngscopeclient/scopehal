@@ -38,6 +38,8 @@
 
 class Instrument;
 
+#include "SCPITransport.h"
+
 /**
 	@brief Generic representation of an oscilloscope or logic analyzer.
 
@@ -357,11 +359,6 @@ public:
 	 */
 	virtual std::string GetTransportName() =0;
 
-	/**
-		@brief Gets the registered name of this driver
-	 */
-	virtual std::string GetDriverName() =0;
-
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Memory depth / sample rate control.
@@ -427,6 +424,31 @@ protected:
 
 	///The channels
 	std::vector<OscilloscopeChannel*> m_channels;
+
+public:
+	typedef Oscilloscope* (*CreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, CreateProcType proc);
+
+	static void EnumDrivers(std::vector<std::string>& names);
+	static Oscilloscope* CreateOscilloscope(std::string driver, SCPITransport* transport);
+
+	virtual std::string GetDriverName() =0;
+	//static std::string GetDriverNameInternal();
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
 };
+
+#define OSCILLOSCOPE_INITPROC(T) \
+	static Oscilloscope* CreateInstance(SCPITransport* transport) \
+	{ \
+		return new T(transport); \
+	} \
+	virtual std::string GetDriverName() \
+	{ return GetDriverNameInternal(); }
+
+#define AddDriverClass(T) Oscilloscope::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
 
 #endif

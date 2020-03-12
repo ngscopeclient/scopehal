@@ -34,16 +34,35 @@
  */
 #include "scopehal.h"
 #include <gtkmm/drawingarea.h>
+#include "AgilentOscilloscope.h"
+#include "AntikernelLogicAnalyzer.h"
+#include "LeCroyOscilloscope.h"
+#include "RigolOscilloscope.h"
+#include "RohdeSchwarzOscilloscope.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
 /**
-	@brief Static initialization forSCPI transports
+	@brief Static initialization for SCPI transports
  */
 void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
 	AddTransportClass(VICPSocketTransport);
+}
+
+/**
+	@brief Static initialization for oscilloscopes
+ */
+void DriverStaticInit()
+{
+	AddDriverClass(AgilentOscilloscope);
+	AddDriverClass(AntikernelLogicAnalyzer);
+	AddDriverClass(LeCroyOscilloscope);
+	AddDriverClass(RigolOscilloscope);
+	AddDriverClass(RohdeSchwarzOscilloscope);
+	AddDriverClass(SiglentSCPIOscilloscope);
 }
 
 string GetDefaultChannelColor(int i)

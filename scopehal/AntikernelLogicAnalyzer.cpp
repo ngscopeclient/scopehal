@@ -103,7 +103,7 @@ string AntikernelLogicAnalyzer::GetTransportConnectionString()
 	return m_transport->GetConnectionString();
 }
 
-string AntikernelLogicAnalyzer::GetDriverName()
+string AntikernelLogicAnalyzer::GetDriverNameInternal()
 {
 	return "akila";
 }

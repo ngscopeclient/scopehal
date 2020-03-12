@@ -320,7 +320,7 @@ LeCroyOscilloscope::~LeCroyOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device information
 
-string LeCroyOscilloscope::GetDriverName()
+string LeCroyOscilloscope::GetDriverNameInternal()
 {
 	return "lecroy";
 }

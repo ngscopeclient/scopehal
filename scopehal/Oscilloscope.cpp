@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,6 +44,8 @@
 
 using namespace std;
 
+Oscilloscope::CreateMapType Oscilloscope::m_createprocs;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -57,6 +59,29 @@ Oscilloscope::~Oscilloscope()
 	for(size_t i=0; i<m_channels.size(); i++)
 		delete m_channels[i];
 	m_channels.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
+
+void Oscilloscope::DoAddDriverClass(string name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
+
+void Oscilloscope::EnumDrivers(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+Oscilloscope* Oscilloscope::CreateOscilloscope(string driver, SCPITransport* transport)
+{
+	if(m_createprocs.find(driver) != m_createprocs.end())
+		return m_createprocs[driver](transport);
+
+	LogError("Invalid driver name");
+	return NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

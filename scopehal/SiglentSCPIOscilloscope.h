@@ -50,14 +50,16 @@ public:
 	SiglentSCPIOscilloscope(SCPITransport* transport);
 	virtual ~SiglentSCPIOscilloscope();
 
-	virtual std::string GetDriverName();
-
 	virtual bool AcquireData(bool toQueue);
 
 protected:
 
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
 	uint32_t ReadWaveHeader(char *header);
+
+public:
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(SiglentSCPIOscilloscope)
 };
 
 #pragma pack(1)

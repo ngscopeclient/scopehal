@@ -37,7 +37,6 @@ public:
 	virtual ~AgilentOscilloscope();
 
 public:
-	virtual std::string GetDriverName();
 
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
@@ -106,6 +105,10 @@ protected:
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+public:
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(AgilentOscilloscope)
 };
 
 #endif

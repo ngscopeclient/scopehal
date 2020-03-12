@@ -55,8 +55,6 @@ protected:
 	void DetectOptions();
 
 public:
-	virtual std::string GetDriverName();
-
 	//Device information
 	virtual std::string GetName();
 	virtual std::string GetVendor();
@@ -203,6 +201,10 @@ protected:
 	//Mutexing for thread safety
 	std::recursive_mutex m_mutex;
 	std::recursive_mutex m_cacheMutex;
+
+public:
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(LeCroyOscilloscope)
 };
 
 #endif

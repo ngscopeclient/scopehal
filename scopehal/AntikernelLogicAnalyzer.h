@@ -46,7 +46,6 @@ public:
 
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
-	virtual std::string GetDriverName();
 
 	virtual std::string GetName();
 	virtual std::string GetVendor();
@@ -116,6 +115,10 @@ protected:
 	uint32_t m_memoryDepth;
 	uint32_t m_memoryWidth;
 	uint32_t m_maxWidth;
+
+public:
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(AntikernelLogicAnalyzer);
 };
 
 #endif

@@ -148,7 +148,7 @@ AgilentOscilloscope::~AgilentOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string AgilentOscilloscope::GetDriverName()
+string AgilentOscilloscope::GetDriverNameInternal()
 {
 	return "agilent";
 }
