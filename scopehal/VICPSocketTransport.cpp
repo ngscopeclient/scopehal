@@ -164,7 +164,19 @@ string VICPSocketTransport::ReadReply()
 
 		//Skip empty blocks, or just newlines
 		if( (len == 0) || (rxbuf == "\n"))
-		{}
+		{
+			//Special handling needed for EOI.
+			if(header[0] & OP_EOI)
+			{
+				//EOI on an empty block is a stop if we have data from previous blocks.
+				if(!payload.empty())
+					break;
+
+				//But if we have no data, hold off and wait for the next frame
+				else
+					continue;
+			}
+		}
 
 		//Actual frame data
 		else
