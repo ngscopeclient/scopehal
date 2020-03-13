@@ -938,10 +938,12 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	//LogDebug("Polling trigger\n");
 
 	//Read the Internal State Change Register
-	m_mutex.lock();
-	m_transport->SendCommand("INR?");
-	string sinr = m_transport->ReadReply();
-	m_mutex.unlock();
+	string sinr;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("INR?");
+		sinr = m_transport->ReadReply();
+	}
 	//LogDebug("Got trigger state\n");
 	int inr = atoi(sinr.c_str());
 
@@ -1026,246 +1028,243 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
-	//LogDebug("acquire\n");
-	m_mutex.lock();
-
-	//LogDebug("Acquire data\n");
-
-	double start = GetTime();
-
-	//Read the wavedesc for every enabled channel in batch mode first
-	//(With VICP framing we cannot use semicolons to separate commands)
-	vector<string> wavedescs;
-	string cmd;
-	bool enabled[4] = {false};
-	bool any_enabled = true;
-	BulkCheckChannelEnableState();
-	unsigned int firstEnabledChannel = UINT_MAX;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		enabled[i] = IsChannelEnabled(i);
-		if(enabled[i])
-			any_enabled = true;
-	}
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		wavedescs.push_back("");
-
-		//If NO channels are enabled, query channel 1's WAVEDESC.
-		//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
-		if(enabled[i] || (!any_enabled && i==0))
-		{
-			if(firstEnabledChannel == UINT_MAX)
-				firstEnabledChannel = i;
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
-		}
-	}
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		if(enabled[i] || (!any_enabled && i==0))
-		{
-			if(!ReadWaveformBlock(wavedescs[i]))
-				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
-		}
-	}
-
-	//Check length, complain if a wavedesc comes back too short
-	size_t expected_wavedesc_size = 346;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		if(!enabled[i] && !(!any_enabled && i==0))
-			continue;
-
-		if(wavedescs[i].size() < expected_wavedesc_size)
-		{
-			LogError("Got wavedesc of %zu bytes (expected %zu)\n", wavedescs[i].size(), expected_wavedesc_size);
-			m_mutex.unlock();
-			return false;
-		}
-	}
-
-	//Figure out how many sequences we have
-	unsigned char* pdesc = NULL;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		if(enabled[i] || (!any_enabled && i==0))
-		{
-			pdesc = (unsigned char*)(&wavedescs[i][0]);
-			break;
-		}
-	}
-	if(pdesc == NULL)
-	{
-		//no enabled channels. abort
-		return false;
-	}
-	uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
 	uint32_t num_sequences = 1;
-	if(trigtime_len > 0)
-		num_sequences = trigtime_len / 16;
+	map<int, vector<CaptureChannelBase*> > pending_waveforms;
+	double start = GetTime();
+	time_t ttime;
+	double basetime;
 
-	//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
-	bool sent_wavetime = false;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
-		if(enabled[i])
-		{
-			//If a multi-segment capture, ask for the trigger time data
-			if( (num_sequences > 1) && !sent_wavetime)
-			{
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
-				sent_wavetime = true;
-			}
+		lock_guard<recursive_mutex> lock(m_mutex);
 
-			//Ask for the data
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
+		//LogDebug("Acquire data\n");
+
+		//Read the wavedesc for every enabled channel in batch mode first
+		//(With VICP framing we cannot use semicolons to separate commands)
+		vector<string> wavedescs;
+		string cmd;
+		bool enabled[4] = {false};
+		bool any_enabled = true;
+		BulkCheckChannelEnableState();
+		unsigned int firstEnabledChannel = UINT_MAX;
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			enabled[i] = IsChannelEnabled(i);
+			if(enabled[i])
+				any_enabled = true;
 		}
-	}
-
-	/*
-		Timestamp is a somewhat complex format that needs some shuffling around.
-		Timestamp starts at offset 296 bytes in the wavedesc
-		(296-303)	double seconds
-		(304)		byte minutes
-		(305)		byte hours
-		(306)		byte days
-		(307)		byte months
-		(308-309)	uint16 year
-
-		TODO: during startup, query instrument for its current time zone
-		since the wavedesc reports instment local time
-	 */
-	double fseconds = *reinterpret_cast<const double*>(wavedescs[firstEnabledChannel].c_str() + 296);
-	uint8_t seconds = floor(fseconds);
-	double basetime = fseconds - seconds;
-	time_t tnow = time(NULL);
-	struct tm tstruc;
-	localtime_r(&tnow, &tstruc);
-
-	//Convert the instrument time to a string, then back to a tm
-	//Is there a better way to do this???
-	//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
-	//Maybe because tm_yday is inconsistent?
-	char tblock[64] = {0};
-	snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
-		*reinterpret_cast<uint16_t*>(pdesc+308),
-		pdesc[307],
-		pdesc[306],
-		pdesc[305],
-		pdesc[304],
-		seconds);
-	locale cur_locale;
-	auto& tget = use_facet< time_get<char> >(cur_locale);
-	istringstream stream(tblock);
-	ios::iostate state;
-	char format[] = "%F %T";
-	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
-	time_t ttime = mktime(&tstruc);
-
-	//Read the timestamps if we're doing segmented capture
-	string wavetime;
-	if(num_sequences > 1)
-	{
-		if(!ReadWaveformBlock(wavetime))
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
-			LogError("fail to read wavetime\n");
-			m_mutex.unlock();
+			wavedescs.push_back("");
+
+			//If NO channels are enabled, query channel 1's WAVEDESC.
+			//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
+			if(enabled[i] || (!any_enabled && i==0))
+			{
+				if(firstEnabledChannel == UINT_MAX)
+					firstEnabledChannel = i;
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			}
+		}
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			if(enabled[i] || (!any_enabled && i==0))
+			{
+				if(!ReadWaveformBlock(wavedescs[i]))
+					LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+			}
+		}
+
+		//Check length, complain if a wavedesc comes back too short
+		size_t expected_wavedesc_size = 346;
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			if(!enabled[i] && !(!any_enabled && i==0))
+				continue;
+
+			if(wavedescs[i].size() < expected_wavedesc_size)
+			{
+				LogError("Got wavedesc of %zu bytes (expected %zu)\n", wavedescs[i].size(), expected_wavedesc_size);
+				return false;
+			}
+		}
+
+		//Figure out how many sequences we have
+		unsigned char* pdesc = NULL;
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			if(enabled[i] || (!any_enabled && i==0))
+			{
+				pdesc = (unsigned char*)(&wavedescs[i][0]);
+				break;
+			}
+		}
+		if(pdesc == NULL)
+		{
+			//no enabled channels. abort
 			return false;
 		}
-	}
-	double* pwtime = reinterpret_cast<double*>(&wavetime[0]);
+		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
+		if(trigtime_len > 0)
+			num_sequences = trigtime_len / 16;
 
-	map<int, vector<CaptureChannelBase*> > pending_waveforms;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
-	{
-		if(!enabled[i])
+		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
+		bool sent_wavetime = false;
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
-			if(!toQueue)
-				m_channels[i]->SetData(NULL);
-			continue;
-		}
-
-		//Parse the wavedesc headers
-		pdesc = (unsigned char*)(&wavedescs[i][0]);
-		//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-		//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
-		float v_gain = *reinterpret_cast<float*>(pdesc + 156);
-		float v_off = *reinterpret_cast<float*>(pdesc + 160);
-		float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
-		double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
-		double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
-		if(h_off_frac < 0)
-			h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-
-		//Read the actual waveform data
-		string data;
-		if(!ReadWaveformBlock(data))
-		{
-			LogError("fail to read waveform\n");
-			break;
-		}
-
-		//Raw waveform data
-		size_t num_samples;
-		if(m_highDefinition)
-			num_samples = data.size()/2;
-		else
-			num_samples = data.size();
-		size_t num_per_segment = num_samples / num_sequences;
-		int16_t* wdata = (int16_t*)&data[0];
-		int8_t* bdata = (int8_t*)&data[0];
-
-		for(size_t j=0; j<num_sequences; j++)
-		{
-			//Set up the capture we're going to store our data into
-			AnalogCapture* cap = new AnalogCapture;
-			cap->m_timescale = round(interval);
-
-			cap->m_triggerPhase = h_off_frac;
-			cap->m_startTimestamp = ttime;
-
-			//Parse the time
-			if(num_sequences > 1)
+			if(enabled[i])
 			{
-				double trigger_delta = pwtime[j*2];
-				//double trigger_offset = pwtime[j*2 + 1];
-				//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
-				cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
+				//If a multi-segment capture, ask for the trigger time data
+				if( (num_sequences > 1) && !sent_wavetime)
+				{
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
+					sent_wavetime = true;
+				}
+
+				//Ask for the data
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
 			}
-			else
-				cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+		}
 
-			//Decode the samples
-			cap->m_samples.resize(num_per_segment);
-			for(unsigned int k=0; k<num_per_segment; k++)
+		/*
+			Timestamp is a somewhat complex format that needs some shuffling around.
+			Timestamp starts at offset 296 bytes in the wavedesc
+			(296-303)	double seconds
+			(304)		byte minutes
+			(305)		byte hours
+			(306)		byte days
+			(307)		byte months
+			(308-309)	uint16 year
+
+			TODO: during startup, query instrument for its current time zone
+			since the wavedesc reports instment local time
+		 */
+		double fseconds = *reinterpret_cast<const double*>(wavedescs[firstEnabledChannel].c_str() + 296);
+		uint8_t seconds = floor(fseconds);
+		basetime = fseconds - seconds;
+		time_t tnow = time(NULL);
+		struct tm tstruc;
+		localtime_r(&tnow, &tstruc);
+
+		//Convert the instrument time to a string, then back to a tm
+		//Is there a better way to do this???
+		//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
+		//Maybe because tm_yday is inconsistent?
+		char tblock[64] = {0};
+		snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
+			*reinterpret_cast<uint16_t*>(pdesc+308),
+			pdesc[307],
+			pdesc[306],
+			pdesc[305],
+			pdesc[304],
+			seconds);
+		locale cur_locale;
+		auto& tget = use_facet< time_get<char> >(cur_locale);
+		istringstream stream(tblock);
+		ios::iostate state;
+		char format[] = "%F %T";
+		tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
+		ttime = mktime(&tstruc);
+
+		//Read the timestamps if we're doing segmented capture
+		string wavetime;
+		if(num_sequences > 1)
+		{
+			if(!ReadWaveformBlock(wavetime))
 			{
-				if(m_highDefinition)
-					cap->m_samples[k] = AnalogSample(k, 1, wdata[k + j*num_per_segment] * v_gain - v_off);
+				LogError("fail to read wavetime\n");
+				return false;
+			}
+		}
+		double* pwtime = reinterpret_cast<double*>(&wavetime[0]);
+
+		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		{
+			if(!enabled[i])
+			{
+				if(!toQueue)
+					m_channels[i]->SetData(NULL);
+				continue;
+			}
+
+			//Parse the wavedesc headers
+			pdesc = (unsigned char*)(&wavedescs[i][0]);
+			//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
+			//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+			float v_gain = *reinterpret_cast<float*>(pdesc + 156);
+			float v_off = *reinterpret_cast<float*>(pdesc + 160);
+			float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+			double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+			if(h_off_frac < 0)
+				h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
+
+			//Read the actual waveform data
+			string data;
+			if(!ReadWaveformBlock(data))
+			{
+				LogError("fail to read waveform\n");
+				break;
+			}
+
+			//Raw waveform data
+			size_t num_samples;
+			if(m_highDefinition)
+				num_samples = data.size()/2;
+			else
+				num_samples = data.size();
+			size_t num_per_segment = num_samples / num_sequences;
+			int16_t* wdata = (int16_t*)&data[0];
+			int8_t* bdata = (int8_t*)&data[0];
+
+			for(size_t j=0; j<num_sequences; j++)
+			{
+				//Set up the capture we're going to store our data into
+				AnalogCapture* cap = new AnalogCapture;
+				cap->m_timescale = round(interval);
+
+				cap->m_triggerPhase = h_off_frac;
+				cap->m_startTimestamp = ttime;
+
+				//Parse the time
+				if(num_sequences > 1)
+				{
+					double trigger_delta = pwtime[j*2];
+					//double trigger_offset = pwtime[j*2 + 1];
+					//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
+					cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
+				}
 				else
-					cap->m_samples[k] = AnalogSample(k, 1, bdata[k + j*num_per_segment] * v_gain - v_off);
+					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+
+				//Decode the samples
+				cap->m_samples.resize(num_per_segment);
+				for(unsigned int k=0; k<num_per_segment; k++)
+				{
+					if(m_highDefinition)
+						cap->m_samples[k] = AnalogSample(k, 1, wdata[k + j*num_per_segment] * v_gain - v_off);
+					else
+						cap->m_samples[k] = AnalogSample(k, 1, bdata[k + j*num_per_segment] * v_gain - v_off);
+				}
+
+				//Done, update the data
+				if(j == 0 && !toQueue)
+					m_channels[i]->SetData(cap);
+				else
+					pending_waveforms[i].push_back(cap);
 			}
-
-			//Done, update the data
-			if(j == 0 && !toQueue)
-				m_channels[i]->SetData(cap);
-			else
-				pending_waveforms[i].push_back(cap);
 		}
-	}
 
-	//LogDebug("unlock mutex\n");
-	m_mutex.unlock();
+	}
 
 	if(num_sequences > 1)
 	{
-		m_mutex.lock();
+		lock_guard<recursive_mutex> lock(m_mutex);
 
 		//LeCroy's LA is derpy and doesn't support sequenced capture!
 		//(at least in wavesurfer 3000 series, need to test waverunner8-ms)
 		for(unsigned int i=0; i<m_digitalChannelCount; i++)
 			m_digitalChannels[i]->SetData(NULL);
-
-		m_mutex.unlock();
 	}
 
 	else if(m_digitalChannelCount > 0)
