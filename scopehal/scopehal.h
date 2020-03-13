@@ -36,14 +36,18 @@
 #ifndef scopehal_h
 #define scopehal_h
 
-#include "../log/log.h"
-
-#include <sigc++/sigc++.h>
-
 #include <vector>
 #include <string>
 #include <map>
 #include <stdint.h>
+
+#include <sigc++/sigc++.h>
+#include <cairomm/context.h>
+
+#include <yaml-cpp/yaml.h>
+
+#include "../log/log.h"
+#include "../graphwidget/Graph.h"
 
 #include "Unit.h"
 
@@ -61,10 +65,6 @@
 #include "PowerSupply.h"
 
 #include "Measurement.h"
-
-#include <cairomm/context.h>
-
-#include "../graphwidget/Graph.h"
 
 uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 

@@ -55,6 +55,11 @@ public:
 	virtual ~Oscilloscope();
 
 	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	virtual void LoadConfiguration(const YAML::Node& node, std::map<void*, int>& idmap);
+
+	/**
 		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
 
 		In order to see updates made by the user at the front panel, the cache must be flushed.
