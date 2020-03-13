@@ -59,6 +59,13 @@ Oscilloscope::~Oscilloscope()
 	for(size_t i=0; i<m_channels.size(); i++)
 		delete m_channels[i];
 	m_channels.clear();
+
+	for(auto set : m_pendingWaveforms)
+	{
+		for(auto it : set)
+			delete it.second;
+	}
+	m_pendingWaveforms.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
