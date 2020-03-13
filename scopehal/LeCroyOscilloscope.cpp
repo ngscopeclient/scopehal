@@ -1169,6 +1169,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(!ReadWaveformBlock(wavetime))
 		{
 			LogError("fail to read wavetime\n");
+			m_mutex.unlock();
 			return false;
 		}
 	}
