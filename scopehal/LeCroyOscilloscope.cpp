@@ -396,15 +396,15 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	//Need to lock the main mutex first to prevent deadlocks
+	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 
 	//Analog
 	if(i < m_analogChannelCount)
 	{
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
-
-		lock_guard<recursive_mutex> lock2(m_mutex);
 
 		//See if the channel is enabled, hide it if not
 		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
@@ -419,8 +419,6 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	//Digital
 	else
 	{
-		lock_guard<recursive_mutex> lock2(m_mutex);
-
 		//See if the channel is on
 		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + "'");
 		string str = m_transport->ReadReply();
