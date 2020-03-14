@@ -323,9 +323,13 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else if(coupling == "gnd")
 			chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
 
-		chan->SetAttenuation(cnode["attenuation"].as<float>());
-		chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
-		chan->SetVoltageRange(cnode["vrange"].as<float>());
-		chan->SetOffset(cnode["offset"].as<float>());
+		//only load gain/offset for actual inputs
+		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		{
+			chan->SetAttenuation(cnode["attenuation"].as<float>());
+			chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
+			chan->SetVoltageRange(cnode["vrange"].as<float>());
+			chan->SetOffset(cnode["offset"].as<float>());
+		}
 	}
 }

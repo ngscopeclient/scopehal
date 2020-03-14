@@ -570,7 +570,7 @@ string Measurement::SerializeConfiguration(IDTable& table, string nick)
 {
 	//Save basic info
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "                : %%\n");
+	snprintf(tmp, sizeof(tmp), "                : \n");
 	string config = tmp;
 	snprintf(tmp, sizeof(tmp), "                    id:          %d\n", table.emplace(this));
 	config += tmp;
@@ -582,7 +582,7 @@ string Measurement::SerializeConfiguration(IDTable& table, string nick)
 	config += tmp;
 
 	//Inputs
-	snprintf(tmp, sizeof(tmp), "                    inputs: %%\n");
+	snprintf(tmp, sizeof(tmp), "                    inputs: \n");
 	config += tmp;
 	for(size_t i=0; i<m_channels.size(); i++)
 	{

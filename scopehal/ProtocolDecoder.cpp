@@ -556,7 +556,17 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 
 void ProtocolDecoder::LoadConfiguration(const YAML::Node& node, IDTable& table)
 {
+	//id, protocol, color are already loaded
+	m_displayname = node["nick"].as<string>();
+	m_hwname = node["name"].as<string>();
 
+	auto inputs = node["inputs"];
+	for(auto it : inputs)
+		SetInput(it.first.as<string>(),	static_cast<OscilloscopeChannel*>(table[it.second.as<int>()]) );
+
+	auto parameters = node["parameters"];
+	for(auto it : parameters)
+		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
 }
 
 string ProtocolDecoder::SerializeConfiguration(IDTable& table)
