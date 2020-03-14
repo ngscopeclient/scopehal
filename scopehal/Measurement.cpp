@@ -580,6 +580,8 @@ string Measurement::SerializeConfiguration(IDTable& table, string nick)
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "                    nick:        \"%s\"\n", nick.c_str());
 	config += tmp;
+	snprintf(tmp, sizeof(tmp), "                    color:       \"%s\"\n", m_channels[0]->m_displaycolor.c_str());
+	config += tmp;
 
 	//Inputs
 	snprintf(tmp, sizeof(tmp), "                    inputs: \n");
