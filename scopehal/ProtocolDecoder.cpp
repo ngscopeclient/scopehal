@@ -554,24 +554,18 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int& nextID)
+void ProtocolDecoder::LoadConfiguration(const YAML::Node& node, IDTable& table)
 {
-	//Name ourself. Note that serialization may not be topologically sorted!
-	//It's possible another decoder may depend on us, and allocate an ID for us in advance
-	int id;
-	if(idmap.find(this) == idmap.end())
-	{
-		id = nextID ++;
-		idmap[this] = id;
-	}
-	else
-		id = idmap[this];
 
+}
+
+string ProtocolDecoder::SerializeConfiguration(IDTable& table)
+{
 	//Save basic decode info
 	char tmp[1024];
 	snprintf(tmp, sizeof(tmp), "    : \n");
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:              %d\n", id);
+	snprintf(tmp, sizeof(tmp), "        id:              %d\n", table.emplace(this));
 	config += tmp;
 
 	//Channel info
@@ -593,18 +587,7 @@ string ProtocolDecoder::SerializeConfiguration(std::map<void*, int>& idmap, int&
 		if(chan == NULL)
 			snprintf(tmp, sizeof(tmp), "            %-20s 0\n", (m_signalNames[i] + ":").c_str());
 		else
-		{
-			if(idmap.find(chan) == idmap.end())
-			{
-				id = nextID ++;
-				idmap[chan] = id;
-			}
-			else
-				id = idmap[chan];
-
-			snprintf(tmp, sizeof(tmp), "            %-20s %d\n", (m_signalNames[i] + ":").c_str(), id);
-		}
-
+			snprintf(tmp, sizeof(tmp), "            %-20s %d\n", (m_signalNames[i] + ":").c_str(), table.emplace(chan));
 		config += tmp;
 	}
 

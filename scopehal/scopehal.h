@@ -50,6 +50,8 @@
 #include "../graphwidget/Graph.h"
 
 #include "Unit.h"
+#include "Bijection.h"
+#include "IDTable.h"
 
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"

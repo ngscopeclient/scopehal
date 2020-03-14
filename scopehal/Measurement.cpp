@@ -566,24 +566,13 @@ string FloatMeasurement::GetValueAsString()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Measurement::SerializeConfiguration(std::map<void*, int>& idmap, int& nextID, string nick)
+string Measurement::SerializeConfiguration(IDTable& table, string nick)
 {
-	//Name ourself. Note that serialization may not be topologically sorted!
-	//It's possible another measurement may depend on us, and allocate an ID for us in advance
-	int id;
-	if(idmap.find(this) == idmap.end())
-	{
-		id = nextID ++;
-		idmap[this] = id;
-	}
-	else
-		id = idmap[this];
-
 	//Save basic info
 	char tmp[1024];
 	snprintf(tmp, sizeof(tmp), "                : %%\n");
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "                    id:          %d\n", id);
+	snprintf(tmp, sizeof(tmp), "                    id:          %d\n", table.emplace(this));
 	config += tmp;
 
 	//Config
@@ -601,17 +590,7 @@ string Measurement::SerializeConfiguration(std::map<void*, int>& idmap, int& nex
 		if(chan == NULL)
 			snprintf(tmp, sizeof(tmp), "                        %s: 0\n", m_signalNames[i].c_str());
 		else
-		{
-			if(idmap.find(chan) == idmap.end())
-			{
-				id = nextID ++;
-				idmap[chan] = id;
-			}
-			else
-				id = idmap[chan];
-
-			snprintf(tmp, sizeof(tmp), "                        %-20s %d\n", (m_signalNames[i] + ":").c_str(), id);
-		}
+			snprintf(tmp, sizeof(tmp), "                        %-20s %d\n", (m_signalNames[i] + ":").c_str(), table.emplace(chan));
 
 		config += tmp;
 	}

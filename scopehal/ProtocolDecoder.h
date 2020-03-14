@@ -150,7 +150,12 @@ public:
 	/**
 		@brief Serialize this decoder's configuration to a string
 	 */
-	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID);
+	virtual std::string SerializeConfiguration(IDTable& table);
+
+	/**
+		@brief Load configuration from a save file
+	 */
+	virtual void LoadConfiguration(const YAML::Node& node, IDTable& table);
 
 protected:
 

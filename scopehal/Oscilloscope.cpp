@@ -69,14 +69,6 @@ Oscilloscope::~Oscilloscope()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// File loading
-
-void Oscilloscope::LoadConfiguration(const YAML::Node& node, std::map<void*, int>& idmap)
-{
-	LogDebug("load config\n");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
 void Oscilloscope::DoAddDriverClass(string name, CreateProcType proc)
@@ -192,17 +184,13 @@ bool Oscilloscope::AcquireDataFifo()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
+string Oscilloscope::SerializeConfiguration(IDTable& table)
 {
-	//Name ourself
-	int id = nextID ++;
-	idmap[this] = id;
-
 	//Save basic scope info
 	char tmp[1024];
 	snprintf(tmp, sizeof(tmp), "    : \n");
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:             %d\n", id);
+	snprintf(tmp, sizeof(tmp), "        id:             %d\n", table.emplace(this));
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        nick:           \"%s\"\n", m_nickname.c_str());
 	config += tmp;
@@ -227,13 +215,10 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 		if(!chan->IsPhysicalChannel())
 			continue;	//skip any kind of math functions etc
 
-		id = nextID ++;
-		idmap[chan] = id;
-
 		//Basic channel info
 		snprintf(tmp, sizeof(tmp), "            : \n");
 		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                id:          %d\n", id);
+		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                index:       %zu\n", i);
 		config += tmp;
@@ -300,5 +285,47 @@ string Oscilloscope::SerializeConfiguration(map<void*, int>& idmap, int& nextID)
 		}
 	}
 
+	//TODO: Serialize trigger and timebase configuration
+
 	return config;
+}
+
+void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
+{
+	//Currently no global config to load (TODO: triggers)
+
+	//Load the channels
+	auto& chans = node["channels"];
+	for(auto it : chans)
+	{
+		auto& cnode = it.second;
+		auto chan = m_channels[cnode["index"].as<int>()];
+		table.emplace(cnode["id"].as<int>(), chan);
+
+		//Ignore name/type.
+		//These are only needed for offline scopes to create a representation of the original instrument.
+
+		chan->m_displaycolor = cnode["color"].as<string>();
+		chan->m_displayname = cnode["nick"].as<string>();
+
+		if(cnode["enabled"].as<int>())
+			chan->Enable();
+		else
+			chan->Disable();
+
+		string coupling = cnode["coupling"].as<string>();
+		if(coupling == "dc_50")
+			chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
+		else if(coupling == "dc_1M")
+			chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
+		else if(coupling == "ac_1M")
+			chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
+		else if(coupling == "gnd")
+			chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
+
+		chan->SetAttenuation(cnode["attenuation"].as<float>());
+		chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
+		chan->SetVoltageRange(cnode["vrange"].as<float>());
+		chan->SetOffset(cnode["offset"].as<float>());
+	}
 }

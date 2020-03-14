@@ -55,11 +55,6 @@ public:
 	virtual ~Oscilloscope();
 
 	/**
-		@brief Load instrument and channel configuration from a save file
-	 */
-	virtual void LoadConfiguration(const YAML::Node& node, std::map<void*, int>& idmap);
-
-	/**
 		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
 
 		In order to see updates made by the user at the front panel, the cache must be flushed.
@@ -405,14 +400,14 @@ public:
 	/**
 		@brief Serializes this oscilloscope's configuration to a YAML string.
 
-		Both idmap and nextID are expected to be modified by this function.
-
-		@param idmap	Map of pointers to integer IDs
-		@param nextID	The next ID value to use
-
 		@return YAML block with this oscilloscope's configuration
 	 */
-	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID);
+	virtual std::string SerializeConfiguration(IDTable& table);
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 public:
 	bool HasPendingWaveforms();

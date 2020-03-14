@@ -73,7 +73,7 @@ public:
 	/**
 		@brief Serialize this measurement's configuration to a string
 	 */
-	virtual std::string SerializeConfiguration(std::map<void*, int>& idmap, int& nextID, std::string nick);
+	virtual std::string SerializeConfiguration(IDTable& table, std::string nick);
 
 protected:
 
