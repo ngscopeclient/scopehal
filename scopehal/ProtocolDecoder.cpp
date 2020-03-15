@@ -78,27 +78,26 @@ void ProtocolDecoderParameter::ParseString(string str)
 				m_intval = 1;
 			else
 				m_intval = 0;
+
 			m_floatval = m_intval;
 			break;
+
+		//Parse both int and float as float
+		//so e.g. 1.5M parses correctly
 		case TYPE_FLOAT:
+		case TYPE_INT:
 			sscanf(str.c_str(), "%20f", &m_floatval);
+			m_floatval *= scale;
 			m_intval = m_floatval;
 			m_filename = "";
 			break;
-		case TYPE_INT:
-			sscanf(str.c_str(), "%10d", &m_intval);
-			m_floatval = m_intval;
-			m_filename = "";
-			break;
+
 		case TYPE_FILENAME:
 			m_intval = 0;
 			m_floatval = 0;
 			m_filename = str;
 			break;
 	}
-
-	m_intval *= scale;
-	m_floatval *= scale;
 }
 
 string ProtocolDecoderParameter::ToString()
