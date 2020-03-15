@@ -30,19 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of AntikernelLogicAnalyzer
+	@brief Declaration of MockOscilloscope
  */
 
-#ifndef AntikernelLogicAnalyzer_h
-#define AntikernelLogicAnalyzer_h
+#ifndef MockOscilloscope_h
+#define MockOscilloscope_h
 
-class AntikernelLogicAnalyzer
-	: public virtual Oscilloscope
-	, public SCPIDevice
+class MockOscilloscope : public Oscilloscope
 {
 public:
-	AntikernelLogicAnalyzer(SCPITransport* transport);
-	virtual ~AntikernelLogicAnalyzer();
+	MockOscilloscope(std::string name, std::string vendor, std::string serial);
+	virtual ~MockOscilloscope();
 
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
@@ -92,33 +90,28 @@ public:
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
 	virtual unsigned int GetInstrumentTypes();
+	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
-	void LoadChannels();
-
-	void SendCommand(uint8_t opcode);
-	void SendCommand(uint8_t opcode, uint8_t chan);
-	void SendCommand(uint8_t opcode, uint8_t chan, uint8_t arg);
-	uint8_t Read1ByteReply();
-
 	void ArmTrigger();
+	std::string m_name;
+	std::string m_vendor;
+	std::string m_serial;
 
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
+	OscilloscopeChannel* m_extTrigger;
 
-	std::recursive_mutex m_mutex;
-
-	std::vector<size_t> m_lowIndexes;
-	std::vector<size_t> m_highIndexes;
-
-	uint32_t m_samplePeriod;
-	uint32_t m_memoryDepth;
-	uint32_t m_memoryWidth;
-	uint32_t m_maxWidth;
+	std::map<size_t, bool> m_channelsEnabled;
+	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCoupling;
+	std::map<size_t, double> m_channelAttenuation;
+	std::map<size_t, unsigned int> m_channelBandwidth;
+	std::map<size_t, double> m_channelVoltageRange;
+	std::map<size_t, double> m_channelOffset;
 
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(AntikernelLogicAnalyzer);
+
+	virtual std::string GetDriverName()
+	{ return GetDriverNameInternal(); }
 };
 
 #endif

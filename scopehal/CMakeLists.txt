@@ -21,11 +21,12 @@ set(SCOPEHAL_SOURCES
 	Instrument.cpp
 	FunctionGenerator.cpp
 	Oscilloscope.cpp
-	SCPIOscilloscope.cpp
 	OscilloscopeChannel.cpp
+	SCPIOscilloscope.cpp
 	AgilentOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	LeCroyOscilloscope.cpp
+	MockOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
 	RigolOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
