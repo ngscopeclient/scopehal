@@ -40,6 +40,8 @@
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
+#include <libgen.h>
+#include <dlfcn.h>
 
 using namespace std;
 
@@ -96,4 +98,59 @@ uint64_t ConvertVectorSignalToScalar(vector<bool> bits)
 	for(auto b : bits)
 		rval = (rval << 1) | b;
 	return rval;
+}
+
+/**
+	@brief Initialize all plugins
+ */
+void InitializePlugins()
+{
+	char tmp[1024];
+	vector<string> search_dirs;
+	search_dirs.push_back("/usr/lib/scopehal/plugins/");
+	search_dirs.push_back("/usr/local/lib/scopehal/plugins/");
+
+	//current binary dir
+	char selfPath[1024] = {0};
+	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
+	if ( readlinkReturn > 0)
+		search_dirs.push_back(dirname(selfPath));
+
+	//Home directory
+	snprintf(tmp, sizeof(tmp), "%s/.scopehal/plugins", getenv("HOME"));
+	search_dirs.push_back(tmp);
+
+	for(auto dir : search_dirs)
+	{
+		DIR* hdir = opendir(dir.c_str());
+		if(!hdir)
+			continue;
+
+		dirent* pent;
+		while((pent = readdir(hdir)))
+		{
+			//Don't load hidden files or parent directory entries
+			if(pent->d_name[0] == '.')
+				continue;
+
+			//Try loading it and see if it works.
+			//(for now, never unload the plugins)
+			string fname = dir + "/" + pent->d_name;
+			void* hlib = dlopen(fname.c_str(), RTLD_NOW);
+			if(hlib == NULL)
+				continue;
+
+			//If loaded, look for PluginInit()
+			typedef void (*PluginInit)();
+			PluginInit init = (PluginInit)dlsym(hlib, "PluginInit");
+			if(!init)
+				continue;
+
+			//If found, it's a valid plugin
+			LogDebug("Loading plugin %s\n", fname.c_str());
+			init();
+		}
+
+		closedir(hdir);
+	}
 }

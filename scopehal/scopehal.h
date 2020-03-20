@@ -75,4 +75,6 @@ std::string GetDefaultChannelColor(int i);
 void TransportStaticInit();
 void DriverStaticInit();
 
+void InitializePlugins();
+
 #endif
