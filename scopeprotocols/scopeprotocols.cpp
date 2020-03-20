@@ -35,8 +35,6 @@
 
 #include "scopeprotocols.h"
 
-#define AddDecoderClass(T) ProtocolDecoder::AddDecoderClass(T::GetProtocolName(), T::CreateInstance)
-
 /**
 	@brief Static initialization for protocol list
  */

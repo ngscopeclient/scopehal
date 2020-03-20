@@ -188,7 +188,7 @@ protected:
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);
-	static void AddDecoderClass(std::string name, CreateProcType proc);
+	static void DoAddDecoderClass(std::string name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
 	static ProtocolDecoder* CreateDecoder(std::string protocol, std::string color);
@@ -206,5 +206,7 @@ protected:
 	} \
 	virtual std::string GetProtocolDisplayName() \
 	{ return GetProtocolName(); }
+
+#define AddDecoderClass(T) ProtocolDecoder::DoAddDecoderClass(T::GetProtocolName(), T::CreateInstance)
 
 #endif

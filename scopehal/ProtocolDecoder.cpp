@@ -318,7 +318,7 @@ void ProtocolDecoder::RefreshIfDirty()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void ProtocolDecoder::AddDecoderClass(string name, CreateProcType proc)
+void ProtocolDecoder::DoAddDecoderClass(string name, CreateProcType proc)
 {
 	m_createprocs[name] = proc;
 }
