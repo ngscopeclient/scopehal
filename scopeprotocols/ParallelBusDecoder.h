@@ -53,6 +53,8 @@ public:
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
+	virtual void LoadConfiguration(const YAML::Node& node, IDTable& table);
+
 	PROTOCOL_DECODER_INITPROC(ParallelBusDecoder)
 
 protected:

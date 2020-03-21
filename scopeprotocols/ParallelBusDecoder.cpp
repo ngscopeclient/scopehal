@@ -96,16 +96,26 @@ bool ParallelBusDecoder::IsOverlay()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void ParallelBusDecoder::LoadConfiguration(const YAML::Node& node, IDTable& table)
+{
+	ProtocolDecoder::LoadConfiguration(node, table);
+
+	m_width = m_parameters[m_widthname].GetIntVal();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void ParallelBusDecoder::Refresh()
 {
 	//Figure out how wide our input is
-	int width = m_parameters[m_widthname].GetIntVal();
+	m_width = m_parameters[m_widthname].GetIntVal();
 
 	//Make sure we have an input for each channel in use
 	vector<DigitalCapture*> inputs;
-	for(int i=0; i<width; i++)
+	for(int i=0; i<m_width; i++)
 	{
 		if(m_channels[i] == NULL)
 		{
@@ -137,7 +147,7 @@ void ParallelBusDecoder::Refresh()
 	{
 		vector<bool> data;
 		bool end = false;
-		for(int j=0; j<width; j++)
+		for(int j=0; j<m_width; j++)
 		{
 			if(inputs[j]->GetDepth() <= i)
 			{
