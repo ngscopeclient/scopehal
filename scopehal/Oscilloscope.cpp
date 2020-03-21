@@ -252,25 +252,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			config += "                enabled:     1\n";
 		else
 			config += "                enabled:     0\n";
-		switch(chan->GetCoupling())
-		{
-			case OscilloscopeChannel::COUPLE_DC_1M:
-				config += "                coupling:    dc_1M\n";
-				break;
-			case OscilloscopeChannel::COUPLE_AC_1M:
-				config += "                coupling:    ac_1M\n";
-				break;
-			case OscilloscopeChannel::COUPLE_DC_50:
-				config += "                coupling:    dc_50\n";
-				break;
-			case OscilloscopeChannel::COUPLE_GND:
-				config += "                coupling:    gnd\n";
-				break;
-
-			//should never get synthetic coupling on a scope channel
-			default:
-				break;
-		}
 
 		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		{
@@ -282,6 +263,26 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			config += tmp;
 			snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset());
 			config += tmp;
+
+			switch(chan->GetCoupling())
+			{
+				case OscilloscopeChannel::COUPLE_DC_1M:
+					config += "                coupling:    dc_1M\n";
+					break;
+				case OscilloscopeChannel::COUPLE_AC_1M:
+					config += "                coupling:    ac_1M\n";
+					break;
+				case OscilloscopeChannel::COUPLE_DC_50:
+					config += "                coupling:    dc_50\n";
+					break;
+				case OscilloscopeChannel::COUPLE_GND:
+					config += "                coupling:    gnd\n";
+					break;
+
+				//should never get synthetic coupling on a scope channel
+				default:
+					break;
+			}
 		}
 	}
 
@@ -313,23 +314,23 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
-		string coupling = cnode["coupling"].as<string>();
-		if(coupling == "dc_50")
-			chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
-		else if(coupling == "dc_1M")
-			chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
-		else if(coupling == "ac_1M")
-			chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
-		else if(coupling == "gnd")
-			chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
-
-		//only load gain/offset for actual inputs
+		//only load AFE config for analog inputs
 		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		{
 			chan->SetAttenuation(cnode["attenuation"].as<float>());
 			chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
 			chan->SetVoltageRange(cnode["vrange"].as<float>());
 			chan->SetOffset(cnode["offset"].as<float>());
+
+			string coupling = cnode["coupling"].as<string>();
+			if(coupling == "dc_50")
+				chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
+			else if(coupling == "dc_1M")
+				chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
+			else if(coupling == "ac_1M")
+				chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
+			else if(coupling == "gnd")
+				chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
 		}
 	}
 }
