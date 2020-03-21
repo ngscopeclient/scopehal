@@ -221,7 +221,7 @@ bool ProtocolDecoder::IsOverlay()
 ProtocolDecoderParameter& ProtocolDecoder::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
-		LogError("Invalid parameter name");
+		LogError("Invalid parameter name\n");
 
 	return m_parameters[s];
 }
@@ -237,7 +237,7 @@ string ProtocolDecoder::GetInputName(size_t i)
 		return m_signalNames[i];
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 		return "";
 	}
 }
@@ -253,13 +253,13 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 		}
 		if(!ValidateChannel(i, channel))
 		{
-			LogError("Invalid channel format");
+			LogError("Invalid channel format\n");
 		}
 		m_channels[i] = channel;
 	}
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 	}
 }
 
@@ -276,7 +276,7 @@ void ProtocolDecoder::SetInput(string name, OscilloscopeChannel* channel)
 	}
 
 	//Not found
-	LogError("Invalid channel name");
+	LogError("Invalid channel name\n");
 }
 
 OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
@@ -285,7 +285,7 @@ OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
 		return m_channels[i];
 	else
 	{
-		LogError("Invalid channel index");
+		LogError("Invalid channel index\n");
 		return NULL;
 	}
 }
@@ -334,7 +334,7 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](color);
 
-	LogError("Invalid decoder name");
+	LogError("Invalid decoder name\n");
 	return NULL;
 }
 
