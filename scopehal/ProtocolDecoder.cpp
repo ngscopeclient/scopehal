@@ -249,6 +249,7 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 		if(!ValidateChannel(i, channel))
 		{
 			LogError("Invalid channel format\n");
+			//return;
 		}
 
 		if(m_channels[i] != NULL)
@@ -333,7 +334,7 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](color);
 
-	LogError("Invalid decoder name\n");
+	LogError("Invalid decoder name: %s\n", protocol.c_str());
 	return NULL;
 }
 
@@ -552,19 +553,22 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void ProtocolDecoder::LoadConfiguration(const YAML::Node& node, IDTable& table)
+void ProtocolDecoder::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 {
 	//id, protocol, color are already loaded
 	m_displayname = node["nick"].as<string>();
 	m_hwname = node["name"].as<string>();
 
-	auto inputs = node["inputs"];
-	for(auto it : inputs)
-		SetInput(it.first.as<string>(),	static_cast<OscilloscopeChannel*>(table[it.second.as<int>()]) );
-
 	auto parameters = node["parameters"];
 	for(auto it : parameters)
 		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
+}
+
+void ProtocolDecoder::LoadInputs(const YAML::Node& node, IDTable& table)
+{
+	auto inputs = node["inputs"];
+	for(auto it : inputs)
+		SetInput(it.first.as<string>(),	static_cast<OscilloscopeChannel*>(table[it.second.as<int>()]) );
 }
 
 string ProtocolDecoder::SerializeConfiguration(IDTable& table)

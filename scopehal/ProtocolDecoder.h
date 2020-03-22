@@ -155,7 +155,8 @@ public:
 	/**
 		@brief Load configuration from a save file
 	 */
-	virtual void LoadConfiguration(const YAML::Node& node, IDTable& table);
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
 
 protected:
 

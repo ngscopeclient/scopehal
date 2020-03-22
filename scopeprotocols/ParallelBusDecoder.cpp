@@ -98,10 +98,9 @@ bool ParallelBusDecoder::IsOverlay()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void ParallelBusDecoder::LoadConfiguration(const YAML::Node& node, IDTable& table)
+void ParallelBusDecoder::LoadParameters(const YAML::Node& node, IDTable& table)
 {
-	ProtocolDecoder::LoadConfiguration(node, table);
-
+	ProtocolDecoder::LoadParameters(node, table);
 	m_width = m_parameters[m_widthname].GetIntVal();
 }
 
@@ -172,4 +171,15 @@ void ParallelBusDecoder::Refresh()
 	cap->m_timescale = inputs[0]->m_timescale;
 	cap->m_startTimestamp = inputs[0]->m_startTimestamp;
 	cap->m_startPicoseconds = inputs[0]->m_startPicoseconds;
+
+	//Set all unused channels to NULL
+	for(size_t i=m_width; i < 16; i++)
+	{
+		if(m_channels[i] != NULL)
+		{
+			if(m_channels[i] != NULL)
+				m_channels[i]->Release();
+			m_channels[i] = NULL;
+		}
+	}
 }
