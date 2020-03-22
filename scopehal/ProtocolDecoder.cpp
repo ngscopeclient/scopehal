@@ -199,11 +199,6 @@ ProtocolDecoder::~ProtocolDecoder()
 void ProtocolDecoder::AddRef()
 {
 	m_refcount ++;
-	for(auto c : m_channels)
-	{
-		if(c != NULL)
-			c->AddRef();
-	}
 }
 
 void ProtocolDecoder::Release()
@@ -255,7 +250,11 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 		{
 			LogError("Invalid channel format\n");
 		}
+
+		if(m_channels[i] != NULL)
+			m_channels[i]->Release();
 		m_channels[i] = channel;
+		channel->AddRef();
 	}
 	else
 	{
