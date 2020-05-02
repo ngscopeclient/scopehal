@@ -24,6 +24,7 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	SCPIOscilloscope.cpp
 	AgilentOscilloscope.cpp
+	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
