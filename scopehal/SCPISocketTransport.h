@@ -57,6 +57,9 @@ public:
 
 	TRANSPORT_INITPROC(SCPISocketTransport)
 
+	std::string GetHostname()
+	{ return m_hostname; }
+
 protected:
 	Socket m_socket;
 

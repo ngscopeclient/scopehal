@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "AntikernelLabsOscilloscope.h"
+#include "SCPISocketTransport.h"
 
 using namespace std;
 
@@ -42,6 +43,12 @@ AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)*/
 {
+	//Create the data-plane socket for our waveforms
+	auto socktrans = dynamic_cast<SCPISocketTransport*>(transport);
+	if(!socktrans)
+		LogFatal("Antikernel Labs oscilloscopes only support SCPISocketTransport\n");
+	m_waveformTransport = new SCPISocketTransport(socktrans->GetHostname() + ":50101");
+
 	//Last digit of the model number is the number of channels
 	//int model_number = atoi(m_model.c_str() + 3);	//FIXME: are all series IDs 3 chars e.g. "RTM"?
 	//int nchans = model_number % 10;
@@ -109,6 +116,8 @@ AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
 
 AntikernelLabsOscilloscope::~AntikernelLabsOscilloscope()
 {
+	delete m_waveformTransport;
+	m_waveformTransport = NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -326,94 +335,49 @@ void AntikernelLabsOscilloscope::ResetTriggerConditions()
 
 Oscilloscope::TriggerMode AntikernelLabsOscilloscope::PollTrigger()
 {
-	/*
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("ACQ:STAT?");
-	string stat = m_transport->ReadReply();
-
-	if(stat == "RUN")
-		return TRIGGER_MODE_RUN;
-	else if( (stat == "STOP") || (stat == "BRE") )
-		return TRIGGER_MODE_STOP;
-	else if(stat == "COMP")
-	{
-		m_triggerArmed = false;
-		return TRIGGER_MODE_TRIGGERED;
-	}
-	*/
-	return TRIGGER_MODE_STOP;
+	//Always report "triggered" for now, since waveforms come nonstop.
+	//TODO: API needs to have a better way to handle push-based workflows
+	return TRIGGER_MODE_TRIGGERED;
 }
 
 bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 {
-	/*
-	//LogDebug("Acquiring data\n");
+	//Read the waveform data
+	const int depth = 16384;
+	static uint8_t waveform[depth];
+	m_waveformTransport->ReadRawData(depth, waveform);
 
+	LogDebug("Got a waveform\n");
+
+	//Now we need to parse it
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
-	double xstart;
-	double xstop;
-	size_t length;
-	int ignored;
-	map<int, vector<AnalogCapture*> > pending_waveforms;
-	for(size_t i=0; i<m_analogChannelCount; i++)
+	//1600 ps per sample for now, hard coded
+	AnalogCapture* cap = new AnalogCapture;
+	cap->m_timescale = 1600;
+	cap->m_triggerPhase = 0;
+	double t = GetTime();
+	cap->m_startTimestamp = floor(t);
+	cap->m_startPicoseconds = (t - cap->m_startTimestamp) * 1e12f;
+
+	//Process the samples
+	float fullscale = GetChannelVoltageRange(0);
+	float scale = fullscale / 256.0f;
+	float offset = GetChannelOffset(0);
+	for(size_t i=0; i<depth; i++)
 	{
-		if(!IsChannelEnabled(i))
-		{
-			if(!toQueue)
-				m_channels[i]->SetData(NULL);
-			continue;
-		}
-
-		//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DATA:HEAD?");
-		string reply = m_transport->ReadReply();
-		sscanf(reply.c_str(), "%lf,%lf,%zu,%d", &xstart, &xstop, &length, &ignored);
-
-		//Figure out the sample rate
-		double capture_len_sec = xstop - xstart;
-		double sec_per_sample = capture_len_sec / length;
-		int64_t ps_per_sample = round(sec_per_sample * 1e12f);
-		//LogDebug("%ld ps/sample\n", ps_per_sample);
-
-		float* temp_buf = new float[length];
-
-		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-		AnalogCapture* cap = new AnalogCapture;
-		cap->m_timescale = ps_per_sample;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
-
-		//Ask for the data
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DATA?");
-
-		//Read and discard the length header
-		char tmp[16] = {0};
-		m_transport->ReadRawData(2, (unsigned char*)tmp);
-		int num_digits = atoi(tmp+1);
-		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		int actual_len = atoi(tmp);
-
-		//Read the actual data
-		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)temp_buf);
-
-		//Format the capture
-		for(size_t i=0; i<length; i++)
-			cap->m_samples.push_back(AnalogSample(i, 1, temp_buf[i]));
-
-		//Done, update the data
-		if(!toQueue)
-			m_channels[i]->SetData(cap);
-		else
-			pending_waveforms[i].push_back(cap);
-
-		//Clean up
-		delete[] temp_buf;
+		//Scale it
+		float v = ((waveform[i] - 128.0f) * scale) - offset;
+		cap->m_samples.push_back(AnalogSample(i, 1, v));
 	}
+
+	//Done, update
+	map<int, vector<AnalogCapture*> > pending_waveforms;
+	if(!toQueue)
+		m_channels[0]->SetData(cap);
+	else
+		pending_waveforms[0].push_back(cap);
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
@@ -432,22 +396,14 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	}
 	m_pendingWaveformsMutex.unlock();
 
-	//TODO: support digital channels
-
-	//Re-arm the trigger if not in one-shot mode
-	if(!m_triggerOneShot)
-	{
-		m_transport->SendCommand("SING");
-		m_triggerArmed = true;
-	}
-
-	//LogDebug("Acquisition done\n");
-	*/
 	return true;
 }
 
 void AntikernelLabsOscilloscope::Start()
 {
+	//Arm the trigger using the current awful hack (sending literally anything)
+	m_waveformTransport->SendCommand("ohai");
+
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("SING");
@@ -458,6 +414,9 @@ void AntikernelLabsOscilloscope::Start()
 
 void AntikernelLabsOscilloscope::StartSingleTrigger()
 {
+	//Arm the trigger using the current awful hack (sending literally anything)
+	m_waveformTransport->SendCommand("ohai");
+
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("SING");

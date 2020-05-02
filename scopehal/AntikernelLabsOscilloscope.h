@@ -81,6 +81,7 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 
 protected:
+	SCPITransport* m_waveformTransport;
 
 	//OscilloscopeChannel* m_extTrigChannel;
 
