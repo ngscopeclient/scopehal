@@ -57,7 +57,7 @@ SCPISocketTransport::SCPISocketTransport(string args)
 		m_port = port;
 	}
 
-	LogDebug("Connecting to VICP oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
+	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
 
 	if(!m_socket.Connect(m_hostname, m_port))
 	{
