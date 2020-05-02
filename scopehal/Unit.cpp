@@ -54,7 +54,7 @@ string Unit::PrettyPrint(double value)
 		value_rescaled /= 1e3;
 		scale = "k";
 	}
-	else if(fabs(value) < 1e-3)
+	else if(fabs(value) < 1)
 	{
 		value_rescaled *= 1e3;
 		scale = "m";
