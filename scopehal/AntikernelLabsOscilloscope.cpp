@@ -283,10 +283,24 @@ double AntikernelLabsOscilloscope::GetChannelVoltageRange(size_t i)
 	return vfs;
 }
 
-void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::SetChannelVoltageRange unimplemented\n");
+	//Convert requested range to gain
+	float frac_gain = 2.0 / range;
+	float db = 20*log10(frac_gain);
+	int rdb = round(db) + 4;
+	//LogDebug("Setting channel gain to %.2f dB (rounding to %d)\n", db, rdb);
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%s:GAIN %d", m_channels[i]->GetHwname().c_str(), rdb);
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
+	m_transport->SendCommand(tmp);
+
+	//TODO: cap to limits and report actual gain if we zoom too far?
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelVoltageRanges[i] = range;
 }
 
 OscilloscopeChannel* AntikernelLabsOscilloscope::GetExternalTrigger()
@@ -298,7 +312,6 @@ OscilloscopeChannel* AntikernelLabsOscilloscope::GetExternalTrigger()
 
 double AntikernelLabsOscilloscope::GetChannelOffset(size_t i)
 {
-	/*
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -317,14 +330,18 @@ double AntikernelLabsOscilloscope::GetChannelOffset(size_t i)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
-	*/
-	return 0;
 }
 
-void AntikernelLabsOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::SetChannelOffset unimplemented\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset);
+	m_transport->SendCommand(tmp);
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelOffsets[i] = offset;
 }
 
 void AntikernelLabsOscilloscope::ResetTriggerConditions()
@@ -347,10 +364,7 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	static uint8_t waveform[depth];
 	m_waveformTransport->ReadRawData(depth, waveform);
 
-	LogDebug("Got a waveform\n");
-
-	//Now we need to parse it
-	lock_guard<recursive_mutex> lock(m_mutex);
+	//LogDebug("Got waveform\n");
 	LogIndenter li;
 
 	//1600 ps per sample for now, hard coded
@@ -372,7 +386,14 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 		cap->m_samples.push_back(AnalogSample(i, 1, v));
 	}
 
+	//See what the actual voltages are at the zero crossing
+	//TODO: this isn't the actual trigger point??
+	float vtrig = 0;
+	float trigfrac = Measurement::InterpolateTime(cap, 57, vtrig);
+	cap->m_triggerPhase = -trigfrac * cap->m_timescale;
+
 	//Done, update
+	lock_guard<recursive_mutex> lock(m_mutex);
 	map<int, vector<AnalogCapture*> > pending_waveforms;
 	if(!toQueue)
 		m_channels[0]->SetData(cap);

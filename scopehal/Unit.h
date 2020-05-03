@@ -73,6 +73,9 @@ public:
 	bool operator!=(const Unit& rhs)
 	{ return m_type != rhs.m_type; }
 
+	bool operator!=(UnitType rhs)
+	{ return m_type != rhs; }
+
 protected:
 	UnitType m_type;
 };
