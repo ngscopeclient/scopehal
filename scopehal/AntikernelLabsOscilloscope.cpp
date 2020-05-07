@@ -186,13 +186,13 @@ bool AntikernelLabsOscilloscope::IsChannelEnabled(size_t i)
 void AntikernelLabsOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand(m_channels[i]->GetHwname() + ":STAT ON");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":EN");
 }
 
 void AntikernelLabsOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand(m_channels[i]->GetHwname() + ":STAT OFF");
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DIS");
 }
 
 OscilloscopeChannel::CouplingType AntikernelLabsOscilloscope::GetChannelCoupling(size_t /*i*/)
@@ -287,17 +287,26 @@ void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
 	//Convert requested range to gain
 	float frac_gain = 2.0 / range;
-	float db = 20*log10(frac_gain);
-	int rdb = round(db) + 4;
-	//LogDebug("Setting channel gain to %.2f dB (rounding to %d)\n", db, rdb);
+	float db = 20*log10(frac_gain) + 4;
+	//LogDebug("Setting channel gain to %.2f dB (rounding to %.0f)\n", db, round(db));
+
+	//Clip gain to the supported range
+	if(db < -9)
+	{
+		db = -9;
+		range = 2.0 / pow(10, (db-4)/20.0f);
+	}
+	else if(db > 26)
+	{
+		db = 26;
+		range = 2.0 / pow(10, (db-4)/20.0f);
+	}
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:GAIN %d", m_channels[i]->GetHwname().c_str(), rdb);
+	snprintf(tmp, sizeof(tmp), "%s:GAIN %d", m_channels[i]->GetHwname().c_str(), (int)round(db));
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 	m_transport->SendCommand(tmp);
-
-	//TODO: cap to limits and report actual gain if we zoom too far?
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
@@ -326,7 +335,6 @@ double AntikernelLabsOscilloscope::GetChannelOffset(size_t i)
 	string reply = m_transport->ReadReply();
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
-	offset = -offset;
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
@@ -337,7 +345,7 @@ void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, double offset)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset);
+	snprintf(tmp, sizeof(tmp), "%s:OFFS %f", m_channels[i]->GetHwname().c_str(), offset);
 	m_transport->SendCommand(tmp);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -382,7 +390,7 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	for(size_t i=0; i<depth; i++)
 	{
 		//Scale it
-		float v = ((waveform[i] - 128.0f) * scale) - offset;
+		float v = ((waveform[i] - 128.0f) * scale) + offset;
 		cap->m_samples.push_back(AnalogSample(i, 1, v));
 	}
 
