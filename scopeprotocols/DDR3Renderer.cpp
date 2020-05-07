@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,46 +30,100 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DDR3Renderer
  */
 
 #include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/ChannelRenderer.h"
+#include "../scopehal/TextRenderer.h"
+#include "DDR3Renderer.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+DDR3Renderer::DDR3Renderer(OscilloscopeChannel* channel)
+: TextRenderer(channel)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rendering
+
+Gdk::Color DDR3Renderer::GetColor(int i)
+{
+	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case DDR3Symbol::TYPE_MRS:
+			case DDR3Symbol::TYPE_REF:
+			case DDR3Symbol::TYPE_PRE:
+			case DDR3Symbol::TYPE_PREA:
+				return m_standardColors[COLOR_CONTROL];
+
+			case DDR3Symbol::TYPE_ACT:
+			case DDR3Symbol::TYPE_WR:
+			case DDR3Symbol::TYPE_WRA:
+			case DDR3Symbol::TYPE_RD:
+			case DDR3Symbol::TYPE_RDA:
+				return m_standardColors[COLOR_ADDRESS];
+
+			case DDR3Symbol::TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string DDR3Renderer::GetText(int i)
+{
+	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(m_channel->GetData());
+	if(capture != NULL)
+	{
+		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case DDR3Symbol::TYPE_MRS:
+				return "MRS";
+
+			case DDR3Symbol::TYPE_REF:
+				return "REF";
+
+			case DDR3Symbol::TYPE_PRE:
+				return "PRE";
+
+			case DDR3Symbol::TYPE_PREA:
+				return "PREA";
+
+			case DDR3Symbol::TYPE_ACT:
+				return "ACT";
+
+			case DDR3Symbol::TYPE_WR:
+				return "WR";
+
+			case DDR3Symbol::TYPE_WRA:
+				return "WRA";
+
+			case DDR3Symbol::TYPE_RD:
+				return "RD";
+
+			case DDR3Symbol::TYPE_RDA:
+				return "RDA";
+
+			case DDR3Symbol::TYPE_ERROR:
+			default:
+				return "ERR";
+		}
+	}
+	return "";
 }

@@ -7,6 +7,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClockRecoveryDecoder.cpp
 	ClockRecoveryDebugDecoder.cpp
 	DCOffsetDecoder.cpp
+	DDR3Decoder.cpp
+	DDR3Renderer.cpp
 	DifferenceDecoder.cpp
 	DVIDecoder.cpp
 	DVIRenderer.cpp

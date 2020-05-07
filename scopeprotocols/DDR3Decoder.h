@@ -30,46 +30,64 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DDR3Decoder
  */
 
-#include "scopeprotocols.h"
+#ifndef DDR3Decoder_h
+#define DDR3Decoder_h
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+#include "../scopehal/ProtocolDecoder.h"
+
+class DDR3Symbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
-}
+public:
+	enum stype
+	{
+		TYPE_MRS,
+		TYPE_REF,
+		TYPE_PRE,
+		TYPE_PREA,
+		TYPE_ACT,
+		TYPE_WR,
+		TYPE_WRA,
+		TYPE_RD,
+		TYPE_RDA,
+
+		TYPE_ERROR
+	};
+
+	DDR3Symbol(stype t)
+	 : m_stype(t)
+	{}
+
+	stype m_stype;
+
+	bool operator== (const DDR3Symbol& s) const
+	{
+		return (m_stype == s.m_stype);
+	}
+};
+
+typedef OscilloscopeSample<DDR3Symbol> DDR3Sample;
+typedef CaptureChannel<DDR3Symbol> DDR3Capture;
+
+class DDR3Decoder : public ProtocolDecoder
+{
+public:
+	DDR3Decoder(std::string color);
+
+	virtual void Refresh();
+	virtual ChannelRenderer* CreateRenderer();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
+
+protected:
+};
+
+#endif
