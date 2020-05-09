@@ -46,9 +46,6 @@ class AnalogRenderer : public ChannelRenderer
 public:
 	AnalogRenderer(OscilloscopeChannel* channel);
 
-	float m_yscale;
-	float m_yoffset;
-
 public:
 	static float PickStepSize(float volts_per_half_span, int min_steps = 2, int max_steps = 5);
 };

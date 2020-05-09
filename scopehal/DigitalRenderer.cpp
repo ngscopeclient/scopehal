@@ -42,6 +42,5 @@
 DigitalRenderer::DigitalRenderer(OscilloscopeChannel* channel)
 : ChannelRenderer(channel)
 {
-	m_height = 22;
 }
 

@@ -50,12 +50,6 @@ public:
 	ChannelRenderer(OscilloscopeChannel* channel);
 	virtual ~ChannelRenderer();
 
-	int m_height;
-	int m_ypos;
-
-	int m_padding;
-	int m_width;
-
 	static void RenderComplexSignal(
 		const Cairo::RefPtr<Cairo::Context>& cr,
 		int visleft, int visright,

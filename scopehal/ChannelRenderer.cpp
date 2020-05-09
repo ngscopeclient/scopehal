@@ -57,10 +57,6 @@ Gdk::Color ChannelRenderer::m_standardColors[STANDARD_COLOR_COUNT] =
 ChannelRenderer::ChannelRenderer(OscilloscopeChannel* channel)
 : m_channel(channel)
 {
-	m_padding = 2;
-	m_height = 24;
-	m_width = 32;
-	m_ypos = 0;
 }
 
 ChannelRenderer::~ChannelRenderer()

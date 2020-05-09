@@ -45,9 +45,7 @@ using namespace std;
 AnalogRenderer::AnalogRenderer(OscilloscopeChannel* channel)
 : ChannelRenderer(channel)
 {
-	m_height = 125;
-	m_yscale = 1;
-	m_yoffset = 0;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
