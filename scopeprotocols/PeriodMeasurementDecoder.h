@@ -43,7 +43,6 @@ public:
 	PeriodMeasurementDecoder(std::string color);
 
 	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
 
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();

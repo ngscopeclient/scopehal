@@ -55,11 +55,6 @@ ParallelBusDecoder::ParallelBusDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ParallelBusDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ParallelBusDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i < 16) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )

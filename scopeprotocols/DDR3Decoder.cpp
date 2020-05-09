@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "DDR3Renderer.h"
 #include "DDR3Decoder.h"
 
 using namespace std;
@@ -76,11 +73,6 @@ DDR3Decoder::DDR3Decoder(string color)
 bool DDR3Decoder::NeedsConfig()
 {
 	return true;
-}
-
-ChannelRenderer* DDR3Decoder::CreateRenderer()
-{
-	return new DDR3Renderer(this);
 }
 
 bool DDR3Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -214,4 +206,80 @@ void DDR3Decoder::Refresh()
 	}
 
 	SetData(cap);
+}
+
+Gdk::Color DDR3Decoder::GetColor(int i)
+{
+	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(GetData());
+	if(capture != NULL)
+	{
+		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case DDR3Symbol::TYPE_MRS:
+			case DDR3Symbol::TYPE_REF:
+			case DDR3Symbol::TYPE_PRE:
+			case DDR3Symbol::TYPE_PREA:
+				return m_standardColors[COLOR_CONTROL];
+
+			case DDR3Symbol::TYPE_ACT:
+			case DDR3Symbol::TYPE_WR:
+			case DDR3Symbol::TYPE_WRA:
+			case DDR3Symbol::TYPE_RD:
+			case DDR3Symbol::TYPE_RDA:
+				return m_standardColors[COLOR_ADDRESS];
+
+			case DDR3Symbol::TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string DDR3Decoder::GetText(int i)
+{
+	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(GetData());
+	if(capture != NULL)
+	{
+		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case DDR3Symbol::TYPE_MRS:
+				return "MRS";
+
+			case DDR3Symbol::TYPE_REF:
+				return "REF";
+
+			case DDR3Symbol::TYPE_PRE:
+				return "PRE";
+
+			case DDR3Symbol::TYPE_PREA:
+				return "PREA";
+
+			case DDR3Symbol::TYPE_ACT:
+				return "ACT";
+
+			case DDR3Symbol::TYPE_WR:
+				return "WR";
+
+			case DDR3Symbol::TYPE_WRA:
+				return "WRA";
+
+			case DDR3Symbol::TYPE_RD:
+				return "RD";
+
+			case DDR3Symbol::TYPE_RDA:
+				return "RDA";
+
+			case DDR3Symbol::TYPE_ERROR:
+			default:
+				return "ERR";
+		}
+	}
+	return "";
 }

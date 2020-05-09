@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "IBM8b10bRenderer.h"
 #include "IBM8b10bDecoder.h"
 
 using namespace std;
@@ -62,11 +59,6 @@ bool IBM8b10bDecoder::NeedsConfig()
 {
 	//baud rate has to be set
 	return true;
-}
-
-ChannelRenderer* IBM8b10bDecoder::CreateRenderer()
-{
-	return new IBM8b10bRenderer(this);
 }
 
 bool IBM8b10bDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -340,3 +332,45 @@ void IBM8b10bDecoder::Refresh()
 
 	SetData(cap);
 }
+
+Gdk::Color IBM8b10bDecoder::GetColor(int i)
+{
+	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+
+		if(s.m_error)
+			return m_standardColors[COLOR_ERROR];
+		else if(s.m_control)
+			return m_standardColors[COLOR_CONTROL];
+		else
+			return m_standardColors[COLOR_DATA];
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string IBM8b10bDecoder::GetText(int i)
+{
+	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+
+		unsigned int right = s.m_data >> 5;
+		unsigned int left = s.m_data & 0x1F;
+
+		char tmp[32];
+		if(s.m_error)
+			snprintf(tmp, sizeof(tmp), "ERR");
+		else if(s.m_control)
+			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
+		else
+			snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
+		return string(tmp);
+	}
+	return "";
+}
+

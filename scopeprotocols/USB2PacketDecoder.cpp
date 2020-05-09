@@ -1,9 +1,8 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,7 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
-#include "USB2PacketRenderer.h"
 
 using namespace std;
 
@@ -48,11 +46,6 @@ USB2PacketDecoder::USB2PacketDecoder(string color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-ChannelRenderer* USB2PacketDecoder::CreateRenderer()
-{
-	return new USB2PacketRenderer(this);
-}
 
 bool USB2PacketDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
@@ -745,4 +738,126 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	pack->m_headers["Length"] = tmp;
 
 	m_packets.push_back(pack);
+}
+
+Gdk::Color USB2PacketDecoder::GetColor(int i)
+{
+	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(GetData());
+	if(data == NULL)
+		return m_standardColors[COLOR_ERROR];
+	if(i >= (int)data->m_samples.size())
+		return m_standardColors[COLOR_ERROR];
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PacketSymbol::TYPE_PID:
+			if( (sample.m_sample.m_data == USB2PacketSymbol::PID_RESERVED) ||
+				(sample.m_sample.m_data == USB2PacketSymbol::PID_STALL) )
+				return m_standardColors[COLOR_ERROR];
+			else
+				return m_standardColors[COLOR_PREAMBLE];
+
+		case USB2PacketSymbol::TYPE_ADDR:
+			return m_standardColors[COLOR_ADDRESS];
+
+		case USB2PacketSymbol::TYPE_ENDP:
+			return m_standardColors[COLOR_ADDRESS];
+
+		case USB2PacketSymbol::TYPE_NFRAME:
+			return m_standardColors[COLOR_DATA];
+
+		case USB2PacketSymbol::TYPE_CRC5:
+		case USB2PacketSymbol::TYPE_CRC16:
+			return m_standardColors[COLOR_CHECKSUM_OK];	//TODO: verify checksum
+
+		case USB2PacketSymbol::TYPE_DATA:
+			return m_standardColors[COLOR_DATA];
+
+		//invalid state, should never happen
+		case USB2PacketSymbol::TYPE_ERROR:
+		default:
+			return m_standardColors[COLOR_ERROR];
+	}
+}
+
+string USB2PacketDecoder::GetText(int i)
+{
+	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	char tmp[32];
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PacketSymbol::TYPE_PID:
+		{
+			switch(sample.m_sample.m_data & 0x0f)
+			{
+				case USB2PacketSymbol::PID_RESERVED:
+					return "RESERVED";
+				case USB2PacketSymbol::PID_OUT:
+					return "OUT";
+				case USB2PacketSymbol::PID_ACK:
+					return "ACK";
+				case USB2PacketSymbol::PID_DATA0:
+					return "DATA0";
+				case USB2PacketSymbol::PID_PING:
+					return "PING";
+				case USB2PacketSymbol::PID_SOF:
+					return "SOF";
+				case USB2PacketSymbol::PID_NYET:
+					return "NYET";
+				case USB2PacketSymbol::PID_DATA2:
+					return "DATA2";
+				case USB2PacketSymbol::PID_SPLIT:
+					return "SPLIT";
+				case USB2PacketSymbol::PID_IN:
+					return "IN";
+				case USB2PacketSymbol::PID_NAK:
+					return "NAK";
+				case USB2PacketSymbol::PID_DATA1:
+					return "DATA1";
+				case USB2PacketSymbol::PID_PRE_ERR:
+					return "PRE/ERR";
+				case USB2PacketSymbol::PID_SETUP:
+					return "SETUP";
+				case USB2PacketSymbol::PID_STALL:
+					return "STALL";
+				case USB2PacketSymbol::PID_MDATA:
+					return "MDATA";
+
+				default:
+					return "INVALID PID";
+			}
+			break;
+		}
+		case USB2PacketSymbol::TYPE_ADDR:
+			snprintf(tmp, sizeof(tmp), "Dev %d", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_NFRAME:
+			snprintf(tmp, sizeof(tmp), "Frame %d", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_ENDP:
+			snprintf(tmp, sizeof(tmp), "EP %d", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_CRC5:
+			snprintf(tmp, sizeof(tmp), "CRC %02x", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_CRC16:
+			snprintf(tmp, sizeof(tmp), "CRC %04x", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", sample.m_sample.m_data);
+			return string(tmp);
+		case USB2PacketSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
+	}
+
+	return "";
 }

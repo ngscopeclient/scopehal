@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "JtagRenderer.h"
 #include "JtagDecoder.h"
 
 using namespace std;
@@ -100,11 +97,6 @@ bool JtagDecoder::NeedsConfig()
 {
 	//need to set channel configuration
 	return true;
-}
-
-ChannelRenderer* JtagDecoder::CreateRenderer()
-{
-	return new JtagRenderer(this);
 }
 
 bool JtagDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -351,3 +343,62 @@ void JtagDecoder::Refresh()
 
 	SetData(cap);
 }
+
+Gdk::Color JtagDecoder::GetColor(int i)
+{
+	JtagCapture* capture = dynamic_cast<JtagCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const JtagSymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_state)
+		{
+			//Unknown states
+			case JtagSymbol::UNKNOWN_0:
+			case JtagSymbol::UNKNOWN_1:
+			case JtagSymbol::UNKNOWN_2:
+			case JtagSymbol::UNKNOWN_3:
+			case JtagSymbol::UNKNOWN_4:
+				return m_standardColors[COLOR_ERROR];
+
+			//Data characters
+			case JtagSymbol::SHIFT_IR:
+			case JtagSymbol::SHIFT_DR:
+				return m_standardColors[COLOR_DATA];
+
+			//intermediate states
+			default:
+				return m_standardColors[COLOR_CONTROL];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string JtagDecoder::GetText(int i)
+{
+	JtagCapture* capture = dynamic_cast<JtagCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const JtagSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[128];
+		const char* sstate = JtagSymbol::GetName(s.m_state);
+		if(s.m_len == 0)
+			return sstate;
+		else if(s.m_len == 8)
+		{
+			snprintf(tmp, sizeof(tmp), "%02x / %02x", s.m_idata, s.m_odata);
+			return tmp;
+		}
+		else
+		{
+			snprintf(tmp, sizeof(tmp), "%d'h%02x / %d'h%02x", s.m_len, s.m_idata, s.m_len, s.m_odata);
+			return tmp;
+		}
+
+	}
+	return "";
+}
+

@@ -37,7 +37,6 @@
 #define ProtocolDecoder_h
 
 #include "OscilloscopeChannel.h"
-#include "../scopehal/ChannelRenderer.h"
 
 class ProtocolDecoderParameter
 {
@@ -159,6 +158,27 @@ public:
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
 
+	/**
+		@brief Standard colors for protocol decoder decode overlays.
+
+		Do not change ordering, add new items to the end only.
+	 */
+	enum
+	{
+		COLOR_DATA,			//protocol data
+		COLOR_CONTROL,		//generic control sequences
+		COLOR_ADDRESS,		//addresses or device IDs
+		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
+		COLOR_CHECKSUM_OK,	//valid CRC/checksum
+		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
+		COLOR_ERROR,		//malformed traffic
+		COLOR_IDLE,			//downtime between frames
+
+		STANDARD_COLOR_COUNT
+	} standard_color;
+
+	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
+
 protected:
 
 	///Names of signals we take as input
@@ -175,6 +195,15 @@ protected:
 
 	///Indicates if our output is out-of-sync with our input
 	bool m_dirty;
+
+public:
+	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
+	virtual Gdk::Color GetColor(int i);
+	virtual std::string GetText(int i);
+
+protected:
+	//Common text formatting
+	virtual std::string GetTextForAsciiChannel(int i);
 
 protected:
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,9 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "EthernetProtocolDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "EthernetRenderer.h"
 
 using namespace std;
 

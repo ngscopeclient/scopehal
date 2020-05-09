@@ -78,8 +78,10 @@ class DDR3Decoder : public ProtocolDecoder
 public:
 	DDR3Decoder(std::string color);
 
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
 	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();

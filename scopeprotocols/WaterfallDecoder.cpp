@@ -100,11 +100,6 @@ WaterfallDecoder::WaterfallDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* WaterfallDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (dynamic_cast<FFTDecoder*>(channel) != NULL) )

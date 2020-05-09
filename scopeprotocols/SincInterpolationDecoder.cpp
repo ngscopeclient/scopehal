@@ -70,11 +70,6 @@ SincInterpolationDecoder::SincInterpolationDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* SincInterpolationDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool SincInterpolationDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

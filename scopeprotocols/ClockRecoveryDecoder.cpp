@@ -60,11 +60,6 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ClockRecoveryDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	switch(i)

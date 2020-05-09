@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "I2CRenderer.h"
 #include "I2CDecoder.h"
 
 using namespace std;
@@ -61,11 +58,6 @@ I2CDecoder::I2CDecoder(string color)
 bool I2CDecoder::NeedsConfig()
 {
 	return true;
-}
-
-ChannelRenderer* I2CDecoder::CreateRenderer()
-{
-	return new I2CRenderer(this);
 }
 
 bool I2CDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -234,4 +226,72 @@ void I2CDecoder::Refresh()
 	}
 
 	SetData(cap);
+}
+
+Gdk::Color I2CDecoder::GetColor(int i)
+{
+	I2CCapture* capture = dynamic_cast<I2CCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const I2CSymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_stype)
+		{
+			case I2CSymbol::TYPE_ERROR:
+				return m_standardColors[COLOR_ERROR];
+			case I2CSymbol::TYPE_ADDRESS:
+				return m_standardColors[COLOR_ADDRESS];
+			case I2CSymbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+			default:
+				return m_standardColors[COLOR_CONTROL];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string I2CDecoder::GetText(int i)
+{
+	I2CCapture* capture = dynamic_cast<I2CCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const I2CSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_stype)
+		{
+			case I2CSymbol::TYPE_NONE:
+			case I2CSymbol::TYPE_ERROR:
+				snprintf(tmp, sizeof(tmp), "ERR");
+				break;
+			case I2CSymbol::TYPE_START:
+				snprintf(tmp, sizeof(tmp), "START");
+				break;
+			case I2CSymbol::TYPE_RESTART:
+				snprintf(tmp, sizeof(tmp), "RESTART");
+				break;
+			case I2CSymbol::TYPE_STOP:
+				snprintf(tmp, sizeof(tmp), "STOP");
+				break;
+			case I2CSymbol::TYPE_ACK:
+				if(s.m_data)
+					snprintf(tmp, sizeof(tmp), "NAK");
+				else
+					snprintf(tmp, sizeof(tmp), "ACK");
+				break;
+			case I2CSymbol::TYPE_ADDRESS:
+				if(s.m_data & 1)
+					snprintf(tmp, sizeof(tmp), "R:%02x", s.m_data & 0xfe);
+				else
+					snprintf(tmp, sizeof(tmp), "W:%02x", s.m_data & 0xfe);
+				break;
+			case I2CSymbol::TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				break;
+		}
+		return string(tmp);
+	}
+	return "";
 }

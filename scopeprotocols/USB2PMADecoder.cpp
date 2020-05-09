@@ -3,7 +3,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,7 +30,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "USB2PMADecoder.h"
-#include "USB2PMARenderer.h"
 
 using namespace std;
 
@@ -54,11 +53,6 @@ USB2PMADecoder::USB2PMADecoder(string color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-ChannelRenderer* USB2PMADecoder::CreateRenderer()
-{
-	return new USB2PMARenderer(this);
-}
 
 bool USB2PMADecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
@@ -208,4 +202,55 @@ void USB2PMADecoder::Refresh()
 	cap->m_timescale = din_p->m_timescale;
 	cap->m_startTimestamp = din_p->m_startTimestamp;
 	cap->m_startPicoseconds = din_p->m_startPicoseconds;
+}
+
+Gdk::Color USB2PMADecoder::GetColor(int i)
+{
+	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(GetData());
+	if(data == NULL)
+		return m_standardColors[COLOR_ERROR];
+	if(i >= (int)data->m_samples.size())
+		return m_standardColors[COLOR_ERROR];
+
+	//TODO: have a set of standard colors we use everywhere?
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PMASymbol::TYPE_J:
+		case USB2PMASymbol::TYPE_K:
+			return m_standardColors[COLOR_DATA];
+
+		case USB2PMASymbol::TYPE_SE0:
+			return m_standardColors[COLOR_PREAMBLE];
+
+		//invalid state, should never happen
+		case USB2PMASymbol::TYPE_SE1:
+		default:
+			return m_standardColors[COLOR_ERROR];
+	}
+}
+
+string USB2PMADecoder::GetText(int i)
+{
+	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	auto sample = data->m_samples[i];
+	switch(sample.m_sample.m_type)
+	{
+		case USB2PMASymbol::TYPE_J:
+			return "J";
+		case USB2PMASymbol::TYPE_K:
+			return "K";
+		case USB2PMASymbol::TYPE_SE0:
+			return "SE0";
+		case USB2PMASymbol::TYPE_SE1:
+			return "SE1";
+	}
+
+	return "";
 }

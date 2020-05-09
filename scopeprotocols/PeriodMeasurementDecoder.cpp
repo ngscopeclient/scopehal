@@ -51,11 +51,6 @@ PeriodMeasurementDecoder::PeriodMeasurementDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* PeriodMeasurementDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

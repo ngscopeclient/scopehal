@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,10 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "../scopehal/AsciiRenderer.h"
-#include "EthernetAutonegotiationRenderer.h"
 #include "EthernetAutonegotiationDecoder.h"
 
 using namespace std;
@@ -59,11 +55,6 @@ EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(string color)
 bool EthernetAutonegotiationDecoder::NeedsConfig()
 {
 	return false;
-}
-
-ChannelRenderer* EthernetAutonegotiationDecoder::CreateRenderer()
-{
-	return new EthernetAutonegotiationRenderer(this);
 }
 
 bool EthernetAutonegotiationDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -180,4 +171,62 @@ void EthernetAutonegotiationDecoder::Refresh()
 	}
 
 	SetData(cap);
+}
+
+Gdk::Color EthernetAutonegotiationDecoder::GetColor(int i)
+{
+	return m_standardColors[COLOR_DATA];
+}
+
+string EthernetAutonegotiationDecoder::GetText(int i)
+{
+	EthernetAutonegotiationCapture* data = dynamic_cast<EthernetAutonegotiationCapture*>(GetData());
+	if(data == NULL)
+		return "";
+	if(i >= (int)data->m_samples.size())
+		return "";
+
+	auto s = data->m_samples[i];
+	unsigned int sel = s & 0x1f;
+	unsigned int ability = (s >> 5) & 0x7f;
+	bool xnp = (s >> 12) & 1;
+	bool rf = (s >> 13) & 1;
+	bool ack = (s >> 14) & 1;
+	bool np = (s >> 15) & 1;
+
+	//Not 802.3? Just display as hex
+	char tmp[128];
+	if(sel != 1)
+	{
+		snprintf(tmp, sizeof(tmp), "%04x", (int)s);
+		return tmp;
+	}
+
+	//Yes, it's 802.3
+	string ret = "Base: ";
+	if(ability & 0x40)
+		ret += "apause ";
+	if(ability & 0x20)
+		ret += "pause ";
+	if(ability & 0x10)
+		ret += "T4 ";
+	if(ability & 0x8)
+		ret += "100/full ";
+	if(ability & 0x4)
+		ret += "100/half ";
+	if(ability & 0x2)
+		ret += "10/full ";
+	if(ability & 0x1)
+		ret += "10/half ";
+
+	if(xnp)
+		ret += "XNP ";
+	if(rf)
+		ret += "FAULT ";
+	if(ack)
+		ret += "ACK ";
+	if(np)
+		ret += "Next-page";
+
+	return ret;
 }

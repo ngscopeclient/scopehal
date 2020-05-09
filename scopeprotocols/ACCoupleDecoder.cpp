@@ -46,11 +46,6 @@ ACCoupleDecoder::ACCoupleDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ACCoupleDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ACCoupleDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

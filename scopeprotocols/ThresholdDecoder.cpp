@@ -50,11 +50,6 @@ ThresholdDecoder::ThresholdDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ThresholdDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ThresholdDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

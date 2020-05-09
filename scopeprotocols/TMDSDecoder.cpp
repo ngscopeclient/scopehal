@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "TMDSRenderer.h"
 #include "TMDSDecoder.h"
 
 using namespace std;
@@ -66,11 +63,6 @@ bool TMDSDecoder::NeedsConfig()
 {
 	//baud rate has to be set
 	return true;
-}
-
-ChannelRenderer* TMDSDecoder::CreateRenderer()
-{
-	return new TMDSRenderer(this);
 }
 
 bool TMDSDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -273,4 +265,63 @@ void TMDSDecoder::Refresh()
 	}
 
 	SetData(cap);
+}
+
+Gdk::Color TMDSDecoder::GetColor(int i)
+{
+	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_type)
+		{
+			case TMDSSymbol::TMDS_TYPE_CONTROL:
+				return m_standardColors[COLOR_CONTROL];
+
+			case TMDSSymbol::TMDS_TYPE_GUARD:
+				return m_standardColors[COLOR_PREAMBLE];
+
+			case TMDSSymbol::TMDS_TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+
+			case TMDSSymbol::TMDS_TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string TMDSDecoder::GetText(int i)
+{
+	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_type)
+		{
+			case TMDSSymbol::TMDS_TYPE_CONTROL:
+				snprintf(tmp, sizeof(tmp), "CTL%d", s.m_data);
+				break;
+
+			case TMDSSymbol::TMDS_TYPE_GUARD:
+				return "GB";
+
+			case TMDSSymbol::TMDS_TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				break;
+
+			case TMDSSymbol::TMDS_TYPE_ERROR:
+			default:
+				return "ERROR";
+
+		}
+		return string(tmp);
+	}
+	return "";
 }

@@ -40,6 +40,18 @@ ProtocolDecoder::CreateMapType ProtocolDecoder::m_createprocs;
 
 using namespace std;
 
+Gdk::Color ProtocolDecoder::m_standardColors[STANDARD_COLOR_COUNT] =
+{
+	Gdk::Color("#336699"),	//COLOR_DATA
+	Gdk::Color("#c000a0"),	//COLOR_CONTROL
+	Gdk::Color("#ffff00"),	//COLOR_ADDRESS
+	Gdk::Color("#808080"),	//COLOR_PREAMBLE
+	Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
+	Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
+	Gdk::Color("#ff0000"),	//COLOR_ERROR
+	Gdk::Color("#404040")	//COLOR_IDLE
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ProtocolDecoderParameter
 
@@ -613,4 +625,39 @@ string ProtocolDecoder::SerializeConfiguration(IDTable& table)
 	}
 
 	return config;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Complex protocol decodes
+
+Gdk::Color ProtocolDecoder::GetColor(int i)
+{
+	return m_standardColors[COLOR_ERROR];
+}
+
+string ProtocolDecoder::GetText(int i)
+{
+	return "(unimplemented)";
+}
+
+string ProtocolDecoder::GetTextForAsciiChannel(int i)
+{
+	AsciiCapture* capture = dynamic_cast<AsciiCapture*>(GetData());
+	if(capture != NULL)
+	{
+		const AsciiSample& sample = capture->m_samples[i];
+		char sbuf[16] = {0};
+		if(isprint(sample.m_sample))
+			sbuf[0] = sample.m_sample;
+		else if(sample.m_sample == '\r')		//special case common non-printable chars
+			return "\\r";
+		else if(sample.m_sample == '\n')
+			return "\\n";
+		else if(sample.m_sample == '\b')
+			return "\\b";
+		else
+			snprintf(sbuf, sizeof(sbuf), "\\x%02x", 0xFF & sample.m_sample);
+		return sbuf;
+	}
+	return "";
 }

@@ -71,8 +71,10 @@ class TMDSDecoder : public ProtocolDecoder
 public:
 	TMDSDecoder(std::string color);
 
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
 	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();

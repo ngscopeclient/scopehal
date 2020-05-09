@@ -38,7 +38,6 @@
 
 #include "CaptureChannel.h"
 
-class ChannelRenderer;
 class Oscilloscope;
 
 /**
@@ -88,8 +87,6 @@ public:
 
 	///Set new data, overwriting the old data as appropriate
 	void SetData(CaptureChannelBase* pNew);
-
-	virtual ChannelRenderer* CreateRenderer();
 
 	int GetWidth()
 	{ return m_width; }

@@ -47,11 +47,6 @@ USB2ActivityDecoder::USB2ActivityDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* USB2ActivityDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool USB2ActivityDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (dynamic_cast<USB2PCSDecoder*>(channel) != NULL) )

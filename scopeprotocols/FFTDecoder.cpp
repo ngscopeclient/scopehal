@@ -57,11 +57,6 @@ FFTDecoder::FFTDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* FFTDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool FFTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

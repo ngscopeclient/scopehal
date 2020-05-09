@@ -7,10 +7,6 @@ set(SCOPEHAL_SOURCES
 
 	Unit.cpp
 
-	AsciiRenderer.cpp
-	ChannelRenderer.cpp
-	TextRenderer.cpp
-
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
 	VICPSocketTransport.cpp

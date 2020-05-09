@@ -49,11 +49,6 @@ DifferenceDecoder::DifferenceDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* DifferenceDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
@@ -93,7 +88,7 @@ bool DifferenceDecoder::NeedsConfig()
 
 double DifferenceDecoder::GetVoltageRange()
 {
-	//TODO: default, but allow overridnig
+	//TODO: default, but allow overriding
 	double v1 = m_channels[0]->GetVoltageRange();
 	double v2 = m_channels[1]->GetVoltageRange();
 	return max(v1, v2) * 2;

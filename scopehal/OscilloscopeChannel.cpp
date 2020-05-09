@@ -35,7 +35,6 @@
 
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
-#include "ChannelRenderer.h"
 
 using namespace std;
 
@@ -212,12 +211,4 @@ void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
 	if(m_data != NULL)
 		delete m_data;
 	m_data = pNew;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-ChannelRenderer* OscilloscopeChannel::CreateRenderer()
-{
-	return NULL;
 }

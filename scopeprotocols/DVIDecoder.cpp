@@ -35,9 +35,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "TMDSDecoder.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "DVIRenderer.h"
 #include "DVIDecoder.h"
 
 using namespace std;
@@ -72,11 +69,6 @@ bool DVIDecoder::NeedsConfig()
 {
 	//channels have to be selected
 	return true;
-}
-
-ChannelRenderer* DVIDecoder::CreateRenderer()
-{
-	return new DVIRenderer(this);
 }
 
 bool DVIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -299,4 +291,70 @@ void DVIDecoder::Refresh()
 		delete current_packet;
 
 	SetData(cap);
+}
+
+Gdk::Color DVIDecoder::GetColor(int i)
+{
+	DVICapture* capture = dynamic_cast<DVICapture*>(GetData());
+	if(capture != NULL)
+	{
+		const DVISymbol& s = capture->m_samples[i].m_sample;
+
+		switch(s.m_type)
+		{
+			case DVISymbol::DVI_TYPE_PREAMBLE:
+				return m_standardColors[COLOR_PREAMBLE];
+
+			case DVISymbol::DVI_TYPE_HSYNC:
+			case DVISymbol::DVI_TYPE_VSYNC:
+				return m_standardColors[COLOR_CONTROL];
+
+			case DVISymbol::DVI_TYPE_VIDEO:
+				{
+					Gdk::Color ret;
+					ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
+					return ret;
+				}
+
+			case DVISymbol::DVI_TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string DVIDecoder::GetText(int i)
+{
+	DVICapture* capture = dynamic_cast<DVICapture*>(GetData());
+	if(capture != NULL)
+	{
+		const DVISymbol& s = capture->m_samples[i].m_sample;
+
+		char tmp[32];
+		switch(s.m_type)
+		{
+			case DVISymbol::DVI_TYPE_PREAMBLE:
+				return "BLANK";
+
+			case DVISymbol::DVI_TYPE_HSYNC:
+				return "HSYNC";
+
+			case DVISymbol::DVI_TYPE_VSYNC:
+				return "VSYNC";
+
+			case DVISymbol::DVI_TYPE_VIDEO:
+				snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
+				break;
+
+			case DVISymbol::DVI_TYPE_ERROR:
+			default:
+				return "ERROR";
+
+		}
+		return string(tmp);
+	}
+	return "";
 }

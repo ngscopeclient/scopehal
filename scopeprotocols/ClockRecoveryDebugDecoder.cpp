@@ -46,11 +46,6 @@ ClockRecoveryDebugDecoder::ClockRecoveryDebugDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ClockRecoveryDebugDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ClockRecoveryDebugDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (dynamic_cast<ClockRecoveryDecoder*>(channel) != NULL) )

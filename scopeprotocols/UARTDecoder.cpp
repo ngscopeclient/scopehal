@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,9 +34,6 @@
  */
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ChannelRenderer.h"
-#include "../scopehal/TextRenderer.h"
-#include "../scopehal/AsciiRenderer.h"
 #include "UARTDecoder.h"
 
 using namespace std;
@@ -56,6 +53,10 @@ UARTDecoder::UARTDecoder(string color)
 	m_parameters[m_baudname].SetIntVal(115200);
 }
 
+UARTDecoder::~UARTDecoder()
+{
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
@@ -71,11 +72,6 @@ bool UARTDecoder::NeedsConfig()
 {
 	//baud rate has to be set
 	return true;
-}
-
-ChannelRenderer* UARTDecoder::CreateRenderer()
-{
-	return new AsciiRenderer(this);
 }
 
 bool UARTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
@@ -237,4 +233,14 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	pack->m_headers["ASCII"] = s;
 
 	m_packets.push_back(pack);
+}
+
+Gdk::Color UARTDecoder::GetColor(int i)
+{
+	return Gdk::Color(m_displaycolor);
+}
+
+string UARTDecoder::GetText(int i)
+{
+	return ProtocolDecoder::GetTextForAsciiChannel(i);
 }

@@ -51,11 +51,6 @@ ClockJitterDecoder::ClockJitterDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-ChannelRenderer* ClockJitterDecoder::CreateRenderer()
-{
-	return NULL;
-}
-
 bool ClockJitterDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )

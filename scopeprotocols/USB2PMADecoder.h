@@ -74,7 +74,6 @@ public:
 	USB2PMADecoder(std::string color);
 
 	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
 
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
@@ -85,6 +84,9 @@ public:
 	virtual double GetVoltageRange();
 
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
 
 	PROTOCOL_DECODER_INITPROC(USB2PMADecoder)
 
