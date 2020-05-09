@@ -56,8 +56,6 @@ public:
 	int m_padding;
 	int m_width;
 
-	bool m_overlay;		//true to draw on top of another channel
-
 	static void RenderComplexSignal(
 		const Cairo::RefPtr<Cairo::Context>& cr,
 		int visleft, int visright,
@@ -69,9 +67,6 @@ public:
 	static void MakePathSignalBody(
 		const Cairo::RefPtr<Cairo::Context>& cr,
 		float xstart, float xoff, float xend, float ybot, float ymid, float ytop);
-
-	//Maximum width, in pixels, of one sample
-	float m_maxsamplewidth;
 
 protected:
 	/**

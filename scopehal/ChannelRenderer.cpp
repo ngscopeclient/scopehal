@@ -58,11 +58,9 @@ ChannelRenderer::ChannelRenderer(OscilloscopeChannel* channel)
 : m_channel(channel)
 {
 	m_padding = 2;
-	m_maxsamplewidth = 150;
 	m_height = 24;
 	m_width = 32;
 	m_ypos = 0;
-	m_overlay = false;
 }
 
 ChannelRenderer::~ChannelRenderer()
