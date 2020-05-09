@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2017 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -55,38 +55,4 @@ Gdk::Color TextRenderer::GetColor(int /*i*/)
 {
 	//default to using our display color for everything
 	return Gdk::Color(m_channel->m_displaycolor);
-}
-
-void TextRenderer::RenderSampleCallback(
-	const Cairo::RefPtr<Cairo::Context>& cr,
-	size_t i,
-	float xstart,
-	float xend,
-	int visleft,
-	int visright
-	)
-{
-	float ytop = m_ypos + m_padding;
-	float ybot = m_ypos + m_height - 2*m_padding;
-	float ymid = (ybot-ytop)/2 + ytop;
-
-	string str = GetText(i);
-
-	RenderComplexSignal(
-		cr,
-		visleft, visright,
-		xstart, xend, 5,
-		ybot, ymid, ytop,
-		str,
-		GetColor(i));
-}
-
-void TextRenderer::RenderEndCallback(
-	const Cairo::RefPtr<Cairo::Context>& cr,
-	int /*width*/,
-	int /*visleft*/,
-	int /*visright*/,
-	std::vector<time_range>& /*ranges*/)
-{
-	cr->restore();
 }

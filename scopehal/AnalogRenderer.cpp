@@ -53,38 +53,6 @@ AnalogRenderer::AnalogRenderer(OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Rendering
 
-void AnalogRenderer::RenderStartCallback(
-	const Cairo::RefPtr<Cairo::Context>& /*cr*/,
-	int /*width*/,
-	int /*visleft*/,
-	int /*visright*/,
-	vector<time_range>& /*ranges*/)
-{
-	//no longer used, will be removed in future refactoring
-}
-
-void AnalogRenderer::RenderSampleCallback(
-	const Cairo::RefPtr<Cairo::Context>& /*cr*/,
-	size_t /*i*/,
-	float /*xstart*/,
-	float /*xend*/,
-	int /*visleft*/,
-	int /*visright*/
-	)
-{
-	//no longer used, will be removed in future refactoring
-}
-
-void AnalogRenderer::RenderEndCallback(
-	const Cairo::RefPtr<Cairo::Context>& /*cr*/,
-	int /*width*/,
-	int /*visleft*/,
-	int /*visright*/,
-	vector<time_range>& /*ranges*/)
-{
-	//no longer used, will be removed in future refactoring
-}
-
 float AnalogRenderer::PickStepSize(float volts_per_half_span, int min_steps, int max_steps)
 {
 	const float step_sizes[24]=
