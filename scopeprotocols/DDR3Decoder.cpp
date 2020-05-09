@@ -45,7 +45,7 @@ using namespace std;
 // Construction / destruction
 
 DDR3Decoder::DDR3Decoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	//Set up channels
 	m_signalNames.push_back("CLK");

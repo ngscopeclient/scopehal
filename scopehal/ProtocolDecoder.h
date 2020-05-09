@@ -93,6 +93,7 @@ public:
 		CAT_CONVERSION,		//Type conversion
 		CAT_MATH,			//Basic math functions
 		CAT_MEASUREMENT,	//Measurement functions
+		CAT_MEMORY,			//Memory buses
 		CAT_SERIAL,			//Serial communications
 		CAT_MISC			//anything not otherwise categorized
 	};
