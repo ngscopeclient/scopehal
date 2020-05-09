@@ -30,66 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DDR3Decoder
+	@brief Declaration of DramRowColumnLatencyMeasurement
  */
+#ifndef DramRowColumnLatencyMeasurement_h
+#define DramRowColumnLatencyMeasurement_h
 
-#ifndef DDR3Decoder_h
-#define DDR3Decoder_h
+#include "../scopehal/Measurement.h"
 
-#include "../scopehal/ProtocolDecoder.h"
-
-class DDR3Symbol
+class DramRowColumnLatencyMeasurement : public FloatMeasurement
 {
 public:
-	enum stype
-	{
-		TYPE_MRS,
-		TYPE_REF,
-		TYPE_PRE,
-		TYPE_PREA,
-		TYPE_ACT,
-		TYPE_WR,
-		TYPE_WRA,
-		TYPE_RD,
-		TYPE_RDA,
+	DramRowColumnLatencyMeasurement();
+	virtual ~DramRowColumnLatencyMeasurement();
 
-		TYPE_ERROR
-	};
+	virtual bool Refresh();
 
-	DDR3Symbol(stype t, int bank = 0)
-	 : m_stype(t)
-	 , m_bank(bank)
-	{}
-
-	stype m_stype;
-	int m_bank;
-
-	bool operator== (const DDR3Symbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_bank == s.m_bank);
-	}
-};
-
-typedef OscilloscopeSample<DDR3Symbol> DDR3Sample;
-typedef CaptureChannel<DDR3Symbol> DDR3Capture;
-
-class DDR3Decoder : public ProtocolDecoder
-{
-public:
-	DDR3Decoder(std::string color);
-
-	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
-	virtual bool NeedsConfig();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
+	static std::string GetMeasurementName();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
+	virtual MeasurementType GetMeasurementType();
 
-protected:
+	MEASUREMENT_INITPROC(DramRowColumnLatencyMeasurement)
 };
 
 #endif

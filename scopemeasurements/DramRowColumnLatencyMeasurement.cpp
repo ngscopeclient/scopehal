@@ -30,66 +30,101 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DDR3Decoder
+	@brief Declaration of DramRowColumnLatencyMeasurement
  */
 
-#ifndef DDR3Decoder_h
-#define DDR3Decoder_h
+#include "scopemeasurements.h"
+#include "DramRowColumnLatencyMeasurement.h"
+#include "../scopeprotocols/DDR3Decoder.h"
 
-#include "../scopehal/ProtocolDecoder.h"
+using namespace std;
 
-class DDR3Symbol
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement()
+	: FloatMeasurement(TYPE_TIME)
 {
-public:
-	enum stype
+	//Configure for a single input
+	m_signalNames.push_back("RAM");
+	m_channels.push_back(NULL);
+}
+
+DramRowColumnLatencyMeasurement::~DramRowColumnLatencyMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType DramRowColumnLatencyMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_PROTO;
+}
+
+string DramRowColumnLatencyMeasurement::GetMeasurementName()
+{
+	return "DRAM Trcd";
+}
+
+bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (dynamic_cast<DDR3Decoder*>(channel) != NULL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool DramRowColumnLatencyMeasurement::Refresh()
+{
+	m_value = INT_MAX;
+
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	//Measure delay from activating a row in a bank until a read or write to the same bank
+	int64_t lastAct[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+	for(size_t i=0; i<din->GetDepth(); i++)
 	{
-		TYPE_MRS,
-		TYPE_REF,
-		TYPE_PRE,
-		TYPE_PREA,
-		TYPE_ACT,
-		TYPE_WR,
-		TYPE_WRA,
-		TYPE_RD,
-		TYPE_RDA,
+		auto sample = din->m_samples[i];
 
-		TYPE_ERROR
-	};
+		//Discard invalid bank IDs
+		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
+			continue;
 
-	DDR3Symbol(stype t, int bank = 0)
-	 : m_stype(t)
-	 , m_bank(bank)
-	{}
+		//If it's an activate, update the last activation time
+		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
+			lastAct[sample.m_sample.m_bank] = sample.m_offset * din->m_timescale;
 
-	stype m_stype;
-	int m_bank;
+		//If it's a read or write, measure the latency
+		else if( (sample.m_sample.m_stype == DDR3Symbol::TYPE_WR) |
+			(sample.m_sample.m_stype == DDR3Symbol::TYPE_WRA) |
+			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RD) |
+			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RDA) )
+		{
+			int64_t tcol = sample.m_offset * din->m_timescale;
 
-	bool operator== (const DDR3Symbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_bank == s.m_bank);
+			//If the activate command is before the start of the capture, ignore this event
+			int64_t tact = lastAct[sample.m_sample.m_bank];
+			if(tact == 0)
+				continue;
+
+			//Valid access, measure the latency
+			int64_t latency = tcol - tact;
+			if(latency < m_value)
+				m_value = latency;
+		}
 	}
-};
 
-typedef OscilloscopeSample<DDR3Symbol> DDR3Sample;
-typedef CaptureChannel<DDR3Symbol> DDR3Capture;
+	//convert ps to sec
+	m_value *= 1e-12f;
 
-class DDR3Decoder : public ProtocolDecoder
-{
-public:
-	DDR3Decoder(std::string color);
-
-	virtual void Refresh();
-	virtual ChannelRenderer* CreateRenderer();
-	virtual bool NeedsConfig();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
-
-	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
-
-protected:
-};
-
-#endif
+	return true;
+}
