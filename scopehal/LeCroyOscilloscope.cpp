@@ -112,6 +112,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_DDA_5K;
 	else if(m_model.find("WAVERUNNER8") == 0)
 		m_modelid = MODEL_WAVERUNNER_8K;
+	else if(m_model.find("SDA3") == 0)
+		m_modelid = MODEL_SDA_3K;
 	else
 		m_modelid = MODEL_UNKNOWN;
 
@@ -242,6 +244,7 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	But, since we can't have nice things, theres are plenty of exceptions. Known formats so far:
 	* WAVERUNNER8104-MS has 4 channels (plus 16 digital)
 	* DDA5005 / DDA5005A have 4 channels
+	* SDA3010 have 4 channels
  */
 void LeCroyOscilloscope::DetectAnalogChannels()
 {
@@ -268,7 +271,8 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 	int nchans = modelNum % 10;
 
 	//DDA5005 and similar have 4 channels despite a model number ending in 5
-	if(m_modelid == MODEL_DDA_5K)
+	//SDA3010 have 4 channels despite a model number ending in 0
+	if(m_modelid == MODEL_DDA_5K || m_modelid == MODEL_SDA_3K)
 		nchans = 4;
 
 	for(int i=0; i<nchans; i++)
