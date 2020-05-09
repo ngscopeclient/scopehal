@@ -42,7 +42,6 @@
  */
 void ScopeMeasurementStaticInit()
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
 	AddMeasurementClass(BaseMeasurement);
 	AddMeasurementClass(DramRefreshActivateLatencyMeasurement);
 	AddMeasurementClass(DramRowColumnLatencyMeasurement);
@@ -54,10 +53,7 @@ void ScopeMeasurementStaticInit()
 	AddMeasurementClass(Fall1090Measurement);
 	AddMeasurementClass(Fall2080Measurement);
 	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
 	AddMeasurementClass(OvershootMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 	AddMeasurementClass(Rise1090Measurement);
 	AddMeasurementClass(Rise2080Measurement);

@@ -2,7 +2,6 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
-	AvgVoltageMeasurement.cpp
 	BaseMeasurement.cpp
 	DramRefreshActivateLatencyMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
@@ -14,10 +13,7 @@ set(SCOPEMEASUREMENTS_SOURCES
 	Fall1090Measurement.cpp
 	Fall2080Measurement.cpp
 	FrequencyMeasurement.cpp
-	MaxVoltageMeasurement.cpp
-	MinVoltageMeasurement.cpp
 	OvershootMeasurement.cpp
-	PeriodMeasurement.cpp
 	PkPkVoltageMeasurement.cpp
 	Rise1090Measurement.cpp
 	Rise2080Measurement.cpp
