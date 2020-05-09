@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -30,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "UartClockRecoveryDecoder.h"
-#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
@@ -58,7 +56,7 @@ UartClockRecoveryDecoder::UartClockRecoveryDecoder(string color)
 
 ChannelRenderer* UartClockRecoveryDecoder::CreateRenderer()
 {
-	return new DigitalRenderer(this);
+	return NULL;
 }
 
 bool UartClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

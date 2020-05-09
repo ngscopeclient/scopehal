@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -30,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "scopeprotocols.h"
-#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
@@ -64,7 +62,7 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 
 ChannelRenderer* ClockRecoveryDecoder::CreateRenderer()
 {
-	return new DigitalRenderer(this);
+	return NULL;
 }
 
 bool ClockRecoveryDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

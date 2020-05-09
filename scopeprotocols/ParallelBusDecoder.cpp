@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "ParallelBusDecoder.h"
-#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
@@ -58,7 +57,7 @@ ParallelBusDecoder::ParallelBusDecoder(string color)
 
 ChannelRenderer* ParallelBusDecoder::CreateRenderer()
 {
-	return new DigitalRenderer(this);
+	return NULL;
 }
 
 bool ParallelBusDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

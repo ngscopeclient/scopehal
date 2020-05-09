@@ -10,7 +10,6 @@ set(SCOPEHAL_SOURCES
 	AnalogRenderer.cpp
 	AsciiRenderer.cpp
 	ChannelRenderer.cpp
-	DigitalRenderer.cpp
 	TextRenderer.cpp
 
 	SCPITransport.cpp

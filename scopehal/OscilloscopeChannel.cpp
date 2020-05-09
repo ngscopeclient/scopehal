@@ -37,7 +37,6 @@
 #include "OscilloscopeChannel.h"
 #include "ChannelRenderer.h"
 #include "AnalogRenderer.h"
-#include "DigitalRenderer.h"
 
 using namespace std;
 
@@ -223,14 +222,12 @@ ChannelRenderer* OscilloscopeChannel::CreateRenderer()
 {
 	switch(m_type)
 	{
-	case CHANNEL_TYPE_DIGITAL:
-		return new DigitalRenderer(this);
-
 	case CHANNEL_TYPE_ANALOG:
 		return new AnalogRenderer(this);
 
 	//complex channels must be procedural (and override this)
 	default:
+	case CHANNEL_TYPE_DIGITAL:
 	case CHANNEL_TYPE_COMPLEX:
 		return NULL;
 	}

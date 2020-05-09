@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "ThresholdDecoder.h"
-#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
@@ -53,7 +52,7 @@ ThresholdDecoder::ThresholdDecoder(string color)
 
 ChannelRenderer* ThresholdDecoder::CreateRenderer()
 {
-	return new DigitalRenderer(this);
+	return NULL;
 }
 
 bool ThresholdDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

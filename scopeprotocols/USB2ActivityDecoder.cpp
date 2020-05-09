@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,7 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "USB2ActivityDecoder.h"
 #include "USB2PCSDecoder.h"
-#include "../scopehal/DigitalRenderer.h"
 
 using namespace std;
 
@@ -50,7 +49,7 @@ USB2ActivityDecoder::USB2ActivityDecoder(string color)
 
 ChannelRenderer* USB2ActivityDecoder::CreateRenderer()
 {
-	return new DigitalRenderer(this);
+	return NULL;
 }
 
 bool USB2ActivityDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
