@@ -41,6 +41,7 @@
 
 #include "AvgVoltageMeasurement.h"
 #include "BaseMeasurement.h"
+#include "DramRefreshActivateLatencyMeasurement.h"
 #include "DramRowColumnLatencyMeasurement.h"
 #include "EyeBitRateMeasurement.h"
 #include "EyeHeightMeasurement.h"

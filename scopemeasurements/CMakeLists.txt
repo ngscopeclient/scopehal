@@ -4,6 +4,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEMEASUREMENTS_SOURCES
 	AvgVoltageMeasurement.cpp
 	BaseMeasurement.cpp
+	DramRefreshActivateLatencyMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
 	EyeBitRateMeasurement.cpp
 	EyeHeightMeasurement.cpp

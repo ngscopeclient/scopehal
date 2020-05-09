@@ -30,37 +30,102 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DramRefreshActivateLatencyMeasurement
  */
 
 #include "scopemeasurements.h"
+#include "DramRefreshActivateLatencyMeasurement.h"
+#include "../scopeprotocols/DDR3Decoder.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction/destruction
+
+DramRefreshActivateLatencyMeasurement::DramRefreshActivateLatencyMeasurement()
+	: FloatMeasurement(TYPE_TIME)
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(DramRefreshActivateLatencyMeasurement);
-	AddMeasurementClass(DramRowColumnLatencyMeasurement);
-	AddMeasurementClass(EyeBitRateMeasurement);
-	AddMeasurementClass(EyeHeightMeasurement);
-	AddMeasurementClass(EyeJitterMeasurement);
-	AddMeasurementClass(EyePeriodMeasurement);
-	AddMeasurementClass(EyeWidthMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(OvershootMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
-	AddMeasurementClass(UndershootMeasurement);
+	//Configure for a single input
+	m_signalNames.push_back("RAM");
+	m_channels.push_back(NULL);
+}
+
+DramRefreshActivateLatencyMeasurement::~DramRefreshActivateLatencyMeasurement()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+Measurement::MeasurementType DramRefreshActivateLatencyMeasurement::GetMeasurementType()
+{
+	return Measurement::MEAS_PROTO;
+}
+
+string DramRefreshActivateLatencyMeasurement::GetMeasurementName()
+{
+	return "DRAM Trfc";
+}
+
+bool DramRefreshActivateLatencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (dynamic_cast<DDR3Decoder*>(channel) != NULL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement processing
+
+bool DramRefreshActivateLatencyMeasurement::Refresh()
+{
+	m_value = INT_MAX;
+
+	//TODO: for now, only report the minimum latency
+	//We really should also report average/max.
+	//This is where unification of measurements and decodes will be really helpful.
+
+	//Get the input data
+	if(m_channels[0] == NULL)
+		return false;
+	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
+		return false;
+
+	//Measure delay from refreshing a bank until an activation to the same bank
+	int64_t lastRef[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+	for(size_t i=0; i<din->GetDepth(); i++)
+	{
+		auto sample = din->m_samples[i];
+
+		//Discard invalid bank IDs
+		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
+			continue;
+
+		//If it's a refresh, update the last refresh time
+		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_REF)
+			lastRef[sample.m_sample.m_bank] = sample.m_offset * din->m_timescale;
+
+		//If it's an activate, measure the latency
+		else if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
+		{
+			int64_t tact = sample.m_offset * din->m_timescale;
+
+			//If the refresh command is before the start of the capture, ignore this event
+			int64_t tref= lastRef[sample.m_sample.m_bank];
+			if(tref == 0)
+				continue;
+
+			//Valid access, measure the latency
+			int64_t latency = tact - tref;
+			if(latency < m_value)
+				m_value = latency;
+		}
+	}
+
+	//convert ps to sec
+	m_value *= 1e-12f;
+
+	return true;
 }

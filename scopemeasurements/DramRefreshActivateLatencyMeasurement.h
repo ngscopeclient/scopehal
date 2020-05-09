@@ -30,37 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DramRefreshActivateLatencyMeasurement
  */
+#ifndef DramRefreshActivateLatencyMeasurement_h
+#define DramRefreshActivateLatencyMeasurement_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/Measurement.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class DramRefreshActivateLatencyMeasurement : public FloatMeasurement
 {
-	AddMeasurementClass(AvgVoltageMeasurement);
-	AddMeasurementClass(BaseMeasurement);
-	AddMeasurementClass(DramRefreshActivateLatencyMeasurement);
-	AddMeasurementClass(DramRowColumnLatencyMeasurement);
-	AddMeasurementClass(EyeBitRateMeasurement);
-	AddMeasurementClass(EyeHeightMeasurement);
-	AddMeasurementClass(EyeJitterMeasurement);
-	AddMeasurementClass(EyePeriodMeasurement);
-	AddMeasurementClass(EyeWidthMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
-	AddMeasurementClass(FrequencyMeasurement);
-	AddMeasurementClass(MaxVoltageMeasurement);
-	AddMeasurementClass(MinVoltageMeasurement);
-	AddMeasurementClass(OvershootMeasurement);
-	AddMeasurementClass(PeriodMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(Rise1090Measurement);
-	AddMeasurementClass(Rise2080Measurement);
-	AddMeasurementClass(TopMeasurement);
-	AddMeasurementClass(UndershootMeasurement);
-}
+public:
+	DramRefreshActivateLatencyMeasurement();
+	virtual ~DramRefreshActivateLatencyMeasurement();
+
+	virtual bool Refresh();
+
+	static std::string GetMeasurementName();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual MeasurementType GetMeasurementType();
+
+	MEASUREMENT_INITPROC(DramRefreshActivateLatencyMeasurement)
+};
+
+#endif
