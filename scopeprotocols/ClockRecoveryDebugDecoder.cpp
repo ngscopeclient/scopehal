@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -30,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "scopeprotocols.h"
-#include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
 
@@ -50,7 +48,7 @@ ClockRecoveryDebugDecoder::ClockRecoveryDebugDecoder(string color)
 
 ChannelRenderer* ClockRecoveryDebugDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return NULL;
 }
 
 bool ClockRecoveryDebugDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

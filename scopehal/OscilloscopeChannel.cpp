@@ -36,7 +36,6 @@
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
 #include "ChannelRenderer.h"
-#include "AnalogRenderer.h"
 
 using namespace std;
 
@@ -220,15 +219,5 @@ void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
 
 ChannelRenderer* OscilloscopeChannel::CreateRenderer()
 {
-	switch(m_type)
-	{
-	case CHANNEL_TYPE_ANALOG:
-		return new AnalogRenderer(this);
-
-	//complex channels must be procedural (and override this)
-	default:
-	case CHANNEL_TYPE_DIGITAL:
-	case CHANNEL_TYPE_COMPLEX:
-		return NULL;
-	}
+	return NULL;
 }

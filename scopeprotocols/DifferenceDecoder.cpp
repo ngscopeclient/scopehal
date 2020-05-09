@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -31,7 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "DifferenceDecoder.h"
 #include "FFTDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
 
@@ -53,7 +51,7 @@ DifferenceDecoder::DifferenceDecoder(string color)
 
 ChannelRenderer* DifferenceDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return NULL;
 }
 
 bool DifferenceDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

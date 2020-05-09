@@ -7,7 +7,6 @@ set(SCOPEHAL_SOURCES
 
 	Unit.cpp
 
-	AnalogRenderer.cpp
 	AsciiRenderer.cpp
 	ChannelRenderer.cpp
 	TextRenderer.cpp

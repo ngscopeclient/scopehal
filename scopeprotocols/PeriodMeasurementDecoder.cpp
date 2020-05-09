@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -30,7 +29,6 @@
 
 #include "scopeprotocols.h"
 #include "PeriodMeasurementDecoder.h"
-#include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
 
@@ -55,7 +53,7 @@ PeriodMeasurementDecoder::PeriodMeasurementDecoder(string color)
 
 ChannelRenderer* PeriodMeasurementDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return NULL;
 }
 
 bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)

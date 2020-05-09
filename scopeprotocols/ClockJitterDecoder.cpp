@@ -1,4 +1,3 @@
-
 /***********************************************************************************************************************
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
@@ -29,7 +28,6 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "../scopehal/AnalogRenderer.h"
 
 using namespace std;
 
@@ -55,7 +53,7 @@ ClockJitterDecoder::ClockJitterDecoder(string color)
 
 ChannelRenderer* ClockJitterDecoder::CreateRenderer()
 {
-	return new AnalogRenderer(this);
+	return NULL;
 }
 
 bool ClockJitterDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
