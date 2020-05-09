@@ -27,53 +27,47 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
- */
-
 #include "scopeprotocols.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
-{
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+using namespace std;
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
+void AverageStatistic::Clear()
+{
+	m_pastSums.clear();
+	m_pastCounts.clear();
+}
+
+string AverageStatistic::GetStatisticName()
+{
+	return "Average";
+}
+
+bool AverageStatistic::Calculate(OscilloscopeChannel* channel, double& value)
+{
+	//Can't do anything if we have no data
+	auto data = dynamic_cast<AnalogCapture*>(channel->GetData());
+	if(!data)
+		return false;
+
+	//Start integrating from the past value, if we have one
+	value = 0;
+	size_t count = 0;
+	if(m_pastSums.find(channel) != m_pastSums.end())
+	{
+		value = m_pastSums[channel];
+		count = m_pastCounts[channel];
+	}
+
+	//Add new sample data
+	for(auto sample : *data)
+		value += (float)sample;
+	count += data->GetDepth();
+
+	//Average and save
+	m_pastCounts[channel] = count;
+	m_pastSums[channel] = value;
+
+	value /= count;
+
+	return true;
 }

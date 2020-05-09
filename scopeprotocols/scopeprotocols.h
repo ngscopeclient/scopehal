@@ -81,6 +81,11 @@
 #include "SchmittTriggerDecoder.h"
 #include "SPIDecoder.h"
 */
+
+#include "AverageStatistic.h"
+#include "MaximumStatistic.h"
+#include "MinimumStatistic.h"
+
 void ScopeProtocolStaticInit();
 
 #endif

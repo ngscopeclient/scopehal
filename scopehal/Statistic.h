@@ -30,50 +30,44 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of Statistic
  */
 
-#include "scopeprotocols.h"
+#ifndef Statistic_h
+#define Statistic_h
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class Statistic
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	//AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
+	Statistic();
+	virtual ~Statistic();
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	///@brief Removes any integrated statistic data
+	virtual void Clear() =0;
+
+	virtual std::string GetStatisticDisplayName() =0;
+	virtual bool Calculate(OscilloscopeChannel* channel, double& value) =0;
+
+	//Enumeration / factory
+public:
+	typedef Statistic* (*CreateProcType)();
+	static void DoAddStatisticClass(std::string name, CreateProcType proc);
+
+	static void EnumStatistics(std::vector<std::string>& names);
+	static Statistic* CreateStatistic(std::string measurement);
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
+};
+
+#define STATISTIC_INITPROC(T) \
+	static Statistic* CreateInstance() \
+	{ return new T; } \
+	virtual std::string GetStatisticDisplayName() \
+	{ return GetStatisticName(); }
+
+#define AddStatisticClass(T) Statistic::DoAddStatisticClass(T::GetStatisticName(), T::CreateInstance)
+
+#endif

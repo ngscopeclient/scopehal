@@ -67,6 +67,7 @@
 #include "PowerSupply.h"
 
 #include "Measurement.h"
+#include "Statistic.h"
 
 uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 
