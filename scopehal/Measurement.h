@@ -60,7 +60,8 @@ public:
 	enum MeasurementType
 	{
 		MEAS_VERT,	//basic vertical axis
-		MEAS_HORZ	//basic horizontal axis
+		MEAS_HORZ,	//basic horizontal axis
+		MEAS_PROTO	//complex protocol analysis
 	};
 
 	virtual MeasurementType GetMeasurementType() =0;
