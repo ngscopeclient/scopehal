@@ -28,32 +28,32 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "PeriodMeasurementDecoder.h"
+#include "DramRefreshActivateMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PeriodMeasurementDecoder::PeriodMeasurementDecoder(string color)
+DramRefreshActivateMeasurementDecoder::DramRefreshActivateMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
-
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
 
-	m_midpoint = 0.5;
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
+
+	m_midpoint = 0;
 	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool DramRefreshActivateMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (dynamic_cast<DDR3Decoder*>(channel) != NULL) )
 		return true;
 	return false;
 }
@@ -61,37 +61,36 @@ bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* ch
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void PeriodMeasurementDecoder::SetDefaultName()
+void DramRefreshActivateMeasurementDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Period(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "Trfc(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string PeriodMeasurementDecoder::GetProtocolName()
+string DramRefreshActivateMeasurementDecoder::GetProtocolName()
 {
-	return "Period";
+	return "DRAM Trfc";
 }
 
-bool PeriodMeasurementDecoder::IsOverlay()
+bool DramRefreshActivateMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool PeriodMeasurementDecoder::NeedsConfig()
+bool DramRefreshActivateMeasurementDecoder::NeedsConfig()
 {
-	//automatic configuration
 	return false;
 }
 
-double PeriodMeasurementDecoder::GetVoltageRange()
+double DramRefreshActivateMeasurementDecoder::GetVoltageRange()
 {
 	return m_range;
 }
 
-double PeriodMeasurementDecoder::GetOffset()
+double DramRefreshActivateMeasurementDecoder::GetOffset()
 {
 	return -m_midpoint;
 }
@@ -99,7 +98,7 @@ double PeriodMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PeriodMeasurementDecoder::Refresh()
+void DramRefreshActivateMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -107,25 +106,8 @@ void PeriodMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-
-	//We need meaningful data
-	size_t len = din->m_samples.size();
-	if(len == 0)
-	{
-		SetData(NULL);
-		return;
-	}
-
-	//Timestamps of the edges
-	vector<int64_t> edges;
-	FindZeroCrossings(din, 0, edges);
-	if(edges.size() < 2)
+	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
+	if(din == NULL || (din->GetDepth() == 0))
 	{
 		SetData(NULL);
 		return;
@@ -134,29 +116,62 @@ void PeriodMeasurementDecoder::Refresh()
 	//Create the output
 	AnalogCapture* cap = new AnalogCapture;
 
-	double rmin = FLT_MAX;
-	double rmax = 0;
+	//Measure delay from refreshing a bank until an activation to the same bank
+	int64_t lastRef[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-	for(size_t i=0; i < (edges.size()-2); i+= 2)
+	float fmax = -1e20;
+	float fmin =  1e20;
+
+	int64_t tlast = 0;
+	for(size_t i=0; i<din->GetDepth(); i++)
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
+		auto sample = din->m_samples[i];
+		int64_t tnow = sample.m_offset * din->m_timescale;
 
-		double delta = end - start;
-		cap->m_samples.push_back(AnalogSample(
-			start, delta, delta));
+		//Discard invalid bank IDs
+		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
+			continue;
 
-		rmin = min(rmin, delta);
-		rmax = max(rmax, delta);
+		//If it's a refresh, update the last refresh time
+		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_REF)
+			lastRef[sample.m_sample.m_bank] = sample.m_offset * din->m_timescale;
+
+		//If it's an activate, measure the latency
+		else if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
+		{
+			int64_t tact = sample.m_offset * din->m_timescale;
+
+			//If the refresh command is before the start of the capture, ignore this event
+			int64_t tref= lastRef[sample.m_sample.m_bank];
+			if(tref == 0)
+				continue;
+
+			//Valid access, measure the latency
+			int64_t latency = tact - tref;
+			if(fmin > latency)
+				fmin = latency;
+			if(fmax < latency)
+				fmax = latency;
+
+			cap->m_samples.push_back(AnalogSample(tlast, tnow-tlast, latency));
+			tlast = tnow;
+
+			//Purge the last-refresh timestamp so we don't report false times for the next activate
+			lastRef[sample.m_sample.m_bank] = 0;
+		}
 	}
 
-	m_range = rmax - rmin;
-	m_midpoint = rmin + m_range/2;
+	if(cap->m_samples.empty())
+	{
+		delete cap;
+		SetData(NULL);
+		return;
+	}
 
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
+	m_range = fmax - fmin + 5000;
+	if(m_range < 5)
+		m_range = 5;
+	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap);
 

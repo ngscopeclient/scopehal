@@ -27,47 +27,31 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DramRowColumnLatencyMeasurement
- */
-
-#include "scopemeasurements.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "../scopeprotocols/DDR3Decoder.h"
+#include "scopeprotocols.h"
+#include "DramRowColumnLatencyMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
+// Construction / destruction
 
-DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement()
-	: FloatMeasurement(TYPE_TIME)
+DramRowColumnLatencyMeasurementDecoder::DramRowColumnLatencyMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	//Configure for a single input
-	m_signalNames.push_back("RAM");
+	//Set up channels
+	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
-}
 
-DramRowColumnLatencyMeasurement::~DramRowColumnLatencyMeasurement()
-{
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
+
+	m_midpoint = 0;
+	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-Measurement::MeasurementType DramRowColumnLatencyMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_PROTO;
-}
-
-string DramRowColumnLatencyMeasurement::GetMeasurementName()
-{
-	return "DRAM Trcd";
-}
-
-bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool DramRowColumnLatencyMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (dynamic_cast<DDR3Decoder*>(channel) != NULL) )
 		return true;
@@ -75,25 +59,74 @@ bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, OscilloscopeChan
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+// Accessors
 
-bool DramRowColumnLatencyMeasurement::Refresh()
+void DramRowColumnLatencyMeasurementDecoder::SetDefaultName()
 {
-	m_value = INT_MAX;
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Trcd(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
+string DramRowColumnLatencyMeasurementDecoder::GetProtocolName()
+{
+	return "DRAM Trcd";
+}
+
+bool DramRowColumnLatencyMeasurementDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool DramRowColumnLatencyMeasurementDecoder::NeedsConfig()
+{
+	return false;
+}
+
+double DramRowColumnLatencyMeasurementDecoder::GetVoltageRange()
+{
+	return m_range;
+}
+
+double DramRowColumnLatencyMeasurementDecoder::GetOffset()
+{
+	return -m_midpoint;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void DramRowColumnLatencyMeasurementDecoder::Refresh()
+{
 	//Get the input data
 	if(m_channels[0] == NULL)
-		return false;
+	{
+		SetData(NULL);
+		return;
+	}
 	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
 	if(din == NULL || (din->GetDepth() == 0))
-		return false;
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Create the output
+	AnalogCapture* cap = new AnalogCapture;
 
 	//Measure delay from activating a row in a bank until a read or write to the same bank
 	int64_t lastAct[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
+	float fmax = -1e20;
+	float fmin =  1e20;
+
+	int64_t tlast = 0;
 	for(size_t i=0; i<din->GetDepth(); i++)
 	{
 		auto sample = din->m_samples[i];
+		int64_t tnow = sample.m_offset * din->m_timescale;
 
 		//Discard invalid bank IDs
 		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
@@ -101,7 +134,7 @@ bool DramRowColumnLatencyMeasurement::Refresh()
 
 		//If it's an activate, update the last activation time
 		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
-			lastAct[sample.m_sample.m_bank] = sample.m_offset * din->m_timescale;
+			lastAct[sample.m_sample.m_bank] = tnow;
 
 		//If it's a read or write, measure the latency
 		else if( (sample.m_sample.m_stype == DDR3Symbol::TYPE_WR) |
@@ -109,7 +142,7 @@ bool DramRowColumnLatencyMeasurement::Refresh()
 			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RD) |
 			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RDA) )
 		{
-			int64_t tcol = sample.m_offset * din->m_timescale;
+			int64_t tcol = tnow;
 
 			//If the activate command is before the start of the capture, ignore this event
 			int64_t tact = lastAct[sample.m_sample.m_bank];
@@ -118,13 +151,35 @@ bool DramRowColumnLatencyMeasurement::Refresh()
 
 			//Valid access, measure the latency
 			int64_t latency = tcol - tact;
-			if(latency < m_value)
-				m_value = latency;
+			if(fmin > latency)
+				fmin = latency;
+			if(fmax < latency)
+				fmax = latency;
+
+			cap->m_samples.push_back(AnalogSample(tlast, tnow-tlast, latency));
+			tlast = tnow;
+
+			//Purge the last-refresh activate so we don't report false times for the next read or write
+			lastAct[sample.m_sample.m_bank] = 0;
 		}
 	}
 
-	//convert ps to sec
-	m_value *= 1e-12f;
+	if(cap->m_samples.empty())
+	{
+		delete cap;
+		SetData(NULL);
+		return;
+	}
 
-	return true;
+	m_range = fmax - fmin + 500;
+	if(m_range < 5)
+		m_range = 5;
+	m_midpoint = (fmax + fmin) / 2;
+
+	SetData(cap);
+
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

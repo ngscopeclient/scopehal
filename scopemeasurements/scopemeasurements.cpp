@@ -42,14 +42,11 @@
  */
 void ScopeMeasurementStaticInit()
 {
-	AddMeasurementClass(DramRefreshActivateLatencyMeasurement);
-	AddMeasurementClass(DramRowColumnLatencyMeasurement);
 	AddMeasurementClass(EyeBitRateMeasurement);
 	AddMeasurementClass(EyeHeightMeasurement);
 	AddMeasurementClass(EyeJitterMeasurement);
 	AddMeasurementClass(EyePeriodMeasurement);
 	AddMeasurementClass(EyeWidthMeasurement);
-	AddMeasurementClass(FrequencyMeasurement);
 	AddMeasurementClass(OvershootMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 	AddMeasurementClass(UndershootMeasurement);

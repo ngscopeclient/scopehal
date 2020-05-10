@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,46 +27,31 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FrequencyMeasurement
- */
-
-#include "scopemeasurements.h"
-#include "FrequencyMeasurement.h"
+#include "scopeprotocols.h"
+#include "FrequencyMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
+// Construction / destruction
 
-FrequencyMeasurement::FrequencyMeasurement()
-	: FloatMeasurement(TYPE_FREQUENCY)
+FrequencyMeasurementDecoder::FrequencyMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
+	m_yAxisUnit = Unit(Unit::UNIT_HZ);
+
+	//Set up channels
+	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
-}
 
-FrequencyMeasurement::~FrequencyMeasurement()
-{
+	m_midpoint = 0.5;
+	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-Measurement::MeasurementType FrequencyMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_HORZ;
-}
-
-string FrequencyMeasurement::GetMeasurementName()
-{
-	return "Freq";
-}
-
-bool FrequencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool FrequencyMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -74,17 +59,110 @@ bool FrequencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channe
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+// Accessors
 
-bool FrequencyMeasurement::Refresh()
+void FrequencyMeasurementDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Frequency(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+string FrequencyMeasurementDecoder::GetProtocolName()
+{
+	return "Frequency";
+}
+
+bool FrequencyMeasurementDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool FrequencyMeasurementDecoder::NeedsConfig()
+{
+	//automatic configuration
+	return false;
+}
+
+double FrequencyMeasurementDecoder::GetVoltageRange()
+{
+	return m_range;
+}
+
+double FrequencyMeasurementDecoder::GetOffset()
+{
+	return -m_midpoint;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void FrequencyMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
-		return false;
+	{
+		SetData(NULL);
+		return;
+	}
 	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
-	m_value = 1.0 / GetPeriod(din);
-	return true;
+	//We need meaningful data
+	size_t len = din->m_samples.size();
+	if(len == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Timestamps of the edges
+	vector<int64_t> edges;
+	FindZeroCrossings(din, 0, edges);
+	if(edges.size() < 2)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Create the output
+	AnalogCapture* cap = new AnalogCapture;
+
+	double rmin = FLT_MAX;
+	double rmax = 0;
+
+	for(size_t i=0; i < (edges.size()-2); i+= 2)
+	{
+		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+		int64_t start = edges[i];
+		int64_t end = edges[i+2];
+
+		double delta = 1.0e12 / (end - start);
+
+		cap->m_samples.push_back(AnalogSample(
+			start, delta, delta));
+
+		rmin = min(rmin, delta);
+		rmax = max(rmax, delta);
+	}
+
+	m_range = rmax - rmin;
+	m_midpoint = rmin + m_range/2;
+
+	//minimum scale
+	if(m_range < 0.001*m_midpoint)
+		m_range = 0.001*m_midpoint;
+
+	SetData(cap);
+
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

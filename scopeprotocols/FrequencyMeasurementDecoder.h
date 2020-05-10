@@ -30,27 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DramRefreshActivateLatencyMeasurement
+	@brief Declaration of FrequencyMeasurementDecoder
  */
-#ifndef DramRefreshActivateLatencyMeasurement_h
-#define DramRefreshActivateLatencyMeasurement_h
+#ifndef FrequencyMeasurementDecoder_h
+#define FrequencyMeasurementDecoder_h
 
-#include "../scopehal/Measurement.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-class DramRefreshActivateLatencyMeasurement : public FloatMeasurement
+class FrequencyMeasurementDecoder : public ProtocolDecoder
 {
 public:
-	DramRefreshActivateLatencyMeasurement();
-	virtual ~DramRefreshActivateLatencyMeasurement();
+	FrequencyMeasurementDecoder(std::string color);
 
-	virtual bool Refresh();
+	virtual void Refresh();
 
-	static std::string GetMeasurementName();
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual MeasurementType GetMeasurementType();
+	PROTOCOL_DECODER_INITPROC(FrequencyMeasurementDecoder)
 
-	MEASUREMENT_INITPROC(DramRefreshActivateLatencyMeasurement)
+protected:
+	double m_midpoint;
+	double m_range;
 };
 
 #endif

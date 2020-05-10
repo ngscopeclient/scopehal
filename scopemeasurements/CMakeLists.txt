@@ -2,14 +2,11 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
-	DramRefreshActivateLatencyMeasurement.cpp
-	DramRowColumnLatencyMeasurement.cpp
 	EyeBitRateMeasurement.cpp
 	EyeHeightMeasurement.cpp
 	EyeJitterMeasurement.cpp
 	EyePeriodMeasurement.cpp
 	EyeWidthMeasurement.cpp
-	FrequencyMeasurement.cpp
 	OvershootMeasurement.cpp
 	PkPkVoltageMeasurement.cpp
 	UndershootMeasurement.cpp

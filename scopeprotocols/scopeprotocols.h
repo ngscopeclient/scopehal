@@ -49,6 +49,8 @@
 #include "DCOffsetDecoder.h"
 #include "DDR3Decoder.h"
 #include "DifferenceDecoder.h"
+#include "DramRefreshActivateMeasurementDecoder.h"
+#include "DramRowColumnLatencyMeasurementDecoder.h"
 #include "DVIDecoder.h"
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
@@ -58,6 +60,7 @@
 #include "EyeDecoder2.h"
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"
+#include "FrequencyMeasurementDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "JtagDecoder.h"

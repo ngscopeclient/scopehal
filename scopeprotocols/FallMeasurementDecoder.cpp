@@ -194,9 +194,13 @@ void FallMeasurementDecoder::Refresh()
 	}
 
 	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
 	m_midpoint = (fmax + fmin) / 2;
+
+	//minimum scale
+	if(m_range < 0.001*m_midpoint)
+		m_range = 0.001*m_midpoint;
+	if(m_range < 200)
+		m_range = 200;
 
 	SetData(cap);
 

@@ -11,6 +11,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	DCOffsetDecoder.cpp
 	DDR3Decoder.cpp
 	DifferenceDecoder.cpp
+	DramRefreshActivateMeasurementDecoder.cpp
+	DramRowColumnLatencyMeasurementDecoder.cpp
 	DVIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
@@ -20,6 +22,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeDecoder2.cpp
 	FallMeasurementDecoder.cpp
 	FFTDecoder.cpp
+	FrequencyMeasurementDecoder.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp
 	JtagDecoder.cpp

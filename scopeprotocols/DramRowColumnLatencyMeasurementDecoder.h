@@ -30,102 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DramRefreshActivateLatencyMeasurement
+	@brief Declaration of DramRowColumnLatencyMeasurementDecoder
  */
+#ifndef DramRowColumnLatencyMeasurementDecoder_h
+#define DramRowColumnLatencyMeasurementDecoder_h
 
-#include "scopemeasurements.h"
-#include "DramRefreshActivateLatencyMeasurement.h"
-#include "../scopeprotocols/DDR3Decoder.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
-
-DramRefreshActivateLatencyMeasurement::DramRefreshActivateLatencyMeasurement()
-	: FloatMeasurement(TYPE_TIME)
+class DramRowColumnLatencyMeasurementDecoder : public ProtocolDecoder
 {
-	//Configure for a single input
-	m_signalNames.push_back("RAM");
-	m_channels.push_back(NULL);
-}
+public:
+	DramRowColumnLatencyMeasurementDecoder(std::string color);
 
-DramRefreshActivateLatencyMeasurement::~DramRefreshActivateLatencyMeasurement()
-{
-}
+	virtual void Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
 
-Measurement::MeasurementType DramRefreshActivateLatencyMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_PROTO;
-}
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-string DramRefreshActivateLatencyMeasurement::GetMeasurementName()
-{
-	return "DRAM Trfc";
-}
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
 
-bool DramRefreshActivateLatencyMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && (dynamic_cast<DDR3Decoder*>(channel) != NULL) )
-		return true;
-	return false;
-}
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+	PROTOCOL_DECODER_INITPROC(DramRowColumnLatencyMeasurementDecoder)
 
-bool DramRefreshActivateLatencyMeasurement::Refresh()
-{
-	m_value = INT_MAX;
+protected:
+	double m_midpoint;
+	double m_range;
+};
 
-	//TODO: for now, only report the minimum latency
-	//We really should also report average/max.
-	//This is where unification of measurements and decodes will be really helpful.
-
-	//Get the input data
-	if(m_channels[0] == NULL)
-		return false;
-	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
-
-	//Measure delay from refreshing a bank until an activation to the same bank
-	int64_t lastRef[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-	for(size_t i=0; i<din->GetDepth(); i++)
-	{
-		auto sample = din->m_samples[i];
-
-		//Discard invalid bank IDs
-		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
-			continue;
-
-		//If it's a refresh, update the last refresh time
-		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_REF)
-			lastRef[sample.m_sample.m_bank] = sample.m_offset * din->m_timescale;
-
-		//If it's an activate, measure the latency
-		else if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
-		{
-			int64_t tact = sample.m_offset * din->m_timescale;
-
-			//If the refresh command is before the start of the capture, ignore this event
-			int64_t tref= lastRef[sample.m_sample.m_bank];
-			if(tref == 0)
-				continue;
-
-			//Valid access, measure the latency
-			int64_t latency = tact - tref;
-			if(latency < m_value)
-				m_value = latency;
-		}
-	}
-
-	//convert ps to sec
-	m_value *= 1e-12f;
-
-	return true;
-}
+#endif

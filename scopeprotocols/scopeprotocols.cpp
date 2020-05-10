@@ -49,6 +49,8 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DCOffsetDecoder);
 	AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DifferenceDecoder);
+	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
+	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
 	AddDecoderClass(DVIDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
@@ -57,6 +59,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EyeDecoder2);
 	AddDecoderClass(FallMeasurementDecoder);
 	AddDecoderClass(FFTDecoder);
+	AddDecoderClass(FrequencyMeasurementDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(JtagDecoder);
