@@ -28,14 +28,14 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "RiseMeasurementDecoder.h"
+#include "FallMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-RiseMeasurementDecoder::RiseMeasurementDecoder(string color)
+FallMeasurementDecoder::FallMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	//Set up channels
@@ -44,11 +44,11 @@ RiseMeasurementDecoder::RiseMeasurementDecoder(string color)
 
 	m_startname = "Start Fraction";
 	m_parameters[m_startname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
-	m_parameters[m_startname].SetFloatVal(0.2);
+	m_parameters[m_startname].SetFloatVal(0.8);
 
 	m_endname = "End Fraction";
 	m_parameters[m_endname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
-	m_parameters[m_endname].SetFloatVal(0.8);
+	m_parameters[m_endname].SetFloatVal(0.2);
 
 	m_yAxisUnit = Unit(Unit::UNIT_PS);
 
@@ -59,7 +59,7 @@ RiseMeasurementDecoder::RiseMeasurementDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool RiseMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool FallMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -69,10 +69,10 @@ bool RiseMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* chan
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void RiseMeasurementDecoder::SetDefaultName()
+void FallMeasurementDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Rise(%s, %d, %d)",
+	snprintf(hwname, sizeof(hwname), "Fall(%s, %d, %d)",
 		m_channels[0]->m_displayname.c_str(),
 		static_cast<int>(m_parameters[m_startname].GetFloatVal() * 100),
 		static_cast<int>(m_parameters[m_endname].GetFloatVal() * 100)
@@ -81,28 +81,28 @@ void RiseMeasurementDecoder::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-string RiseMeasurementDecoder::GetProtocolName()
+string FallMeasurementDecoder::GetProtocolName()
 {
-	return "Rise";
+	return "Fall";
 }
 
-bool RiseMeasurementDecoder::IsOverlay()
+bool FallMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool RiseMeasurementDecoder::NeedsConfig()
+bool FallMeasurementDecoder::NeedsConfig()
 {
 	return true;
 }
 
-double RiseMeasurementDecoder::GetVoltageRange()
+double FallMeasurementDecoder::GetVoltageRange()
 {
 	return m_range;
 }
 
-double RiseMeasurementDecoder::GetOffset()
+double FallMeasurementDecoder::GetOffset()
 {
 	return -m_midpoint;
 }
@@ -110,7 +110,7 @@ double RiseMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void RiseMeasurementDecoder::Refresh()
+void FallMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -145,7 +145,7 @@ void RiseMeasurementDecoder::Refresh()
 	//Create the output
 	AnalogCapture* cap = new AnalogCapture;
 
-	float last = 1e20;
+	float last = -1e20;
 	double tedge = 0;
 	float fmax = -1e20;
 	float fmin =  1e20;
@@ -163,7 +163,7 @@ void RiseMeasurementDecoder::Refresh()
 		//Find start of edge
 		if(state == 0)
 		{
-			if( (cur > vstart) && (last <= vstart) )
+			if( (cur < vstart) && (last >= vstart) )
 			{
 				tedge = tnow - din->m_timescale + Measurement::InterpolateTime(din, i-1, vstart);
 				state = 1;
@@ -173,7 +173,7 @@ void RiseMeasurementDecoder::Refresh()
 		//Find end of edge
 		else if(state == 1)
 		{
-			if( (cur > vend) && (last <= vend) )
+			if( (cur < vend) && (last >= vend) )
 			{
 				double tlerp = tnow - din->m_timescale + Measurement::InterpolateTime(din, i-1, vend);
 				double dt = tlerp - tedge;

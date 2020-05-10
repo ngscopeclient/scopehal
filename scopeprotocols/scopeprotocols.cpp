@@ -55,6 +55,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EthernetGMIIDecoder);
 	//AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeDecoder2);
+	AddDecoderClass(FallMeasurementDecoder);
 	AddDecoderClass(FFTDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(I2CDecoder);

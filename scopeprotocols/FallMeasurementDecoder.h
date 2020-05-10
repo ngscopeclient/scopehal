@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,27 +30,39 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Fall1090Measurement
+	@brief Declaration of FallMeasurementDecoder
  */
-#ifndef Fall1090Measurement_h
-#define Fall1090Measurement_h
+#ifndef FallMeasurementDecoder_h
+#define FallMeasurementDecoder_h
 
-#include "../scopehal/Measurement.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-class Fall1090Measurement : public FloatMeasurement
+class FallMeasurementDecoder : public ProtocolDecoder
 {
 public:
-	Fall1090Measurement();
-	virtual ~Fall1090Measurement();
+	FallMeasurementDecoder(std::string color);
 
-	virtual bool Refresh();
+	virtual void Refresh();
 
-	static std::string GetMeasurementName();
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual MeasurementType GetMeasurementType();
+	PROTOCOL_DECODER_INITPROC(FallMeasurementDecoder)
 
-	MEASUREMENT_INITPROC(Fall1090Measurement)
+protected:
+	double m_midpoint;
+	double m_range;
+
+	std::string m_startname;
+	std::string m_endname;
 };
 
 #endif

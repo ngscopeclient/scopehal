@@ -49,8 +49,6 @@ void ScopeMeasurementStaticInit()
 	AddMeasurementClass(EyeJitterMeasurement);
 	AddMeasurementClass(EyePeriodMeasurement);
 	AddMeasurementClass(EyeWidthMeasurement);
-	AddMeasurementClass(Fall1090Measurement);
-	AddMeasurementClass(Fall2080Measurement);
 	AddMeasurementClass(FrequencyMeasurement);
 	AddMeasurementClass(OvershootMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);

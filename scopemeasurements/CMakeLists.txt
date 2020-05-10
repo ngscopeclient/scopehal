@@ -9,8 +9,6 @@ set(SCOPEMEASUREMENTS_SOURCES
 	EyeJitterMeasurement.cpp
 	EyePeriodMeasurement.cpp
 	EyeWidthMeasurement.cpp
-	Fall1090Measurement.cpp
-	Fall2080Measurement.cpp
 	FrequencyMeasurement.cpp
 	OvershootMeasurement.cpp
 	PkPkVoltageMeasurement.cpp
