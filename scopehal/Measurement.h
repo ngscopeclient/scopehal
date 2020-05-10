@@ -96,18 +96,18 @@ public:
 	static void EnumMeasurements(std::vector<std::string>& names);
 	static Measurement* CreateMeasurement(std::string measurement);
 
-protected:
+public:
 	//Helpers for more complex measurements
 	//TODO: create some process for caching this so we don't waste CPU time
-	float GetMinVoltage(AnalogCapture* cap);
-	float GetMaxVoltage(AnalogCapture* cap);
-	float GetBaseVoltage(AnalogCapture* cap);
-	float GetTopVoltage(AnalogCapture* cap);
-	float GetAvgVoltage(AnalogCapture* cap);
-	float GetPeriod(AnalogCapture* cap);
-	float GetRiseTime(AnalogCapture* cap, float low, float high);
-	float GetFallTime(AnalogCapture* cap, float low, float high);
-	std::vector<size_t> MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins);
+	static float GetMinVoltage(AnalogCapture* cap);
+	static float GetMaxVoltage(AnalogCapture* cap);
+	static float GetBaseVoltage(AnalogCapture* cap);
+	static float GetTopVoltage(AnalogCapture* cap);
+	static float GetAvgVoltage(AnalogCapture* cap);
+	static float GetPeriod(AnalogCapture* cap);
+	static float GetRiseTime(AnalogCapture* cap, float low, float high);
+	static float GetFallTime(AnalogCapture* cap, float low, float high);
+	static std::vector<size_t> MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins);
 
 protected:
 	//Class enumeration

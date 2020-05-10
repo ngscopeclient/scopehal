@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,63 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of BaseMeasurement
+	@brief Declaration of BaseMeasurementDecoder
  */
+#ifndef BaseMeasurementDecoder_h
+#define BaseMeasurementDecoder_h
 
-#include "scopemeasurements.h"
-#include "BaseMeasurement.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
-
-BaseMeasurement::BaseMeasurement()
-	: FloatMeasurement(TYPE_VOLTAGE)
+class BaseMeasurementDecoder : public ProtocolDecoder
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
-	m_channels.push_back(NULL);
-}
+public:
+	BaseMeasurementDecoder(std::string color);
 
-BaseMeasurement::~BaseMeasurement()
-{
-}
+	virtual void Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
 
-Measurement::MeasurementType BaseMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_VERT;
-}
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-string BaseMeasurement::GetMeasurementName()
-{
-	return "Base";
-}
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
 
-bool BaseMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	return false;
-}
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+	PROTOCOL_DECODER_INITPROC(BaseMeasurementDecoder)
 
-bool BaseMeasurement::Refresh()
-{
-	m_value = FLT_MAX;
+protected:
+	double m_midpoint;
+	double m_range;
+};
 
-	//Get the input data
-	if(m_channels[0] == NULL)
-		return false;
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
-
-	m_value = GetBaseVoltage(din);
-	return true;
-}
+#endif

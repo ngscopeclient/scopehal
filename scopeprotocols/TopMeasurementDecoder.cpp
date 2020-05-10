@@ -28,30 +28,28 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "PeriodMeasurementDecoder.h"
+#include "TopMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PeriodMeasurementDecoder::PeriodMeasurementDecoder(string color)
+TopMeasurementDecoder::TopMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
-
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
 
-	m_midpoint = 0.5;
+	m_midpoint = 0;
 	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool TopMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -61,37 +59,37 @@ bool PeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* ch
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void PeriodMeasurementDecoder::SetDefaultName()
+void TopMeasurementDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Period(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "Top(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string PeriodMeasurementDecoder::GetProtocolName()
+string TopMeasurementDecoder::GetProtocolName()
 {
-	return "Period";
+	return "Top";
 }
 
-bool PeriodMeasurementDecoder::IsOverlay()
+bool TopMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool PeriodMeasurementDecoder::NeedsConfig()
+bool TopMeasurementDecoder::NeedsConfig()
 {
 	//automatic configuration
 	return false;
 }
 
-double PeriodMeasurementDecoder::GetVoltageRange()
+double TopMeasurementDecoder::GetVoltageRange()
 {
 	return m_range;
 }
 
-double PeriodMeasurementDecoder::GetOffset()
+double TopMeasurementDecoder::GetOffset()
 {
 	return -m_midpoint;
 }
@@ -99,7 +97,7 @@ double PeriodMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void PeriodMeasurementDecoder::Refresh()
+void TopMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -122,37 +120,80 @@ void PeriodMeasurementDecoder::Refresh()
 		return;
 	}
 
-	//Timestamps of the edges
-	vector<int64_t> edges;
-	FindZeroCrossings(din, 0, edges);
-	if(edges.size() < 2)
+	//Make a histogram of the waveform
+	float min = Measurement::GetMinVoltage(din);
+	float max = Measurement::GetMaxVoltage(din);
+	size_t nbins = 64;
+	vector<size_t> hist = Measurement::MakeHistogram(din, min, max, nbins);
+
+	//Set temporary midpoint and range
+	m_range = (max - min);
+	m_midpoint = m_range/2 + min;
+
+	//Find the highest peak in the last quarter of the histogram
+	//This is the peak for the entire waveform
+	size_t binval = 0;
+	size_t idx = 0;
+	for(size_t i=(nbins*3/4); i<nbins; i++)
 	{
-		SetData(NULL);
-		return;
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
 	}
+	float fbin = (idx + 0.5f)/nbins;
+	float global_top = fbin*m_range + min;
 
 	//Create the output
 	AnalogCapture* cap = new AnalogCapture;
 
-	double rmin = FLT_MAX;
-	double rmax = 0;
+	float last = min;
+	int64_t tedge = 0;
+	float sum = 0;
+	int64_t count = 0;
+	float delta = m_range * 0.1;
 
-	for(size_t i=0; i < (edges.size()-2); i+= 2)
+	float fmax = -99999;
+	float fmin =  99999;
+
+	for(size_t i=0; i < din->m_samples.size(); i++)
 	{
-		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
+		//Wait for a falling edge
+		float cur = din->m_samples[i];
+		int64_t tnow = din->m_samples[i].m_offset * din->m_timescale;
 
-		double delta = end - start;
-		cap->m_samples.push_back(AnalogSample(
-			start, delta, delta));
+		if( (cur > m_midpoint) && (last <= m_midpoint) )
+		{
+			//Done, add the sample
+			if(count != 0)
+			{
+				float vavg = sum/count;
+				if(vavg > fmax)
+					fmax = vavg;
+				if(vavg < fmin)
+					fmin = vavg;
 
-		rmin = min(rmin, delta);
-		rmax = max(rmax, delta);
+				cap->m_samples.push_back(AnalogSample(tedge, tnow-tedge, vavg));
+			}
+			tedge = tnow;
+		}
+
+		//If the value is fairly close to the calculated top, average it
+		//TODO: discard samples on the rising/falling edges as this will skew the results
+		if(fabs(cur - global_top) < delta)
+		{
+			count ++;
+			sum += cur;
+		}
+
+		last = cur;
 	}
 
-	m_range = rmax - rmin;
-	m_midpoint = rmin + m_range/2;
+	m_range = fmax - fmin;
+	if(m_range < 0.025)
+		m_range = 0.025;
+	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap);
 

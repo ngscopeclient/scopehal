@@ -3,6 +3,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleDecoder.cpp
+	BaseMeasurementDecoder.cpp
 	CANDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
@@ -28,6 +29,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	TMDSDecoder.cpp
+	TopMeasurementDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
 	USB2ActivityDecoder.cpp

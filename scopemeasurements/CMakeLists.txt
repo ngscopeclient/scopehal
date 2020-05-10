@@ -2,7 +2,6 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
-	BaseMeasurement.cpp
 	DramRefreshActivateLatencyMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
 	EyeBitRateMeasurement.cpp
@@ -17,7 +16,6 @@ set(SCOPEMEASUREMENTS_SOURCES
 	PkPkVoltageMeasurement.cpp
 	Rise1090Measurement.cpp
 	Rise2080Measurement.cpp
-	TopMeasurement.cpp
 	UndershootMeasurement.cpp
 
 	scopemeasurements.cpp

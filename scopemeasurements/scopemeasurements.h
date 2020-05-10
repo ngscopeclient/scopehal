@@ -39,7 +39,6 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/Measurement.h"
 
-#include "BaseMeasurement.h"
 #include "DramRefreshActivateLatencyMeasurement.h"
 #include "DramRowColumnLatencyMeasurement.h"
 #include "EyeBitRateMeasurement.h"
@@ -54,7 +53,6 @@
 #include "PkPkVoltageMeasurement.h"
 #include "Rise1090Measurement.h"
 #include "Rise2080Measurement.h"
-#include "TopMeasurement.h"
 #include "UndershootMeasurement.h"
 
 void ScopeMeasurementStaticInit();

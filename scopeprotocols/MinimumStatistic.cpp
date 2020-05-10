@@ -49,7 +49,7 @@ bool MinimumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 		return false;
 
 	//Starting value is previous minimum, if we have one
-	value = FLT_MAX;
+	value = 999999;
 	if(m_pastMinimums.find(channel) != m_pastMinimums.end())
 		value = m_pastMinimums[channel];
 

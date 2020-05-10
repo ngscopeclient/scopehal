@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,46 +27,29 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of TopMeasurement
- */
-
-#include "scopemeasurements.h"
-#include "TopMeasurement.h"
+#include "scopeprotocols.h"
+#include "BaseMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
+// Construction / destruction
 
-TopMeasurement::TopMeasurement()
-	: FloatMeasurement(TYPE_VOLTAGE)
+BaseMeasurementDecoder::BaseMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
+	//Set up channels
+	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
-}
 
-TopMeasurement::~TopMeasurement()
-{
+	m_midpoint = 0;
+	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-Measurement::MeasurementType TopMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_VERT;
-}
-
-string TopMeasurement::GetMeasurementName()
-{
-	return "Top";
-}
-
-bool TopMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool BaseMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -74,19 +57,148 @@ bool TopMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+// Accessors
 
-bool TopMeasurement::Refresh()
+void BaseMeasurementDecoder::SetDefaultName()
 {
-	m_value = FLT_MAX;
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Base(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
+string BaseMeasurementDecoder::GetProtocolName()
+{
+	return "Base";
+}
+
+bool BaseMeasurementDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool BaseMeasurementDecoder::NeedsConfig()
+{
+	//automatic configuration
+	return false;
+}
+
+double BaseMeasurementDecoder::GetVoltageRange()
+{
+	return m_range;
+}
+
+double BaseMeasurementDecoder::GetOffset()
+{
+	return -m_midpoint;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void BaseMeasurementDecoder::Refresh()
+{
 	//Get the input data
 	if(m_channels[0] == NULL)
-		return false;
+	{
+		SetData(NULL);
+		return;
+	}
 	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
-	m_value = GetTopVoltage(din);
-	return true;
+	//We need meaningful data
+	size_t len = din->m_samples.size();
+	if(len == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Make a histogram of the waveform
+	float min = Measurement::GetMinVoltage(din);
+	float max = Measurement::GetMaxVoltage(din);
+	size_t nbins = 64;
+	vector<size_t> hist = Measurement::MakeHistogram(din, min, max, nbins);
+
+	//Set temporary midpoint and range
+	m_range = (max - min);
+	m_midpoint = m_range/2 + min;
+
+	//Find the highest peak in the first quarter of the histogram
+	//This is the base for the entire waveform
+	size_t binval = 0;
+	size_t idx = 0;
+	for(size_t i=0; i<(nbins/4); i++)
+	{
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
+	}
+	float fbin = (idx + 0.5f)/nbins;
+	float global_base = fbin*m_range + min;
+
+	//Create the output
+	AnalogCapture* cap = new AnalogCapture;
+
+	float last = min;
+	int64_t tedge = 0;
+	float sum = 0;
+	int64_t count = 0;
+	float delta = m_range * 0.1;
+
+	float fmax = -99999;
+	float fmin =  99999;
+
+	for(size_t i=0; i < din->m_samples.size(); i++)
+	{
+		//Wait for a falling edge
+		float cur = din->m_samples[i];
+		int64_t tnow = din->m_samples[i].m_offset * din->m_timescale;
+
+		if( (cur < m_midpoint) && (last >= m_midpoint) )
+		{
+			//Done, add the sample
+			if(count != 0)
+			{
+				float vavg = sum/count;
+				if(vavg > fmax)
+					fmax = vavg;
+				if(vavg < fmin)
+					fmin = vavg;
+
+				cap->m_samples.push_back(AnalogSample(tedge, tnow-tedge, vavg));
+			}
+			tedge = tnow;
+		}
+
+		//If the value is fairly close to the calculated base, average it
+		//TODO: discard samples on the rising/falling edges as this will skew the results
+		if(fabs(cur - global_base) < delta)
+		{
+			count ++;
+			sum += cur;
+		}
+
+		last = cur;
+	}
+
+	m_range = fmax - fmin;
+	if(m_range < 0.025)
+		m_range = 0.025;
+	m_midpoint = (fmax + fmin) / 2;
+
+	SetData(cap);
+
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

@@ -41,6 +41,7 @@
 //#include "../scopehal/StateDecoder.h"
 
 #include "ACCoupleDecoder.h"
+#include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
@@ -66,6 +67,7 @@
 #include "SincInterpolationDecoder.h"
 #include "ThresholdDecoder.h"
 #include "TMDSDecoder.h"
+#include "TopMeasurementDecoder.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
 #include "USB2ActivityDecoder.h"
