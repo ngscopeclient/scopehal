@@ -63,6 +63,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MovingAverageDecoder);
 	AddDecoderClass(ParallelBusDecoder);
 	AddDecoderClass(PeriodMeasurementDecoder);
+	AddDecoderClass(RiseMeasurementDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(ThresholdDecoder);
 	AddDecoderClass(TMDSDecoder);

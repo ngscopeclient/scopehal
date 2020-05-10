@@ -26,6 +26,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MovingAverageDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
+	RiseMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	ThresholdDecoder.cpp
 	TMDSDecoder.cpp

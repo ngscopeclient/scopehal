@@ -14,8 +14,6 @@ set(SCOPEMEASUREMENTS_SOURCES
 	FrequencyMeasurement.cpp
 	OvershootMeasurement.cpp
 	PkPkVoltageMeasurement.cpp
-	Rise1090Measurement.cpp
-	Rise2080Measurement.cpp
 	UndershootMeasurement.cpp
 
 	scopemeasurements.cpp

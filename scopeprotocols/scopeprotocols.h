@@ -64,6 +64,7 @@
 #include "MovingAverageDecoder.h"
 #include "ParallelBusDecoder.h"
 #include "PeriodMeasurementDecoder.h"
+#include "RiseMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "ThresholdDecoder.h"
 #include "TMDSDecoder.h"

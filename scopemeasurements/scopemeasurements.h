@@ -51,8 +51,6 @@
 #include "FrequencyMeasurement.h"
 #include "OvershootMeasurement.h"
 #include "PkPkVoltageMeasurement.h"
-#include "Rise1090Measurement.h"
-#include "Rise2080Measurement.h"
 #include "UndershootMeasurement.h"
 
 void ScopeMeasurementStaticInit();
