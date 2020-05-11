@@ -27,111 +27,138 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EyeDecoder2
- */
+#include "scopeprotocols.h"
+#include "HorizontalBathtubDecoder.h"
 
-#include "../scopehal/ProtocolDecoder.h"
-#include "../scopehal/CaptureChannel.h"
+using namespace std;
 
-class EyeCapture2 : public CaptureChannelBase
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+HorizontalBathtubDecoder::HorizontalBathtubDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
-public:
-	EyeCapture2(size_t width, size_t height, float center);
-	virtual ~EyeCapture2();
+	m_yAxisUnit = Unit(Unit::UNIT_COUNTS);
 
-	float* GetData()
-	{ return m_outdata; }
+	//Set up channels
+	m_signalNames.push_back("din");
+	m_channels.push_back(NULL);
 
-	int64_t* GetAccumData()
-	{ return m_accumdata; }
+	m_midpoint = 0.5;
+	m_range = 1;
 
-	void Normalize();
+	m_voltageName = "Voltage";
+	m_parameters[m_voltageName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_voltageName].SetFloatVal(0);
+}
 
-	size_t GetTotalUIs()
-	{ return m_totalUIs; }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	float GetCenterVoltage()
-	{ return m_centerVoltage; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
-
-	float m_uiWidth;
-
-protected:
-	size_t m_width;
-	size_t m_height;
-
-	float* m_outdata;
-	int64_t* m_accumdata;
-
-	size_t m_totalUIs;
-	float m_centerVoltage;
-
-public:
-	//Not really applicable for eye patterns, but...
-	virtual size_t GetDepth() const;
-	virtual int64_t GetEndTime() const;
-	virtual int64_t GetSampleStart(size_t i) const;
-	virtual int64_t GetSampleLen(size_t i) const;
-	virtual bool EqualityTest(size_t i, size_t j) const;
-	virtual bool SamplesAdjacent(size_t i, size_t j) const;
-};
-
-class EyeDecoder2 : public ProtocolDecoder
+bool HorizontalBathtubDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-public:
-	EyeDecoder2(std::string color);
+	if( (i == 0) && (dynamic_cast<EyeDecoder2*>(channel) != NULL) )
+		return true;
+	return false;
+}
 
-	virtual void Refresh();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+void HorizontalBathtubDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "HBathtub(%s, %.2f)",
+		m_channels[0]->m_displayname.c_str(),
+		m_parameters[m_voltageName].GetFloatVal()
+		);
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+string HorizontalBathtubDecoder::GetProtocolName()
+{
+	return "Horz Bathtub";
+}
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+bool HorizontalBathtubDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
 
-	virtual double GetVoltageRange();
+bool HorizontalBathtubDecoder::NeedsConfig()
+{
+	return true;
+}
 
-	//TODO: this should be a property of the capture, not the decode
-	int64_t GetUIWidth()
-	{ return m_uiWidth; }
+double HorizontalBathtubDecoder::GetVoltageRange()
+{
+	return m_range;
+}
 
-	void SetWidth(size_t width)
+double HorizontalBathtubDecoder::GetOffset()
+{
+	return -m_midpoint;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void HorizontalBathtubDecoder::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
 	{
-		m_width = width;
 		SetData(NULL);
+		return;
+	}
+	EyeCapture2* din = dynamic_cast<EyeCapture2*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
 	}
 
-	void SetHeight(size_t height)
+	float threshold = m_parameters[m_voltageName].GetFloatVal();
+
+	//Find the eye bin for this height
+	float yscale = din->GetHeight() / m_channels[0]->GetVoltageRange();
+	float ymid = din->GetHeight()/2;
+	float center = din->GetCenterVoltage();
+
+	//Sanity check we're not off the eye
+	size_t ybin = round( (threshold-center)*yscale + ymid);
+	if(ybin >= din->GetHeight())
+		return;
+
+	//Horizontal scale: one eye is two UIs wide
+	double ps_per_width = 2*din->m_uiWidth;
+	double ps_per_pixel = ps_per_width / din->GetWidth();
+
+	//Create the output
+	AnalogCapture* cap = new AnalogCapture;
+
+	//Extract the single scanline we're interested in
+	int64_t* row = din->GetAccumData() + ybin*din->GetWidth();
+	m_range = 0;
+	for(size_t i=0; i<din->GetWidth(); i++)
 	{
-		m_height = height;
-		SetData(NULL);
+		int64_t sample = row[i];
+		if(sample > m_range)
+			m_range = sample;
+
+		cap->m_samples.push_back(AnalogSample(i*ps_per_pixel - din->m_uiWidth, ps_per_pixel, sample));
 	}
 
-	size_t GetWidth()
-	{ return m_width; }
+	//Scale so we don't quite touch the edges of the plot
+	m_range *= 1.05;
+	m_midpoint = m_range/2;
 
-	size_t GetHeight()
-	{ return m_height; }
+	SetData(cap);
 
-	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
-
-protected:
-
-	size_t m_width;
-	size_t m_height;
-
-	size_t m_uiWidth;
-};
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+}

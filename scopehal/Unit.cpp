@@ -134,6 +134,11 @@ string Unit::PrettyPrint(double value)
 			scale = "";
 			value_rescaled = value;
 			break;
+		case UNIT_COUNTS:
+			unit = "";
+			scale = "";
+			value_rescaled = value;	//TODO: scientific notation flag?
+			break;
 
 		default:
 			return "Invalid unit";

@@ -23,6 +23,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FallMeasurementDecoder.cpp
 	FFTDecoder.cpp
 	FrequencyMeasurementDecoder.cpp
+	HorizontalBathtubDecoder.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp
 	JtagDecoder.cpp

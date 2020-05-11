@@ -30,67 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeDecoder2
+	@brief Declaration of HorizontalBathtubDecoder
  */
+#ifndef HorizontalBathtubDecoder_h
+#define HorizontalBathtubDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
-#include "../scopehal/CaptureChannel.h"
 
-class EyeCapture2 : public CaptureChannelBase
+class HorizontalBathtubDecoder : public ProtocolDecoder
 {
 public:
-	EyeCapture2(size_t width, size_t height, float center);
-	virtual ~EyeCapture2();
-
-	float* GetData()
-	{ return m_outdata; }
-
-	int64_t* GetAccumData()
-	{ return m_accumdata; }
-
-	void Normalize();
-
-	size_t GetTotalUIs()
-	{ return m_totalUIs; }
-
-	float GetCenterVoltage()
-	{ return m_centerVoltage; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
-
-	float m_uiWidth;
-
-protected:
-	size_t m_width;
-	size_t m_height;
-
-	float* m_outdata;
-	int64_t* m_accumdata;
-
-	size_t m_totalUIs;
-	float m_centerVoltage;
-
-public:
-	//Not really applicable for eye patterns, but...
-	virtual size_t GetDepth() const;
-	virtual int64_t GetEndTime() const;
-	virtual int64_t GetSampleStart(size_t i) const;
-	virtual int64_t GetSampleLen(size_t i) const;
-	virtual bool EqualityTest(size_t i, size_t j) const;
-	virtual bool SamplesAdjacent(size_t i, size_t j) const;
-};
-
-class EyeDecoder2 : public ProtocolDecoder
-{
-public:
-	EyeDecoder2(std::string color);
+	HorizontalBathtubDecoder(std::string color);
 
 	virtual void Refresh();
 
@@ -100,38 +50,18 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual double GetVoltageRange();
-
-	//TODO: this should be a property of the capture, not the decode
-	int64_t GetUIWidth()
-	{ return m_uiWidth; }
-
-	void SetWidth(size_t width)
-	{
-		m_width = width;
-		SetData(NULL);
-	}
-
-	void SetHeight(size_t height)
-	{
-		m_height = height;
-		SetData(NULL);
-	}
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
+	PROTOCOL_DECODER_INITPROC(HorizontalBathtubDecoder)
 
 protected:
+	std::string m_voltageName;
 
-	size_t m_width;
-	size_t m_height;
-
-	size_t m_uiWidth;
+	double m_midpoint;
+	double m_range;
 };
+
+#endif

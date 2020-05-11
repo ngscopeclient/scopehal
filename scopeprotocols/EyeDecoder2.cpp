@@ -36,9 +36,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeCapture2::EyeCapture2(size_t width, size_t height)
+EyeCapture2::EyeCapture2(size_t width, size_t height, float center)
 	: m_width(width)
 	, m_height(height)
+	, m_totalUIs(0)
+	, m_centerVoltage(center)
 {
 	size_t npix = width*height;
 	m_accumdata = new int64_t[npix];
@@ -48,6 +50,8 @@ EyeCapture2::EyeCapture2(size_t width, size_t height)
 		m_outdata[i] = 0;
 		m_accumdata[i] = 0;
 	}
+
+	m_uiWidth = 1;
 }
 
 EyeCapture2::~EyeCapture2()
@@ -377,9 +381,12 @@ void EyeDecoder2::Refresh()
 	//TODO: timestamps? do we need those?
 	EyeCapture2* cap = dynamic_cast<EyeCapture2*>(m_data);
 	if(cap == NULL)
-		cap = new EyeCapture2(m_width, m_height);
+		cap = new EyeCapture2(m_width, m_height, 0);	//TODO: make center configurable (scopehal:#1)
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
+
+	//Midpoint of the eye voltage
+	double center = cap->GetCenterVoltage();
 
 	//Process the eye
 	size_t iclock = 0;
@@ -416,7 +423,7 @@ void EyeDecoder2::Refresh()
 		//LogDebug("offset = %ld, twidth = %ld\n",offset, twidth);
 
 		//Find (and sanity check) the Y coordinate
-		size_t pixel_y = round( (samp.m_sample * yscale) + ymid );
+		size_t pixel_y = round( ((samp.m_sample - center) * yscale) + ymid );
 		if(pixel_y >= m_height)
 			continue;
 		int64_t* row = data + pixel_y*m_width;
@@ -441,6 +448,10 @@ void EyeDecoder2::Refresh()
 		}
 	}
 	m_uiWidth = round(awidth / nwidth);
+	cap->m_uiWidth = m_uiWidth;
+
+	//Count total number of UIs we've integrated
+	cap->IntegrateUIs(clock->GetDepth());
 
 	cap->Normalize();
 	SetData(cap);

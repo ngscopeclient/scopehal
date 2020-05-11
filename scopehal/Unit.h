@@ -53,7 +53,8 @@ public:
 		UNIT_OHMS,		//Resistance
 		UNIT_BITRATE,	//Bits per second
 		UNIT_PERCENT,	//Dimensionless ratio
-		UNIT_DB			//Dimensionless ratio
+		UNIT_DB,		//Dimensionless ratio
+		UNIT_COUNTS		//Dimensionless ratio (histogram)
 
 		//TODO: more here
 	};

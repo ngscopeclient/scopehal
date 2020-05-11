@@ -61,6 +61,7 @@
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"
 #include "FrequencyMeasurementDecoder.h"
+#include "HorizontalBathtubDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "JtagDecoder.h"
