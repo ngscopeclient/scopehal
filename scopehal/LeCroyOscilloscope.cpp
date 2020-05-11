@@ -400,13 +400,16 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
+	//Early-out if status is in cache
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+			return m_channelsEnabled[i];
+	}
+
 	//Need to lock the main mutex first to prevent deadlocks
 	lock_guard<recursive_mutex> lock(m_mutex);
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-
-	//Check cache
-	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-		return m_channelsEnabled[i];
 
 	//Analog
 	if(i < m_analogChannelCount)
