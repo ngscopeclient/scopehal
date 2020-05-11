@@ -41,6 +41,8 @@ ClockRecoveryDebugDecoder::ClockRecoveryDebugDecoder(string color)
 	//Set up channels
 	m_signalNames.push_back("PLL");
 	m_channels.push_back(NULL);
+
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
