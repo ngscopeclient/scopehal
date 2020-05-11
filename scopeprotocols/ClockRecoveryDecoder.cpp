@@ -57,6 +57,15 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_nominalPeriod = 0;
 }
 
+ClockRecoveryDecoder::~ClockRecoveryDecoder()
+{
+	if(m_phaseErrorCapture)
+	{
+		delete m_phaseErrorCapture;
+		m_phaseErrorCapture = NULL;
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
@@ -146,7 +155,7 @@ void ClockRecoveryDecoder::Refresh()
 
 	//Create debug capture
 	if(m_phaseErrorCapture != NULL)
-		m_phaseErrorCapture = NULL;
+		delete m_phaseErrorCapture;
 	m_phaseErrorCapture = new AnalogCapture;
 	m_phaseErrorCapture->m_startTimestamp = din->m_startTimestamp;
 	m_phaseErrorCapture->m_startPicoseconds = din->m_startPicoseconds;

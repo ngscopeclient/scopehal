@@ -41,6 +41,7 @@ class ClockRecoveryDecoder : public ProtocolDecoder
 {
 public:
 	ClockRecoveryDecoder(std::string color);
+	virtual ~ClockRecoveryDecoder();
 
 	virtual void Refresh();
 
