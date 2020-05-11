@@ -404,12 +404,13 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 
+	//Check cache
+	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+		return m_channelsEnabled[i];
+
 	//Analog
 	if(i < m_analogChannelCount)
 	{
-		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-			return m_channelsEnabled[i];
-
 		//See if the channel is enabled, hide it if not
 		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
 		m_transport->SendCommand(cmd);
