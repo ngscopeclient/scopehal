@@ -38,14 +38,11 @@ using namespace std;
 HorizontalBathtubDecoder::HorizontalBathtubDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_COUNTS);
+	m_yAxisUnit = Unit(Unit::UNIT_LOG_BER);
 
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
-
-	m_midpoint = 0.5;
-	m_range = 1;
 
 	m_voltageName = "Voltage";
 	m_parameters[m_voltageName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
@@ -94,12 +91,14 @@ bool HorizontalBathtubDecoder::NeedsConfig()
 
 double HorizontalBathtubDecoder::GetVoltageRange()
 {
-	return m_range;
+	//1e12 total height
+	return 12;
 }
 
 double HorizontalBathtubDecoder::GetOffset()
 {
-	return -m_midpoint;
+	//1e-6 is the midpoint
+	return 6;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,20 +139,52 @@ void HorizontalBathtubDecoder::Refresh()
 	AnalogCapture* cap = new AnalogCapture;
 
 	//Extract the single scanline we're interested in
+	//TODO: support a range of voltages
 	int64_t* row = din->GetAccumData() + ybin*din->GetWidth();
-	m_range = 0;
+	float nmax = 0;
 	for(size_t i=0; i<din->GetWidth(); i++)
 	{
 		int64_t sample = row[i];
-		if(sample > m_range)
-			m_range = sample;
+		if(sample > nmax)
+			nmax = sample;
 
 		cap->m_samples.push_back(AnalogSample(i*ps_per_pixel - din->m_uiWidth, ps_per_pixel, sample));
 	}
 
-	//Scale so we don't quite touch the edges of the plot
-	m_range *= 1.05;
-	m_midpoint = m_range/2;
+	//Normalize to max amplitude
+	for(size_t i=0; i<cap->m_samples.size(); i++)
+		cap->m_samples[i].m_sample /= nmax;
+
+	//Move from the center out and persist the max BER
+	float maxleft = 0;
+	float maxright = 0;
+	ssize_t mid = cap->m_samples.size()/2;
+	for(ssize_t i=mid; i>=0; i--)
+	{
+		float& samp = cap->m_samples[i].m_sample;
+		if(samp > maxleft)
+			maxleft = samp;
+		else
+			samp = maxleft;
+	}
+	for(size_t i=mid; i<cap->m_samples.size(); i++)
+	{
+		float& samp = cap->m_samples[i].m_sample;
+		if(samp > maxright)
+			maxright = samp;
+		else
+			samp = maxright;
+	}
+
+	//Log post-scaling
+	for(size_t i=0; i<cap->m_samples.size(); i++)
+	{
+		float& samp = cap->m_samples[i].m_sample;
+		if(samp < 1e-12)
+			samp = -14;	//cap ber if we don't have enough data
+		else
+			samp = log10(samp);
+	}
 
 	SetData(cap);
 

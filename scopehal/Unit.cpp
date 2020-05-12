@@ -139,12 +139,20 @@ string Unit::PrettyPrint(double value)
 			scale = "";
 			value_rescaled = value;	//TODO: scientific notation flag?
 			break;
+		case UNIT_LOG_BER:
+			unit = "";
+			scale = "";
+			value_rescaled = value;
+			break;
 
 		default:
 			return "Invalid unit";
 	}
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+	if(m_type == UNIT_LOG_BER)		//special formatting for BER since it's already logarithmic
+		snprintf(tmp, sizeof(tmp), "1e%.0f", value);
+	else
+		snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
 	return string(tmp);
 }

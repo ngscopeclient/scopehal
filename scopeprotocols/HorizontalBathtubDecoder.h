@@ -59,9 +59,6 @@ public:
 
 protected:
 	std::string m_voltageName;
-
-	double m_midpoint;
-	double m_range;
 };
 
 #endif

@@ -54,7 +54,8 @@ public:
 		UNIT_BITRATE,	//Bits per second
 		UNIT_PERCENT,	//Dimensionless ratio
 		UNIT_DB,		//Dimensionless ratio
-		UNIT_COUNTS		//Dimensionless ratio (histogram)
+		UNIT_COUNTS,	//Dimensionless ratio (histogram)
+		UNIT_LOG_BER	//Dimensionless ratio (log scale)
 
 		//TODO: more here
 	};
