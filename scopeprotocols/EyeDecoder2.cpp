@@ -369,14 +369,16 @@ void EyeDecoder2::Refresh()
 	double awidth = 0;
 	int64_t nwidth = 0;
 	float yscale = m_height / m_channels[0]->GetVoltageRange();
+	int64_t hwidth = m_width / 2;
 	float fwidth = m_width / 2.0f;
 	float ymid = m_height / 2;
+	float yoff = -center*yscale + ymid;
 	for(size_t i=0; i<waveform->m_samples.size()-1; i++)
 	{
 		auto& samp = waveform->m_samples[i];
 		auto& nsamp = waveform->m_samples[i+1];
 
-		//Stop when we get to the end
+		//Stop when we get to the end of the clock
 		if(iclock + 1 >= clock->GetDepth())
 			break;
 
@@ -387,11 +389,9 @@ void EyeDecoder2::Refresh()
 		awidth += twidth;
 		nwidth ++;
 
-		//Find time of this sample
-		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t tnext = nsamp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
-
+		//Find time of this sample.
 		//If it's past the end of the current UI, increment the clock
+		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
 		int64_t offset = tstart - tclock;
 		if(offset < 0)
 			continue;
@@ -410,27 +410,26 @@ void EyeDecoder2::Refresh()
 			continue;
 
 		//Interpolate voltage
+		int64_t dt = (nsamp.m_offset - samp.m_offset) * waveform->m_timescale;
 		float scale = fwidth / twidth;
 		float pixel_x_f = offset * scale;
-		float sample_dx_pix = (tnext-tstart)*scale;
 		float pixel_x_fround = floor(pixel_x_f);
-		float pixel_x_frac = pixel_x_f - pixel_x_fround;
-		float dx_frac = pixel_x_frac / sample_dx_pix;
-		int64_t pixel_x_round = pixel_x_fround + m_width/2;
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * scale );
+		int64_t pixel_x_round = pixel_x_fround + hwidth;
 
 		float dv = nsamp.m_sample - samp.m_sample;
 		float nominal_voltage = samp.m_sample + dv*dx_frac;
 
 		//Find (and sanity check) the Y coordinate
-		float nominal_pixel_y = ((nominal_voltage - center) * yscale) + ymid;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
 		size_t y1 = floor(nominal_pixel_y);
 		if((y1+1) >= m_height)
 			continue;
 
 		//Calculate how much of the pixel's intensity to put in each row
 		float yfrac = nominal_pixel_y - y1;
-		int bin2 = yfrac*100;
-		int bin1 = 100-bin2;
+		int bin2 = yfrac*64;
+		int bin1 = 64-bin2;
 		int64_t* row1 = data + y1*m_width;
 		int64_t* row2 = row1 + m_width;
 
