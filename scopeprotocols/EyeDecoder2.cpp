@@ -106,30 +106,6 @@ void EyeCapture2::Normalize()
 
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = m_accumdata[i] * norm;
-
-	//Once the output is normalized, check for any rows with no bin hits due to roundoff and interpolate into them.
-	for(size_t y=1; y+1 < m_height; y++)
-	{
-		bool empty = true;
-		for(size_t x=0; x<m_width; x++)
-		{
-			if(m_accumdata[y*m_width + x])
-			{
-				empty = false;
-				break;
-			}
-		}
-
-		if(empty)
-		{
-			for(size_t x=0; x<m_width; x++)
-			{
-				float out1 = m_outdata[(y-1)*m_width + x];
-				float out2 = m_outdata[(y+1)*m_width + x];
-				m_outdata[y*m_width + x] = (out1 + out2) / 2;
-			}
-		}
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,8 +371,11 @@ void EyeDecoder2::Refresh()
 	float yscale = m_height / m_channels[0]->GetVoltageRange();
 	float fwidth = m_width / 2.0f;
 	float ymid = m_height / 2;
-	for(auto& samp : waveform->m_samples)
+	for(size_t i=0; i<waveform->m_samples.size()-1; i++)
 	{
+		auto& samp = waveform->m_samples[i];
+		auto& nsamp = waveform->m_samples[i+1];
+
 		//Stop when we get to the end
 		if(iclock + 1 >= clock->GetDepth())
 			break;
@@ -410,6 +389,7 @@ void EyeDecoder2::Refresh()
 
 		//Find time of this sample
 		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
+		int64_t tnext = nsamp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
 
 		//If it's past the end of the current UI, increment the clock
 		int64_t offset = tstart - tclock;
@@ -420,13 +400,6 @@ void EyeDecoder2::Refresh()
 			iclock ++;
 			offset -= twidth;
 		}
-		//LogDebug("offset = %ld, twidth = %ld\n",offset, twidth);
-
-		//Find (and sanity check) the Y coordinate
-		size_t pixel_y = round( ((samp.m_sample - center) * yscale) + ymid );
-		if(pixel_y >= m_height)
-			continue;
-		int64_t* row = data + pixel_y*m_width;
 
 		//Sampling clock is the middle of the UI, not the start.
 		//Anything more than half a UI right of the clock is negative.
@@ -436,15 +409,42 @@ void EyeDecoder2::Refresh()
 		if(offset < -halfwidth)
 			continue;
 
+		//Interpolate voltage
+		float scale = fwidth / twidth;
+		float pixel_x_f = offset * scale;
+		float sample_dx_pix = (tnext-tstart)*scale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float pixel_x_frac = pixel_x_f - pixel_x_fround;
+		float dx_frac = pixel_x_frac / sample_dx_pix;
+		int64_t pixel_x_round = pixel_x_fround + m_width/2;
+
+		float dv = nsamp.m_sample - samp.m_sample;
+		float nominal_voltage = samp.m_sample + dv*dx_frac;
+
+		//Find (and sanity check) the Y coordinate
+		float nominal_pixel_y = ((nominal_voltage - center) * yscale) + ymid;
+		size_t y1 = floor(nominal_pixel_y);
+		if((y1+1) >= m_height)
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - y1;
+		int bin2 = yfrac*100;
+		int bin1 = 100-bin2;
+		int64_t* row1 = data + y1*m_width;
+		int64_t* row2 = row1 + m_width;
+
 		//Plot each point 3 times for center/left/right portions of the eye
 		//Map -twidth to +twidth to 0...m_width
-		int64_t xpos[] = {offset, offset + twidth, -twidth + offset };
-		float scale = fwidth / twidth;
+		int64_t tscale = round(twidth*scale);
+		int64_t xpos[] = {pixel_x_round, pixel_x_round + tscale, -tscale + pixel_x_round};
 		for(auto x : xpos)
 		{
-			size_t pixel_x = round((x + twidth) * scale);
-			if(pixel_x < m_width)
-				row[pixel_x] ++;
+			if( (x < (int64_t)m_width) && (x >= 0) )
+			{
+				row1[x] += bin1;
+				row2[x] += bin2;
+			}
 		}
 	}
 	m_uiWidth = round(awidth / nwidth);
