@@ -72,7 +72,7 @@ string EthernetAutonegotiationDecoder::GetProtocolName()
 void EthernetAutonegotiationDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s/Autonegotiation", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "EthANeg(%s)", m_channels[0]->m_displayname.c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -210,14 +210,26 @@ string EthernetAutonegotiationDecoder::GetText(int i)
 		ret += "pause ";
 	if(ability & 0x10)
 		ret += "T4 ";
-	if(ability & 0x8)
-		ret += "100/full ";
-	if(ability & 0x4)
-		ret += "100/half ";
-	if(ability & 0x2)
-		ret += "10/full ";
-	if(ability & 0x1)
-		ret += "10/half ";
+	if(ability & 0xc)
+	{
+		ret += "100/";
+		if( (ability & 0xc) == 0xc)
+			ret += "full+half ";
+		else if(ability & 0x8)
+			ret += "full ";
+		else if(ability & 0x4)
+			ret += "half ";
+	}
+	if(ability & 0x3)
+	{
+		ret += "10/";
+		if( (ability & 0x3) == 0x3)
+			ret += "full+half ";
+		else if(ability & 0x2)
+			ret += "full ";
+		else if(ability & 0x1)
+			ret += "half ";
+	}
 
 	if(xnp)
 		ret += "XNP ";
