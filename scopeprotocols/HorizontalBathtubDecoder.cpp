@@ -141,40 +141,32 @@ void HorizontalBathtubDecoder::Refresh()
 	//Extract the single scanline we're interested in
 	//TODO: support a range of voltages
 	int64_t* row = din->GetAccumData() + ybin*din->GetWidth();
-	float nmax = 0;
 	for(size_t i=0; i<din->GetWidth(); i++)
-	{
-		int64_t sample = row[i];
-		if(sample > nmax)
-			nmax = sample;
+		cap->m_samples.push_back(AnalogSample(i*ps_per_pixel - din->m_uiWidth, ps_per_pixel, row[i]));
 
-		cap->m_samples.push_back(AnalogSample(i*ps_per_pixel - din->m_uiWidth, ps_per_pixel, sample));
-	}
-
-	//Normalize to max amplitude
-	for(size_t i=0; i<cap->m_samples.size(); i++)
-		cap->m_samples[i].m_sample /= nmax;
-
-	//Move from the center out and persist the max BER
-	float maxleft = 0;
-	float maxright = 0;
+	//Move from the center out and integrate BER
+	float sumleft = 0;
+	float sumright = 0;
 	ssize_t mid = cap->m_samples.size()/2;
 	for(ssize_t i=mid; i>=0; i--)
 	{
 		float& samp = cap->m_samples[i].m_sample;
-		if(samp > maxleft)
-			maxleft = samp;
-		else
-			samp = maxleft;
+		sumleft += samp;
+		samp = sumleft;
 	}
 	for(size_t i=mid; i<cap->m_samples.size(); i++)
 	{
 		float& samp = cap->m_samples[i].m_sample;
-		if(samp > maxright)
-			maxright = samp;
-		else
-			samp = maxright;
+		sumright += samp;
+		samp = sumright;
 	}
+
+	//Normalize to max amplitude
+	float nmax = sumleft;
+	if(sumright > sumleft)
+		nmax = sumright;
+	for(size_t i=0; i<cap->m_samples.size(); i++)
+		cap->m_samples[i].m_sample /= nmax;
 
 	//Log post-scaling
 	for(size_t i=0; i<cap->m_samples.size(); i++)
