@@ -38,8 +38,33 @@
 
 #include "../scopehal/ProtocolDecoder.h"
 
-typedef OscilloscopeSample<uint8_t> SPISample;
-typedef CaptureChannel<uint8_t> SPICapture;
+class SPISymbol
+{
+public:
+	enum stype
+	{
+		TYPE_SELECT,
+		TYPE_DATA,
+		TYPE_DESELECT,
+		TYPE_ERROR
+	};
+
+	SPISymbol(stype t,uint8_t d)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint8_t m_data;
+
+	bool operator== (const SPISymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef OscilloscopeSample<SPISymbol> SPISample;
+typedef CaptureChannel<SPISymbol> SPICapture;
 
 class SPIDecoder : public ProtocolDecoder
 {

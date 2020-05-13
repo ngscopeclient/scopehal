@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 ThresholdDecoder::ThresholdDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din");

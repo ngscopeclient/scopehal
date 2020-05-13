@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 I2CDecoder::I2CDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
 	m_signalNames.push_back("sda");

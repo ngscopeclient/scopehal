@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 UARTDecoder::UARTDecoder(string color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
 	m_signalNames.push_back("din");

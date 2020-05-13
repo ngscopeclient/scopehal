@@ -86,7 +86,7 @@ bool WaterfallCapture::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
 // Construction / destruction
 
 WaterfallDecoder::WaterfallDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 	, m_pixelsPerHz(0.001)
 	, m_offsetHz(0)
 	, m_width(1)

@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 SPIDecoder::SPIDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
 	m_signalNames.push_back("clk");
@@ -129,6 +129,7 @@ void SPIDecoder::Refresh()
 	uint8_t	current_byte	= 0;
 	uint8_t	bitcount 		= 0;
 	int64_t bytestart		= 0;
+	bool first				= false;
 
 	for(size_t i=0; i<clk->m_samples.size(); i++)
 	{
@@ -148,6 +149,8 @@ void SPIDecoder::Refresh()
 					state = STATE_SELECTED_CLKLO;
 					current_byte = 0;
 					bitcount = 0;
+					bytestart = clk->m_samples[i].m_offset;
+					first = true;
 				}
 				break;
 
@@ -156,7 +159,18 @@ void SPIDecoder::Refresh()
 				if(cur_clk)
 				{
 					if(bitcount == 0)
+					{
+						//Add a "chip selected" event
+						if(first)
+						{
+							cap->m_samples.push_back(SPISample(
+								bytestart,
+								clk->m_samples[i].m_offset - bytestart,
+								SPISymbol(SPISymbol::TYPE_SELECT, 0)));
+							first = false;
+						}
 						bytestart = clk->m_samples[i].m_offset;
+					}
 
 					state = STATE_SELECTED_CLKHI;
 					bitcount ++;
@@ -170,17 +184,26 @@ void SPIDecoder::Refresh()
 						cap->m_samples.push_back(SPISample(
 							bytestart,
 							clk->m_samples[i].m_offset - bytestart,
-							current_byte));
+							SPISymbol(SPISymbol::TYPE_DATA, current_byte)));
 
 						bitcount = 0;
 						current_byte = 0;
+						bytestart = clk->m_samples[i].m_offset;
 					}
 				}
 
 				//end of packet
 				//TODO: error if a byte is truncated
 				else if(cur_cs)
+				{
+					cap->m_samples.push_back(SPISample(
+						bytestart,
+						clk->m_samples[i].m_offset - bytestart,
+						SPISymbol(SPISymbol::TYPE_DESELECT, 0)));
+
+					bytestart = clk->m_samples[i].m_offset;
 					state = STATE_DESELECTED;
+				}
 				break;
 
 			//wait for falling edge of clk
@@ -191,7 +214,15 @@ void SPIDecoder::Refresh()
 				//end of packet
 				//TODO: error if a byte is truncated
 				else if(cur_cs)
+				{
+					cap->m_samples.push_back(SPISample(
+						bytestart,
+						clk->m_samples[i].m_offset - bytestart,
+						SPISymbol(SPISymbol::TYPE_DESELECT, 0)));
+
+					bytestart = clk->m_samples[i].m_offset;
 					state = STATE_DESELECTED;
+				}
 
 				break;
 		}
@@ -200,9 +231,27 @@ void SPIDecoder::Refresh()
 	SetData(cap);
 }
 
-Gdk::Color SPIDecoder::GetColor(int /*i*/)
+Gdk::Color SPIDecoder::GetColor(int i)
 {
-	return m_standardColors[COLOR_DATA];
+	SPICapture* capture = dynamic_cast<SPICapture*>(GetData());
+	if(capture != NULL)
+	{
+		const SPISymbol& s = capture->m_samples[i].m_sample;
+		switch(s.m_stype)
+		{
+			case SPISymbol::TYPE_SELECT:
+			case SPISymbol::TYPE_DESELECT:
+				return m_standardColors[COLOR_CONTROL];
+
+			case SPISymbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
+
+			case SPISymbol::TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+	return m_standardColors[COLOR_ERROR];
 }
 
 string SPIDecoder::GetText(int i)
@@ -210,9 +259,21 @@ string SPIDecoder::GetText(int i)
 	SPICapture* capture = dynamic_cast<SPICapture*>(GetData());
 	if(capture != NULL)
 	{
-		char tmp[16];
-		snprintf(tmp, sizeof(tmp), "%02x", capture->m_samples[i].m_sample);
-		return string(tmp);
+		const SPISymbol& s = capture->m_samples[i].m_sample;
+		char tmp[32];
+		switch(s.m_stype)
+		{
+			case SPISymbol::TYPE_SELECT:
+				return "SELECT";
+			case SPISymbol::TYPE_DESELECT:
+				return "DESELECT";
+			case SPISymbol::TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02x", capture->m_samples[i].m_sample.m_data);
+				return string(tmp);
+			case SPISymbol::TYPE_ERROR:
+			default:
+				return "ERROR";
+		}
 	}
 	return "";
 }

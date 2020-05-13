@@ -85,16 +85,18 @@ class ProtocolDecoder : public OscilloscopeChannel
 {
 public:
 
+	//Add new categories to the end of this list to maintain ABI compatibility with existing plugins
 	enum Category
 	{
-		CAT_ANALYSIS,		//Signal analysis (histograms, eye patterns, etc)
+		CAT_ANALYSIS,		//Signal integrity analysis
+		CAT_BUS,			//Buses
 		CAT_CLOCK,			//Clock stuff
-		CAT_CONVERSION,		//Type conversion
 		CAT_MATH,			//Basic math functions
 		CAT_MEASUREMENT,	//Measurement functions
 		CAT_MEMORY,			//Memory buses
 		CAT_SERIAL,			//Serial communications
-		CAT_MISC			//anything not otherwise categorized
+		CAT_MISC,			//anything not otherwise categorized
+		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
 	};
 
 	ProtocolDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat);

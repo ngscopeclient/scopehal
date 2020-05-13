@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 ParallelBusDecoder::ParallelBusDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CONVERSION)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_BUS)
 {
 	//Set up channels
 	char tmp[32];

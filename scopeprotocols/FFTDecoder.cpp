@@ -44,7 +44,7 @@ FFTCapture::~FFTCapture()
 // Construction / destruction
 
 FFTDecoder::FFTDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	m_yAxisUnit = Unit(Unit::UNIT_DB);

@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 ACCoupleDecoder::ACCoupleDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CONVERSION)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
