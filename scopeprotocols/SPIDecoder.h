@@ -30,59 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of SPIDecoder
  */
 
-#include "scopeprotocols.h"
+#ifndef SPIDecoder_h
+#define SPIDecoder_h
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+#include "../scopehal/ProtocolDecoder.h"
+
+typedef OscilloscopeSample<uint8_t> SPISample;
+typedef CaptureChannel<uint8_t> SPICapture;
+
+class SPIDecoder : public ProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
+	SPIDecoder(std::string color);
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(SPIDecoder)
+
+protected:
+};
+
+#endif

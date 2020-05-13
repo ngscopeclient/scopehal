@@ -71,6 +71,7 @@
 #include "PeriodMeasurementDecoder.h"
 #include "RiseMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
+#include "SPIDecoder.h"
 #include "ThresholdDecoder.h"
 #include "TMDSDecoder.h"
 #include "TopMeasurementDecoder.h"
@@ -87,7 +88,6 @@
 #include "RPCDecoder.h"
 #include "RPCNameserverDecoder.h"
 #include "SchmittTriggerDecoder.h"
-#include "SPIDecoder.h"
 */
 
 #include "AverageStatistic.h"

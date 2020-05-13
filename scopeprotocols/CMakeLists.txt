@@ -33,6 +33,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeriodMeasurementDecoder.cpp
 	RiseMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
+	SPIDecoder.cpp
 	ThresholdDecoder.cpp
 	TMDSDecoder.cpp
 	TopMeasurementDecoder.cpp
