@@ -173,11 +173,13 @@ void SPIDecoder::Refresh()
 					}
 
 					state = STATE_SELECTED_CLKHI;
+
+					//TODO: selectable msb/lsb first direction
 					bitcount ++;
 					if(cur_data)
-						current_byte = 0x80 | (current_byte >> 1);
+						current_byte = 1 | (current_byte << 1);
 					else
-						current_byte = (current_byte >> 1);
+						current_byte = (current_byte << 1);
 
 					if(bitcount == 8)
 					{
