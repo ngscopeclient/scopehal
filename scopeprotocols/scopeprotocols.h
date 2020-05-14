@@ -41,6 +41,7 @@
 //#include "../scopehal/StateDecoder.h"
 
 #include "ACCoupleDecoder.h"
+#include "ADL5205Decoder.h"
 #include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
 #include "ClockJitterDecoder.h"
