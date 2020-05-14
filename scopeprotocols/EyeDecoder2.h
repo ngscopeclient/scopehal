@@ -104,6 +104,8 @@ public:
 
 	virtual double GetVoltageRange();
 
+	virtual void ClearSweeps();
+
 	//TODO: this should be a property of the capture, not the decode
 	int64_t GetUIWidth()
 	{ return m_uiWidth; }

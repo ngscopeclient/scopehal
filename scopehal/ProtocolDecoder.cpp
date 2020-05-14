@@ -208,6 +208,11 @@ ProtocolDecoder::~ProtocolDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+void ProtocolDecoder::ClearSweeps()
+{
+	//default no-op implementation
+}
+
 void ProtocolDecoder::AddRef()
 {
 	m_refcount ++;

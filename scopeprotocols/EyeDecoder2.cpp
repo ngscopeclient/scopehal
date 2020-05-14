@@ -322,6 +322,15 @@ bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
 }
 */
 
+void EyeDecoder2::ClearSweeps()
+{
+	if(m_data != NULL)
+	{
+		delete m_data;
+		m_data = NULL;
+	}
+}
+
 void EyeDecoder2::Refresh()
 {
 	static double total_time = 0;
@@ -423,7 +432,7 @@ void EyeDecoder2::Refresh()
 		//Find (and sanity check) the Y coordinate
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;
 		size_t y1 = floor(nominal_pixel_y);
-		if((y1+1) >= m_height)
+		if((y1 >= m_height) || ((y1+1) >= m_height) )
 			continue;
 
 		//Calculate how much of the pixel's intensity to put in each row

@@ -107,6 +107,13 @@ public:
 	virtual void AddRef();
 	virtual void Release();
 
+	/**
+		@brief Clears any integrated data from past triggers (e.g. eye patterns).
+
+		Most decoders shouldn't have to do anything for this.
+	 */
+	virtual void ClearSweeps();
+
 	virtual void SetDefaultName() =0;
 
 	//Channels
