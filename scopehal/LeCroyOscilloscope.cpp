@@ -1417,7 +1417,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	m_pendingWaveformsMutex.unlock();
 
 	double dt = GetTime() - start;
-	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
+	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
 
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
