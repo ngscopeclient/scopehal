@@ -140,7 +140,7 @@ void DifferenceDecoder::Refresh()
 
 	//Subtract all of our samples
 	cap->m_samples.resize(len);
-	#pragma omp parallel for num_threads(4)
+	#pragma omp parallel for
 	for(size_t i=0; i<len; i++)
 	{
 		const AnalogSample& sin_p = din_p->m_samples[i];
