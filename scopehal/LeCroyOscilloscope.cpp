@@ -1245,14 +1245,23 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				else
 					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
-				//Decode the samples
+				//Convert raw ADC samples to volts
 				cap->m_samples.resize(num_per_segment);
-				for(unsigned int k=0; k<num_per_segment; k++)
+				if(m_highDefinition)
 				{
-					if(m_highDefinition)
-						cap->m_samples[k] = AnalogSample(k, 1, wdata[k + j*num_per_segment] * v_gain - v_off);
-					else
-						cap->m_samples[k] = AnalogSample(k, 1, bdata[k + j*num_per_segment] * v_gain - v_off);
+					int16_t* base = wdata + j*num_per_segment;
+
+					#pragma omp parallel for
+					for(unsigned int k=0; k<num_per_segment; k++)
+						cap->m_samples[k] = AnalogSample(k, 1, base[k] * v_gain - v_off);
+				}
+				else
+				{
+					int8_t* base = bdata + j*num_per_segment;
+
+					#pragma omp parallel for
+					for(unsigned int k=0; k<num_per_segment; k++)
+						cap->m_samples[k] = AnalogSample(k, 1, base[k] * v_gain - v_off);
 				}
 
 				//Done, update the data
