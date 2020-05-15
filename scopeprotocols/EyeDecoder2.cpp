@@ -373,31 +373,36 @@ void EyeDecoder2::Refresh()
 	//Midpoint of the eye voltage
 	double center = cap->GetCenterVoltage();
 
+	//Calculate average period of the clock
+	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
+	//We probably need a preprocessing filter to handle analog etc clock sources.
+	size_t cend = clock->GetDepth();
+	double tlastclk = clock->m_samples[cend-1].m_offset + clock->m_samples[cend-1].m_duration;
+	m_uiWidth = tlastclk / cend;
+	cap->m_uiWidth = m_uiWidth;
+
 	//Process the eye
 	size_t iclock = 0;
-	double awidth = 0;
-	int64_t nwidth = 0;
 	float yscale = m_height / m_channels[0]->GetVoltageRange();
 	int64_t hwidth = m_width / 2;
 	float fwidth = m_width / 2.0f;
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	size_t wend = waveform->m_samples.size()-1;
-	size_t cend = clock->GetDepth();
+	int64_t halfwidth = m_uiWidth / 2;
+	float scale = fwidth / m_uiWidth;
+	int64_t tscale = round(m_uiWidth * scale);
 	for(size_t i=0; i<wend; i++)
 	{
-		auto& samp = waveform->m_samples[i];
-		auto& nsamp = waveform->m_samples[i+1];
-
 		//Stop when we get to the end of the clock
 		if(iclock + 1 >= cend)
 			break;
 
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
+		auto& samp = waveform->m_samples[i];
+		auto& nsamp = waveform->m_samples[i+1];
 		int64_t twidth = clock->m_samples[iclock].m_duration;
-		awidth += twidth;
-		nwidth ++;
 		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
 		int64_t offset = tstart - clock->m_samples[iclock].m_offset * clock->m_timescale;
 		if(offset < 0)
@@ -410,7 +415,6 @@ void EyeDecoder2::Refresh()
 
 		//Sampling clock is the middle of the UI, not the start.
 		//Anything more than half a UI right of the clock is negative.
-		int64_t halfwidth = twidth/2;
 		if(offset > halfwidth)
 			offset = offset - twidth;
 		if(offset < -halfwidth)
@@ -418,7 +422,6 @@ void EyeDecoder2::Refresh()
 
 		//Interpolate voltage
 		int64_t dt = (nsamp.m_offset - samp.m_offset) * waveform->m_timescale;
-		float scale = fwidth / twidth;
 		float pixel_x_f = offset * scale;
 		float pixel_x_fround = floor(pixel_x_f);
 		int64_t pixel_x_round = pixel_x_fround + hwidth;
@@ -441,7 +444,6 @@ void EyeDecoder2::Refresh()
 
 		//Plot each point 3 times for center/left/right portions of the eye
 		//Map -twidth to +twidth to 0...m_width
-		int64_t tscale = round(twidth*scale);
 		int64_t xpos[] = {pixel_x_round, pixel_x_round + tscale, -tscale + pixel_x_round};
 		for(auto x : xpos)
 		{
@@ -452,8 +454,6 @@ void EyeDecoder2::Refresh()
 			}
 		}
 	}
-	m_uiWidth = round(awidth / nwidth);
-	cap->m_uiWidth = m_uiWidth;
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock->GetDepth());
