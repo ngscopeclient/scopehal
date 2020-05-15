@@ -1368,9 +1368,14 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 					//Capture timestamp
 					cap->m_startTimestamp = ttime;
 					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
-
+					cap->m_samples.resize(num_samples);
+					#pragma omp parallel for
 					for(int j=0; j<num_samples; j++)
-						cap->m_samples.push_back(DigitalSample(j, 1, block[icapchan*num_samples + j]));
+					{
+						cap->m_samples[j].m_offset = j;
+						cap->m_samples[j].m_duration = 1;
+						cap->m_samples[j].m_sample = block[icapchan*num_samples + j];
+					}
 
 					//Done, update the data
 					if(!toQueue)
