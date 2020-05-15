@@ -537,16 +537,11 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 	//Find times of the zero crossings (TODO: extract this into reusable function)
 	bool first = true;
 	bool last = false;
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
 	for(size_t i=1; i<data->m_samples.size(); i++)
 	{
 		auto sin = data->m_samples[i];
 		bool value = static_cast<float>(sin) > threshold;
-
-		//Start time of the sample, in picoseconds
-		int64_t t = data->m_triggerPhase + data->m_timescale * sin.m_offset;
-
-		//Move to the middle of the sample
-		t += data->m_timescale/2;
 
 		//Save the last value
 		if(first)
@@ -560,8 +555,8 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 		if(last == value)
 			continue;
 
-		//Interpolate the time
-		t += data->m_timescale * Measurement::InterpolateTime(data, i-1, threshold);
+		//Midpoint of the sample, plus the zero crossing
+		int64_t t = phoff + data->m_timescale * (sin.m_offset + Measurement::InterpolateTime(data, i-1, threshold));
 		edges.push_back(t);
 		last = value;
 	}
