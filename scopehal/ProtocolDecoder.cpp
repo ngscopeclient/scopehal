@@ -538,9 +538,10 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 	bool first = true;
 	bool last = false;
 	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
-	for(size_t i=1; i<data->m_samples.size(); i++)
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
-		auto sin = data->m_samples[i];
+		auto& sin = data->m_samples[i];
 		bool value = static_cast<float>(sin) > threshold;
 
 		//Save the last value
@@ -630,12 +631,12 @@ string ProtocolDecoder::SerializeConfiguration(IDTable& table)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Complex protocol decodes
 
-Gdk::Color ProtocolDecoder::GetColor(int i)
+Gdk::Color ProtocolDecoder::GetColor(int /*i*/)
 {
 	return m_standardColors[COLOR_ERROR];
 }
 
-string ProtocolDecoder::GetText(int i)
+string ProtocolDecoder::GetText(int /*i*/)
 {
 	return "(unimplemented)";
 }
