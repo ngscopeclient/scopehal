@@ -143,18 +143,16 @@ void DifferenceDecoder::Refresh()
 	#pragma omp parallel for
 	for(size_t i=0; i<len; i++)
 	{
-		const AnalogSample& sin_p = din_p->m_samples[i];
-		cap->m_samples[i] = AnalogSample(
-			sin_p.m_offset,
-			sin_p.m_duration,
-			sin_p.m_sample - din_n->m_samples[i].m_sample);
+		cap->m_samples[i].m_offset 		= din_p->m_samples[i].m_offset;
+		cap->m_samples[i].m_duration 	= din_p->m_samples[i].m_duration;
+		cap->m_samples[i].m_sample 		= din_p->m_samples[i].m_sample - din_n->m_samples[i].m_sample;
 	}
 
 	SetData(cap);
 
 	//Copy our time scales from the input
 	//Use the first trace's timestamp as our start time if they differ
-	cap->m_timescale = din_p->m_timescale;
-	cap->m_startTimestamp = din_p->m_startTimestamp;
+	cap->m_timescale 		= din_p->m_timescale;
+	cap->m_startTimestamp 	= din_p->m_startTimestamp;
 	cap->m_startPicoseconds = din_p->m_startPicoseconds;
 }
