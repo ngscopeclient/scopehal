@@ -97,11 +97,13 @@ void Ethernet100BaseTDecoder::Refresh()
 
 	//Logical voltage of each point after some hysteresis
 	vector<int> voltages;
+	size_t ilen = din->m_samples.size();
+	voltages.resize(ilen);
 	int oldstate = GetState(din->m_samples[0]);
-	for(auto s : din->m_samples)
+	for(size_t i=1; i<ilen; i++)
 	{
 		int newstate = oldstate;
-		float voltage = s;
+		float voltage = din->m_samples[i].m_sample;
 		switch(oldstate)
 		{
 			//At the middle? Need significant motion either way to change state
@@ -125,19 +127,21 @@ void Ethernet100BaseTDecoder::Refresh()
 				break;
 		}
 
-		voltages.push_back(newstate);
+		voltages[i] = newstate;
 		oldstate = newstate;
 	}
 
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int old_voltage = voltages[0];
-	size_t old_index = 0;
 	vector<DigitalSample> bits;
 	bool signal_ok = false;
 	vector<size_t> carrier_starts;
 	vector<size_t> carrier_stops;
-	for(size_t i=0; i<voltages.size(); i++)
+	size_t losslen = 20*ui_width;
+	size_t old_offset = 0;
+	float ui_inverse = 1.0f / ui_width;
+	for(size_t i=0; i<ilen; i++)
 	{
 		if(voltages[i] != old_voltage)
 		{
@@ -149,46 +153,35 @@ void Ethernet100BaseTDecoder::Refresh()
 			}
 
 			//Don't actually process the first bit since it's truncated
-			if(old_index != 0)
+			if(old_offset != 0)
 			{
 				//See how long the voltage stayed constant.
 				//For each UI, add a "0" bit, then a "1" bit for the current state
-				int64_t tstart = din->m_samples[old_index].m_offset;
 				int64_t tchange = din->m_samples[i].m_offset;
-				int64_t dt = (tchange - tstart) * din->m_timescale;
-				int num_uis = round(dt * 1.0f / ui_width);
-
-				/*LogTrace("Voltage changed to %2d at %10.6f us (%d UIs): ",
-					voltages[i],
-					tchange * din->m_timescale * 1e-6f,
-					num_uis);*/
+				int64_t dt = (tchange - old_offset) * din->m_timescale;
+				int num_uis = round(dt * ui_inverse);
 
 				//Add zero bits for each UI without a transition
 				int64_t tnext;
 				for(int j=0; j<(num_uis - 1); j++)
 				{
-					tnext = tstart + ui_width_samples*j;
-					bits.push_back(DigitalSample(
-						tnext,
-						ui_width_samples,
-						0));
+					tnext = old_offset + ui_width_samples*j;
+					bits.push_back(DigitalSample(tnext,	ui_width_samples, 0));
 				}
-				tnext = tstart + ui_width_samples*(num_uis - 1);
+				tnext = old_offset + ui_width_samples*(num_uis - 1);
 
 				//and then a 1 bit
 				bits.push_back(DigitalSample(
-					tnext,
-					(tchange + din->m_samples[i].m_duration) - tnext,
-					1));
+					tnext, (tchange + din->m_samples[i].m_duration) - tnext, 1));
 			}
 
-			old_index = i;
+			old_offset = din->m_samples[i].m_offset;
 			old_voltage = voltages[i];
 		}
 
 		//Look for complete loss of signal.
 		//We define this as more than 20 "0" symbols in a row.
-		if( (old_index + 20*ui_width_samples) < i)
+		if( (old_offset + losslen) < (size_t)din->m_samples[i].m_offset)
 		{
 			if(signal_ok)
 			{
