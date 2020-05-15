@@ -1246,6 +1246,8 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
 				//Convert raw ADC samples to volts
+				//Somewhat surprisingly, this is MASSIVELY faster
+				//(by a factor of two) than calling the AnalogSample constructor.
 				cap->m_samples.resize(num_per_segment);
 				if(m_highDefinition)
 				{
@@ -1253,7 +1255,11 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 					#pragma omp parallel for
 					for(unsigned int k=0; k<num_per_segment; k++)
-						cap->m_samples[k] = AnalogSample(k, 1, base[k] * v_gain - v_off);
+					{
+						cap->m_samples[k].m_offset = k;
+						cap->m_samples[k].m_duration = 1;
+						cap->m_samples[k].m_sample = base[k] * v_gain - v_off;
+					}
 				}
 				else
 				{
@@ -1261,7 +1267,11 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 					#pragma omp parallel for
 					for(unsigned int k=0; k<num_per_segment; k++)
-						cap->m_samples[k] = AnalogSample(k, 1, base[k] * v_gain - v_off);
+					{
+						cap->m_samples[k].m_offset = k;
+						cap->m_samples[k].m_duration = 1;
+						cap->m_samples[k].m_sample = base[k] * v_gain - v_off;
+					}
 				}
 
 				//Done, update the data
