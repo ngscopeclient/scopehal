@@ -30,22 +30,34 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of CaptureChannel
+	@brief Declaration of Waveform
  */
 
-#ifndef CaptureChannel_h
-#define CaptureChannel_h
+#ifndef Waveform_h
+#define Waveform_h
 
-#include "OscilloscopeSample.h"
 #include <vector>
 
 /**
-	@brief Base class for all CaptureChannel specializations
+	@brief Base class for all Waveform specializations
+
+	One waveform contains a time-series of sample objects as well as scale information etc. The samples may
+	or may not be at regular intervals depending on whether the Oscilloscope uses RLE compression.
+
+	The WaveformBase contains all metadata, but the actual samples are stored in a derived class member.
  */
-class CaptureChannelBase
+class WaveformBase
 {
 public:
-	virtual ~CaptureChannelBase()
+	WaveformBase()
+	{
+		m_triggerPhase = 0;
+		m_startTimestamp = 0;
+		m_startPicoseconds = 0;
+	}
+
+	//empty virtual destructor in case any derived classes need one
+	virtual ~WaveformBase()
 	{}
 
 	/**
@@ -71,104 +83,54 @@ public:
 	 */
 	double m_triggerPhase;
 
-	virtual size_t GetDepth() const =0;
+	///@brief Start timestamps of each sample
+	std::vector<int64_t> m_offsets;
 
-	/**
-		@brief Gets the time the capture ends at, in time steps
-	 */
-	virtual int64_t GetEndTime() const =0;
+	///@brief Durations of each sample
+	std::vector<int64_t> m_durations;
 
-	virtual int64_t GetSampleStart(size_t i) const =0;
-	int64_t GetSampleEnd(size_t i) const
-	{ return GetSampleStart(i) + GetSampleLen(i); }
-	virtual int64_t GetSampleLen(size_t i) const =0;
+	virtual void clear()
+	{
+		m_offsets.clear();
+		m_durations.clear();
+	}
 
-	virtual bool EqualityTest(size_t i, size_t j) const =0;
-
-	virtual bool SamplesAdjacent(size_t i, size_t j) const =0;
+	virtual void Resize(size_t size)
+	{
+		m_offsets.resize(size);
+		m_durations.resize(size);
+	}
 };
 
 /**
-	@brief A single channel of an oscilloscope capture.
-
-	One channel contains a time-series of OscilloscopeSample objects as well as scale information etc. The samples may
-	or may not be at regular intervals depending on whether the Oscilloscope uses RLE compression.
-
-	The channel data is independent of the renderer.
+	@brief A waveform that contains actual data
  */
 template<class S>
-class CaptureChannel : public CaptureChannelBase
+class Waveform : public WaveformBase
 {
 public:
-	CaptureChannel()
+
+	///@brief Sample data
+	std::vector<S> m_samples;
+
+	virtual void Resize(size_t size)
 	{
-		m_triggerPhase = 0;
-		m_startTimestamp = 0;
-		m_startPicoseconds = 0;
+		m_offsets.resize(size);
+		m_durations.resize(size);
+		m_samples.resize(size);
 	}
 
-	typedef std::vector< OscilloscopeSample<S> > vtype;
-
-	/**
-		@brief The actual samples
-	 */
-	vtype m_samples;
-
-	virtual size_t GetDepth() const
+	virtual void clear()
 	{
-		return m_samples.size();
+		m_offsets.clear();
+		m_durations.clear();
+		m_samples.clear();
 	}
-
-	virtual int64_t GetSampleStart(size_t i) const
-	{
-		return m_samples[i].m_offset;
-	}
-
-	virtual int64_t GetSampleLen(size_t i) const
-	{
-		return m_samples[i].m_duration;
-	}
-
-	virtual bool EqualityTest(size_t i, size_t j) const
-	{
-		return (m_samples[i].m_sample == m_samples[j].m_sample);
-	}
-
-	virtual bool SamplesAdjacent(size_t i, size_t j) const
-	{
-		auto sa = m_samples[i];
-		auto sb = m_samples[j];
-
-		return (sa.m_offset + sa.m_duration) == sb.m_offset;
-	}
-
-	virtual int64_t GetEndTime() const
-	{
-		if(m_samples.empty())
-			return 0;
-		const OscilloscopeSample<S>& samp = m_samples[m_samples.size() - 1];
-		return samp.m_offset + samp.m_duration;
-	}
-
-	size_t size() const
-	{ return m_samples.size(); }
-
-	S& operator[](size_t i)
-	{ return m_samples[i]; }
-
-	typename vtype::iterator begin()
-	{ return m_samples.begin(); }
-
-	typename vtype::iterator end()
-	{ return m_samples.end(); }
-
 };
 
-typedef CaptureChannel<bool> DigitalCapture;
-typedef CaptureChannel< std::vector<bool> > DigitalBusCapture;
-typedef CaptureChannel<float> AnalogCapture;
-typedef CaptureChannel<char> AsciiCapture;
-typedef CaptureChannel<unsigned char> ByteCapture;
-typedef CaptureChannel<std::string> StringCapture;
+typedef Waveform<bool> 					DigitalWaveform;
+typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
+typedef Waveform<float>					AnalogWaveform;
+typedef Waveform<char>					AsciiWaveform;
 
 #endif

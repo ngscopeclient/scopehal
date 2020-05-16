@@ -40,6 +40,7 @@
  */
 void ScopeProtocolStaticInit()
 {
+	/*
 	AddDecoderClass(ACCoupleDecoder);
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurementDecoder);
@@ -86,4 +87,5 @@ void ScopeProtocolStaticInit()
 	AddStatisticClass(AverageStatistic);
 	AddStatisticClass(MaximumStatistic);
 	AddStatisticClass(MinimumStatistic);
+	*/
 }

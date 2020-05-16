@@ -37,11 +37,11 @@
 
 #include "../scopehal/ProtocolDecoder.h"
 
-class WaterfallCapture : public CaptureChannelBase
+class WaterfallWaveform : public WaveformBase
 {
 public:
-	WaterfallCapture(size_t width, size_t height);
-	virtual ~WaterfallCapture();
+	WaterfallWaveform(size_t width, size_t height);
+	virtual ~WaterfallWaveform();
 
 	float* GetData()
 	{ return m_outdata; }
@@ -51,15 +51,6 @@ protected:
 	size_t m_height;
 
 	float* m_outdata;
-
-public:
-	//Not really applicable for waterfall plots
-	virtual size_t GetDepth() const;
-	virtual int64_t GetEndTime() const;
-	virtual int64_t GetSampleStart(size_t i) const;
-	virtual int64_t GetSampleLen(size_t i) const;
-	virtual bool EqualityTest(size_t i, size_t j) const;
-	virtual bool SamplesAdjacent(size_t i, size_t j) const;
 };
 
 class WaterfallDecoder : public ProtocolDecoder

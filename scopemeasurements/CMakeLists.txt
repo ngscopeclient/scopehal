@@ -2,14 +2,14 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
-	EyeBitRateMeasurement.cpp
-	EyeHeightMeasurement.cpp
-	EyeJitterMeasurement.cpp
-	EyePeriodMeasurement.cpp
-	EyeWidthMeasurement.cpp
-	OvershootMeasurement.cpp
-	PkPkVoltageMeasurement.cpp
-	UndershootMeasurement.cpp
+	#EyeBitRateMeasurement.cpp
+	#EyeHeightMeasurement.cpp
+	#EyeJitterMeasurement.cpp
+	#EyePeriodMeasurement.cpp
+	#EyeWidthMeasurement.cpp
+	#OvershootMeasurement.cpp
+	#PkPkVoltageMeasurement.cpp
+	#UndershootMeasurement.cpp
 
 	scopemeasurements.cpp
 	)

@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-WaterfallCapture::WaterfallCapture(size_t width, size_t height)
+WaterfallWaveform::WaterfallWaveform(size_t width, size_t height)
 	: m_width(width)
 	, m_height(height)
 {
@@ -46,40 +46,10 @@ WaterfallCapture::WaterfallCapture(size_t width, size_t height)
 		m_outdata[i] = 0;
 }
 
-WaterfallCapture::~WaterfallCapture()
+WaterfallWaveform::~WaterfallWaveform()
 {
 	delete[] m_outdata;
 	m_outdata = NULL;
-}
-
-size_t WaterfallCapture::GetDepth() const
-{
-	return 0;
-}
-
-int64_t WaterfallCapture::GetEndTime() const
-{
-	return 0;
-}
-
-int64_t WaterfallCapture::GetSampleStart(size_t /*i*/) const
-{
-	return 0;
-}
-
-int64_t WaterfallCapture::GetSampleLen(size_t /*i*/) const
-{
-	return 0;
-}
-
-bool WaterfallCapture::EqualityTest(size_t /*i*/, size_t /*j*/) const
-{
-	return false;
-}
-
-bool WaterfallCapture::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
-{
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,10 +126,11 @@ void WaterfallDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	FFTCapture* din = dynamic_cast<FFTCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<FFTWaveform*>(m_channels[0]->GetData());
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	size_t inlen = din->m_samples.size();
+	if(inlen == 0)
 	{
 		SetData(NULL);
 		return;
@@ -167,9 +138,9 @@ void WaterfallDecoder::Refresh()
 
 	//Initialize the capture
 	//TODO: timestamps? do we need those?qui
-	WaterfallCapture* cap = dynamic_cast<WaterfallCapture*>(m_data);
+	WaterfallWaveform* cap = dynamic_cast<WaterfallWaveform*>(m_data);
 	if(cap == NULL)
-		cap = new WaterfallCapture(m_width, m_height);
+		cap = new WaterfallWaveform(m_width, m_height);
 	cap->m_timescale = 1;
 	float* data = cap->GetData();
 
@@ -192,8 +163,8 @@ void WaterfallDecoder::Refresh()
 		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x + bin_offset));
 
 		float value = 0;
-		if(nbin < din->GetDepth())
-			value = (-70 - 20 * log10(din->m_samples[nbin].m_sample)) / -70;
+		if(nbin < inlen)
+			value = (-70 - 20 * log10(din->m_samples[nbin])) / -70;
 
 		//Cap values to prevent going off-scale-low with our color ramps
 		if(value < vmin)

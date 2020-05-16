@@ -1037,7 +1037,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
 	uint32_t num_sequences = 1;
-	map<int, vector<CaptureChannelBase*> > pending_waveforms;
+	map<int, vector<WaveformBase*> > pending_waveforms;
 	double start = GetTime();
 	time_t ttime;
 	double basetime;
@@ -1228,7 +1228,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			for(size_t j=0; j<num_sequences; j++)
 			{
 				//Set up the capture we're going to store our data into
-				AnalogCapture* cap = new AnalogCapture;
+				AnalogWaveform* cap = new AnalogWaveform;
 				cap->m_timescale = round(interval);
 
 				cap->m_triggerPhase = h_off_frac;
@@ -1246,9 +1246,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
 				//Convert raw ADC samples to volts
-				//Somewhat surprisingly, this is MASSIVELY faster
-				//(by a factor of two) than calling the AnalogSample constructor.
-				cap->m_samples.resize(num_per_segment);
+				cap->Resize(num_per_segment);
 				if(m_highDefinition)
 				{
 					int16_t* base = wdata + j*num_per_segment;
@@ -1256,9 +1254,9 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 					#pragma omp parallel for
 					for(unsigned int k=0; k<num_per_segment; k++)
 					{
-						cap->m_samples[k].m_offset = k;
-						cap->m_samples[k].m_duration = 1;
-						cap->m_samples[k].m_sample = base[k] * v_gain - v_off;
+						cap->m_offsets[k] = k;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = base[k] * v_gain - v_off;
 					}
 				}
 				else
@@ -1268,9 +1266,9 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 					#pragma omp parallel for
 					for(unsigned int k=0; k<num_per_segment; k++)
 					{
-						cap->m_samples[k].m_offset = k;
-						cap->m_samples[k].m_duration = 1;
-						cap->m_samples[k].m_sample = base[k] * v_gain - v_off;
+						cap->m_offsets[k] = k;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = base[k] * v_gain - v_off;
 					}
 				}
 
@@ -1362,19 +1360,19 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			{
 				if(enabledChannels[icapchan])
 				{
-					DigitalCapture* cap = new DigitalCapture;
+					DigitalWaveform* cap = new DigitalWaveform;
 					cap->m_timescale = interval;
 
 					//Capture timestamp
 					cap->m_startTimestamp = ttime;
 					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
-					cap->m_samples.resize(num_samples);
+					cap->Resize(num_samples);
 					#pragma omp parallel for
 					for(int j=0; j<num_samples; j++)
 					{
-						cap->m_samples[j].m_offset = j;
-						cap->m_samples[j].m_duration = 1;
-						cap->m_samples[j].m_sample = block[icapchan*num_samples + j];
+						cap->m_offsets[j] = j;
+						cap->m_durations[j] = 1;
+						cap->m_samples[j] = block[icapchan*num_samples + j];
 					}
 
 					//Done, update the data

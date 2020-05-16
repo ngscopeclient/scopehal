@@ -98,8 +98,8 @@ void TMDSDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* din = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* clkin = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto clkin = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (din == NULL) || (clkin == NULL) )
 	{
 		SetData(NULL);
@@ -107,13 +107,13 @@ void TMDSDecoder::Refresh()
 	}
 
 	//Create the capture
-	TMDSCapture* cap = new TMDSCapture;
+	auto cap = new TMDSWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Record the value of the data stream at each clock edge
-	vector<DigitalSample> sampdata;
+	DigitalWaveform sampdata;
 	SampleOnAnyEdges(din, clkin, sampdata);
 
 	/*
@@ -135,7 +135,7 @@ void TMDSDecoder::Refresh()
 	for(size_t offset=0; offset < 10; offset ++)
 	{
 		size_t num_preambles[4] = {0};
-		for(size_t i=0; i<sampdata.size() - 20; i += 10)
+		for(size_t i=0; i<sampdata.m_samples.size() - 20; i += 10)
 		{
 			//Look for control code "j" at phase "offset", position "i" within the data stream
 			for(size_t j=0; j<4; j++)
@@ -143,7 +143,7 @@ void TMDSDecoder::Refresh()
 				bool match = true;
 				for(size_t k=0; k<10; k++)
 				{
-					if(sampdata[i+offset+k].m_sample != control_codes[j][k])
+					if(sampdata.m_samples[i+offset+k] != control_codes[j][k])
 						match = false;
 				}
 				if(match)
@@ -184,7 +184,8 @@ void TMDSDecoder::Refresh()
 	} last_symbol_type = TYPE_DATA;
 
 	//Decode the actual data
-	for(size_t i=max_offset; i<sampdata.size()-11; i+= 10)
+	size_t sampmax = sampdata.m_samples.size()-11;
+	for(size_t i=max_offset; i<sampmax; i+= 10)
 	{
 		bool match = true;
 
@@ -194,16 +195,16 @@ void TMDSDecoder::Refresh()
 			match = true;
 			for(size_t k=0; k<10; k++)
 			{
-				if(sampdata[i+k].m_sample != control_codes[j][k])
+				if(sampdata.m_samples[i+k] != control_codes[j][k])
 					match = false;
 			}
 
 			if(match)
 			{
-				cap->m_samples.push_back(TMDSSample(
-					sampdata[i].m_offset,
-					sampdata[i+10].m_offset - sampdata[i].m_offset,
-					TMDSSymbol(TMDSSymbol::TMDS_TYPE_CONTROL, j)));
+				cap->m_offsets.push_back(sampdata.m_offsets[i]);
+				cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+				cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_CONTROL, j));
+
 				last_symbol_type = TYPE_PREAMBLE;
 				break;
 			}
@@ -218,16 +219,15 @@ void TMDSDecoder::Refresh()
 			match = true;
 			for(size_t k=0; k<10; k++)
 			{
-				if(sampdata[i+k].m_sample != video_guard[lane][k])
+				if(sampdata.m_samples[i+k] != video_guard[lane][k])
 					match = false;
 			}
 
 			if(match)
 			{
-				cap->m_samples.push_back(TMDSSample(
-					sampdata[i].m_offset,
-					sampdata[i+10].m_offset - sampdata[i].m_offset,
-					TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, 0)));
+				cap->m_offsets.push_back(sampdata.m_offsets[i]);
+				cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+				cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, 0));
 				last_symbol_type = TYPE_GUARD;
 				break;
 			}
@@ -237,17 +237,17 @@ void TMDSDecoder::Refresh()
 			continue;
 
 		//Whatever is left is assumed to be video data
-		bool d9 = sampdata[i+9].m_sample;
-		bool d8 = sampdata[i+8].m_sample;
+		bool d9 = sampdata.m_samples[i+9];
+		bool d8 = sampdata.m_samples[i+8];
 
-		uint8_t d = sampdata[i+0].m_sample |
-					(sampdata[i+1].m_sample << 1) |
-					(sampdata[i+2].m_sample << 2) |
-					(sampdata[i+3].m_sample << 3) |
-					(sampdata[i+4].m_sample << 4) |
-					(sampdata[i+5].m_sample << 5) |
-					(sampdata[i+6].m_sample << 6) |
-					(sampdata[i+7].m_sample << 7);
+		uint8_t d = sampdata.m_samples[i+0] |
+					(sampdata.m_samples[i+1] << 1) |
+					(sampdata.m_samples[i+2] << 2) |
+					(sampdata.m_samples[i+3] << 3) |
+					(sampdata.m_samples[i+4] << 4) |
+					(sampdata.m_samples[i+5] << 5) |
+					(sampdata.m_samples[i+6] << 6) |
+					(sampdata.m_samples[i+7] << 7);
 
 		if(d9)
 			d ^= 0xff;
@@ -257,10 +257,9 @@ void TMDSDecoder::Refresh()
 		else
 			d ^= (d << 1) ^ 0xfe;
 
-		cap->m_samples.push_back(TMDSSample(
-			sampdata[i].m_offset,
-			sampdata[i+10].m_offset - sampdata[i].m_offset,
-			TMDSSymbol(TMDSSymbol::TMDS_TYPE_DATA, d)));
+		cap->m_offsets.push_back(sampdata.m_offsets[i]);
+		cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
+		cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_DATA, d));
 		last_symbol_type = TYPE_DATA;
 	}
 
@@ -269,10 +268,10 @@ void TMDSDecoder::Refresh()
 
 Gdk::Color TMDSDecoder::GetColor(int i)
 {
-	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(GetData());
+	auto capture = dynamic_cast<TMDSWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+		const TMDSSymbol& s = capture->m_samples[i];
 
 		switch(s.m_type)
 		{
@@ -297,10 +296,10 @@ Gdk::Color TMDSDecoder::GetColor(int i)
 
 string TMDSDecoder::GetText(int i)
 {
-	TMDSCapture* capture = dynamic_cast<TMDSCapture*>(GetData());
+	auto capture = dynamic_cast<TMDSWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const TMDSSymbol& s = capture->m_samples[i].m_sample;
+		const TMDSSymbol& s = capture->m_samples[i];
 
 		char tmp[32];
 		switch(s.m_type)

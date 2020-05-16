@@ -149,7 +149,7 @@ void AntikernelLabsOscilloscope::FlushConfigCache()
 	*/
 }
 
-bool AntikernelLabsOscilloscope::IsChannelEnabled(size_t i)
+bool AntikernelLabsOscilloscope::IsChannelEnabled(size_t /*i*/)
 {
 	/*
 	//ext trigger should never be displayed
@@ -376,7 +376,7 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	LogIndenter li;
 
 	//1600 ps per sample for now, hard coded
-	AnalogCapture* cap = new AnalogCapture;
+	AnalogWaveform* cap = new AnalogWaveform;
 	cap->m_timescale = 1600;
 	cap->m_triggerPhase = 0;
 	double t = GetTime();
@@ -387,11 +387,12 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	float fullscale = GetChannelVoltageRange(0);
 	float scale = fullscale / 256.0f;
 	float offset = GetChannelOffset(0);
+	cap->Resize(depth);
 	for(size_t i=0; i<depth; i++)
 	{
-		//Scale it
-		float v = ((waveform[i] - 128.0f) * scale) + offset;
-		cap->m_samples.push_back(AnalogSample(i, 1, v));
+		cap->m_offsets[i] = i;
+		cap->m_durations[i] = 1;
+		cap->m_samples[i] = ((waveform[i] - 128.0f) * scale) + offset;
 	}
 
 	//See what the actual voltages are at the zero crossing
@@ -402,7 +403,7 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 
 	//Done, update
 	lock_guard<recursive_mutex> lock(m_mutex);
-	map<int, vector<AnalogCapture*> > pending_waveforms;
+	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	if(!toQueue)
 		m_channels[0]->SetData(cap);
 	else

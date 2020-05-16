@@ -42,6 +42,7 @@
  */
 void ScopeMeasurementStaticInit()
 {
+	/*
 	AddMeasurementClass(EyeBitRateMeasurement);
 	AddMeasurementClass(EyeHeightMeasurement);
 	AddMeasurementClass(EyeJitterMeasurement);
@@ -50,4 +51,5 @@ void ScopeMeasurementStaticInit()
 	AddMeasurementClass(OvershootMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 	AddMeasurementClass(UndershootMeasurement);
+	*/
 }

@@ -65,8 +65,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<USB2PMASymbol> USBLineSample;
-typedef CaptureChannel<USB2PMASymbol> USB2PMACapture;
+typedef Waveform<USB2PMASymbol> USB2PMAWaveform;
 
 class USB2PMADecoder : public ProtocolDecoder
 {

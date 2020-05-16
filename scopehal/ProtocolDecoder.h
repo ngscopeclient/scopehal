@@ -218,13 +218,13 @@ protected:
 
 	//Samples a digital channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
-	void SampleOnAnyEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
-	void SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
-	void SampleOnRisingEdges(DigitalBusCapture* data, DigitalCapture* clock, std::vector<DigitalBusSample>& samples);
-	void SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, std::vector<DigitalSample>& samples);
+	void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+	void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+	void SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
+	void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 
 	//Find interpolated zero crossings of a signal
-	void FindZeroCrossings(AnalogCapture* data, float threshold, std::vector<int64_t>& edges);
+	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);

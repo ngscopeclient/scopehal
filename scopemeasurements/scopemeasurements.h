@@ -37,6 +37,7 @@
 #define scopemeasurements_h
 
 #include "../scopehal/scopehal.h"
+#include "../scopehal/Waveform.h"
 #include "../scopehal/Measurement.h"
 
 #include "EyeBitRateMeasurement.h"

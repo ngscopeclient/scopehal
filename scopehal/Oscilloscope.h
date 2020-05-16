@@ -416,7 +416,7 @@ public:
 	virtual bool AcquireDataFifo();
 
 protected:
-	typedef std::map<OscilloscopeChannel*, CaptureChannelBase*> SequenceSet;
+	typedef std::map<OscilloscopeChannel*, WaveformBase*> SequenceSet;
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
 

@@ -40,6 +40,7 @@
 #include "../scopehal/ProtocolDecoder.h"
 //#include "../scopehal/StateDecoder.h"
 
+/*
 #include "ACCoupleDecoder.h"
 #include "ADL5205Decoder.h"
 #include "BaseMeasurementDecoder.h"
@@ -52,17 +53,23 @@
 #include "DifferenceDecoder.h"
 #include "DramRefreshActivateMeasurementDecoder.h"
 #include "DramRowColumnLatencyMeasurementDecoder.h"
+*/
 #include "DVIDecoder.h"
+/*
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
+*/
 #include "EyeDecoder2.h"
+/*
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"
 #include "FrequencyMeasurementDecoder.h"
+*/
 #include "HorizontalBathtubDecoder.h"
+/*
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "JtagDecoder.h"
@@ -82,7 +89,9 @@
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
 #include "USB2PMADecoder.h"
+*/
 #include "WaterfallDecoder.h"
+
 /*
 #include "DigitalToAnalogDecoder.h"
 #include "DMADecoder.h"

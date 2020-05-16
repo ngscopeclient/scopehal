@@ -144,11 +144,11 @@ Measurement* Measurement::CreateMeasurement(string protocol)
 
 	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
  */
-float Measurement::InterpolateTime(AnalogCapture* cap, size_t a, float voltage)
+float Measurement::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
 {
 	//If the voltage isn't between the two points, abort
-	float fa = (*cap)[a];
-	float fb = (*cap)[a+1];
+	float fa = cap->m_samples[a];
+	float fb = cap->m_samples[a+1];
 	bool ag = (fa > voltage);
 	bool bg = (fb > voltage);
 	if( (ag && bg) || (!ag && !bg) )
@@ -166,14 +166,14 @@ float Measurement::InterpolateTime(AnalogCapture* cap, size_t a, float voltage)
 /**
 	@brief Gets the lowest voltage of a waveform
  */
-float Measurement::GetMinVoltage(AnalogCapture* cap)
+float Measurement::GetMinVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the minimum
 	float tmp = FLT_MAX;
-	for(auto sample : *cap)
+	for(float f : cap->m_samples)
 	{
-		if((float)sample < tmp)
-			tmp = sample;
+		if(f < tmp)
+			tmp = f;
 	}
 	return tmp;
 }
@@ -181,14 +181,14 @@ float Measurement::GetMinVoltage(AnalogCapture* cap)
 /**
 	@brief Gets the highest voltage of a waveform
  */
-float Measurement::GetMaxVoltage(AnalogCapture* cap)
+float Measurement::GetMaxVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the maximum
-	float tmp = FLT_MIN;
-	for(auto sample : *cap)
+	float tmp = -FLT_MAX;
+	for(float f : cap->m_samples)
 	{
-		if((float)sample > tmp)
-			tmp = sample;
+		if(f > tmp)
+			tmp = f;
 	}
 	return tmp;
 }
@@ -196,66 +196,14 @@ float Measurement::GetMaxVoltage(AnalogCapture* cap)
 /**
 	@brief Gets the average voltage of a waveform
  */
-float Measurement::GetAvgVoltage(AnalogCapture* cap)
+float Measurement::GetAvgVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the average
 	//TODO: more numerically stable summation algorithm for deep captures
 	double sum = 0;
-	for(auto sample : *cap)
-		sum += (float)sample;
-	return sum / cap->GetDepth();
-}
-
-/**
-	@brief Gets the average period of a waveform (measured from rising edge to rising edge with +/- 10% hysteresis)
- */
-float Measurement::GetPeriod(AnalogCapture* cap)
-{
-	//Find min, max, and average voltage of the signal
-	float low = GetMinVoltage(cap);
-	float high = GetMaxVoltage(cap);
-	float avg = GetAvgVoltage(cap);
-
-	//Hysteresis: aim 10% above and below the average
-	float delta = (high - low) / 10;
-	float vlo = avg - delta;
-	float vhi = avg + delta;
-
-	bool first = true;
-	size_t prev_rising = 0;
-	bool current_state = false;
-	double delta_sum = 0;
-	double delta_count = 0;
-	for(size_t i=1; i<cap->GetDepth(); i++)
-	{
-		//Go from high to low
-		float v = (*cap)[i];
-		if(current_state && (v < vlo) )
-			current_state = false;
-
-		//Go from low to high
-		else if(!current_state && (v > vhi) )
-		{
-			//If we've seen at least one rising edge, calculate the delta
-			if(!first)
-			{
-				//Find the approximate time of the zero crossing, then interpolate
-				float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(prev_rising);
-				delta_samples += InterpolateTime(cap, i-1, vhi);
-				delta_samples -= InterpolateTime(cap, prev_rising-1, vhi);
-
-				delta_sum += delta_samples * cap->m_timescale;
-				delta_count ++;
-			}
-
-			first = false;
-			prev_rising = i;
-			current_state = true;
-		}
-	}
-
-	double avg_ps = delta_sum / delta_count;
-	return avg_ps * 1e-12f;
+	for(float f : cap->m_samples)
+		sum += f;
+	return sum / cap->m_samples.size();
 }
 
 /**
@@ -267,7 +215,7 @@ float Measurement::GetPeriod(AnalogCapture* cap)
 	@param high High endpoint of the histogram (volts)
 	@param bins	Number of histogram bins
  */
-vector<size_t> Measurement::MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins)
+vector<size_t> Measurement::MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins)
 {
 	vector<size_t> ret;
 	for(size_t i=0; i<bins; i++)
@@ -275,7 +223,7 @@ vector<size_t> Measurement::MakeHistogram(AnalogCapture* cap, float low, float h
 
 	float delta = high-low;
 
-	for(float v : *cap)
+	for(float v : cap->m_samples)
 	{
 		float fbin = (v-low) / delta;
 		size_t bin = floor(fbin * bins);
@@ -292,7 +240,7 @@ vector<size_t> Measurement::MakeHistogram(AnalogCapture* cap, float low, float h
 /**
 	@brief Gets the most probable "0" level for a digital waveform
  */
-float Measurement::GetBaseVoltage(AnalogCapture* cap)
+float Measurement::GetBaseVoltage(AnalogWaveform* cap)
 {
 	float vmin = GetMinVoltage(cap);
 	float vmax = GetMaxVoltage(cap);
@@ -319,7 +267,7 @@ float Measurement::GetBaseVoltage(AnalogCapture* cap)
 /**
 	@brief Gets the most probable "1" level for a digital waveform
  */
-float Measurement::GetTopVoltage(AnalogCapture* cap)
+float Measurement::GetTopVoltage(AnalogWaveform* cap)
 {
 	float vmin = GetMinVoltage(cap);
 	float vmax = GetMaxVoltage(cap);
@@ -341,156 +289,6 @@ float Measurement::GetTopVoltage(AnalogCapture* cap)
 
 	float fbin = (idx + 0.5f)/nbins;
 	return fbin*delta + vmin;
-}
-
-/**
-	@brief Gets the average rise time of a waveform
-
-	The low and high thresholds are fractional values, e.g. 0.2 and 0.8 for 20-80% rise time.
- */
-float Measurement::GetRiseTime(AnalogCapture* cap, float low, float high)
-{
-	float base = GetBaseVoltage(cap);
-	float top = GetTopVoltage(cap);
-	float delta = top-base;
-
-	float start = low*delta + base;
-	float end = high*delta + base;
-
-	//Find all of the rising edges and count stuff
-	enum
-	{
-		STATE_UNKNOWN,
-		STATE_RISING,
-		STATE_FALLING,
-		STATE_LOW
-	} state = STATE_UNKNOWN;
-	size_t edge_start = 0;
-	double delta_sum = 0;
-	double delta_count = 0;
-	for(size_t i=1; i<cap->GetDepth(); i++)
-	{
-		float v = (*cap)[i];
-
-		switch(state)
-		{
-			//Starting out
-			case STATE_UNKNOWN:
-				if(v > end)
-					state = STATE_FALLING;
-				if(v < start)
-					state = STATE_LOW;
-				break;
-
-			//Waiting for falling edge
-			case STATE_FALLING:
-				if(v < start)
-					state = STATE_LOW;
-				break;
-
-			//Wait for start of rising edge
-			case STATE_LOW:
-				if(v > start)
-				{
-					edge_start = i;
-					state = STATE_RISING;
-				}
-				break;
-
-			//Wait for end of rising edge
-			case STATE_RISING:
-				if(v > end)
-				{
-					//Interpolate end point
-					float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(edge_start);
-					delta_samples += InterpolateTime(cap, i-1, end);
-					delta_samples -= InterpolateTime(cap, edge_start-1, start);
-
-					delta_sum += delta_samples * cap->m_timescale;
-					delta_count ++;
-
-					state = STATE_FALLING;
-				}
-				break;
-		}
-	}
-
-	double avg_ps = delta_sum / delta_count;
-	return avg_ps * 1e-12f;
-}
-
-/**
-	@brief Gets the average fall time of a waveform
-
-	The low and high thresholds are fractional values, e.g. 0.2 and 0.8 for 20-80% rise time.
- */
-float Measurement::GetFallTime(AnalogCapture* cap, float low, float high)
-{
-	float base = GetBaseVoltage(cap);
-	float top = GetTopVoltage(cap);
-	float delta = top-base;
-
-	float start = high*delta + base;
-	float end = low*delta + base;
-
-	//Find all of the falling edges and count stuff
-	enum
-	{
-		STATE_UNKNOWN,
-		STATE_RISING,
-		STATE_FALLING,
-		STATE_HIGH
-	} state = STATE_UNKNOWN;
-	size_t edge_start = 0;
-	double delta_sum = 0;
-	double delta_count = 0;
-	for(size_t i=1; i<cap->GetDepth(); i++)
-	{
-		float v = (*cap)[i];
-
-		switch(state)
-		{
-			//Starting out
-			case STATE_UNKNOWN:
-				if(v > start)
-					state = STATE_HIGH;
-				break;
-
-			//Waiting for falling edge
-			case STATE_RISING:
-				if(v > start)
-					state = STATE_HIGH;
-				break;
-
-			//Wait for start of falling edge
-			case STATE_HIGH:
-				if(v < start)
-				{
-					edge_start = i;
-					state = STATE_FALLING;
-				}
-				break;
-
-			//Wait for end of falling edge
-			case STATE_FALLING:
-				if(v < end)
-				{
-					//Interpolate end point
-					float delta_samples = cap->GetSampleStart(i) - cap->GetSampleStart(edge_start);
-					delta_samples += InterpolateTime(cap, i-1, end);
-					delta_samples -= InterpolateTime(cap, edge_start-1, start);
-
-					delta_sum += delta_samples * cap->m_timescale;
-					delta_count ++;
-
-					state = STATE_RISING;
-				}
-				break;
-		}
-	}
-
-	double avg_ps = delta_sum / delta_count;
-	return avg_ps * 1e-12f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

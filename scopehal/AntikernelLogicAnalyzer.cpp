@@ -316,7 +316,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 	double time = GetTime();
 	double ps = (time - floor(time)) * 1e12f;
 	{
-		DigitalCapture* cap = new DigitalCapture;
+		DigitalWaveform* cap = new DigitalWaveform;
 		cap->m_timescale = m_samplePeriod / 2;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time;
@@ -327,8 +327,13 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 
 		for(size_t i=0; i<m_memoryDepth; i++)
 		{
-			cap->m_samples[i*2] 	= DigitalSample(i*2, 1, 0);
-			cap->m_samples[i*2 + 1] = DigitalSample(i*2 + 1, 1, 1);
+			cap->m_offsets[i*2]			= i*2;
+			cap->m_durations[i*2] 		= 1;
+			cap->m_samples[i*2] 		= false;
+
+			cap->m_offsets[i*2 + 1]		= i*2 + 1;
+			cap->m_durations[i*2 + 1] 	= 1;
+			cap->m_samples[i*2 + 1] 	= true;
 		}
 
 		//Done, update the data
@@ -352,7 +357,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			size_t nbit = nlow % 8;
 
 			//Create the channel
-			DigitalCapture* cap = new DigitalCapture;
+			DigitalWaveform* cap = new DigitalWaveform;
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
@@ -362,8 +367,11 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			//Pull the data
 			for(size_t j=0; j<m_memoryDepth; j++)
 			{
+				cap->m_offsets[j] 	= j;
+				cap->m_durations[j]	= 1;
+
 				uint8_t s = data[j*bytewidth + nbyte];
-				cap->m_samples[j] = DigitalSample(j, 1, (s >> nbit) & 1 ? true : false);
+				cap->m_samples[j]	= (s >> nbit) & 1 ? true : false;
 			}
 
 			//Done, update the data
@@ -376,15 +384,18 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 		else
 		{
 			//Create the channel
-			DigitalBusCapture* cap = new DigitalBusCapture;
+			DigitalBusWaveform* cap = new DigitalBusWaveform;
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
 			cap->m_startPicoseconds = ps;
-			cap->m_samples.reserve(m_memoryDepth);
+			cap->m_samples.resize(m_memoryDepth);
 
 			for(size_t j=0; j<m_memoryDepth; j++)
 			{
+				cap->m_offsets[j] = j;
+				cap->m_durations[j] = 1;
+
 				vector<bool> bits;
 				for(size_t k=0; k<cwidth; k++)
 				{
@@ -395,7 +406,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 					bits.push_back((s >> nbit) & 1 ? true : false);
 				}
 
-				cap->m_samples.push_back(DigitalBusSample(j, 1, bits));
+				cap->m_samples[j] = bits;
 			}
 
 			//Done, update the data

@@ -34,9 +34,9 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FFTCapture
+// FFTWaveform
 
-FFTCapture::~FFTCapture()
+FFTWaveform::~FFTWaveform()
 {
 }
 
@@ -113,28 +113,27 @@ void FFTDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	AnalogWaveform* din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	const size_t npoints_raw = din->m_samples.size();
+	if(npoints_raw == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
-	LogTrace("FFTDecoder: processing %zu raw points\n", din->m_samples.size());
-
 	//Truncate to next power of 2 down
-	const size_t npoints_raw = din->m_samples.size();
 	const size_t npoints = pow(2,floor(log2(npoints_raw)));
+	LogTrace("FFTDecoder: processing %zu raw points\n", npoints_raw);
 	LogTrace("Rounded to %zu\n", npoints);
 
 	//Format the input data as raw samples for the FFT
 	//TODO: handle non-uniform sample rates
 	float* rdin;
-	posix_memalign((void**)&rdin, 32, npoints * sizeof(float));
-	for(size_t i=0; i<npoints; i++)
-		rdin[i] 		= din->m_samples[i];
+	size_t insize = npoints * sizeof(float);
+	posix_memalign((void**)&rdin, 32, insize);
+	memcpy(rdin, &din->m_samples[0], insize);
 
 	float* rdout;
 	const size_t nouts = npoints/2 + 1;
@@ -146,12 +145,12 @@ void FFTDecoder::Refresh()
 	ffts_free(plan);
 
 	//Set up output and copy timestamps
-	FFTCapture* cap = new FFTCapture;
+	auto cap = new FFTWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Calculate size of each bin
-	double ps = din->m_timescale * (din->GetSampleStart(1) - din->GetSampleStart(0));
+	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	cap->m_timescale = bin_hz;
@@ -172,8 +171,13 @@ void FFTDecoder::Refresh()
 			maxmag = mag;
 	}
 
+	cap->Resize(nouts);
 	for(size_t i=1; i<nouts; i++)
-		cap->m_samples.push_back(AnalogSample(i, 1, mags[i-1] / maxmag));
+	{
+		cap->m_offsets[i] = i;
+		cap->m_durations[i] = 1;
+		cap->m_samples[i] = mags[i-1] / maxmag;
+	}
 
 	SetData(cap);
 

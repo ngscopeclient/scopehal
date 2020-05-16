@@ -50,6 +50,10 @@ public:
 		DVI_TYPE_ERROR
 	};
 
+	//default for STL
+	DVISymbol()
+	{}
+
 	DVISymbol(DVIType type, uint8_t r = 0, uint8_t g = 0, uint8_t b = 0)
 	 : m_type(type)
 	 , m_red(r)
@@ -74,8 +78,7 @@ public:
 	virtual ~VideoScanlinePacket();
 };
 
-typedef OscilloscopeSample<DVISymbol> DVISample;
-typedef CaptureChannel<DVISymbol> DVICapture;
+typedef Waveform<DVISymbol> DVIWaveform;
 
 class DVIDecoder : public PacketDecoder
 {

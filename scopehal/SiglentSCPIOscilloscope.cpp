@@ -58,9 +58,6 @@ string SiglentSCPIOscilloscope::GetDriverNameInternal()
 // parses out length, does no other validation. requires 17 bytes at header.
 uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 {
-
-	int r = 0;
-
 	m_transport->ReadRawData(16, (unsigned char*)header);
 
 	if (strlen(header) != 16)
@@ -72,10 +69,9 @@ uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 	return atoi(&header[8]);
 }
 
-void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel)
+void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int /*channel*/)
 {
 	char header[17] = {0};
-	ssize_t r = 0;
 	uint32_t headerLength = 0;
 
 	headerLength = ReadWaveHeader(header);
@@ -137,7 +133,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Set up the capture we're going to store our data into
-		AnalogCapture* cap = new AnalogCapture;
+		AnalogWaveform* cap = new AnalogWaveform;
 
 		//TODO: get sequence count from wavedesc
 		//TODO: sequence mode should be multiple captures, one per sequence, with some kind of fifo or something?
@@ -224,17 +220,24 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			//LogDebug("    Trigger offset: %.3f sec (%lu samples)\n", trigoff, trigoff_samples);
 
 			//If we have samples already in the capture, stretch the final one to our trigger offset
+			/*
 			if(cap->m_samples.size())
 			{
 				auto& last_sample = cap->m_samples[cap->m_samples.size()-1];
 				last_sample.m_duration = trigtime_samples - last_sample.m_offset;
 			}
+			*/
 
 			//Decode the samples
 			unsigned int num_samples = wavesize;
 			LogDebug("Got %u samples\n", num_samples);
+			cap->Resize(num_samples);
 			for(unsigned int i=0; i<num_samples; i++)
-				cap->m_samples.push_back(AnalogSample(i + trigtime_samples, 1, data[i] * v_gain - v_off));
+			{
+				cap->m_offsets[i]	= i+trigtime_samples;
+				cap->m_durations[i]	= 1;
+				cap->m_samples[i]	= data[i] * v_gain - v_off;
+			}
 		}
 
 		//Done, update the data
@@ -243,12 +246,6 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
-	//Refresh protocol decoders
-	for(size_t i=0; i<m_channels.size(); i++)
-	{
-		ProtocolDecoder* decoder = dynamic_cast<ProtocolDecoder*>(m_channels[i]);
-		if(decoder != NULL)
-			decoder->Refresh();
-	}
+
 	return true;
 }

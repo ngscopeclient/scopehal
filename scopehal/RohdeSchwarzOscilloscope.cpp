@@ -409,7 +409,7 @@ bool RohdeSchwarzOscilloscope::AcquireData(bool toQueue)
 	double xstop;
 	size_t length;
 	int ignored;
-	map<int, vector<AnalogCapture*> > pending_waveforms;
+	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
@@ -433,7 +433,7 @@ bool RohdeSchwarzOscilloscope::AcquireData(bool toQueue)
 		float* temp_buf = new float[length];
 
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-		AnalogCapture* cap = new AnalogCapture;
+		AnalogWaveform* cap = new AnalogWaveform;
 		cap->m_timescale = ps_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -454,8 +454,13 @@ bool RohdeSchwarzOscilloscope::AcquireData(bool toQueue)
 		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)temp_buf);
 
 		//Format the capture
+		cap->Resize(length);
 		for(size_t i=0; i<length; i++)
-			cap->m_samples.push_back(AnalogSample(i, 1, temp_buf[i]));
+		{
+			cap->m_offsets[i] = i;
+			cap->m_durations[i] = 1;
+			cap->m_samples[i] = temp_buf[i];
+		}
 
 		//Done, update the data
 		if(!toQueue)

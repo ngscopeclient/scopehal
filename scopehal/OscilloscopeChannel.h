@@ -36,7 +36,7 @@
 #ifndef OscilloscopeChannel_h
 #define OscilloscopeChannel_h
 
-#include "CaptureChannel.h"
+#include "Waveform.h"
 
 class Oscilloscope;
 
@@ -52,6 +52,7 @@ public:
 	{
 		CHANNEL_TYPE_ANALOG,
 		CHANNEL_TYPE_DIGITAL,
+		CHANNEL_TYPE_EYE,
 
 		CHANNEL_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
 
@@ -76,17 +77,26 @@ public:
 	std::string m_displayname;
 
 	//Stuff here is set once at init and can't be changed
-	ChannelType GetType();
-	std::string GetHwname();
+	ChannelType GetType()
+	{ return m_type; }
+
+	std::string GetHwname()
+	{ return m_hwname; }
 
 	///Get the channel's data
-	CaptureChannelBase* GetData();
+	WaveformBase* GetData()
+	{ return m_data; }
 
 	///Detach the capture data from this channel
-	CaptureChannelBase* Detach();
+	WaveformBase* Detach()
+	{
+		WaveformBase* tmp = m_data;
+		m_data = NULL;
+		return tmp;
+	}
 
 	///Set new data, overwriting the old data as appropriate
-	void SetData(CaptureChannelBase* pNew);
+	void SetData(WaveformBase* pNew);
 
 	int GetWidth()
 	{ return m_width; }
@@ -150,7 +160,7 @@ protected:
 	Oscilloscope* m_scope;
 
 	///Capture data
-	CaptureChannelBase* m_data;
+	WaveformBase* m_data;
 
 	///Channel type
 	ChannelType m_type;
@@ -160,9 +170,6 @@ protected:
 
 	///Bus width (1 to N, only meaningful for digital channels)
 	int m_width;
-
-	///Set to true if we're the output of a protocol decoder
-	bool m_procedural;
 
 	///Channel index
 	size_t m_index;

@@ -71,8 +71,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<USB2PCSSymbol> USB2PCSSample;
-typedef CaptureChannel<USB2PCSSymbol> USB2PCSCapture;
+typedef Waveform<USB2PCSSymbol> USB2PCSWaveform;
 
 class USB2PCSDecoder : public ProtocolDecoder
 {
@@ -116,29 +115,29 @@ protected:
 		DecodeState& state,
 		BusSpeed& speed,
 		size_t& ui_width,
-		USB2PCSCapture* cap,
-		USB2PMACapture* din,
+		USB2PCSWaveform* cap,
+		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSample& current_sample);
+		USB2PCSSymbol& current_sample);
 
 	void RefreshIterationSync(
 		const USBLineSample& sin,
 		DecodeState& state,
 		size_t& ui_width,
-		USB2PCSCapture* cap,
-		USB2PMACapture* din,
+		USB2PCSWaveform* cap,
+		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSample& current_sample);
+		USB2PCSSymbol& current_sample);
 
 	void RefreshIterationData(
 		const USBLineSample& sin,
 		const USBLineSample& slast,
 		DecodeState& state,
 		size_t& ui_width,
-		USB2PCSCapture* cap,
-		USB2PMACapture* din,
+		USB2PCSWaveform* cap,
+		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSample& current_sample);
+		USB2PCSSymbol& current_sample);
 };
 
 #endif

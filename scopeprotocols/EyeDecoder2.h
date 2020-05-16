@@ -34,13 +34,12 @@
  */
 
 #include "../scopehal/ProtocolDecoder.h"
-#include "../scopehal/CaptureChannel.h"
 
-class EyeCapture2 : public CaptureChannelBase
+class EyeWaveform : public WaveformBase
 {
 public:
-	EyeCapture2(size_t width, size_t height, float center);
-	virtual ~EyeCapture2();
+	EyeWaveform(size_t width, size_t height, float center);
+	virtual ~EyeWaveform();
 
 	float* GetData()
 	{ return m_outdata; }
@@ -76,15 +75,6 @@ protected:
 
 	size_t m_totalUIs;
 	float m_centerVoltage;
-
-public:
-	//Not really applicable for eye patterns, but...
-	virtual size_t GetDepth() const;
-	virtual int64_t GetEndTime() const;
-	virtual int64_t GetSampleStart(size_t i) const;
-	virtual int64_t GetSampleLen(size_t i) const;
-	virtual bool EqualityTest(size_t i, size_t j) const;
-	virtual bool SamplesAdjacent(size_t i, size_t j) const;
 };
 
 class EyeDecoder2 : public ProtocolDecoder

@@ -56,7 +56,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_type(type)
 	, m_hwname(hwname)
 	, m_width(width)
-	, m_procedural(false)
 	, m_index(index)
 	, m_physical(physical)
 	, m_refcount(0)
@@ -181,29 +180,7 @@ void OscilloscopeChannel::SetVoltageRange(double range)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-CaptureChannelBase* OscilloscopeChannel::Detach()
-{
-	CaptureChannelBase* tmp = m_data;
-	m_data = NULL;
-	return tmp;
-}
-
-OscilloscopeChannel::ChannelType OscilloscopeChannel::GetType()
-{
-	return m_type;
-}
-
-string OscilloscopeChannel::GetHwname()
-{
-	return m_hwname;
-}
-
-CaptureChannelBase* OscilloscopeChannel::GetData()
-{
-	return m_data;
-}
-
-void OscilloscopeChannel::SetData(CaptureChannelBase* pNew)
+void OscilloscopeChannel::SetData(WaveformBase* pNew)
 {
 	if(m_data == pNew)
 		return;

@@ -57,8 +57,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<ADL5205Symbol> ADL5205Sample;
-typedef CaptureChannel<ADL5205Symbol> ADL5205Capture;
+typedef Waveform<ADL5205Symbol> ADL5205Waveform;
 
 class ADL5205Decoder : public ProtocolDecoder
 {

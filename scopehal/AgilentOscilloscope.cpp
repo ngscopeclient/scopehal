@@ -435,7 +435,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 	double yincrement;
 	double yorigin;
 	double yreference;
-	map<int, vector<AnalogCapture*> > pending_waveforms;
+	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
@@ -459,8 +459,9 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 
 		//LogDebug("length = %d\n", length);
 
-		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-		AnalogCapture* cap = new AnalogCapture;
+		//Set up the capture we're going to store our data into
+		//(no TDC data available on Agilent scopes?)
+		AnalogWaveform* cap = new AnalogWaveform;
 		cap->m_timescale = ps_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -487,8 +488,13 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
 
 		//Format the capture
+		cap->Resize(length);
 		for(size_t j=0; j<length; j++)
-			cap->m_samples.push_back(AnalogSample(j, 1, yincrement * (temp_buf[j] - yreference) + yorigin));
+		{
+			cap->m_offsets[j] = j;
+			cap->m_durations[j] = 1;
+			cap->m_samples[j] = yincrement * (temp_buf[j] - yreference) + yorigin;
+		}
 
 		//Done, update the data
 		if(!toQueue)

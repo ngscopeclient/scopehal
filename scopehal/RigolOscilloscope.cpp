@@ -230,7 +230,7 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 	return atten;
 }
 
-void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
+void RigolOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
 {
 	//FIXME
 }
@@ -247,7 +247,7 @@ int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 0;
 }
 
-void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+void RigolOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
 {
 	//FIXME
 }
@@ -272,7 +272,7 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void RigolOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
 {
 	//FIXME
 }
@@ -304,7 +304,7 @@ double RigolOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void RigolOscilloscope::SetChannelOffset(size_t i, double offset)
+void RigolOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 {
 	//FIXME
 }
@@ -374,7 +374,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	double yreference;
 	size_t maxpoints = 250*1000;
 	unsigned char* temp_buf = new unsigned char[maxpoints];
-	map<int, vector<AnalogCapture*> > pending_waveforms;
+	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
@@ -408,7 +408,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 
 		//Set up the capture we're going to store our data into
-		AnalogCapture* cap = new AnalogCapture;
+		AnalogWaveform* cap = new AnalogWaveform;
 		cap->m_timescale = ps_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -446,11 +446,14 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			//Scale: (value - Yorigin - Yref) * Yinc
 			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	//why is there a trailing byte here??
 			double ydelta = yorigin + yreference;
+			cap->Resize(cap->m_samples.size() + header_blocksize);
 			for(size_t j=0; j<header_blocksize; j++)
 			{
 				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
-				cap->m_samples.push_back(AnalogSample(npoint+j, 1, v));
+				cap->m_offsets[npoint+j] = npoint+j;
+				cap->m_durations[npoint+j] = 1;
+				cap->m_samples[npoint+j] = v;
 			}
 
 			//Done, update the data

@@ -122,9 +122,9 @@ void DVIDecoder::Refresh()
 		return;
 	}
 
-	TMDSCapture* dblue = dynamic_cast<TMDSCapture*>(m_channels[0]->GetData());
-	TMDSCapture* dgreen = dynamic_cast<TMDSCapture*>(m_channels[1]->GetData());
-	TMDSCapture* dred = dynamic_cast<TMDSCapture*>(m_channels[2]->GetData());
+	auto dblue = dynamic_cast<TMDSWaveform*>(m_channels[0]->GetData());
+	auto dgreen = dynamic_cast<TMDSWaveform*>(m_channels[1]->GetData());
+	auto dred = dynamic_cast<TMDSWaveform*>(m_channels[2]->GetData());
 	if( (dblue == NULL) || (dgreen == NULL) || (dred == NULL) )
 	{
 		SetData(NULL);
@@ -132,7 +132,7 @@ void DVIDecoder::Refresh()
 	}
 
 	//Create the capture
-	DVICapture* cap = new DVICapture;
+	DVIWaveform* cap = new DVIWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = dblue->m_startTimestamp;
 	cap->m_startPicoseconds = dblue->m_startPicoseconds;
@@ -147,17 +147,20 @@ void DVIDecoder::Refresh()
 	int current_pixels = 0;
 
 	//Decode the actual data
-	for(iblue = 0; (iblue < dblue->size()) && (igreen < dgreen->size()) && (ired < dred->size()); )
+	size_t bsize = dblue->m_offsets.size();
+	size_t wgsize = dgreen->m_offsets.size();
+	size_t rsize = dred->m_offsets.size();
+	for(iblue = 0; (iblue < bsize) && (igreen < wgsize) && (ired < rsize); )
 	{
 		auto sblue = dblue->m_samples[iblue];
 
 		//Control code in master channel? Decode it
-		if(sblue.m_sample.m_type == TMDSSymbol::TMDS_TYPE_CONTROL)
+		if(sblue.m_type == TMDSSymbol::TMDS_TYPE_CONTROL)
 		{
 			//If the last sample was data, save the packet for the scanline or data island
 			if( (last_type == TMDSSymbol::TMDS_TYPE_DATA) && (current_packet != NULL) )
 			{
-				current_packet->m_len = sblue.m_offset + sblue.m_duration - current_packet->m_offset;
+				current_packet->m_len = dblue->m_offsets[iblue] + dblue->m_durations[iblue] - current_packet->m_offset;
 				char tmp[32];
 				snprintf(tmp, sizeof(tmp), "%d", current_pixels);
 				current_packet->m_headers["Width"] = tmp;
@@ -169,46 +172,44 @@ void DVIDecoder::Refresh()
 
 			//Extract synchronization signals from blue channel
 			//Red/green have status signals that aren't used in DVI.
-			bool hsync = (sblue.m_sample.m_data & 1) ? true : false;
-			bool vsync = (sblue.m_sample.m_data & 2) ? true : false;
+			bool hsync = (sblue.m_data & 1) ? true : false;
+			bool vsync = (sblue.m_data & 2) ? true : false;
 
 			//If this symbol matches the previous one, just extend it
 			//rather than creating a new symbol
-			if( (cap->m_samples.size() > 0) && (dblue->m_samples[iblue-1].m_sample == sblue.m_sample) )
-			{
-				auto& last_sample = cap->m_samples[cap->m_samples.size()-1];
-				last_sample.m_duration = sblue.m_offset + sblue.m_duration - last_sample.m_offset;
-			}
+			size_t last = cap->m_durations.size()-1;
+			if( (cap->m_samples.size() > 0) && (dblue->m_samples[iblue-1] == sblue) )
+				cap->m_durations[last] = dblue->m_offsets[iblue] + dblue->m_durations[iblue] - cap->m_offsets[last];
 
 			else if(vsync)
 			{
 				auto pack = new Packet;
-				pack->m_offset = sblue.m_offset;
+				pack->m_offset = dblue->m_offsets[iblue];
 				pack->m_headers["Type"] = "VSYNC";
 				m_packets.push_back(pack);
 
-				cap->m_samples.push_back(DVISample(
-					sblue.m_offset, sblue.m_duration,
-					DVISymbol(DVISymbol::DVI_TYPE_VSYNC)));
+				cap->m_offsets.push_back(dblue->m_offsets[iblue]);
+				cap->m_durations.push_back(dblue->m_durations[iblue]);
+				cap->m_samples.push_back(DVISymbol(DVISymbol::DVI_TYPE_VSYNC));
 			}
 
 			else if(hsync)
 			{
-				cap->m_samples.push_back(DVISample(
-					sblue.m_offset, sblue.m_duration,
-					DVISymbol(DVISymbol::DVI_TYPE_HSYNC)));
+				cap->m_offsets.push_back(dblue->m_offsets[iblue]);
+				cap->m_durations.push_back(dblue->m_durations[iblue]);
+				cap->m_samples.push_back(DVISymbol(DVISymbol::DVI_TYPE_HSYNC));
 			}
 
 			else
 			{
-				cap->m_samples.push_back(DVISample(
-					sblue.m_offset, sblue.m_duration,
-					DVISymbol(DVISymbol::DVI_TYPE_PREAMBLE)));
+				cap->m_offsets.push_back(dblue->m_offsets[iblue]);
+				cap->m_durations.push_back(dblue->m_durations[iblue]);
+				cap->m_samples.push_back(DVISymbol(DVISymbol::DVI_TYPE_PREAMBLE));
 			}
 		}
 
 		//Data? Decode it
-		else if(sblue.m_sample.m_type == TMDSSymbol::TMDS_TYPE_DATA)
+		else if(sblue.m_type == TMDSSymbol::TMDS_TYPE_DATA)
 		{
 			//If the LAST sample was a control symbol, re-synchronize the three lanes
 			//to compensate for lane-to-lane clock skew.
@@ -222,11 +223,11 @@ void DVIDecoder::Refresh()
 					size_t ngreen = delta + igreen;
 					if(ngreen < 1)
 						continue;
-					if(ngreen >= dgreen->size())
+					if(ngreen >= wgsize)
 						continue;
-					if(dgreen->m_samples[ngreen-1].m_sample.m_type != TMDSSymbol::TMDS_TYPE_CONTROL)
+					if(dgreen->m_samples[ngreen-1].m_type != TMDSSymbol::TMDS_TYPE_CONTROL)
 						continue;
-					if(dgreen->m_samples[ngreen].m_sample.m_type != TMDSSymbol::TMDS_TYPE_DATA)
+					if(dgreen->m_samples[ngreen].m_type != TMDSSymbol::TMDS_TYPE_DATA)
 						continue;
 
 					igreen += delta;
@@ -239,11 +240,11 @@ void DVIDecoder::Refresh()
 					size_t nred = delta + ired;
 					if(nred < 1)
 						continue;
-					if(nred >= dred->size())
+					if(nred >= rsize)
 						continue;
-					if(dred->m_samples[nred-1].m_sample.m_type != TMDSSymbol::TMDS_TYPE_CONTROL)
+					if(dred->m_samples[nred-1].m_type != TMDSSymbol::TMDS_TYPE_CONTROL)
 						continue;
-					if(dred->m_samples[nred].m_sample.m_type != TMDSSymbol::TMDS_TYPE_DATA)
+					if(dred->m_samples[nred].m_type != TMDSSymbol::TMDS_TYPE_DATA)
 						continue;
 
 					ired += delta;
@@ -252,7 +253,7 @@ void DVIDecoder::Refresh()
 
 				//Start a new packet
 				current_packet = new VideoScanlinePacket;
-				current_packet->m_offset = sblue.m_offset;
+				current_packet->m_offset = dblue->m_offsets[iblue];
 				current_packet->m_headers["Type"] = "Video";
 				current_pixels = 0;
 			}
@@ -260,26 +261,26 @@ void DVIDecoder::Refresh()
 			auto sgreen = dgreen->m_samples[igreen];
 			auto sred = dred->m_samples[ired];
 
-			cap->m_samples.push_back(DVISample(
-				sblue.m_offset, sblue.m_duration,
-				DVISymbol(DVISymbol::DVI_TYPE_VIDEO,
-				sred.m_sample.m_data,
-				sgreen.m_sample.m_data,
-				sblue.m_sample.m_data)));
+			cap->m_offsets.push_back(dblue->m_offsets[iblue]);
+			cap->m_durations.push_back(dblue->m_durations[iblue]);
+			cap->m_samples.push_back(DVISymbol(DVISymbol::DVI_TYPE_VIDEO,
+				sred.m_data,
+				sgreen.m_data,
+				sblue.m_data));
 
 			//In-memory packet data is RGB order for compatibility with Gdk::Pixbuf
 			//may be null if waveform starts halfway through a scan line. Don't make a packet for that.
 			if(current_packet != NULL)
 			{
-				current_packet->m_data.push_back(sred.m_sample.m_data);
-				current_packet->m_data.push_back(sgreen.m_sample.m_data);
-				current_packet->m_data.push_back(sblue.m_sample.m_data);
+				current_packet->m_data.push_back(sred.m_data);
+				current_packet->m_data.push_back(sgreen.m_data);
+				current_packet->m_data.push_back(sblue.m_data);
 				current_pixels ++;
 			}
 		}
 
 		//Save the previous type of sample
-		last_type = sblue.m_sample.m_type;
+		last_type = sblue.m_type;
 
 		//Default to incrementing all channels
 		iblue ++;
@@ -295,11 +296,10 @@ void DVIDecoder::Refresh()
 
 Gdk::Color DVIDecoder::GetColor(int i)
 {
-	DVICapture* capture = dynamic_cast<DVICapture*>(GetData());
+	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const DVISymbol& s = capture->m_samples[i].m_sample;
-
+		auto s = capture->m_samples[i];
 		switch(s.m_type)
 		{
 			case DVISymbol::DVI_TYPE_PREAMBLE:
@@ -328,11 +328,10 @@ Gdk::Color DVIDecoder::GetColor(int i)
 
 string DVIDecoder::GetText(int i)
 {
-	DVICapture* capture = dynamic_cast<DVICapture*>(GetData());
+	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const DVISymbol& s = capture->m_samples[i].m_sample;
-
+		auto s = capture->m_samples[i];
 		char tmp[32];
 		switch(s.m_type)
 		{

@@ -49,6 +49,10 @@ public:
 		TMDS_TYPE_DATA
 	};
 
+	//default constructor for STL
+	TMDSSymbol()
+	{}
+
 	TMDSSymbol(TMDSType type,uint8_t d)
 	 : m_type(type)
 	 , m_data(d)
@@ -63,8 +67,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<TMDSSymbol> TMDSSample;
-typedef CaptureChannel<TMDSSymbol> TMDSCapture;
+typedef Waveform<TMDSSymbol> TMDSWaveform;
 
 class TMDSDecoder : public ProtocolDecoder
 {

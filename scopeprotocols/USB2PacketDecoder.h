@@ -93,8 +93,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<USB2PacketSymbol> USB2PacketSample;
-typedef CaptureChannel<USB2PacketSymbol> USB2PacketCapture;
+typedef Waveform<USB2PacketSymbol> USB2PacketWaveform;
 
 class USB2PacketDecoder : public PacketDecoder
 {

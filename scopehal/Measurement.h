@@ -86,7 +86,7 @@ protected:
 
 public:
 	//Helpers for superresolution
-	static float InterpolateTime(AnalogCapture* cap, size_t a, float voltage);
+	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
 
 	//Enumeration / factory
 public:
@@ -99,15 +99,12 @@ public:
 public:
 	//Helpers for more complex measurements
 	//TODO: create some process for caching this so we don't waste CPU time
-	static float GetMinVoltage(AnalogCapture* cap);
-	static float GetMaxVoltage(AnalogCapture* cap);
-	static float GetBaseVoltage(AnalogCapture* cap);
-	static float GetTopVoltage(AnalogCapture* cap);
-	static float GetAvgVoltage(AnalogCapture* cap);
-	static float GetPeriod(AnalogCapture* cap);
-	static float GetRiseTime(AnalogCapture* cap, float low, float high);
-	static float GetFallTime(AnalogCapture* cap, float low, float high);
-	static std::vector<size_t> MakeHistogram(AnalogCapture* cap, float low, float high, size_t bins);
+	static float GetMinVoltage(AnalogWaveform* cap);
+	static float GetMaxVoltage(AnalogWaveform* cap);
+	static float GetBaseVoltage(AnalogWaveform* cap);
+	static float GetTopVoltage(AnalogWaveform* cap);
+	static float GetAvgVoltage(AnalogWaveform* cap);
+	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
 
 protected:
 	//Class enumeration

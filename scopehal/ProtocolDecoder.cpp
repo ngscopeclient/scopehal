@@ -369,35 +369,38 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* clock, vector<DigitalSample>& samples)
+void ProtocolDecoder::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
 	size_t ndata = 0;
-	for(size_t i=1; i<clock->m_samples.size(); i++)
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
 		//Throw away clock samples until we find a rising edge
-		auto csample = clock->m_samples[i];
-		auto ocsample = clock->m_samples[i-1];
-		if(!(csample.m_sample && !ocsample.m_sample))
+		if(!(clock->m_samples[i] && !clock->m_samples[i-1]))
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = csample.m_offset * clock->m_timescale;
-		while( (ndata < data->m_samples.size()) && (data->m_samples[ndata].m_offset * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
+		while( (ndata < dlen) && (data->m_offsets[ndata] * data->m_timescale < clkstart) )
 			ndata ++;
-		if(ndata >= data->m_samples.size())
+		if(ndata >= dlen)
 			break;
 
 		//Extend the previous sample's duration (if any) to our start
-		if(samples.size())
+		size_t ssize = samples.m_samples.size();
+		if(ssize)
 		{
-			auto& s = samples[samples.size() - 1];
-			s.m_duration = clkstart - s.m_offset;
+			size_t last = ssize - 1;
+			samples.m_durations[last] = clkstart - samples.m_offsets[last];
 		}
 
 		//Add the new sample
-		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
+		samples.m_offsets.push_back(clkstart);
+		samples.m_durations.push_back(1);
+		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
 }
 
@@ -412,35 +415,38 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalCapture* data, DigitalCapture* 
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnRisingEdges(DigitalBusCapture* data, DigitalCapture* clock, vector<DigitalBusSample>& samples)
+void ProtocolDecoder::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
 {
 	samples.clear();
 
 	size_t ndata = 0;
-	for(size_t i=1; i<clock->m_samples.size(); i++)
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
 		//Throw away clock samples until we find a rising edge
-		auto csample = clock->m_samples[i];
-		auto ocsample = clock->m_samples[i-1];
-		if(!(csample.m_sample && !ocsample.m_sample))
+		if(!(clock->m_samples[i] && !clock->m_samples[i-1]))
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = csample.m_offset * clock->m_timescale;
-		while( (ndata < data->m_samples.size()) && (data->m_samples[ndata].m_offset * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
+		while( (ndata < dlen) && (data->m_offsets[ndata] * data->m_timescale < clkstart) )
 			ndata ++;
-		if(ndata >= data->m_samples.size())
+		if(ndata >= dlen)
 			break;
 
 		//Extend the previous sample's duration (if any) to our start
-		if(samples.size())
+		size_t ssize = samples.m_samples.size();
+		if(ssize)
 		{
-			auto& s = samples[samples.size() - 1];
-			s.m_duration = clkstart - s.m_offset;
+			size_t last = ssize - 1;
+			samples.m_durations[last] = clkstart - samples.m_offsets[last];
 		}
 
 		//Add the new sample
-		samples.push_back(DigitalBusSample(clkstart, 1, data->m_samples[ndata].m_sample));
+		samples.m_offsets.push_back(clkstart);
+		samples.m_durations.push_back(1);
+		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
 }
 
@@ -455,34 +461,38 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalBusCapture* data, DigitalCaptur
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnFallingEdges(DigitalCapture* data, DigitalCapture* clock, vector<DigitalSample>& samples)
+void ProtocolDecoder::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
 	size_t ndata = 0;
-	for(size_t i=1; i<clock->m_samples.size(); i++)
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
 		//Throw away clock samples until we find a falling edge
-		auto csample = clock->m_samples[i];
-		auto ocsample = clock->m_samples[i-1];
-		if(!(!csample.m_sample && ocsample.m_sample))
+		if(!(!clock->m_samples[i] && clock->m_samples[i-1]))
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = csample.m_offset * clock->m_timescale;
-		while( (ndata < data->m_samples.size()) && (data->m_samples[ndata].m_offset * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
+		while( (ndata < dlen) && (data->m_offsets[ndata] * data->m_timescale < clkstart) )
 			ndata ++;
-		if(ndata >= data->m_samples.size())
+		if(ndata >= dlen)
 			break;
 
 		//Extend the previous sample's duration (if any) to our start
-		if(samples.size())
+		size_t ssize = samples.m_samples.size();
+		if(ssize)
 		{
-			auto& s = samples[samples.size() - 1];
-			s.m_duration = clkstart - s.m_offset;
+			size_t last = ssize - 1;
+			samples.m_durations[last] = clkstart - samples.m_offsets[last];
 		}
 
-		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
+		//Add the new sample
+		samples.m_offsets.push_back(clkstart);
+		samples.m_durations.push_back(1);
+		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
 }
 
@@ -497,42 +507,45 @@ void ProtocolDecoder::SampleOnFallingEdges(DigitalCapture* data, DigitalCapture*
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnAnyEdges(DigitalCapture* data, DigitalCapture* clock, vector<DigitalSample>& samples)
+void ProtocolDecoder::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
 	size_t ndata = 0;
-	for(size_t i=1; i<clock->m_samples.size(); i++)
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
 		//Throw away clock samples until we find an edge
-		auto csample = clock->m_samples[i];
-		auto ocsample = clock->m_samples[i-1];
-		if(csample.m_sample == ocsample.m_sample)
+		if(clock->m_samples[i] == clock->m_samples[i-1])
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = csample.m_offset * clock->m_timescale;
-		while( (ndata < data->m_samples.size()) && (data->m_samples[ndata].m_offset * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
+		while( (ndata < dlen) && (data->m_offsets[ndata] * data->m_timescale < clkstart) )
 			ndata ++;
-		if(ndata >= data->m_samples.size())
+		if(ndata >= dlen)
 			break;
 
 		//Extend the previous sample's duration (if any) to our start
-		if(samples.size())
+		size_t ssize = samples.m_samples.size();
+		if(ssize)
 		{
-			auto& s = samples[samples.size() - 1];
-			s.m_duration = clkstart - s.m_offset;
+			size_t last = ssize - 1;
+			samples.m_durations[last] = clkstart - samples.m_offsets[last];
 		}
 
 		//Add the new sample
-		samples.push_back(DigitalSample(clkstart, 1, data->m_samples[ndata].m_sample));
+		samples.m_offsets.push_back(clkstart);
+		samples.m_durations.push_back(1);
+		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
 }
 
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, std::vector<int64_t>& edges)
+void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
 {
 	//Find times of the zero crossings (TODO: extract this into reusable function)
 	bool first = true;
@@ -541,8 +554,7 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 	size_t len = data->m_samples.size();
 	for(size_t i=1; i<len; i++)
 	{
-		auto& sin = data->m_samples[i];
-		bool value = static_cast<float>(sin) > threshold;
+		bool value = data->m_samples[i] > threshold;
 
 		//Save the last value
 		if(first)
@@ -557,7 +569,7 @@ void ProtocolDecoder::FindZeroCrossings(AnalogCapture* data, float threshold, st
 			continue;
 
 		//Midpoint of the sample, plus the zero crossing
-		int64_t t = phoff + data->m_timescale * (sin.m_offset + Measurement::InterpolateTime(data, i-1, threshold));
+		int64_t t = phoff + data->m_timescale * (data->m_offsets[i] + Measurement::InterpolateTime(data, i-1, threshold));
 		edges.push_back(t);
 		last = value;
 	}
@@ -643,21 +655,21 @@ string ProtocolDecoder::GetText(int /*i*/)
 
 string ProtocolDecoder::GetTextForAsciiChannel(int i)
 {
-	AsciiCapture* capture = dynamic_cast<AsciiCapture*>(GetData());
+	AsciiWaveform* capture = dynamic_cast<AsciiWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const AsciiSample& sample = capture->m_samples[i];
+		char c = capture->m_samples[i];
 		char sbuf[16] = {0};
-		if(isprint(sample.m_sample))
-			sbuf[0] = sample.m_sample;
-		else if(sample.m_sample == '\r')		//special case common non-printable chars
+		if(isprint(c))
+			sbuf[0] = c;
+		else if(c == '\r')		//special case common non-printable chars
 			return "\\r";
-		else if(sample.m_sample == '\n')
+		else if(c == '\n')
 			return "\\n";
-		else if(sample.m_sample == '\b')
+		else if(c == '\b')
 			return "\\b";
 		else
-			snprintf(sbuf, sizeof(sbuf), "\\x%02x", 0xFF & sample.m_sample);
+			snprintf(sbuf, sizeof(sbuf), "\\x%02x", 0xFF & c);
 		return sbuf;
 	}
 	return "";

@@ -112,7 +112,7 @@ void HorizontalBathtubDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	EyeCapture2* din = dynamic_cast<EyeCapture2*>(m_channels[0]->GetData());
+	EyeWaveform* din = dynamic_cast<EyeWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -136,27 +136,33 @@ void HorizontalBathtubDecoder::Refresh()
 	double ps_per_pixel = ps_per_width / din->GetWidth();
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	AnalogWaveform* cap = new AnalogWaveform;
 
 	//Extract the single scanline we're interested in
 	//TODO: support a range of voltages
 	int64_t* row = din->GetAccumData() + ybin*din->GetWidth();
-	for(size_t i=0; i<din->GetWidth(); i++)
-		cap->m_samples.push_back(AnalogSample(i*ps_per_pixel - din->m_uiWidth, ps_per_pixel, row[i]));
+	size_t len = din->GetWidth();
+	cap->Resize(len);
+	for(size_t i=0; i<len; i++)
+	{
+		cap->m_offsets[i] = i*ps_per_pixel - din->m_uiWidth;
+		cap->m_durations[i] = ps_per_pixel;
+		cap->m_samples[i] = row[i];
+	}
 
 	//Move from the center out and integrate BER
 	float sumleft = 0;
 	float sumright = 0;
-	ssize_t mid = cap->m_samples.size()/2;
+	ssize_t mid = len/2;
 	for(ssize_t i=mid; i>=0; i--)
 	{
-		float& samp = cap->m_samples[i].m_sample;
+		float& samp = cap->m_samples[i];
 		sumleft += samp;
 		samp = sumleft;
 	}
-	for(size_t i=mid; i<cap->m_samples.size(); i++)
+	for(size_t i=mid; i<len; i++)
 	{
-		float& samp = cap->m_samples[i].m_sample;
+		float& samp = cap->m_samples[i];
 		sumright += samp;
 		samp = sumright;
 	}
@@ -165,13 +171,13 @@ void HorizontalBathtubDecoder::Refresh()
 	float nmax = sumleft;
 	if(sumright > sumleft)
 		nmax = sumright;
-	for(size_t i=0; i<cap->m_samples.size(); i++)
-		cap->m_samples[i].m_sample /= nmax;
+	for(size_t i=0; i<len; i++)
+		cap->m_samples[i] /= nmax;
 
 	//Log post-scaling
-	for(size_t i=0; i<cap->m_samples.size(); i++)
+	for(size_t i=0; i<len; i++)
 	{
-		float& samp = cap->m_samples[i].m_sample;
+		float& samp = cap->m_samples[i];
 		if(samp < 1e-12)
 			samp = -14;	//cap ber if we don't have enough data
 		else

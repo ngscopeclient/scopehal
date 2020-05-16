@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeCapture2::EyeCapture2(size_t width, size_t height, float center)
+EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
 	: m_width(width)
 	, m_height(height)
 	, m_totalUIs(0)
@@ -54,7 +54,7 @@ EyeCapture2::EyeCapture2(size_t width, size_t height, float center)
 	m_uiWidth = 1;
 }
 
-EyeCapture2::~EyeCapture2()
+EyeWaveform::~EyeWaveform()
 {
 	delete[] m_accumdata;
 	m_accumdata = NULL;
@@ -62,37 +62,7 @@ EyeCapture2::~EyeCapture2()
 	m_outdata = NULL;
 }
 
-size_t EyeCapture2::GetDepth() const
-{
-	return 0;
-}
-
-int64_t EyeCapture2::GetEndTime() const
-{
-	return 0;
-}
-
-int64_t EyeCapture2::GetSampleStart(size_t /*i*/) const
-{
-	return 0;
-}
-
-int64_t EyeCapture2::GetSampleLen(size_t /*i*/) const
-{
-	return 0;
-}
-
-bool EyeCapture2::EqualityTest(size_t /*i*/, size_t /*j*/) const
-{
-	return false;
-}
-
-bool EyeCapture2::SamplesAdjacent(size_t /*i*/, size_t /*j*/) const
-{
-	return false;
-}
-
-void EyeCapture2::Normalize()
+void EyeWaveform::Normalize()
 {
 	//Normalize it
 	size_t len = m_width * m_height;
@@ -345,8 +315,8 @@ void EyeDecoder2::Refresh()
 		return;
 	}
 
-	auto waveform = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	auto clock = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto waveform = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	auto clock = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (waveform == NULL) || (clock == NULL) )
 	{
 		SetData(NULL);
@@ -354,7 +324,8 @@ void EyeDecoder2::Refresh()
 	}
 
 	//Can't do much if we have no samples to work with
-	if( (waveform->GetDepth() == 0) || (clock->GetDepth() == 0) )
+	size_t cend = clock->m_samples.size();
+	if( (waveform->m_samples.size() == 0) || !cend )
 	{
 		SetData(NULL);
 		return;
@@ -364,9 +335,9 @@ void EyeDecoder2::Refresh()
 
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
-	EyeCapture2* cap = dynamic_cast<EyeCapture2*>(m_data);
+	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(m_data);
 	if(cap == NULL)
-		cap = new EyeCapture2(m_width, m_height, 0);	//TODO: make center configurable (scopehal:#1)
+		cap = new EyeWaveform(m_width, m_height, 0);	//TODO: make center configurable (scopehal:#1)
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
 
@@ -376,8 +347,7 @@ void EyeDecoder2::Refresh()
 	//Calculate average period of the clock
 	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
 	//We probably need a preprocessing filter to handle analog etc clock sources.
-	size_t cend = clock->GetDepth();
-	double tlastclk = clock->m_samples[cend-1].m_offset + clock->m_samples[cend-1].m_duration;
+	double tlastclk = clock->m_offsets[cend-1] + clock->m_durations[cend-1];
 	m_uiWidth = tlastclk / cend;
 	cap->m_uiWidth = m_uiWidth;
 
@@ -400,11 +370,9 @@ void EyeDecoder2::Refresh()
 
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
-		auto& samp = waveform->m_samples[i];
-		auto& nsamp = waveform->m_samples[i+1];
-		int64_t twidth = clock->m_samples[iclock].m_duration;
-		int64_t tstart = samp.m_offset * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - clock->m_samples[iclock].m_offset * clock->m_timescale;
+		int64_t twidth = clock->m_durations[iclock];
+		int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
+		int64_t offset = tstart - clock->m_offsets[iclock] * clock->m_timescale;
 		if(offset < 0)
 			continue;
 		if(offset > twidth)
@@ -421,13 +389,13 @@ void EyeDecoder2::Refresh()
 			continue;
 
 		//Interpolate voltage
-		int64_t dt = (nsamp.m_offset - samp.m_offset) * waveform->m_timescale;
+		int64_t dt = (waveform->m_offsets[i+1] - waveform->m_offsets[i]) * waveform->m_timescale;
 		float pixel_x_f = offset * scale;
 		float pixel_x_fround = floor(pixel_x_f);
 		int64_t pixel_x_round = pixel_x_fround + hwidth;
-		float dv = nsamp.m_sample - samp.m_sample;
+		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
 		float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * scale );
-		float nominal_voltage = samp.m_sample + dv*dx_frac;
+		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 
 		//Find (and sanity check) the Y coordinate
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;
@@ -456,7 +424,7 @@ void EyeDecoder2::Refresh()
 	}
 
 	//Count total number of UIs we've integrated
-	cap->IntegrateUIs(clock->GetDepth());
+	cap->IntegrateUIs(clock->m_samples.size());
 
 	cap->Normalize();
 	SetData(cap);
