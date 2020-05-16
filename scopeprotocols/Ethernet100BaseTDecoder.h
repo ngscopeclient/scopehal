@@ -51,8 +51,8 @@ public:
 protected:
 	int GetState(float voltage);
 	bool TrySync(
-		std::vector<DigitalSample>& bits,
-		std::vector<DigitalSample>& descrambled_bits,
+		DigitalWaveform& bits,
+		DigitalWaveform& descrambled_bits,
 		size_t idle_offset,
 		size_t stop);
 };

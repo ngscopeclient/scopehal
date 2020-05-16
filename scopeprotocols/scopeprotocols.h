@@ -45,23 +45,26 @@
 #include "ADL5205Decoder.h"
 #include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
+*/
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
-#include "ClockRecoveryDebugDecoder.h"
+/*
 #include "DCOffsetDecoder.h"
 #include "DDR3Decoder.h"
+*/
 #include "DifferenceDecoder.h"
+/*
 #include "DramRefreshActivateMeasurementDecoder.h"
 #include "DramRowColumnLatencyMeasurementDecoder.h"
 */
 #include "DVIDecoder.h"
-/*
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
+/*
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
 */
+#include "Ethernet100BaseTDecoder.h"
 #include "EyeDecoder2.h"
 /*
 #include "FallMeasurementDecoder.h"

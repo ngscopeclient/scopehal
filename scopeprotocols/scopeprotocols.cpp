@@ -45,24 +45,33 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurementDecoder);
 	AddDecoderClass(CANDecoder);
+	*/
 	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockRecoveryDebugDecoder);
 	AddDecoderClass(ClockJitterDecoder);
+	/*
 	AddDecoderClass(DCOffsetDecoder);
 	AddDecoderClass(DDR3Decoder);
+	*/
 	AddDecoderClass(DifferenceDecoder);
+	/*
 	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
 	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
+	*/
 	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
+	//AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
+	/*
 	AddDecoderClass(EthernetGMIIDecoder);
 	AddDecoderClass(EthernetAutonegotiationDecoder);
+	*/
 	AddDecoderClass(EyeDecoder2);
+	/*
 	AddDecoderClass(FallMeasurementDecoder);
 	AddDecoderClass(FFTDecoder);
 	AddDecoderClass(FrequencyMeasurementDecoder);
+	*/
 	AddDecoderClass(HorizontalBathtubDecoder);
+	/*
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(JtagDecoder);
@@ -82,8 +91,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(USB2PMADecoder);
+	*/
 	AddDecoderClass(WaterfallDecoder);
-
+	/*
 	AddStatisticClass(AverageStatistic);
 	AddStatisticClass(MaximumStatistic);
 	AddStatisticClass(MinimumStatistic);

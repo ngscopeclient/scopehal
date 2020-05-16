@@ -53,17 +53,11 @@ ClockRecoveryDecoder::ClockRecoveryDecoder(string color)
 	m_parameters[m_threshname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_threshname].SetFloatVal(0);
 
-	m_phaseErrorCapture = NULL;
 	m_nominalPeriod = 0;
 }
 
 ClockRecoveryDecoder::~ClockRecoveryDecoder()
 {
-	if(m_phaseErrorCapture)
-	{
-		delete m_phaseErrorCapture;
-		m_phaseErrorCapture = NULL;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,16 +124,16 @@ void ClockRecoveryDecoder::Refresh()
 		return;
 	}
 
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if( (din == NULL) || (din->GetDepth() == 0) )
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if( (din == NULL) || (din->m_samples.size() == 0) )
 	{
 		SetData(NULL);
 		return;
 	}
 
-	DigitalCapture* gate = NULL;
+	DigitalWaveform* gate = NULL;
 	if(m_channels[1] != NULL)
-		gate = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+		gate = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
@@ -147,20 +141,11 @@ void ClockRecoveryDecoder::Refresh()
 	m_nominalPeriod = ps;
 
 	//Create the output waveform and copy our timescales
-	DigitalCapture* cap = new DigitalCapture;
+	auto cap = new DigitalWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
-
-	//Create debug capture
-	if(m_phaseErrorCapture != NULL)
-		delete m_phaseErrorCapture;
-	m_phaseErrorCapture = new AnalogCapture;
-	m_phaseErrorCapture->m_startTimestamp = din->m_startTimestamp;
-	m_phaseErrorCapture->m_startPicoseconds = din->m_startPicoseconds;
-	m_phaseErrorCapture->m_triggerPhase = 0;
-	m_phaseErrorCapture->m_timescale = 1;
 
 	double start = GetTime();
 
@@ -180,7 +165,7 @@ void ClockRecoveryDecoder::Refresh()
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	int64_t tend = din->m_samples[din->m_samples.size() - 1].m_offset * din->m_timescale;
+	int64_t tend = din->m_offsets[din->m_offsets.size() - 1] * din->m_timescale;
 	float period = ps;
 	size_t nedge = 1;
 	//LogDebug("n,delta,period\n");
@@ -203,8 +188,8 @@ void ClockRecoveryDecoder::Refresh()
 			while(igate < edges.size()-1)
 			{
 				//See if this edge is within the region
-				int64_t a = gate->m_samples[igate].m_offset;
-				int64_t b = a + gate->m_samples[igate].m_duration;
+				int64_t a = gate->m_offsets[igate];
+				int64_t b = a + gate->m_durations[igate];
 				a *= gate->m_timescale;
 				b *= gate->m_timescale;
 
@@ -219,7 +204,7 @@ void ClockRecoveryDecoder::Refresh()
 				//Good alignment
 				else
 				{
-					gating = !gate->m_samples[igate].m_sample;
+					gating = !gate->m_samples[igate];
 					break;
 				}
 			}
@@ -235,17 +220,6 @@ void ClockRecoveryDecoder::Refresh()
 			//Find phase error
 			int64_t delta = (edgepos - tnext) - period;
 			total_error += fabs(delta);
-
-			//Extend the previous debug sample to now
-			if(!m_phaseErrorCapture->m_samples.empty())
-			{
-				auto& last = m_phaseErrorCapture->m_samples[m_phaseErrorCapture->size() - 1];
-				last.m_duration = tnext - last.m_offset;
-			}
-
-			//Record the current phase error
-			m_phaseErrorCapture->m_samples.push_back(AnalogSample(
-				tnext, period, delta));
 
 			//If the clock is currently gated, re-sync to the edge
 			if(was_gating && !gating)
@@ -277,9 +251,10 @@ void ClockRecoveryDecoder::Refresh()
 		if(!gating)
 		{
 			value = !value;
-			cap->m_samples.push_back(DigitalSample(
-				static_cast<int64_t>(round(edgepos_orig + period/2 - din->m_timescale*1.5)),
-				(int64_t)period, value));
+
+			cap->m_offsets.push_back(static_cast<int64_t>(round(edgepos_orig + period/2 - din->m_timescale*1.5)));
+			cap->m_durations.push_back(period);
+			cap->m_samples.push_back(value);
 		}
 	}
 

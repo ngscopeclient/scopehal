@@ -39,6 +39,35 @@
 #include <vector>
 
 /**
+	@brief Wrapper around a primitive data type that has an empty default constructor.
+
+	Can be seamlessly casted to that type. This allows STL data structures to be created with explicitly uninitialized
+	members via resize() and avoids a nasty memset that wastes a lot of time.
+*/
+template<class T>
+class EmptyConstructorWrapper
+{
+public:
+	EmptyConstructorWrapper()
+	{}
+
+	EmptyConstructorWrapper(const T& rhs)
+	: m_value(rhs)
+	{}
+
+	operator T&()
+	{ return m_value; }
+
+	T& operator=(const T& rhs)
+	{
+		m_value = rhs;
+		return *this;
+	}
+
+	T m_value;
+};
+
+/**
 	@brief Base class for all Waveform specializations
 
 	One waveform contains a time-series of sample objects as well as scale information etc. The samples may
@@ -84,10 +113,10 @@ public:
 	double m_triggerPhase;
 
 	///@brief Start timestamps of each sample
-	std::vector<int64_t> m_offsets;
+	std::vector<EmptyConstructorWrapper<int64_t>> m_offsets;
 
 	///@brief Durations of each sample
-	std::vector<int64_t> m_durations;
+	std::vector<EmptyConstructorWrapper<int64_t>> m_durations;
 
 	virtual void clear()
 	{
@@ -128,7 +157,9 @@ public:
 	}
 };
 
-typedef Waveform<bool> 					DigitalWaveform;
+//we need this to avoid problems with the bitfield packing used by vector<bool>
+typedef Waveform<EmptyConstructorWrapper<bool> >	DigitalWaveform;
+
 typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
 typedef Waveform<float>					AnalogWaveform;
 typedef Waveform<char>					AsciiWaveform;

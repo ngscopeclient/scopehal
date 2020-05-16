@@ -105,8 +105,8 @@ void ClockJitterDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* clk = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	DigitalCapture* golden = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto clk = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	auto golden = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (clk == NULL) || (golden == NULL) )
 	{
 		SetData(NULL);
@@ -124,7 +124,7 @@ void ClockJitterDecoder::Refresh()
 	}
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
@@ -139,7 +139,7 @@ void ClockJitterDecoder::Refresh()
 		if(iedge >= len)
 			break;
 
-		int64_t prev_edge = golden->m_samples[iedge].m_offset * golden->m_timescale;
+		int64_t prev_edge = golden->m_offsets[iedge] * golden->m_timescale;
 		int64_t next_edge = prev_edge;
 		size_t jedge = iedge;
 
@@ -149,7 +149,7 @@ void ClockJitterDecoder::Refresh()
 		while(true)
 		{
 			prev_edge = next_edge;
-			next_edge = golden->m_samples[jedge].m_offset * golden->m_timescale;
+			next_edge = golden->m_offsets[jedge] * golden->m_timescale;
 
 			//First golden edge is after this signal edge
 			if(prev_edge > atime)
@@ -186,8 +186,9 @@ void ClockJitterDecoder::Refresh()
 		int64_t tie = atime - golden_center;
 
 		m_maxTie = max(m_maxTie, fabs(tie));
-		cap->m_samples.push_back(AnalogSample(
-			atime, golden_period, tie));
+		cap->m_offsets.push_back(atime);
+		cap->m_durations.push_back(golden_period);
+		cap->m_samples.push_back(tie);
 	}
 
 	SetData(cap);

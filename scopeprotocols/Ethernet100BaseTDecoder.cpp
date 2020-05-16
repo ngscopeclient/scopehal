@@ -70,7 +70,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -78,14 +78,14 @@ void Ethernet100BaseTDecoder::Refresh()
 	}
 
 	//Can't do much if we have no samples to work with
-	if(din->GetDepth() == 0)
+	if(din->m_samples.size() == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Copy our time scales from the input
-	EthernetCapture* cap = new EthernetCapture;
+	EthernetWaveform* cap = new EthernetWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
@@ -103,7 +103,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	for(size_t i=1; i<ilen; i++)
 	{
 		int newstate = oldstate;
-		float voltage = din->m_samples[i].m_sample;
+		float voltage = din->m_samples[i];
 		switch(oldstate)
 		{
 			//At the middle? Need significant motion either way to change state
@@ -134,7 +134,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int old_voltage = voltages[0];
-	vector<DigitalSample> bits;
+	DigitalWaveform bits;
 	bool signal_ok = false;
 	vector<size_t> carrier_starts;
 	vector<size_t> carrier_stops;
@@ -157,7 +157,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			{
 				//See how long the voltage stayed constant.
 				//For each UI, add a "0" bit, then a "1" bit for the current state
-				int64_t tchange = din->m_samples[i].m_offset;
+				int64_t tchange = din->m_offsets[i];
 				int64_t dt = (tchange - old_offset) * din->m_timescale;
 				int num_uis = round(dt * ui_inverse);
 
@@ -166,22 +166,25 @@ void Ethernet100BaseTDecoder::Refresh()
 				for(int j=0; j<(num_uis - 1); j++)
 				{
 					tnext = old_offset + ui_width_samples*j;
-					bits.push_back(DigitalSample(tnext,	ui_width_samples, 0));
+					bits.m_offsets.push_back(tnext);
+					bits.m_durations.push_back(ui_width_samples);
+					bits.m_samples.push_back(0);
 				}
 				tnext = old_offset + ui_width_samples*(num_uis - 1);
 
 				//and then a 1 bit
-				bits.push_back(DigitalSample(
-					tnext, (tchange + din->m_samples[i].m_duration) - tnext, 1));
+				bits.m_offsets.push_back(tnext);
+				bits.m_durations.push_back(tchange + din->m_durations[i]);
+				bits.m_samples.push_back(1);
 			}
 
-			old_offset = din->m_samples[i].m_offset;
+			old_offset = din->m_offsets[i];
 			old_voltage = voltages[i];
 		}
 
 		//Look for complete loss of signal.
 		//We define this as more than 20 "0" symbols in a row.
-		if( (old_offset + losslen) < (size_t)din->m_samples[i].m_offset)
+		if( (old_offset + losslen) < (size_t)din->m_offsets[i])
 		{
 			if(signal_ok)
 			{
@@ -197,13 +200,13 @@ void Ethernet100BaseTDecoder::Refresh()
 	if(carrier_stops.size() < carrier_starts.size())
 	{
 		lost_before_end = false;
-		carrier_stops.push_back(bits[bits.size()-1].m_offset);
+		carrier_stops.push_back(bits.m_offsets[bits.m_offsets.size()-1]);
 	}
 
 	//Run all remaining decode steps in blocks of valid signal
 	for(size_t nblock=0; nblock<carrier_starts.size(); nblock ++)
 	{
-		LogTrace("nblock = %zu\n", nblock);
+		//LogTrace("nblock = %zu\n", nblock);
 		size_t istart = carrier_starts[nblock];
 		size_t istop = carrier_stops[nblock];
 
@@ -211,17 +214,18 @@ void Ethernet100BaseTDecoder::Refresh()
 		if(nblock > 0)
 		{
 			size_t ilost = carrier_stops[nblock-1];
-			size_t tstart = din->m_samples[ilost].m_offset;
-			size_t tend = din->m_samples[istart].m_offset;
+			size_t tstart = din->m_offsets[ilost];
+			size_t tend = din->m_offsets[istart];
 			LogTrace("No carrier from %zu to %zu\n", tstart, tend);
 			EthernetFrameSegment seg;
 			seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;
-			EthernetSample sample(tstart, tend-tstart, seg);
-			cap->m_samples.push_back(sample);
+			cap->m_offsets.push_back(tstart);
+			cap->m_durations.push_back(tend - tstart);
+			cap->m_samples.push_back(seg);
 		}
 
 		//RX LFSR sync
-		vector<DigitalSample> descrambled_bits;
+		DigitalWaveform descrambled_bits;
 		bool synced = false;
 		for(size_t idle_offset = istart; idle_offset<istart+15000 && idle_offset<istop; idle_offset++)
 		{
@@ -243,12 +247,14 @@ void Ethernet100BaseTDecoder::Refresh()
 		bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
 		size_t i = 0;
 		bool hit = true;
-		for(i=0; i<descrambled_bits.size() - 10; i++)
+		size_t des10 = descrambled_bits.m_samples.size() - 10;
+		for(i=0; i<des10; i++)
 		{
 			hit = true;
 			for(int j=0; j<10; j++)
 			{
-				if(descrambled_bits[i+j].m_sample != ssd[j])
+				bool b = descrambled_bits.m_samples[i+j];
+				if(b != ssd[j])
 				{
 					hit = false;
 					break;
@@ -314,14 +320,15 @@ void Ethernet100BaseTDecoder::Refresh()
 		bool first = true;
 		uint8_t current_byte = 0;
 		uint64_t current_start = 0;
-		for(; i<descrambled_bits.size()-5; i+=5)
+		size_t deslen = descrambled_bits.m_samples.size()-5;
+		for(; i<deslen; i+=5)
 		{
 			unsigned int code =
-				(descrambled_bits[i+0].m_sample << 4) |
-				(descrambled_bits[i+1].m_sample << 3) |
-				(descrambled_bits[i+2].m_sample << 2) |
-				(descrambled_bits[i+3].m_sample << 1) |
-				(descrambled_bits[i+4].m_sample << 0);
+				(descrambled_bits.m_samples[i+0] ? 16 : 0) |
+				(descrambled_bits.m_samples[i+1] ? 8 : 0) |
+				(descrambled_bits.m_samples[i+2] ? 4 : 0) |
+				(descrambled_bits.m_samples[i+3] ? 2 : 0) |
+				(descrambled_bits.m_samples[i+4] ? 1 : 0);
 
 			//Handle special stuff
 			if(code == 0x18)
@@ -357,7 +364,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			int decoded = code_5to4[code];
 			if(first)
 			{
-				current_start = descrambled_bits[i].m_offset;
+				current_start = descrambled_bits.m_offsets[i];
 				current_byte = decoded;
 			}
 			else
@@ -366,7 +373,7 @@ void Ethernet100BaseTDecoder::Refresh()
 
 				bytes.push_back(current_byte);
 				starts.push_back(current_start * cap->m_timescale);
-				uint64_t end = descrambled_bits[i+4].m_offset + descrambled_bits[i+4].m_duration;
+				uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
 				ends.push_back(end * cap->m_timescale);
 			}
 
@@ -380,60 +387,60 @@ void Ethernet100BaseTDecoder::Refresh()
 	if(lost_before_end)
 	{
 		size_t nindex = carrier_stops[carrier_stops.size()-1];
-		size_t tstart = din->m_samples[nindex].m_offset;
-		size_t tend = din->m_samples[din->m_samples.size()-1].m_offset;
+		size_t tstart = din->m_offsets[nindex];
+		size_t tend = din->m_offsets[din->m_samples.size()-1];
 		LogTrace("No carrier from index %zu (time %zu) to %zu (end of capture)\n",
 			nindex, tstart, tend);
 		EthernetFrameSegment seg;
 		seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;
-		EthernetSample sample(tstart, tend-tstart, seg);
-		cap->m_samples.push_back(sample);
+		cap->m_offsets.push_back(tstart);
+		cap->m_durations.push_back(tend - tstart);
+		cap->m_samples.push_back(seg);
 	}
 
 	SetData(cap);
 }
 
 bool Ethernet100BaseTDecoder::TrySync(
-	vector<DigitalSample>& bits,
-	vector<DigitalSample>& descrambled_bits,
+	DigitalWaveform& bits,
+	DigitalWaveform& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {
-	if( (idle_offset + 64) >= bits.size())
+	if( (idle_offset + 64) >= bits.m_samples.size())
 		return false;
 	descrambled_bits.clear();
 
 	//For now, assume the link is idle at the time we triggered
 	unsigned int lfsr =
-		( (!bits[idle_offset + 0]) << 10 ) |
-		( (!bits[idle_offset + 1]) << 9 ) |
-		( (!bits[idle_offset + 2]) << 8 ) |
-		( (!bits[idle_offset + 3]) << 7 ) |
-		( (!bits[idle_offset + 4]) << 6 ) |
-		( (!bits[idle_offset + 5]) << 5 ) |
-		( (!bits[idle_offset + 6]) << 4 ) |
-		( (!bits[idle_offset + 7]) << 3 ) |
-		( (!bits[idle_offset + 8]) << 2 ) |
-		( (!bits[idle_offset + 9]) << 1 ) |
-		( (!bits[idle_offset + 10]) << 0 );
+		( (!bits.m_samples[idle_offset + 0]) << 10 ) |
+		( (!bits.m_samples[idle_offset + 1]) << 9 ) |
+		( (!bits.m_samples[idle_offset + 2]) << 8 ) |
+		( (!bits.m_samples[idle_offset + 3]) << 7 ) |
+		( (!bits.m_samples[idle_offset + 4]) << 6 ) |
+		( (!bits.m_samples[idle_offset + 5]) << 5 ) |
+		( (!bits.m_samples[idle_offset + 6]) << 4 ) |
+		( (!bits.m_samples[idle_offset + 7]) << 3 ) |
+		( (!bits.m_samples[idle_offset + 8]) << 2 ) |
+		( (!bits.m_samples[idle_offset + 9]) << 1 ) |
+		( (!bits.m_samples[idle_offset + 10]) << 0 );
 
 	//Descramble
-	for(unsigned int i=idle_offset + 11; i<bits.size() && i<stop; i++)
+	size_t len = bits.m_samples.size();
+	for(unsigned int i=idle_offset + 11; i<len && i<stop; i++)
 	{
-		auto b = bits[i];
 		lfsr = (lfsr << 1) ^ ((lfsr >> 8)&1) ^ ((lfsr >> 10)&1);
-
-		descrambled_bits.push_back(DigitalSample(
-			b.m_offset,
-			b.m_duration,
-			b.m_sample ^ (lfsr & 1)));
+		descrambled_bits.m_offsets.push_back(bits.m_offsets[i]);
+		descrambled_bits.m_durations.push_back(bits.m_durations[i]);
+		bool b = bits.m_samples[i] ^ (lfsr & 1);
+		descrambled_bits.m_samples.push_back(b);
 	}
 
 	//We should have at least 64 "1" bits in a row once the descrambling is done.
 	//The minimum inter-frame gap is a lot bigger than this.
 	for(int i=0; i<64; i++)
 	{
-		if(descrambled_bits[i + idle_offset + 11].m_sample != 1)
+		if(descrambled_bits.m_samples[i + idle_offset + 11] != 1)
 			return false;
 	}
 

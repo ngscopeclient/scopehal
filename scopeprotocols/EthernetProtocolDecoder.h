@@ -66,8 +66,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<EthernetFrameSegment> EthernetSample;
-typedef CaptureChannel<EthernetFrameSegment> EthernetCapture;
+typedef Waveform<EthernetFrameSegment> EthernetWaveform;
 
 class EthernetProtocolDecoder : public PacketDecoder
 {
@@ -87,7 +86,7 @@ protected:
 		std::vector<uint8_t>& bytes,
 		std::vector<uint64_t>& starts,
 		std::vector<uint64_t>& ends,
-		EthernetCapture* cap);
+		EthernetWaveform* cap);
 };
 
 #endif

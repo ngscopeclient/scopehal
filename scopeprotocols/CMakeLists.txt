@@ -6,20 +6,19 @@ set(SCOPEPROTOCOLS_SOURCES
 	#ADL5205Decoder.cpp
 	#BaseMeasurementDecoder.cpp
 	#CANDecoder.cpp
-	#ClockJitterDecoder.cpp
-	#ClockRecoveryDecoder.cpp
-	#ClockRecoveryDebugDecoder.cpp
+	ClockJitterDecoder.cpp
+	ClockRecoveryDecoder.cpp
 	#DCOffsetDecoder.cpp
 	#DDR3Decoder.cpp
-	#DifferenceDecoder.cpp
+	DifferenceDecoder.cpp
 	#DramRefreshActivateMeasurementDecoder.cpp
 	#DramRowColumnLatencyMeasurementDecoder.cpp
 	DVIDecoder.cpp
 	#Ethernet10BaseTDecoder.cpp
-	#Ethernet100BaseTDecoder.cpp
+	Ethernet100BaseTDecoder.cpp
 	#EthernetAutonegotiationDecoder.cpp
 	#EthernetGMIIDecoder.cpp
-	#EthernetProtocolDecoder.cpp
+	EthernetProtocolDecoder.cpp
 	EyeDecoder2.cpp
 	#FallMeasurementDecoder.cpp
 	FFTDecoder.cpp

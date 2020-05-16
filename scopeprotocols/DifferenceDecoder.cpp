@@ -105,8 +105,8 @@ void DifferenceDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
+	auto din_p = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	auto din_n = dynamic_cast<AnalogWaveform*>(m_channels[1]->GetData());
 	if( (din_p == NULL) || (din_n == NULL) )
 	{
 		SetData(NULL);
@@ -132,21 +132,19 @@ void DifferenceDecoder::Refresh()
 	}
 
 	//Create the output
-	AnalogCapture* cap;
-	if(dynamic_cast<FFTCapture*>(din_p) != NULL)
-		cap = new FFTCapture;
+	AnalogWaveform* cap;
+	if(dynamic_cast<FFTWaveform*>(din_p) != NULL)
+		cap = new FFTWaveform;
 	else
-		cap = new AnalogCapture;
+		cap = new AnalogWaveform;
 
 	//Subtract all of our samples
-	cap->m_samples.resize(len);
+	cap->Resize(len);
+	memcpy(&cap->m_offsets[0],		&din_p->m_offsets[0],	sizeof(int64_t)*len);
+	memcpy(&cap->m_durations[0],	&din_p->m_durations[0], sizeof(int64_t)*len);
 	#pragma omp parallel for
 	for(size_t i=0; i<len; i++)
-	{
-		cap->m_samples[i].m_offset 		= din_p->m_samples[i].m_offset;
-		cap->m_samples[i].m_duration 	= din_p->m_samples[i].m_duration;
-		cap->m_samples[i].m_sample 		= din_p->m_samples[i].m_sample - din_n->m_samples[i].m_sample;
-	}
+		cap->m_samples[i] 		= din_p->m_samples[i] - din_n->m_samples[i];
 
 	SetData(cap);
 
