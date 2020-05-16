@@ -139,12 +139,16 @@ void DifferenceDecoder::Refresh()
 		cap = new AnalogWaveform;
 
 	//Subtract all of our samples
+	//Heap blocks are guaranteed aligned on 64-bit glibc, so this might break on 32 bit.
+	//Does anyone still use that?
 	cap->Resize(len);
 	memcpy(&cap->m_offsets[0],		&din_p->m_offsets[0],	sizeof(int64_t)*len);
 	memcpy(&cap->m_durations[0],	&din_p->m_durations[0], sizeof(int64_t)*len);
-	#pragma omp parallel for
+	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	float* a = (float*)__builtin_assume_aligned(&din_p->m_samples[0], 16);
+	float* b = (float*)__builtin_assume_aligned(&din_n->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] 		= din_p->m_samples[i] - din_n->m_samples[i];
+		out[i] 		= a[i] - b[i];
 
 	SetData(cap);
 
