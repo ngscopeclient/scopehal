@@ -206,7 +206,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	//Run all remaining decode steps in blocks of valid signal
 	for(size_t nblock=0; nblock<carrier_starts.size(); nblock ++)
 	{
-		//LogTrace("nblock = %zu\n", nblock);
+		LogTrace("nblock = %zu\n", nblock);
 		size_t istart = carrier_starts[nblock];
 		size_t istop = carrier_stops[nblock];
 
