@@ -162,6 +162,24 @@ protected:
 	void BulkCheckChannelEnableState();
 
 	bool ReadWaveformBlock(std::string& data);
+	bool ReadWavedescs(
+		std::vector<std::string>& wavedescs,
+		bool* enabled,
+		unsigned int& firstEnabledChannel,
+		bool& any_enabled);
+	void RequestWaveforms(bool* enabled, uint32_t num_sequences);
+	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
+	void ProcessAnalogWaveform(
+		std::string data,
+		unsigned int nchan,
+		bool toQueue,
+		std::string& wavedesc,
+		uint32_t num_sequences,
+		time_t ttime,
+		double basetime,
+		double* wavetime,
+		std::map<int, std::vector<WaveformBase*> >& pending_waveforms
+		);
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

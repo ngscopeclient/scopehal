@@ -1034,8 +1034,215 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	}*/
 }
 
+bool LeCroyOscilloscope::ReadWavedescs(
+	vector<string>& wavedescs,
+	bool* enabled,
+	unsigned int& firstEnabledChannel,
+	bool& any_enabled)
+{
+	//(Note: with VICP framing we cannot use semicolons to separate commands)
+	BulkCheckChannelEnableState();
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		enabled[i] = IsChannelEnabled(i);
+		if(enabled[i])
+			any_enabled = true;
+	}
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		wavedescs.push_back("");
+
+		//If NO channels are enabled, query channel 1's WAVEDESC.
+		//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
+		if(enabled[i] || (!any_enabled && i==0))
+		{
+			if(firstEnabledChannel == UINT_MAX)
+				firstEnabledChannel = i;
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+		}
+	}
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(enabled[i] || (!any_enabled && i==0))
+		{
+			if(!ReadWaveformBlock(wavedescs[i]))
+				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
+		}
+	}
+
+	//Check length, complain if a wavedesc comes back too short
+	size_t expected_wavedesc_size = 346;
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(!enabled[i] && !(!any_enabled && i==0))
+			continue;
+
+		if(wavedescs[i].size() < expected_wavedesc_size)
+		{
+			LogError("Got wavedesc of %zu bytes (expected %zu)\n", wavedescs[i].size(), expected_wavedesc_size);
+			return false;
+		}
+	}
+	return true;
+}
+
+void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences)
+{
+	bool sent_wavetime = false;
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(enabled[i])
+		{
+			//If a multi-segment capture, ask for the trigger time data
+			if( (num_sequences > 1) && !sent_wavetime)
+			{
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
+				sent_wavetime = true;
+			}
+
+			//Ask for the data
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
+		}
+	}
+}
+
+time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& basetime)
+{
+	/*
+		Timestamp is a somewhat complex format that needs some shuffling around.
+		Timestamp starts at offset 296 bytes in the wavedesc
+		(296-303)	double seconds
+		(304)		byte minutes
+		(305)		byte hours
+		(306)		byte days
+		(307)		byte months
+		(308-309)	uint16 year
+
+		TODO: during startup, query instrument for its current time zone
+		since the wavedesc reports instment local time
+	 */
+	double fseconds = *reinterpret_cast<const double*>(wavedesc + 296);
+	uint8_t seconds = floor(fseconds);
+	basetime = fseconds - seconds;
+	time_t tnow = time(NULL);
+	struct tm tstruc;
+	localtime_r(&tnow, &tstruc);
+
+	//Convert the instrument time to a string, then back to a tm
+	//Is there a better way to do this???
+	//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
+	//Maybe because tm_yday is inconsistent?
+	char tblock[64] = {0};
+	snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
+		*reinterpret_cast<uint16_t*>(wavedesc + 308),
+		wavedesc[307],
+		wavedesc[306],
+		wavedesc[305],
+		wavedesc[304],
+		seconds);
+	locale cur_locale;
+	auto& tget = use_facet< time_get<char> >(cur_locale);
+	istringstream stream(tblock);
+	ios::iostate state;
+	char format[] = "%F %T";
+	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
+	return mktime(&tstruc);
+}
+
+void LeCroyOscilloscope::ProcessAnalogWaveform(
+	string data,
+	unsigned int nchan,
+	bool toQueue,
+	string& wavedesc,
+	uint32_t num_sequences,
+	time_t ttime,
+	double basetime,
+	double* wavetime,
+	map<int, vector<WaveformBase*> >& pending_waveforms)
+{
+	//Parse the wavedesc headers
+	auto pdesc = (unsigned char*)(&wavedesc[0]);
+	//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
+	//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+	float v_gain = *reinterpret_cast<float*>(pdesc + 156);
+	float v_off = *reinterpret_cast<float*>(pdesc + 160);
+	float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+	double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+	double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+	if(h_off_frac < 0)
+		h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
+
+	//Raw waveform data
+	size_t num_samples;
+	if(m_highDefinition)
+		num_samples = data.size()/2;
+	else
+		num_samples = data.size();
+	size_t num_per_segment = num_samples / num_sequences;
+	int16_t* wdata = (int16_t*)&data[0];
+	int8_t* bdata = (int8_t*)&data[0];
+
+	for(size_t j=0; j<num_sequences; j++)
+	{
+		//Set up the capture we're going to store our data into
+		AnalogWaveform* cap = new AnalogWaveform;
+		cap->m_timescale = round(interval);
+
+		cap->m_triggerPhase = h_off_frac;
+		cap->m_startTimestamp = ttime;
+
+		//Parse the time
+		if(num_sequences > 1)
+		{
+			double trigger_delta = wavetime[j*2];
+			//double trigger_offset = pwtime[j*2 + 1];
+			//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
+			cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
+		}
+		else
+			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+
+		//Convert raw ADC samples to volts
+		cap->Resize(num_per_segment);
+		int64_t* offs = reinterpret_cast<int64_t*>(&cap->m_offsets[0]);
+		int64_t* durs = reinterpret_cast<int64_t*>(&cap->m_durations[0]);
+		float* samps = reinterpret_cast<float*>(&cap->m_samples[0]);
+		if(m_highDefinition)
+		{
+			int16_t* base = wdata + j*num_per_segment;
+
+			//#pragma omp parallel for
+			for(unsigned int k=0; k<num_per_segment; k++)
+			{
+				offs[k] = k;
+				durs[k] = 1;
+				samps[k] = base[k] * v_gain - v_off;
+			}
+		}
+		else
+		{
+			int8_t* base = bdata + j*num_per_segment;
+
+			//#pragma omp parallel for
+			for(unsigned int k=0; k<num_per_segment; k++)
+			{
+				offs[k] = k;
+				durs[k] = 1;
+				samps[k] = base[k] * v_gain - v_off;
+			}
+		}
+
+		//Done, update the data
+		if(j == 0 && !toQueue)
+			m_channels[nchan]->SetData(cap);
+		else
+			pending_waveforms[nchan].push_back(cap);
+	}
+}
+
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
+	//Read the wavedesc for every enabled channel in batch mode first
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*> > pending_waveforms;
 	double start = GetTime();
@@ -1045,57 +1252,13 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
 
-		//LogDebug("Acquire data\n");
-
-		//Read the wavedesc for every enabled channel in batch mode first
-		//(With VICP framing we cannot use semicolons to separate commands)
+		//Get the wavedescs for all channels
 		vector<string> wavedescs;
-		string cmd;
-		bool enabled[4] = {false};
-		bool any_enabled = true;
-		BulkCheckChannelEnableState();
+		bool enabled[8] = {false};
 		unsigned int firstEnabledChannel = UINT_MAX;
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
-		{
-			enabled[i] = IsChannelEnabled(i);
-			if(enabled[i])
-				any_enabled = true;
-		}
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
-		{
-			wavedescs.push_back("");
-
-			//If NO channels are enabled, query channel 1's WAVEDESC.
-			//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
-			if(enabled[i] || (!any_enabled && i==0))
-			{
-				if(firstEnabledChannel == UINT_MAX)
-					firstEnabledChannel = i;
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
-			}
-		}
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
-		{
-			if(enabled[i] || (!any_enabled && i==0))
-			{
-				if(!ReadWaveformBlock(wavedescs[i]))
-					LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
-			}
-		}
-
-		//Check length, complain if a wavedesc comes back too short
-		size_t expected_wavedesc_size = 346;
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
-		{
-			if(!enabled[i] && !(!any_enabled && i==0))
-				continue;
-
-			if(wavedescs[i].size() < expected_wavedesc_size)
-			{
-				LogError("Got wavedesc of %zu bytes (expected %zu)\n", wavedescs[i].size(), expected_wavedesc_size);
-				return false;
-			}
-		}
+		bool any_enabled = true;
+		if(!ReadWavedescs(wavedescs, enabled, firstEnabledChannel, any_enabled))
+			return false;
 
 		//Figure out how many sequences we have
 		unsigned char* pdesc = NULL;
@@ -1117,62 +1280,10 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			num_sequences = trigtime_len / 16;
 
 		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
-		bool sent_wavetime = false;
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
-		{
-			if(enabled[i])
-			{
-				//If a multi-segment capture, ask for the trigger time data
-				if( (num_sequences > 1) && !sent_wavetime)
-				{
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
-					sent_wavetime = true;
-				}
+		RequestWaveforms(enabled, num_sequences);
 
-				//Ask for the data
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
-			}
-		}
-
-		/*
-			Timestamp is a somewhat complex format that needs some shuffling around.
-			Timestamp starts at offset 296 bytes in the wavedesc
-			(296-303)	double seconds
-			(304)		byte minutes
-			(305)		byte hours
-			(306)		byte days
-			(307)		byte months
-			(308-309)	uint16 year
-
-			TODO: during startup, query instrument for its current time zone
-			since the wavedesc reports instment local time
-		 */
-		double fseconds = *reinterpret_cast<const double*>(wavedescs[firstEnabledChannel].c_str() + 296);
-		uint8_t seconds = floor(fseconds);
-		basetime = fseconds - seconds;
-		time_t tnow = time(NULL);
-		struct tm tstruc;
-		localtime_r(&tnow, &tstruc);
-
-		//Convert the instrument time to a string, then back to a tm
-		//Is there a better way to do this???
-		//Naively poking "struct tm" fields gives incorrect results (scopehal-apps:#52)
-		//Maybe because tm_yday is inconsistent?
-		char tblock[64] = {0};
-		snprintf(tblock, sizeof(tblock), "%d-%d-%d %d:%02d:%02d",
-			*reinterpret_cast<uint16_t*>(pdesc+308),
-			pdesc[307],
-			pdesc[306],
-			pdesc[305],
-			pdesc[304],
-			seconds);
-		locale cur_locale;
-		auto& tget = use_facet< time_get<char> >(cur_locale);
-		istringstream stream(tblock);
-		ios::iostate state;
-		char format[] = "%F %T";
-		tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
-		ttime = mktime(&tstruc);
+		//Get the timestamp of the wavedesc
+		ttime = ExtractTimestamp(pdesc, basetime);
 
 		//Read the timestamps if we're doing segmented capture
 		string wavetime;
@@ -1195,18 +1306,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				continue;
 			}
 
-			//Parse the wavedesc headers
-			pdesc = (unsigned char*)(&wavedescs[i][0]);
-			//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-			//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
-			float v_gain = *reinterpret_cast<float*>(pdesc + 156);
-			float v_off = *reinterpret_cast<float*>(pdesc + 160);
-			float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
-			double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
-			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
-			if(h_off_frac < 0)
-				h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
-
 			//Read the actual waveform data
 			string data;
 			if(!ReadWaveformBlock(data))
@@ -1215,71 +1314,17 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				break;
 			}
 
-			//Raw waveform data
-			size_t num_samples;
-			if(m_highDefinition)
-				num_samples = data.size()/2;
-			else
-				num_samples = data.size();
-			size_t num_per_segment = num_samples / num_sequences;
-			int16_t* wdata = (int16_t*)&data[0];
-			int8_t* bdata = (int8_t*)&data[0];
-
-			for(size_t j=0; j<num_sequences; j++)
-			{
-				//Set up the capture we're going to store our data into
-				AnalogWaveform* cap = new AnalogWaveform;
-				cap->m_timescale = round(interval);
-
-				cap->m_triggerPhase = h_off_frac;
-				cap->m_startTimestamp = ttime;
-
-				//Parse the time
-				if(num_sequences > 1)
-				{
-					double trigger_delta = pwtime[j*2];
-					//double trigger_offset = pwtime[j*2 + 1];
-					//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
-					cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
-				}
-				else
-					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
-
-				//Convert raw ADC samples to volts
-				cap->Resize(num_per_segment);
-				if(m_highDefinition)
-				{
-					int16_t* base = wdata + j*num_per_segment;
-
-					#pragma omp parallel for
-					for(unsigned int k=0; k<num_per_segment; k++)
-					{
-						cap->m_offsets[k] = k;
-						cap->m_durations[k] = 1;
-						cap->m_samples[k] = base[k] * v_gain - v_off;
-					}
-				}
-				else
-				{
-					int8_t* base = bdata + j*num_per_segment;
-
-					#pragma omp parallel for
-					for(unsigned int k=0; k<num_per_segment; k++)
-					{
-						cap->m_offsets[k] = k;
-						cap->m_durations[k] = 1;
-						cap->m_samples[k] = base[k] * v_gain - v_off;
-					}
-				}
-
-				//Done, update the data
-				if(j == 0 && !toQueue)
-					m_channels[i]->SetData(cap);
-				else
-					pending_waveforms[i].push_back(cap);
-			}
+			ProcessAnalogWaveform(
+				data,
+				i,
+				toQueue,
+				wavedescs[i],
+				num_sequences,
+				ttime,
+				basetime,
+				pwtime,
+				pending_waveforms);
 		}
-
 	}
 
 	if(num_sequences > 1)
