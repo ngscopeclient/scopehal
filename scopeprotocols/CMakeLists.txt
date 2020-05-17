@@ -9,7 +9,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
 	DCOffsetDecoder.cpp
-	#DDR3Decoder.cpp
+	DDR3Decoder.cpp
 	DifferenceDecoder.cpp
 	#DramRefreshActivateMeasurementDecoder.cpp
 	#DramRowColumnLatencyMeasurementDecoder.cpp
@@ -34,7 +34,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	#RiseMeasurementDecoder.cpp
 	#SincInterpolationDecoder.cpp
 	#SPIDecoder.cpp
-	#ThresholdDecoder.cpp
+	ThresholdDecoder.cpp
 	TMDSDecoder.cpp
 	#TopMeasurementDecoder.cpp
 	#ARTDecoder.cpp

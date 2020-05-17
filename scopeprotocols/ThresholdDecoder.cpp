@@ -89,7 +89,7 @@ void ThresholdDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -97,7 +97,8 @@ void ThresholdDecoder::Refresh()
 	}
 
 	//Can't do much if we have no samples to work with
-	if(din->GetDepth() == 0)
+	auto len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
@@ -105,15 +106,12 @@ void ThresholdDecoder::Refresh()
 
 	//Threshold all of our samples
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
-	DigitalCapture* cap = new DigitalCapture;
-	cap->m_samples.resize(din->m_samples.size());
+	DigitalWaveform* cap = new DigitalWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(din);
 	#pragma omp parallel for
-	for(size_t i=0; i<din->m_samples.size(); i++)
-	{
-		AnalogSample sin = din->m_samples[i];
-		bool b = (float)sin > midpoint;
-		cap->m_samples[i] = DigitalSample(sin.m_offset, sin.m_duration, b);
-	}
+	for(size_t i=0; i<len; i++)
+		cap->m_samples[i] = din->m_samples[i] > midpoint;
 	SetData(cap);
 
 	//Copy our time scales from the input

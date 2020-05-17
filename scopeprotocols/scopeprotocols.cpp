@@ -49,7 +49,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ClockRecoveryDecoder);
 	AddDecoderClass(ClockJitterDecoder);
 	AddDecoderClass(DCOffsetDecoder);
-	//AddDecoderClass(DDR3Decoder);
+	AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DifferenceDecoder);
 	/*
 	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
@@ -80,7 +80,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(RiseMeasurementDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(SPIDecoder);
+	*/
 	AddDecoderClass(ThresholdDecoder);
+	/*
 	AddDecoderClass(TMDSDecoder);
 	AddDecoderClass(TopMeasurementDecoder);
 	AddDecoderClass(UARTDecoder);

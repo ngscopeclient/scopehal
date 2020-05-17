@@ -35,6 +35,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "DDR3Decoder.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -101,7 +102,7 @@ void DDR3Decoder::SetDefaultName()
 void DDR3Decoder::Refresh()
 {
 	//Get the input data
-	DigitalCapture* caps[7] = {0};
+	DigitalWaveform* caps[7] = {0};
 	for(int i=0; i<7; i++)
 	{
 		if(m_channels[i] == NULL)
@@ -109,7 +110,7 @@ void DDR3Decoder::Refresh()
 			SetData(NULL);
 			return;
 		}
-		DigitalCapture* cap = dynamic_cast<DigitalCapture*>(m_channels[i]->GetData());
+		auto cap = dynamic_cast<DigitalWaveform*>(m_channels[i]->GetData());
 		if(cap == NULL)
 		{
 			SetData(NULL);
@@ -119,13 +120,13 @@ void DDR3Decoder::Refresh()
 	}
 
 	//Sample all of the inputs
-	DigitalCapture* cclk = caps[0];
-	vector<DigitalSample> we;
-	vector<DigitalSample> ras;
-	vector<DigitalSample> cas;
-	vector<DigitalSample> cs;
-	vector<DigitalSample> a12;
-	vector<DigitalSample> a10;
+	DigitalWaveform* cclk = caps[0];
+	DigitalWaveform we;
+	DigitalWaveform ras;
+	DigitalWaveform cas;
+	DigitalWaveform cs;
+	DigitalWaveform a12;
+	DigitalWaveform a10;
 	SampleOnRisingEdges(caps[1], cclk, we);
 	SampleOnRisingEdges(caps[2], cclk, ras);
 	SampleOnRisingEdges(caps[3], cclk, cas);
@@ -134,30 +135,26 @@ void DDR3Decoder::Refresh()
 	SampleOnRisingEdges(caps[6], cclk, a10);
 
 	//Create the capture
-	DDR3Capture* cap = new DDR3Capture;
+	auto cap = new DDR3Waveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
 	cap->m_startPicoseconds = 0;
 
 	//Loop over the data and look for events on clock edges
-	for(size_t i=0; i<we.size(); i++)
+	size_t len = we.m_samples.size();
+	len = min(len, ras.m_samples.size());
+	len = min(len, cas.m_samples.size());
+	len = min(len, cs.m_samples.size());
+	len = min(len, a12.m_samples.size());
+	len = min(len, a10.m_samples.size());
+	for(size_t i=0; i<len; i++)
 	{
-		//Abort if one of the other waveforms ends earlier
-		if( (i >= ras.size()) ||
-			(i >= cas.size()) ||
-			(i >= cs.size()) ||
-			(i >= a12.size()) ||
-			(i >= a10.size()) )
-		{
-			break;
-		}
-
-		bool swe = we[i];
-		bool sras = ras[i];
-		bool scas = cas[i];
-		bool scs = cs[i];
-		bool sa12 = a12[i];
-		bool sa10 = a10[i];
+		bool swe = we.m_samples[i];
+		bool sras = ras.m_samples[i];
+		bool scas = cas.m_samples[i];
+		bool scs = cs.m_samples[i];
+		bool sa12 = a12.m_samples[i];
+		bool sa10 = a10.m_samples[i];
 
 		if(!scs)
 		{
@@ -198,22 +195,20 @@ void DDR3Decoder::Refresh()
 				LogDebug("[%zu] Unknown command (RAS=%d, CAS=%d, WE=%d, A12=%d, A10=%d)\n", i, sras, scas, swe, sa12, sa10);
 
 			//Create the symbol
-			cap->m_samples.push_back(DDR3Sample(
-				we[i].m_offset,
-				we[i].m_duration,
-				sym));
+			cap->m_offsets.push_back(we.m_offsets[i]);
+			cap->m_durations.push_back(we.m_durations[i]);
+			cap->m_samples.push_back(sym);
 		}
 	}
-
 	SetData(cap);
 }
 
 Gdk::Color DDR3Decoder::GetColor(int i)
 {
-	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(GetData());
+	auto capture = dynamic_cast<DDR3Waveform*>(GetData());
 	if(capture != NULL)
 	{
-		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+		const DDR3Symbol& s = capture->m_samples[i];
 
 		switch(s.m_stype)
 		{
@@ -242,10 +237,10 @@ Gdk::Color DDR3Decoder::GetColor(int i)
 
 string DDR3Decoder::GetText(int i)
 {
-	DDR3Capture* capture = dynamic_cast<DDR3Capture*>(GetData());
+	auto capture = dynamic_cast<DDR3Waveform*>(GetData());
 	if(capture != NULL)
 	{
-		const DDR3Symbol& s = capture->m_samples[i].m_sample;
+		const DDR3Symbol& s = capture->m_samples[i];
 
 		switch(s.m_stype)
 		{

@@ -49,7 +49,7 @@
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
 #include "DCOffsetDecoder.h"
-//#include "DDR3Decoder.h"
+#include "DDR3Decoder.h"
 #include "DifferenceDecoder.h"
 /*
 #include "DramRefreshActivateMeasurementDecoder.h"
@@ -81,7 +81,9 @@
 #include "RiseMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "SPIDecoder.h"
+*/
 #include "ThresholdDecoder.h"
+/*
 #include "TMDSDecoder.h"
 #include "TopMeasurementDecoder.h"
 #include "UARTDecoder.h"

@@ -56,6 +56,9 @@ public:
 		TYPE_ERROR
 	};
 
+	DDR3Symbol()
+	{}
+
 	DDR3Symbol(stype t, int bank = 0)
 	 : m_stype(t)
 	 , m_bank(bank)
@@ -70,8 +73,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<DDR3Symbol> DDR3Sample;
-typedef CaptureChannel<DDR3Symbol> DDR3Capture;
+typedef Waveform<DDR3Symbol> DDR3Waveform;
 
 class DDR3Decoder : public ProtocolDecoder
 {
