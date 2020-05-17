@@ -97,35 +97,37 @@ void ACCoupleDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(!din)
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	auto len = din->m_samples.size() ;
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Find the average of our samples (assume data is DC balanced)
-	double sum = 0;
-	int64_t count = 0;
-	for(auto sample : *din)
-	{
-		sum += sample;
-		count ++;
-	}
-	double offset = sum / count;
-	LogTrace("ACCoupleDecoder: DC offset is %.3f\n", offset);
+	float average = Measurement::GetAvgVoltage(din);
 
 	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
-	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample - offset));
-	}
-	SetData(cap);
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(din);
+	float* fsrc = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
+	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	for(size_t i=0; i<len; i++)
+		fdst[i] = fsrc[i] - average;
 
 	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
+	cap->m_timescale 		= din->m_timescale;
+	cap->m_startTimestamp 	= din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+
+	SetData(cap);
 }

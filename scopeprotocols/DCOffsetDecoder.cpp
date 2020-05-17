@@ -105,10 +105,16 @@ void DCOffsetDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	size_t len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
@@ -117,12 +123,13 @@ void DCOffsetDecoder::Refresh()
 	float offset = m_parameters[m_offsetname].GetFloatVal();
 
 	//Subtract all of our samples
-	AnalogCapture* cap = new AnalogCapture;
-	for(size_t i=0; i<din->m_samples.size(); i++)
-	{
-		AnalogSample sin = din->m_samples[i];
-		cap->m_samples.push_back(AnalogSample(sin.m_offset, sin.m_duration, sin.m_sample + offset));
-	}
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(din);
+	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
+	for(size_t i=0; i<len; i++)
+		out[i] 		= a[i] + offset;
 	SetData(cap);
 
 	//Copy our time scales from the input

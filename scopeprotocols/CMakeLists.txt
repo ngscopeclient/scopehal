@@ -2,13 +2,13 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEPROTOCOLS_SOURCES
-	#ACCoupleDecoder.cpp
+	ACCoupleDecoder.cpp
 	#ADL5205Decoder.cpp
 	#BaseMeasurementDecoder.cpp
 	#CANDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
-	#DCOffsetDecoder.cpp
+	DCOffsetDecoder.cpp
 	#DDR3Decoder.cpp
 	DifferenceDecoder.cpp
 	#DramRefreshActivateMeasurementDecoder.cpp

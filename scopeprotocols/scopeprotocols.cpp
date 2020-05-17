@@ -40,18 +40,16 @@
  */
 void ScopeProtocolStaticInit()
 {
-	/*
 	AddDecoderClass(ACCoupleDecoder);
+	/*
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurementDecoder);
 	AddDecoderClass(CANDecoder);
 	*/
 	AddDecoderClass(ClockRecoveryDecoder);
 	AddDecoderClass(ClockJitterDecoder);
-	/*
 	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	*/
+	//AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DifferenceDecoder);
 	/*
 	AddDecoderClass(DramRefreshActivateMeasurementDecoder);

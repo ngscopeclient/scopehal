@@ -40,18 +40,16 @@
 #include "../scopehal/ProtocolDecoder.h"
 //#include "../scopehal/StateDecoder.h"
 
-/*
 #include "ACCoupleDecoder.h"
+/*
 #include "ADL5205Decoder.h"
 #include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
 */
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
-/*
 #include "DCOffsetDecoder.h"
-#include "DDR3Decoder.h"
-*/
+//#include "DDR3Decoder.h"
 #include "DifferenceDecoder.h"
 /*
 #include "DramRefreshActivateMeasurementDecoder.h"
