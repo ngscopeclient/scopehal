@@ -83,8 +83,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 	Packet* pack = NULL;
 
 	EthernetFrameSegment segment;
+	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
-	for(size_t i=0; i<bytes.size(); i++)
+	size_t len = bytes.size();
+	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
 		{
@@ -117,6 +119,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Look for the SFD
 				if(bytes[i] == 0xd5)
 				{
+
 					//Save the preamble
 					cap->m_offsets.push_back(start);
 					cap->m_durations.push_back( (starts[i] / cap->m_timescale) - start);
