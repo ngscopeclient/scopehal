@@ -1210,7 +1210,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		{
 			int16_t* base = wdata + j*num_per_segment;
 
-			//#pragma omp parallel for
 			for(unsigned int k=0; k<num_per_segment; k++)
 			{
 				offs[k] = k;
@@ -1222,7 +1221,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		{
 			int8_t* base = bdata + j*num_per_segment;
 
-			//#pragma omp parallel for
 			for(unsigned int k=0; k<num_per_segment; k++)
 			{
 				offs[k] = k;
@@ -1423,6 +1421,23 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	}
 
 	//Process analog waveforms
+	vector< vector<WaveformBase*> > waveforms;
+	waveforms.resize(m_analogChannelCount);
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(enabled[i])
+		{
+			waveforms[i] = ProcessAnalogWaveform(
+				analogWaveformData[i],
+				wavedescs[i],
+				num_sequences,
+				ttime,
+				basetime,
+				pwtime);
+		}
+	}
+
+	//Save analog waveform data
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
@@ -1431,32 +1446,24 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				m_channels[i]->SetData(NULL);
 			continue;
 		}
-
-		vector<WaveformBase*> waveforms = ProcessAnalogWaveform(
-			analogWaveformData[i],
-			wavedescs[i],
-			num_sequences,
-			ttime,
-			basetime,
-			pwtime);
-
 		//Done, update the data
 		if(toQueue)
 		{
 			for(size_t j=0; j<num_sequences; j++)
-				pending_waveforms[i].push_back(waveforms[j]);
+				pending_waveforms[i].push_back(waveforms[i][j]);
 		}
 		else
 		{
 			for(size_t j=0; j<num_sequences; j++)
 			{
 				if(j == 0)
-					m_channels[i]->SetData(waveforms[j]);
+					m_channels[i]->SetData(waveforms[i][j]);
 				else
-					pending_waveforms[i].push_back(waveforms[j]);
+					pending_waveforms[i].push_back(waveforms[i][j]);
 			}
 		}
 	}
+
 
 	//TODO: proper support for sequenced capture when digital channels are active
 	//(seems like this doesn't work right on at least wavesurfer 3000 series)
