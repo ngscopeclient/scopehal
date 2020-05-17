@@ -49,6 +49,9 @@ public:
 		TYPE_ERROR
 	};
 
+	SPISymbol()
+	{}
+
 	SPISymbol(stype t,uint8_t d)
 	 : m_stype(t)
 	 , m_data(d)
@@ -63,8 +66,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<SPISymbol> SPISample;
-typedef CaptureChannel<SPISymbol> SPICapture;
+typedef Waveform<SPISymbol> SPIWaveform;
 
 class SPIDecoder : public ProtocolDecoder
 {

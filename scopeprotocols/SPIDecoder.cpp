@@ -35,6 +35,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "SPIDecoder.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -97,9 +98,9 @@ void SPIDecoder::Refresh()
 			return;
 		}
 	}
-	DigitalCapture* clk = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* csn = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
-	DigitalCapture* data = dynamic_cast<DigitalCapture*>(m_channels[2]->GetData());
+	auto clk = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto csn = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
+	auto data = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
 	if( (clk == NULL) || (csn == NULL) || (data == NULL) )
 	{
 		SetData(NULL);
@@ -107,7 +108,7 @@ void SPIDecoder::Refresh()
 	}
 
 	//Create the capture
-	SPICapture* cap = new SPICapture;
+	auto cap = new SPIWaveform;
 	cap->m_timescale = clk->m_timescale;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startPicoseconds = clk->m_startPicoseconds;
@@ -131,14 +132,14 @@ void SPIDecoder::Refresh()
 	int64_t bytestart		= 0;
 	bool first				= false;
 
-	for(size_t i=0; i<clk->m_samples.size(); i++)
+	size_t len = clk->m_samples.size();
+	len = min(len, csn->m_samples.size());
+	len = min(len, data->m_samples.size());
+	for(size_t i=0; i<len; i++)
 	{
-		if( (i >= csn->m_samples.size()) || (i >= data->m_samples.size()) )
-			break;
-
-		bool cur_cs = csn->m_samples[i].m_sample;
-		bool cur_clk = clk->m_samples[i].m_sample;
-		bool cur_data = data->m_samples[i].m_sample;
+		bool cur_cs = csn->m_samples[i];
+		bool cur_clk = clk->m_samples[i];
+		bool cur_data = data->m_samples[i];
 
 		switch(state)
 		{
@@ -149,7 +150,7 @@ void SPIDecoder::Refresh()
 					state = STATE_SELECTED_CLKLO;
 					current_byte = 0;
 					bitcount = 0;
-					bytestart = clk->m_samples[i].m_offset;
+					bytestart = clk->m_offsets[i];
 					first = true;
 				}
 				break;
@@ -163,13 +164,12 @@ void SPIDecoder::Refresh()
 						//Add a "chip selected" event
 						if(first)
 						{
-							cap->m_samples.push_back(SPISample(
-								bytestart,
-								clk->m_samples[i].m_offset - bytestart,
-								SPISymbol(SPISymbol::TYPE_SELECT, 0)));
+							cap->m_offsets.push_back(bytestart);
+							cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
 							first = false;
 						}
-						bytestart = clk->m_samples[i].m_offset;
+						bytestart = clk->m_offsets[i];
 					}
 
 					state = STATE_SELECTED_CLKHI;
@@ -183,14 +183,13 @@ void SPIDecoder::Refresh()
 
 					if(bitcount == 8)
 					{
-						cap->m_samples.push_back(SPISample(
-							bytestart,
-							clk->m_samples[i].m_offset - bytestart,
-							SPISymbol(SPISymbol::TYPE_DATA, current_byte)));
+						cap->m_offsets.push_back(bytestart);
+						cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+						cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
 
 						bitcount = 0;
 						current_byte = 0;
-						bytestart = clk->m_samples[i].m_offset;
+						bytestart = clk->m_offsets[i];
 					}
 				}
 
@@ -198,12 +197,11 @@ void SPIDecoder::Refresh()
 				//TODO: error if a byte is truncated
 				else if(cur_cs)
 				{
-					cap->m_samples.push_back(SPISample(
-						bytestart,
-						clk->m_samples[i].m_offset - bytestart,
-						SPISymbol(SPISymbol::TYPE_DESELECT, 0)));
+					cap->m_offsets.push_back(bytestart);
+					cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_samples[i].m_offset;
+					bytestart = clk->m_offsets[i];
 					state = STATE_DESELECTED;
 				}
 				break;
@@ -217,12 +215,11 @@ void SPIDecoder::Refresh()
 				//TODO: error if a byte is truncated
 				else if(cur_cs)
 				{
-					cap->m_samples.push_back(SPISample(
-						bytestart,
-						clk->m_samples[i].m_offset - bytestart,
-						SPISymbol(SPISymbol::TYPE_DESELECT, 0)));
+					cap->m_offsets.push_back(bytestart);
+					cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_samples[i].m_offset;
+					bytestart = clk->m_offsets[i];
 					state = STATE_DESELECTED;
 				}
 
@@ -235,10 +232,10 @@ void SPIDecoder::Refresh()
 
 Gdk::Color SPIDecoder::GetColor(int i)
 {
-	SPICapture* capture = dynamic_cast<SPICapture*>(GetData());
+	auto capture = dynamic_cast<SPIWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const SPISymbol& s = capture->m_samples[i].m_sample;
+		const SPISymbol& s = capture->m_samples[i];
 		switch(s.m_stype)
 		{
 			case SPISymbol::TYPE_SELECT:
@@ -258,10 +255,10 @@ Gdk::Color SPIDecoder::GetColor(int i)
 
 string SPIDecoder::GetText(int i)
 {
-	SPICapture* capture = dynamic_cast<SPICapture*>(GetData());
+	auto capture = dynamic_cast<SPIWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const SPISymbol& s = capture->m_samples[i].m_sample;
+		const SPISymbol& s = capture->m_samples[i];
 		char tmp[32];
 		switch(s.m_stype)
 		{
@@ -270,7 +267,7 @@ string SPIDecoder::GetText(int i)
 			case SPISymbol::TYPE_DESELECT:
 				return "DESELECT";
 			case SPISymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", capture->m_samples[i].m_sample.m_data);
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 				return string(tmp);
 			case SPISymbol::TYPE_ERROR:
 			default:

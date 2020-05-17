@@ -29,11 +29,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	#JtagDecoder.cpp
 	#MDIODecoder.cpp
 	MovingAverageDecoder.cpp
-	#ParallelBusDecoder.cpp
-	#PeriodMeasurementDecoder.cpp
-	#RiseMeasurementDecoder.cpp
-	#SincInterpolationDecoder.cpp
-	#SPIDecoder.cpp
+	ParallelBusDecoder.cpp
+	PeriodMeasurementDecoder.cpp
+	RiseMeasurementDecoder.cpp
+	SincInterpolationDecoder.cpp
+	SPIDecoder.cpp
 	ThresholdDecoder.cpp
 	TMDSDecoder.cpp
 	#TopMeasurementDecoder.cpp

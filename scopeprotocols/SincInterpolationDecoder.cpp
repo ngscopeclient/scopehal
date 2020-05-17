@@ -32,6 +32,9 @@
 
 using namespace std;
 
+float sinc(float x, float width);
+float blackman(float x, float width);
+
 float sinc(float x, float width)
 {
 	float xi = x - width/2;
@@ -115,10 +118,10 @@ void SincInterpolationDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	if( (din == NULL) || din->m_samples.empty() )
 	{
 		SetData(NULL);
 		return;
@@ -126,36 +129,38 @@ void SincInterpolationDecoder::Refresh()
 
 	//Configuration parameters that eventually have to be user specified
 	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
-	const size_t window = 5;
-	const size_t kernel = window*upsample_factor;
+	size_t window = 5;
+	size_t kernel = window*upsample_factor;
 
 	//Create the interpolation filter
 	float frac_kernel = kernel * 1.0f / upsample_factor;
-	float filter[kernel];
+	vector<float> filter;
 	for(size_t i=0; i<kernel; i++)
 	{
 		float frac = i*1.0f / upsample_factor;
-		filter[i] = sinc(frac, frac_kernel) * blackman(frac, frac_kernel);
+		filter.push_back(sinc(frac, frac_kernel) * blackman(frac, frac_kernel));
 	}
 
 	//Create the output and configure it
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
+
+	//TODO: make this work on not-dense-packed waveforms
 
 	//Fill out the input with samples
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	size_t len = din->m_samples.size();
+	for(size_t i=0; i < len; i++)
 	{
 		for(size_t j=0; j<upsample_factor; j++)
 		{
-			cap->m_samples.push_back(AnalogSample(
-				i * upsample_factor + j,
-				1,
-				0));
+			cap->m_offsets.push_back(i * upsample_factor + j);
+			cap->m_durations.push_back(1);
+			cap->m_samples.push_back(0);
 		}
 	}
 
 	//Logically, we upsample by inserting zeroes, then convolve with the sinc filter.
 	//Optimization: don't actually waste time multiplying by zero
-	size_t imax = din->m_samples.size() - window;
+	size_t imax = len - window;
 	#pragma omp parallel for
 	for(size_t i=0; i < imax; i++)
 	{
@@ -172,9 +177,9 @@ void SincInterpolationDecoder::Refresh()
 
 			float f = 0;
 			for(size_t k = start; k<kernel; k += upsample_factor, sstart ++)
-				f += filter[k] * din->m_samples[i + sstart].m_sample;
+				f += filter[k] * din->m_samples[i + sstart];
 
-			cap->m_samples[offset + j].m_sample = f;
+			cap->m_samples[offset + j] = f;
 		}
 	}
 

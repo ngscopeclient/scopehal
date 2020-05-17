@@ -107,7 +107,7 @@ void PeriodMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -135,7 +135,7 @@ void PeriodMeasurementDecoder::Refresh()
 	}
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	double rmin = FLT_MAX;
 	double rmax = 0;
@@ -147,8 +147,9 @@ void PeriodMeasurementDecoder::Refresh()
 		int64_t end = edges[i+2];
 
 		double delta = end - start;
-		cap->m_samples.push_back(AnalogSample(
-			start, delta, delta));
+		cap->m_offsets.push_back(start);
+		cap->m_durations.push_back(delta);
+		cap->m_samples.push_back(delta);
 
 		rmin = min(rmin, delta);
 		rmax = max(rmax, delta);

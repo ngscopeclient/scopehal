@@ -73,13 +73,11 @@
 //#include "JtagDecoder.h"
 //#include "MDIODecoder.h"
 #include "MovingAverageDecoder.h"
-/*
 #include "ParallelBusDecoder.h"
 #include "PeriodMeasurementDecoder.h"
 #include "RiseMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
 #include "SPIDecoder.h"
-*/
 #include "ThresholdDecoder.h"
 /*
 #include "TMDSDecoder.h"

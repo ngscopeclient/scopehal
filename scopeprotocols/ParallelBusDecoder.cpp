@@ -107,7 +107,7 @@ void ParallelBusDecoder::Refresh()
 	m_width = m_parameters[m_widthname].GetIntVal();
 
 	//Make sure we have an input for each channel in use
-	vector<DigitalCapture*> inputs;
+	vector<DigitalWaveform*> inputs;
 	for(int i=0; i<m_width; i++)
 	{
 		if(m_channels[i] == NULL)
@@ -116,7 +116,7 @@ void ParallelBusDecoder::Refresh()
 			SetData(NULL);
 			return;
 		}
-		DigitalCapture* din = dynamic_cast<DigitalCapture*>(m_channels[i]->GetData());
+		auto din = dynamic_cast<DigitalWaveform*>(m_channels[i]->GetData());
 		if(din == NULL)
 		{
 			LogDebug("err 2\n");
@@ -131,33 +131,21 @@ void ParallelBusDecoder::Refresh()
 		return;
 	}
 
+	//Figure out length of the output
+	size_t len = inputs[0]->m_samples.size();
+	for(int j=1; j<m_width; j++)
+		len = min(len, inputs[j]->m_samples.size());
+
 	//Merge all of our samples
 	//TODO: handle variable sample rates etc
-	DigitalBusCapture* cap = new DigitalBusCapture;
-	cap->m_samples.resize(inputs[0]->m_samples.size());
+	auto cap = new DigitalBusWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(inputs[0]);
 	#pragma omp parallel for
-	for(size_t i=0; i<inputs[0]->m_samples.size(); i++)
+	for(size_t i=0; i<len; i++)
 	{
-		vector<bool> data;
-		bool end = false;
 		for(int j=0; j<m_width; j++)
-		{
-			if(inputs[j]->GetDepth() <= i)
-			{
-				end = true;
-				break;
-			}
-
-			data.push_back(inputs[j]->m_samples[i].m_sample);
-		}
-
-		if(!end)
-		{
-			cap->m_samples[i] = DigitalBusSample(
-				inputs[0]->m_samples[i].m_offset,
-				inputs[0]->m_samples[i].m_duration,
-				data);
-		}
+			cap->m_samples[i].push_back(inputs[j]->m_samples[i]);
 	}
 	SetData(cap);
 
