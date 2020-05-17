@@ -1315,20 +1315,25 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
 {
-	//Read the wavedesc for every enabled channel in batch mode first
+	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*> > pending_waveforms;
 	double start = GetTime();
 	time_t ttime;
 	double basetime;
 	bool denabled = false;
+	map<int, string> analogWaveformData;
+	string wavetime;
+	bool enabled[8] = {false};
+	vector<string> wavedescs;
+	double* pwtime = NULL;
+	string digitalWaveformData;
 
+	//Acquire the data (but don't parse it)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
 
 		//Get the wavedescs for all channels
-		vector<string> wavedescs;
-		bool enabled[8] = {false};
 		unsigned int firstEnabledChannel = UINT_MAX;
 		bool any_enabled = true;
 		if(!ReadWavedescs(wavedescs, enabled, firstEnabledChannel, any_enabled))
@@ -1372,11 +1377,9 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
 		RequestWaveforms(enabled, num_sequences, denabled);
 
-		//Get the timestamp of the wavedesc
-		ttime = ExtractTimestamp(pdesc, basetime);
-
+		//Figure out when the first trigger happened.
 		//Read the timestamps if we're doing segmented capture
-		string wavetime;
+		ttime = ExtractTimestamp(pdesc, basetime);
 		if(num_sequences > 1)
 		{
 			if(!ReadWaveformBlock(wavetime))
@@ -1385,37 +1388,69 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				return false;
 			}
 		}
-		double* pwtime = reinterpret_cast<double*>(&wavetime[0]);
+		pwtime = reinterpret_cast<double*>(&wavetime[0]);
 
+		//Read the data from each analog waveform
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
-			if(!enabled[i])
+			if(enabled[i])
 			{
-				if(!toQueue)
-					m_channels[i]->SetData(NULL);
-				continue;
+				if(!ReadWaveformBlock(analogWaveformData[i]))
+				{
+					LogError("fail to read waveform\n");
+					return false;
+				}
 			}
+		}
 
-			//Read the actual waveform data
-			string data;
-			if(!ReadWaveformBlock(data))
+		//Read the data from the digital waveforms, if enabled
+		if(denabled)
+		{
+			if(!ReadWaveformBlock(digitalWaveformData))
 			{
-				LogError("fail to read waveform\n");
-				break;
+				LogDebug("failed to download digital waveform\n");
+				return false;
 			}
+		}
+	}
 
-			vector<WaveformBase*> waveforms = ProcessAnalogWaveform(
-				data,
-				wavedescs[i],
-				num_sequences,
-				ttime,
-				basetime,
-				pwtime);
+	//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
+	//Re-arm the trigger if not in one-shot mode
+	if(!m_triggerOneShot)
+	{
+		m_transport->SendCommand("TRIG_MODE SINGLE");
+		m_triggerArmed = true;
+	}
 
-			//Done, update the data
+	//Process analog waveforms
+	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	{
+		if(!enabled[i])
+		{
+			if(!toQueue)
+				m_channels[i]->SetData(NULL);
+			continue;
+		}
+
+		vector<WaveformBase*> waveforms = ProcessAnalogWaveform(
+			analogWaveformData[i],
+			wavedescs[i],
+			num_sequences,
+			ttime,
+			basetime,
+			pwtime);
+
+		//Done, update the data
+		if(toQueue)
+		{
+			for(size_t j=0; j<num_sequences; j++)
+				pending_waveforms[i].push_back(waveforms[j]);
+		}
+		else
+		{
 			for(size_t j=0; j<num_sequences; j++)
 			{
-				if(j == 0 && !toQueue)
+				if(j == 0)
 					m_channels[i]->SetData(waveforms[j]);
 				else
 					pending_waveforms[i].push_back(waveforms[j]);
@@ -1423,37 +1458,24 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		}
 	}
 
-	if(num_sequences > 1)
+	//TODO: proper support for sequenced capture when digital channels are active
+	//(seems like this doesn't work right on at least wavesurfer 3000 series)
+
+	if(denabled)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-
-		//LeCroy's LA is derpy and doesn't support sequenced capture!
-		//(at least in wavesurfer 3000 series, need to test waverunner8-ms)
-		for(unsigned int i=0; i<m_digitalChannelCount; i++)
-			m_digitalChannels[i]->SetData(NULL);
-	}
-
-	else if(denabled)
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-
 		//This is a weird XML-y format but I can't find any other way to get it :(
-		string data;
-		if(!ReadWaveformBlock(data))
-		{
-			LogDebug("failed to download digital waveform\n");
-			return false;
-		}
-
-		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(data, ttime, basetime);
+		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, ttime, basetime);
 
 		//Done, update the data
-		for(auto it : digwaves)
+		if(toQueue)
 		{
-			if(!toQueue)
-				m_channels[it.first]->SetData(it.second);
-			else
+			for(auto it : digwaves)
 				pending_waveforms[it.first].push_back(it.second);
+		}
+		else
+		{
+			for(auto it : digwaves)
+				m_channels[it.first]->SetData(it.second);
 		}
 	}
 
@@ -1476,13 +1498,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
-
-	//Re-arm the trigger if not in one-shot mode
-	if(!m_triggerOneShot)
-	{
-		m_transport->SendCommand("TRIG_MODE SINGLE");
-		m_triggerArmed = true;
-	}
 
 	return true;
 }
