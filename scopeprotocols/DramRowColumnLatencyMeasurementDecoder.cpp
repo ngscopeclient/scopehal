@@ -106,15 +106,15 @@ void DramRowColumnLatencyMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DDR3Capture* din = dynamic_cast<DDR3Capture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
+	auto din = dynamic_cast<DDR3Waveform*>(m_channels[0]->GetData());
+	if(din == NULL || (din->m_samples.size() == 0))
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	//Measure delay from activating a row in a bank until a read or write to the same bank
 	int64_t lastAct[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -123,29 +123,30 @@ void DramRowColumnLatencyMeasurementDecoder::Refresh()
 	float fmin =  1e20;
 
 	int64_t tlast = 0;
-	for(size_t i=0; i<din->GetDepth(); i++)
+	size_t len = din->m_samples.size();
+	for(size_t i=0; i<len; i++)
 	{
-		auto sample = din->m_samples[i];
-		int64_t tnow = sample.m_offset * din->m_timescale;
+		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
 		//Discard invalid bank IDs
-		if( (sample.m_sample.m_bank < 0) || (sample.m_sample.m_bank > 8) )
+		auto sample = din->m_samples[i];
+		if( (sample.m_bank < 0) || (sample.m_bank > 8) )
 			continue;
 
 		//If it's an activate, update the last activation time
-		if(sample.m_sample.m_stype == DDR3Symbol::TYPE_ACT)
-			lastAct[sample.m_sample.m_bank] = tnow;
+		if(sample.m_stype == DDR3Symbol::TYPE_ACT)
+			lastAct[sample.m_bank] = tnow;
 
 		//If it's a read or write, measure the latency
-		else if( (sample.m_sample.m_stype == DDR3Symbol::TYPE_WR) |
-			(sample.m_sample.m_stype == DDR3Symbol::TYPE_WRA) |
-			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RD) |
-			(sample.m_sample.m_stype == DDR3Symbol::TYPE_RDA) )
+		else if( (sample.m_stype == DDR3Symbol::TYPE_WR) |
+			(sample.m_stype == DDR3Symbol::TYPE_WRA) |
+			(sample.m_stype == DDR3Symbol::TYPE_RD) |
+			(sample.m_stype == DDR3Symbol::TYPE_RDA) )
 		{
 			int64_t tcol = tnow;
 
 			//If the activate command is before the start of the capture, ignore this event
-			int64_t tact = lastAct[sample.m_sample.m_bank];
+			int64_t tact = lastAct[sample.m_bank];
 			if(tact == 0)
 				continue;
 
@@ -156,11 +157,13 @@ void DramRowColumnLatencyMeasurementDecoder::Refresh()
 			if(fmax < latency)
 				fmax = latency;
 
-			cap->m_samples.push_back(AnalogSample(tlast, tnow-tlast, latency));
+			cap->m_offsets.push_back(tlast);
+			cap->m_durations.push_back(tnow - tlast);
+			cap->m_samples.push_back(latency);
 			tlast = tnow;
 
 			//Purge the last-refresh activate so we don't report false times for the next read or write
-			lastAct[sample.m_sample.m_bank] = 0;
+			lastAct[sample.m_bank] = 0;
 		}
 	}
 

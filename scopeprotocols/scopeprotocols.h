@@ -51,10 +51,8 @@
 #include "DCOffsetDecoder.h"
 #include "DDR3Decoder.h"
 #include "DifferenceDecoder.h"
-/*
 #include "DramRefreshActivateMeasurementDecoder.h"
 #include "DramRowColumnLatencyMeasurementDecoder.h"
-*/
 #include "DVIDecoder.h"
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 /*

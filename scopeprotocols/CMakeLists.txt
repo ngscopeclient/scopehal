@@ -11,8 +11,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	DCOffsetDecoder.cpp
 	DDR3Decoder.cpp
 	DifferenceDecoder.cpp
-	#DramRefreshActivateMeasurementDecoder.cpp
-	#DramRowColumnLatencyMeasurementDecoder.cpp
+	DramRefreshActivateMeasurementDecoder.cpp
+	DramRowColumnLatencyMeasurementDecoder.cpp
 	DVIDecoder.cpp
 	#Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
