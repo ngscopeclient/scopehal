@@ -96,7 +96,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	//const int64_t jitter_tol 		= 1500;
 
 	//Logical voltage of each point after some hysteresis
-	vector<int> voltages;
+	vector<EmptyConstructorWrapper<int>> voltages;
 	size_t ilen = din->m_samples.size();
 	voltages.resize(ilen);
 	int oldstate = GetState(din->m_samples[0]);

@@ -142,8 +142,7 @@ void DifferenceDecoder::Refresh()
 	//Heap blocks are guaranteed aligned on 64-bit glibc, so this might break on 32 bit.
 	//Does anyone still use that?
 	cap->Resize(len);
-	memcpy(&cap->m_offsets[0],		&din_p->m_offsets[0],	sizeof(int64_t)*len);
-	memcpy(&cap->m_durations[0],	&din_p->m_durations[0], sizeof(int64_t)*len);
+	cap->CopyTimestamps(din_p);
 	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	float* a = (float*)__builtin_assume_aligned(&din_p->m_samples[0], 16);
 	float* b = (float*)__builtin_assume_aligned(&din_n->m_samples[0], 16);
