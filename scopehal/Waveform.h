@@ -129,6 +129,18 @@ public:
 		m_offsets.resize(size);
 		m_durations.resize(size);
 	}
+
+	/**
+		@brief Copies offsets/durations from one waveform to another.
+
+		Must have been resized to match rhs first.
+	 */
+	void CopyTimestamps(const WaveformBase* rhs)
+	{
+		size_t len = sizeof(int64_t) * rhs->m_offsets.size();
+		memcpy((void*)&m_offsets[0], (void*)&rhs->m_offsets[0], len);
+		memcpy((void*)&m_durations[0], (void*)&rhs->m_durations[0], len);
+	}
 };
 
 /**
@@ -157,11 +169,10 @@ public:
 	}
 };
 
-//we need this to avoid problems with the bitfield packing used by vector<bool>
 typedef Waveform<EmptyConstructorWrapper<bool> >	DigitalWaveform;
+typedef Waveform<EmptyConstructorWrapper<float>>	AnalogWaveform;
 
 typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
-typedef Waveform<float>					AnalogWaveform;
 typedef Waveform<char>					AsciiWaveform;
 
 #endif
