@@ -35,6 +35,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "I2CDecoder.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -93,8 +94,8 @@ void I2CDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* sda = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* scl = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto sda = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto scl = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (sda == NULL) || (scl == NULL) )
 	{
 		SetData(NULL);
@@ -102,7 +103,7 @@ void I2CDecoder::Refresh()
 	}
 
 	//Create the capture
-	I2CCapture* cap = new I2CCapture;
+	auto cap = new I2CWaveform;
 	cap->m_timescale = sda->m_timescale;
 	cap->m_startTimestamp = sda->m_startTimestamp;
 	cap->m_startPicoseconds = sda->m_startPicoseconds;
@@ -116,15 +117,17 @@ void I2CDecoder::Refresh()
 	uint8_t				current_byte = 0;
 	uint8_t				bitcount = 0;
 	bool				last_was_start	= 0;
-	for(size_t i=0; i<sda->m_samples.size(); i++)
+	size_t len = sda->m_samples.size();
+	len = min(len, scl->m_samples.size());
+	for(size_t i=0; i<len; i++)
 	{
-		bool cur_sda = sda->m_samples[i].m_sample;
-		bool cur_scl = scl->m_samples[i].m_sample;
+		bool cur_sda = sda->m_samples[i];
+		bool cur_scl = scl->m_samples[i];
 
 		//SDA falling with SCL high is beginning of a start condition
 		if(!cur_sda && last_sda && cur_scl)
 		{
-			LogDebug("found i2c start at time %zu\n", sda->m_samples[i].m_offset);
+			LogTrace("found i2c start at time %zu\n", (size_t)sda->m_offsets[i]);
 
 			//If we're following an ACK, this is a restart
 			if(current_type == I2CSymbol::TYPE_DATA)
@@ -141,10 +144,10 @@ void I2CDecoder::Refresh()
 		else if( ((current_type == I2CSymbol::TYPE_START) || (current_type == I2CSymbol::TYPE_RESTART)) &&
 				(cur_sda || !cur_scl) )
 		{
-			cap->m_samples.push_back(I2CSample(
-				sda->m_samples[symbol_start].m_offset,
-				sda->m_samples[i].m_offset - symbol_start,
-				I2CSymbol(current_type, 0)));
+			auto tstart = sda->m_offsets[symbol_start];
+			cap->m_offsets.push_back(tstart);
+			cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+			cap->m_samples.push_back(I2CSymbol(current_type, 0));
 
 			last_was_start	= true;
 			current_type = I2CSymbol::TYPE_DATA;
@@ -157,12 +160,13 @@ void I2CDecoder::Refresh()
 		//SDA rising with SCL high is a stop condition
 		else if(cur_sda && !last_sda && cur_scl)
 		{
-			LogDebug("found i2c stop at time %zu\n", sda->m_samples[i].m_offset);
+			LogTrace("found i2c stop at time %zu\n", (size_t)sda->m_offsets[i]);
 
-			cap->m_samples.push_back(I2CSample(
-				sda->m_samples[symbol_start].m_offset,
-				sda->m_samples[i].m_offset - symbol_start,
-				I2CSymbol(I2CSymbol::TYPE_STOP, 0)));
+			auto tstart = sda->m_offsets[symbol_start];
+			cap->m_offsets.push_back(tstart);
+			cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+			cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_STOP, 0));
+
 			last_was_start	= false;
 
 			symbol_start = i;
@@ -182,20 +186,14 @@ void I2CDecoder::Refresh()
 				//Add a sample if the byte is over
 				if(bitcount == 8)
 				{
+					auto tstart = sda->m_offsets[symbol_start];
+					cap->m_offsets.push_back(tstart);
+					cap->m_durations.push_back(sda->m_offsets[i] - tstart);
 					if(last_was_start)
-					{
-						cap->m_samples.push_back(I2CSample(
-							sda->m_samples[symbol_start].m_offset,
-							sda->m_samples[i].m_offset - symbol_start,
-							I2CSymbol(I2CSymbol::TYPE_ADDRESS, current_byte)));
-					}
+						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ADDRESS, current_byte));
 					else
-					{
-						cap->m_samples.push_back(I2CSample(
-							sda->m_samples[symbol_start].m_offset,
-							sda->m_samples[i].m_offset - symbol_start,
-							I2CSymbol(I2CSymbol::TYPE_DATA, current_byte)));
-					}
+						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
+
 					last_was_start	= false;
 
 					bitcount = 0;
@@ -209,10 +207,11 @@ void I2CDecoder::Refresh()
 			//ACK/NAK
 			else if(current_type == I2CSymbol::TYPE_ACK)
 			{
-				cap->m_samples.push_back(I2CSample(
-					sda->m_samples[symbol_start].m_offset,
-					sda->m_samples[i].m_offset - symbol_start,
-					I2CSymbol(I2CSymbol::TYPE_ACK, cur_sda)));
+				auto tstart = sda->m_offsets[symbol_start];
+				cap->m_offsets.push_back(tstart);
+				cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+				cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ACK, cur_sda));
+
 				last_was_start	= false;
 
 				symbol_start = i;
@@ -230,10 +229,10 @@ void I2CDecoder::Refresh()
 
 Gdk::Color I2CDecoder::GetColor(int i)
 {
-	I2CCapture* capture = dynamic_cast<I2CCapture*>(GetData());
+	auto capture = dynamic_cast<I2CWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const I2CSymbol& s = capture->m_samples[i].m_sample;
+		const I2CSymbol& s = capture->m_samples[i];
 
 		switch(s.m_stype)
 		{
@@ -254,10 +253,10 @@ Gdk::Color I2CDecoder::GetColor(int i)
 
 string I2CDecoder::GetText(int i)
 {
-	I2CCapture* capture = dynamic_cast<I2CCapture*>(GetData());
+	auto capture = dynamic_cast<I2CWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const I2CSymbol& s = capture->m_samples[i].m_sample;
+		const I2CSymbol& s = capture->m_samples[i];
 
 		char tmp[32];
 		switch(s.m_stype)

@@ -24,11 +24,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	FFTDecoder.cpp
 	#FrequencyMeasurementDecoder.cpp
 	HorizontalBathtubDecoder.cpp
-	#I2CDecoder.cpp
-	#IBM8b10bDecoder.cpp
+	I2CDecoder.cpp
+	IBM8b10bDecoder.cpp
 	#JtagDecoder.cpp
 	#MDIODecoder.cpp
-	#MovingAverageDecoder.cpp
+	MovingAverageDecoder.cpp
 	#ParallelBusDecoder.cpp
 	#PeriodMeasurementDecoder.cpp
 	#RiseMeasurementDecoder.cpp

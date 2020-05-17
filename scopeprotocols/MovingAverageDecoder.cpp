@@ -106,10 +106,16 @@ void MovingAverageDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	size_t len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
@@ -120,9 +126,11 @@ void MovingAverageDecoder::Refresh()
 	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
 
 	//Do the average
-	AnalogCapture* cap = new AnalogCapture;
-
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(din);
+	#pragma omp parallel for
+	for(size_t i=0; i<len; i++)
 	{
 		float v = 0;
 		size_t navg = 0;
@@ -131,13 +139,12 @@ void MovingAverageDecoder::Refresh()
 			if(j > i)
 				break;
 
-			v += din->m_samples[i-j].m_sample;
+			v += din->m_samples[i-j];
 			navg ++;
 		}
 		v /= navg;
 
-		cap->m_samples.push_back(AnalogSample(
-			din->m_samples[i].m_offset, din->m_samples[i].m_duration, v));
+		cap->m_samples[i] = v;
 	}
 	SetData(cap);
 

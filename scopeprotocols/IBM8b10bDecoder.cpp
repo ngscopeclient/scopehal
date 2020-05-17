@@ -94,8 +94,8 @@ void IBM8b10bDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* din = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* clkin = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto clkin = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (din == NULL) || (clkin == NULL) )
 	{
 		SetData(NULL);
@@ -103,34 +103,15 @@ void IBM8b10bDecoder::Refresh()
 	}
 
 	//Create the capture
-	IBM8b10bCapture* cap = new IBM8b10bCapture;
+	auto cap = new IBM8b10bWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Record the value of the data stream at each clock edge
-	vector<DigitalSample> data;
-	size_t ndata = 0;
-	bool old_clk = false;
-	for(size_t i=0; i<clkin->m_samples.size(); i++)
-	{
-		//Throw away clock samples until we find an edge
-		//For now, reference clock is always DDR.
-		//TODO: support single rate reference clocks
-		auto csample = clkin->m_samples[i];
-		if(old_clk == csample.m_sample)
-			break;
-		old_clk = csample.m_sample;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = csample.m_offset * clkin->m_timescale;
-		while( (ndata < din->m_samples.size()) && (din->m_samples[ndata].m_offset * din->m_timescale < clkstart) )
-			ndata ++;
-		if(ndata >= din->m_samples.size())
-			break;
-
-		data.push_back(DigitalSample(clkstart, 1, din->m_samples[ndata].m_sample));
-	}
+	//TODO: allow single rate clocks too?
+	DigitalWaveform data;
+	SampleOnAnyEdges(din, clkin, data);
 
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
@@ -139,14 +120,15 @@ void IBM8b10bDecoder::Refresh()
 	for(size_t offset=0; offset < 10; offset ++)
 	{
 		size_t num_commas = 0;
-		for(size_t i=0; i<data.size() - 20; i += 10)
+		size_t dlen = data.m_samples.size() - 20;
+		for(size_t i=0; i<dlen; i += 10)
 		{
 			//Check if we have a comma (five identical bits) anywhere in the data stream
 			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
 			bool comma = true;
 			for(int j=3; j<=6; j++)
 			{
-				if(data[i+offset+j].m_sample != data[i+offset+2].m_sample)
+				if(data.m_samples[i+offset+j] != data.m_samples[i+offset+2])
 				{
 					comma = false;
 					break;
@@ -166,16 +148,18 @@ void IBM8b10bDecoder::Refresh()
 	//Decode the actual data
 	bool first = true;
 	int last_disp = -1;
-	for(size_t i=max_offset; i<data.size()-11; i+= 10)
+	size_t dlen = data.m_samples.size() - 11;
+	for(size_t i=max_offset; i<dlen; i+= 10)
 	{
 		//5b/6b decode
+
 		uint8_t code6 =
-			(data[i].m_sample << 5) |
-			(data[i+1].m_sample << 4) |
-			(data[i+2].m_sample << 3) |
-			(data[i+3].m_sample << 2) |
-			(data[i+4].m_sample << 1) |
-			(data[i+5].m_sample << 0);
+			(data.m_samples[i+0] ? 32 : 0) |
+			(data.m_samples[i+1] ? 16 : 0) |
+			(data.m_samples[i+2] ? 8 : 0) |
+			(data.m_samples[i+3] ? 4 : 0) |
+			(data.m_samples[i+4] ? 2 : 0) |
+			(data.m_samples[i+5] ? 1 : 0);
 
 		static const int code5_table[64] =
 		{
@@ -232,10 +216,10 @@ void IBM8b10bDecoder::Refresh()
 
 		//3b/4b decode
 		uint8_t code4 =
-			(data[i+6].m_sample << 3) |
-			(data[i+7].m_sample << 2) |
-			(data[i+8].m_sample << 1) |
-			(data[i+9].m_sample << 0);
+			(data.m_samples[i+6] ? 8 : 0) |
+			(data.m_samples[i+7] ? 4 : 0) |
+			(data.m_samples[i+8] ? 2 : 0) |
+			(data.m_samples[i+9] ? 1 : 0);
 
 		static const bool err3_ctl_table[16] =
 		{
@@ -323,11 +307,9 @@ void IBM8b10bDecoder::Refresh()
 		else
 			last_disp += total_disp;
 
-
-		cap->m_samples.push_back(IBM8b10bSample(
-			data[i].m_offset,
-			data[i+10].m_offset - data[i].m_offset,
-			IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5)));
+		cap->m_offsets.push_back(data.m_offsets[i]);
+		cap->m_durations.push_back(data.m_offsets[i+10] - data.m_offsets[i]);
+		cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5));
 	}
 
 	SetData(cap);
@@ -335,10 +317,10 @@ void IBM8b10bDecoder::Refresh()
 
 Gdk::Color IBM8b10bDecoder::GetColor(int i)
 {
-	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(GetData());
+	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+		const IBM8b10bSymbol& s = capture->m_samples[i];
 
 		if(s.m_error)
 			return m_standardColors[COLOR_ERROR];
@@ -354,10 +336,10 @@ Gdk::Color IBM8b10bDecoder::GetColor(int i)
 
 string IBM8b10bDecoder::GetText(int i)
 {
-	IBM8b10bCapture* capture = dynamic_cast<IBM8b10bCapture*>(GetData());
+	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const IBM8b10bSymbol& s = capture->m_samples[i].m_sample;
+		const IBM8b10bSymbol& s = capture->m_samples[i];
 
 		unsigned int right = s.m_data >> 5;
 		unsigned int left = s.m_data & 0x1F;

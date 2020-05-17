@@ -67,12 +67,12 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FrequencyMeasurementDecoder);
 	*/
 	AddDecoderClass(HorizontalBathtubDecoder);
-	/*
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
+	//AddDecoderClass(JtagDecoder);
+	//AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MovingAverageDecoder);
+	/*
 	AddDecoderClass(ParallelBusDecoder);
 	AddDecoderClass(PeriodMeasurementDecoder);
 	AddDecoderClass(RiseMeasurementDecoder);

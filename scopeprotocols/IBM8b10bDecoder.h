@@ -41,6 +41,9 @@
 class IBM8b10bSymbol
 {
 public:
+	IBM8b10bSymbol()
+	{}
+
 	IBM8b10bSymbol(bool b, bool e,uint8_t d)
 	 : m_control(b)
 	 , m_error(e)
@@ -57,8 +60,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<IBM8b10bSymbol> IBM8b10bSample;
-typedef CaptureChannel<IBM8b10bSymbol> IBM8b10bCapture;
+typedef Waveform<IBM8b10bSymbol> IBM8b10bWaveform;
 
 class IBM8b10bDecoder : public ProtocolDecoder
 {

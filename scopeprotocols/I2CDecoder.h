@@ -53,6 +53,9 @@ public:
 		TYPE_NONE
 	};
 
+	I2CSymbol()
+	{}
+
 	I2CSymbol(stype t,uint8_t d)
 	 : m_stype(t)
 	 , m_data(d)
@@ -67,8 +70,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<I2CSymbol> I2CSample;
-typedef CaptureChannel<I2CSymbol> I2CCapture;
+typedef Waveform<I2CSymbol> I2CWaveform;
 
 class I2CDecoder : public ProtocolDecoder
 {
