@@ -1464,7 +1464,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		}
 	}
 
-
 	//TODO: proper support for sequenced capture when digital channels are active
 	//(seems like this doesn't work right on at least wavesurfer 3000 series)
 
