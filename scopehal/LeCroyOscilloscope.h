@@ -167,19 +167,20 @@ protected:
 		bool* enabled,
 		unsigned int& firstEnabledChannel,
 		bool& any_enabled);
-	void RequestWaveforms(bool* enabled, uint32_t num_sequences);
+	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
-	void ProcessAnalogWaveform(
-		std::string data,
-		unsigned int nchan,
-		bool toQueue,
+	std::vector<WaveformBase*> ProcessAnalogWaveform(
+		std::string& data,
 		std::string& wavedesc,
 		uint32_t num_sequences,
 		time_t ttime,
 		double basetime,
-		double* wavetime,
-		std::map<int, std::vector<WaveformBase*> >& pending_waveforms
+		double* wavetime
 		);
+	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(
+		std::string& data,
+		time_t ttime,
+		double basetime);
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

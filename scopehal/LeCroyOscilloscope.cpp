@@ -1086,8 +1086,9 @@ bool LeCroyOscilloscope::ReadWavedescs(
 	return true;
 }
 
-void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences)
+void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled)
 {
+	//Ask for all analog waveforms
 	bool sent_wavetime = false;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
@@ -1104,6 +1105,10 @@ void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences)
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
 		}
 	}
+
+	//Ask for the digital waveforms
+	if(denabled)
+		m_transport->SendCommand("Digital1:WF?");
 }
 
 time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& basetime)
@@ -1149,17 +1154,16 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 	return mktime(&tstruc);
 }
 
-void LeCroyOscilloscope::ProcessAnalogWaveform(
-	string data,
-	unsigned int nchan,
-	bool toQueue,
+vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
+	string& data,
 	string& wavedesc,
 	uint32_t num_sequences,
 	time_t ttime,
 	double basetime,
-	double* wavetime,
-	map<int, vector<WaveformBase*> >& pending_waveforms)
+	double* wavetime)
 {
+	vector<WaveformBase*> ret;
+
 	//Parse the wavedesc headers
 	auto pdesc = (unsigned char*)(&wavedesc[0]);
 	//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
@@ -1193,12 +1197,7 @@ void LeCroyOscilloscope::ProcessAnalogWaveform(
 
 		//Parse the time
 		if(num_sequences > 1)
-		{
-			double trigger_delta = wavetime[j*2];
-			//double trigger_offset = pwtime[j*2 + 1];
-			//LogDebug("trigger delta for segment %lu: %.3f us\n", j, trigger_delta * 1e9f);
-			cap->m_startPicoseconds = static_cast<int64_t>( (basetime + trigger_delta) * 1e12f );
-		}
+			cap->m_startPicoseconds = static_cast<int64_t>( (basetime + wavetime[j*2]) * 1e12f );
 		else
 			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
@@ -1232,12 +1231,86 @@ void LeCroyOscilloscope::ProcessAnalogWaveform(
 			}
 		}
 
-		//Done, update the data
-		if(j == 0 && !toQueue)
-			m_channels[nchan]->SetData(cap);
-		else
-			pending_waveforms[nchan].push_back(cap);
+		ret.push_back(cap);
 	}
+
+	return ret;
+}
+
+map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
+	string& data,
+	time_t ttime,
+	double basetime)
+{
+	map<int, DigitalWaveform*> ret;
+
+	//See what channels are enabled
+	string tmp = data.substr(data.find("SelectedLines=") + 14);
+	tmp = tmp.substr(0, 16);
+	bool enabledChannels[16];
+	for(int i=0; i<16; i++)
+		enabledChannels[i] = (tmp[i] == '1');
+
+	//Quick and dirty string searching. We only care about a small fraction of the XML
+	//so no sense bringing in a full parser.
+	tmp = data.substr(data.find("<HorPerStep>") + 12);
+	tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
+	float interval = atof(tmp.c_str()) * 1e12f;
+	//LogDebug("Sample interval: %.2f ps\n", interval);
+
+	tmp = data.substr(data.find("<NumSamples>") + 12);
+	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
+	int num_samples = atoi(tmp.c_str());
+	//LogDebug("Expecting %d samples\n", num_samples);
+
+	/*
+	Nanoseconds since Jan 1 2000. Use this instead?
+	tmp = data.substr(data.find("<FirstEventTime>") + 16);
+	tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
+	*/
+
+	//Pull out the actual binary data (Base64 coded)
+	tmp = data.substr(data.find("<BinaryData>") + 12);
+	tmp = tmp.substr(0, tmp.find("</BinaryData>"));
+
+	//Decode the base64
+	base64_decodestate bstate;
+	base64_init_decodestate(&bstate);
+	unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
+	base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &bstate);
+
+	//We have each channel's data from start to finish before the next (no interleaving).
+	unsigned int icapchan = 0;
+	for(unsigned int i=0; i<m_digitalChannelCount; i++)
+	{
+		if(enabledChannels[icapchan])
+		{
+			DigitalWaveform* cap = new DigitalWaveform;
+			cap->m_timescale = interval;
+
+			//Capture timestamp
+			cap->m_startTimestamp = ttime;
+			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+			cap->Resize(num_samples);
+			#pragma omp parallel for
+			for(int j=0; j<num_samples; j++)
+			{
+				cap->m_offsets[j] = j;
+				cap->m_durations[j] = 1;
+				cap->m_samples[j] = block[icapchan*num_samples + j];
+			}
+
+			//Done, save data and go on to next
+			ret[m_digitalChannels[i]->GetIndex()] = cap;
+			icapchan ++;
+		}
+
+		//No data here for us!
+		else
+			ret[m_digitalChannels[i]->GetIndex()] = NULL;
+	}
+	delete[] block;
+	return ret;
 }
 
 bool LeCroyOscilloscope::AcquireData(bool toQueue)
@@ -1248,6 +1321,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	double start = GetTime();
 	time_t ttime;
 	double basetime;
+	bool denabled = false;
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
@@ -1273,14 +1347,30 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(pdesc == NULL)
 		{
 			//no enabled channels. abort
+			//TODO: handle the case of digital channels enabled, but no analog
 			return false;
 		}
 		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
 		if(trigtime_len > 0)
 			num_sequences = trigtime_len / 16;
 
+		//See if any digital channels are enabled
+		if(m_digitalChannelCount > 0)
+		{
+			m_cacheMutex.lock();
+			for(size_t i=0; i<m_digitalChannels.size(); i++)
+			{
+				if(m_channelsEnabled[m_digitalChannels[i]->GetIndex()])
+				{
+					denabled = true;
+					break;
+				}
+			}
+			m_cacheMutex.unlock();
+		}
+
 		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
-		RequestWaveforms(enabled, num_sequences);
+		RequestWaveforms(enabled, num_sequences, denabled);
 
 		//Get the timestamp of the wavedesc
 		ttime = ExtractTimestamp(pdesc, basetime);
@@ -1314,16 +1404,22 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 				break;
 			}
 
-			ProcessAnalogWaveform(
+			vector<WaveformBase*> waveforms = ProcessAnalogWaveform(
 				data,
-				i,
-				toQueue,
 				wavedescs[i],
 				num_sequences,
 				ttime,
 				basetime,
-				pwtime,
-				pending_waveforms);
+				pwtime);
+
+			//Done, update the data
+			for(size_t j=0; j<num_sequences; j++)
+			{
+				if(j == 0 && !toQueue)
+					m_channels[i]->SetData(waveforms[j]);
+				else
+					pending_waveforms[i].push_back(waveforms[j]);
+			}
 		}
 	}
 
@@ -1337,108 +1433,27 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 			m_digitalChannels[i]->SetData(NULL);
 	}
 
-	else if(m_digitalChannelCount > 0)
+	else if(denabled)
 	{
-		//If no digital channels are enabled, skip this step
-		bool denabled = false;
-		m_cacheMutex.lock();
-		for(size_t i=0; i<m_digitalChannels.size(); i++)
-		{
-			if(m_channelsEnabled[m_digitalChannels[i]->GetIndex()])
-			{
-				denabled = true;
-				break;
-			}
-		}
-		m_cacheMutex.unlock();
-
 		lock_guard<recursive_mutex> lock(m_mutex);
-		if(denabled)
+
+		//This is a weird XML-y format but I can't find any other way to get it :(
+		string data;
+		if(!ReadWaveformBlock(data))
 		{
-			//Ask for the waveform. This is a weird XML-y format but I can't find any other way to get it :(
-			m_transport->SendCommand("Digital1:WF?");
-			string data;
-			if(!ReadWaveformBlock(data))
-			{
-				LogDebug("failed to download digital waveform\n");
-				return false;
-			}
+			LogDebug("failed to download digital waveform\n");
+			return false;
+		}
 
-			//See what channels are enabled
-			string tmp = data.substr(data.find("SelectedLines=") + 14);
-			tmp = tmp.substr(0, 16);
-			bool enabledChannels[16];
-			for(int i=0; i<16; i++)
-				enabledChannels[i] = (tmp[i] == '1');
+		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(data, ttime, basetime);
 
-			//Quick and dirty string searching. We only care about a small fraction of the XML
-			//so no sense bringing in a full parser.
-			tmp = data.substr(data.find("<HorPerStep>") + 12);
-			tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
-			float interval = atof(tmp.c_str()) * 1e12f;
-			//LogDebug("Sample interval: %.2f ps\n", interval);
-
-			tmp = data.substr(data.find("<NumSamples>") + 12);
-			tmp = tmp.substr(0, tmp.find("</NumSamples>"));
-			int num_samples = atoi(tmp.c_str());
-			//LogDebug("Expecting %d samples\n", num_samples);
-
-			/*
-			Nanoseconds since Jan 1 2000. Use this instead?
-			tmp = data.substr(data.find("<FirstEventTime>") + 16);
-			tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
-			*/
-
-			//Pull out the actual binary data (Base64 coded)
-			tmp = data.substr(data.find("<BinaryData>") + 12);
-			tmp = tmp.substr(0, tmp.find("</BinaryData>"));
-
-			//Decode the base64
-			base64_decodestate bstate;
-			base64_init_decodestate(&bstate);
-			unsigned char* block = new unsigned char[tmp.length()];	//base64 is smaller than plaintext, leave room
-			base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &bstate);
-
-			//We have each channel's data from start to finish before the next (no interleaving).
-			unsigned int icapchan = 0;
-			for(unsigned int i=0; i<m_digitalChannelCount; i++)
-			{
-				if(enabledChannels[icapchan])
-				{
-					DigitalWaveform* cap = new DigitalWaveform;
-					cap->m_timescale = interval;
-
-					//Capture timestamp
-					cap->m_startTimestamp = ttime;
-					cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
-					cap->Resize(num_samples);
-					#pragma omp parallel for
-					for(int j=0; j<num_samples; j++)
-					{
-						cap->m_offsets[j] = j;
-						cap->m_durations[j] = 1;
-						cap->m_samples[j] = block[icapchan*num_samples + j];
-					}
-
-					//Done, update the data
-					if(!toQueue)
-						m_channels[m_digitalChannels[i]->GetIndex()]->SetData(cap);
-					else
-						pending_waveforms[m_digitalChannels[i]->GetIndex()].push_back(cap);
-
-					//Go to next channel in the capture
-					icapchan ++;
-				}
-				else
-				{
-					//No data here for us!
-					if(!toQueue)
-						m_channels[m_digitalChannels[i]->GetIndex()]->SetData(NULL);
-					else
-						pending_waveforms[m_digitalChannels[i]->GetIndex()].push_back(NULL);
-				}
-			}
-			delete[] block;
+		//Done, update the data
+		for(auto it : digwaves)
+		{
+			if(!toQueue)
+				m_channels[it.first]->SetData(it.second);
+			else
+				pending_waveforms[it.first].push_back(it.second);
 		}
 	}
 
