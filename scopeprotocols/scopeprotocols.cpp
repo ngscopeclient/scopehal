@@ -52,12 +52,10 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
 	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
 	AddDecoderClass(DVIDecoder);
-	//AddDecoderClass(Ethernet10BaseTDecoder);
+	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
-	/*
 	AddDecoderClass(EthernetGMIIDecoder);
 	AddDecoderClass(EthernetAutonegotiationDecoder);
-	*/
 	AddDecoderClass(EyeDecoder2);
 	/*
 	AddDecoderClass(FallMeasurementDecoder);

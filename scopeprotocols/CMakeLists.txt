@@ -14,10 +14,10 @@ set(SCOPEPROTOCOLS_SOURCES
 	DramRefreshActivateMeasurementDecoder.cpp
 	DramRowColumnLatencyMeasurementDecoder.cpp
 	DVIDecoder.cpp
-	#Ethernet10BaseTDecoder.cpp
+	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
-	#EthernetAutonegotiationDecoder.cpp
-	#EthernetGMIIDecoder.cpp
+	EthernetAutonegotiationDecoder.cpp
+	EthernetGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
 	EyeDecoder2.cpp
 	#FallMeasurementDecoder.cpp

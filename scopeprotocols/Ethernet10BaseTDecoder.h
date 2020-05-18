@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,10 +49,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(Ethernet10BaseTDecoder)
 
 protected:
-	bool FindFallingEdge(size_t& i, AnalogCapture* cap);
-	bool FindRisingEdge(size_t& i, AnalogCapture* cap);
+	bool FindFallingEdge(size_t& i, AnalogWaveform* cap);
+	bool FindRisingEdge(size_t& i, AnalogWaveform* cap);
 
-	bool FindEdge(size_t& i, AnalogCapture* cap, bool polarity)
+	bool FindEdge(size_t& i, AnalogWaveform* cap, bool polarity)
 	{
 		if(polarity)
 			return FindRisingEdge(i, cap);

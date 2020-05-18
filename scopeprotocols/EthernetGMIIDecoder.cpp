@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -107,10 +108,10 @@ void EthernetGMIIDecoder::Refresh()
 			return;
 		}
 	}
-	DigitalBusCapture* data = dynamic_cast<DigitalBusCapture*>(m_channels[0]->GetData());
-	DigitalCapture* clk = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
-	DigitalCapture* en = dynamic_cast<DigitalCapture*>(m_channels[2]->GetData());
-	DigitalCapture* er = dynamic_cast<DigitalCapture*>(m_channels[3]->GetData());
+	auto data = dynamic_cast<DigitalBusWaveform*>(m_channels[0]->GetData());
+	auto clk = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
+	auto en = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
+	auto er = dynamic_cast<DigitalWaveform*>(m_channels[3]->GetData());
 	if( (data == NULL) || (clk == NULL) || (en == NULL) || (er == NULL) )
 	{
 		SetData(NULL);
@@ -118,23 +119,25 @@ void EthernetGMIIDecoder::Refresh()
 	}
 
 	//Sample everything on the clock edges
-	vector<DigitalSample> den;
-	vector<DigitalSample> der;
-	vector<DigitalBusSample> ddata;
+	DigitalWaveform den;
+	DigitalWaveform der;
+	DigitalBusWaveform ddata;
 	SampleOnRisingEdges(en, clk, den);
 	SampleOnRisingEdges(er, clk, der);
 	SampleOnRisingEdges(data, clk, ddata);
 
 	//Create the output capture
-	EthernetCapture* cap = new EthernetCapture;
+	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startPicoseconds = data->m_startPicoseconds;
 
-	for(size_t i=0; i<den.size(); i++)
+	size_t len = den.m_samples.size();
+	len = min(len, der.m_samples.size());
+	len = min(len, ddata.m_samples.size());
+	for(size_t i=0; i < len; i++)
 	{
-		bool cur_en = den[i].m_sample;
-		if(!cur_en)
+		if(!den.m_samples[i])
 			continue;
 
 		//Set of recovered bytes and timestamps
@@ -143,20 +146,19 @@ void EthernetGMIIDecoder::Refresh()
 		vector<uint64_t> ends;
 
 		//TODO: handle error signal (ignored for now)
-
-		while( (i < den.size()) && (den[i].m_sample) )
+		while( (i < len) && (den.m_samples[i]) )
 		{
 			//Convert bits to bytes
 			uint8_t dval = 0;
 			for(size_t j=0; j<8; j++)
 			{
-				if(ddata[i].m_sample[j])
+				if(ddata.m_samples[i][j])
 					dval |= (1 << j);
 			}
 
 			bytes.push_back(dval);
-			starts.push_back(ddata[i].m_offset);
-			ends.push_back(ddata[i].m_offset + ddata[i].m_duration);
+			starts.push_back(ddata.m_offsets[i]);
+			ends.push_back(ddata.m_offsets[i] + ddata.m_durations[i]);
 			i++;
 		}
 

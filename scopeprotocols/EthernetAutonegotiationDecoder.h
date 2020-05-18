@@ -38,8 +38,7 @@
 
 #include "../scopehal/ProtocolDecoder.h"
 
-typedef OscilloscopeSample<uint16_t> EthernetAutonegotiationSample;
-typedef CaptureChannel<uint16_t> EthernetAutonegotiationCapture;
+typedef Waveform<uint16_t> EthernetAutonegotiationWaveform;
 
 class EthernetAutonegotiationDecoder : public ProtocolDecoder
 {

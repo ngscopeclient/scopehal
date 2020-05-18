@@ -88,7 +88,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -96,7 +96,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	}
 
 	//Create the outbound data
-	auto* cap = new EthernetAutonegotiationCapture;
+	auto* cap = new EthernetAutonegotiationWaveform;
 	cap->m_timescale = din->m_timescale;
 
 	//Crunch it
@@ -106,12 +106,11 @@ void EthernetAutonegotiationDecoder::Refresh()
 	int nbit = 0;
 	int64_t frame_start = 0;
 	bool last_was_data = false;
-	for(size_t i = 0; i < din->m_samples.size(); i ++)
+	auto len = din->m_samples.size();
+	for(size_t i = 0; i < len; i ++)
 	{
-		auto sample = din->m_samples[i];
-		float v = sample;
-		bool sample_value = (v > 1.25);
-		int64_t tm = sample.m_offset * din->m_timescale;
+		bool sample_value = (din->m_samples[i] > 1.25);
+		int64_t tm = din->m_offsets[i] * din->m_timescale;
 		float dt = (tm - last_pulse) * 1e-6f;
 
 		if(sample_value && !old_value)
@@ -121,7 +120,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 			{
 				nbit = 0;
 				last_was_data = false;
-				frame_start = sample.m_offset;
+				frame_start = din->m_offsets[i];
 			}
 
 			//If delta is less than 30 us, it's a glitch - skip it
@@ -156,10 +155,9 @@ void EthernetAutonegotiationDecoder::Refresh()
 				for(int j=0; j<16; j++)
 					ncode |= (code[j] << j);
 
-				cap->m_samples.push_back(EthernetAutonegotiationSample(
-					frame_start,
-					sample.m_offset + sample.m_duration - frame_start,
-					ncode));
+				cap->m_offsets.push_back(frame_start);
+				cap->m_durations.push_back(din->m_offsets[i] + din->m_durations[i] - frame_start);
+				cap->m_samples.push_back(ncode);
 
 				nbit = 0;
 			}
@@ -180,7 +178,7 @@ Gdk::Color EthernetAutonegotiationDecoder::GetColor(int i)
 
 string EthernetAutonegotiationDecoder::GetText(int i)
 {
-	EthernetAutonegotiationCapture* data = dynamic_cast<EthernetAutonegotiationCapture*>(GetData());
+	auto data = dynamic_cast<EthernetAutonegotiationWaveform*>(GetData());
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())
