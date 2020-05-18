@@ -118,7 +118,7 @@ void FallMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -143,7 +143,7 @@ void FallMeasurementDecoder::Refresh()
 	float vend = base + m_parameters[m_endname].GetFloatVal()*delta;
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	float last = -1e20;
 	double tedge = 0;
@@ -154,11 +154,10 @@ void FallMeasurementDecoder::Refresh()
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
-
-	for(size_t i=0; i < din->m_samples.size(); i++)
+	for(size_t i=0; i < len; i++)
 	{
 		float cur = din->m_samples[i];
-		int64_t tnow = din->m_samples[i].m_offset * din->m_timescale;
+		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
 		//Find start of edge
 		if(state == 0)
@@ -178,7 +177,9 @@ void FallMeasurementDecoder::Refresh()
 				double tlerp = tnow - din->m_timescale + Measurement::InterpolateTime(din, i-1, vend);
 				double dt = tlerp - tedge;
 
-				cap->m_samples.push_back(AnalogSample(tlast, tnow-tlast, dt));
+				cap->m_offsets.push_back(tlast);
+				cap->m_durations.push_back(tnow - tlast);
+				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
 				if(dt < fmin)

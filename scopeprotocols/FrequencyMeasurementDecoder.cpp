@@ -107,7 +107,7 @@ void FrequencyMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -135,12 +135,12 @@ void FrequencyMeasurementDecoder::Refresh()
 	}
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	double rmin = FLT_MAX;
 	double rmax = 0;
-
-	for(size_t i=0; i < (edges.size()-2); i+= 2)
+	size_t elen = edges.size();
+	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
 		int64_t start = edges[i];
@@ -148,8 +148,9 @@ void FrequencyMeasurementDecoder::Refresh()
 
 		double delta = 1.0e12 / (end - start);
 
-		cap->m_samples.push_back(AnalogSample(
-			start, delta, delta));
+		cap->m_offsets.push_back(start);
+		cap->m_durations.push_back(delta);
+		cap->m_samples.push_back(delta);
 
 		rmin = min(rmin, delta);
 		rmax = max(rmax, delta);

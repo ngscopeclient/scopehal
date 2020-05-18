@@ -20,9 +20,9 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
 	EyeDecoder2.cpp
-	#FallMeasurementDecoder.cpp
+	FallMeasurementDecoder.cpp
 	FFTDecoder.cpp
-	#FrequencyMeasurementDecoder.cpp
+	FrequencyMeasurementDecoder.cpp
 	HorizontalBathtubDecoder.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp

@@ -58,11 +58,9 @@
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
 #include "EyeDecoder2.h"
-/*
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"
 #include "FrequencyMeasurementDecoder.h"
-*/
 #include "HorizontalBathtubDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
