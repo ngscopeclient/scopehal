@@ -34,6 +34,7 @@
  */
 #include "scopehal.h"
 #include <gtkmm/drawingarea.h>
+#include <lxi.h>
 #include "AgilentOscilloscope.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
@@ -51,7 +52,10 @@ using namespace std;
  */
 void TransportStaticInit()
 {
+	lxi_init();
+
 	AddTransportClass(SCPISocketTransport);
+	AddTransportClass(SCPILxiTransport);
 	AddTransportClass(VICPSocketTransport);
 }
 

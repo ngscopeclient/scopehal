@@ -30,53 +30,97 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Implementation of SCPILxiTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopehal.h"
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+using namespace std;
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <yaml-cpp/yaml.h>
+SCPILxiTransport::SCPILxiTransport(string args)
+	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+{
+	char hostname[128];
+	unsigned int port = 0;
+	if(2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	{
+		//default if port not specified
+		m_hostname = args;
+		m_port = 1861;
+	}
+	else
+	{
+		m_hostname = hostname;
+		m_port = port;
+	}
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	if(!m_socket.Connect(m_hostname, m_port))
+	{
+		LogError("Couldn't connect to socket\n");
+		return;
+	}
+	if(!m_socket.DisableNagle())
+	{
+		LogError("Couldn't disable Nagle\n");
+		return;
+	}
+}
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+SCPILxiTransport::~SCPILxiTransport()
+{
+}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
 
-#include "Measurement.h"
-#include "Statistic.h"
+string SCPILxiTransport::GetTransportName()
+{
+	return "lxi";
+}
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+string SCPILxiTransport::GetConnectionString()
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "%s:%u", m_hostname.c_str(), m_port);
+	return string(tmp);
+}
 
-std::string GetDefaultChannelColor(int i);
+bool SCPILxiTransport::SendCommand(string cmd)
+{
+	LogTrace("Sending %s\n", cmd.c_str());
+	string tempbuf = cmd + "\n";
+	return m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
+}
 
-void TransportStaticInit();
-void DriverStaticInit();
+string SCPILxiTransport::ReadReply()
+{
+	//FIXME: there *has* to be a more efficient way to do this...
+	char tmp = ' ';
+	string ret;
+	while(true)
+	{
+		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
+			break;
+		if( (tmp == '\n') || (tmp == ';') )
+			break;
+		else
+			ret += tmp;
+	}
+	LogTrace("Got %s\n", ret.c_str());
+	return ret;
+}
 
-void InitializePlugins();
+void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
+{
+	m_socket.SendLooped(buf, len);
+}
 
-#endif
+void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
+{
+	m_socket.RecvLooped(buf, len);
+}

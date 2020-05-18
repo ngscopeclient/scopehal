@@ -30,53 +30,41 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SCPILxiTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef SCPILxiTransport_h
+#define SCPILxiTransport_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+#include "../xptools/Socket.h"
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPILxiTransport : public SCPITransport
+{
+public:
+	SCPILxiTransport(std::string args);
+	virtual ~SCPILxiTransport();
 
-#include <yaml-cpp/yaml.h>
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	TRANSPORT_INITPROC(SCPILxiTransport)
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	std::string GetHostname()
+	{ return m_hostname; }
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+protected:
+	Socket m_socket;
 
-#include "Measurement.h"
-#include "Statistic.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
+	std::string m_hostname;
+	unsigned short m_port;
+};
 
 #endif
