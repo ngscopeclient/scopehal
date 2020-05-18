@@ -73,11 +73,11 @@
 #include "SincInterpolationDecoder.h"
 #include "SPIDecoder.h"
 #include "ThresholdDecoder.h"
-/*
 #include "TMDSDecoder.h"
 #include "TopMeasurementDecoder.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
+/*
 #include "USB2ActivityDecoder.h"
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"

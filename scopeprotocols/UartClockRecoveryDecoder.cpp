@@ -107,8 +107,8 @@ void UartClockRecoveryDecoder::Refresh()
 		return;
 	}
 
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if( (din == NULL) || (din->GetDepth() == 0) )
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if( (din == NULL) || (din->m_samples.size() == 0) )
 	{
 		SetData(NULL);
 		return;
@@ -119,7 +119,7 @@ void UartClockRecoveryDecoder::Refresh()
 	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
 
 	//Create the output waveform and copy our timescales
-	DigitalCapture* cap = new DigitalCapture;
+	auto cap = new DigitalWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 	cap->m_triggerPhase = 0;
@@ -132,13 +132,13 @@ void UartClockRecoveryDecoder::Refresh()
 	bool first = true;
 	bool last = false;
 	const float threshold = m_parameters[m_threshname].GetFloatVal();
-	for(size_t i=1; i<din->m_samples.size(); i++)
+	size_t len = din->m_samples.size();
+	for(size_t i=1; i<len; i++)
 	{
-		auto sin = din->m_samples[i];
-		bool value = static_cast<float>(sin) > threshold;
+		bool value = din->m_samples[i] > threshold;
 
 		//Start time of the sample, in picoseconds
-		int64_t t = din->m_triggerPhase + din->m_timescale * sin.m_offset;
+		int64_t t = din->m_triggerPhase + din->m_timescale * din->m_offsets[i];
 
 		//Move to the middle of the sample
 		t += din->m_timescale/2;
@@ -166,7 +166,8 @@ void UartClockRecoveryDecoder::Refresh()
 	size_t nedge = 0;
 	int64_t bcenter = 0;
 	bool value = false;
-	for(; nedge < edges.size();)
+	size_t elen = edges.size();
+	for(; nedge < elen;)
 	{
 		//The current bit starts half a baud period after the start bit edge
 		bcenter = edges[nedge] + ps/2;
@@ -175,7 +176,7 @@ void UartClockRecoveryDecoder::Refresh()
 		//We have ten start/ data/stop bits after this
 		for(int i=0; i<10; i++)
 		{
-			if(nedge >= edges.size())
+			if(nedge >= elen)
 				break;
 
 			//If the next edge is around the time of this bit, re-sync to it
@@ -186,7 +187,9 @@ void UartClockRecoveryDecoder::Refresh()
 			}
 
 			//Emit a sample for this data bit
-			cap->m_samples.push_back(DigitalSample(bcenter, ps, value));
+			cap->m_offsets.push_back(bcenter);
+			cap->m_durations.push_back(ps);
+			cap->m_samples.push_back(value);
 			value = !value;
 
 			//Next bit starts one baud period later

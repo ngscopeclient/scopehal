@@ -72,11 +72,11 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SincInterpolationDecoder);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(ThresholdDecoder);
-	/*
 	AddDecoderClass(TMDSDecoder);
 	AddDecoderClass(TopMeasurementDecoder);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryDecoder);
+	/*
 	AddDecoderClass(USB2ActivityDecoder);
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);

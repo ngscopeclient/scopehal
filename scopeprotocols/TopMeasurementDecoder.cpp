@@ -105,7 +105,7 @@ void TopMeasurementDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -146,7 +146,7 @@ void TopMeasurementDecoder::Refresh()
 	float global_top = fbin*m_range + min;
 
 	//Create the output
-	AnalogCapture* cap = new AnalogCapture;
+	auto cap = new AnalogWaveform;
 
 	float last = min;
 	int64_t tedge = 0;
@@ -157,11 +157,11 @@ void TopMeasurementDecoder::Refresh()
 	float fmax = -99999;
 	float fmin =  99999;
 
-	for(size_t i=0; i < din->m_samples.size(); i++)
+	for(size_t i=0; i < len; i++)
 	{
 		//Wait for a falling edge
 		float cur = din->m_samples[i];
-		int64_t tnow = din->m_samples[i].m_offset * din->m_timescale;
+		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
 		if( (cur > m_midpoint) && (last <= m_midpoint) )
 		{
@@ -174,7 +174,9 @@ void TopMeasurementDecoder::Refresh()
 				if(vavg < fmin)
 					fmin = vavg;
 
-				cap->m_samples.push_back(AnalogSample(tedge, tnow-tedge, vavg));
+				cap->m_offsets.push_back(tedge);
+				cap->m_durations.push_back(tnow - tedge);
+				cap->m_samples.push_back(vavg);
 			}
 			tedge = tnow;
 		}

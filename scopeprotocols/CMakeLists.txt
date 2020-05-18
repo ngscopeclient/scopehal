@@ -36,9 +36,9 @@ set(SCOPEPROTOCOLS_SOURCES
 	SPIDecoder.cpp
 	ThresholdDecoder.cpp
 	TMDSDecoder.cpp
-	#TopMeasurementDecoder.cpp
-	#ARTDecoder.cpp
-	#UartClockRecoveryDecoder.cpp
+	TopMeasurementDecoder.cpp
+	UARTDecoder.cpp
+	UartClockRecoveryDecoder.cpp
 	#USB2ActivityDecoder.cpp
 	#USB2PacketDecoder.cpp
 	#USB2PCSDecoder.cpp

@@ -107,7 +107,7 @@ void UARTDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* din = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -121,7 +121,7 @@ void UARTDecoder::Refresh()
 	int64_t scaledbitper = ibitper / din->m_timescale;
 
 	//UART processing
-	AsciiCapture* cap = new AsciiCapture;
+	auto cap = new AsciiWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
@@ -131,22 +131,23 @@ void UARTDecoder::Refresh()
 	size_t isample = 0;
 	int64_t tlast = 0;
 	Packet* pack = NULL;
-	while(isample < din->m_samples.size())
+	size_t len = din->m_samples.size();
+	while(isample < len)
 	{
 		//Wait for signal to go high (idle state)
-		while( (isample < din->m_samples.size()) && !din->m_samples[isample].m_sample)
+		while( (isample < len) && !din->m_samples[isample])
 			isample ++;
-		if(isample >= din->m_samples.size())
+		if(isample >= len)
 			break;
 
 		//Wait for a falling edge (start bit)
-		while( (isample < din->m_samples.size()) && din->m_samples[isample].m_sample)
+		while( (isample < len) && din->m_samples[isample])
 			isample ++;
-		if(isample >= din->m_samples.size())
+		if(isample >= len)
 			break;
 
 		//Time of the start bit
-		int64_t tstart = din->m_samples[isample].m_offset;
+		int64_t tstart = din->m_offsets[isample];
 
 		//The next data bit should be measured 1.5 bit periods after the falling edge
 		next_value = tstart + scaledbitper + scaledbitper/2;
@@ -156,34 +157,33 @@ void UARTDecoder::Refresh()
 		for(int ibit=0; ibit<8; ibit++)
 		{
 			//Find the sample of interest
-			while( (isample < din->m_samples.size()) && ((din->m_samples[isample].m_offset + din->m_samples[isample].m_duration) < next_value))
+			while( (isample < len) && ((din->m_offsets[isample] + din->m_durations[isample]) < next_value))
 				isample ++;
-			if(isample >= din->m_samples.size())
+			if(isample >= len)
 				break;
 
 			//Got the sample
-			dval = (dval >> 1) | (din->m_samples[isample].m_sample ? 0x80 : 0);
+			dval = (dval >> 1) | (din->m_samples[isample] ? 0x80 : 0);
 
 			//Go on to the next bit
 			next_value += scaledbitper;
 		}
 
 		//If we ran out of space before we hit the end of the buffer, abort
-		if(isample >= din->m_samples.size())
+		if(isample >= len)
 			break;
 
 		//All good, read the stop bit
-		while( (isample < din->m_samples.size()) && ((din->m_samples[isample].m_offset + din->m_samples[isample].m_duration) < next_value))
+		while( (isample < len) && ((din->m_offsets[isample] + din->m_durations[isample]) < next_value))
 			isample ++;
-		if(isample >= din->m_samples.size())
+		if(isample >= len)
 			break;
 
 		//Save the sample
 		int64_t tend = next_value + (scaledbitper/2);
-		cap->m_samples.push_back(AsciiSample(
-			tstart,
-			tend-tstart,
-			(char)dval));
+		cap->m_offsets.push_back(tstart);
+		cap->m_durations.push_back(tend-tstart);
+		cap->m_samples.push_back(dval);
 
 		//If the last packet was more than 3 byte times ago, start a new one
 		if(pack != NULL)
@@ -212,7 +212,7 @@ void UARTDecoder::Refresh()
 	//If we have a packet in progress, add it
 	if(pack)
 	{
-		pack->m_len = (din->m_samples[din->m_samples.size()-1].m_offset * din->m_timescale) - pack->m_offset;
+		pack->m_len = (din->m_offsets[len-1] * din->m_timescale) - pack->m_offset;
 		FinishPacket(pack);
 	}
 
@@ -235,7 +235,7 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-Gdk::Color UARTDecoder::GetColor(int i)
+Gdk::Color UARTDecoder::GetColor(int /*i*/)
 {
 	return Gdk::Color(m_displaycolor);
 }
