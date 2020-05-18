@@ -97,44 +97,52 @@ void ADL5205Decoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	SPICapture* din = dynamic_cast<SPICapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<SPIWaveform*>(m_channels[0]->GetData());
+	if(!din)
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
-	if(din->GetDepth() == 0)
+	size_t len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Loop over the SPI events and process stuff
-	ADL5205Capture* cap = new ADL5205Capture;
+	auto cap = new ADL5205Waveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
-	ADL5205Sample samp;
+	ADL5205Symbol samp;
 	int phase = 0;
-	for(size_t i=0; i<din->GetDepth(); i++)
+	int64_t offset = 0;
+	for(size_t i=0; i<len; i++)
 	{
 		auto s = din->m_samples[i];
+		SetData(NULL);
 
 		switch(phase)
 		{
 			//Wait for us to be selected, ignore any traffic before that
 			case 0:
-				if(s.m_sample.m_stype == SPISymbol::TYPE_SELECT)
+				if(s.m_stype == SPISymbol::TYPE_SELECT)
 					phase = 1;
 				break;
 
 			//First byte
 			case 1:
-				if(s.m_sample.m_stype == SPISymbol::TYPE_DATA)
+				if(s.m_stype == SPISymbol::TYPE_DATA)
 				{
-					samp.m_offset = s.m_offset;
+					offset = din->m_offsets[i];
 
-					if(s.m_sample.m_data & 1)
-						samp.m_sample.m_write  = false;
+					if(s.m_data & 1)
+						samp.m_write  = false;
 					else
-						samp.m_sample.m_write  = true;
+						samp.m_write  = true;
 					phase = 2;
 				}
 				else
@@ -143,20 +151,21 @@ void ADL5205Decoder::Refresh()
 
 			//Second byte
 			case 2:
-				if(s.m_sample.m_stype == SPISymbol::TYPE_DATA)
+				if(s.m_stype == SPISymbol::TYPE_DATA)
 				{
-					int fa_code = s.m_sample.m_data >> 6;
-					int gain_code = s.m_sample.m_data & 0x3f;
+					int fa_code = s.m_data >> 6;
+					int gain_code = s.m_data & 0x3f;
 
 					//Fast attack
-					samp.m_sample.m_fa = 1 << fa_code;
+					samp.m_fa = 1 << fa_code;
 
 					//Gain
 					if(gain_code > 35)
 						gain_code = 35;
-					samp.m_sample.m_gain = 26 - gain_code;
+					samp.m_gain = 26 - gain_code;
 
-					samp.m_duration = s.m_offset + s.m_duration - samp.m_offset;
+					cap->m_offsets.push_back(offset);
+					cap->m_durations.push_back(din->m_offsets[i] + din->m_durations[i] - offset);
 					cap->m_samples.push_back(samp);
 					phase = 3;
 				}
@@ -165,7 +174,7 @@ void ADL5205Decoder::Refresh()
 				break;
 
 			case 3:
-				if(s.m_sample.m_stype == SPISymbol::TYPE_DESELECT)
+				if(s.m_stype == SPISymbol::TYPE_DESELECT)
 					phase = 0;
 				break;
 		}
@@ -181,10 +190,10 @@ Gdk::Color ADL5205Decoder::GetColor(int /*i*/)
 
 string ADL5205Decoder::GetText(int i)
 {
-	ADL5205Capture* capture = dynamic_cast<ADL5205Capture*>(GetData());
+	auto capture = dynamic_cast<ADL5205Waveform*>(GetData());
 	if(capture != NULL)
 	{
-		const ADL5205Symbol& s = capture->m_samples[i].m_sample;
+		const ADL5205Symbol& s = capture->m_samples[i];
 
 		char tmp[128];
 		snprintf(tmp, sizeof(tmp), "%s: FA=%d dB, gain=%d dB",

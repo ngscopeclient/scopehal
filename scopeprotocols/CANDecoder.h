@@ -25,6 +25,9 @@ public:
 		TYPE_IDLE
 	};
 
+	CANSymbol()
+	{}
+
 	CANSymbol(stype t, uint8_t *data, size_t size)
 	 : m_stype(t)
 	{
@@ -43,8 +46,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<CANSymbol> CANSample;
-typedef CaptureChannel<CANSymbol> CANCapture;
+typedef Waveform<CANSymbol> CANWaveform;
 
 class CANDecoder : public ProtocolDecoder
 {

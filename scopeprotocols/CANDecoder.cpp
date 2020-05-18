@@ -72,15 +72,15 @@ void CANDecoder::Refresh()
 		return;
 	}
 
-	DigitalCapture* diff = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	if( (diff == NULL) )
+	auto diff = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	if(diff == NULL)
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Create the capture
-	CANCapture* cap = new CANCapture;
+	auto cap = new CANWaveform;
 	cap->m_timescale = diff->m_timescale;
 	cap->m_startTimestamp = diff->m_startTimestamp;
 	cap->m_startPicoseconds = diff->m_startPicoseconds;
@@ -101,23 +101,23 @@ void CANDecoder::Refresh()
 	// FIXME
 	m_nbt = m_parameters[m_tq].GetIntVal() * ( 1 + m_parameters[m_bs1].GetIntVal() + m_parameters[m_bs2].GetIntVal() );
 
-	for(size_t i = 0; i < diff->m_samples.size(); i++)
+	size_t len = diff->m_samples.size();
+	int delta1 = ((2 * m_parameters[m_bs1].GetIntVal() + 1) * m_parameters[m_tq].GetIntVal() * 500);
+	for(size_t i = 0; i < len; i++)
 	{
 		if (symbol_start != 0 && current_symbol == CANSymbol::TYPE_SOF &&
-		    ((diff->m_samples[i].m_offset - diff->m_samples[bit_start].m_offset + 1) * diff->m_timescale)
-		    <
-		    ((2 * m_parameters[m_bs1].GetIntVal() + 1) * m_parameters[m_tq].GetIntVal() * 500))
+		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < delta1)
 		{
 			// We wait for the next bit
 			continue;
 		} else if (symbol_start != 0 && current_symbol != CANSymbol::TYPE_SOF &&
-		    ((diff->m_samples[i].m_offset - diff->m_samples[bit_start].m_offset + 1) * diff->m_timescale) < (m_nbt * 1e3))
+		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < (m_nbt * 1e3))
 		{
 			// We wait for the next bit
 			continue;
 		}
 
-		cur_diff = diff->m_samples[i].m_sample;
+		cur_diff = diff->m_samples[i];
 		bit_start = i;
 
 		if (current_symbol != CANSymbol::TYPE_IDLE)
@@ -144,12 +144,9 @@ void CANDecoder::Refresh()
 		}
 		else if (current_symbol == CANSymbol::TYPE_SOF)
 		{
-			cap->m_samples.push_back(CANSample(
-					diff->m_samples[symbol_start].m_offset,
-					diff->m_samples[i].m_offset - symbol_start,
-					CANSymbol(CANSymbol::TYPE_SOF, NULL, 0)
-				)
-			);
+			cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+			cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, NULL, 0));
 
 			current_symbol = CANSymbol::TYPE_SID;
 			symbol_start = i;
@@ -162,12 +159,9 @@ void CANDecoder::Refresh()
 
 			if (bitcount == 11) // SID
 			{
-				cap->m_samples.push_back(CANSample(
-						diff->m_samples[symbol_start].m_offset,
-						diff->m_samples[i].m_offset - symbol_start,
-						CANSymbol(CANSymbol::TYPE_SID, (uint8_t*)&current_data, 2)
-					)
-				);
+				cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+				cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+				cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SID, (uint8_t*)&current_data, 2));
 
 				bitcount = 0;
 				current_data = 0;
@@ -179,12 +173,9 @@ void CANDecoder::Refresh()
 		{
 			current_data |= (cur_diff)?0:1;
 
-			cap->m_samples.push_back(CANSample(
-					diff->m_samples[symbol_start].m_offset,
-					diff->m_samples[i].m_offset - symbol_start,
-					CANSymbol(CANSymbol::TYPE_RTR, (uint8_t *)&current_data, 1)
-				)
-			);
+			cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+			cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, (uint8_t *)&current_data, 1));
 
 			current_data = 0;
 			symbol_start = i;
@@ -194,12 +185,9 @@ void CANDecoder::Refresh()
 		{
 			current_data |= (cur_diff)?0:1;
 
-			cap->m_samples.push_back(CANSample(
-					diff->m_samples[symbol_start].m_offset,
-					diff->m_samples[i].m_offset - symbol_start,
-					CANSymbol(CANSymbol::TYPE_IDE, (uint8_t *)&current_data, 1)
-				)
-			);
+			cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+			cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_IDE, (uint8_t *)&current_data, 1));
 
 			current_data = 0;
 			symbol_start = i;
@@ -209,12 +197,9 @@ void CANDecoder::Refresh()
 		{
 			current_data |= (cur_diff)?0:1;
 
-			cap->m_samples.push_back(CANSample(
-					diff->m_samples[symbol_start].m_offset,
-					diff->m_samples[i].m_offset - symbol_start,
-					CANSymbol(CANSymbol::TYPE_R0, (uint8_t *)&current_data, 1)
-				)
-			);
+			cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+			cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+			cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_R0, (uint8_t *)&current_data, 1));
 
 			current_data = 0;
 			symbol_start = i;
@@ -228,12 +213,9 @@ void CANDecoder::Refresh()
 
 			if (bitcount == 4)
 			{
-				cap->m_samples.push_back(CANSample(
-						diff->m_samples[symbol_start].m_offset,
-						diff->m_samples[i].m_offset - symbol_start,
-						CANSymbol(CANSymbol::TYPE_DLC, (uint8_t*)&current_data, 1)
-					)
-				);
+				cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+				cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+				cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DLC, (uint8_t*)&current_data, 1));
 
 				dlc = current_data;
 				bitcount = 0;
@@ -250,12 +232,9 @@ void CANDecoder::Refresh()
 
 			if (bitcount == 8)
 			{
-				cap->m_samples.push_back(CANSample(
-						diff->m_samples[symbol_start].m_offset,
-						diff->m_samples[i].m_offset - symbol_start,
-						CANSymbol(CANSymbol::TYPE_DATA, (uint8_t*)&current_data, 1)
-					)
-				);
+				cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+				cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+				cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, (uint8_t*)&current_data, 1));
 
 				bitcount = 0;
 				current_data = 0;
@@ -279,12 +258,9 @@ void CANDecoder::Refresh()
 
 			if (bitcount == 15)
 			{
-				cap->m_samples.push_back(CANSample(
-						diff->m_samples[symbol_start].m_offset,
-						diff->m_samples[i].m_offset - symbol_start,
-						CANSymbol(CANSymbol::TYPE_CRC, (uint8_t*)&current_data, 2)
-					)
-				);
+				cap->m_offsets.push_back(diff->m_offsets[symbol_start]);
+				cap->m_durations.push_back(diff->m_offsets[i] - symbol_start);
+				cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_CRC, (uint8_t*)&current_data, 2));
 
 				bitcount = 0;
 				current_data = 0;
@@ -302,10 +278,10 @@ void CANDecoder::Refresh()
 
 Gdk::Color CANDecoder::GetColor(int i)
 {
-	CANCapture* capture = dynamic_cast<CANCapture*>(GetData());
+	auto capture = dynamic_cast<CANWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const CANSymbol& s = capture->m_samples[i].m_sample;
+		const CANSymbol& s = capture->m_samples[i];
 
 		if(s.m_stype == CANSymbol::TYPE_SOF)
 			return m_standardColors[COLOR_CONTROL];
@@ -332,10 +308,10 @@ Gdk::Color CANDecoder::GetColor(int i)
 
 string CANDecoder::GetText(int i)
 {
-	CANCapture* capture = dynamic_cast<CANCapture*>(GetData());
+	auto capture = dynamic_cast<CANWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const CANSymbol& s = capture->m_samples[i].m_sample;
+		const CANSymbol& s = capture->m_samples[i];
 
 		char tmp[32];
 		switch(s.m_stype)
