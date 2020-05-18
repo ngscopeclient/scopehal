@@ -53,6 +53,9 @@ public:
 		TYPE_ERROR,
 	};
 
+	MDIOSymbol()
+	{}
+
 	MDIOSymbol(stype t, uint16_t d = 0)
 	 : m_stype(t)
 	 , m_data(d)
@@ -67,8 +70,7 @@ public:
 	}
 };
 
-typedef OscilloscopeSample<MDIOSymbol> MDIOSample;
-typedef CaptureChannel<MDIOSymbol> MDIOCapture;
+typedef Waveform<MDIOSymbol> MDIOWaveform;
 
 class MDIODecoder : public PacketDecoder
 {

@@ -35,6 +35,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "JtagDecoder.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -141,10 +142,10 @@ void JtagDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* tdi = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* tdo = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
-	DigitalCapture* tms = dynamic_cast<DigitalCapture*>(m_channels[2]->GetData());
-	DigitalCapture* tck = dynamic_cast<DigitalCapture*>(m_channels[3]->GetData());
+	auto tdi = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto tdo = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
+	auto tms = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
+	auto tck = dynamic_cast<DigitalWaveform*>(m_channels[3]->GetData());
 	if( (tdi == NULL) || (tdo == NULL) || (tms == NULL) || (tck == NULL) )
 	{
 		SetData(NULL);
@@ -152,15 +153,15 @@ void JtagDecoder::Refresh()
 	}
 
 	//Sample the data stream at each clock edge
-	vector<DigitalSample> dtdi;
-	vector<DigitalSample> dtdo;
-	vector<DigitalSample> dtms;
+	DigitalWaveform dtdi;
+	DigitalWaveform dtdo;
+	DigitalWaveform dtms;
 	SampleOnRisingEdges(tdi, tck, dtdi);
 	SampleOnRisingEdges(tdo, tck, dtdo);
 	SampleOnRisingEdges(tms, tck, dtms);
 
 	//Create the capture
-	JtagCapture* cap = new JtagCapture;
+	auto cap = new JtagWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = tck->m_startTimestamp;
 	cap->m_startPicoseconds = tck->m_startPicoseconds;
@@ -229,11 +230,14 @@ void JtagDecoder::Refresh()
 	vector<uint8_t> ibytes;
 	vector<uint8_t> obytes;
 	string irval = "??";
-	for(size_t i=0; i<dtms.size(); i++)
+	size_t len = dtms.m_samples.size();
+	len = min(len, dtdi.m_samples.size());
+	len = min(len, dtdo.m_samples.size());
+	for(size_t i=0; i<len; i++)
 	{
 		//Update the state
 		JtagSymbol::JtagState next_state;
-		if(dtms[i])
+		if(dtms.m_samples[i])
 			next_state = state_if_tms_high[state];
 		else
 			next_state = state_if_tms_low[state];
@@ -241,10 +245,10 @@ void JtagDecoder::Refresh()
 		if( (state == JtagSymbol::SHIFT_IR) || (state == JtagSymbol::SHIFT_DR) )
 		{
 			idata = (idata >> 1);
-			if(dtdi[i])
+			if(dtdi.m_samples[i])
 				idata |= 0x80;
 			odata = (odata << 1);
-			if(dtdo[i])
+			if(dtdo.m_samples[i])
 				odata |= 0x1;
 			nbits ++;
 		}
@@ -252,10 +256,9 @@ void JtagDecoder::Refresh()
 		if(next_state != state)
 		{
 			//Add a sample for the previous state
-			cap->m_samples.push_back(JtagSample(
-				dtms[istart].m_offset,
-				dtms[i].m_offset - dtms[istart].m_offset,
-				JtagSymbol(state, idata, odata, nbits)));
+			cap->m_offsets.push_back(dtms.m_offsets[istart]);
+			cap->m_durations.push_back(dtms.m_offsets[i] - dtms.m_offsets[istart]);
+			cap->m_samples.push_back(JtagSymbol(state, idata, odata, nbits));
 
 			//Add packets for the IR/DR change
 			char tmp[128];
@@ -269,7 +272,7 @@ void JtagDecoder::Refresh()
 
 				//Write side
 				Packet* pack = new Packet;
-				pack->m_offset = dtms[packstart].m_offset;
+				pack->m_offset = dtms.m_offsets[packstart];
 				if(state == JtagSymbol::SHIFT_IR)
 					pack->m_headers["Operation"] = "IR write";
 				else
@@ -278,12 +281,12 @@ void JtagDecoder::Refresh()
 				snprintf(tmp, sizeof(tmp), "%zu", ibytes.size()*8 - 8 + nbits);
 				pack->m_headers["Bits"] = tmp;
 				pack->m_data = ibytes;
-				pack->m_len = dtms[i].m_offset - pack->m_offset;
+				pack->m_len = dtms.m_offsets[i] - pack->m_offset;
 				m_packets.push_back(pack);
 
 				//Read side
 				pack = new Packet;
-				pack->m_offset = dtms[packstart].m_offset;
+				pack->m_offset = dtms.m_offsets[packstart];
 				if(state == JtagSymbol::SHIFT_IR)
 					pack->m_headers["Operation"] = "IR read";
 				else
@@ -292,7 +295,7 @@ void JtagDecoder::Refresh()
 				snprintf(tmp, sizeof(tmp), "%zu", ibytes.size()*8 - 8 + nbits);
 				pack->m_headers["Bits"] = tmp;
 				pack->m_data = obytes;
-				pack->m_len = dtms[i].m_offset - pack->m_offset;
+				pack->m_len = dtms.m_offsets[i] - pack->m_offset;
 				m_packets.push_back(pack);
 
 				//Update current IR
@@ -325,10 +328,9 @@ void JtagDecoder::Refresh()
 		{
 			if(nbits == 8)
 			{
-				cap->m_samples.push_back(JtagSample(
-					dtms[istart].m_offset,
-					dtms[i].m_offset - dtms[istart].m_offset,
-					JtagSymbol(state, idata, odata, 8)));
+				cap->m_offsets.push_back(dtms.m_offsets[istart]);
+				cap->m_durations.push_back(dtms.m_offsets[i] - dtms.m_offsets[istart]);
+				cap->m_samples.push_back(JtagSymbol(state, idata, odata, 8));
 
 				ibytes.push_back(idata);
 				obytes.push_back(odata);
@@ -346,10 +348,10 @@ void JtagDecoder::Refresh()
 
 Gdk::Color JtagDecoder::GetColor(int i)
 {
-	JtagCapture* capture = dynamic_cast<JtagCapture*>(GetData());
+	auto capture = dynamic_cast<JtagWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const JtagSymbol& s = capture->m_samples[i].m_sample;
+		const JtagSymbol& s = capture->m_samples[i];
 
 		switch(s.m_state)
 		{
@@ -378,10 +380,10 @@ Gdk::Color JtagDecoder::GetColor(int i)
 
 string JtagDecoder::GetText(int i)
 {
-	JtagCapture* capture = dynamic_cast<JtagCapture*>(GetData());
+	auto capture = dynamic_cast<JtagWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const JtagSymbol& s = capture->m_samples[i].m_sample;
+		const JtagSymbol& s = capture->m_samples[i];
 
 		char tmp[128];
 		const char* sstate = JtagSymbol::GetName(s.m_state);

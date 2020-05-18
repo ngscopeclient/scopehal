@@ -68,6 +68,9 @@ public:
 		UNKNOWN_4,
 	};
 
+	JtagSymbol()
+	{}
+
 	JtagSymbol(JtagSymbol::JtagState state, uint8_t idata, uint8_t odata, uint8_t len)
 		: m_state(state)
 		, m_idata(idata)
@@ -92,8 +95,7 @@ public:
 	uint8_t m_len;
 };
 
-typedef OscilloscopeSample<JtagSymbol> JtagSample;
-typedef CaptureChannel<JtagSymbol> JtagCapture;
+typedef Waveform<JtagSymbol> JtagWaveform;
 
 class JtagDecoder : public PacketDecoder
 {

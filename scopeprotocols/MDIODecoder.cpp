@@ -87,6 +87,8 @@ void MDIODecoder::SetDefaultName()
 
 void MDIODecoder::Refresh()
 {
+	char tmp[128];
+
 	//Remove old packets from previous decode passes
 	ClearPackets();
 
@@ -96,8 +98,8 @@ void MDIODecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	DigitalCapture* mdio = dynamic_cast<DigitalCapture*>(m_channels[0]->GetData());
-	DigitalCapture* mdc = dynamic_cast<DigitalCapture*>(m_channels[1]->GetData());
+	auto mdio = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
+	auto mdc = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
 	if( (mdio == NULL) || (mdc == NULL) )
 	{
 		SetData(NULL);
@@ -105,33 +107,34 @@ void MDIODecoder::Refresh()
 	}
 
 	//Create the capture
-	MDIOCapture* cap = new MDIOCapture;
+	auto cap = new MDIOWaveform;
 	cap->m_timescale = 1;	//SampleOnRisingEdges() gives us ps level timestamps
 	cap->m_startTimestamp = mdc->m_startTimestamp;
 	cap->m_startPicoseconds = mdc->m_startPicoseconds;
 
 	//Sample the data stream at each clock edge
-	vector<DigitalSample> dmdio;
+	DigitalWaveform dmdio;
 	SampleOnRisingEdges(mdio, mdc, dmdio);
-	for(size_t i=0; i<dmdio.size(); i++)
+	size_t dlen = dmdio.m_samples.size();
+	for(size_t i=0; i<dlen; i++)
 	{
 		//Start by looking for a preamble
-		size_t start = dmdio[i].m_offset;
+		size_t start = dmdio.m_offsets[i];
 		bool err = false;
 		size_t len = 0;
 		for(size_t j=0; j<32; j++)
 		{
-			len = (dmdio[i+j].m_offset - start) + dmdio[i+j].m_duration;
+			len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
 
 			//Abort if we don't have space for a whole frame
-			if(i+j+1 == dmdio.size())
+			if(i+j+1 == len)
 			{
 				err = true;
 				break;
 			}
 
 			//Expect 32 "1" bits in a row. If we see any non-1 bits, declare an error
-			if(dmdio[i+j].m_sample != true)
+			if(dmdio.m_samples[i+j] != true)
 			{
 				err = true;
 				break;
@@ -142,18 +145,16 @@ void MDIODecoder::Refresh()
 		//If we don't have a valid preamble, stop
 		if(err)
 		{
-			cap->m_samples.push_back(MDIOSample(
-				start,
-				len,
-				MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0)));
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(len);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0));
 			continue;
 		}
 
 		//Good preamble
-		cap->m_samples.push_back(MDIOSample(
-			start,
-			len,
-			MDIOSymbol(MDIOSymbol::TYPE_PREAMBLE, 0)));
+		cap->m_offsets.push_back(start);
+		cap->m_durations.push_back(len);
+		cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_PREAMBLE, 0));
 
 		//Create the packet
 		Packet* pack = new Packet;
@@ -162,15 +163,15 @@ void MDIODecoder::Refresh()
 		//TODO: safely ignore extra preamble bits
 
 		//Next 2 bits are start delimiter
-		if(i+2 >= dmdio.size())
+		if(i+2 >= dlen)
 		{
 			delete pack;
 			break;
 		}
 		uint16_t sof = 0;
-		if(dmdio[i].m_sample)
+		if(dmdio.m_samples[i])
 			sof |= 2;
-		if(dmdio[i+1].m_sample)
+		if(dmdio.m_samples[i+1])
 			sof |= 1;
 
 		//MDIO Clause 22 frame
@@ -179,22 +180,21 @@ void MDIODecoder::Refresh()
 			pack->m_headers["Clause"] = "22";
 
 			//Add the start symbol
-			cap->m_samples.push_back(MDIOSample(
-				dmdio[i].m_offset,
-				(dmdio[i+1].m_offset - dmdio[i].m_offset) + dmdio[i+1].m_duration,
-				MDIOSymbol(MDIOSymbol::TYPE_START, sof)));
+			cap->m_offsets.push_back(dmdio.m_offsets[i]);
+			cap->m_durations.push_back((dmdio.m_offsets[i+1] - dmdio.m_offsets[i]) + dmdio.m_durations[i+1]);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_START, sof));
 			i += 2;
 
 			//Next 2 bits are opcode
-			if(i+2 >= dmdio.size())
+			if(i+2 >= dlen)
 			{
 				delete pack;
 				break;
 			}
 			uint16_t op = 0;
-			if(dmdio[i].m_sample)
+			if(dmdio.m_samples[i])
 				op |= 2;
-			if(dmdio[i+1].m_sample)
+			if(dmdio.m_samples[i+1])
 				op |= 1;
 
 			if(op == 1)
@@ -204,86 +204,80 @@ void MDIODecoder::Refresh()
 			else
 				pack->m_headers["Op"] = "ERROR";
 
-			cap->m_samples.push_back(MDIOSample(
-				dmdio[i].m_offset,
-				(dmdio[i+1].m_offset - dmdio[i].m_offset) + dmdio[i+1].m_duration,
-				MDIOSymbol(MDIOSymbol::TYPE_OP, op)));
+			cap->m_offsets.push_back(dmdio.m_offsets[i]);
+			cap->m_durations.push_back((dmdio.m_offsets[i+1] - dmdio.m_offsets[i]) + dmdio.m_durations[i+1]);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_OP, op));
 			i += 2;
 
 			//Next 5 bits are PHY address
-			if(i+5 >= dmdio.size())
+			if(i+5 >= dlen)
 				break;
 			uint16_t addr = 0;
-			start = dmdio[i].m_offset;
+			start = dmdio.m_offsets[i];
 			for(size_t j=0; j<5; j++)
 			{
-				len = (dmdio[i+j].m_offset - start) + dmdio[i+j].m_duration;
+				len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
 				addr <<= 1;
-				if(dmdio[i+j].m_sample)
+				if(dmdio.m_samples[i+j])
 					addr |= 1;
 			}
-			cap->m_samples.push_back(MDIOSample(
-				start,
-				len,
-				MDIOSymbol(MDIOSymbol::TYPE_PHYADDR, addr)));
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(len);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_PHYADDR, addr));
 			i += 5;
 
-			char tmp[32];
 			snprintf(tmp, sizeof(tmp), "%02x", addr);
 			pack->m_headers["PHY"] = tmp;
 
 			//Next 5 bits are reg address
-			if(i+5 >= dmdio.size())
+			if(i+5 >= dlen)
 			{
 				delete pack;
 				break;
 			}
 			addr = 0;
-			start = dmdio[i].m_offset;
+			start = dmdio.m_offsets[i];
 			for(size_t j=0; j<5; j++)
 			{
-				len = (dmdio[i+j].m_offset - start) + dmdio[i+j].m_duration;
+				len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
 				addr <<= 1;
-				if(dmdio[i+j].m_sample)
+				if(dmdio.m_samples[i+j])
 					addr |= 1;
 			}
-			cap->m_samples.push_back(MDIOSample(
-				start,
-				len,
-				MDIOSymbol(MDIOSymbol::TYPE_REGADDR, addr)));
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(len);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_REGADDR, addr));
 			i += 5;
 
 			snprintf(tmp, sizeof(tmp), "%02x", addr);
 			pack->m_headers["Reg"] = tmp;
 
 			//Next 2 bits are bus turnaround
-			if(i+2 >= dmdio.size())
+			if(i+2 >= dlen)
 				break;
-			cap->m_samples.push_back(MDIOSample(
-				dmdio[i].m_offset,
-				(dmdio[i+1].m_offset - dmdio[i].m_offset) + dmdio[i+1].m_duration,
-				MDIOSymbol(MDIOSymbol::TYPE_TURN, 0)));
+			cap->m_offsets.push_back(dmdio.m_offsets[i]);
+			cap->m_durations.push_back((dmdio.m_offsets[i+1] - dmdio.m_offsets[i]) + dmdio.m_durations[i+1]);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_TURN, 0));
 			i += 2;
 
 			//Next 16 bits are frame data
-			if(i+16 >= dmdio.size())
+			if(i+16 >= dlen)
 			{
 				delete pack;
 				break;
 			}
 			uint16_t value = 0;
-			start = dmdio[i].m_offset;
+			start = dmdio.m_offsets[i];
 			for(size_t j=0; j<16; j++)
 			{
-				len = (dmdio[i+j].m_offset - start) + dmdio[i+j].m_duration;
+				len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
 				value <<= 1;
-				if(dmdio[i+j].m_sample)
+				if(dmdio.m_samples[i+j])
 					value |= 1;
 			}
-			cap->m_samples.push_back(MDIOSample(
-				start,
-				len,
-				MDIOSymbol(MDIOSymbol::TYPE_DATA, value)));
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(len);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_DATA, value));
 			i += 16;
 
 			snprintf(tmp, sizeof(tmp), "%04x", value);
@@ -383,7 +377,6 @@ void MDIODecoder::Refresh()
 					info = "1000base-T Control: ";
 					if( (value >> 13) != 0)
 					{
-						char tmp[128];
 						snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
 						info += tmp;
 					}
@@ -415,7 +408,6 @@ void MDIODecoder::Refresh()
 					//TODO: other fields
 
 					{
-						char tmp[32];
 						snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
 						info += tmp;
 					}
@@ -471,10 +463,9 @@ void MDIODecoder::Refresh()
 		//Invalid frame format
 		else
 		{
-			cap->m_samples.push_back(MDIOSample(
-				dmdio[i].m_offset,
-				(dmdio[i+1].m_offset - dmdio[i].m_offset) + dmdio[i+1].m_duration,
-				MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0)));
+			cap->m_offsets.push_back(dmdio.m_offsets[i]);
+			cap->m_durations.push_back((dmdio.m_offsets[i+1] - dmdio.m_offsets[i]) + dmdio.m_offsets[i+1]);
+			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0));
 			continue;
 		}
 	}
@@ -496,10 +487,10 @@ vector<string> MDIODecoder::GetHeaders()
 
 Gdk::Color MDIODecoder::GetColor(int i)
 {
-	MDIOCapture* capture = dynamic_cast<MDIOCapture*>(GetData());
+	auto capture = dynamic_cast<MDIOWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const MDIOSymbol& s = capture->m_samples[i].m_sample;
+		const MDIOSymbol& s = capture->m_samples[i];
 
 		switch(s.m_stype)
 		{
@@ -532,10 +523,10 @@ Gdk::Color MDIODecoder::GetColor(int i)
 
 string MDIODecoder::GetText(int i)
 {
-	MDIOCapture* capture = dynamic_cast<MDIOCapture*>(GetData());
+	auto capture = dynamic_cast<MDIOWaveform*>(GetData());
 	if(capture != NULL)
 	{
-		const MDIOSymbol& s = capture->m_samples[i].m_sample;
+		const MDIOSymbol& s = capture->m_samples[i];
 
 		char tmp[32];
 		switch(s.m_stype)

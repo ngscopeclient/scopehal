@@ -26,8 +26,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	HorizontalBathtubDecoder.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp
-	#JtagDecoder.cpp
-	#MDIODecoder.cpp
+	JtagDecoder.cpp
+	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
