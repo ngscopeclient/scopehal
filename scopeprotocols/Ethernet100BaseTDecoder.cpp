@@ -174,7 +174,7 @@ void Ethernet100BaseTDecoder::Refresh()
 
 				//and then a 1 bit
 				bits.m_offsets.push_back(tnext);
-				bits.m_durations.push_back(tchange + din->m_durations[i]);
+				bits.m_durations.push_back(ui_width_samples);
 				bits.m_samples.push_back(1);
 			}
 

@@ -101,7 +101,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Got a valid 55. We're now in the preamble
 				else
 				{
-					start = starts[i] / cap->m_timescale;
+					start = starts[i];
 					segment.m_type = EthernetFrameSegment::TYPE_PREAMBLE;
 					segment.m_data.clear();
 					segment.m_data.push_back(0x55);
@@ -114,21 +114,18 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 			case EthernetFrameSegment::TYPE_PREAMBLE:
 
-				//TODO: Verify that this byte is immediately after the previous one
-
 				//Look for the SFD
 				if(bytes[i] == 0xd5)
 				{
-
 					//Save the preamble
-					cap->m_offsets.push_back(start);
-					cap->m_durations.push_back( (starts[i] / cap->m_timescale) - start);
+					cap->m_offsets.push_back(start / cap->m_timescale);
+					cap->m_durations.push_back( (starts[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
 					//Save the SFD
-					start = starts[i] / cap->m_timescale;
-					cap->m_offsets.push_back(start);
-					cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+					start = starts[i];
+					cap->m_offsets.push_back(start / cap->m_timescale);
+					cap->m_durations.push_back( (ends[i] - starts[i]) / cap->m_timescale);
 					segment.m_type = EthernetFrameSegment::TYPE_SFD;
 					segment.m_data.clear();
 					segment.m_data.push_back(0xd5);
@@ -156,8 +153,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of MAC? Record start time
 				if(segment.m_data.empty())
 				{
-					start = starts[i] / cap->m_timescale;
-					cap->m_offsets.push_back(start);
+					start = starts[i];
+					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
@@ -166,7 +163,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Are we done? Add it
 				if(segment.m_data.size() == 6)
 				{
-					cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale );
 					cap->m_samples.push_back(segment);
 
 					//Reset for next block of the frame
@@ -192,8 +189,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of MAC? Record start time
 				if(segment.m_data.empty())
 				{
-					start = starts[i] / cap->m_timescale;
-					cap->m_offsets.push_back(start);
+					start = starts[i];
+					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
@@ -202,7 +199,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Are we done? Add it
 				if(segment.m_data.size() == 6)
 				{
-					cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
 					//Reset for next block of the frame
@@ -228,8 +225,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of Ethertype? Record start time
 				if(segment.m_data.empty())
 				{
-					start = starts[i] / cap->m_timescale;
-					cap->m_offsets.push_back(start);
+					start = starts[i] ;
+					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
@@ -238,7 +235,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Are we done? Add it
 				if(segment.m_data.size() == 2)
 				{
-					cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
 					//Reset for next block of the frame
@@ -281,9 +278,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 				//Add a data element
 				//For now, each byte is its own payload blob
-				start = starts[i] / cap->m_timescale;
-				cap->m_offsets.push_back(start);
-				cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+				start = starts[i];
+				cap->m_offsets.push_back(start / cap->m_timescale);
+				cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 				segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
 				segment.m_data.clear();
 				segment.m_data.push_back(bytes[i]);
@@ -304,8 +301,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of FCS? Record start time
 				if(segment.m_data.empty())
 				{
-					start = starts[i] / cap->m_timescale;
-					cap->m_offsets.push_back(start);
+					start = starts[i];
+					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
@@ -314,7 +311,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Are we done? Add it
 				if(segment.m_data.size() == 4)
 				{
-					cap->m_durations.push_back( (ends[i] / cap->m_timescale) - start);
+					cap->m_durations.push_back( (ends[i] - start)/ cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
 					pack->m_len = ends[i] - pack->m_offset;
@@ -327,6 +324,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 				break;
 		}
 	}
+
+	LogDebug("End. Lengths %zu, %zu, %zu\n", cap->m_offsets.size(), cap->m_durations.size(), cap->m_samples.size());
 }
 
 Gdk::Color EthernetProtocolDecoder::GetColor(int i)
