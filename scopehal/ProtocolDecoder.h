@@ -108,7 +108,7 @@ public:
 	virtual void Release();
 
 	//Decoder enumeration
-	std::set<ProtocolDecoder*> EnumDecodes()
+	static std::set<ProtocolDecoder*> EnumDecodes()
 	{ return m_decodes; }
 
 	/**
