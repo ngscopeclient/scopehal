@@ -37,6 +37,7 @@
 #include "ProtocolDecoder.h"
 
 ProtocolDecoder::CreateMapType ProtocolDecoder::m_createprocs;
+std::set<ProtocolDecoder*> ProtocolDecoder::m_decodes;
 
 using namespace std;
 
@@ -194,10 +195,13 @@ ProtocolDecoder::ProtocolDecoder(
 	, m_dirty(true)
 {
 	m_physical = false;
+	m_decodes.emplace(this);
 }
 
 ProtocolDecoder::~ProtocolDecoder()
 {
+	m_decodes.erase(this);
+
 	for(auto c : m_channels)
 	{
 		if(c != NULL)

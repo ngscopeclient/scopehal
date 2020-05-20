@@ -107,6 +107,10 @@ public:
 	virtual void AddRef();
 	virtual void Release();
 
+	//Decoder enumeration
+	std::set<ProtocolDecoder*> EnumDecodes()
+	{ return m_decodes; }
+
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
 
@@ -237,6 +241,9 @@ protected:
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
+
+	//Decoder enumeration
+	static std::set<ProtocolDecoder*> m_decodes;
 };
 
 #define PROTOCOL_DECODER_INITPROC(T) \
