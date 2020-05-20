@@ -100,6 +100,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	size_t ilen = din->m_samples.size();
 	voltages.resize(ilen);
 	int oldstate = GetState(din->m_samples[0]);
+	voltages[0] = 0;
 	for(size_t i=1; i<ilen; i++)
 	{
 		int newstate = oldstate;
