@@ -30,6 +30,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "USB2PMADecoder.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -106,8 +107,8 @@ void USB2PMADecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	AnalogCapture* din_p = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	AnalogCapture* din_n = dynamic_cast<AnalogCapture*>(m_channels[1]->GetData());
+	auto din_p = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	auto din_n = dynamic_cast<AnalogWaveform*>(m_channels[1]->GetData());
 	if( (din_p == NULL) || (din_n == NULL) )
 	{
 		SetData(NULL);
@@ -115,7 +116,8 @@ void USB2PMADecoder::Refresh()
 	}
 
 	//We need meaningful data
-	if(din_p->GetDepth() == 0)
+	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
@@ -125,15 +127,11 @@ void USB2PMADecoder::Refresh()
 	int speed = m_parameters[m_speedname].GetIntVal();
 
 	//Figure out the line state for each input (no clock recovery yet)
-	USB2PMACapture* cap = new USB2PMACapture;
-	for(size_t i=0; i<din_p->m_samples.size(); i++)
+	auto cap = new USB2PMAWaveform;
+	for(size_t i=0; i<len; i++)
 	{
-		const AnalogSample& sin_p = din_p->m_samples[i];
-		const AnalogSample& sin_n = din_n->m_samples[i];
-
-		//TODO: handle this better.
-		bool bp = (sin_p.m_sample > 0.4);
-		bool bn = (sin_n.m_sample > 0.4);
+		bool bp = (din_p->m_samples[i] > 0.4);
+		bool bn = (din_n->m_samples[i] > 0.4);
 
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
 		if(bp && bn)
@@ -161,38 +159,36 @@ void USB2PMADecoder::Refresh()
 		//First sample goes as-is
 		if(cap->m_samples.empty())
 		{
-			cap->m_samples.push_back(USBLineSample(
-				sin_p.m_offset,
-				sin_p.m_duration,
-				type));
+			cap->m_offsets.push_back(din_p->m_offsets[i]);
+			cap->m_durations.push_back(din_p->m_durations[i]);
+			cap->m_samples.push_back(type);
 			continue;
 		}
 
 		//Type match? Extend the existing sample
-		USBLineSample& oldsample = cap->m_samples[cap->m_samples.size()-1];
-		USB2PMASymbol::SegmentType &oldtype = oldsample.m_sample.m_type;
+		size_t iold = cap->m_samples.size()-1;
+		auto oldtype = cap->m_samples[iold];
 		if(oldtype == type)
 		{
-			oldsample.m_duration += sin_p.m_duration;
+			cap->m_durations[iold] += din_p->m_durations[i];
 			continue;
 		}
 
 		//Ignore SE0/SE1 states during transitions.
-		int64_t last_ps = oldsample.m_duration * din_p->m_timescale;
+		int64_t last_ps = cap->m_durations[iold] * din_p->m_timescale;
 		if(
 			( (oldtype == USB2PMASymbol::TYPE_SE0) || (oldtype == USB2PMASymbol::TYPE_SE1) ) &&
 			(last_ps < 100000))
 		{
-			oldsample.m_sample.m_type = type;
-			oldsample.m_duration += sin_p.m_duration;
+			cap->m_samples[iold].m_type = type;
+			cap->m_durations[iold] += din_p->m_durations[i];
 			continue;
 		}
 
 		//Not a match. Add a new sample.
-		cap->m_samples.push_back(USBLineSample(
-			sin_p.m_offset,
-			sin_p.m_duration,
-			type));
+		cap->m_offsets.push_back(din_p->m_offsets[i]);
+		cap->m_durations.push_back(din_p->m_durations[i]);
+		cap->m_samples.push_back(type);
 	}
 
 	SetData(cap);
@@ -206,16 +202,15 @@ void USB2PMADecoder::Refresh()
 
 Gdk::Color USB2PMADecoder::GetColor(int i)
 {
-	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(GetData());
+	auto data = dynamic_cast<USB2PMAWaveform*>(GetData());
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
 		return m_standardColors[COLOR_ERROR];
 
 	//TODO: have a set of standard colors we use everywhere?
-
 	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
+	switch(sample.m_type)
 	{
 		case USB2PMASymbol::TYPE_J:
 		case USB2PMASymbol::TYPE_K:
@@ -233,14 +228,14 @@ Gdk::Color USB2PMADecoder::GetColor(int i)
 
 string USB2PMADecoder::GetText(int i)
 {
-	USB2PMACapture* data = dynamic_cast<USB2PMACapture*>(GetData());
+	auto data = dynamic_cast<USB2PMAWaveform*>(GetData());
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())
 		return "";
 
 	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
+	switch(sample.m_type)
 	{
 		case USB2PMASymbol::TYPE_J:
 			return "J";

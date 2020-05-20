@@ -77,12 +77,10 @@
 #include "TopMeasurementDecoder.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
-/*
 #include "USB2ActivityDecoder.h"
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
 #include "USB2PMADecoder.h"
-*/
 #include "WaterfallDecoder.h"
 
 /*

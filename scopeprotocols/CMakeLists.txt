@@ -39,10 +39,10 @@ set(SCOPEPROTOCOLS_SOURCES
 	TopMeasurementDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
-	#USB2ActivityDecoder.cpp
-	#USB2PacketDecoder.cpp
-	#USB2PCSDecoder.cpp
-	#USB2PMADecoder.cpp
+	USB2ActivityDecoder.cpp
+	USB2PacketDecoder.cpp
+	USB2PCSDecoder.cpp
+	USB2PMADecoder.cpp
 	WaterfallDecoder.cpp
 
 	#AverageStatistic.cpp

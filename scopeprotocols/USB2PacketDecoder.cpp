@@ -112,15 +112,21 @@ void USB2PacketDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	USB2PCSCapture* din = dynamic_cast<USB2PCSCapture*>(m_channels[0]->GetData());
-	if( (din == NULL) || (din->GetDepth() == 0) )
+	auto din = dynamic_cast<USB2PCSWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	size_t len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
 	//Make the capture and copy our time scales from the input
-	USB2PacketCapture* cap = new USB2PacketCapture;
+	auto cap = new USB2PacketWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
@@ -140,21 +146,18 @@ void USB2PacketDecoder::Refresh()
 	//Decode stuff
 	uint8_t last = 0;
 	uint64_t last_offset;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	for(size_t i=0; i<len; i++)
 	{
 		auto& sin = din->m_samples[i];
+		int64_t halfdur = din->m_durations[i]/2;
 
 		switch(state)
 		{
 			case STATE_IDLE:
 
-				//Expect IDLE or SYNC
-				switch(sin.m_sample.m_type)
+				//Expect SYNC
+				switch(sin.m_type)
 				{
-					//Ignore idles
-					case USB2PCSSymbol::TYPE_IDLE:
-						break;
-
 					//Start a new packet if we see a SYNC
 					case USB2PCSSymbol::TYPE_SYNC:
 						state = STATE_PID;
@@ -162,10 +165,9 @@ void USB2PacketDecoder::Refresh()
 
 					//Anything else is an error
 					default:
-						cap->m_samples.push_back(USB2PacketSample(
-							sin.m_offset,
-							sin.m_duration,
-							USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0)));
+						cap->m_offsets.push_back(din->m_offsets[i]);
+						cap->m_durations.push_back(din->m_durations[i]);
+						cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0));
 						break;
 				}
 
@@ -175,37 +177,34 @@ void USB2PacketDecoder::Refresh()
 			case STATE_PID:
 
 				//Should be data
-				if(sin.m_sample.m_type != USB2PCSSymbol::TYPE_DATA)
+				if(sin.m_type != USB2PCSSymbol::TYPE_DATA)
 				{
-					cap->m_samples.push_back(USB2PacketSample(
-						sin.m_offset,
-						sin.m_duration,
-						USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0)));
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0));
 
 					state = STATE_IDLE;
 					continue;
 				}
 
 				//If the low bits don't match the complement of the high bits, we have a bad PID
-				if( (sin.m_sample.m_data >> 4) != (0xf & ~sin.m_sample.m_data) )
+				if( (sin.m_data >> 4) != (0xf & ~sin.m_data) )
 				{
-					cap->m_samples.push_back(USB2PacketSample(
-						sin.m_offset,
-						sin.m_duration,
-						USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0)));
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0));
 
 					state = STATE_IDLE;
 					continue;
 				}
 
 				//All good, add the PID
-				cap->m_samples.push_back(USB2PacketSample(
-					sin.m_offset,
-					sin.m_duration,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_PID, sin.m_sample.m_data)));
+				cap->m_offsets.push_back(din->m_offsets[i]);
+				cap->m_durations.push_back(din->m_durations[i]);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_PID, sin.m_data));
 
 				//Look at the PID and decide what to expect next
-				switch(sin.m_sample.m_data & 0xf)
+				switch(sin.m_data & 0xf)
 				{
 					case USB2PacketSymbol::PID_ACK:
 					case USB2PacketSymbol::PID_STALL:
@@ -244,12 +243,11 @@ void USB2PacketDecoder::Refresh()
 
 			//Done, expect EOP
 			case STATE_END:
-				if(sin.m_sample.m_type != USB2PCSSymbol::TYPE_EOP)
+				if(sin.m_type != USB2PCSSymbol::TYPE_EOP)
 				{
-					cap->m_samples.push_back(USB2PacketSample(
-						sin.m_offset,
-						sin.m_duration,
-						USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0)));
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR, 0));
 				}
 				break;
 
@@ -257,39 +255,33 @@ void USB2PacketDecoder::Refresh()
 			case STATE_TOKEN_0:
 
 				//Pull out the 7-bit address
-				cap->m_samples.push_back(USB2PacketSample(
-					sin.m_offset,
-					sin.m_duration,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_ADDR, sin.m_sample.m_data & 0x7f)));
+				cap->m_offsets.push_back(din->m_offsets[i]);
+				cap->m_durations.push_back(din->m_durations[i]);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ADDR, sin.m_data & 0x7f));
 
-				last = sin.m_sample.m_data;
+				last = sin.m_data;
 
 				state = STATE_TOKEN_1;
 				break;
 
 			case STATE_TOKEN_1:
 
-				//Endpoint number
-				cap->m_samples.push_back(USB2PacketSample(
-					sin.m_offset,
-					sin.m_duration / 2,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_ENDP,
-						( last >> 7) | ( (sin.m_sample.m_data & 0x7) << 1 )
-						)));
+				cap->m_offsets.push_back(din->m_offsets[i]);
+				cap->m_durations.push_back(halfdur);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR,
+					( last >> 7) | ( (sin.m_data & 0x7) << 1 )));
 
-				//CRC
-				cap->m_samples.push_back(USB2PacketSample(
-					sin.m_offset + sin.m_duration/2,
-					sin.m_duration/2,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_CRC5, sin.m_sample.m_data >> 3)));
+				cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
+				cap->m_durations.push_back(halfdur);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_CRC5, sin.m_data >> 3));
 
 				state = STATE_END;
 				break;
 
 			case STATE_SOF_0:
 
-				last = sin.m_sample.m_data;
-				last_offset = sin.m_offset;
+				last = sin.m_data;
+				last_offset = din->m_offsets[i];
 
 				state = STATE_SOF_1;
 				break;
@@ -297,18 +289,15 @@ void USB2PacketDecoder::Refresh()
 			case STATE_SOF_1:
 
 				//Frame number is the entire previous symbol, plus the low 3 bits of this one
-				cap->m_samples.push_back(USB2PacketSample(
-					last_offset,
-					(sin.m_offset - last_offset) + sin.m_duration/2,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_NFRAME,
-						(sin.m_sample.m_data & 0x7 ) << 8 | last
-						)));
+				cap->m_offsets.push_back(last_offset);
+				cap->m_durations.push_back(din->m_offsets[i] - last_offset + halfdur);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_NFRAME,
+						(sin.m_data & 0x7 ) << 8 | last));
 
 				//CRC
-				cap->m_samples.push_back(USB2PacketSample(
-					sin.m_offset + sin.m_duration/2,
-					sin.m_duration/2,
-					USB2PacketSymbol(USB2PacketSymbol::TYPE_CRC5, sin.m_sample.m_data >> 3)));
+				cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
+				cap->m_durations.push_back(halfdur);
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_CRC5, sin.m_data >> 3));
 
 				state = STATE_END;
 				break;
@@ -316,32 +305,35 @@ void USB2PacketDecoder::Refresh()
 			case STATE_DATA:
 
 				//Assume data bytes are data (but they might be CRC, can't tell yet)
-				if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_DATA)
+				if(sin.m_type == USB2PCSSymbol::TYPE_DATA)
 				{
-					cap->m_samples.push_back(USB2PacketSample(
-						sin.m_offset,
-						sin.m_duration,
-						USB2PacketSymbol(USB2PacketSymbol::TYPE_DATA, sin.m_sample.m_data)));
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_DATA, sin.m_data));
 				}
 
 				//Last two bytes were actually the CRC!
 				//Merge them into the first one and delete the second
-				else if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_EOP)
+				else if(sin.m_type == USB2PCSSymbol::TYPE_EOP)
 				{
-					auto& first = cap->m_samples[cap->m_samples.size() - 2];
-					auto& second = cap->m_samples[cap->m_samples.size() - 1];
-					first.m_duration += second.m_duration;
-					first.m_sample.m_data = (first.m_sample.m_data << 8) | second.m_sample.m_data;
-					first.m_sample.m_type = USB2PacketSymbol::TYPE_CRC16;
+					size_t firstoff = cap->m_samples.size() - 2;
+					size_t secondoff = cap->m_samples.size() - 1;
 
-					cap->m_samples.resize(cap->m_samples.size()-1);
+					cap->m_durations[firstoff] += cap->m_durations[secondoff];
+					cap->m_samples[firstoff] = USB2PacketSymbol(
+						USB2PacketSymbol::TYPE_CRC16,
+						(cap->m_samples[firstoff].m_data << 8) | cap->m_samples[secondoff].m_data);
+
+					cap->m_offsets.resize(secondoff);
+					cap->m_durations.resize(secondoff);
+					cap->m_samples.resize(secondoff);
 				}
 
 				break;
 		}
 
 		//EOP always returns us to idle state
-		if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_EOP)
+		if(sin.m_type == USB2PCSSymbol::TYPE_EOP)
 			state = STATE_IDLE;
 	}
 
@@ -352,7 +344,7 @@ void USB2PacketDecoder::Refresh()
 	FindPackets(cap);
 }
 
-void USB2PacketDecoder::FindPackets(USB2PacketCapture* cap)
+void USB2PacketDecoder::FindPackets(USB2PacketWaveform* cap)
 {
 	ClearPackets();
 
@@ -360,29 +352,30 @@ void USB2PacketDecoder::FindPackets(USB2PacketCapture* cap)
 	for(size_t i=0; i<cap->m_samples.size() - 2;)
 	{
 		//Every packet should start with a PID. Discard unknown garbage.
+		size_t istart = i;
 		auto& psample = cap->m_samples[i];
-		if(psample.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+		if(psample.m_type != USB2PacketSymbol::TYPE_PID)
 		{
 			i++;
 			continue;
 		}
-		uint8_t pid = psample.m_sample.m_data & 0xf;
+		uint8_t pid = psample.m_data & 0xf;
 		i++;
 
 		//See what the PID is
 		switch(pid)
 		{
 			case USB2PacketSymbol::PID_SOF:
-				DecodeSof(cap, psample, i);
+				DecodeSof(cap, istart, i);
 				break;
 
 			case USB2PacketSymbol::PID_SETUP:
-				DecodeSetup(cap, psample, i);
+				DecodeSetup(cap, istart, i);
 				break;
 
 			case USB2PacketSymbol::PID_IN:
 			case USB2PacketSymbol::PID_OUT:
-				DecodeData(cap, psample, i);
+				DecodeData(cap, istart, i);
 				break;
 
 			default:
@@ -391,7 +384,7 @@ void USB2PacketDecoder::FindPackets(USB2PacketCapture* cap)
 	}
 }
 
-void USB2PacketDecoder::DecodeSof(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+void USB2PacketDecoder::DecodeSof(USB2PacketWaveform* cap, size_t istart, size_t& i)
 {
 	//A SOF should contain a TYPE_NFRAME and a TYPE_CRC5
 	//Bail out if we only have part of the packet
@@ -402,21 +395,22 @@ void USB2PacketDecoder::DecodeSof(USB2PacketCapture* cap, USB2PacketSample& star
 	}
 
 	//TODO: better display for invalid/malformed packets
-	USB2PacketSample& snframe = cap->m_samples[i++];
-	USB2PacketSample& scrc = cap->m_samples[i++];
-	if(snframe.m_sample.m_type != USB2PacketSymbol::TYPE_NFRAME)
+	auto snframe = cap->m_samples[i++];
+	size_t icrc = i++;
+	auto scrc = cap->m_samples[icrc];
+	if(snframe.m_type != USB2PacketSymbol::TYPE_NFRAME)
 		return;
-	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+	if(scrc.m_type != USB2PacketSymbol::TYPE_CRC5)
 		return;
 
 	//Make the packet
 	Packet* pack = new Packet;
-	pack->m_offset = start.m_offset * cap->m_timescale;
+	pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 	pack->m_headers["Type"] = "SOF";
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "Sequence = %u", snframe.m_sample.m_data);
+	snprintf(tmp, sizeof(tmp), "Sequence = %u", snframe.m_data);
 	pack->m_headers["Details"] = tmp;
-	pack->m_len = ((scrc.m_offset + scrc.m_duration) * cap->m_timescale) - pack->m_offset;
+	pack->m_len = ((cap->m_offsets[icrc] + cap->m_durations[icrc]) * cap->m_timescale) - pack->m_offset;
 	m_packets.push_back(pack);
 
 	pack->m_headers["Device"] = "--";
@@ -424,7 +418,7 @@ void USB2PacketDecoder::DecodeSof(USB2PacketCapture* cap, USB2PacketSample& star
 	pack->m_headers["Length"] = "2";
 }
 
-void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+void USB2PacketDecoder::DecodeSetup(USB2PacketWaveform* cap, size_t istart, size_t& i)
 {
 	//A SETUP packet should contain ADDR, ENDP, CRC5
 	//Bail out if we only have part of the packet.
@@ -433,22 +427,22 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 		LogDebug("Truncated SETUP\n");
 		return;
 	}
-	USB2PacketSample& saddr = cap->m_samples[i++];
-	USB2PacketSample& sendp = cap->m_samples[i++];
-	USB2PacketSample& scrc = cap->m_samples[i++];
+	auto saddr = cap->m_samples[i++];
+	auto sendp = cap->m_samples[i++];
+	auto scrc = cap->m_samples[i++];
 
 	//TODO: better display for invalid/malformed packets
-	if(saddr.m_sample.m_type != USB2PacketSymbol::TYPE_ADDR)
+	if(saddr.m_type != USB2PacketSymbol::TYPE_ADDR)
 	{
 		LogError("not TYPE_ADDR\n");
 		return;
 	}
-	if(sendp.m_sample.m_type != USB2PacketSymbol::TYPE_ENDP)
+	if(sendp.m_type != USB2PacketSymbol::TYPE_ENDP)
 	{
 		LogError("not TYPE_ENDP\n");
 		return;
 	}
-	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+	if(scrc.m_type != USB2PacketSymbol::TYPE_CRC5)
 	{
 		LogError("not TYPE_CRC5\n");
 		return;
@@ -462,13 +456,13 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 		LogDebug("Truncated data\n");
 		return;
 	}
-	USB2PacketSample& sdatpid = cap->m_samples[i++];
-	if(sdatpid.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+	auto sdatpid = cap->m_samples[i++];
+	if(sdatpid.m_type != USB2PacketSymbol::TYPE_PID)
 	{
 		LogError("Not PID\n");
 		return;
 	}
-	if( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA0)
+	if( (sdatpid.m_data & 0xf) != USB2PacketSymbol::PID_DATA0)
 	{
 		LogError("not DATA0\n");
 		return;
@@ -476,16 +470,17 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 	uint16_t data[8] = {0};
 	for(int j=0; j<8; j++)
 	{
-		USB2PacketSample& sdat = cap->m_samples[i++];
-		if(sdat.m_sample.m_type != USB2PacketSymbol::TYPE_DATA)
+		auto sdat = cap->m_samples[i++];
+		if(sdat.m_type != USB2PacketSymbol::TYPE_DATA)
 		{
 			LogError("not data\n");
 			return;
 		}
-		data[j] = sdat.m_sample.m_data;
+		data[j] = sdat.m_data;
 	}
-	USB2PacketSample& sdcrc = cap->m_samples[i++];
-	if(sdcrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC16)
+	size_t idcrc = i++;
+	auto sdcrc = cap->m_samples[idcrc];
+	if(sdcrc.m_type != USB2PacketSymbol::TYPE_CRC16)
 	{
 		LogError("not CRC16\n");
 		return;
@@ -498,12 +493,12 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 		LogDebug("Truncated ACK\n");
 		return;
 	}
-	USB2PacketSample& sack = cap->m_samples[i++];
-	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
+	auto sack = cap->m_samples[i++];
+	if(sack.m_type == USB2PacketSymbol::TYPE_PID)
 	{
-		if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
+		if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
 			ack = "ACK";
-		else if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+		else if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
 			ack = "NAK";
 		else
 			ack = "Unknown end PID";
@@ -511,12 +506,12 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 
 	//Make the packet
 	Packet* pack = new Packet;
-	pack->m_offset = start.m_offset * cap->m_timescale;
+	pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 	pack->m_headers["Type"] = "SETUP";
 	char tmp[256];
-	snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+	snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 	pack->m_headers["Device"] = tmp;
-	snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+	snprintf(tmp, sizeof(tmp), "%d", sendp.m_data);
 	pack->m_headers["Endpoint"] = tmp;
 	pack->m_headers["Length"] = "8";	//constant
 
@@ -578,32 +573,35 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& st
 	pack->m_headers["Details"] = tmp;
 
 	//Done
-	pack->m_len = ((sdcrc.m_offset + sdcrc.m_duration) * cap->m_timescale) - pack->m_offset;
+	pack->m_len = ((cap->m_offsets[idcrc] + cap->m_durations[idcrc]) * cap->m_timescale) - pack->m_offset;
 	m_packets.push_back(pack);
 }
 
-void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i)
+void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_t& i)
 {
 	//The IN/OUT packet should contain ADDR, ENDP, CRC5
 	//Bail out if we only have part of the packet.
 	if(i+2 >= cap->m_samples.size())
 		return;
-	USB2PacketSample& saddr = cap->m_samples[i++];
-	USB2PacketSample& sendp = cap->m_samples[i++];
-	USB2PacketSample& scrc = cap->m_samples[i++];
+	size_t iaddr = i++;
+	auto saddr = cap->m_samples[iaddr];
+	size_t iendp = i++;
+	auto sendp = cap->m_samples[iendp];
+	size_t icrc = i++;
+	auto scrc = cap->m_samples[icrc];
 
 	//TODO: better display for invalid/malformed packets
-	if(saddr.m_sample.m_type != USB2PacketSymbol::TYPE_ADDR)
+	if(saddr.m_type != USB2PacketSymbol::TYPE_ADDR)
 	{
 		LogError("not TYPE_ADDR\n");
 		return;
 	}
-	if(sendp.m_sample.m_type != USB2PacketSymbol::TYPE_ENDP)
+	if(sendp.m_type != USB2PacketSymbol::TYPE_ENDP)
 	{
 		LogError("not TYPE_ENDP\n");
 		return;
 	}
-	if(scrc.m_sample.m_type != USB2PacketSymbol::TYPE_CRC5)
+	if(scrc.m_type != USB2PacketSymbol::TYPE_CRC5)
 	{
 		LogError("not TYPE_CRC5\n");
 		return;
@@ -619,34 +617,33 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	char tmp[256];
 
 	//Look for the DATA packet after the IN/OUT
-	USB2PacketSample& sdatpid = cap->m_samples[i];
-	if(sdatpid.m_sample.m_type != USB2PacketSymbol::TYPE_PID)
+	auto sdatpid = cap->m_samples[i];
+	if(sdatpid.m_type != USB2PacketSymbol::TYPE_PID)
 	{
 		LogError("Not PID\n");
 		return;
 	}
 	//We can get a SOF thrown in anywhere, handle that first
-	if( (sdatpid.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_SOF)
+	if( (sdatpid.m_data & 0xf) == USB2PacketSymbol::PID_SOF)
 	{
 		LogDebug("Random SOF in data stream (i=%zu)\n", i);
-		DecodeSof(cap, sdatpid, i);
+		DecodeSof(cap, i, i);
 		sdatpid = cap->m_samples[i];
 	}
-	else if( (sdatpid.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+	else if( (sdatpid.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
 	{
 		i++;
 
 		//Add a line for the aborted transaction
 		Packet* pack = new Packet;
-		pack->m_offset = start.m_offset * cap->m_timescale;
-		if( (start.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_IN)
+		pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
+		if( (cap->m_samples[istart].m_data & 0xf) == USB2PacketSymbol::PID_IN)
 			pack->m_headers["Type"] = "IN";
 		else
 			pack->m_headers["Type"] = "OUT";
-		char tmp[256];
-		snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+		snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 		pack->m_headers["Device"] = tmp;
-		snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+		snprintf(tmp, sizeof(tmp), "%d", sendp.m_data);
 		pack->m_headers["Endpoint"] = tmp;
 		pack->m_headers["Details"] = "NAK";
 		m_packets.push_back(pack);
@@ -654,14 +651,14 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	}
 	else	//normal data
 		i++;
-	if( ( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA0) &&
-		( (sdatpid.m_sample.m_data & 0xf) != USB2PacketSymbol::PID_DATA1) )
+	if( ( (sdatpid.m_data & 0xf) != USB2PacketSymbol::PID_DATA0) &&
+		( (sdatpid.m_data & 0xf) != USB2PacketSymbol::PID_DATA1) )
 	{
-		LogError("Not data PID (%x, i=%zu)\n", sdatpid.m_sample.m_data, i);
+		LogError("Not data PID (%x, i=%zu)\n", sdatpid.m_data, i);
 
 		//DEBUG
 		Packet* pack = new Packet;
-		pack->m_offset = start.m_offset * cap->m_timescale;
+		pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 		pack->m_headers["Details"] = "ERROR";
 		m_packets.push_back(pack);
 		return;
@@ -669,34 +666,36 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 
 	//Create the new packet
 	Packet* pack = new Packet;
-	pack->m_offset = start.m_offset * cap->m_timescale;
-	if( (start.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_IN)
+	pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
+	if( (cap->m_samples[istart].m_data & 0xf) == USB2PacketSymbol::PID_IN)
 		pack->m_headers["Type"] = "IN";
 	else
 		pack->m_headers["Type"] = "OUT";
-	snprintf(tmp, sizeof(tmp), "%d", saddr.m_sample.m_data);
+	snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 	pack->m_headers["Device"] = tmp;
-	snprintf(tmp, sizeof(tmp), "%d", sendp.m_sample.m_data);
+	snprintf(tmp, sizeof(tmp), "%d", sendp.m_data);
 	pack->m_headers["Endpoint"] = tmp;
 
 	//Read the data
 	while(i < cap->m_samples.size())
 	{
-		USB2PacketSample& s = cap->m_samples[i++];
+		auto s = cap->m_samples[i];
 
 		//Keep adding data
-		if(s.m_sample.m_type == USB2PacketSymbol::TYPE_DATA)
+		if(s.m_type == USB2PacketSymbol::TYPE_DATA)
 		{
-			pack->m_data.push_back(s.m_sample.m_data);
-			pack->m_len = ((s.m_offset + s.m_duration) * cap->m_timescale) - pack->m_offset;
+			pack->m_data.push_back(s.m_data);
+			pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
 		}
 
 		//Next should be a CRC16
-		else if(s.m_sample.m_type == USB2PacketSymbol::TYPE_CRC16)
+		else if(s.m_type == USB2PacketSymbol::TYPE_CRC16)
 		{
 			//TODO: verify the CRC
 			break;
 		}
+
+		i++;
 	}
 
 	//Expect ACK/NAK
@@ -706,12 +705,12 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 		return;
 	}
 	string ack = "";
-	USB2PacketSample& sack = cap->m_samples[i++];
-	if(sack.m_sample.m_type == USB2PacketSymbol::TYPE_PID)
+	auto sack = cap->m_samples[i++];
+	if(sack.m_type == USB2PacketSymbol::TYPE_PID)
 	{
-		if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
+		if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
 			ack = "";
-		else if( (sack.m_sample.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+		else if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
 			ack = "NAK";
 		else
 			ack = "Unknown end PID";
@@ -720,7 +719,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 	//TODO: handle errors better
 	else
 	{
-		LogDebug("DecodeData got type %x instead of ACK/NAK\n", sack.m_sample.m_type);
+		LogDebug("DecodeData got type %x instead of ACK/NAK\n", sack.m_type);
 		ack = "Not a PID";
 	}
 
@@ -742,18 +741,18 @@ void USB2PacketDecoder::DecodeData(USB2PacketCapture* cap, USB2PacketSample& sta
 
 Gdk::Color USB2PacketDecoder::GetColor(int i)
 {
-	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(GetData());
+	auto data = dynamic_cast<USB2PacketWaveform*>(GetData());
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
 		return m_standardColors[COLOR_ERROR];
 
 	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
+	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:
-			if( (sample.m_sample.m_data == USB2PacketSymbol::PID_RESERVED) ||
-				(sample.m_sample.m_data == USB2PacketSymbol::PID_STALL) )
+			if( (sample.m_data == USB2PacketSymbol::PID_RESERVED) ||
+				(sample.m_data == USB2PacketSymbol::PID_STALL) )
 				return m_standardColors[COLOR_ERROR];
 			else
 				return m_standardColors[COLOR_PREAMBLE];
@@ -783,7 +782,7 @@ Gdk::Color USB2PacketDecoder::GetColor(int i)
 
 string USB2PacketDecoder::GetText(int i)
 {
-	USB2PacketCapture* data = dynamic_cast<USB2PacketCapture*>(GetData());
+	auto data = dynamic_cast<USB2PacketWaveform*>(GetData());
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())
@@ -792,11 +791,11 @@ string USB2PacketDecoder::GetText(int i)
 	char tmp[32];
 
 	auto sample = data->m_samples[i];
-	switch(sample.m_sample.m_type)
+	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:
 		{
-			switch(sample.m_sample.m_data & 0x0f)
+			switch(sample.m_data & 0x0f)
 			{
 				case USB2PacketSymbol::PID_RESERVED:
 					return "RESERVED";
@@ -837,22 +836,22 @@ string USB2PacketDecoder::GetText(int i)
 			break;
 		}
 		case USB2PacketSymbol::TYPE_ADDR:
-			snprintf(tmp, sizeof(tmp), "Dev %d", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "Dev %d", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_NFRAME:
-			snprintf(tmp, sizeof(tmp), "Frame %d", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "Frame %d", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_ENDP:
-			snprintf(tmp, sizeof(tmp), "EP %d", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "EP %d", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_CRC5:
-			snprintf(tmp, sizeof(tmp), "CRC %02x", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "CRC %02x", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_CRC16:
-			snprintf(tmp, sizeof(tmp), "CRC %04x", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "CRC %04x", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_DATA:
-			snprintf(tmp, sizeof(tmp), "%02x", sample.m_sample.m_data);
+			snprintf(tmp, sizeof(tmp), "%02x", sample.m_data);
 			return string(tmp);
 		case USB2PacketSymbol::TYPE_ERROR:
 		default:

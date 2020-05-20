@@ -86,7 +86,7 @@ void USB2ActivityDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	USB2PCSCapture* din = dynamic_cast<USB2PCSCapture*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<USB2PCSWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
 	{
 		SetData(NULL);
@@ -94,29 +94,34 @@ void USB2ActivityDecoder::Refresh()
 	}
 
 	//Can't do much if we have no samples to work with
-	if(din->GetDepth() == 0)
+	size_t len = din->m_samples.size();
+	if(len == 0)
 	{
 		SetData(NULL);
 		return;
 	}
 
-	DigitalCapture* cap = new DigitalCapture;
+	auto cap = new DigitalWaveform;
 
 	//Start low, go high when we see a SYNC, low at EOP
 	int64_t last = 0;
-	for(size_t i=0; i<din->m_samples.size(); i++)
+	for(size_t i=0; i<len; i++)
 	{
-		USB2PCSSample sin = din->m_samples[i];
-		if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_SYNC)
+		auto sin = din->m_samples[i];
+		if(sin.m_type == USB2PCSSymbol::TYPE_SYNC)
 		{
-			cap->m_samples.push_back(DigitalSample(last, sin.m_offset - last, false));
-			last = sin.m_offset;
+			cap->m_offsets.push_back(last);
+			cap->m_durations.push_back(din->m_offsets[i] - last);
+			cap->m_samples.push_back(false);
+			last = din->m_offsets[i];
 		}
 
-		if(sin.m_sample.m_type == USB2PCSSymbol::TYPE_EOP)
+		if(sin.m_type == USB2PCSSymbol::TYPE_EOP)
 		{
-			cap->m_samples.push_back(DigitalSample(last, sin.m_offset + sin.m_duration - last, true));
-			last = sin.m_offset + sin.m_duration;
+			cap->m_offsets.push_back(last);
+			cap->m_durations.push_back(din->m_offsets[i] + din->m_durations[i] - last);
+			cap->m_samples.push_back(true);
+			last = din->m_offsets[i] + din->m_durations[i];
 		}
 	}
 

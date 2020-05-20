@@ -121,10 +121,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(USB2PacketDecoder)
 
 protected:
-	void FindPackets(USB2PacketCapture* cap);
-	void DecodeSof(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
-	void DecodeSetup(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
-	void DecodeData(USB2PacketCapture* cap, USB2PacketSample& start, size_t& i);
+	void FindPackets(USB2PacketWaveform* cap);
+	void DecodeSof(USB2PacketWaveform* cap, size_t istart, size_t& i);
+	void DecodeSetup(USB2PacketWaveform* cap, size_t istart, size_t& i);
+	void DecodeData(USB2PacketWaveform* cap, size_t istart, size_t& i);
 };
 
 #endif

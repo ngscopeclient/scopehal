@@ -47,7 +47,6 @@ public:
 
 	enum SymbolType
 	{
-		TYPE_IDLE,
 		TYPE_SYNC,
 		TYPE_EOP,
 		TYPE_RESET,
@@ -57,8 +56,9 @@ public:
 		TYPE_ERROR
 	};
 
-	USB2PCSSymbol(SymbolType type = TYPE_IDLE)
+	USB2PCSSymbol(SymbolType type = TYPE_SYNC, uint8_t data = 0)
 	 : m_type(type)
+	 , m_data(data)
 	{
 	}
 
@@ -111,33 +111,36 @@ protected:
 	};
 
 	void RefreshIterationIdle(
-		const USBLineSample& sin,
+		size_t nin,
 		DecodeState& state,
 		BusSpeed& speed,
 		size_t& ui_width,
 		USB2PCSWaveform* cap,
 		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSymbol& current_sample);
+		int64_t& offset
+		);
 
 	void RefreshIterationSync(
-		const USBLineSample& sin,
+		size_t nin,
 		DecodeState& state,
 		size_t& ui_width,
 		USB2PCSWaveform* cap,
 		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSymbol& current_sample);
+		int64_t& offset,
+		uint8_t& data);
 
 	void RefreshIterationData(
-		const USBLineSample& sin,
-		const USBLineSample& slast,
+		size_t nin,
+		size_t nlast,
 		DecodeState& state,
 		size_t& ui_width,
 		USB2PCSWaveform* cap,
 		USB2PMAWaveform* din,
 		size_t& count,
-		USB2PCSSymbol& current_sample);
+		int64_t& offset,
+		uint8_t& data);
 };
 
 #endif
