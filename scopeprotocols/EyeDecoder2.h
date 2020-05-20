@@ -66,6 +66,8 @@ public:
 
 	float m_uiWidth;
 
+	float m_saturationLevel;
+
 protected:
 	size_t m_width;
 	size_t m_height;
@@ -126,4 +128,6 @@ protected:
 	size_t m_height;
 
 	size_t m_uiWidth;
+
+	std::string m_saturationName;
 };

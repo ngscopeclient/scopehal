@@ -37,7 +37,9 @@ using namespace std;
 // Construction / destruction
 
 EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
-	: m_width(width)
+	: m_uiWidth(1)
+	, m_saturationLevel(1)
+	, m_width(width)
 	, m_height(height)
 	, m_totalUIs(0)
 	, m_centerVoltage(center)
@@ -50,8 +52,6 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
 		m_outdata[i] = 0;
 		m_accumdata[i] = 0;
 	}
-
-	m_uiWidth = 1;
 }
 
 EyeWaveform::~EyeWaveform()
@@ -67,6 +67,7 @@ void EyeWaveform::Normalize()
 	//Normalize it
 	size_t len = m_width * m_height;
 
+	//Find the peak amplitude
 	int64_t nmax = 0;
 	for(size_t i=0; i<len; i++)
 		nmax = max(m_accumdata[i], nmax);
@@ -74,8 +75,14 @@ void EyeWaveform::Normalize()
 		nmax = 1;
 	float norm = 2.0f / nmax;
 
+	/*
+		Normalize with saturation
+		Saturation level of 1.0 means mapping all values to [0, 1].
+		2.0 means mapping values to [0, 2] and saturating anything above 1.
+	 */
+	norm *= m_saturationLevel;
 	for(size_t i=0; i<len; i++)
-		m_outdata[i] = m_accumdata[i] * norm;
+		m_outdata[i] = min(1.0f, m_accumdata[i] * norm);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +101,10 @@ EyeDecoder2::EyeDecoder2(string color)
 	m_uiWidth = 0;
 	m_width = 0;
 	m_height = 0;
+
+	m_saturationName = "Saturation Level";
+	m_parameters[m_saturationName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_saturationName].SetFloatVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,6 +349,7 @@ void EyeDecoder2::Refresh()
 	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(m_data);
 	if(cap == NULL)
 		cap = new EyeWaveform(m_width, m_height, 0);	//TODO: make center configurable (scopehal:#1)
+	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
 
