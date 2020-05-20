@@ -45,7 +45,7 @@ string AverageStatistic::GetStatisticName()
 bool AverageStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogCapture*>(channel->GetData());
+	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData());
 	if(!data)
 		return false;
 
@@ -59,9 +59,9 @@ bool AverageStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 	}
 
 	//Add new sample data
-	for(auto sample : *data)
+	for(auto sample : data->m_samples)
 		value += (float)sample;
-	count += data->GetDepth();
+	count += data->m_samples.size();
 
 	//Average and save
 	m_pastCounts[channel] = count;

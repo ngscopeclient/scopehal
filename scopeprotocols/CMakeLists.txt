@@ -45,9 +45,9 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PMADecoder.cpp
 	WaterfallDecoder.cpp
 
-	#AverageStatistic.cpp
-	#MaximumStatistic.cpp
-	#MinimumStatistic.cpp
+	AverageStatistic.cpp
+	MaximumStatistic.cpp
+	MinimumStatistic.cpp
 
 	scopeprotocols.cpp
 	)

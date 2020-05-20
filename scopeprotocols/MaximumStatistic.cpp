@@ -44,7 +44,7 @@ string MaximumStatistic::GetStatisticName()
 bool MaximumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogCapture*>(channel->GetData());
+	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData());
 	if(!data)
 		return false;
 
@@ -53,7 +53,7 @@ bool MaximumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 	if(m_pastMaximums.find(channel) != m_pastMaximums.end())
 		value = m_pastMaximums[channel];
 
-	for(auto sample : *data)
+	for(auto sample : data->m_samples)
 	{
 		if((float)sample > value)
 			value = sample;

@@ -44,7 +44,7 @@ string MinimumStatistic::GetStatisticName()
 bool MinimumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogCapture*>(channel->GetData());
+	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData());
 	if(!data)
 		return false;
 
@@ -53,7 +53,7 @@ bool MinimumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 	if(m_pastMinimums.find(channel) != m_pastMinimums.end())
 		value = m_pastMinimums[channel];
 
-	for(auto sample : *data)
+	for(auto sample : data->m_samples)
 	{
 		if((float)sample < value)
 			value = sample;
