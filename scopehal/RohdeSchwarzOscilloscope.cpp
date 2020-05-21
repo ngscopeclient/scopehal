@@ -671,3 +671,13 @@ uint64_t RohdeSchwarzOscilloscope::GetSampleDepth()
 	//FIXME
 	return 1;
 }
+
+void RohdeSchwarzOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//FIXME
+}
+
+void RohdeSchwarzOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//FIXME
+}

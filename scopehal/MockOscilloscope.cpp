@@ -334,3 +334,13 @@ uint64_t MockOscilloscope::GetSampleDepth()
 	//FIXME
 	return 1;
 }
+
+void MockOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//no-op
+}
+
+void MockOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//no-op
+}

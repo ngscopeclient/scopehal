@@ -81,6 +81,9 @@ void LeCroyOscilloscope::SharedCtorInit()
 	else
 		m_transport->SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
 
+	//Always use "max memory" config for setting sample depth
+	m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
+
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
 }
@@ -1192,6 +1195,10 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	int16_t* wdata = (int16_t*)&data[0];
 	int8_t* bdata = (int8_t*)&data[0];
 
+	//Update cache with settings from this trigger
+	m_memoryDepth = num_per_segment;
+	m_memoryDepthValid = true;
+
 	for(size_t j=0; j<num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
@@ -1817,6 +1824,9 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(10 * g);
 			ret.push_back(20 * g);
 			break;
+
+		default:
+			break;
 	}
 
 	return ret;
@@ -1841,20 +1851,37 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	//The front panel allows going as low as 2 samples on some instruments, but don't allow that here.
 	//Going below 1K has no measurable perfomance boost.
 	ret.push_back(1 * k);
+	ret.push_back(2 * k);
 	ret.push_back(5 * k);
 	ret.push_back(10 * k);
+	ret.push_back(20 * k);
 	ret.push_back(50 * k);
 	ret.push_back(100 * k);
+	ret.push_back(200 * k);
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
+	ret.push_back(2 * m);
 	ret.push_back(5 * m);
 	ret.push_back(10 * m);
 
-	//Waverunner 8K has deeper memory.
-	//TODO: even deeper memory support for 8K-M series
-	if(m_modelid == MODEL_WAVERUNNER_8K)
-		ret.push_back(16 * m);
+	switch(m_modelid)
+	{
+		//TODO: even deeper memory support for 8K-M series
+		case MODEL_WAVERUNNER_8K:
+			ret.push_back(16 * m);
+			break;
+
+		//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
+		case MODEL_HDO_9K:
+			ret.push_back(25 * m);
+			ret.push_back(50 * m);
+			ret.push_back(64 * m);
+			break;
+
+		default:
+			break;
+	}
 
 	return ret;
 }
@@ -1912,7 +1939,6 @@ uint64_t LeCroyOscilloscope::GetSampleRate()
 		uint64_t depth = GetSampleDepth();
 		double time_per_sample = time_per_plot / (double)depth;
 		uint64_t ps_per_sample = round(time_per_sample / 1.0e-12);
-
 		m_sampleRate = 1000000000000L / ps_per_sample;
 		m_sampleRateValid = true;
 	}
@@ -1935,4 +1961,27 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 	}
 
 	return m_memoryDepth;
+}
+
+void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "MSIZ %ld", depth);
+	m_transport->SendCommand(tmp);
+	m_memoryDepth = depth;
+}
+
+void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
+{
+	uint64_t ps_per_sample = 1000000000000L / rate;
+	double time_per_sample = ps_per_sample * 1.0e-12;
+	double time_per_plot = time_per_sample * GetSampleDepth();
+	double time_per_div = time_per_plot / 10;
+	m_sampleRate = rate;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "TDIV %.0e", time_per_div);
+	m_transport->SendCommand(tmp);
 }

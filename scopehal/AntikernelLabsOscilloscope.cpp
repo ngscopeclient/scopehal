@@ -617,3 +617,13 @@ uint64_t AntikernelLabsOscilloscope::GetSampleDepth()
 	//FIXME
 	return 16384;
 }
+
+void AntikernelLabsOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//FIXME
+}
+
+void AntikernelLabsOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//FIXME
+}

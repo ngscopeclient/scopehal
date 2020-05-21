@@ -625,3 +625,13 @@ uint64_t AntikernelLogicAnalyzer::GetSampleDepth()
 {
 	return m_memoryDepth;
 }
+
+void AntikernelLogicAnalyzer::SetSampleDepth(uint64_t /*depth*/)
+{
+	//not changeable, no-op
+}
+
+void AntikernelLogicAnalyzer::SetSampleRate(uint64_t /*rate*/)
+{
+	//not changeable, no-op
+}

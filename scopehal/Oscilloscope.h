@@ -401,6 +401,16 @@ public:
 	 */
 	virtual uint64_t GetSampleDepth() =0;
 
+	/**
+		@brief Sets the sample depth of the scope
+	 */
+	virtual void SetSampleDepth(uint64_t depth) =0;
+
+	/**
+		@brief Sets the sample rate of the scope, in Hz
+	 */
+	virtual void SetSampleRate(uint64_t rate) =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering
 

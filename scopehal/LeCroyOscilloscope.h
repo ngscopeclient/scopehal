@@ -160,6 +160,8 @@ public:
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
 	virtual uint64_t GetSampleRate();
 	virtual uint64_t GetSampleDepth();
+	virtual void SetSampleDepth(uint64_t depth);
+	virtual void SetSampleRate(uint64_t rate);
 
 protected:
 	void BulkCheckChannelEnableState();

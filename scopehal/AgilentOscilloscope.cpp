@@ -698,3 +698,13 @@ uint64_t AgilentOscilloscope::GetSampleDepth()
 	//FIXME
 	return 1;
 }
+
+void AgilentOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//FIXME
+}
+
+void AgilentOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//FIXME
+}

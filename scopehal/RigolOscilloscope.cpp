@@ -651,3 +651,13 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 	//FIXME
 	return 1;
 }
+
+void RigolOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//FIXME
+}
+
+void RigolOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//FIXME
+}
