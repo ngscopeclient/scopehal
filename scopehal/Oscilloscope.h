@@ -374,6 +374,11 @@ public:
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved() =0;
 
 	/**
+		@brief Gets the current sampling rate (in Hz) of this scope
+	 */
+	virtual uint64_t GetSampleRate() =0;
+
+	/**
 		@brief Get the set of conflicting channels.
 
 		If any pair of channels in this list is enabled, channel interleaving is not possible.
@@ -390,6 +395,11 @@ public:
 		@brief Get the legal memory depths for this scope in combined-channels mode
 	 */
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() =0;
+
+	/**
+		@brief Gets the current sample depth of this scope
+	 */
+	virtual uint64_t GetSampleDepth() =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering

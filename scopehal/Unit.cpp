@@ -111,6 +111,10 @@ string Unit::PrettyPrint(double value)
 			unit = "S/s";
 			break;
 
+		case UNIT_SAMPLEDEPTH:
+			unit = "S";
+			break;
+
 		case UNIT_VOLTS:
 			unit = "V";
 			break;
@@ -155,11 +159,23 @@ string Unit::PrettyPrint(double value)
 
 	//TODO: allow user to specify how many sigfigs they want
 	char tmp[128];
-	if(m_type == UNIT_LOG_BER)		//special formatting for BER since it's already logarithmic
-		snprintf(tmp, sizeof(tmp), "1e%.0f", value);
-	else if(m_type == UNIT_SAMPLERATE)
-		snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
-	else
-		snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+	switch(m_type)
+	{
+		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
+			snprintf(tmp, sizeof(tmp), "1e%.0f", value);
+			break;
+
+		case UNIT_SAMPLERATE:
+			snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
+			break;
+
+		case UNIT_SAMPLEDEPTH:
+			snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
+			break;
+
+		default:
+			snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+			break;
+	}
 	return string(tmp);
 }

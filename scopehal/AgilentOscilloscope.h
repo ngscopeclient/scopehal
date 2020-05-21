@@ -80,6 +80,8 @@ public:
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;

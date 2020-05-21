@@ -659,3 +659,15 @@ vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleDepthsInterleaved()
 	vector<uint64_t> ret;
 	return ret;
 }
+
+uint64_t RohdeSchwarzOscilloscope::GetSampleRate()
+{
+	//FIXME
+	return 1;
+}
+
+uint64_t RohdeSchwarzOscilloscope::GetSampleDepth()
+{
+	//FIXME
+	return 1;
+}

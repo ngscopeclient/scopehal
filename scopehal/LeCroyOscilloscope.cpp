@@ -45,6 +45,10 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasFunctionGen(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_sampleRateValid(false)
+	, m_sampleRate(1)
+	, m_memoryDepthValid(false)
+	, m_memoryDepth(1)
 	, m_highDefinition(false)
 {
 	//standard initialization
@@ -345,6 +349,8 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
+	m_sampleRateValid = false;
+	m_memoryDepthValid = false;
 }
 
 /**
@@ -1886,4 +1892,47 @@ set<LeCroyOscilloscope::InterleaveConflict> LeCroyOscilloscope::GetInterleaveCon
 	}
 
 	return ret;
+}
+
+uint64_t LeCroyOscilloscope::GetSampleRate()
+{
+	if(!m_sampleRateValid)
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("TDIV?");
+		string reply = m_transport->ReadReply();
+
+		/*
+			Instead of having a sane API for accessing the actual sample rate, LeCroy scopes report time per "division".
+			There are ten divisions in the entire plot area... then we have to check the memory depth too!
+		 */
+		float time_per_div;
+		sscanf(reply.c_str(), "%f", &time_per_div);
+		double time_per_plot = time_per_div * 10;
+		uint64_t depth = GetSampleDepth();
+		double time_per_sample = time_per_plot / (double)depth;
+		uint64_t ps_per_sample = round(time_per_sample / 1.0e-12);
+
+		m_sampleRate = 1000000000000L / ps_per_sample;
+		m_sampleRateValid = true;
+	}
+
+	return m_sampleRate;
+}
+
+uint64_t LeCroyOscilloscope::GetSampleDepth()
+{
+	if(!m_memoryDepthValid)
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("MSIZ?");
+		string reply = m_transport->ReadReply();
+		float size;
+		sscanf(reply.c_str(), "%f", &size);
+
+		m_memoryDepth = size;
+		m_memoryDepthValid = true;
+	}
+
+	return m_memoryDepth;
 }

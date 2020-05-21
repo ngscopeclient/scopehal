@@ -152,11 +152,14 @@ public:
 	Model GetModelID()
 	{ return m_modelid; }
 
+	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
 
 protected:
 	void BulkCheckChannelEnableState();
@@ -210,6 +213,10 @@ protected:
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<size_t, double> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
+	bool m_sampleRateValid;
+	int64_t m_sampleRate;
+	bool m_memoryDepthValid;
+	int64_t m_memoryDepth;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;

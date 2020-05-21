@@ -686,3 +686,15 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsInterleaved()
 	vector<uint64_t> ret;
 	return ret;
 }
+
+uint64_t AgilentOscilloscope::GetSampleRate()
+{
+	//FIXME
+	return 1;
+}
+
+uint64_t AgilentOscilloscope::GetSampleDepth()
+{
+	//FIXME
+	return 1;
+}

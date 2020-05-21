@@ -639,3 +639,15 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 	vector<uint64_t> ret;
 	return ret;
 }
+
+uint64_t RigolOscilloscope::GetSampleRate()
+{
+	//FIXME
+	return 1;
+}
+
+uint64_t RigolOscilloscope::GetSampleDepth()
+{
+	//FIXME
+	return 1;
+}
