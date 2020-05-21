@@ -1727,10 +1727,21 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void LeCroyOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//TODO
-	LogWarning("LeCroyOscilloscope::SetChannelOffset unimplemented\n");
+	//not meaningful for trigger or digital channels
+	if(i > m_analogChannelCount)
+		return;
+
+	{
+		lock_guard<recursive_mutex> lock2(m_mutex);
+		char tmp[128];
+		snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", m_channels[i]->GetHwname().c_str(), offset);
+		m_transport->SendCommand(tmp);
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffsets[i] = offset;
 }
 
 double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
