@@ -293,7 +293,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 
 void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 {
-	//Currently no global config to load (TODO: triggers)
+	m_nickname = node["nick"].as<string>();
 
 	//Load the channels
 	auto& chans = node["channels"];
