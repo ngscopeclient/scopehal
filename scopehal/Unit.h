@@ -55,7 +55,8 @@ public:
 		UNIT_PERCENT,	//Dimensionless ratio
 		UNIT_DB,		//Dimensionless ratio
 		UNIT_COUNTS,	//Dimensionless ratio (histogram)
-		UNIT_LOG_BER	//Dimensionless ratio (log scale)
+		UNIT_LOG_BER,	//Dimensionless ratio (log scale)
+		UNIT_SAMPLERATE	//Sample rate (Hz but displayed as S/s)
 
 		//TODO: more here
 	};

@@ -39,17 +39,17 @@ string Unit::PrettyPrint(double value)
 	double value_rescaled = value;
 
 	//Default scaling and prefixes for SI base units
-	if(fabs(value) > 1e9f)
+	if(fabs(value) >= 1e9f)
 	{
 		value_rescaled /= 1e9;
 		scale = "G";
 	}
-	else if(fabs(value) > 1e6)
+	else if(fabs(value) >= 1e6)
 	{
 		value_rescaled /= 1e6;
 		scale = "M";
 	}
-	else if(fabs(value) > 1e3)
+	else if(fabs(value) >= 1e3)
 	{
 		value_rescaled /= 1e3;
 		scale = "k";
@@ -107,6 +107,10 @@ string Unit::PrettyPrint(double value)
 			unit = "Hz";
 			break;
 
+		case UNIT_SAMPLERATE:
+			unit = "S/s";
+			break;
+
 		case UNIT_VOLTS:
 			unit = "V";
 			break;
@@ -149,9 +153,12 @@ string Unit::PrettyPrint(double value)
 			return "Invalid unit";
 	}
 
+	//TODO: allow user to specify how many sigfigs they want
 	char tmp[128];
 	if(m_type == UNIT_LOG_BER)		//special formatting for BER since it's already logarithmic
 		snprintf(tmp, sizeof(tmp), "1e%.0f", value);
+	else if(m_type == UNIT_SAMPLERATE)
+		snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
 	else
 		snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
 	return string(tmp);
