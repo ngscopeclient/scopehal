@@ -1794,10 +1794,23 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	ret.push_back(2 * g);
 
 	//Some scopes can go faster
-	if(m_modelid == MODEL_WAVERUNNER_8K)
+	switch(m_modelid)
 	{
-		ret.push_back(5 * g);
-		ret.push_back(10 * g);
+		case MODEL_DDA_5K:
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
+		case MODEL_WAVERUNNER_8K:
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
+		case MODEL_HDO_9K:
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			ret.push_back(20 * g);
+			break;
 	}
 
 	return ret;
