@@ -37,14 +37,6 @@
 
 #include "../scopehal/ProtocolDecoder.h"
 
-//needs an empty virtual destructor so we have our own vtable
-//which will allow RTTI to identify us
-class FFTWaveform : public AnalogWaveform
-{
-public:
-	virtual ~FFTWaveform();
-};
-
 class FFTDecoder : public ProtocolDecoder
 {
 public:

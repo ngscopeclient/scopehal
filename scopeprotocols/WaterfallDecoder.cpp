@@ -72,7 +72,7 @@ WaterfallDecoder::WaterfallDecoder(string color)
 
 bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (dynamic_cast<FFTDecoder*>(channel) != NULL) )
+	if( (i == 0) && (channel->GetYAxisUnits() != Unit::UNIT_DB) )
 		return true;
 	return false;
 }
@@ -126,7 +126,7 @@ void WaterfallDecoder::Refresh()
 		SetData(NULL);
 		return;
 	}
-	auto din = dynamic_cast<FFTWaveform*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
 
 	//We need meaningful data
 	size_t inlen = din->m_samples.size();

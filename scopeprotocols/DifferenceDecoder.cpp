@@ -132,11 +132,7 @@ void DifferenceDecoder::Refresh()
 	}
 
 	//Create the output
-	AnalogWaveform* cap;
-	if(dynamic_cast<FFTWaveform*>(din_p) != NULL)
-		cap = new FFTWaveform;
-	else
-		cap = new AnalogWaveform;
+	AnalogWaveform* cap = new AnalogWaveform;
 
 	//Subtract all of our samples
 	//Heap blocks are guaranteed aligned on 64-bit glibc, so this might break on 32 bit.

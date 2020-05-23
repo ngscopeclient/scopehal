@@ -33,6 +33,9 @@
 	@brief Declaration of EyeDecoder2
  */
 
+#ifndef EyeDecoder2_h
+#define EyeDecoder2_h
+
 #include "../scopehal/ProtocolDecoder.h"
 
 class EyeWaveform : public WaveformBase
@@ -131,3 +134,5 @@ protected:
 
 	std::string m_saturationName;
 };
+
+#endif
