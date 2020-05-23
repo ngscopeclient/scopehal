@@ -28,7 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "EyeJitterMeasurementDecoder.h"
+#include "EyeWidthMeasurementDecoder.h"
 #include "EyeDecoder2.h"
 #include <algorithm>
 
@@ -37,7 +37,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeJitterMeasurementDecoder::EyeJitterMeasurementDecoder(string color)
+EyeWidthMeasurementDecoder::EyeWidthMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
@@ -62,7 +62,7 @@ EyeJitterMeasurementDecoder::EyeJitterMeasurementDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool EyeJitterMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EyeWidthMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
 		return true;
@@ -72,13 +72,13 @@ bool EyeJitterMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel*
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeJitterMeasurementDecoder::SetDefaultName()
+void EyeWidthMeasurementDecoder::SetDefaultName()
 {
 	float vstart = m_parameters[m_startname].GetFloatVal();
 	float vend = m_parameters[m_endname].GetFloatVal();
 
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyePPJitter(%s, %.2f, %.2f)",
+	snprintf(hwname, sizeof(hwname), "EyeWidth(%s, %.2f, %.2f)",
 		m_channels[0]->m_displayname.c_str(),
 		vstart,
 		vend);
@@ -86,29 +86,29 @@ void EyeJitterMeasurementDecoder::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-string EyeJitterMeasurementDecoder::GetProtocolName()
+string EyeWidthMeasurementDecoder::GetProtocolName()
 {
-	return "Eye P-P Jitter";
+	return "Eye Width";
 }
 
-bool EyeJitterMeasurementDecoder::IsOverlay()
+bool EyeWidthMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool EyeJitterMeasurementDecoder::NeedsConfig()
+bool EyeWidthMeasurementDecoder::NeedsConfig()
 {
 	//need manual config
 	return true;
 }
 
-double EyeJitterMeasurementDecoder::GetVoltageRange()
+double EyeWidthMeasurementDecoder::GetVoltageRange()
 {
 	return m_max - m_min;
 }
 
-double EyeJitterMeasurementDecoder::GetOffset()
+double EyeWidthMeasurementDecoder::GetOffset()
 {
 	return - (m_min + m_max)/2;
 }
@@ -116,7 +116,7 @@ double EyeJitterMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeJitterMeasurementDecoder::Refresh()
+void EyeWidthMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -165,8 +165,6 @@ void EyeJitterMeasurementDecoder::Refresh()
 
 		int64_t cleft = 0;		//left side of eye opening
 		int64_t cright = w-1;	//right side of eye opening
-		int64_t left = w-1;		//left side of eye edge
-		int64_t right = 0;		//right side of eye edge
 
 		//Find the edges of the eye in this scanline
 		for(int64_t dx = 0; dx < xcenter; dx ++)
@@ -174,24 +172,15 @@ void EyeJitterMeasurementDecoder::Refresh()
 			//left of center
 			int64_t x = xcenter - dx;
 			if(row[x] > ber_max)
-			{
 				cleft = max(cleft, x);
-				left = min(left, x);
-			}
 
 			//right of center
 			x = xcenter + dx;
 			if(row[x] > ber_max)
-			{
 				cright = min(cright, x);
-				right = max(right, x);
-			}
 		}
 
-		int64_t jitter_left = cleft - left;
-		int64_t jitter_right = cright - right;
-
-		float value = ps_per_pixel * max(jitter_left, jitter_right);
+		float value = ps_per_pixel * (cright - cleft);
 
 		//Output waveform generation
 		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
@@ -201,7 +190,7 @@ void EyeJitterMeasurementDecoder::Refresh()
 		m_min = min(m_min, value);
 	}
 
-	//Padding on edges of plot
+	//Proper display of flat lines
 	m_min -= 10;
 	m_max += 10;
 

@@ -4,7 +4,6 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEMEASUREMENTS_SOURCES
 	#EyeHeightMeasurement.cpp
 	#EyePeriodMeasurement.cpp
-	#EyeWidthMeasurement.cpp
 	#OvershootMeasurement.cpp
 	#PkPkVoltageMeasurement.cpp
 	#UndershootMeasurement.cpp

@@ -42,7 +42,6 @@
 
 #include "EyeHeightMeasurement.h"
 #include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
 #include "OvershootMeasurement.h"
 #include "PkPkVoltageMeasurement.h"
 #include "UndershootMeasurement.h"

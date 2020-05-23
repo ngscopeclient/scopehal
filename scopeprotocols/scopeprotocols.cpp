@@ -59,6 +59,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EyeBitRateMeasurementDecoder);
 	AddDecoderClass(EyeDecoder2);
 	AddDecoderClass(EyeJitterMeasurementDecoder);
+	AddDecoderClass(EyeWidthMeasurementDecoder);
 	AddDecoderClass(FallMeasurementDecoder);
 	AddDecoderClass(FFTDecoder);
 	AddDecoderClass(FrequencyMeasurementDecoder);
