@@ -89,7 +89,7 @@ void EyeWaveform::Normalize()
 // Construction / destruction
 
 EyeDecoder2::EyeDecoder2(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_ANALYSIS)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_EYE, color, CAT_ANALYSIS)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
