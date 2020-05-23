@@ -60,6 +60,7 @@
 #include "EyeBitRateMeasurementDecoder.h"
 #include "EyeDecoder2.h"
 #include "EyeJitterMeasurementDecoder.h"
+#include "EyePeriodMeasurementDecoder.h"
 #include "EyeWidthMeasurementDecoder.h"
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"

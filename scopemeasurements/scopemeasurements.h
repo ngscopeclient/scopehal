@@ -41,7 +41,6 @@
 #include "../scopehal/Measurement.h"
 
 #include "EyeHeightMeasurement.h"
-#include "EyePeriodMeasurement.h"
 #include "OvershootMeasurement.h"
 #include "PkPkVoltageMeasurement.h"
 #include "UndershootMeasurement.h"

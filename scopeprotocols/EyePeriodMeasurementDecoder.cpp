@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,66 +27,98 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of EyePeriodMeasurement
- */
-
-#include "scopemeasurements.h"
-#include "EyePeriodMeasurement.h"
-#include "../scopeprotocols/EyeDecoder2.h"
+#include "scopeprotocols.h"
+#include "EyePeriodMeasurementDecoder.h"
+#include "EyeDecoder2.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
+// Construction / destruction
 
-EyePeriodMeasurement::EyePeriodMeasurement()
-	: FloatMeasurement(TYPE_TIME)
+EyePeriodMeasurementDecoder::EyePeriodMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
+
+	//Set up channels
+	m_signalNames.push_back("Eye");
 	m_channels.push_back(NULL);
-}
 
-EyePeriodMeasurement::~EyePeriodMeasurement()
-{
+	m_value = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-Measurement::MeasurementType EyePeriodMeasurement::GetMeasurementType()
+bool EyePeriodMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	return Measurement::MEAS_HORZ;
-}
-
-string EyePeriodMeasurement::GetMeasurementName()
-{
-	return "Eye Period";
-}
-
-bool EyePeriodMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
 		return true;
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+// Accessors
 
-bool EyePeriodMeasurement::Refresh()
+void EyePeriodMeasurementDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "EyePeriod(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+string EyePeriodMeasurementDecoder::GetProtocolName()
+{
+	return "Eye Period";
+}
+
+bool EyePeriodMeasurementDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool EyePeriodMeasurementDecoder::NeedsConfig()
+{
+	//automatic configuration
+	return false;
+}
+
+double EyePeriodMeasurementDecoder::GetVoltageRange()
+{
+	return 10;
+}
+
+double EyePeriodMeasurementDecoder::GetOffset()
+{
+	return -m_value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void EyePeriodMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
-		return false;
-	auto chan = dynamic_cast<EyeDecoder2*>(m_channels[0]);
-	auto din = dynamic_cast<EyeCapture2*>(chan->GetData());
+		return;
+	auto din = dynamic_cast<EyeWaveform*>(m_channels[0]->GetData());
 	if(din == NULL)
-		return false;
+		return;
 
-	m_value = chan->GetUIWidth() * 1e-12f;
-	return true;
+	//Create the output
+	auto cap = new AnalogWaveform;
+	cap->m_offsets.push_back(0);
+	cap->m_durations.push_back(2 * din->m_uiWidth);
+	m_value = din->m_uiWidth;
+	cap->m_samples.push_back(m_value);
+
+	SetData(cap);
+
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

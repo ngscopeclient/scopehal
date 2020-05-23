@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,27 +30,35 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyePeriodMeasurement
+	@brief Declaration of EyePeriodMeasurementDecoder
  */
-#ifndef EyePeriodMeasurement_h
-#define EyePeriodMeasurement_h
+#ifndef EyePeriodMeasurementDecoder_h
+#define EyePeriodMeasurementDecoder_h
 
-#include "../scopehal/Measurement.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-class EyePeriodMeasurement : public FloatMeasurement
+class EyePeriodMeasurementDecoder : public ProtocolDecoder
 {
 public:
-	EyePeriodMeasurement();
-	virtual ~EyePeriodMeasurement();
+	EyePeriodMeasurementDecoder(std::string color);
 
-	virtual bool Refresh();
+	virtual void Refresh();
 
-	static std::string GetMeasurementName();
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual MeasurementType GetMeasurementType();
+	PROTOCOL_DECODER_INITPROC(EyePeriodMeasurementDecoder)
 
-	MEASUREMENT_INITPROC(EyePeriodMeasurement)
+protected:
+	float m_value;
 };
 
 #endif

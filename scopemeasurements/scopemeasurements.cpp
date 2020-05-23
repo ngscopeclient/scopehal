@@ -44,7 +44,6 @@ void ScopeMeasurementStaticInit()
 {
 	/*
 	AddMeasurementClass(EyeHeightMeasurement);
-	AddMeasurementClass(EyePeriodMeasurement);
 	AddMeasurementClass(OvershootMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 	AddMeasurementClass(UndershootMeasurement);

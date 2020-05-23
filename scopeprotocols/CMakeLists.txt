@@ -22,6 +22,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeBitRateMeasurementDecoder.cpp
 	EyeDecoder2.cpp
 	EyeJitterMeasurementDecoder.cpp
+	EyePeriodMeasurementDecoder.cpp
 	EyeWidthMeasurementDecoder.cpp
 	FallMeasurementDecoder.cpp
 	FFTDecoder.cpp
