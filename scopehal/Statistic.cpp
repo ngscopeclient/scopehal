@@ -60,3 +60,8 @@ Statistic* Statistic::CreateStatistic(string protocol)
 	LogError("Invalid statistic name\n");
 	return NULL;
 }
+
+Unit Statistic::GetUnits(OscilloscopeChannel* channel)
+{
+	return channel->GetYAxisUnits();
+}

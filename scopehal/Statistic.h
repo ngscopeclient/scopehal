@@ -48,6 +48,8 @@ public:
 	virtual std::string GetStatisticDisplayName() =0;
 	virtual bool Calculate(OscilloscopeChannel* channel, double& value) =0;
 
+	virtual Unit GetUnits(OscilloscopeChannel* channel);
+
 	//Enumeration / factory
 public:
 	typedef Statistic* (*CreateProcType)();
