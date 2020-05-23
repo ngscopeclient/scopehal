@@ -1294,7 +1294,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 	unsigned int icapchan = 0;
 	for(unsigned int i=0; i<m_digitalChannelCount; i++)
 	{
-		if(enabledChannels[icapchan])
+		if(enabledChannels[i])
 		{
 			DigitalWaveform* cap = new DigitalWaveform;
 			cap->m_timescale = interval;
@@ -1479,7 +1479,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 
 	//TODO: proper support for sequenced capture when digital channels are active
 	//(seems like this doesn't work right on at least wavesurfer 3000 series)
-
 	if(denabled)
 	{
 		//This is a weird XML-y format but I can't find any other way to get it :(
