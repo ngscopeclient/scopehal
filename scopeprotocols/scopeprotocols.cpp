@@ -56,6 +56,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(Ethernet100BaseTDecoder);
 	AddDecoderClass(EthernetGMIIDecoder);
 	AddDecoderClass(EthernetAutonegotiationDecoder);
+	AddDecoderClass(EyeBitRateMeasurementDecoder);
 	AddDecoderClass(EyeDecoder2);
 	AddDecoderClass(FallMeasurementDecoder);
 	AddDecoderClass(FFTDecoder);

@@ -57,6 +57,7 @@
 #include "EthernetGMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
+#include "EyeBitRateMeasurementDecoder.h"
 #include "EyeDecoder2.h"
 #include "FallMeasurementDecoder.h"
 #include "FFTDecoder.h"

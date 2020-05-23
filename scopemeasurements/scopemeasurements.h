@@ -40,7 +40,6 @@
 #include "../scopehal/Waveform.h"
 #include "../scopehal/Measurement.h"
 
-#include "EyeBitRateMeasurement.h"
 #include "EyeHeightMeasurement.h"
 #include "EyeJitterMeasurement.h"
 #include "EyePeriodMeasurement.h"
