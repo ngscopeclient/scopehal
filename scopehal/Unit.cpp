@@ -119,6 +119,13 @@ string Unit::PrettyPrint(double value)
 			unit = "V";
 			break;
 
+		//No scaling applied, forced to mV
+		case UNIT_MILLIVOLTS:
+			unit = "mV";
+			value_rescaled = value;
+			scale = "";
+			break;
+
 		case UNIT_AMPS:
 			unit = "A";
 			break;

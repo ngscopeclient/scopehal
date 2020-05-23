@@ -28,30 +28,41 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "EyeBitRateMeasurementDecoder.h"
+#include "EyeJitterMeasurementDecoder.h"
 #include "EyeDecoder2.h"
+#include <algorithm>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeBitRateMeasurementDecoder::EyeBitRateMeasurementDecoder(string color)
+EyeJitterMeasurementDecoder::EyeJitterMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_BITRATE);
+	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
 
 	//Set up channels
 	m_signalNames.push_back("Eye");
 	m_channels.push_back(NULL);
 
-	m_value = 0;
+	m_startname = "Start Voltage";
+	m_parameters[m_startname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_startname].SetFloatVal(0);
+
+	m_endname = "End Voltage";
+	m_parameters[m_endname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_endname].SetFloatVal(0);
+
+	m_min = 0;
+	m_max = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool EyeBitRateMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EyeJitterMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
 		return true;
@@ -61,45 +72,51 @@ bool EyeBitRateMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeBitRateMeasurementDecoder::SetDefaultName()
+void EyeJitterMeasurementDecoder::SetDefaultName()
 {
+	float vstart = m_parameters[m_startname].GetFloatVal();
+	float vend = m_parameters[m_endname].GetFloatVal();
+
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeBitRate(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "EyePPJitter(%s, %.2f, %.2f)",
+		m_channels[0]->m_displayname.c_str(),
+		vstart,
+		vend);
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string EyeBitRateMeasurementDecoder::GetProtocolName()
+string EyeJitterMeasurementDecoder::GetProtocolName()
 {
-	return "Eye Bit Rate";
+	return "Eye P-P Jitter";
 }
 
-bool EyeBitRateMeasurementDecoder::IsOverlay()
+bool EyeJitterMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool EyeBitRateMeasurementDecoder::NeedsConfig()
+bool EyeJitterMeasurementDecoder::NeedsConfig()
 {
-	//automatic configuration
-	return false;
+	//need manual config
+	return true;
 }
 
-double EyeBitRateMeasurementDecoder::GetVoltageRange()
+double EyeJitterMeasurementDecoder::GetVoltageRange()
 {
-	return 10;
+	return m_max - m_min;
 }
 
-double EyeBitRateMeasurementDecoder::GetOffset()
+double EyeJitterMeasurementDecoder::GetOffset()
 {
-	return -m_value;
+	return - (m_min + m_max)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeBitRateMeasurementDecoder::Refresh()
+void EyeJitterMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -110,10 +127,86 @@ void EyeBitRateMeasurementDecoder::Refresh()
 
 	//Create the output
 	auto cap = new AnalogWaveform;
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(2 * din->m_uiWidth);
-	m_value = 1.0e12f / din->m_uiWidth;
-	cap->m_samples.push_back(m_value);
+
+	//Make sure voltages are in the right order
+	float vstart = m_parameters[m_startname].GetFloatVal();
+	float vend = m_parameters[m_endname].GetFloatVal();
+	if(vstart > vend)
+	{
+		float tmp = vstart;
+		vstart = vend;
+		vend = tmp;
+	}
+
+	//Figure out how many volts per eye bin and round everything to nearest eye bin
+	float vrange = m_channels[0]->GetVoltageRange();
+	float volts_per_row = vrange / din->GetHeight();
+	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
+
+	size_t start_bin = round( (vstart - volts_at_bottom) / volts_per_row);
+	size_t end_bin = round( (vend - volts_at_bottom) / volts_per_row);
+	start_bin = min(start_bin, din->GetHeight()-1);
+	end_bin = min(end_bin, din->GetHeight()-1);
+	float duration_mv = volts_per_row * 1000;
+	float base_mv = volts_at_bottom * 1000;
+
+	m_min = FLT_MAX;
+	m_max = 0;
+
+	float* data = din->GetData();
+	int64_t w = din->GetWidth();
+	int64_t xcenter = w / 2;
+	float ber_max = FLT_EPSILON;
+	double width_ps = 2 * din->m_uiWidth;
+	double ps_per_pixel = width_ps / w;
+	for(size_t i=start_bin; i <= end_bin; i++)
+	{
+		float* row = data + i*w;
+
+		int64_t cleft = 0;		//left side of eye opening
+		int64_t cright = w-1;	//right side of eye opening
+		int64_t left = w-1;		//left side of eye edge
+		int64_t right = 0;		//right side of eye edge
+
+		//Find the edges of the eye in this scanline
+		for(int64_t dx = 0; dx < xcenter; dx ++)
+		{
+			//left of center
+			int64_t x = xcenter - dx;
+			if(row[x] > ber_max)
+			{
+				cleft = max(cleft, x);
+				left = min(left, x);
+			}
+
+			//right of center
+			x = xcenter + dx;
+			if(row[x] > ber_max)
+			{
+				cright = min(cright, x);
+				right = max(right, x);
+			}
+		}
+
+		int64_t jitter_left = cleft - left;
+		int64_t jitter_right = cright - right;
+
+		float value = ps_per_pixel * max(jitter_left, jitter_right);
+
+		//Output waveform generation
+		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
+		cap->m_durations.push_back(round(duration_mv));
+		cap->m_samples.push_back(value);
+		m_max = max(m_max, value);
+		m_min = min(m_min, value);
+	}
+
+	//Proper display of flat lines
+	if( (m_max - m_min) < 10)
+	{
+		m_min -= 5;
+		m_max += 5;
+	}
 
 	SetData(cap);
 

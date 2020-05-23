@@ -41,7 +41,6 @@
 #include "../scopehal/Measurement.h"
 
 #include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
 #include "EyePeriodMeasurement.h"
 #include "EyeWidthMeasurement.h"
 #include "OvershootMeasurement.h"

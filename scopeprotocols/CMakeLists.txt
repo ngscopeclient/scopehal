@@ -21,6 +21,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetProtocolDecoder.cpp
 	EyeBitRateMeasurementDecoder.cpp
 	EyeDecoder2.cpp
+	EyeJitterMeasurementDecoder.cpp
 	FallMeasurementDecoder.cpp
 	FFTDecoder.cpp
 	FrequencyMeasurementDecoder.cpp

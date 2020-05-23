@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,27 +30,39 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeJitterMeasurement
+	@brief Declaration of EyeJitterMeasurementDecoder
  */
-#ifndef EyeJitterMeasurement_h
-#define EyeJitterMeasurement_h
+#ifndef EyeJitterMeasurementDecoder_h
+#define EyeJitterMeasurementDecoder_h
 
-#include "../scopehal/Measurement.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-class EyeJitterMeasurement : public FloatMeasurement
+class EyeJitterMeasurementDecoder : public ProtocolDecoder
 {
 public:
-	EyeJitterMeasurement();
-	virtual ~EyeJitterMeasurement();
+	EyeJitterMeasurementDecoder(std::string color);
 
-	virtual bool Refresh();
+	virtual void Refresh();
 
-	static std::string GetMeasurementName();
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-	virtual MeasurementType GetMeasurementType();
+	PROTOCOL_DECODER_INITPROC(EyeJitterMeasurementDecoder)
 
-	MEASUREMENT_INITPROC(EyeJitterMeasurement)
+protected:
+	float m_min;
+	float m_max;
+
+	std::string m_startname;
+	std::string m_endname;
 };
 
 #endif

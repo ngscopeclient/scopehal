@@ -57,7 +57,9 @@ public:
 		UNIT_COUNTS,		//Dimensionless ratio (histogram)
 		UNIT_LOG_BER,		//Dimensionless ratio (log scale)
 		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
-		UNIT_SAMPLEDEPTH	//Memory depth (number of samples)
+		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
+
+		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordiantes there
 
 		//TODO: more here
 	};
