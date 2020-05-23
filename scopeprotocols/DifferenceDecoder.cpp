@@ -114,8 +114,9 @@ void DifferenceDecoder::Refresh()
 	}
 
 	//Set up units and complain if they're inconsistent
+	m_xAxisUnit = m_channels[0]->GetXAxisUnits();
 	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
-	if(m_yAxisUnit != m_channels[1]->GetYAxisUnits())
+	if( (m_xAxisUnit != m_channels[1]->GetXAxisUnits()) || (m_yAxisUnit != m_channels[1]->GetYAxisUnits()) )
 	{
 		SetData(NULL);
 		return;
