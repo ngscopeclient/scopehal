@@ -59,6 +59,7 @@
 #include "Ethernet100BaseTDecoder.h"
 #include "EyeBitRateMeasurementDecoder.h"
 #include "EyeDecoder2.h"
+#include "EyeHeightMeasurementDecoder.h"
 #include "EyeJitterMeasurementDecoder.h"
 #include "EyePeriodMeasurementDecoder.h"
 #include "EyeWidthMeasurementDecoder.h"

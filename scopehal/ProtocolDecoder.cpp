@@ -80,7 +80,11 @@ void ProtocolDecoderParameter::ParseString(string str)
 		else if(suffix == 'm')
 			scale = 0.001f;
 		else if(suffix == 'u')	//TODO: handle μ
-			scale = 0.000001f;
+			scale = 1e-6f;
+		else if(suffix == 'n')
+			scale = 1e-9f;
+		else if(suffix == 'p')
+			scale = 1e-12f;
 	}
 
 	switch(m_type)
@@ -125,8 +129,16 @@ string ProtocolDecoderParameter::ToString()
 				snprintf(str_out, sizeof(str_out), "%f M", m_floatval / 1000000.0f);
 			else if(fabs(m_floatval) > 1000.0f)
 				snprintf(str_out, sizeof(str_out), "%f k", m_floatval / 1000.0f);
-			else
+			else if(fabs(m_floatval) > 1)
 				snprintf(str_out, sizeof(str_out), "%f", m_floatval);
+			else if(fabs(m_floatval) > 1e-3)
+				snprintf(str_out, sizeof(str_out), "%f m", m_floatval * 1e3f);
+			else if(fabs(m_floatval) > 1e-6)
+				snprintf(str_out, sizeof(str_out), "%f u", m_floatval * 1e6f);
+			else if(fabs(m_floatval) > 1e-9)
+				snprintf(str_out, sizeof(str_out), "%f n", m_floatval * 1e9f);
+			else
+				snprintf(str_out, sizeof(str_out), "%f p", m_floatval * 1e12f);
 			break;
 		case TYPE_BOOL:
 		case TYPE_INT:

@@ -28,7 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "EyeWidthMeasurementDecoder.h"
+#include "EyeHeightMeasurementDecoder.h"
 #include "EyeDecoder2.h"
 #include <algorithm>
 
@@ -37,23 +37,27 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeWidthMeasurementDecoder::EyeWidthMeasurementDecoder(string color)
+EyeHeightMeasurementDecoder::EyeHeightMeasurementDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
+	m_xAxisUnit = Unit(Unit::UNIT_PS);
+	m_yAxisUnit = Unit(Unit::UNIT_VOLTS);
 
 	//Set up channels
 	m_signalNames.push_back("Eye");
 	m_channels.push_back(NULL);
 
-	m_startname = "Start Voltage";
+	m_startname = "Begin Time";
 	m_parameters[m_startname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_startname].SetFloatVal(0);
 
-	m_endname = "End Voltage";
+	m_endname = "End Time";
 	m_parameters[m_endname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_endname].SetFloatVal(0);
+
+	m_posname = "Midpoint Voltage";
+	m_parameters[m_posname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_posname].SetFloatVal(0);
 
 	m_min = 0;
 	m_max = 1;
@@ -62,7 +66,7 @@ EyeWidthMeasurementDecoder::EyeWidthMeasurementDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool EyeWidthMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EyeHeightMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
 		return true;
@@ -72,13 +76,13 @@ bool EyeWidthMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeWidthMeasurementDecoder::SetDefaultName()
+void EyeHeightMeasurementDecoder::SetDefaultName()
 {
 	float vstart = m_parameters[m_startname].GetFloatVal();
 	float vend = m_parameters[m_endname].GetFloatVal();
 
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeWidth(%s, %.2f, %.2f)",
+	snprintf(hwname, sizeof(hwname), "EyeHeight(%s, %.2f, %.2f)",
 		m_channels[0]->m_displayname.c_str(),
 		vstart,
 		vend);
@@ -86,29 +90,29 @@ void EyeWidthMeasurementDecoder::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-string EyeWidthMeasurementDecoder::GetProtocolName()
+string EyeHeightMeasurementDecoder::GetProtocolName()
 {
-	return "Eye Width";
+	return "Eye Height";
 }
 
-bool EyeWidthMeasurementDecoder::IsOverlay()
+bool EyeHeightMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool EyeWidthMeasurementDecoder::NeedsConfig()
+bool EyeHeightMeasurementDecoder::NeedsConfig()
 {
 	//need manual config
 	return true;
 }
 
-double EyeWidthMeasurementDecoder::GetVoltageRange()
+double EyeHeightMeasurementDecoder::GetVoltageRange()
 {
 	return m_max - m_min;
 }
 
-double EyeWidthMeasurementDecoder::GetOffset()
+double EyeHeightMeasurementDecoder::GetOffset()
 {
 	return - (m_min + m_max)/2;
 }
@@ -116,7 +120,7 @@ double EyeWidthMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EyeWidthMeasurementDecoder::Refresh()
+void EyeHeightMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
@@ -128,71 +132,74 @@ void EyeWidthMeasurementDecoder::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	//Make sure voltages are in the right order
-	float vstart = m_parameters[m_startname].GetFloatVal();
-	float vend = m_parameters[m_endname].GetFloatVal();
-	if(vstart > vend)
+	//Make sure times are in the right order, and convert from seconds to picoseconds
+	float tstart = m_parameters[m_startname].GetFloatVal() * 1e12;
+	float tend = m_parameters[m_endname].GetFloatVal() * 1e12;
+	if(tstart > tend)
 	{
-		float tmp = vstart;
-		vstart = vend;
-		vend = tmp;
+		float tmp = tstart;
+		tstart = tend;
+		tend = tmp;
 	}
 
-	//Figure out how many volts per eye bin and round everything to nearest eye bin
-	float vrange = m_channels[0]->GetVoltageRange();
-	float volts_per_row = vrange / din->GetHeight();
-	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
+	//Convert times to bins
+	size_t width_bins = din->GetWidth();
+	float width_ps = din->m_uiWidth * 2;
+	float ps_per_bin = width_ps / width_bins;
 
-	size_t start_bin = round( (vstart - volts_at_bottom) / volts_per_row);
-	size_t end_bin = round( (vend - volts_at_bottom) / volts_per_row);
-	start_bin = min(start_bin, din->GetHeight()-1);
-	end_bin = min(end_bin, din->GetHeight()-1);
-	float duration_mv = volts_per_row * 1000;
-	float base_mv = volts_at_bottom * 1000;
+	//Find start/end time bins
+	size_t start_bin = round((tstart + din->m_uiWidth) / ps_per_bin);
+	size_t end_bin = round((tend + din->m_uiWidth) / ps_per_bin);
+	start_bin = min(start_bin, din->GetWidth());
+	end_bin = min(end_bin, din->GetWidth());
+
+	//Approximate center of the eye opening
+	float vrange = m_channels[0]->GetVoltageRange();
+	size_t height = din->GetHeight();
+	float volts_per_row = vrange / height;
+	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
+	float vmid = m_parameters[m_posname].GetFloatVal();
+	size_t mid_bin = round( (vmid - volts_at_bottom) / volts_per_row);
+	mid_bin = min(mid_bin, din->GetHeight()-1);
 
 	m_min = FLT_MAX;
 	m_max = 0;
 
 	float* data = din->GetData();
 	int64_t w = din->GetWidth();
-	int64_t xcenter = w / 2;
 	float ber_max = FLT_EPSILON;
-	double width_ps = 2 * din->m_uiWidth;
-	double ps_per_pixel = width_ps / w;
-	for(size_t i=start_bin; i <= end_bin; i++)
+	for(size_t x = start_bin; x <= end_bin; x ++)
 	{
-		float* row = data + i*w;
-
-		int64_t cleft = 0;		//left side of eye opening
-		int64_t cright = w-1;	//right side of eye opening
-
-		//Find the edges of the eye in this scanline
-		for(int64_t dx = 0; dx < xcenter; dx ++)
+		//Search up and down from the midpoint to find the edges of the eye opening
+		size_t top_bin = mid_bin;
+		for(; top_bin < height; top_bin ++)
 		{
-			//left of center
-			int64_t x = xcenter - dx;
-			if(row[x] > ber_max)
-				cleft = max(cleft, x);
-
-			//right of center
-			x = xcenter + dx;
-			if(row[x] > ber_max)
-				cright = min(cright, x);
+			if(data[top_bin*w + x] > ber_max)
+				break;
 		}
 
-		float value = ps_per_pixel * (cright - cleft);
+		size_t bot_bin = mid_bin;
+		for(; bot_bin > 0; bot_bin --)
+		{
+			if(data[bot_bin*w + x] > ber_max)
+				break;
+		}
+
+		//Convert from eye bins to volts
+		size_t height_bins = top_bin - bot_bin;
+		float height_volts = volts_per_row * height_bins;
 
 		//Output waveform generation
-		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
-		cap->m_durations.push_back(round(duration_mv));
-		cap->m_samples.push_back(value);
-		m_max = max(m_max, value);
-		m_min = min(m_min, value);
+		cap->m_offsets.push_back(round( (x*ps_per_bin) - din->m_uiWidth ));
+		cap->m_durations.push_back(round(ps_per_bin));
+		cap->m_samples.push_back(height_volts);
+		m_min = min(height_volts, m_min);
+		m_max = max(height_volts, m_max);
 	}
 
-	//Proper display of flat lines
-	m_min -= 10;
-	m_max += 10;
+	//Add some margin to the graph
+	m_min -= 0.025;
+	m_max += 0.025;
 
 	SetData(cap);
 

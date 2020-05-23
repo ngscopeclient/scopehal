@@ -40,7 +40,6 @@
 #include "../scopehal/Waveform.h"
 #include "../scopehal/Measurement.h"
 
-#include "EyeHeightMeasurement.h"
 #include "OvershootMeasurement.h"
 #include "PkPkVoltageMeasurement.h"
 #include "UndershootMeasurement.h"

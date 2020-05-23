@@ -21,6 +21,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetProtocolDecoder.cpp
 	EyeBitRateMeasurementDecoder.cpp
 	EyeDecoder2.cpp
+	EyeHeightMeasurementDecoder.cpp
 	EyeJitterMeasurementDecoder.cpp
 	EyePeriodMeasurementDecoder.cpp
 	EyeWidthMeasurementDecoder.cpp
