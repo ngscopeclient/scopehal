@@ -3,7 +3,6 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEMEASUREMENTS_SOURCES
 	#PkPkVoltageMeasurement.cpp
-	#UndershootMeasurement.cpp
 
 	scopemeasurements.cpp
 	)

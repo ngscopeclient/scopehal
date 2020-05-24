@@ -97,21 +97,6 @@ double OvershootMeasurementDecoder::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-/*
-//Get the input data
-	if(m_channels[0] == NULL)
-		return false;
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
-
-	//Calculate the worst case overshoot
-	float max = GetMaxVoltage(din);
-	float top = GetTopVoltage(din);
-	float base = GetBaseVoltage(din);
-	m_value = (max-top) / (top-base);
-	*/
-
 void OvershootMeasurementDecoder::Refresh()
 {
 	//Get the input data

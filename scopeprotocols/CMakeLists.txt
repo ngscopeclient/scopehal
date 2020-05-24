@@ -45,6 +45,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TopMeasurementDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
+	UndershootMeasurementDecoder.cpp
 	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp

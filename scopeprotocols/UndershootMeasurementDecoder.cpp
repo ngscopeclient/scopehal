@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,46 +27,29 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of UndershootMeasurement
- */
-
-#include "scopemeasurements.h"
-#include "UndershootMeasurement.h"
+#include "scopeprotocols.h"
+#include "UndershootMeasurementDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
+// Construction / destruction
 
-UndershootMeasurement::UndershootMeasurement()
-	: FloatMeasurement(TYPE_PERCENTAGE)
+UndershootMeasurementDecoder::UndershootMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
+	//Set up channels
+	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
-}
 
-UndershootMeasurement::~UndershootMeasurement()
-{
+	m_midpoint = 0;
+	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-Measurement::MeasurementType UndershootMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_VERT;
-}
-
-string UndershootMeasurement::GetMeasurementName()
-{
-	return "Undershoot";
-}
-
-bool UndershootMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool UndershootMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -74,21 +57,133 @@ bool UndershootMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* chann
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+// Accessors
 
-bool UndershootMeasurement::Refresh()
+void UndershootMeasurementDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Undershoot(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+string UndershootMeasurementDecoder::GetProtocolName()
+{
+	return "Undershoot";
+}
+
+bool UndershootMeasurementDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool UndershootMeasurementDecoder::NeedsConfig()
+{
+	//automatic configuration
+	return false;
+}
+
+double UndershootMeasurementDecoder::GetVoltageRange()
+{
+	return m_range;
+}
+
+double UndershootMeasurementDecoder::GetOffset()
+{
+	return -m_midpoint;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void UndershootMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
-		return false;
-	AnalogCapture* din = dynamic_cast<AnalogCapture*>(m_channels[0]->GetData());
-	if(din == NULL || (din->GetDepth() == 0))
-		return false;
+	{
+		SetData(NULL);
+		return;
+	}
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
-	//Calculate the worst case undershoot
-	float min = GetMinVoltage(din);
-	float top = GetTopVoltage(din);
-	float base = GetBaseVoltage(din);
-	m_value = (base-min) / (top-base);
-	return true;
+	//We need meaningful data
+	size_t len = din->m_samples.size();
+	if(len == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Figure out the nominal top of the waveform
+	float top = Measurement::GetTopVoltage(din);
+	float base = Measurement::GetBaseVoltage(din);
+	float midpoint = (top+base)/2;
+
+	//Create the output
+	auto cap = new AnalogWaveform;
+
+	float 		fmax = -FLT_MAX;
+	float		fmin =  FLT_MAX;
+
+	int64_t		tmin = 0;
+	float		vmin = FLT_MAX;
+
+	//For each cycle, find how far we got below the base
+	for(size_t i=0; i < len; i++)
+	{
+		//If we're above the midpoint, reset everything and add a new sample
+		float v = din->m_samples[i];
+		if(v > midpoint)
+		{
+			//Add a sample for the current value (if any)
+			if(tmin > 0)
+			{
+				//Update duration of the previous sample
+				size_t off = cap->m_offsets.size();
+				if(off > 0)
+					cap->m_durations[off-1] = tmin - cap->m_offsets[off-1];
+
+				float value = base - vmin;
+				fmax = max(fmax, value);
+				fmin = min(fmin, value);
+
+				//Add the new sample
+				cap->m_offsets.push_back(tmin);
+				cap->m_durations.push_back(0);
+				cap->m_samples.push_back(value);
+			}
+
+			//Reset
+			tmin = 0;
+			vmin = FLT_MAX;
+		}
+
+		//Accumulate the lowest peak of this cycle
+		else
+		{
+			if(v < vmin)
+			{
+				tmin = din->m_offsets[i];
+				vmin = v;
+			}
+		}
+	}
+
+	m_range = fmax - fmin;
+	if(m_range < 0.025)
+		m_range = 0.025;
+	m_midpoint = (fmax + fmin) / 2;
+
+	SetData(cap);
+
+	//Copy start time etc from the input.
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

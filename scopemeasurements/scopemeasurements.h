@@ -41,7 +41,6 @@
 #include "../scopehal/Measurement.h"
 
 #include "PkPkVoltageMeasurement.h"
-#include "UndershootMeasurement.h"
 
 void ScopeMeasurementStaticInit();
 

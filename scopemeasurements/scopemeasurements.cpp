@@ -42,8 +42,5 @@
  */
 void ScopeMeasurementStaticInit()
 {
-	/*
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(UndershootMeasurement);
-	*/
+	//AddMeasurementClass(PkPkVoltageMeasurement);
 }

@@ -82,6 +82,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TopMeasurementDecoder);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryDecoder);
+	AddDecoderClass(UndershootMeasurementDecoder);
 	AddDecoderClass(USB2ActivityDecoder);
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);

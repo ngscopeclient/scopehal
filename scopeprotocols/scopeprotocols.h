@@ -83,6 +83,7 @@
 #include "TopMeasurementDecoder.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryDecoder.h"
+#include "UndershootMeasurementDecoder.h"
 #include "USB2ActivityDecoder.h"
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
