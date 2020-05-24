@@ -37,6 +37,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OvershootMeasurementDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
+	PkPkMeasurementDecoder.cpp
 	RiseMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	SPIDecoder.cpp

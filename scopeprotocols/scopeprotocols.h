@@ -74,6 +74,7 @@
 #include "MovingAverageDecoder.h"
 #include "OvershootMeasurementDecoder.h"
 #include "ParallelBusDecoder.h"
+#include "PkPkMeasurementDecoder.h"
 #include "PeriodMeasurementDecoder.h"
 #include "RiseMeasurementDecoder.h"
 #include "SincInterpolationDecoder.h"
