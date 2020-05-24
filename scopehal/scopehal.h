@@ -46,6 +46,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <lxi.h>
+
 #include "../log/log.h"
 #include "../graphwidget/Graph.h"
 

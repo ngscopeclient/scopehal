@@ -34,7 +34,6 @@
  */
 #include "scopehal.h"
 #include <gtkmm/drawingarea.h>
-#include <lxi.h>
 #include "AgilentOscilloscope.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"

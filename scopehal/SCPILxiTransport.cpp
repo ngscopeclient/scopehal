@@ -41,7 +41,6 @@ using namespace std;
 // Construction / destruction
 
 SCPILxiTransport::SCPILxiTransport(string args)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 {
 	char hostname[128];
 	unsigned int port = 0;
@@ -49,7 +48,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 	{
 		//default if port not specified
 		m_hostname = args;
-		m_port = 1861;
+		m_port = 0;
 	}
 	else
 	{
@@ -57,16 +56,14 @@ SCPILxiTransport::SCPILxiTransport(string args)
 		m_port = port;
 	}
 
-	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
+	m_timeout = 1000;
 
-	if(!m_socket.Connect(m_hostname, m_port))
-	{
-		LogError("Couldn't connect to socket\n");
-		return;
-	}
-	if(!m_socket.DisableNagle())
-	{
-		LogError("Couldn't disable Nagle\n");
+	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
+
+	m_device = lxi_connect(m_hostname.c_str(), m_port, "inst0", m_timeout, VXI11);
+
+	if (m_device == LXI_ERROR){
+		LogError("Couldn't connect to VXI-11 device\n");
 		return;
 	}
 }
@@ -93,34 +90,35 @@ string SCPILxiTransport::GetConnectionString()
 bool SCPILxiTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
-	string tempbuf = cmd + "\n";
-	return m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
+
+	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout); 
+	return (result != LXI_ERROR);
 }
 
 string SCPILxiTransport::ReadReply()
 {
-	//FIXME: there *has* to be a more efficient way to do this...
-	char tmp = ' ';
+	char buf[65536];
+
+	int bytes_received = lxi_receive(m_device, buf, sizeof(buf), m_timeout);
+
+	//FIXME: just as ugly as in SCPISocketTransport... But if they're allowed to do this, so am I. :-)
 	string ret;
-	while(true)
-	{
-		if(!m_socket.RecvLooped((unsigned char*)&tmp, 1))
-			break;
-		if( (tmp == '\n') || (tmp == ';') )
-			break;
-		else
-			ret += tmp;
+	int i = 0;
+	while(i<bytes_received && (buf[i] != '\n' || buf[i] != ';')){
+		ret += buf[i];
+		++i;
 	}
+
 	LogTrace("Got %s\n", ret.c_str());
 	return ret;
 }
 
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
-	m_socket.SendLooped(buf, len);
+	lxi_send(m_device, (const char *)buf, len, m_timeout); 
 }
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 {
-	m_socket.RecvLooped(buf, len);
+	lxi_receive(m_device, (char *)buf, len, m_timeout);
 }

@@ -36,8 +36,6 @@
 #ifndef SCPILxiTransport_h
 #define SCPILxiTransport_h
 
-#include "../xptools/Socket.h"
-
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
  */
@@ -61,10 +59,11 @@ public:
 	{ return m_hostname; }
 
 protected:
-	Socket m_socket;
-
 	std::string m_hostname;
 	unsigned short m_port;
+
+	int m_device;
+	int m_timeout;
 };
 
 #endif
