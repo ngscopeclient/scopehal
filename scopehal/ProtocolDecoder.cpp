@@ -585,7 +585,7 @@ void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, s
 			continue;
 
 		//Midpoint of the sample, plus the zero crossing
-		int64_t t = phoff + data->m_timescale * (data->m_offsets[i] + Measurement::InterpolateTime(data, i-1, threshold));
+		int64_t t = phoff + data->m_timescale * (data->m_offsets[i] + InterpolateTime(data, i-1, threshold));
 		edges.push_back(t);
 		last = value;
 	}
@@ -689,4 +689,161 @@ string ProtocolDecoder::GetTextForAsciiChannel(int i)
 		return sbuf;
 	}
 	return "";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Interpolation helpers
+
+/**
+	@brief Interpolates the actual time of a threshold crossing between two samples
+
+	Simple linear interpolation for now (TODO sinc)
+
+	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
+ */
+float ProtocolDecoder::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
+{
+	//If the voltage isn't between the two points, abort
+	float fa = cap->m_samples[a];
+	float fb = cap->m_samples[a+1];
+	bool ag = (fa > voltage);
+	bool bg = (fb > voltage);
+	if( (ag && bg) || (!ag && !bg) )
+		return 0;
+
+	//no need to divide by time, sample spacing is normalized to 1 timebase unit
+	float slope = (fb - fa);
+	float delta = voltage - fa;
+	return delta / slope;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Measurement helpers
+
+/**
+	@brief Gets the lowest voltage of a waveform
+ */
+float ProtocolDecoder::GetMinVoltage(AnalogWaveform* cap)
+{
+	//Loop over samples and find the minimum
+	float tmp = FLT_MAX;
+	for(float f : cap->m_samples)
+	{
+		if(f < tmp)
+			tmp = f;
+	}
+	return tmp;
+}
+
+/**
+	@brief Gets the highest voltage of a waveform
+ */
+float ProtocolDecoder::GetMaxVoltage(AnalogWaveform* cap)
+{
+	//Loop over samples and find the maximum
+	float tmp = -FLT_MAX;
+	for(float f : cap->m_samples)
+	{
+		if(f > tmp)
+			tmp = f;
+	}
+	return tmp;
+}
+
+/**
+	@brief Gets the average voltage of a waveform
+ */
+float ProtocolDecoder::GetAvgVoltage(AnalogWaveform* cap)
+{
+	//Loop over samples and find the average
+	//TODO: more numerically stable summation algorithm for deep captures
+	double sum = 0;
+	for(float f : cap->m_samples)
+		sum += f;
+	return sum / cap->m_samples.size();
+}
+
+/**
+	@brief Makes a histogram from a waveform with the specified number of bins.
+
+	Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+	@param low	Low endpoint of the histogram (volts)
+	@param high High endpoint of the histogram (volts)
+	@param bins	Number of histogram bins
+ */
+vector<size_t> ProtocolDecoder::MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins)
+{
+	vector<size_t> ret;
+	for(size_t i=0; i<bins; i++)
+		ret.push_back(0);
+
+	float delta = high-low;
+
+	for(float v : cap->m_samples)
+	{
+		float fbin = (v-low) / delta;
+		size_t bin = floor(fbin * bins);
+		if(fbin < 0)
+			bin = 0;
+		if(bin >= bins)
+			bin = bin-1;
+		ret[bin] ++;
+	}
+
+	return ret;
+}
+
+/**
+	@brief Gets the most probable "0" level for a digital waveform
+ */
+float ProtocolDecoder::GetBaseVoltage(AnalogWaveform* cap)
+{
+	float vmin = GetMinVoltage(cap);
+	float vmax = GetMaxVoltage(cap);
+	float delta = vmax - vmin;
+	const int nbins = 100;
+	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+	//Find the highest peak in the first quarter of the histogram
+	size_t binval = 0;
+	int idx = 0;
+	for(int i=0; i<(nbins/4); i++)
+	{
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
+	}
+
+	float fbin = (idx + 0.5f)/nbins;
+	return fbin*delta + vmin;
+}
+
+/**
+	@brief Gets the most probable "1" level for a digital waveform
+ */
+float ProtocolDecoder::GetTopVoltage(AnalogWaveform* cap)
+{
+	float vmin = GetMinVoltage(cap);
+	float vmax = GetMaxVoltage(cap);
+	float delta = vmax - vmin;
+	const int nbins = 100;
+	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+	//Find the highest peak in the third quarter of the histogram
+	size_t binval = 0;
+	int idx = 0;
+	for(int i=(nbins*3)/4; i<nbins; i++)
+	{
+		if(hist[i] > binval)
+		{
+			binval = hist[i];
+			idx = i;
+		}
+	}
+
+	float fbin = (idx + 0.5f)/nbins;
+	return fbin*delta + vmin;
 }

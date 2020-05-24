@@ -123,7 +123,7 @@ void PeriodMeasurementDecoder::Refresh()
 	}
 
 	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = Measurement::GetAvgVoltage(din);
+	float midpoint = GetAvgVoltage(din);
 
 	//Timestamps of the edges
 	vector<int64_t> edges;

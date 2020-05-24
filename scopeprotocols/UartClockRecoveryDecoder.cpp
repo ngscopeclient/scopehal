@@ -156,7 +156,7 @@ void UartClockRecoveryDecoder::Refresh()
 			continue;
 
 		//Interpolate the time
-		t += din->m_timescale * Measurement::InterpolateTime(din, i-1, threshold);
+		t += din->m_timescale * InterpolateTime(din, i-1, threshold);
 		edges.push_back(t);
 		last = value;
 	}

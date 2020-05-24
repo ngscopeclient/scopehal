@@ -66,8 +66,8 @@
 #include "SCPIOscilloscope.h"
 #include "PowerSupply.h"
 
-#include "Measurement.h"
 #include "Statistic.h"
+#include "ProtocolDecoder.h"
 
 uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 

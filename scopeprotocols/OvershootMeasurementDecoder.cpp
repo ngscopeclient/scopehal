@@ -121,8 +121,8 @@ void OvershootMeasurementDecoder::Refresh()
 	}
 
 	//Figure out the nominal top of the waveform
-	float top = Measurement::GetTopVoltage(din);
-	float base = Measurement::GetBaseVoltage(din);
+	float top = GetTopVoltage(din);
+	float base = GetBaseVoltage(din);
 	float midpoint = (top+base)/2;
 
 	//Create the output
