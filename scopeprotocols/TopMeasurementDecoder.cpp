@@ -159,7 +159,7 @@ void TopMeasurementDecoder::Refresh()
 
 	for(size_t i=0; i < len; i++)
 	{
-		//Wait for a falling edge
+		//Wait for a rising edge
 		float cur = din->m_samples[i];
 		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 

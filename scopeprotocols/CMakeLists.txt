@@ -34,6 +34,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	JtagDecoder.cpp
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
+	OvershootMeasurementDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
 	RiseMeasurementDecoder.cpp

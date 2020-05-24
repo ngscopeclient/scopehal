@@ -43,7 +43,6 @@
 void ScopeMeasurementStaticInit()
 {
 	/*
-	AddMeasurementClass(OvershootMeasurement);
 	AddMeasurementClass(PkPkVoltageMeasurement);
 	AddMeasurementClass(UndershootMeasurement);
 	*/
