@@ -84,6 +84,9 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Always use "max memory" config for setting sample depth
 	m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
 
+	//Disable channel interleaving until we support this properly
+	m_transport->SendCommand("COMBINE_CHANNELS 1");
+
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
 }
