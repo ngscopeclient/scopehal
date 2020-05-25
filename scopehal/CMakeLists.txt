@@ -35,7 +35,6 @@ set(SCOPEHAL_SOURCES
 
 	ProtocolDecoder.cpp
 	PacketDecoder.cpp
-	Measurement.cpp
 	Statistic.cpp
 	)
 
