@@ -66,10 +66,18 @@ SCPILxiTransport::SCPILxiTransport(string args)
 		LogError("Couldn't connect to VXI-11 device\n");
 		return;
 	}
+
+	m_staging_buf_size = 200000000;
+	m_staging_buf = (unsigned char *)malloc(m_staging_buf_size);
+	assert(m_staging_buf != NULL);
+	m_data_in_staging_buf = 0;
+	m_data_offset = 0;
+	m_data_depleted = false;
 }
 
 SCPILxiTransport::~SCPILxiTransport()
 {
+	free(m_staging_buf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,25 +100,32 @@ bool SCPILxiTransport::SendCommand(string cmd)
 	LogTrace("Sending %s\n", cmd.c_str());
 
 	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout); 
+
+	m_data_in_staging_buf = 0;
+	m_data_offset = 0;
+	m_data_depleted = false;
+
 	return (result != LXI_ERROR);
 }
 
 string SCPILxiTransport::ReadReply()
 {
-	char buf[65536];
-
-	int bytes_received = lxi_receive(m_device, buf, sizeof(buf), m_timeout);
-
-	//FIXME: just as ugly as in SCPISocketTransport... But if they're allowed to do this, so am I. :-)
+	//FIXME: there *has* to be a more efficient way to do this...
+	char tmp = ' ';
 	string ret;
-	int i = 0;
-	while(i<bytes_received && (buf[i] != '\n' || buf[i] != ';')){
-		ret += buf[i];
-		++i;
+	while(true)
+	{
+		ReadRawData(1, (unsigned char *)&tmp);
+		if (m_data_depleted)
+			break;
+		if( (tmp == '\n') || (tmp == ';') )
+			break;
+		else
+			ret += tmp;
 	}
-
 	LogTrace("Got %s\n", ret.c_str());
 	return ret;
+
 }
 
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
@@ -120,5 +135,27 @@ void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 {
-	lxi_receive(m_device, (char *)buf, len, m_timeout);
+	if (!m_data_depleted){
+		if (m_data_in_staging_buf == 0){
+			m_data_in_staging_buf = lxi_receive(m_device, (char *)m_staging_buf, m_staging_buf_size, m_timeout);
+			if (m_data_in_staging_buf == LXI_ERROR)
+				m_data_in_staging_buf = 0;
+			m_data_offset = 0;
+		}
+
+		int data_left = m_data_in_staging_buf - m_data_offset;
+		if (data_left > 0){
+			int nr_bytes = len > data_left ? data_left : len;
+
+			memcpy(buf, m_staging_buf + m_data_offset, nr_bytes);
+
+			m_data_offset += nr_bytes;
+		}
+
+		if (m_data_offset == m_data_in_staging_buf)
+				m_data_depleted = true;
+	}
+	else{
+		LogDebug("ReadRawData: data depleted.\n");
+	}
 }

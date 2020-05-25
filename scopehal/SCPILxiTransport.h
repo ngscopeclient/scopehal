@@ -64,6 +64,12 @@ protected:
 
 	int m_device;
 	int m_timeout;
+
+	int m_staging_buf_size;
+	unsigned char *m_staging_buf;
+	int m_data_in_staging_buf;
+	int m_data_offset;
+	bool m_data_depleted;
 };
 
 #endif

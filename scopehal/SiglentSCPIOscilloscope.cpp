@@ -58,13 +58,17 @@ string SiglentSCPIOscilloscope::GetDriverNameInternal()
 // parses out length, does no other validation. requires 17 bytes at header.
 uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 {
-	m_transport->ReadRawData(16, (unsigned char*)header);
+	m_transport->ReadRawData(15, (unsigned char*)header);
+    header[15] = 0;
 
+    /*
 	if (strlen(header) != 16)
 	{
 		LogError("Unexpected descriptor header %s\n", header);
 		return 0;
 	}
+    */
+
 	LogDebug("got header: %s\n", header);
 	return atoi(&header[8]);
 }
@@ -75,6 +79,7 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 	uint32_t headerLength = 0;
 
 	headerLength = ReadWaveHeader(header);
+    LogDebug("header length: %d\n", headerLength);
 
 	if(headerLength != sizeof(struct SiglentWaveformDesc_t))
 	{

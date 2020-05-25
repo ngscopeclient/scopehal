@@ -1005,10 +1005,10 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	for(auto i : uncached)
+	for(auto i : uncached){
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
-	for(auto i : uncached)
-	{
+//	for(auto i : uncached)
+//	{
 		string reply = m_transport->ReadReply();
 		if(reply == "OFF")
 			m_channelsEnabled[i] = false;
