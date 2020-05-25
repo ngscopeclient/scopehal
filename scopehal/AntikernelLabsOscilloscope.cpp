@@ -398,7 +398,7 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	//See what the actual voltages are at the zero crossing
 	//TODO: this isn't the actual trigger point??
 	float vtrig = 0;
-	float trigfrac = Measurement::InterpolateTime(cap, 57, vtrig);
+	float trigfrac = ProtocolDecoder::InterpolateTime(cap, 57, vtrig);
 	cap->m_triggerPhase = -trigfrac * cap->m_timescale;
 
 	//Done, update

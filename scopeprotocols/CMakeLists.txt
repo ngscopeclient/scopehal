@@ -34,8 +34,10 @@ set(SCOPEPROTOCOLS_SOURCES
 	JtagDecoder.cpp
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
+	OvershootMeasurementDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp
+	PkPkMeasurementDecoder.cpp
 	RiseMeasurementDecoder.cpp
 	SincInterpolationDecoder.cpp
 	SPIDecoder.cpp
@@ -44,6 +46,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TopMeasurementDecoder.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryDecoder.cpp
+	UndershootMeasurementDecoder.cpp
 	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp

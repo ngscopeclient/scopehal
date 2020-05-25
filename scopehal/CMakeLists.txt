@@ -12,7 +12,7 @@ set(SCOPEHAL_SOURCES
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
 	VICPSocketTransport.cpp
-    SCPILxiTransport.cpp
+	SCPILxiTransport.cpp
 	SCPIDevice.cpp
 
 	Instrument.cpp
@@ -35,7 +35,6 @@ set(SCOPEHAL_SOURCES
 
 	ProtocolDecoder.cpp
 	PacketDecoder.cpp
-	Measurement.cpp
 	Statistic.cpp
 	)
 

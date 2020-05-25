@@ -121,10 +121,10 @@ void BaseMeasurementDecoder::Refresh()
 	}
 
 	//Make a histogram of the waveform
-	float min = Measurement::GetMinVoltage(din);
-	float max = Measurement::GetMaxVoltage(din);
+	float min = GetMinVoltage(din);
+	float max = GetMaxVoltage(din);
 	size_t nbins = 64;
-	vector<size_t> hist = Measurement::MakeHistogram(din, min, max, nbins);
+	vector<size_t> hist = MakeHistogram(din, min, max, nbins);
 
 	//Set temporary midpoint and range
 	m_range = (max - min);

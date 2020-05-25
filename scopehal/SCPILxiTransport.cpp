@@ -44,9 +44,9 @@ SCPILxiTransport::SCPILxiTransport(string args)
 {
 	char hostname[128];
 	unsigned int port = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	if (2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
 	{
-		//default if port not specified
+		//default if port not specified. VXI-11 is port 111, but liblxi fills that in for us.
 		m_hostname = args;
 		m_port = 0;
 	}
@@ -62,14 +62,24 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 	m_device = lxi_connect(m_hostname.c_str(), m_port, "inst0", m_timeout, VXI11);
 
-	if (m_device == LXI_ERROR){
+	if (m_device == LXI_ERROR)
+	{
 		LogError("Couldn't connect to VXI-11 device\n");
 		return;
 	}
 
-	m_staging_buf_size = 200000000;
-	m_staging_buf = (unsigned char *)malloc(m_staging_buf_size);
-	assert(m_staging_buf != NULL);
+	// When you issue a lxi_receive request, you need to specify the size of the receiving buffer.
+	// However, when the data received is larger than this buffer, liblxi simply discards this data.
+	// ReadReply and ReadRawData expect to be able to fetch received data piecemeal.
+	// The clunky solution is to have an intermediate buffer that is large enough to store all the
+	// data that could possible be returned by a scope.
+	// My Siglent oscilloscope can have a waveform of 140M samples, so I reserve 150M. However,
+	// I haven't been able to fetch waveforms larger than 1.4M (for reasons unknown.)
+	// Maybe we should reduce this number...
+	m_staging_buf_size = 150000000;
+	m_staging_buf = new unsigned char[m_staging_buf_size];
+	if (m_staging_buf == NULL)
+		return;
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
 	m_data_depleted = false;
@@ -77,7 +87,12 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 SCPILxiTransport::~SCPILxiTransport()
 {
-	free(m_staging_buf);
+	delete[] m_staging_buf;
+}
+
+bool SCPILxiTransport::IsConnected()
+{
+	return (m_device != LXI_ERROR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +114,7 @@ bool SCPILxiTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
-	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout); 
+	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout);
 
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
@@ -110,10 +125,15 @@ bool SCPILxiTransport::SendCommand(string cmd)
 
 string SCPILxiTransport::ReadReply()
 {
+	string ret;
+
+	if (!m_staging_buf)
+		return ret;
+
 	//FIXME: there *has* to be a more efficient way to do this...
 	char tmp = ' ';
-	string ret;
-	while(true){
+	while(true)
+	{
 		if (m_data_depleted)
 			break;
 		ReadRawData(1, (unsigned char *)&tmp);
@@ -128,13 +148,24 @@ string SCPILxiTransport::ReadReply()
 
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
-	lxi_send(m_device, (const char *)buf, len, m_timeout); 
+	// XXX: Should this reset m_data_depleted just like SendCommmand?
+	lxi_send(m_device, (const char *)buf, len, m_timeout);
 }
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 {
-	if (!m_data_depleted){
-		if (m_data_in_staging_buf == 0){
+	// Data in the staging buffer is assumed to always be a consequence of a SendCommand request.
+	// Since we fetch all the reply data in one go, once all this data has been fetched, we mark
+	// the staging buffer as depleted and don't issue a new lxi_receive until a new SendCommand
+	// is issued.
+
+	if (!m_staging_buf)
+		return;
+
+	if (!m_data_depleted)
+	{
+		if (m_data_in_staging_buf == 0)
+		{
 			m_data_in_staging_buf = lxi_receive(m_device, (char *)m_staging_buf, m_staging_buf_size, m_timeout);
 			if (m_data_in_staging_buf == LXI_ERROR)
 				m_data_in_staging_buf = 0;
@@ -142,7 +173,8 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 		}
 
 		unsigned int data_left = m_data_in_staging_buf - m_data_offset;
-		if (data_left > 0){
+		if (data_left > 0)
+		{
 			int nr_bytes = len > data_left ? data_left : len;
 
 			memcpy(buf, m_staging_buf + m_data_offset, nr_bytes);
@@ -153,7 +185,15 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 		if (m_data_offset == m_data_in_staging_buf)
 				m_data_depleted = true;
 	}
-	else{
+	else
+	{
+		// When this happens, the SCPIDevice is fetching more data from device than what
+		// could be expected from the SendCommand that was issued.
 		LogDebug("ReadRawData: data depleted.\n");
 	}
+}
+
+bool SCPILxiTransport::IsCommandBatchingSupported()
+{
+	return false;
 }

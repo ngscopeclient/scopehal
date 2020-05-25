@@ -30,21 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of OvershootMeasurementDecoder
  */
+#ifndef OvershootMeasurementDecoder_h
+#define OvershootMeasurementDecoder_h
 
-#include "scopemeasurements.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-#define AddMeasurementClass(T) Measurement::AddMeasurementClass(T::GetMeasurementName(), T::CreateInstance)
-
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeMeasurementStaticInit()
+class OvershootMeasurementDecoder : public ProtocolDecoder
 {
-	/*
-	AddMeasurementClass(OvershootMeasurement);
-	AddMeasurementClass(PkPkVoltageMeasurement);
-	AddMeasurementClass(UndershootMeasurement);
-	*/
-}
+public:
+	OvershootMeasurementDecoder(std::string color);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(OvershootMeasurementDecoder)
+
+protected:
+	double m_midpoint;
+	double m_range;
+};
+
+#endif

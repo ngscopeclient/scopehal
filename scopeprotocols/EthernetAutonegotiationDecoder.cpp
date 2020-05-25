@@ -171,7 +171,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	SetData(cap);
 }
 
-Gdk::Color EthernetAutonegotiationDecoder::GetColor(int i)
+Gdk::Color EthernetAutonegotiationDecoder::GetColor(int /*i*/)
 {
 	return m_standardColors[COLOR_DATA];
 }

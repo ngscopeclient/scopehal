@@ -113,7 +113,7 @@ void ACCoupleDecoder::Refresh()
 	}
 
 	//Find the average of our samples (assume data is DC balanced)
-	float average = Measurement::GetAvgVoltage(din);
+	float average = GetAvgVoltage(din);
 
 	//Subtract all of our samples
 	auto cap = new AnalogWaveform;

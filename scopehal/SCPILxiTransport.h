@@ -53,6 +53,9 @@ public:
 	virtual void ReadRawData(size_t len, unsigned char* buf);
 	virtual void SendRawData(size_t len, const unsigned char* buf);
 
+	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
+
 	TRANSPORT_INITPROC(SCPILxiTransport)
 
 	std::string GetHostname()

@@ -84,6 +84,9 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Always use "max memory" config for setting sample depth
 	m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
 
+	//Disable channel interleaving until we support this properly
+	m_transport->SendCommand("COMBINE_CHANNELS 1");
+
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
 }
@@ -1014,15 +1017,34 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	for(auto i : uncached){
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
-//	for(auto i : uncached)
-//	{
-		string reply = m_transport->ReadReply();
-		if(reply == "OFF")
-			m_channelsEnabled[i] = false;
-		else
-			m_channelsEnabled[i] = true;
+	//Batched implementation
+	if(m_transport->IsCommandBatchingSupported())
+	{
+		for(auto i : uncached)
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
+		for(auto i : uncached)
+		{
+			string reply = m_transport->ReadReply();
+			if(reply == "OFF")
+				m_channelsEnabled[i] = false;
+			else
+				m_channelsEnabled[i] = true;
+		}
+	}
+
+	//Unoptimized fallback for use with transports that can't handle batching
+	else
+	{
+		for(auto i : uncached)
+		{
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
+
+			string reply = m_transport->ReadReply();
+			if(reply == "OFF")
+				m_channelsEnabled[i] = false;
+			else
+				m_channelsEnabled[i] = true;
+		}
 	}
 
 	/*

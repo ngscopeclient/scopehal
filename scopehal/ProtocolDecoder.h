@@ -214,11 +214,21 @@ public:
 	virtual Gdk::Color GetColor(int i);
 	virtual std::string GetText(int i);
 
+	//Helpers for superresolution
+	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
+
+	//Helpers for more complex measurements
+	//TODO: create some process for caching this so we don't waste CPU time
+	static float GetMinVoltage(AnalogWaveform* cap);
+	static float GetMaxVoltage(AnalogWaveform* cap);
+	static float GetBaseVoltage(AnalogWaveform* cap);
+	static float GetTopVoltage(AnalogWaveform* cap);
+	static float GetAvgVoltage(AnalogWaveform* cap);
+	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
+
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i);
-
-protected:
 
 	//Samples a digital channel on the edges of another channel.
 	//The two channels need not be the same sample rate.

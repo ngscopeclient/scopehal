@@ -71,7 +71,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MovingAverageDecoder);
+	AddDecoderClass(OvershootMeasurementDecoder);
 	AddDecoderClass(ParallelBusDecoder);
+	AddDecoderClass(PkPkMeasurementDecoder);
 	AddDecoderClass(PeriodMeasurementDecoder);
 	AddDecoderClass(RiseMeasurementDecoder);
 	AddDecoderClass(SincInterpolationDecoder);
@@ -81,6 +83,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TopMeasurementDecoder);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryDecoder);
+	AddDecoderClass(UndershootMeasurementDecoder);
 	AddDecoderClass(USB2ActivityDecoder);
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);

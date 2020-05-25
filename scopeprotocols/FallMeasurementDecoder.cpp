@@ -134,8 +134,8 @@ void FallMeasurementDecoder::Refresh()
 	}
 
 	//Get the base/top (we use these for calculating percentages)
-	float base = Measurement::GetBaseVoltage(din);
-	float top = Measurement::GetTopVoltage(din);
+	float base = GetBaseVoltage(din);
+	float top = GetTopVoltage(din);
 
 	//Find the actual levels we use for our time gate
 	float delta = top - base;
@@ -164,7 +164,7 @@ void FallMeasurementDecoder::Refresh()
 		{
 			if( (cur < vstart) && (last >= vstart) )
 			{
-				tedge = tnow - din->m_timescale + Measurement::InterpolateTime(din, i-1, vstart);
+				tedge = tnow - din->m_timescale + InterpolateTime(din, i-1, vstart);
 				state = 1;
 			}
 		}
@@ -174,7 +174,7 @@ void FallMeasurementDecoder::Refresh()
 		{
 			if( (cur < vend) && (last >= vend) )
 			{
-				double tlerp = tnow - din->m_timescale + Measurement::InterpolateTime(din, i-1, vend);
+				double tlerp = tnow - din->m_timescale + InterpolateTime(din, i-1, vend);
 				double dt = tlerp - tedge;
 
 				cap->m_offsets.push_back(tlast);
