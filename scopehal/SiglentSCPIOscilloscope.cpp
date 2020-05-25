@@ -55,35 +55,78 @@ string SiglentSCPIOscilloscope::GetDriverNameInternal()
 	return "siglent";
 }
 
-// parses out length, does no other validation. requires 17 bytes at header.
-uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
+//  Somewhat arbitrary. No header has been seen that's larger than 17...
+static const int maxWaveHeaderSize = 40;
+
+// "WF?" commands return data that starts with a header. 
+// On a Siglnet SDS2304X, the header of "C0: WF? DESC looks like this: "ALL,#9000000346"
+// On other Siglent scopes, a header may look like this: "C1:WF ALL,#9000000070"
+// So the size of the header is unknown due to the variable lenghth prefix.
+
+// Returns -1 if no valid header was seen.
+// Otherwise, it returns the size of the data chunk that follows the header.
+int SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 {
-	m_transport->ReadRawData(15, (unsigned char*)header);
-    header[15] = 0;
+	int i = 0;
 
-    /*
-	if (strlen(header) != 16)
+	// Scan the prefix until ',' is seen.
+	// We don't want to overfetch, so just get stuff one byte at time...
+	bool comma_seen = false;
+	while(!comma_seen && i<maxWaveHeaderSize-12)			// -12: we need space for the size part of the header
 	{
-		LogError("Unexpected descriptor header %s\n", header);
-		return 0;
+		m_transport->ReadRawData(1, (unsigned char *)(header+i));
+		comma_seen = (header[i] == ',');
+		++i;
 	}
-    */
+	header[maxWaveHeaderSize-1] = '\0';
 
-	LogDebug("got header: %s\n", header);
-	return atoi(&header[8]);
+	if (!comma_seen)
+	{
+		LogError("WaveHeader: no end of prefix seen... (%s)\n", header);
+		return -1;
+	}
+
+	// We now expect "#9xxxxxxxxx" (11 characters), where 'x' is a digit.
+	int start_of_size = i;
+
+	m_transport->ReadRawData(11, (unsigned char *)(header+start_of_size));
+	header[start_of_size+11] = '\0';
+
+	bool header_conformant = true;
+
+	header_conformant &= (header[start_of_size]   == '#');
+	header_conformant &= (header[start_of_size+1] == '9');
+	for(i=2; i<11;++i)
+		header_conformant &= isdigit(header[start_of_size+i]);
+
+	header[start_of_size+11] = '\0';
+
+	if (!header_conformant)
+	{
+		LogError("WaveHeader: header non-conformant (%s)\n", header);
+		return -1;
+	}
+
+	int data_chunk_size = atoi(&header[start_of_size+2]);
+
+	LogDebug("WaveHeader: size = %d (%s)\n", data_chunk_size, header);
+	return data_chunk_size;
+
+	m_transport->ReadRawData(15, (unsigned char*)header);
+	header[15] = 0;
 }
 
 void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int /*channel*/)
 {
-	char header[17] = {0};
-	uint32_t headerLength = 0;
+	char header[maxWaveHeaderSize] = {0};
+	int headerLength = 0;
 
 	headerLength = ReadWaveHeader(header);
-    LogDebug("header length: %d\n", headerLength);
+	LogDebug("header length: %d\n", headerLength);
 
 	if(headerLength != sizeof(struct SiglentWaveformDesc_t))
 	{
-		LogError("Unexpected header length: %u\n", headerLength);
+		LogError("Unexpected header length: %d\n", headerLength);
 	}
 
 	m_transport->ReadRawData(sizeof(struct SiglentWaveformDesc_t), (unsigned char*)descriptor);
@@ -116,10 +159,10 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		if(enabled[i])
 		{
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			// TODO: a bunch of error checking...
 			ReadWaveDescriptorBlock(wavedescs[i], i);
 			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName,
 				wavedescs[i]->InstrumentNumber);
-
 		}
 	}
 

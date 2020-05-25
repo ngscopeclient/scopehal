@@ -55,7 +55,7 @@ public:
 protected:
 
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
-	uint32_t ReadWaveHeader(char *header);
+	int ReadWaveHeader(char *header);
 
 public:
 	static std::string GetDriverNameInternal();
