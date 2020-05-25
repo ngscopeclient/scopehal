@@ -170,13 +170,13 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	//TODO: WFSU in outer loop and WF in inner loop
 	unsigned int num_sequences = 1;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	for(unsigned int chan_nr=0; chan_nr<m_analogChannelCount; chan_nr++)
 	{
 		//If the channel is invisible, don't waste time capturing data
-		struct SiglentWaveformDesc_t *wavedesc = wavedescs[i];
+		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chan_nr];
 		if(string(wavedesc->DescName).empty())
 		{
-			m_channels[i]->SetData(NULL);
+			m_channels[chan_nr]->SetData(NULL);
 			continue;
 		}
 
@@ -222,23 +222,23 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		tstruc.tm_isdst = now->tm_isdst;
 		cap->m_startTimestamp = mktime(&tstruc);
 		cap->m_timescale = round(interval);
-		for(unsigned int j=0; j<num_sequences; j++)
+		for(unsigned int seq_nr=0; seq_nr<num_sequences; seq_nr++)
 		{
-			LogDebug("Channel %u block %u\n", i, j);
+			LogDebug("Channel %u block %u\n", chan_nr, seq_nr);
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
 			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
-				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
+				snprintf(tmp, sizeof(tmp), "%u", seq_nr + 1);	//segment 0 = "all", 1 = first part of capture
 				cmd += tmp;
 				m_transport->SendCommand(cmd);
 			}
 
 			//Read the actual waveform data
 			cmd = "C1:WF? DAT2";
-			cmd[1] += i;
+			cmd[1] += chan_nr;
 			m_transport->SendCommand(cmd);
 			char header[17] = {0};
 			size_t wavesize = ReadWaveHeader(header);
@@ -249,11 +249,11 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			m_transport->ReadReply();
 
 			double trigtime = 0;
-			if( (num_sequences > 1) && (j > 0) )
+			if( (num_sequences > 1) && (seq_nr > 0) )
 			{
 				//If a multi-segment capture, ask for the trigger time data
 				cmd = "C1:WF? TIME";
-				cmd[1] += i;
+				cmd[1] += chan_nr;
 				m_transport->SendCommand(cmd);
 
 				trigtime = ReadWaveHeader(header);
@@ -289,7 +289,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Done, update the data
-		m_channels[i]->SetData(cap);
+		m_channels[chan_nr]->SetData(cap);
 	}
 
 	double dt = GetTime() - start;
