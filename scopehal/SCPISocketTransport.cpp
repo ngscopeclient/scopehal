@@ -124,3 +124,8 @@ void SCPISocketTransport::ReadRawData(size_t len, unsigned char* buf)
 {
 	m_socket.RecvLooped(buf, len);
 }
+
+bool SCPISocketTransport::IsCommandBatchingSupported()
+{
+	return true;
+}

@@ -202,3 +202,8 @@ void VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf)
 {
 	m_socket.RecvLooped(buf, len);
 }
+
+bool VICPSocketTransport::IsCommandBatchingSupported()
+{
+	return true;
+}

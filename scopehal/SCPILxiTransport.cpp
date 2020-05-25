@@ -77,7 +77,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 	// I haven't been able to fetch waveforms larger than 1.4M (for reasons unknown.)
 	// Maybe we should reduce this number...
 	m_staging_buf_size = 150000000;
-	m_staging_buf = new char[m_staging_buf_size];
+	m_staging_buf = new unsigned char[m_staging_buf_size];
 	if (m_staging_buf == NULL)
 		return;
 	m_data_in_staging_buf = 0;
@@ -87,7 +87,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 SCPILxiTransport::~SCPILxiTransport()
 {
-	delete(m_staging_buf);
+	delete[] m_staging_buf;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,7 +109,7 @@ bool SCPILxiTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
-	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout); 
+	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout);
 
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
@@ -144,7 +144,7 @@ string SCPILxiTransport::ReadReply()
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	// XXX: Should this reset m_data_depleted just like SendCommmand?
-	lxi_send(m_device, (const char *)buf, len, m_timeout); 
+	lxi_send(m_device, (const char *)buf, len, m_timeout);
 }
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
@@ -186,4 +186,9 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 		// could be expected from the SendCommand that was issued.
 		LogDebug("ReadRawData: data depleted.\n");
 	}
+}
+
+bool SCPILxiTransport::IsCommandBatchingSupported()
+{
+	return false;
 }
