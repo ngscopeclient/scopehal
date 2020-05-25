@@ -147,6 +147,7 @@ void RigolOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_triggerChannelValid = false;
 	m_triggerLevelValid = false;
+	m_triggerTypeValid = false;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -586,10 +587,12 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 			//Ask for the data block
 			m_transport->SendCommand("WAV:DATA?");
+			LogWarning("Req data\n");
 
 			//Read block header
 			unsigned char header[12] = {0};
 			m_transport->ReadRawData(11, header);
+			LogWarning("Got header\n");
 
 			//Look up the block size
 			//size_t blocksize = end - npoints;
@@ -597,10 +600,14 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			size_t header_blocksize;
 			sscanf((char *)header, "#9%zu", &header_blocksize);
 			//LogDebug("Header block size = %zu\n", header_blocksize);
+			LogWarning("Got header bs: %i\n", header_blocksize);
+			if (header_blocksize < 0)
+				return false;
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize + 1, temp_buf); //why is there a trailing byte here??
+			m_transport->ReadRawData(header_blocksize + 1, temp_buf); //why is there a trailing byte here??´
+			LogWarning("Got block\n");
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
 			for (size_t j = 0; j < header_blocksize; j++)
