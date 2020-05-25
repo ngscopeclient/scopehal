@@ -44,7 +44,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 {
 	char hostname[128];
 	unsigned int port = 0;
-	if(2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	if (2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
 	{
 		//default if port not specified. VXI-11 is port 111, but liblxi fills that in for us.
 		m_hostname = args;
@@ -62,7 +62,8 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 	m_device = lxi_connect(m_hostname.c_str(), m_port, "inst0", m_timeout, VXI11);
 
-	if (m_device == LXI_ERROR){
+	if (m_device == LXI_ERROR)
+	{
 		LogError("Couldn't connect to VXI-11 device\n");
 		return;
 	}
@@ -76,7 +77,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 	// I haven't been able to fetch waveforms larger than 1.4M (for reasons unknown.)
 	// Maybe we should reduce this number...
 	m_staging_buf_size = 150000000;
-	m_staging_buf = (unsigned char *)malloc(m_staging_buf_size);
+	m_staging_buf = new char[m_staging_buf_size];
 	if (m_staging_buf == NULL)
 		return;
 	m_data_in_staging_buf = 0;
@@ -86,7 +87,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 SCPILxiTransport::~SCPILxiTransport()
 {
-	free(m_staging_buf);
+	delete(m_staging_buf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +127,8 @@ string SCPILxiTransport::ReadReply()
 
 	//FIXME: there *has* to be a more efficient way to do this...
 	char tmp = ' ';
-	while(true){
+	while(true)
+	{
 		if (m_data_depleted)
 			break;
 		ReadRawData(1, (unsigned char *)&tmp);
@@ -155,8 +157,10 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 	if (!m_staging_buf)
 		return;
 
-	if (!m_data_depleted){
-		if (m_data_in_staging_buf == 0){
+	if (!m_data_depleted)
+	{
+		if (m_data_in_staging_buf == 0)
+		{
 			m_data_in_staging_buf = lxi_receive(m_device, (char *)m_staging_buf, m_staging_buf_size, m_timeout);
 			if (m_data_in_staging_buf == LXI_ERROR)
 				m_data_in_staging_buf = 0;
@@ -164,7 +168,8 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 		}
 
 		unsigned int data_left = m_data_in_staging_buf - m_data_offset;
-		if (data_left > 0){
+		if (data_left > 0)
+		{
 			int nr_bytes = len > data_left ? data_left : len;
 
 			memcpy(buf, m_staging_buf + m_data_offset, nr_bytes);
@@ -175,7 +180,8 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 		if (m_data_offset == m_data_in_staging_buf)
 				m_data_depleted = true;
 	}
-	else{
+	else
+	{
 		// When this happens, the SCPIDevice is fetching more data from device than what
 		// could be expected from the SendCommand that was issued.
 		LogDebug("ReadRawData: data depleted.\n");
