@@ -526,8 +526,9 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	size_t maxpoints = 250 * 1000;
 	if (protocol == DS)
 		maxpoints = 250 * 1000;
-	else if (protocol == MSO5);
-		maxpoints = 25 * 10 * 1000; // You can use 250E6 points too, but it is very slow
+	else if (protocol == MSO5)
+		;
+	maxpoints = 25 * 10 * 1000; // You can use 250E6 points too, but it is very slow
 	unsigned char *temp_buf = new unsigned char[maxpoints];
 	map<int, vector<AnalogWaveform *>> pending_waveforms;
 	for (size_t i = 0; i < m_analogChannelCount; i++)
@@ -717,7 +718,9 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 
 void RigolOscilloscope::SetTriggerChannelIndex(size_t i)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("TRIG:EDGE:SOUR " + m_channels[i]->GetHwname());
+	m_triggerChannelValid = false;
 }
 
 float RigolOscilloscope::GetTriggerVoltage()
@@ -744,17 +747,46 @@ float RigolOscilloscope::GetTriggerVoltage()
 
 void RigolOscilloscope::SetTriggerVoltage(float v)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TRIG:EDGE:LEV %f", v);
+	m_transport->SendCommand(buf);
+	m_triggerLevelValid = false;
 }
 
 Oscilloscope::TriggerType RigolOscilloscope::GetTriggerType()
 {
-	//FIXME
-	return Oscilloscope::TRIGGER_TYPE_RISING;
+	if (m_triggerTypeValid)
+		return m_triggerType;
+	m_transport->SendCommand("TRIG:EDGE:SLOPE?");
+	string ret = m_transport->ReadReply();
+
+	if (ret == "POS")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING;
+	else if (ret == "NEG")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING;
+	else if (ret == "RFAL")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE;
+
+	return m_triggerType;
 }
 
 void RigolOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 {
+	switch (type)
+	{
+	case Oscilloscope::TRIGGER_TYPE_RISING:
+		m_transport->SendCommand("TRIG:EDGE:SLOPE POS");
+		break;
+	case Oscilloscope::TRIGGER_TYPE_FALLING:
+		m_transport->SendCommand("TRIG:EDGE:SLOPE NEG");
+		break;
+	case Oscilloscope::TRIGGER_TYPE_CHANGE:
+		m_transport->SendCommand("TRIG:EDGE:SLOPE RFAL");
+		break;
+	default:
+		LogError("Invalid trigger type\n");
+	}
 	//FIXME
 }
 

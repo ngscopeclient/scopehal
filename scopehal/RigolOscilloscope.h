@@ -109,6 +109,8 @@ protected:
 	size_t m_triggerChannel;
 	bool m_triggerLevelValid;
 	float m_triggerLevel;
+	bool m_triggerTypeValid;
+	Oscilloscope::TriggerType m_triggerType;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
