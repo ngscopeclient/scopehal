@@ -284,7 +284,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			{
 				cap->m_offsets[i]	= i+trigtime_samples;
 				cap->m_durations[i]	= 1;
-				cap->m_samples[i]	= data[i] * v_gain - v_off;
+				cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
 			}
 		}
 
