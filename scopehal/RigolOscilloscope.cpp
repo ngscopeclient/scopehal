@@ -116,6 +116,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport *transport)
 	if (protocol == MSO5)
 		for (int i = 0; i < 4; i++)
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":VERN ON");
+	m_transport->SendCommand("TIM:VERN ON");
 }
 
 RigolOscilloscope::~RigolOscilloscope()
@@ -148,6 +149,8 @@ void RigolOscilloscope::FlushConfigCache()
 	m_triggerChannelValid = false;
 	m_triggerLevelValid = false;
 	m_triggerTypeValid = false;
+	m_srateValid = false;
+	m_mdepthValid = false;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -804,13 +807,15 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
+	if (protocol == MSO5)
+		ret = {100, 200, 500, 1000, 2000, 5000, 10 * 1000, 20 * 1000, 50 * 1000, 100 * 1000, 200 * 1000, 500 * 1000, 1 * 1000 * 1000, 2 * 1000 * 1000, 5 * 1000 * 1000, 10 * 1000 * 1000, 20 * 1000 * 1000, 50 * 1000 * 1000, 100 * 1000 * 1000, 200 * 1000 * 1000, 500 * 1000 * 1000, 1 * 1000 * 1000 * 1000, 2 * 1000 * 1000 * 1000};
 	return ret;
 }
 
 vector<uint64_t> RigolOscilloscope::GetSampleRatesInterleaved()
 {
 	//FIXME
-	vector<uint64_t> ret;
+	vector<uint64_t> ret = {};
 	return ret;
 }
 
@@ -825,6 +830,8 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
+	if (protocol == MSO5)
+		ret = {1000, 10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000, 25 * 1000 * 1000};
 	return ret;
 }
 
@@ -837,22 +844,86 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t RigolOscilloscope::GetSampleRate()
 {
-	//FIXME
-	return 1;
+	if (m_srateValid)
+		return m_srate;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("ACQ:SRAT?");
+	string ret = m_transport->ReadReply();
+
+	uint64_t rate;
+	sscanf(ret.c_str(), "%lu", &rate);
+	m_srate = rate;
+	m_srateValid = true;
+	return rate;
 }
 
 uint64_t RigolOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	if (m_mdepthValid)
+		return m_mdepth;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("ACQ:MDEP?");
+	string ret = m_transport->ReadReply();
+
+	double depth;
+	sscanf(ret.c_str(), "%lf", &depth);
+	m_mdepth = (uint64_t) depth;
+	m_mdepthValid = true;
+	return depth;
 }
 
-void RigolOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch (depth)
+	{
+	case 1000:
+		m_transport->SendCommand("ACQ:MDEP 1k");
+		break;
+	case 10000:
+		m_transport->SendCommand("ACQ:MDEP 10k");
+		break;
+	case 100000:
+		m_transport->SendCommand("ACQ:MDEP 100k");
+		break;
+	case 1000000:
+		m_transport->SendCommand("ACQ:MDEP 1M");
+		break;
+	case 10000000:
+		m_transport->SendCommand("ACQ:MDEP 10M");
+		break;
+	case 25000000:
+		m_transport->SendCommand("ACQ:MDEP 25M");
+		break;
+	case 50000000:
+		m_transport->SendCommand("ACQ:MDEP 50M");
+		break;
+	case 100000000:
+		m_transport->SendCommand("ACQ:MDEP 100M");
+		break;
+	case 200000000:
+		m_transport->SendCommand("ACQ:MDEP 200M");
+		break;
+	default:
+		m_transport->SendCommand("ACQ:MDEP AUTO");
+		LogError("Invalid memory depth for channel: %i\n", depth);
+	}
+	m_mdepthValid = false;
 }
 
-void RigolOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void RigolOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//FIXME
+	//FIXME, you can set :TIMebase:SCALe
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_mdepthValid = false;
+	double sampletime = GetSampleDepth() / (double)rate;
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TIM:SCAL %f", sampletime / 10);
+	m_transport->SendCommand(buf);
+	m_srateValid = false;
+	m_mdepthValid = false;
 }

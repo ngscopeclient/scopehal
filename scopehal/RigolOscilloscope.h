@@ -109,6 +109,10 @@ protected:
 	size_t m_triggerChannel;
 	bool m_triggerLevelValid;
 	float m_triggerLevel;
+	bool m_srateValid;
+	uint64_t m_srate;
+	bool m_mdepthValid;
+	uint64_t m_mdepth;
 	bool m_triggerTypeValid;
 	Oscilloscope::TriggerType m_triggerType;
 
