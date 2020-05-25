@@ -27,52 +27,44 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "WaterfallDecoder.h"
-#include "FFTDecoder.h"
+#include "scopeprotocols.h"
+#include "EyeWidthMeasurementDecoder.h"
+#include "EyeDecoder2.h"
+#include <algorithm>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-WaterfallWaveform::WaterfallWaveform(size_t width, size_t height)
-	: m_width(width)
-	, m_height(height)
+EyeWidthMeasurementDecoder::EyeWidthMeasurementDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	size_t npix = width*height;
-	m_outdata = new float[npix];
-	for(size_t i=0; i<npix; i++)
-		m_outdata[i] = 0;
-}
+	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
+	m_yAxisUnit = Unit(Unit::UNIT_PS);
 
-WaterfallWaveform::~WaterfallWaveform()
-{
-	delete[] m_outdata;
-	m_outdata = NULL;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-WaterfallDecoder::WaterfallDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
-	, m_pixelsPerHz(0.001)
-	, m_offsetHz(0)
-	, m_width(1)
-	, m_height(1)
-{
 	//Set up channels
-	m_signalNames.push_back("din");
+	m_signalNames.push_back("Eye");
 	m_channels.push_back(NULL);
+
+	m_startname = "Start Voltage";
+	m_parameters[m_startname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_startname].SetFloatVal(0);
+
+	m_endname = "End Voltage";
+	m_parameters[m_endname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_endname].SetFloatVal(0);
+
+	m_min = 0;
+	m_max = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EyeWidthMeasurementDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetYAxisUnits() != Unit::UNIT_DB) )
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
 		return true;
 	return false;
 }
@@ -80,98 +72,132 @@ bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double WaterfallDecoder::GetOffset()
+void EyeWidthMeasurementDecoder::SetDefaultName()
 {
-	return 0;
+	float vstart = m_parameters[m_startname].GetFloatVal();
+	float vend = m_parameters[m_endname].GetFloatVal();
+
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "EyeWidth(%s, %.2f, %.2f)",
+		m_channels[0]->m_displayname.c_str(),
+		vstart,
+		vend);
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
-double WaterfallDecoder::GetVoltageRange()
+string EyeWidthMeasurementDecoder::GetProtocolName()
 {
-	return 1;
+	return "Eye Width";
 }
 
-string WaterfallDecoder::GetProtocolName()
-{
-	return "Waterfall";
-}
-
-bool WaterfallDecoder::IsOverlay()
+bool EyeWidthMeasurementDecoder::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool WaterfallDecoder::NeedsConfig()
+bool EyeWidthMeasurementDecoder::NeedsConfig()
 {
-	//we auto-select the midpoint as our threshold
-	return false;
+	//need manual config
+	return true;
 }
 
-void WaterfallDecoder::SetDefaultName()
+double EyeWidthMeasurementDecoder::GetVoltageRange()
 {
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Waterfall(%s)", m_channels[0]->m_displayname.c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
+	return m_max - m_min;
+}
+
+double EyeWidthMeasurementDecoder::GetOffset()
+{
+	return - (m_min + m_max)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void WaterfallDecoder::Refresh()
+void EyeWidthMeasurementDecoder::Refresh()
 {
 	//Get the input data
 	if(m_channels[0] == NULL)
-	{
-		SetData(NULL);
 		return;
-	}
-	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-
-	//We need meaningful data
-	size_t inlen = din->m_samples.size();
-	if(inlen == 0)
-	{
-		SetData(NULL);
+	auto din = dynamic_cast<EyeWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
 		return;
-	}
 
-	//Initialize the capture
-	//TODO: timestamps? do we need those?qui
-	WaterfallWaveform* cap = dynamic_cast<WaterfallWaveform*>(m_data);
-	if(cap == NULL)
-		cap = new WaterfallWaveform(m_width, m_height);
-	cap->m_timescale = 1;
-	float* data = cap->GetData();
+	//Create the output
+	auto cap = new AnalogWaveform;
 
-	//Move the whole waterfall down by one row
-	for(size_t y=0; y < m_height-1 ; y++)
+	//Make sure voltages are in the right order
+	float vstart = m_parameters[m_startname].GetFloatVal();
+	float vend = m_parameters[m_endname].GetFloatVal();
+	if(vstart > vend)
 	{
-		for(size_t x=0; x<m_width; x++)
-			data[y*m_width + x] = data[(y+1)*m_width + x];
+		float tmp = vstart;
+		vstart = vend;
+		vend = tmp;
 	}
 
-	//Add the new data
-	double hz_per_bin = din->m_timescale;
-	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
-	double bin_offset = m_offsetHz / hz_per_bin;
-	double vmin = 1.0 / 255.0;
-	for(size_t x=0; x<m_width; x++)
+	//Figure out how many volts per eye bin and round everything to nearest eye bin
+	float vrange = m_channels[0]->GetVoltageRange();
+	float volts_per_row = vrange / din->GetHeight();
+	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
+
+	size_t start_bin = round( (vstart - volts_at_bottom) / volts_per_row);
+	size_t end_bin = round( (vend - volts_at_bottom) / volts_per_row);
+	start_bin = min(start_bin, din->GetHeight()-1);
+	end_bin = min(end_bin, din->GetHeight()-1);
+	float duration_mv = volts_per_row * 1000;
+	float base_mv = volts_at_bottom * 1000;
+
+	m_min = FLT_MAX;
+	m_max = 0;
+
+	float* data = din->GetData();
+	int64_t w = din->GetWidth();
+	int64_t xcenter = w / 2;
+	float ber_max = FLT_EPSILON;
+	double width_ps = 2 * din->m_uiWidth;
+	double ps_per_pixel = width_ps / w;
+	for(size_t i=start_bin; i <= end_bin; i++)
 	{
-		//Look up the frequency bin for this position
-		//For now, just do nearest neighbor interpolation
-		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x + bin_offset));
+		float* row = data + i*w;
 
-		float value = 0;
-		if(nbin < inlen)
-			value = (-70 - 20 * log10(din->m_samples[nbin])) / -70;
+		int64_t cleft = 0;		//left side of eye opening
+		int64_t cright = w-1;	//right side of eye opening
 
-		//Cap values to prevent going off-scale-low with our color ramps
-		if(value < vmin)
-			value = vmin;
+		//Find the edges of the eye in this scanline
+		for(int64_t dx = 0; dx < xcenter; dx ++)
+		{
+			//left of center
+			int64_t x = xcenter - dx;
+			if(row[x] > ber_max)
+				cleft = max(cleft, x);
 
-		data[(m_height-1)*m_width + x] = value;
+			//right of center
+			x = xcenter + dx;
+			if(row[x] > ber_max)
+				cright = min(cright, x);
+		}
+
+		float value = ps_per_pixel * (cright - cleft);
+
+		//Output waveform generation
+		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
+		cap->m_durations.push_back(round(duration_mv));
+		cap->m_samples.push_back(value);
+		m_max = max(m_max, value);
+		m_min = min(m_min, value);
 	}
+
+	//Proper display of flat lines
+	m_min -= 10;
+	m_max += 10;
 
 	SetData(cap);
+
+	//Copy start time etc from the input. Timestamps are in picoseconds.
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

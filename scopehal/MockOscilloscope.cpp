@@ -323,3 +323,24 @@ vector<uint64_t> MockOscilloscope::GetSampleDepthsInterleaved()
 	vector<uint64_t> ret;
 	return ret;
 }
+
+uint64_t MockOscilloscope::GetSampleRate()
+{
+	return 1;
+}
+
+uint64_t MockOscilloscope::GetSampleDepth()
+{
+	//FIXME
+	return 1;
+}
+
+void MockOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//no-op
+}
+
+void MockOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//no-op
+}

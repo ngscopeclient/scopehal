@@ -324,8 +324,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 				break;
 		}
 	}
-
-	LogDebug("End. Lengths %zu, %zu, %zu\n", cap->m_offsets.size(), cap->m_durations.size(), cap->m_samples.size());
 }
 
 Gdk::Color EthernetProtocolDecoder::GetColor(int i)

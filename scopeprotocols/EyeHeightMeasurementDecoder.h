@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2019 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,63 +30,40 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeBitRateMeasurement
+	@brief Declaration of EyeHeightMeasurementDecoder
  */
+#ifndef EyeHeightMeasurementDecoder_h
+#define EyeHeightMeasurementDecoder_h
 
-#include "scopemeasurements.h"
-#include "EyeBitRateMeasurement.h"
-#include "../scopeprotocols/EyeDecoder2.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction/destruction
-
-EyeBitRateMeasurement::EyeBitRateMeasurement()
-	: FloatMeasurement(TYPE_BAUD)
+class EyeHeightMeasurementDecoder : public ProtocolDecoder
 {
-	//Configure for a single input
-	m_signalNames.push_back("Vin");
-	m_channels.push_back(NULL);
-}
+public:
+	EyeHeightMeasurementDecoder(std::string color);
 
-EyeBitRateMeasurement::~EyeBitRateMeasurement()
-{
-}
+	virtual void Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
 
-Measurement::MeasurementType EyeBitRateMeasurement::GetMeasurementType()
-{
-	return Measurement::MEAS_HORZ;
-}
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-string EyeBitRateMeasurement::GetMeasurementName()
-{
-	return "Eye Bitrate";
-}
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
 
-bool EyeBitRateMeasurement::ValidateChannel(size_t i, OscilloscopeChannel* channel)
-{
-	if( (i == 0) && dynamic_cast<EyeDecoder2*>(channel) != NULL )
-		return true;
-	return false;
-}
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Measurement processing
+	PROTOCOL_DECODER_INITPROC(EyeHeightMeasurementDecoder)
 
-bool EyeBitRateMeasurement::Refresh()
-{
-	//Get the input data
-	if(m_channels[0] == NULL)
-		return false;
-	auto chan = dynamic_cast<EyeDecoder2*>(m_channels[0]);
-	auto din = dynamic_cast<EyeCapture2*>(chan->GetData());
-	if(din == NULL)
-		return false;
+protected:
+	float m_min;
+	float m_max;
 
-	m_value = 1.0e12f / chan->GetUIWidth();
-	return true;
-}
+	std::string m_startname;
+	std::string m_endname;
+	std::string m_posname;
+};
+
+#endif

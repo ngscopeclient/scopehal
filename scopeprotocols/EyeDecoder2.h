@@ -33,6 +33,9 @@
 	@brief Declaration of EyeDecoder2
  */
 
+#ifndef EyeDecoder2_h
+#define EyeDecoder2_h
+
 #include "../scopehal/ProtocolDecoder.h"
 
 class EyeWaveform : public WaveformBase
@@ -65,6 +68,8 @@ public:
 	{ m_totalUIs += uis; }
 
 	float m_uiWidth;
+
+	float m_saturationLevel;
 
 protected:
 	size_t m_width;
@@ -126,4 +131,8 @@ protected:
 	size_t m_height;
 
 	size_t m_uiWidth;
+
+	std::string m_saturationName;
 };
+
+#endif

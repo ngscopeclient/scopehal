@@ -603,14 +603,35 @@ set<Oscilloscope::InterleaveConflict> AntikernelLogicAnalyzer::GetInterleaveConf
 
 vector<uint64_t> AntikernelLogicAnalyzer::GetSampleDepthsNonInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
+	ret.push_back(m_memoryDepth);
 	return ret;
 }
 
 vector<uint64_t> AntikernelLogicAnalyzer::GetSampleDepthsInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
+	ret.push_back(m_memoryDepth);
 	return ret;
+}
+
+uint64_t AntikernelLogicAnalyzer::GetSampleRate()
+{
+	//FIXME
+	return 1;
+}
+
+uint64_t AntikernelLogicAnalyzer::GetSampleDepth()
+{
+	return m_memoryDepth;
+}
+
+void AntikernelLogicAnalyzer::SetSampleDepth(uint64_t /*depth*/)
+{
+	//not changeable, no-op
+}
+
+void AntikernelLogicAnalyzer::SetSampleRate(uint64_t /*rate*/)
+{
+	//not changeable, no-op
 }

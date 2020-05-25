@@ -34,13 +34,6 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FFTWaveform
-
-FFTWaveform::~FFTWaveform()
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 FFTDecoder::FFTDecoder(string color)
@@ -145,7 +138,7 @@ void FFTDecoder::Refresh()
 	ffts_free(plan);
 
 	//Set up output and copy timestamps
-	auto cap = new FFTWaveform;
+	auto cap = new AnalogWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 

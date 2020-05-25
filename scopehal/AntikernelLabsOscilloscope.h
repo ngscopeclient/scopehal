@@ -74,11 +74,16 @@ public:
 	virtual void SetTriggerType(Oscilloscope::TriggerType type);
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
+	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
+	virtual void SetSampleDepth(uint64_t depth);
+	virtual void SetSampleRate(uint64_t rate);
 
 protected:
 	SCPITransport* m_waveformTransport;

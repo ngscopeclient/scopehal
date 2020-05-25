@@ -605,3 +605,25 @@ vector<uint64_t> AntikernelLabsOscilloscope::GetSampleDepthsInterleaved()
 	vector<uint64_t> ret;
 	return ret;
 }
+
+uint64_t AntikernelLabsOscilloscope::GetSampleRate()
+{
+	//FIXME
+	return 625000000L;
+}
+
+uint64_t AntikernelLabsOscilloscope::GetSampleDepth()
+{
+	//FIXME
+	return 16384;
+}
+
+void AntikernelLabsOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+{
+	//FIXME
+}
+
+void AntikernelLabsOscilloscope::SetSampleRate(uint64_t /*rate*/)
+{
+	//FIXME
+}

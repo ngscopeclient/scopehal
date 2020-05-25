@@ -123,6 +123,7 @@ void MovingAverageDecoder::Refresh()
 
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 
+	m_xAxisUnit = m_channels[0]->GetXAxisUnits();
 	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
 
 	//Do the average
