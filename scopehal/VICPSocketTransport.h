@@ -56,6 +56,7 @@ public:
 	virtual void SendRawData(size_t len, const unsigned char* buf);
 
 	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
 
 	//VICP constant helpers
 	enum HEADER_OPS

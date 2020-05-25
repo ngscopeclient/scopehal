@@ -61,11 +61,13 @@ VICPSocketTransport::VICPSocketTransport(string args)
 
 	if(!m_socket.Connect(m_hostname, m_port))
 	{
+		m_socket.Close();
 		LogError("Couldn't connect to socket\n");
 		return;
 	}
 	if(!m_socket.DisableNagle())
 	{
+		m_socket.Close();
 		LogError("Couldn't disable Nagle\n");
 		return;
 	}
@@ -73,6 +75,11 @@ VICPSocketTransport::VICPSocketTransport(string args)
 
 VICPSocketTransport::~VICPSocketTransport()
 {
+}
+
+bool VICPSocketTransport::IsConnected()
+{
+	return m_socket.IsValid();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

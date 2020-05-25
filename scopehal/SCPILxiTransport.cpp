@@ -90,6 +90,11 @@ SCPILxiTransport::~SCPILxiTransport()
 	delete[] m_staging_buf;
 }
 
+bool SCPILxiTransport::IsConnected()
+{
+	return (m_device != LXI_ERROR);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual transport code
 

@@ -54,6 +54,7 @@ public:
 	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
 
 	virtual bool IsCommandBatchingSupported() =0;
+	virtual bool IsConnected() =0;
 
 public:
 	typedef SCPITransport* (*CreateProcType)(std::string args);

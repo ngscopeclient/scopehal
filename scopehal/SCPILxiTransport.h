@@ -54,6 +54,7 @@ public:
 	virtual void SendRawData(size_t len, const unsigned char* buf);
 
 	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
 
 	TRANSPORT_INITPROC(SCPILxiTransport)
 
