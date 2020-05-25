@@ -46,6 +46,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <lxi.h>
+
 #include "../log/log.h"
 #include "../graphwidget/Graph.h"
 
@@ -55,6 +57,7 @@
 
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
+#include "SCPILxiTransport.h"
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
 

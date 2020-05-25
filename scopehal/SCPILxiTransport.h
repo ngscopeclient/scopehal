@@ -30,132 +30,46 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of global functions
+	@brief Declaration of SCPILxiTransport
  */
-#include "scopehal.h"
-#include <gtkmm/drawingarea.h>
-#include "AgilentOscilloscope.h"
-#include "AntikernelLabsOscilloscope.h"
-#include "AntikernelLogicAnalyzer.h"
-#include "LeCroyOscilloscope.h"
-#include "RigolOscilloscope.h"
-#include "RohdeSchwarzOscilloscope.h"
-#include "SiglentSCPIOscilloscope.h"
-#include <libgen.h>
-#include <dlfcn.h>
 
-using namespace std;
+#ifndef SCPILxiTransport_h
+#define SCPILxiTransport_h
 
 /**
-	@brief Static initialization for SCPI transports
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
  */
-void TransportStaticInit()
+class SCPILxiTransport : public SCPITransport
 {
-	lxi_init();
+public:
+	SCPILxiTransport(std::string args);
+	virtual ~SCPILxiTransport();
 
-	AddTransportClass(SCPISocketTransport);
-	AddTransportClass(SCPILxiTransport);
-	AddTransportClass(VICPSocketTransport);
-}
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
-/**
-	@brief Static initialization for oscilloscopes
- */
-void DriverStaticInit()
-{
-	AddDriverClass(AgilentOscilloscope);
-	AddDriverClass(AntikernelLabsOscilloscope);
-	AddDriverClass(AntikernelLogicAnalyzer);
-	AddDriverClass(LeCroyOscilloscope);
-	AddDriverClass(RigolOscilloscope);
-	AddDriverClass(RohdeSchwarzOscilloscope);
-	AddDriverClass(SiglentSCPIOscilloscope);
-}
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-string GetDefaultChannelColor(int i)
-{
-	const int NUM_COLORS = 12;
-	static const char* colorTable[NUM_COLORS]=
-	{
-		"#a6cee3",
-		"#1f78b4",
-		"#b2df8a",
-		"#33a02c",
-		"#fb9a99",
-		"#e31a1c",
-		"#fdbf6f",
-		"#ff7f00",
-		"#cab2d6",
-		"#6a3d9a",
-		"#ffff99",
-		"#b15928"
-	};
+	TRANSPORT_INITPROC(SCPILxiTransport)
 
-	return colorTable[i % NUM_COLORS];
-}
+	std::string GetHostname()
+	{ return m_hostname; }
 
-/**
-	@brief Converts a vector bus signal into a scalar (up to 64 bits wide)
- */
-uint64_t ConvertVectorSignalToScalar(vector<bool> bits)
-{
-	uint64_t rval = 0;
-	for(auto b : bits)
-		rval = (rval << 1) | b;
-	return rval;
-}
+protected:
+	std::string m_hostname;
+	unsigned short m_port;
 
-/**
-	@brief Initialize all plugins
- */
-void InitializePlugins()
-{
-	char tmp[1024];
-	vector<string> search_dirs;
-	search_dirs.push_back("/usr/lib/scopehal/plugins/");
-	search_dirs.push_back("/usr/local/lib/scopehal/plugins/");
+	int m_device;
+	int m_timeout;
 
-	//current binary dir
-	char selfPath[1024] = {0};
-	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
-	if ( readlinkReturn > 0)
-		search_dirs.push_back(dirname(selfPath));
+	int m_staging_buf_size;
+	unsigned char *m_staging_buf;
+	int m_data_in_staging_buf;
+	int m_data_offset;
+	bool m_data_depleted;
+};
 
-	//Home directory
-	snprintf(tmp, sizeof(tmp), "%s/.scopehal/plugins", getenv("HOME"));
-	search_dirs.push_back(tmp);
-
-	for(auto dir : search_dirs)
-	{
-		DIR* hdir = opendir(dir.c_str());
-		if(!hdir)
-			continue;
-
-		dirent* pent;
-		while((pent = readdir(hdir)))
-		{
-			//Don't load hidden files or parent directory entries
-			if(pent->d_name[0] == '.')
-				continue;
-
-			//Try loading it and see if it works.
-			//(for now, never unload the plugins)
-			string fname = dir + "/" + pent->d_name;
-			void* hlib = dlopen(fname.c_str(), RTLD_NOW);
-			if(hlib == NULL)
-				continue;
-
-			//If loaded, look for PluginInit()
-			typedef void (*PluginInit)();
-			PluginInit init = (PluginInit)dlsym(hlib, "PluginInit");
-			if(!init)
-				continue;
-
-			//If found, it's a valid plugin
-			LogDebug("Loading plugin %s\n", fname.c_str());
-			init();
-		}
-
-		closedir(hdir);
-	}
-}
+#endif

@@ -1,6 +1,8 @@
 include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
+find_library(LXI_LIB lxi)
+
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
@@ -10,6 +12,7 @@ set(SCOPEHAL_SOURCES
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
 	VICPSocketTransport.cpp
+	SCPILxiTransport.cpp
 	SCPIDevice.cpp
 
 	Instrument.cpp
@@ -37,7 +40,7 @@ set(SCOPEHAL_SOURCES
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
-target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp)
+target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp ${LXI_LIB})
 
 target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
