@@ -30,55 +30,46 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SCPILxiTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef SCPILxiTransport_h
+#define SCPILxiTransport_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPILxiTransport : public SCPITransport
+{
+public:
+	SCPILxiTransport(std::string args);
+	virtual ~SCPILxiTransport();
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
-#include <yaml-cpp/yaml.h>
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-#include <lxi.h>
+	TRANSPORT_INITPROC(SCPILxiTransport)
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	std::string GetHostname()
+	{ return m_hostname; }
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+protected:
+	std::string m_hostname;
+	unsigned short m_port;
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	int m_device;
+	int m_timeout;
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Measurement.h"
-#include "Statistic.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
+	int m_staging_buf_size;
+	unsigned char *m_staging_buf;
+	int m_data_in_staging_buf;
+	int m_data_offset;
+	bool m_data_depleted;
+};
 
 #endif

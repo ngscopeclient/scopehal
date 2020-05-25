@@ -30,55 +30,130 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Implementation of SCPILxiTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopehal.h"
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+using namespace std;
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <yaml-cpp/yaml.h>
+SCPILxiTransport::SCPILxiTransport(string args)
+{
+	char hostname[128];
+	unsigned int port = 0;
+	if(2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
+	{
+		//default if port not specified
+		m_hostname = args;
+		m_port = 0;
+	}
+	else
+	{
+		m_hostname = hostname;
+		m_port = port;
+	}
 
-#include <lxi.h>
+	m_timeout = 1000;
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	m_device = lxi_connect(m_hostname.c_str(), m_port, "inst0", m_timeout, VXI11);
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	if (m_device == LXI_ERROR){
+		LogError("Couldn't connect to VXI-11 device\n");
+		return;
+	}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	m_staging_buf_size = 200000000;
+	m_staging_buf = (unsigned char *)malloc(m_staging_buf_size);
+	assert(m_staging_buf != NULL);
+	m_data_in_staging_buf = 0;
+	m_data_offset = 0;
+	m_data_depleted = false;
+}
 
-#include "Measurement.h"
-#include "Statistic.h"
+SCPILxiTransport::~SCPILxiTransport()
+{
+	free(m_staging_buf);
+}
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
 
-std::string GetDefaultChannelColor(int i);
+string SCPILxiTransport::GetTransportName()
+{
+	return "lxi";
+}
 
-void TransportStaticInit();
-void DriverStaticInit();
+string SCPILxiTransport::GetConnectionString()
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "%s:%u", m_hostname.c_str(), m_port);
+	return string(tmp);
+}
 
-void InitializePlugins();
+bool SCPILxiTransport::SendCommand(string cmd)
+{
+	LogTrace("Sending %s\n", cmd.c_str());
 
-#endif
+	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout); 
+
+	m_data_in_staging_buf = 0;
+	m_data_offset = 0;
+	m_data_depleted = false;
+
+	return (result != LXI_ERROR);
+}
+
+string SCPILxiTransport::ReadReply()
+{
+	//FIXME: there *has* to be a more efficient way to do this...
+	char tmp = ' ';
+	string ret;
+	while(true){
+		if (m_data_depleted)
+			break;
+		ReadRawData(1, (unsigned char *)&tmp);
+		if( (tmp == '\n') || (tmp == ';') )
+			break;
+		else
+			ret += tmp;
+	}
+	LogTrace("Got %s\n", ret.c_str());
+	return ret;
+}
+
+void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
+{
+	lxi_send(m_device, (const char *)buf, len, m_timeout); 
+}
+
+void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
+{
+	if (!m_data_depleted){
+		if (m_data_in_staging_buf == 0){
+			m_data_in_staging_buf = lxi_receive(m_device, (char *)m_staging_buf, m_staging_buf_size, m_timeout);
+			if (m_data_in_staging_buf == LXI_ERROR)
+				m_data_in_staging_buf = 0;
+			m_data_offset = 0;
+		}
+
+		unsigned int data_left = m_data_in_staging_buf - m_data_offset;
+		if (data_left > 0){
+			int nr_bytes = len > data_left ? data_left : len;
+
+			memcpy(buf, m_staging_buf + m_data_offset, nr_bytes);
+
+			m_data_offset += nr_bytes;
+		}
+
+		if (m_data_offset == m_data_in_staging_buf)
+				m_data_depleted = true;
+	}
+	else{
+		LogDebug("ReadRawData: data depleted.\n");
+	}
+}
