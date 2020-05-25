@@ -113,11 +113,10 @@ string SCPILxiTransport::ReadReply()
 	//FIXME: there *has* to be a more efficient way to do this...
 	char tmp = ' ';
 	string ret;
-	while(true)
-	{
-		ReadRawData(1, (unsigned char *)&tmp);
+	while(true){
 		if (m_data_depleted)
 			break;
+		ReadRawData(1, (unsigned char *)&tmp);
 		if( (tmp == '\n') || (tmp == ';') )
 			break;
 		else
@@ -125,7 +124,6 @@ string SCPILxiTransport::ReadReply()
 	}
 	LogTrace("Got %s\n", ret.c_str());
 	return ret;
-
 }
 
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
@@ -143,7 +141,7 @@ void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 			m_data_offset = 0;
 		}
 
-		int data_left = m_data_in_staging_buf - m_data_offset;
+		unsigned int data_left = m_data_in_staging_buf - m_data_offset;
 		if (data_left > 0){
 			int nr_bytes = len > data_left ? data_left : len;
 
