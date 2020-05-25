@@ -87,6 +87,11 @@ public:
 	virtual void SetSampleRate(uint64_t rate);
 
 protected:
+	enum protocol_version {
+		MSO5, // MSO5000 series
+		DS,
+	};
+
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//Mutexing for thread safety
@@ -107,6 +112,10 @@ protected:
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+	char *model_name;
+	int model_number;
+	protocol_version protocol;
 
 public:
 	static std::string GetDriverNameInternal();
