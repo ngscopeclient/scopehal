@@ -37,7 +37,6 @@ public:
 	virtual ~RigolOscilloscope();
 
 public:
-
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
 
@@ -87,6 +86,12 @@ public:
 	virtual void SetSampleRate(uint64_t rate);
 
 protected:
+	enum protocol_version
+	{
+		MSO5,	 //MSO5000 series
+		DS,
+	};
+
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//Mutexing for thread safety
@@ -104,9 +109,20 @@ protected:
 	size_t m_triggerChannel;
 	bool m_triggerLevelValid;
 	float m_triggerLevel;
+	bool m_srateValid;
+	uint64_t m_srate;
+	bool m_mdepthValid;
+	uint64_t m_mdepth;
+	bool m_triggerTypeValid;
+	Oscilloscope::TriggerType m_triggerType;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+	int m_modelNumber;
+	unsigned int m_bandwidth;
+	bool m_opt200M;
+	protocol_version m_protocol;
 
 public:
 	static std::string GetDriverNameInternal();

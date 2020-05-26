@@ -27,31 +27,41 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
 #include "RigolOscilloscope.h"
+#include "scopehal.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
+//Construction / destruction
 
 RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
-	, m_triggerArmed(false)
-	, m_triggerOneShot(false)
+	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	int model_number;
-	if(1 != sscanf(m_model.c_str(), "DS%d", &model_number))
+	if(1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
 	{
-		if(1 != sscanf(m_model.c_str(), "MSO%d", &model_number))
+		if(1 != sscanf(m_model.c_str(), "MSO%d", &m_modelNumber))
 		{
 			LogError("Bad model number\n");
 			return;
 		}
+		else
+		{
+			m_protocol = MSO5;
+			m_transport->SendCommand(m_channels[i]->GetHwname() + "SYST:OPT:STAT? RL2");
+			string reply = m_transport->ReadReply();
+			m_opt200M = reply == "1" ? true : false;
+		}
 	}
-	int nchans = model_number % 10;
-	for(int i=0; i<nchans; i++)
+	else
+	{
+		m_protocol = MSO5;
+	}
+
+	int nchans = m_modelNumber % 10;
+	m_bandwidth = m_modelNumber % 1000 - nchans;
+	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
 		string chname = string("CHAN1");
@@ -80,31 +90,22 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 		//Create the channel
 		m_channels.push_back(
-			new OscilloscopeChannel(
-			this,
-			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-			color,
-			1,
-			i,
-			true));
+			new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, 1, i, true));
 	}
 	m_analogChannelCount = nchans;
 
 	//Add the external trigger input
-	m_extTrigChannel = new OscilloscopeChannel(
-		this,
-		"EX",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
-		"",
-		1,
-		m_channels.size(),
-		true);
+	m_extTrigChannel =
+		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
 
 	//Configure acquisition modes
 	m_transport->SendCommand("WAV:FORM BYTE");
 	m_transport->SendCommand("WAV:MODE RAW");
+	if(m_protocol == MSO5)
+		for(int i = 0; i < 4; i++)
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":VERN ON");
+	m_transport->SendCommand("TIM:VERN ON");
 }
 
 RigolOscilloscope::~RigolOscilloscope()
@@ -112,7 +113,7 @@ RigolOscilloscope::~RigolOscilloscope()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+//Accessors
 
 unsigned int RigolOscilloscope::GetInstrumentTypes()
 {
@@ -120,7 +121,7 @@ unsigned int RigolOscilloscope::GetInstrumentTypes()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Device interface functions
+//Device interface functions
 
 string RigolOscilloscope::GetDriverNameInternal()
 {
@@ -136,6 +137,9 @@ void RigolOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_triggerChannelValid = false;
 	m_triggerLevelValid = false;
+	m_triggerTypeValid = false;
+	m_srateValid = false;
+	m_mdepthValid = false;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -230,12 +234,100 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 	return atten;
 }
 
-void RigolOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch((
+		int)(atten * 10000 +
+			 0.1))	  //+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
+	{
+		case 1:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.0001");
+			break;
+		case 2:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.0002");
+			break;
+		case 5:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.0005");
+			break;
+		case 10:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.001");
+			break;
+		case 20:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.002");
+			break;
+		case 50:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.005");
+			break;
+		case 100:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.01");
+			break;
+		case 200:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.02");
+			break;
+		case 500:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.05");
+			break;
+		case 1000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.1");
+			break;
+		case 2000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.2");
+			break;
+		case 5000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.5");
+			break;
+		case 10000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 1");
+			break;
+		case 20000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 2");
+			break;
+		case 50000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 5");
+			break;
+		case 100000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 10");
+			break;
+		case 200000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 20");
+			break;
+		case 500000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 50");
+			break;
+		case 1000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 100");
+			break;
+		case 2000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 200");
+			break;
+		case 5000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 500");
+			break;
+		case 10000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 1000");
+			break;
+		case 20000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 2000");
+			break;
+		case 50000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 5000");
+			break;
+		case 100000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 10000");
+			break;
+		case 200000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 20000");
+			break;
+		case 500000000:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 50000");
+			break;
+		default:
+			LogError("Invalid attenuation for channel\n");
+	}
 }
 
-int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
+int RigolOscilloscope::GetChannelm_bandwidthLimit(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -247,9 +339,46 @@ int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 0;
 }
 
-void RigolOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void RigolOscilloscope::SetChannelm_bandwidthLimit(size_t i, unsigned int limit_mhz)
 {
 	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(m_protocol == MSO5)
+	{
+		switch(m_bandwidth)
+		{
+			case 70:
+			case 100:
+				if(limit_mhz <= 20)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
+				break;
+			case 200:
+				if(limit_mhz <= 20)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
+				else if(limit_mhz <= 100)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 100M");
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
+				break;
+			case 350:
+				if(limit_mhz <= 20)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
+				else if(limit_mhz <= 100)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 100M");
+				else if(limit_mhz <= 200)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 200M");
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
+				break;
+			default:
+				LogError("Invalid model number\n");
+		}
+	}
+	else
+		LogError("m_bandwidth Limit not implemented for this model\n");
 }
 
 double RigolOscilloscope::GetChannelVoltageRange(size_t i)
@@ -262,18 +391,32 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
+	if(m_protocol == DS)
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
+	else if(m_protocol == MSO5)
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCALE?");
 
 	string reply = m_transport->ReadReply();
 	double range;
 	sscanf(reply.c_str(), "%lf", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	if(m_protocol == MSO5)
+		range = 8 * range;
 	m_channelVoltageRanges[i] = range;
 	return range;
 }
 
-void RigolOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	if(m_protocol == DS)
+		snprintf(buf, sizeof(buf), "%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range);
+	else if(m_protocol == MSO5)
+		snprintf(buf, sizeof(buf), "%s:SCALE %f", m_channels[i]->GetHwname().c_str(), range / 8);
+	m_transport->SendCommand(buf);
+	m_channelVoltageRanges[i] = range;
+
 	//FIXME
 }
 
@@ -304,9 +447,12 @@ double RigolOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void RigolOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void RigolOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), "%s:OFFS %f", m_channels[i]->GetHwname().c_str(), offset);
+	m_transport->SendCommand(buf);
 }
 
 void RigolOscilloscope::ResetTriggerConditions()
@@ -372,10 +518,14 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	double yincrement;
 	double yorigin;
 	double yreference;
-	size_t maxpoints = 250*1000;
+	size_t maxpoints = 250 * 1000;
+	if(m_protocol == DS)
+		maxpoints = 250 * 1000;
+	else if(m_protocol == MSO5)
+		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints];
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
-	for(size_t i=0; i<m_analogChannelCount; i++)
+	map<int, vector<AnalogWaveform*>> pending_waveforms;
+	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
 		{
@@ -392,7 +542,8 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		m_transport->SendCommand("WAV:PRE?");
 		string reply = m_transport->ReadReply();
 		//LogDebug("Preamble = %s\n", reply.c_str());
-		sscanf(reply.c_str(), "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
+		sscanf(reply.c_str(),
+			"%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 			&unused1,
 			&unused2,
 			&npoints,
@@ -416,11 +567,11 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
-		for(size_t npoint=0; npoint < maxpoints; npoint += maxpoints)
+		for(size_t npoint = 0; npoint < maxpoints; npoint += maxpoints)
 		{
 			//Ask for the data
 			char tmp[128];
-			snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	//ONE based indexing WTF
+			snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	   //ONE based indexing WTF
 			m_transport->SendCommand(tmp);
 			size_t end = npoint + maxpoints;
 			if(end > npoints)
@@ -442,18 +593,22 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			sscanf((char*)header, "#9%zu", &header_blocksize);
 			//LogDebug("Header block size = %zu\n", header_blocksize);
 
+			if(header_blocksize < 0)
+				return false;
+
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	//why is there a trailing byte here??
+			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	 //why is there a trailing byte here??´
+
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
-			for(size_t j=0; j<header_blocksize; j++)
+			for(size_t j = 0; j < header_blocksize; j++)
 			{
 				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
-				cap->m_offsets[npoint+j] = npoint+j;
-				cap->m_durations[npoint+j] = 1;
-				cap->m_samples[npoint+j] = v;
+				cap->m_offsets[npoint + j] = npoint + j;
+				cap->m_durations[npoint + j] = 1;
+				cap->m_samples[npoint + j] = v;
 			}
 
 			//Done, update the data
@@ -467,12 +622,12 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
 	size_t num_pending = 0;
-	if(toQueue)				//if saving to queue, the 0'th segment counts too
-		num_pending ++;
-	for(size_t i=0; i<num_pending; i++)
+	if(toQueue)	   //if saving to queue, the 0'th segment counts too
+		num_pending++;
+	for(size_t i = 0; i < num_pending; i++)
 	{
 		SequenceSet s;
-		for(size_t j=0; j<m_analogChannelCount; j++)
+		for(size_t j = 0; j < m_analogChannelCount; j++)
 		{
 			if(enabled[j])
 				s[m_channels[j]] = pending_waveforms[j][i];
@@ -489,7 +644,10 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		m_transport->SendCommand("TRIG_MODE SINGLE");
+		if(m_protocol == DS)
+			m_transport->SendCommand("TRIG_MODE SINGLE");
+		else if(m_protocol == MSO5)
+			m_transport->SendCommand("SING");
 		m_triggerArmed = true;
 	}
 
@@ -539,11 +697,11 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 	//This is nasty because there are separate commands to see what the trigger source is
 	//depending on what the trigger type is!!!
 	//FIXME: For now assume edge
-	m_transport->SendCommand("TRIG:EDG:SOUR?");
+	m_transport->SendCommand("TRIG:EDGE:SOUR?");
 	string ret = m_transport->ReadReply();
 	LogDebug("Trigger source: %s\n", ret.c_str());
 
-	for(size_t i=0; i<m_channels.size(); i++)
+	for(size_t i = 0; i < m_channels.size(); i++)
 	{
 		if(m_channels[i]->GetHwname() == ret)
 		{
@@ -559,7 +717,9 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 
 void RigolOscilloscope::SetTriggerChannelIndex(size_t i)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("TRIG:EDGE:SOUR " + m_channels[i]->GetHwname());
+	m_triggerChannelValid = false;
 }
 
 float RigolOscilloscope::GetTriggerVoltage()
@@ -574,7 +734,7 @@ float RigolOscilloscope::GetTriggerVoltage()
 	//This is nasty because there are separate commands to see what the trigger source is
 	//depending on what the trigger type is!!!
 	//FIXME: For now assume edge
-	m_transport->SendCommand("TRIG:EDG:LEV?");
+	m_transport->SendCommand("TRIG:EDGE:LEV?");
 	string ret = m_transport->ReadReply();
 
 	double level;
@@ -586,17 +746,46 @@ float RigolOscilloscope::GetTriggerVoltage()
 
 void RigolOscilloscope::SetTriggerVoltage(float v)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TRIG:EDGE:LEV %f", v);
+	m_transport->SendCommand(buf);
+	m_triggerLevelValid = false;
 }
 
 Oscilloscope::TriggerType RigolOscilloscope::GetTriggerType()
 {
-	//FIXME
-	return Oscilloscope::TRIGGER_TYPE_RISING;
+	if(m_triggerTypeValid)
+		return m_triggerType;
+	m_transport->SendCommand("TRIG:EDGE:SLOPE?");
+	string ret = m_transport->ReadReply();
+
+	if(ret == "POS")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING;
+	else if(ret == "NEG")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING;
+	else if(ret == "RFAL")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE;
+
+	return m_triggerType;
 }
 
 void RigolOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 {
+	switch(type)
+	{
+		case Oscilloscope::TRIGGER_TYPE_RISING:
+			m_transport->SendCommand("TRIG:EDGE:SLOPE POS");
+			break;
+		case Oscilloscope::TRIGGER_TYPE_FALLING:
+			m_transport->SendCommand("TRIG:EDGE:SLOPE NEG");
+			break;
+		case Oscilloscope::TRIGGER_TYPE_CHANGE:
+			m_transport->SendCommand("TRIG:EDGE:SLOPE RFAL");
+			break;
+		default:
+			LogError("Invalid trigger type\n");
+	}
 	//FIXME
 }
 
@@ -609,13 +798,39 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
+	if(m_protocol == MSO5)
+		ret = {
+			100,
+			200,
+			500,
+			1000,
+			2000,
+			5000,
+			10 * 1000,
+			20 * 1000,
+			50 * 1000,
+			100 * 1000,
+			200 * 1000,
+			500 * 1000,
+			1 * 1000 * 1000,
+			2 * 1000 * 1000,
+			5 * 1000 * 1000,
+			10 * 1000 * 1000,
+			20 * 1000 * 1000,
+			50 * 1000 * 1000,
+			100 * 1000 * 1000,
+			200 * 1000 * 1000,
+			500 * 1000 * 1000,
+			1 * 1000 * 1000 * 1000,
+			2 * 1000 * 1000 * 1000,
+		};
 	return ret;
 }
 
 vector<uint64_t> RigolOscilloscope::GetSampleRatesInterleaved()
 {
 	//FIXME
-	vector<uint64_t> ret;
+	vector<uint64_t> ret = {};
 	return ret;
 }
 
@@ -630,6 +845,15 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
+	if(m_protocol == MSO5)
+		ret = {
+			1000,
+			10 * 1000,
+			100 * 1000,
+			1000 * 1000,
+			10 * 1000 * 1000,
+			25 * 1000 * 1000,
+		};
 	return ret;
 }
 
@@ -642,22 +866,97 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t RigolOscilloscope::GetSampleRate()
 {
-	//FIXME
-	return 1;
+	if(m_srateValid)
+		return m_srate;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("ACQ:SRAT?");
+	string ret = m_transport->ReadReply();
+
+	uint64_t rate;
+	sscanf(ret.c_str(), "%lu", &rate);
+	m_srate = rate;
+	m_srateValid = true;
+	return rate;
 }
 
 uint64_t RigolOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	if(m_mdepthValid)
+		return m_mdepth;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("ACQ:MDEP?");
+	string ret = m_transport->ReadReply();
+
+	double depth;
+	sscanf(ret.c_str(), "%lf", &depth);
+	m_mdepth = (uint64_t)depth;
+	m_mdepthValid = true;
+	return depth;
 }
 
-void RigolOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(m_protocol = MSO5)
+	{
+		switch(depth)
+		{
+			case 1000:
+				m_transport->SendCommand("ACQ:MDEP 1k");
+				break;
+			case 10000:
+				m_transport->SendCommand("ACQ:MDEP 10k");
+				break;
+			case 100000:
+				m_transport->SendCommand("ACQ:MDEP 100k");
+				break;
+			case 1000000:
+				m_transport->SendCommand("ACQ:MDEP 1M");
+				break;
+			case 10000000:
+				m_transport->SendCommand("ACQ:MDEP 10M");
+				break;
+			case 25000000:
+				m_transport->SendCommand("ACQ:MDEP 25M");
+				break;
+			case 50000000:
+				if(m_opt200M)
+					m_transport->SendCommand("ACQ:MDEP 50M");
+				else
+					LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			case 100000000:
+				//m_transport->SendCommand("ACQ:MDEP 100M");
+				LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			case 200000000:
+				//m_transport->SendCommand("ACQ:MDEP 200M");
+				LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			default:
+				LogError("Invalid memory depth for channel: %i\n", depth);
+		}
+	}
+	else
+	{
+		LogError("Memory depth setting not implemented for this series");
+	}
+	m_mdepthValid = false;
 }
 
-void RigolOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void RigolOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//FIXME
+	//FIXME, you can set :TIMebase:SCALe
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_mdepthValid = false;
+	double sampletime = GetSampleDepth() / (double)rate;
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TIM:SCAL %f", sampletime / 10);
+	m_transport->SendCommand(buf);
+	m_srateValid = false;
+	m_mdepthValid = false;
 }
