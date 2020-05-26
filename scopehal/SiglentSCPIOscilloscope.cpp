@@ -289,7 +289,11 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 				cap->m_offsets[i]	= i+trigtime_samples;
 				cap->m_durations[i]	= 1;
 				if (m_acquiredDataIsSigned)
-					cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
+				{
+					// See programming guide, page 267: https://siglentna.com/wp-content/uploads/2020/04/ProgrammingGuide_PG01-E02C.pdf
+					// voltage value (V) = code value * (vdiv /25) - voffset
+					cap->m_samples[i]	= (int8_t)(data[i]) * (v_gain / 25.0) - v_off;
+				}
 				else
 					cap->m_samples[i]	= data[i] * v_gain - v_off;
 			}
