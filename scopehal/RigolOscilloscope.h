@@ -30,100 +30,102 @@
 #ifndef RigolOscilloscope_h
 #define RigolOscilloscope_h
 
-class RigolOscilloscope : public SCPIOscilloscope {
+class RigolOscilloscope : public SCPIOscilloscope
+{
 public:
-    RigolOscilloscope(SCPITransport* transport);
-    virtual ~RigolOscilloscope();
+	RigolOscilloscope(SCPITransport* transport);
+	virtual ~RigolOscilloscope();
 
 public:
-    //Device information
-    virtual unsigned int GetInstrumentTypes();
+	//Device information
+	virtual unsigned int GetInstrumentTypes();
 
-    virtual void FlushConfigCache();
+	virtual void FlushConfigCache();
 
-    //Channel configuration
-    virtual bool IsChannelEnabled(size_t i);
-    virtual void EnableChannel(size_t i);
-    virtual void DisableChannel(size_t i);
-    virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-    virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-    virtual double GetChannelAttenuation(size_t i);
-    virtual void SetChannelAttenuation(size_t i, double atten);
-    virtual int GetChannelBandwidthLimit(size_t i);
-    virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-    virtual double GetChannelVoltageRange(size_t i);
-    virtual void SetChannelVoltageRange(size_t i, double range);
-    virtual OscilloscopeChannel* GetExternalTrigger();
-    virtual double GetChannelOffset(size_t i);
-    virtual void SetChannelOffset(size_t i, double offset);
+	//Channel configuration
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual double GetChannelAttenuation(size_t i);
+	virtual void SetChannelAttenuation(size_t i, double atten);
+	virtual int GetChannelBandwidthLimit(size_t i);
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
+	virtual double GetChannelVoltageRange(size_t i);
+	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual double GetChannelOffset(size_t i);
+	virtual void SetChannelOffset(size_t i, double offset);
 
-    //Triggering
-    virtual void ResetTriggerConditions();
-    virtual Oscilloscope::TriggerMode PollTrigger();
-    virtual bool AcquireData(bool toQueue = false);
-    virtual void Start();
-    virtual void StartSingleTrigger();
-    virtual void Stop();
-    virtual bool IsTriggerArmed();
-    virtual size_t GetTriggerChannelIndex();
-    virtual void SetTriggerChannelIndex(size_t i);
-    virtual float GetTriggerVoltage();
-    virtual void SetTriggerVoltage(float v);
-    virtual Oscilloscope::TriggerType GetTriggerType();
-    virtual void SetTriggerType(Oscilloscope::TriggerType type);
-    virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
+	//Triggering
+	virtual void ResetTriggerConditions();
+	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool AcquireData(bool toQueue = false);
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void Stop();
+	virtual bool IsTriggerArmed();
+	virtual size_t GetTriggerChannelIndex();
+	virtual void SetTriggerChannelIndex(size_t i);
+	virtual float GetTriggerVoltage();
+	virtual void SetTriggerVoltage(float v);
+	virtual Oscilloscope::TriggerType GetTriggerType();
+	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
-    //Timebase
-    virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-    virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-    virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-    virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-    virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-    virtual uint64_t GetSampleRate();
-    virtual uint64_t GetSampleDepth();
-    virtual void SetSampleDepth(uint64_t depth);
-    virtual void SetSampleRate(uint64_t rate);
+	//Timebase
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
+	virtual void SetSampleDepth(uint64_t depth);
+	virtual void SetSampleRate(uint64_t rate);
 
 protected:
-    enum protocol_version {
-        MSO5, // MSO5000 series
-        DS,
-    };
+	enum protocol_version
+	{
+		MSO5, // MSO5000 series
+		DS,
+	};
 
-    OscilloscopeChannel* m_extTrigChannel;
+	OscilloscopeChannel* m_extTrigChannel;
 
-    //Mutexing for thread safety
-    std::recursive_mutex m_mutex;
-    std::recursive_mutex m_cacheMutex;
+	//Mutexing for thread safety
+	std::recursive_mutex m_mutex;
+	std::recursive_mutex m_cacheMutex;
 
-    //hardware analog channel count, independent of LA option etc
-    unsigned int m_analogChannelCount;
+	//hardware analog channel count, independent of LA option etc
+	unsigned int m_analogChannelCount;
 
-    //config cache
-    std::map<size_t, double> m_channelOffsets;
-    std::map<size_t, double> m_channelVoltageRanges;
-    std::map<int, bool> m_channelsEnabled;
-    bool m_triggerChannelValid;
-    size_t m_triggerChannel;
-    bool m_triggerLevelValid;
-    float m_triggerLevel;
-    bool m_srateValid;
-    uint64_t m_srate;
-    bool m_mdepthValid;
-    uint64_t m_mdepth;
-    bool m_triggerTypeValid;
-    Oscilloscope::TriggerType m_triggerType;
+	//config cache
+	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<int, bool> m_channelsEnabled;
+	bool m_triggerChannelValid;
+	size_t m_triggerChannel;
+	bool m_triggerLevelValid;
+	float m_triggerLevel;
+	bool m_srateValid;
+	uint64_t m_srate;
+	bool m_mdepthValid;
+	uint64_t m_mdepth;
+	bool m_triggerTypeValid;
+	Oscilloscope::TriggerType m_triggerType;
 
-    bool m_triggerArmed;
-    bool m_triggerOneShot;
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 
-    char* model_name;
-    int model_number;
-    protocol_version protocol;
+	char* model_name;
+	int model_number;
+	protocol_version protocol;
 
 public:
-    static std::string GetDriverNameInternal();
-    OSCILLOSCOPE_INITPROC(RigolOscilloscope)
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(RigolOscilloscope)
 };
 
 #endif
