@@ -176,7 +176,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 	{
 		//If the channel is invisible, don't waste time capturing data
 		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chanNr];
-		if(string(wavedesc->DescName).empty())
+		if(!enabled[chanNr] || string(wavedesc->DescName).empty())
 		{
 			m_channels[chanNr]->SetData(NULL);
 			continue;
@@ -226,7 +226,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		cap->m_timescale = round(interval);
 		for(unsigned int seqNr=0; seqNr<num_sequences; seqNr++)
 		{
-			LogDebug("Channel %u block %u\n", chanNr, seqNr);
+			LogDebug("Channel %s block %u\n", m_channels[chanNr]->GetHwname().c_str(), seqNr);
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
