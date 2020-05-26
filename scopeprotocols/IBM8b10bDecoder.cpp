@@ -346,7 +346,7 @@ string IBM8b10bDecoder::GetText(int i)
 
 		char tmp[32];
 		if(s.m_error)
-			snprintf(tmp, sizeof(tmp), "ERR");
+			snprintf(tmp, sizeof(tmp), "ERROR");
 		else if(s.m_control)
 			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
 		else
