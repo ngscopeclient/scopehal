@@ -119,11 +119,10 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	char* model_name;
-	int model_number;
-	unsigned int bandwidth;
-	bool memory_200m;
-	protocol_version protocol;
+	int m_model_number;
+	unsigned int m_bandwidth;
+	bool m_memory_200m;
+	protocol_version m_protocol;
 
 public:
 	static std::string GetDriverNameInternal();

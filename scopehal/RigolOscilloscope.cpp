@@ -39,30 +39,28 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	if(1 != sscanf(m_model.c_str(), "DS%d", &model_number))
+	if(1 != sscanf(m_model.c_str(), "DS%d", &m_model_number))
 	{
-		if(1 != sscanf(m_model.c_str(), "MSO%d", &model_number))
+		if(1 != sscanf(m_model.c_str(), "MSO%d", &m_model_number))
 		{
 			LogError("Bad model number\n");
 			return;
 		}
 		else
 		{
-			model_name = "MSO";
-			protocol = MSO5;
+			m_protocol = MSO5;
 			m_transport->SendCommand(m_channels[i]->GetHwname() + "SYST:OPT:STAT? RL2");
 			string reply = m_transport->ReadReply();
-			memory_200m = reply == "1" ? true : false;
+			m_memory_200m = reply == "1" ? true : false;
 		}
 	}
 	else
 	{
-		model_name = "DS";
-		protocol = MSO5;
+		m_protocol = MSO5;
 	}
 
-	int nchans = model_number % 10;
-	bandwidth = model_number % 1000 - nchans;
+	int nchans = m_model_number % 10;
+	m_bandwidth = m_model_number % 1000 - nchans;
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
@@ -104,7 +102,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	//Configure acquisition modes
 	m_transport->SendCommand("WAV:FORM BYTE");
 	m_transport->SendCommand("WAV:MODE RAW");
-	if(protocol == MSO5)
+	if(m_protocol == MSO5)
 		for(int i = 0; i < 4; i++)
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":VERN ON");
 	m_transport->SendCommand("TIM:VERN ON");
@@ -329,7 +327,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
-int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
+int RigolOscilloscope::GetChannelm_bandwidthLimit(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -341,14 +339,14 @@ int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 0;
 }
 
-void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+void RigolOscilloscope::SetChannelm_bandwidthLimit(size_t i, unsigned int limit_mhz)
 {
 	//FIXME
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	if(protocol == MSO5)
+	if(m_protocol == MSO5)
 	{
-		switch(bandwidth)
+		switch(m_bandwidth)
 		{
 			case 70:
 			case 100:
@@ -380,7 +378,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 		}
 	}
 	else
-		LogError("Bandwidth Limit not implemented for this model\n");
+		LogError("m_bandwidth Limit not implemented for this model\n");
 }
 
 double RigolOscilloscope::GetChannelVoltageRange(size_t i)
@@ -393,16 +391,16 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	if(protocol == DS)
+	if(m_protocol == DS)
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
-	else if(protocol == MSO5)
+	else if(m_protocol == MSO5)
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCALE?");
 
 	string reply = m_transport->ReadReply();
 	double range;
 	sscanf(reply.c_str(), "%lf", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	if(protocol == MSO5)
+	if(m_protocol == MSO5)
 		range = 8 * range;
 	m_channelVoltageRanges[i] = range;
 	return range;
@@ -412,9 +410,9 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	if(protocol == DS)
+	if(m_protocol == DS)
 		snprintf(buf, sizeof(buf), "%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range);
-	else if(protocol == MSO5)
+	else if(m_protocol == MSO5)
 		snprintf(buf, sizeof(buf), "%s:SCALE %f", m_channels[i]->GetHwname().c_str(), range / 8);
 	m_transport->SendCommand(buf);
 	m_channelVoltageRanges[i] = range;
@@ -521,9 +519,9 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	double yorigin;
 	double yreference;
 	size_t maxpoints = 250 * 1000;
-	if(protocol == DS)
+	if(m_protocol == DS)
 		maxpoints = 250 * 1000;
-	else if(protocol == MSO5)
+	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints];
 	map<int, vector<AnalogWaveform*>> pending_waveforms;
@@ -646,9 +644,9 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		if(protocol == DS)
+		if(m_protocol == DS)
 			m_transport->SendCommand("TRIG_MODE SINGLE");
-		else if(protocol == MSO5)
+		else if(m_protocol == MSO5)
 			m_transport->SendCommand("SING");
 		m_triggerArmed = true;
 	}
@@ -800,7 +798,7 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
-	if(protocol == MSO5)
+	if(m_protocol == MSO5)
 		ret = {
 			100,
 			200,
@@ -847,7 +845,7 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	//FIXME
 	vector<uint64_t> ret;
-	if(protocol == MSO5)
+	if(m_protocol == MSO5)
 		ret = {
 			1000,
 			10 * 1000,
@@ -903,7 +901,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if(protocol = MSO5)
+	if(m_protocol = MSO5)
 	{
 		switch(depth)
 		{
@@ -926,7 +924,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 				m_transport->SendCommand("ACQ:MDEP 25M");
 				break;
 			case 50000000:
-				if(memory_200m)
+				if(m_memory_200m)
 					m_transport->SendCommand("ACQ:MDEP 50M");
 				else
 					LogError("Invalid memory depth for channel: %i\n", depth);
