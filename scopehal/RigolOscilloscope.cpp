@@ -39,9 +39,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
-	if(1 != sscanf(m_model.c_str(), "DS%d", &m_model_number))
+	if(1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
 	{
-		if(1 != sscanf(m_model.c_str(), "MSO%d", &m_model_number))
+		if(1 != sscanf(m_model.c_str(), "MSO%d", &m_modelNumber))
 		{
 			LogError("Bad model number\n");
 			return;
@@ -51,7 +51,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			m_protocol = MSO5;
 			m_transport->SendCommand(m_channels[i]->GetHwname() + "SYST:OPT:STAT? RL2");
 			string reply = m_transport->ReadReply();
-			m_memory_200m = reply == "1" ? true : false;
+			m_opt200M = reply == "1" ? true : false;
 		}
 	}
 	else
@@ -59,8 +59,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		m_protocol = MSO5;
 	}
 
-	int nchans = m_model_number % 10;
-	m_bandwidth = m_model_number % 1000 - nchans;
+	int nchans = m_modelNumber % 10;
+	m_bandwidth = m_modelNumber % 1000 - nchans;
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
@@ -924,7 +924,7 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 				m_transport->SendCommand("ACQ:MDEP 25M");
 				break;
 			case 50000000:
-				if(m_memory_200m)
+				if(m_opt200M)
 					m_transport->SendCommand("ACQ:MDEP 50M");
 				else
 					LogError("Invalid memory depth for channel: %i\n", depth);

@@ -119,9 +119,9 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	int m_model_number;
+	int m_modelNumber;
 	unsigned int m_bandwidth;
-	bool m_memory_200m;
+	bool m_opt200M;
 	protocol_version m_protocol;
 
 public:
