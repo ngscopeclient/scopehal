@@ -39,7 +39,12 @@ using namespace std;
 
 SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	: LeCroyOscilloscope(transport)
+	, m_acquiredDataIsSigned(false)
 {
+	if (m_modelid == MODEL_SIGLENT_SDS2000X)
+	{
+		m_acquiredDataIsSigned = true;
+	}
 }
 
 SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
@@ -55,30 +60,77 @@ string SiglentSCPIOscilloscope::GetDriverNameInternal()
 	return "siglent";
 }
 
-// parses out length, does no other validation. requires 17 bytes at header.
-uint32_t SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
-{
-	m_transport->ReadRawData(16, (unsigned char*)header);
+//  Somewhat arbitrary. No header has been seen that's larger than 17...
+static const int maxWaveHeaderSize = 40;
 
-	if (strlen(header) != 16)
+// "WF?" commands return data that starts with a header. 
+// On a Siglent SDS2304X, the header of "C0: WF? DESC looks like this: "ALL,#9000000346"
+// On other Siglent scopes, a header may look like this: "C1:WF ALL,#9000000070"
+// So the size of the header is unknown due to the variable lenghth prefix.
+
+// Returns -1 if no valid header was seen.
+// Otherwise, it returns the size of the data chunk that follows the header.
+int SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
+{
+	int i = 0;
+
+	// Scan the prefix until ',' is seen.
+	// We don't want to overfetch, so just get stuff one byte at time...
+	bool comma_seen = false;
+	while(!comma_seen && i<maxWaveHeaderSize-12)			// -12: we need space for the size part of the header
 	{
-		LogError("Unexpected descriptor header %s\n", header);
-		return 0;
+		m_transport->ReadRawData(1, (unsigned char *)(header+i));
+		comma_seen = (header[i] == ',');
+		++i;
 	}
-	LogDebug("got header: %s\n", header);
-	return atoi(&header[8]);
+	header[i] = '\0';
+
+	if (!comma_seen)
+	{
+		LogError("WaveHeader: no end of prefix seen in header (%s)\n", header);
+		return -1;
+	}
+
+	// We now expect "#9nnnnnnnnn" (11 characters), where 'n' is a digit.
+	int start_of_size = i;
+
+	m_transport->ReadRawData(11, (unsigned char *)(header+start_of_size));
+	header[start_of_size+11] = '\0';
+
+	bool header_conformant = true;
+	header_conformant &= (header[start_of_size]   == '#');
+	header_conformant &= (header[start_of_size+1] == '9');
+	for(i=2; i<11;++i)
+		header_conformant &= isdigit(header[start_of_size+i]);
+
+	header[start_of_size+11] = '\0';
+
+	if (!header_conformant)
+	{
+		LogError("WaveHeader: header non-conformant (%s)\n", header);
+		return -1;
+	}
+
+	int data_chunk_size = atoi(&header[start_of_size+2]);
+
+	LogDebug("WaveHeader: size = %d (%s)\n", data_chunk_size, header);
+	return data_chunk_size;
+
+	m_transport->ReadRawData(15, (unsigned char*)header);
+	header[15] = 0;
 }
 
 void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int /*channel*/)
 {
-	char header[17] = {0};
-	uint32_t headerLength = 0;
+	char header[maxWaveHeaderSize] = {0};
+	int headerLength = 0;
 
 	headerLength = ReadWaveHeader(header);
+	LogDebug("header length: %d\n", headerLength);
 
 	if(headerLength != sizeof(struct SiglentWaveformDesc_t))
 	{
-		LogError("Unexpected header length: %u\n", headerLength);
+		LogError("Unexpected header length: %d\n", headerLength);
 	}
 
 	m_transport->ReadRawData(sizeof(struct SiglentWaveformDesc_t), (unsigned char*)descriptor);
@@ -96,9 +148,8 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 	double start = GetTime();
 
 
-	//Read the wavedesc for every enabled channel in batch mode first
+	//Read the wavedesc for every enabled channel 
 	vector<struct SiglentWaveformDesc_t*> wavedescs;
-	char tmp[128];
 	string cmd;
 	bool enabled[4] = {false};
 	BulkCheckChannelEnableState();
@@ -111,10 +162,10 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		if(enabled[i])
 		{
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			// TODO: a bunch of error checking...
 			ReadWaveDescriptorBlock(wavedescs[i], i);
 			LogDebug("name %s, number: %u\n",wavedescs[i]->InstrumentName,
 				wavedescs[i]->InstrumentNumber);
-
 		}
 	}
 
@@ -122,13 +173,13 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	//TODO: WFSU in outer loop and WF in inner loop
 	unsigned int num_sequences = 1;
-	for(unsigned int i=0; i<m_analogChannelCount; i++)
+	for(unsigned int chan_nr=0; chan_nr<m_analogChannelCount; chan_nr++)
 	{
 		//If the channel is invisible, don't waste time capturing data
-		struct SiglentWaveformDesc_t *wavedesc = wavedescs[i];
+		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chan_nr];
 		if(string(wavedesc->DescName).empty())
 		{
-			m_channels[i]->SetData(NULL);
+			m_channels[chan_nr]->SetData(NULL);
 			continue;
 		}
 
@@ -174,23 +225,24 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		tstruc.tm_isdst = now->tm_isdst;
 		cap->m_startTimestamp = mktime(&tstruc);
 		cap->m_timescale = round(interval);
-		for(unsigned int j=0; j<num_sequences; j++)
+		for(unsigned int seq_nr=0; seq_nr<num_sequences; seq_nr++)
 		{
-			LogDebug("Channel %u block %u\n", i, j);
+			LogDebug("Channel %u block %u\n", chan_nr, seq_nr);
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
 			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
-				snprintf(tmp, sizeof(tmp), "%u", j + 1);	//segment 0 = "all", 1 = first part of capture
+				char tmp[128];
+				snprintf(tmp, sizeof(tmp), "%u", seq_nr + 1);	//segment 0 = "all", 1 = first part of capture
 				cmd += tmp;
 				m_transport->SendCommand(cmd);
 			}
 
 			//Read the actual waveform data
 			cmd = "C1:WF? DAT2";
-			cmd[1] += i;
+			cmd[1] += chan_nr;
 			m_transport->SendCommand(cmd);
 			char header[17] = {0};
 			size_t wavesize = ReadWaveHeader(header);
@@ -201,11 +253,11 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			m_transport->ReadReply();
 
 			double trigtime = 0;
-			if( (num_sequences > 1) && (j > 0) )
+			if( (num_sequences > 1) && (seq_nr > 0) )
 			{
 				//If a multi-segment capture, ask for the trigger time data
 				cmd = "C1:WF? TIME";
-				cmd[1] += i;
+				cmd[1] += chan_nr;
 				m_transport->SendCommand(cmd);
 
 				trigtime = ReadWaveHeader(header);
@@ -236,12 +288,15 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			{
 				cap->m_offsets[i]	= i+trigtime_samples;
 				cap->m_durations[i]	= 1;
-				cap->m_samples[i]	= data[i] * v_gain - v_off;
+				if (m_acquiredDataIsSigned)
+					cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
+				else
+					cap->m_samples[i]	= data[i] * v_gain - v_off;
 			}
 		}
 
 		//Done, update the data
-		m_channels[i]->SetData(cap);
+		m_channels[chan_nr]->SetData(cap);
 	}
 
 	double dt = GetTime() - start;

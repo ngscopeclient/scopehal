@@ -114,6 +114,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 	m_fwVersion = version;
 
 	//Look up model info
+	m_modelid = MODEL_UNKNOWN;
+
 	if(m_model.find("WS3") == 0)
 		m_modelid = MODEL_WAVESURFER_3K;
 	else if(m_model.find("HDO9") == 0)
@@ -124,8 +126,13 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_WAVERUNNER_8K;
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
-	else
-		m_modelid = MODEL_UNKNOWN;
+	else if (m_vendor.compare("SIGLENT") == 0)
+	{
+		// TODO: if LeCroy and Siglent classes get split, then this should obviously
+		// move to the Siglent class. 
+		if (m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 'X')
+			m_modelid = MODEL_SIGLENT_SDS2000X;
+	}
 
 	//TODO: better way of doing this?
 	if(m_model.find("HD") != string::npos)
