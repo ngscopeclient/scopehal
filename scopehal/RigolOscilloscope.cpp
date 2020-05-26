@@ -50,6 +50,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		{
 			model_name = "MSO";
 			protocol = MSO5;
+			m_transport->SendCommand(m_channels[i]->GetHwname() + "SYST:OPT:STAT? RL2");
+			string reply = m_transport->ReadReply();
+			memory_200m = reply == "1" ? true : false;
 		}
 	}
 	else
@@ -59,6 +62,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 
 	int nchans = model_number % 10;
+	bandwidth = model_number % 1000 - nchans;
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
@@ -342,18 +346,18 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 	//FIXME
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	if(model_name == "MSO" & (model_number / 1000) == 5)
+	if(protocol == MSO5)
 	{
-		switch(model_number % 1000 / 10)
+		switch(bandwidth)
 		{
-			case 7:
-			case 10:
+			case 70:
+			case 100:
 				if(limit_mhz <= 20)
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
 				break;
-			case 20:
+			case 200:
 				if(limit_mhz <= 20)
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
 				else if(limit_mhz <= 100)
@@ -361,7 +365,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
 				break;
-			case 35:
+			case 350:
 				if(limit_mhz <= 20)
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
 				else if(limit_mhz <= 100)
@@ -376,7 +380,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 		}
 	}
 	else
-		LogError("Invalid model for Bandwidth Limit\n");
+		LogError("Bandwidth Limit not implemented for this model\n");
 }
 
 double RigolOscilloscope::GetChannelVoltageRange(size_t i)
@@ -520,8 +524,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	if(protocol == DS)
 		maxpoints = 250 * 1000;
 	else if(protocol == MSO5)
-		;
-	maxpoints = 25 * 10 * 1000;	   //You can use 250E6 points too, but it is very slow
+		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints];
 	map<int, vector<AnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -798,7 +801,8 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 	//FIXME
 	vector<uint64_t> ret;
 	if(protocol == MSO5)
-		ret = {100,
+		ret = {
+			100,
 			200,
 			500,
 			1000,
@@ -820,7 +824,8 @@ vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
 			200 * 1000 * 1000,
 			500 * 1000 * 1000,
 			1 * 1000 * 1000 * 1000,
-			2 * 1000 * 1000 * 1000};
+			2 * 1000 * 1000 * 1000,
+		};
 	return ret;
 }
 
@@ -843,7 +848,14 @@ vector<uint64_t> RigolOscilloscope::GetSampleDepthsNonInterleaved()
 	//FIXME
 	vector<uint64_t> ret;
 	if(protocol == MSO5)
-		ret = {1000, 10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000, 25 * 1000 * 1000};
+		ret = {
+			1000,
+			10 * 1000,
+			100 * 1000,
+			1000 * 1000,
+			10 * 1000 * 1000,
+			25 * 1000 * 1000,
+		};
 	return ret;
 }
 
@@ -891,38 +903,49 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	switch(depth)
+	if(protocol = MSO5)
 	{
-		case 1000:
-			m_transport->SendCommand("ACQ:MDEP 1k");
-			break;
-		case 10000:
-			m_transport->SendCommand("ACQ:MDEP 10k");
-			break;
-		case 100000:
-			m_transport->SendCommand("ACQ:MDEP 100k");
-			break;
-		case 1000000:
-			m_transport->SendCommand("ACQ:MDEP 1M");
-			break;
-		case 10000000:
-			m_transport->SendCommand("ACQ:MDEP 10M");
-			break;
-		case 25000000:
-			m_transport->SendCommand("ACQ:MDEP 25M");
-			break;
-		case 50000000:
-			m_transport->SendCommand("ACQ:MDEP 50M");
-			break;
-		case 100000000:
-			m_transport->SendCommand("ACQ:MDEP 100M");
-			break;
-		case 200000000:
-			m_transport->SendCommand("ACQ:MDEP 200M");
-			break;
-		default:
-			m_transport->SendCommand("ACQ:MDEP AUTO");
-			LogError("Invalid memory depth for channel: %i\n", depth);
+		switch(depth)
+		{
+			case 1000:
+				m_transport->SendCommand("ACQ:MDEP 1k");
+				break;
+			case 10000:
+				m_transport->SendCommand("ACQ:MDEP 10k");
+				break;
+			case 100000:
+				m_transport->SendCommand("ACQ:MDEP 100k");
+				break;
+			case 1000000:
+				m_transport->SendCommand("ACQ:MDEP 1M");
+				break;
+			case 10000000:
+				m_transport->SendCommand("ACQ:MDEP 10M");
+				break;
+			case 25000000:
+				m_transport->SendCommand("ACQ:MDEP 25M");
+				break;
+			case 50000000:
+				if(memory_200m)
+					m_transport->SendCommand("ACQ:MDEP 50M");
+				else
+					LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			case 100000000:
+				//m_transport->SendCommand("ACQ:MDEP 100M");
+				LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			case 200000000:
+				//m_transport->SendCommand("ACQ:MDEP 200M");
+				LogError("Invalid memory depth for channel: %i\n", depth);
+				break;
+			default:
+				LogError("Invalid memory depth for channel: %i\n", depth);
+		}
+	}
+	else
+	{
+		LogError("Memory depth setting not implemented for this series");
 	}
 	m_mdepthValid = false;
 }

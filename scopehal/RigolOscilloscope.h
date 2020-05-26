@@ -121,6 +121,8 @@ protected:
 
 	char* model_name;
 	int model_number;
+	unsigned int bandwidth;
+	bool memory_200m;
 	protocol_version protocol;
 
 public:
