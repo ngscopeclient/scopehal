@@ -129,7 +129,7 @@ void LeCroyOscilloscope::IdentifyHardware()
 	else if (m_vendor.compare("SIGLENT") == 0)
 	{
 		// TODO: if LeCroy and Siglent classes get split, then this should obviously
-		// move to the Siglent class. 
+		// move to the Siglent class.
 		if (m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 'X')
 			m_modelid = MODEL_SIGLENT_SDS2000X;
 	}
@@ -511,7 +511,7 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
