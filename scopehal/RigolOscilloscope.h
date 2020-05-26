@@ -32,11 +32,11 @@
 
 class RigolOscilloscope : public SCPIOscilloscope
 {
-   public:
+public:
 	RigolOscilloscope(SCPITransport* transport);
 	virtual ~RigolOscilloscope();
 
-   public:
+public:
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
 
@@ -85,10 +85,10 @@ class RigolOscilloscope : public SCPIOscilloscope
 	virtual void SetSampleDepth(uint64_t depth);
 	virtual void SetSampleRate(uint64_t rate);
 
-   protected:
+protected:
 	enum protocol_version
 	{
-		MSO5,	 // MSO5000 series
+		MSO5,	 //MSO5000 series
 		DS,
 	};
 
@@ -123,7 +123,7 @@ class RigolOscilloscope : public SCPIOscilloscope
 	int model_number;
 	protocol_version protocol;
 
-   public:
+public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(RigolOscilloscope)
 };

@@ -33,7 +33,7 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
+//Construction / destruction
 
 RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerOneShot(false)
@@ -111,7 +111,7 @@ RigolOscilloscope::~RigolOscilloscope()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+//Accessors
 
 unsigned int RigolOscilloscope::GetInstrumentTypes()
 {
@@ -119,7 +119,7 @@ unsigned int RigolOscilloscope::GetInstrumentTypes()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Device interface functions
+//Device interface functions
 
 string RigolOscilloscope::GetDriverNameInternal()
 {
@@ -237,7 +237,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	switch((
 		int)(atten * 10000 +
-			 0.1))	  // + 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
+			 0.1))	  //+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
 	{
 		case 1:
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB 0.0001");
@@ -521,7 +521,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		maxpoints = 250 * 1000;
 	else if(protocol == MSO5)
 		;
-	maxpoints = 25 * 10 * 1000;	   // You can use 250E6 points too, but it is very slow
+	maxpoints = 25 * 10 * 1000;	   //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints];
 	map<int, vector<AnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
