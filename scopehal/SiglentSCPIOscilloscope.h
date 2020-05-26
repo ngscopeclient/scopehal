@@ -57,6 +57,8 @@ protected:
 	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
 	int ReadWaveHeader(char *header);
 
+    bool m_acquiredDataIsSigned;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(SiglentSCPIOscilloscope)

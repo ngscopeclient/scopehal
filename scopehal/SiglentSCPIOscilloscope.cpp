@@ -39,7 +39,12 @@ using namespace std;
 
 SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	: LeCroyOscilloscope(transport)
+	, m_acquiredDataIsSigned(false)
 {
+	if (m_modelid == MODEL_SIGLENT_SDS2000X)
+	{
+		m_acquiredDataIsSigned = true;
+	}
 }
 
 SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
@@ -144,9 +149,8 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 	double start = GetTime();
 
 
-	//Read the wavedesc for every enabled channel in batch mode first
+	//Read the wavedesc for every enabled channel 
 	vector<struct SiglentWaveformDesc_t*> wavedescs;
-	char tmp[128];
 	string cmd;
 	bool enabled[4] = {false};
 	BulkCheckChannelEnableState();
@@ -231,6 +235,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
+				char tmp[128];
 				snprintf(tmp, sizeof(tmp), "%u", seq_nr + 1);	//segment 0 = "all", 1 = first part of capture
 				cmd += tmp;
 				m_transport->SendCommand(cmd);
@@ -284,7 +289,10 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			{
 				cap->m_offsets[i]	= i+trigtime_samples;
 				cap->m_durations[i]	= 1;
-				cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
+				if (m_acquiredDataIsSigned)
+					cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
+				else
+					cap->m_samples[i]	= data[i] * v_gain - v_off;
 			}
 		}
 
