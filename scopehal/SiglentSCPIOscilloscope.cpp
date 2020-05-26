@@ -64,7 +64,7 @@ string SiglentSCPIOscilloscope::GetDriverNameInternal()
 static const int maxWaveHeaderSize = 40;
 
 // "WF?" commands return data that starts with a header. 
-// On a Siglnet SDS2304X, the header of "C0: WF? DESC looks like this: "ALL,#9000000346"
+// On a Siglent SDS2304X, the header of "C0: WF? DESC looks like this: "ALL,#9000000346"
 // On other Siglent scopes, a header may look like this: "C1:WF ALL,#9000000070"
 // So the size of the header is unknown due to the variable lenghth prefix.
 
@@ -83,22 +83,21 @@ int SiglentSCPIOscilloscope::ReadWaveHeader(char *header)
 		comma_seen = (header[i] == ',');
 		++i;
 	}
-	header[maxWaveHeaderSize-1] = '\0';
+	header[i] = '\0';
 
 	if (!comma_seen)
 	{
-		LogError("WaveHeader: no end of prefix seen... (%s)\n", header);
+		LogError("WaveHeader: no end of prefix seen in header (%s)\n", header);
 		return -1;
 	}
 
-	// We now expect "#9xxxxxxxxx" (11 characters), where 'x' is a digit.
+	// We now expect "#9nnnnnnnnn" (11 characters), where 'n' is a digit.
 	int start_of_size = i;
 
 	m_transport->ReadRawData(11, (unsigned char *)(header+start_of_size));
 	header[start_of_size+11] = '\0';
 
 	bool header_conformant = true;
-
 	header_conformant &= (header[start_of_size]   == '#');
 	header_conformant &= (header[start_of_size+1] == '9');
 	for(i=2; i<11;++i)
