@@ -27,8 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "RigolOscilloscope.h"
 #include "scopehal.h"
+#include "RigolOscilloscope.h"
 
 using namespace std;
 
@@ -49,7 +49,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		else
 		{
 			m_protocol = MSO5;
-			m_transport->SendCommand(m_channels[i]->GetHwname() + "SYST:OPT:STAT? RL2");
+			m_transport->SendCommand("SYST:OPT:STAT? RL2");
 			string reply = m_transport->ReadReply();
 			m_opt200M = reply == "1" ? true : false;
 		}
@@ -327,7 +327,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
-int RigolOscilloscope::GetChannelm_bandwidthLimit(size_t i)
+int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -339,7 +339,7 @@ int RigolOscilloscope::GetChannelm_bandwidthLimit(size_t i)
 		return 0;
 }
 
-void RigolOscilloscope::SetChannelm_bandwidthLimit(size_t i, unsigned int limit_mhz)
+void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
 	//FIXME
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -510,7 +510,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Grab the analog waveform data
 	int unused1;
 	int unused2;
-	int npoints;
+	size_t npoints;
 	int unused3;
 	double sec_per_sample;
 	double xorigin;
@@ -543,7 +543,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		string reply = m_transport->ReadReply();
 		//LogDebug("Preamble = %s\n", reply.c_str());
 		sscanf(reply.c_str(),
-			"%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf",
+			"%d,%d,%lu,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 			&unused1,
 			&unused2,
 			&npoints,
@@ -592,9 +592,6 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			size_t header_blocksize;
 			sscanf((char*)header, "#9%zu", &header_blocksize);
 			//LogDebug("Header block size = %zu\n", header_blocksize);
-
-			if(header_blocksize < 0)
-				return false;
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
@@ -901,7 +898,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if(m_protocol = MSO5)
+	if(m_protocol == MSO5)
 	{
 		switch(depth)
 		{
@@ -927,18 +924,18 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 				if(m_opt200M)
 					m_transport->SendCommand("ACQ:MDEP 50M");
 				else
-					LogError("Invalid memory depth for channel: %i\n", depth);
+					LogError("Invalid memory depth for channel: %lu\n", depth);
 				break;
 			case 100000000:
 				//m_transport->SendCommand("ACQ:MDEP 100M");
-				LogError("Invalid memory depth for channel: %i\n", depth);
+				LogError("Invalid memory depth for channel: %lu\n", depth);
 				break;
 			case 200000000:
 				//m_transport->SendCommand("ACQ:MDEP 200M");
-				LogError("Invalid memory depth for channel: %i\n", depth);
+				LogError("Invalid memory depth for channel: %lu\n", depth);
 				break;
 			default:
-				LogError("Invalid memory depth for channel: %i\n", depth);
+				LogError("Invalid memory depth for channel: %lu\n", depth);
 		}
 	}
 	else
