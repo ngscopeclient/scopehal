@@ -150,7 +150,6 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	//Read the wavedesc for every enabled channel 
 	vector<struct SiglentWaveformDesc_t*> wavedescs;
-	string cmd;
 	bool enabled[4] = {false};
 	BulkCheckChannelEnableState();
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -173,13 +172,13 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	//TODO: WFSU in outer loop and WF in inner loop
 	unsigned int num_sequences = 1;
-	for(unsigned int chan_nr=0; chan_nr<m_analogChannelCount; chan_nr++)
+	for(unsigned int chanNr=0; chanNr<m_analogChannelCount; chanNr++)
 	{
 		//If the channel is invisible, don't waste time capturing data
-		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chan_nr];
-		if(string(wavedesc->DescName).empty())
+		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chanNr];
+		if(!enabled[chanNr] || string(wavedesc->DescName).empty())
 		{
-			m_channels[chan_nr]->SetData(NULL);
+			m_channels[chanNr]->SetData(NULL);
 			continue;
 		}
 
@@ -225,26 +224,21 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		tstruc.tm_isdst = now->tm_isdst;
 		cap->m_startTimestamp = mktime(&tstruc);
 		cap->m_timescale = round(interval);
-		for(unsigned int seq_nr=0; seq_nr<num_sequences; seq_nr++)
+		for(unsigned int seqNr=0; seqNr<num_sequences; seqNr++)
 		{
-			LogDebug("Channel %u block %u\n", chan_nr, seq_nr);
+			LogDebug("Channel %s block %u\n", m_channels[chanNr]->GetHwname().c_str(), seqNr);
 
 			//Ask for the segment of interest
 			//(segment number is ignored for non-segmented waveforms)
-			cmd = "WAVEFORM_SETUP SP,0,NP,0,FP,0,SN,";
 			if(num_sequences > 1)
 			{
-				char tmp[128];
-				snprintf(tmp, sizeof(tmp), "%u", seq_nr + 1);	//segment 0 = "all", 1 = first part of capture
-				cmd += tmp;
-				m_transport->SendCommand(cmd);
+				//segment 0 = "all", 1 = first part of capture
+				m_transport->SendCommand("WAVEFORM_SETUP SP,0,NP,0,FP,0,SN," + (seqNr+1));
 			}
 
 			//Read the actual waveform data
-			cmd = "C1:WF? DAT2";
-			cmd[1] += chan_nr;
-			m_transport->SendCommand(cmd);
-			char header[17] = {0};
+			m_transport->SendCommand(m_channels[chanNr]->GetHwname() + ":WF? DAT2");
+			char header[maxWaveHeaderSize] = {0};
 			size_t wavesize = ReadWaveHeader(header);
 			uint8_t *data = new uint8_t[wavesize];
 			m_transport->ReadRawData(wavesize, data);
@@ -253,12 +247,10 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			m_transport->ReadReply();
 
 			double trigtime = 0;
-			if( (num_sequences > 1) && (seq_nr > 0) )
+			if( (num_sequences > 1) && (seqNr > 0) )
 			{
 				//If a multi-segment capture, ask for the trigger time data
-				cmd = "C1:WF? TIME";
-				cmd[1] += chan_nr;
-				m_transport->SendCommand(cmd);
+				m_transport->SendCommand(m_channels[chanNr]->GetHwname() + ":WF? TIME");
 
 				trigtime = ReadWaveHeader(header);
 				// \n
@@ -289,14 +281,18 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 				cap->m_offsets[i]	= i+trigtime_samples;
 				cap->m_durations[i]	= 1;
 				if (m_acquiredDataIsSigned)
-					cap->m_samples[i]	= (int8_t)data[i] * v_gain - v_off;
+				{
+					// See programming guide, page 267: https://siglentna.com/wp-content/uploads/2020/04/ProgrammingGuide_PG01-E02C.pdf
+					// voltage value (V) = code value * (vdiv /25) - voffset
+					cap->m_samples[i]	= (int8_t)(data[i]) * (v_gain / 25.0) - v_off;
+				}
 				else
 					cap->m_samples[i]	= data[i] * v_gain - v_off;
 			}
 		}
 
 		//Done, update the data
-		m_channels[chan_nr]->SetData(cap);
+		m_channels[chanNr]->SetData(cap);
 	}
 
 	double dt = GetTime() - start;
