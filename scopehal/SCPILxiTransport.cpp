@@ -60,7 +60,7 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
-	m_device = lxi_connect(m_hostname.c_str(), m_port, "inst0", m_timeout, VXI11);
+	m_device = lxi_connect((char *)(m_hostname.c_str()), m_port, (char *)("inst0"), m_timeout, VXI11);
 
 	if (m_device == LXI_ERROR)
 	{
@@ -114,7 +114,7 @@ bool SCPILxiTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
-	int result = lxi_send(m_device, cmd.c_str(), cmd.length(), m_timeout);
+	int result = lxi_send(m_device, (char *)(cmd.c_str()), cmd.length(), m_timeout);
 
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
@@ -149,7 +149,7 @@ string SCPILxiTransport::ReadReply()
 void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	// XXX: Should this reset m_data_depleted just like SendCommmand?
-	lxi_send(m_device, (const char *)buf, len, m_timeout);
+	lxi_send(m_device, (char *)buf, len, m_timeout);
 }
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
