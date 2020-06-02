@@ -60,9 +60,9 @@ SCPILxiTransport::SCPILxiTransport(string args)
 
 	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
-	char *hostname_dup = new char[m_hostname.length()];
+	char *hostname_dup = new char[m_hostname.length()+1];
 	strcpy(hostname_dup, m_hostname.c_str());
-	char *instname_dup = new char[strlen("inst0")];
+	char *instname_dup = new char[strlen("inst0")+1];
 	strcpy(instname_dup, "inst0");
 
 	m_device = lxi_connect(hostname_dup, m_port, instname_dup, m_timeout, VXI11);
@@ -121,7 +121,7 @@ bool SCPILxiTransport::SendCommand(string cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
-	char *cmd_dup = new char[cmd.length()];
+	char *cmd_dup = new char[cmd.length()+1];
 	strcpy(cmd_dup, cmd.c_str());
 	int result = lxi_send(m_device, cmd_dup, cmd.length(), m_timeout);
 
@@ -159,7 +159,7 @@ void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	// XXX: Should this reset m_data_depleted just like SendCommmand?
 
-	char *buf_dup = new char[len];
+	char *buf_dup = new char[len+1];
 	memcpy(buf_dup, buf, len);
 	lxi_send(m_device, buf_dup, len, m_timeout);
 }
