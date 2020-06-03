@@ -46,7 +46,10 @@
 
 #include <yaml-cpp/yaml.h>
 
+extern "C"
+{
 #include <lxi.h>
+}
 
 #include "../log/log.h"
 #include "../graphwidget/Graph.h"
