@@ -147,7 +147,6 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	double start = GetTime();
 
-
 	//Read the wavedesc for every enabled channel 
 	vector<struct SiglentWaveformDesc_t*> wavedescs;
 	bool enabled[4] = {false};
@@ -171,6 +170,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 	// grab the actual waveforms
 
 	//TODO: WFSU in outer loop and WF in inner loop
+	map<int, vector<WaveformBase*> > pending_waveforms;
 	unsigned int num_sequences = 1;
 	for(unsigned int chanNr=0; chanNr<m_analogChannelCount; chanNr++)
 	{
@@ -178,7 +178,8 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		struct SiglentWaveformDesc_t *wavedesc = wavedescs[chanNr];
 		if(!enabled[chanNr] || string(wavedesc->DescName).empty())
 		{
-			m_channels[chanNr]->SetData(NULL);
+			if (!toQueue)
+				m_channels[chanNr]->SetData(NULL);
 			continue;
 		}
 
@@ -292,8 +293,29 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Done, update the data
-		m_channels[chanNr]->SetData(cap);
+		if (!toQueue)
+			m_channels[chanNr]->SetData(cap);
+		else
+			pending_waveforms[chanNr].push_back(cap);
 	}
+
+	m_pendingWaveformsMutex.lock();
+	size_t num_pending = 0;
+
+	if (toQueue)
+		num_pending++;
+
+	for(size_t i = 0; i < num_pending; ++i)
+	{
+		SequenceSet s;
+		for(size_t j = 0; j < m_analogChannelCount; j++)
+		{
+			if(enabled[j])
+				s[m_channels[j]] = pending_waveforms[j][i];
+		}
+		m_pendingWaveforms.push_back(s);
+	}
+	m_pendingWaveformsMutex.unlock();
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download took %.3f ms\n", dt * 1000);
