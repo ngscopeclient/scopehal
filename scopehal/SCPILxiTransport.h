@@ -29,7 +29,7 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
+	@author Tom Verbeure
 	@brief Declaration of SCPILxiTransport
  */
 
@@ -62,6 +62,8 @@ public:
 	{ return m_hostname; }
 
 protected:
+	static bool m_lxi_initialized;
+
 	std::string m_hostname;
 	unsigned short m_port;
 

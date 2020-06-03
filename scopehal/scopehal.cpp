@@ -51,8 +51,6 @@ using namespace std;
  */
 void TransportStaticInit()
 {
-	lxi_init();
-
 	AddTransportClass(SCPISocketTransport);
 	AddTransportClass(SCPILxiTransport);
 	AddTransportClass(SCPITMCTransport);

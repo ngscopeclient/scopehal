@@ -29,9 +29,14 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
+	@author Tom Verbeure 
 	@brief Implementation of SCPILxiTransport
  */
+
+extern "C"
+{
+#include <lxi.h>
+}
 
 #include "scopehal.h"
 
@@ -40,8 +45,16 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+bool SCPILxiTransport::m_lxi_initialized = false;
+
 SCPILxiTransport::SCPILxiTransport(string args)
 {
+	if (!m_lxi_initialized)
+	{
+		lxi_init();
+		m_lxi_initialized = true;
+	}
+
 	char hostname[128];
 	unsigned int port = 0;
 	if (2 != sscanf(args.c_str(), "%127[^:]:%u", hostname, &port))
