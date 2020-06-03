@@ -30,59 +30,48 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SCPITMCTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef SCPITMCTransport_h
+#define SCPITMCTransport_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
-
-#include <yaml-cpp/yaml.h>
-
-extern "C"
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPITMCTransport : public SCPITransport
 {
-#include <lxi.h>
-}
+public:
+	SCPITMCTransport(std::string args);
+	virtual ~SCPITMCTransport();
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPITMCTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	TRANSPORT_INITPROC(SCPITMCTransport)
 
-#include "Statistic.h"
-#include "ProtocolDecoder.h"
+	std::string GetDevicePath()
+	{ return m_devicePath; }
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+protected:
+	std::string m_devicePath;
 
-std::string GetDefaultChannelColor(int i);
+	int m_handle;
+	int m_timeout;
 
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
+	int m_staging_buf_size;
+	unsigned char *m_staging_buf;
+	int m_data_in_staging_buf;
+	int m_data_offset;
+	bool m_data_depleted;
+};
 
 #endif
