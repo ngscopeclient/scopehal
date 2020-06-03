@@ -62,6 +62,8 @@ public:
 	{ return m_hostname; }
 
 protected:
+	static bool m_lxi_initialized;
+
 	std::string m_hostname;
 	unsigned short m_port;
 
