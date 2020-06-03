@@ -268,7 +268,7 @@ void USB2PacketDecoder::Refresh()
 
 				cap->m_offsets.push_back(din->m_offsets[i]);
 				cap->m_durations.push_back(halfdur);
-				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ERROR,
+				cap->m_samples.push_back(USB2PacketSymbol(USB2PacketSymbol::TYPE_ENDP,
 					( last >> 7) | ( (sin.m_data & 0x7) << 1 )));
 
 				cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
