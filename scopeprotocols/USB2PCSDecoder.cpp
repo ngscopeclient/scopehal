@@ -232,7 +232,7 @@ void USB2PCSDecoder::RefreshIterationSync(
 	int64_t& offset,
 	uint8_t& data)
 {
-	size_t sample_ps = din->m_offsets[nin] * din->m_timescale;
+	size_t sample_ps = din->m_durations[nin] * din->m_timescale;
 	float sample_width_ui = sample_ps * 1.0f / ui_width;
 
 	//Keep track of our position in the sync sequence
