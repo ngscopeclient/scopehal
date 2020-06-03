@@ -1458,6 +1458,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 		m_transport->SendCommand("TRIG_MODE SINGLE");
 		m_triggerArmed = true;
 	}
