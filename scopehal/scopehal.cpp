@@ -55,6 +55,7 @@ void TransportStaticInit()
 
 	AddTransportClass(SCPISocketTransport);
 	AddTransportClass(SCPILxiTransport);
+	AddTransportClass(SCPITMCTransport);
 	AddTransportClass(VICPSocketTransport);
 }
 
