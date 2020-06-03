@@ -29,7 +29,7 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
+	@author Tom Verbeure
 	@brief Declaration of SCPILxiTransport
  */
 
