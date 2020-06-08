@@ -1651,7 +1651,16 @@ float LeCroyOscilloscope::GetTriggerVoltage()
 		return m_triggerLevel;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("TRLV?");
+
+	//If we have the MSO option installed, the last channel we touched might have been digital.
+	//If this is the case the scope will be derpy and drop the command even if the trigger source is an analog channel!
+	//The fix is to explicitly query the trigger voltage on the actual analog channel.
+	if(m_hasLA)
+		m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRLV?");
+	else
+		m_transport->SendCommand("TRLV?");
+
+
 	string reply = m_transport->ReadReply();
 	sscanf(reply.c_str(), "%f", &m_triggerLevel);
 	m_triggerLevelValid = true;
