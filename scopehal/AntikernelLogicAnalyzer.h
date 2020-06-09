@@ -44,6 +44,8 @@ public:
 	AntikernelLogicAnalyzer(SCPITransport* transport);
 	virtual ~AntikernelLogicAnalyzer();
 
+	virtual std::string IDPing();
+
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 

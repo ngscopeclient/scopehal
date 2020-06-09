@@ -55,6 +55,14 @@ public:
 	virtual ~Oscilloscope();
 
 	/**
+		@brief Returns the instrument's identification string.
+
+		This function MUST NOT CACHE the return value and is safe to use as a barrier synchronization to ensure that
+		the instrument has received and processed all previous commands.
+	 */
+	virtual std::string IDPing() =0;
+
+	/**
 		@brief Instruments are allowed to cache configuration settings to reduce round trip queries to the device.
 
 		In order to see updates made by the user at the front panel, the cache must be flushed.
@@ -439,6 +447,7 @@ protected:
 	typedef std::map<OscilloscopeChannel*, WaveformBase*> SequenceSet;
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
+	std::recursive_mutex m_mutex;
 
 protected:
 

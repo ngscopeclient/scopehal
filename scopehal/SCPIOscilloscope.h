@@ -40,6 +40,8 @@ public:
 	SCPIOscilloscope(SCPITransport* transport);
 	virtual ~SCPIOscilloscope();
 
+	virtual std::string IDPing();
+
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 

@@ -42,6 +42,8 @@ public:
 	MockOscilloscope(std::string name, std::string vendor, std::string serial);
 	virtual ~MockOscilloscope();
 
+	virtual std::string IDPing();
+
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 

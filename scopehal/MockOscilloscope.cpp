@@ -58,6 +58,11 @@ MockOscilloscope::~MockOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
+string MockOscilloscope::IDPing()
+{
+	return "";
+}
+
 string MockOscilloscope::GetTransportName()
 {
 	return "null";

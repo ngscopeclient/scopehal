@@ -229,7 +229,6 @@ protected:
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 
 	//Mutexing for thread safety
-	std::recursive_mutex m_mutex;
 	std::recursive_mutex m_cacheMutex;
 
 public:

@@ -95,7 +95,6 @@ protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//Mutexing for thread safety
-	std::recursive_mutex m_mutex;
 	std::recursive_mutex m_cacheMutex;
 
 	//hardware analog channel count, independent of LA option etc

@@ -48,6 +48,13 @@ SCPIOscilloscope::~SCPIOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+string SCPIOscilloscope::IDPing()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("*IDN?");
+	return m_transport->ReadReply();
+}
+
 string SCPIOscilloscope::GetTransportName()
 {
 	return m_transport->GetName();
