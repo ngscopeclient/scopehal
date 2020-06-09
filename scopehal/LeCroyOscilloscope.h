@@ -192,10 +192,6 @@ protected:
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
 
-	std::string m_vendor;
-	std::string m_model;
-	std::string m_serial;
-	std::string m_fwVersion;
 	Model m_modelid;
 
 	//set of SW/HW options we have

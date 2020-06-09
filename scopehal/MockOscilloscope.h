@@ -100,9 +100,12 @@ public:
 
 protected:
 	void ArmTrigger();
+
+	//standard *IDN? fields
 	std::string m_name;
 	std::string m_vendor;
 	std::string m_serial;
+	std::string m_fwVersion;
 
 	OscilloscopeChannel* m_extTrigger;
 
