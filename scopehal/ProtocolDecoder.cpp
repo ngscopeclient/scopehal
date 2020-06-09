@@ -559,6 +559,52 @@ void ProtocolDecoder::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* c
 }
 
 /**
+	@brief Samples a digital waveform on all edges of a clock
+
+	The sampling rate of the data and clock signals need not be equal or uniform.
+
+	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+
+	@param data		The data signal to sample
+	@param clock	The clock signal to use
+	@param samples	Output waveform
+ */
+void ProtocolDecoder::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
+{
+	samples.clear();
+
+	size_t ndata = 0;
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		//Throw away clock samples until we find an edge
+		if(clock->m_samples[i] == clock->m_samples[i-1])
+			continue;
+
+		//Throw away data samples until the data is synced with us
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
+		while( (ndata < dlen) && (data->m_offsets[ndata] * data->m_timescale < clkstart) )
+			ndata ++;
+		if(ndata >= dlen)
+			break;
+
+		//Extend the previous sample's duration (if any) to our start
+		size_t ssize = samples.m_samples.size();
+		if(ssize)
+		{
+			size_t last = ssize - 1;
+			samples.m_durations[last] = clkstart - samples.m_offsets[last];
+		}
+
+		//Add the new sample
+		samples.m_offsets.push_back(clkstart);
+		samples.m_durations.push_back(1);
+		samples.m_samples.push_back(data->m_samples[ndata]);
+	}
+}
+
+/**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
 void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
