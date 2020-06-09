@@ -18,6 +18,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	Ethernet100BaseTDecoder.cpp
 	EthernetAutonegotiationDecoder.cpp
 	EthernetGMIIDecoder.cpp
+	EthernetRGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
 	EyeBitRateMeasurementDecoder.cpp
 	EyeDecoder2.cpp
