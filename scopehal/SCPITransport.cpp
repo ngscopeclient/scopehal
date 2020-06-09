@@ -66,6 +66,6 @@ SCPITransport* SCPITransport::CreateTransport(string transport, string args)
 	if(m_createprocs.find(transport) != m_createprocs.end())
 		return m_createprocs[transport](args);
 
-	LogError("Invalid transport name");
+	LogError("Invalid transport name \"%s\"\n", transport.c_str());
 	return NULL;
 }
