@@ -358,6 +358,14 @@ public:
 	virtual bool IsTriggerArmed() =0;
 
 	/**
+		@brief Enables the trigger output, configuring a shared auxiliary port for this purpose if needed
+
+		The default implementation does nothing, and is intended for instruments where the trigger output is always
+		enabled.
+	 */
+	virtual void EnableTriggerOutput();
+
+	/**
 		@brief Gets the connection string for our transport
 	 */
 	virtual std::string GetTransportConnectionString() =0;

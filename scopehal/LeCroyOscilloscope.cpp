@@ -2034,3 +2034,11 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 	snprintf(tmp, sizeof(tmp), "TDIV %.0e", time_per_div);
 	m_transport->SendCommand(tmp);
 }
+
+void LeCroyOscilloscope::EnableTriggerOutput()
+{
+	//Enable 400ns trigger-out pulse, 1V p-p
+	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.AuxMode=\"TriggerOut\"'");
+	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
+	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
+}

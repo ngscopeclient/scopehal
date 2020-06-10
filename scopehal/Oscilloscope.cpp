@@ -334,3 +334,8 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		}
 	}
 }
+
+void Oscilloscope::EnableTriggerOutput()
+{
+	//do nothing, assuming the scope needs no config to enable trigger out
+}

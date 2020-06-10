@@ -95,6 +95,7 @@ public:
 	virtual Oscilloscope::TriggerType GetTriggerType();
 	virtual void SetTriggerType(Oscilloscope::TriggerType type);
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
+	virtual void EnableTriggerOutput();
 
 	//DMM acquisition
 	virtual double GetVoltage();
