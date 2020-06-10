@@ -438,6 +438,37 @@ public:
 	 */
 	virtual void SetUseExternalRefclk(bool external);
 
+	/**
+		@brief Sets the trigger offset
+
+		@param offset		Picoseconds from the start of the capture to the trigger point.
+							Positive values mean the trigger is within the waveform.
+							Negative values mean there is a delay from the trigger point to the start of the waveform.
+	 */
+	virtual void SetTriggerOffset(int64_t offset)	=0;
+
+	/**
+		@brief Gets the trigger offset
+	 */
+	virtual int64_t GetTriggerOffset() =0;
+
+	/**
+		@brief Sets the deskew setting for a channel
+
+		@param channel		The channel to deskew
+		@param skew			Skew value, in picoseconds.
+
+		The default implementation does nothing, and is suitable for lower-end instruments that do not support deskew.
+	 */
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
+
+	/**
+		@brief Gets the deskew setting for a channel
+
+		The default implementation returns zero, and is suitable for lower-end instruments that do not support deskew.
+	 */
+	virtual int64_t GetDeskewForChannel(size_t channel);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering
 

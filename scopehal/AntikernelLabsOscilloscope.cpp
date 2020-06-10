@@ -627,3 +627,14 @@ void AntikernelLabsOscilloscope::SetSampleRate(uint64_t /*rate*/)
 {
 	//FIXME
 }
+
+void AntikernelLabsOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t AntikernelLabsOscilloscope::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

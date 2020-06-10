@@ -91,6 +91,8 @@ public:
 	virtual uint64_t GetSampleDepth();
 	virtual void SetSampleDepth(uint64_t depth);
 	virtual void SetSampleRate(uint64_t rate);
+	virtual void SetTriggerOffset(int64_t offset);
+	virtual int64_t GetTriggerOffset();
 
 	virtual void ResetTriggerConditions();
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);

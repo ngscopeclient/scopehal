@@ -349,3 +349,14 @@ void MockOscilloscope::SetSampleRate(uint64_t /*rate*/)
 {
 	//no-op
 }
+
+void MockOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t MockOscilloscope::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

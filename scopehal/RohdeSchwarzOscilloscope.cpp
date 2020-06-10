@@ -681,3 +681,14 @@ void RohdeSchwarzOscilloscope::SetSampleRate(uint64_t /*rate*/)
 {
 	//FIXME
 }
+
+void RohdeSchwarzOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t RohdeSchwarzOscilloscope::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

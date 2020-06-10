@@ -346,3 +346,14 @@ void Oscilloscope::SetUseExternalRefclk(bool external)
 	if(external)
 		LogWarning("Oscilloscope::SetUseExternalRefclk: no external reference supported\n");
 }
+
+void Oscilloscope::SetDeskewForChannel(size_t /*channel*/, int64_t /*skew*/)
+{
+	//override this function in the driver class if deskew is supported
+}
+
+int64_t Oscilloscope::GetDeskewForChannel(size_t /*channel*/)
+{
+	//override this function in the driver class if deskew is supported
+	return 0;
+}

@@ -708,3 +708,14 @@ void AgilentOscilloscope::SetSampleRate(uint64_t /*rate*/)
 {
 	//FIXME
 }
+
+void AgilentOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t AgilentOscilloscope::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

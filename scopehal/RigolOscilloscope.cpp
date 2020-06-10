@@ -957,3 +957,14 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	m_srateValid = false;
 	m_mdepthValid = false;
 }
+
+void RigolOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t RigolOscilloscope::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

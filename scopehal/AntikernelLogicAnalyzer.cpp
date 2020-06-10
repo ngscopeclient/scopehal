@@ -641,3 +641,14 @@ void AntikernelLogicAnalyzer::SetSampleRate(uint64_t /*rate*/)
 {
 	//not changeable, no-op
 }
+
+void AntikernelLogicAnalyzer::SetTriggerOffset(int64_t /*offset*/)
+{
+	//FIXME
+}
+
+int64_t AntikernelLogicAnalyzer::GetTriggerOffset()
+{
+	//FIXME
+	return 0;
+}

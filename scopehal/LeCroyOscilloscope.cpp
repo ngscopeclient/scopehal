@@ -49,6 +49,8 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
 	, m_memoryDepth(1)
+	, m_triggerOffsetValid(false)
+	, m_triggerOffset(0)
 	, m_highDefinition(false)
 {
 	//standard initialization
@@ -364,6 +366,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
+	m_triggerOffsetValid = false;
 }
 
 /**
@@ -2046,7 +2049,58 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 void LeCroyOscilloscope::SetUseExternalRefclk(bool external)
 {
 	if(external)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.ReferenceClock=\"External\"'");
+		m_transport->SendCommand("RCLK EXTERNAL");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.ReferenceClock=\"Internal\"'");
+		m_transport->SendCommand("RCLK INTERNAL");
+}
+
+void LeCroyOscilloscope::SetTriggerOffset(int64_t offset)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "TRDL %e", offset * 1e-12);
+	m_transport->SendCommand(tmp);
+
+	//Don't update the cache because the scope is likely to round the offset we ask for.
+	//If we query the instrument later, the cache will be updated then.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_triggerOffsetValid = false;
+}
+
+int64_t LeCroyOscilloscope::GetTriggerOffset()
+{
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_triggerOffsetValid)
+			return m_triggerOffset;
+	}
+
+	string reply;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("TRDL?");
+		reply = m_transport->ReadReply();
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	//Result comes back in scientific notation
+	double sec;
+	sscanf(reply.c_str(), "%le", &sec);
+
+	m_triggerOffset = static_cast<int64_t>(round(sec * 1e12));
+	m_triggerOffsetValid = true;
+
+	return m_triggerOffset;
+}
+
+void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
+{
+}
+
+int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
+{
+	return 0;
 }

@@ -166,6 +166,11 @@ public:
 	virtual void SetSampleRate(uint64_t rate);
 	virtual void SetUseExternalRefclk(bool external);
 
+	virtual void SetTriggerOffset(int64_t offset);
+	virtual int64_t GetTriggerOffset();
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
+	virtual int64_t GetDeskewForChannel(size_t channel);
+
 protected:
 	void BulkCheckChannelEnableState();
 
@@ -218,6 +223,8 @@ protected:
 	int64_t m_sampleRate;
 	bool m_memoryDepthValid;
 	int64_t m_memoryDepth;
+	bool m_triggerOffsetValid;
+	int64_t m_triggerOffset;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
