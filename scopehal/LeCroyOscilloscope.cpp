@@ -2058,8 +2058,14 @@ void LeCroyOscilloscope::SetTriggerOffset(int64_t offset)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
+	//LeCroy's standard has the offset being from the midpoint of the capture.
+	//Scopehal has offset from the start.
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(1e12f * halfdepth / rate));
+
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "TRDL %e", offset * 1e-12);
+	snprintf(tmp, sizeof(tmp), "TRDL %e", (offset - halfwidth) * 1e-12);
 	m_transport->SendCommand(tmp);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
@@ -2089,8 +2095,14 @@ int64_t LeCroyOscilloscope::GetTriggerOffset()
 	//Result comes back in scientific notation
 	double sec;
 	sscanf(reply.c_str(), "%le", &sec);
-
 	m_triggerOffset = static_cast<int64_t>(round(sec * 1e12));
+
+	//Convert from midpoint to start point
+	int64_t rate = GetSampleRate();
+	int64_t halfdepth = GetSampleDepth() / 2;
+	int64_t halfwidth = static_cast<int64_t>(round(1e12f * halfdepth / rate));
+	m_triggerOffset += halfwidth;
+
 	m_triggerOffsetValid = true;
 
 	return m_triggerOffset;
