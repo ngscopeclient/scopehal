@@ -457,6 +457,8 @@ public:
 
 		@param channel		The channel to deskew
 		@param skew			Skew value, in picoseconds.
+							Negative values move the channel earlier relative to the zero point.
+							Positive values move the channel later.
 
 		The default implementation does nothing, and is suitable for lower-end instruments that do not support deskew.
 	 */

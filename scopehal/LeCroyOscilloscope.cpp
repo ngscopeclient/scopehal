@@ -364,6 +364,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
+	m_channelDeskew.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
@@ -2110,9 +2111,43 @@ int64_t LeCroyOscilloscope::GetTriggerOffset()
 
 void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "VBS? 'app.Acquisition.%s.Deskew=%e'",
+		m_channels[channel]->GetHwname().c_str(),
+		skew * 1e-12
+		);
+	m_transport->SendCommand(tmp);
+
+	//Update cache
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDeskew[channel] = skew;
 }
 
 int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 {
-	return 0;
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelDeskew.find(channel) != m_channelDeskew.end())
+			return m_channelDeskew[channel];
+	}
+
+	//Read the deskew
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "VBS? 'return = app.Acquisition.%s.Deskew'", m_channels[channel]->GetHwname().c_str());
+	m_transport->SendCommand(tmp);
+	string reply = m_transport->ReadReply();
+
+	//Value comes back as floating point ps
+	float skew;
+	sscanf(reply.c_str(), "%f", &skew);
+	int64_t skew_ps = round(skew * 1e12f);
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDeskew[channel] = skew_ps;
+
+	return skew_ps;
 }

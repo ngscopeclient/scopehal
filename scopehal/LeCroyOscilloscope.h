@@ -225,6 +225,7 @@ protected:
 	int64_t m_memoryDepth;
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
+	std::map<size_t, int64_t> m_channelDeskew;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;

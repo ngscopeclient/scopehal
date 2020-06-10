@@ -140,6 +140,9 @@ public:
 	virtual int GetBandwidthLimit();
 	virtual void SetBandwidthLimit(int mhz);
 
+	virtual void SetDeskew(int64_t skew);
+	virtual int64_t GetDeskew();
+
 	bool IsPhysicalChannel()
 	{ return m_physical; }
 

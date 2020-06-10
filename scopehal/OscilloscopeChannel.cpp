@@ -177,6 +177,18 @@ void OscilloscopeChannel::SetVoltageRange(double range)
 		return m_scope->SetChannelVoltageRange(m_index, range);
 }
 
+void OscilloscopeChannel::SetDeskew(int64_t skew)
+{
+	if(m_scope)
+		m_scope->SetDeskewForChannel(m_index, skew);
+}
+
+int64_t OscilloscopeChannel::GetDeskew()
+{
+	if(m_scope)
+		return m_scope->GetDeskewForChannel(m_index);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
