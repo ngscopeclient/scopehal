@@ -2042,3 +2042,11 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
 	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
 }
+
+void LeCroyOscilloscope::SetUseExternalRefclk(bool external)
+{
+	if(external)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.ReferenceClock=\"External\"'");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.ReferenceClock=\"Internal\"'");
+}

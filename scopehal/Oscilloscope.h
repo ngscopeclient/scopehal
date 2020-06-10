@@ -427,6 +427,17 @@ public:
 	 */
 	virtual void SetSampleRate(uint64_t rate) =0;
 
+	/**
+		@brief Configures the instrument's clock source
+
+		@param external		True to use external reference
+							False to use internal clock
+
+		The default implementation prints an "unsupported operation" warning, and is suitable for lower-end
+		instruments that do not support external clock inputs.
+	 */
+	virtual void SetUseExternalRefclk(bool external);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sequenced triggering
 

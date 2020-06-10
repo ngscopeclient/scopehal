@@ -339,3 +339,10 @@ void Oscilloscope::EnableTriggerOutput()
 {
 	//do nothing, assuming the scope needs no config to enable trigger out
 }
+
+void Oscilloscope::SetUseExternalRefclk(bool external)
+{
+	//override this function in the driver class if an external reference input is present
+	if(external)
+		LogWarning("Oscilloscope::SetUseExternalRefclk: no external reference supported\n");
+}

@@ -164,6 +164,7 @@ public:
 	virtual uint64_t GetSampleDepth();
 	virtual void SetSampleDepth(uint64_t depth);
 	virtual void SetSampleRate(uint64_t rate);
+	virtual void SetUseExternalRefclk(bool external);
 
 protected:
 	void BulkCheckChannelEnableState();
