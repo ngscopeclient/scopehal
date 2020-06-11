@@ -153,6 +153,21 @@ bool Oscilloscope::HasPendingWaveforms()
 }
 
 /**
+	@brief Discard any pending waveforms that haven't yet been processed
+ */
+void Oscilloscope::ClearPendingWaveforms()
+{
+	lock_guard<mutex> lock(m_pendingWaveformsMutex);
+	while(!m_pendingWaveforms.empty())
+	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			delete it.second;
+		m_pendingWaveforms.pop_front();
+	}
+}
+
+/**
 	@brief Just like PollTrigger(), but checks the fifo instead
  */
 Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()

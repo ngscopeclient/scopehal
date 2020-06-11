@@ -1574,15 +1574,16 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("TRIG_MODE STOP");
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("TRIG_MODE STOP");
+	}
+
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 
 	//Clear out any pending data (the user doesn't want it, and we don't want stale stuff hanging around)
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.clear();
-	m_pendingWaveformsMutex.unlock();
+	ClearPendingWaveforms();
 }
 
 size_t LeCroyOscilloscope::GetTriggerChannelIndex()

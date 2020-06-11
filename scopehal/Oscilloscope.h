@@ -491,6 +491,7 @@ public:
 
 public:
 	bool HasPendingWaveforms();
+	void ClearPendingWaveforms();
 	size_t GetPendingWaveformCount();
 	virtual Oscilloscope::TriggerMode PollTriggerFifo();
 	virtual bool AcquireDataFifo();
