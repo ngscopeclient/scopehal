@@ -492,13 +492,13 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			m_transport->SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
+			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
 
 		//Enable this channel on the hardware
-		m_transport->SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
+		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
 		char tmp[128];
 		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
-		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
+		snprintf(tmp, sizeof(tmp), "VBS 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
 		m_transport->SendCommand(tmp);
 	}
 
@@ -537,10 +537,10 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			m_transport->SendCommand("VBS? 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
+			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
 
 		//Disable this channel
-		m_transport->SendCommand(string("VBS? 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
+		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
 	}
 }
 
