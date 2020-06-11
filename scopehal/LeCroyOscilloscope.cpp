@@ -84,7 +84,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 		m_transport->SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
 
 	//Always use "max memory" config for setting sample depth
-	m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
+	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
 
 	//Disable channel interleaving until we support this properly
 	m_transport->SendCommand("COMBINE_CHANNELS 1");
