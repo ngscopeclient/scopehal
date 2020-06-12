@@ -1909,6 +1909,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(5 * k);
 	ret.push_back(10 * k);
 	ret.push_back(20 * k);
+	ret.push_back(40 * k);			//hdo9 uses this sometimes
 	ret.push_back(50 * k);
 	ret.push_back(100 * k);
 	ret.push_back(200 * k);

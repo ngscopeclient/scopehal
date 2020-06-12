@@ -337,8 +337,8 @@ Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 	switch(data->m_samples[i].m_type)
 	{
 		//Preamble/SFD: gray (not interesting)
+		case EthernetFrameSegment::TYPE_INBAND_STATUS:
 		case EthernetFrameSegment::TYPE_PREAMBLE:
-			return m_standardColors[COLOR_PREAMBLE];
 		case EthernetFrameSegment::TYPE_SFD:
 			return m_standardColors[COLOR_PREAMBLE];
 
@@ -374,6 +374,8 @@ string EthernetProtocolDecoder::GetText(int i)
 	if(i >= (int)data->m_samples.size())
 		return "";
 
+	char tmp[128];
+
 	auto sample = data->m_samples[i];
 	switch(sample.m_type)
 	{
@@ -391,7 +393,6 @@ string EthernetProtocolDecoder::GetText(int i)
 				if(sample.m_data.size() != 6)
 					return "[invalid dest MAC length]";
 
-				char tmp[32];
 				snprintf(tmp, sizeof(tmp), "Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x",
 					sample.m_data[0],
 					sample.m_data[1],
@@ -407,7 +408,6 @@ string EthernetProtocolDecoder::GetText(int i)
 				if(sample.m_data.size() != 6)
 					return "[invalid src MAC length]";
 
-				char tmp[32];
 				snprintf(tmp, sizeof(tmp), "Src MAC: %02x:%02x:%02x:%02x:%02x:%02x",
 					sample.m_data[0],
 					sample.m_data[1],
@@ -425,7 +425,6 @@ string EthernetProtocolDecoder::GetText(int i)
 
 				string type = "Type: ";
 
-				char tmp[32];
 				uint16_t ethertype = (sample.m_data[0] << 8) | sample.m_data[1];
 				switch(ethertype)
 				{
@@ -459,8 +458,6 @@ string EthernetProtocolDecoder::GetText(int i)
 						break;
 				}
 
-				//TODO: look up a table of common Ethertype values
-
 				return type;
 			}
 
@@ -469,11 +466,32 @@ string EthernetProtocolDecoder::GetText(int i)
 				string ret;
 				for(auto b : sample.m_data)
 				{
-					char tmp[32];
 					snprintf(tmp, sizeof(tmp), "%02x ", b);
 					ret += tmp;
 				}
 				return ret;
+			}
+
+		case EthernetFrameSegment::TYPE_INBAND_STATUS:
+			{
+				int status = sample.m_data[0];
+
+				int up = status & 1;
+				int rawspeed = (status >> 1) & 3;
+				int duplex = (status >> 3) & 1;
+
+				int speed = 10;
+				if(rawspeed == 1)
+					speed = 100;
+				else if(rawspeed == 2)
+					speed = 1000;
+
+				snprintf(tmp, sizeof(tmp), "%s, %s duplex, %d Mbps",
+					up ? "up" : "down",
+					duplex ? "full" : "half",
+					speed
+					);
+				return tmp;
 			}
 
 		case EthernetFrameSegment::TYPE_FCS:
@@ -481,7 +499,6 @@ string EthernetProtocolDecoder::GetText(int i)
 				if(sample.m_data.size() != 4)
 					return "[invalid FCS length]";
 
-				char tmp[32];
 				snprintf(tmp, sizeof(tmp), "CRC: %02x%02x%02x%02x",
 					sample.m_data[0],
 					sample.m_data[1],

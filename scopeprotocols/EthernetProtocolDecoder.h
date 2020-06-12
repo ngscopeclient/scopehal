@@ -55,10 +55,18 @@ public:
 		TYPE_VLAN_TAG,
 		TYPE_PAYLOAD,
 		TYPE_FCS,
+		TYPE_INBAND_STATUS,	//RGMII or similar
 		TYPE_NO_CARRIER
 	} m_type;
 
 	std::vector<uint8_t> m_data;
+
+	EthernetFrameSegment()
+	{}
+
+	EthernetFrameSegment(SegmentType type, uint8_t value)
+		: m_type(type)
+	{ m_data.push_back(value); }
 
 	bool operator==(const EthernetFrameSegment& rhs) const
 	{

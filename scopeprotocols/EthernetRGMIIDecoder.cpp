@@ -139,8 +139,42 @@ void EthernetRGMIIDecoder::Refresh()
 
 	for(size_t i=0; i < len; i++)
 	{
+		//Not sending a frame. Decode in-band status
 		if(!dctl.m_samples[i])
+		{
+			//Extract in-band status
+			uint8_t status = 0;
+			for(size_t j=0; j<4; j++)
+			{
+				if(ddata.m_samples[i][j])
+					status |= (1 << j);
+			}
+
+			//Same status? Merge samples
+			bool extend = false;
+			size_t last = cap->m_samples.size() - 1;
+			if(!cap->m_samples.empty())
+			{
+				auto& sample = cap->m_samples[last];
+				if( (sample.m_type == EthernetFrameSegment::TYPE_INBAND_STATUS) &&
+					(sample.m_data[0] == status) )
+				{
+					extend = true;
+				}
+			}
+
+			//Decode
+			if(extend)
+				cap->m_durations[last] = ddata.m_offsets[i] + ddata.m_durations[i] - cap->m_offsets[last];
+			else
+			{
+				cap->m_offsets.push_back(ddata.m_offsets[i]);
+				cap->m_durations.push_back(ddata.m_durations[i]);
+				cap->m_samples.push_back(EthernetFrameSegment(EthernetFrameSegment::TYPE_INBAND_STATUS, status));
+			}
+
 			continue;
+		}
 
 		//Set of recovered bytes and timestamps
 		vector<uint8_t> bytes;
