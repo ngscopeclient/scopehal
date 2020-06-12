@@ -186,3 +186,53 @@ string Unit::PrettyPrint(double value)
 	}
 	return string(tmp);
 }
+
+/**
+	@brief Parses a string based on the supplied unit
+ */
+double Unit::ParseString(string str)
+{
+	//Find the first non-numeric character in the strnig
+	double scale = 1;
+	for(size_t i=0; i<str.size(); i++)
+	{
+		char c = str[i];
+		if(isspace(c) || isdigit(c) || (c == '.') || (c == '-') )
+			continue;
+
+		if(c == 'G')
+			scale = 1000000000.0;
+		else if(c == 'M')
+			scale = 1000000.0;
+		else if(c == 'K')
+			scale = 1000.0;
+		else if(c == 'm')
+			scale = 0.001;
+		else if(c == 'u')	//TODO: handle μ
+			scale = 1e-6;
+		else if(c == 'n')
+			scale = 1e-9;
+		else if(c == 'p')
+			scale = 1e-12;
+
+		break;
+	}
+
+	//Parse the base value
+	double ret;
+	sscanf(str.c_str(), "%20lf", &ret);
+	ret *= scale;
+
+	//Apply a unit-specific scaling factor
+	switch(m_type)
+	{
+		case Unit::UNIT_PS:
+			ret *= 1e12;
+			break;
+
+		default:
+			break;
+	}
+
+	return ret;
+}
