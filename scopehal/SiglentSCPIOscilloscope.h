@@ -50,6 +50,8 @@ public:
 	SiglentSCPIOscilloscope(SCPITransport* transport);
 	virtual ~SiglentSCPIOscilloscope();
 
+	virtual void SetChannelVoltageRange(size_t i, double range);
+
 	virtual bool AcquireData(bool toQueue);
 
 protected:
@@ -58,10 +60,13 @@ protected:
 	int ReadWaveHeader(char *header);
 
 	bool m_acquiredDataIsSigned;
+	bool m_hasVdivAttnBug;
 
 public:
 	static std::string GetDriverNameInternal();
+
 	OSCILLOSCOPE_INITPROC(SiglentSCPIOscilloscope)
+
 };
 
 #pragma pack(1)
