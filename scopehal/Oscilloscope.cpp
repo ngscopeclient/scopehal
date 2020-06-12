@@ -127,14 +127,14 @@ OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
 
 bool Oscilloscope::WaitForTrigger(int timeout)
 {
-	bool trig = false;
-	for(int i=0; i<timeout*100 && !trig; i++)
+	for(int i=0; i<timeout*100; i++)
 	{
-		trig = (PollTriggerFifo() == Oscilloscope::TRIGGER_MODE_TRIGGERED);
+		if(HasPendingWaveforms())
+			return true;
 		usleep(10 * 1000);
 	}
 
-	return trig;
+	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,17 +165,6 @@ void Oscilloscope::ClearPendingWaveforms()
 			delete it.second;
 		m_pendingWaveforms.pop_front();
 	}
-}
-
-/**
-	@brief Just like PollTrigger(), but checks the fifo instead
- */
-Oscilloscope::TriggerMode Oscilloscope::PollTriggerFifo()
-{
-	if(HasPendingWaveforms())
-		return Oscilloscope::TRIGGER_MODE_TRIGGERED;
-	else
-		return Oscilloscope::TRIGGER_MODE_RUN;
 }
 
 /**
