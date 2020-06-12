@@ -92,7 +92,7 @@ double OscilloscopeChannel::GetOffset()
 	if(m_scope != NULL)
 		return m_scope->GetChannelOffset(m_index);
 	else
-		return 0;	//todo: if protocol decoder use root channel offset or similar?
+		return 0;
 }
 
 void OscilloscopeChannel::SetOffset(double offset)

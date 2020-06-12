@@ -98,6 +98,7 @@ public:
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
 	virtual double GetVoltageRange();
+	virtual double GetOffset();
 
 	virtual void ClearSweeps();
 
@@ -133,6 +134,7 @@ protected:
 	size_t m_uiWidth;
 
 	std::string m_saturationName;
+	std::string m_centerName;
 };
 
 #endif

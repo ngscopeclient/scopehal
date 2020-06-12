@@ -105,6 +105,10 @@ EyeDecoder2::EyeDecoder2(string color)
 	m_saturationName = "Saturation Level";
 	m_parameters[m_saturationName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_saturationName].SetFloatVal(1);
+
+	m_centerName = "Center Voltage";
+	m_parameters[m_centerName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_centerName].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -312,6 +316,11 @@ void EyeDecoder2::ClearSweeps()
 	}
 }
 
+double EyeDecoder2::GetOffset()
+{
+	return -m_parameters[m_centerName].GetFloatVal();
+}
+
 void EyeDecoder2::Refresh()
 {
 	static double total_time = 0;
@@ -344,17 +353,25 @@ void EyeDecoder2::Refresh()
 
 	double start = GetTime();
 
+	//If center of the eye was changed, reset existing eye data
+	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(m_data);
+	double center = m_parameters[m_centerName].GetFloatVal();
+	if(cap)
+	{
+		if(abs(cap->GetCenterVoltage() - center) > 0.001)
+		{
+			delete cap;
+			cap = NULL;
+		}
+	}
+
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
-	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(m_data);
 	if(cap == NULL)
-		cap = new EyeWaveform(m_width, m_height, 0);	//TODO: make center configurable (scopehal:#1)
+		cap = new EyeWaveform(m_width, m_height, center);
 	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
-
-	//Midpoint of the eye voltage
-	double center = cap->GetCenterVoltage();
 
 	//Calculate average period of the clock
 	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
