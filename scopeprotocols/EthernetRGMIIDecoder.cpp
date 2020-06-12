@@ -122,14 +122,14 @@ void EthernetRGMIIDecoder::Refresh()
 	SampleOnAnyEdges(data, clk, ddata);
 
 	//Need a reasonable number of samples or there's no point in decoding.
-	//Cut off the last sample since we're DDR.
+	//Cut off the last few samples because we might be either DDR or SDR and need to seek past our current position.
 	size_t len = min(dctl.m_samples.size(), ddata.m_samples.size());
 	if(len < 100)
 	{
 		SetData(NULL);
 		return;
 	}
-	len --;
+	len -= 4;
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
@@ -137,7 +137,8 @@ void EthernetRGMIIDecoder::Refresh()
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startPicoseconds = data->m_startPicoseconds;
 
-	for(size_t i=0; i < len; i++)
+	//skip first 2 samples so we can get a full clock cycle before starting
+	for(size_t i=2; i < len; i++)
 	{
 		//Not sending a frame. Decode in-band status
 		if(!dctl.m_samples[i])
@@ -176,6 +177,15 @@ void EthernetRGMIIDecoder::Refresh()
 			continue;
 		}
 
+		//We're processing a frame.
+		//Figure out the clock period.
+		//Need to do this cycle-by-cycle in case the link speed changes during a deep capture
+		//TODO: alert if clock isn't close to one of the three legal frequencies
+		int64_t clkperiod = dctl.m_offsets[i] - dctl.m_offsets[i-2];
+		bool ddr = false;		//Default to 2.5/25 MHz SDR.
+		if(clkperiod < 10000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
+			ddr = true;
+
 		//Set of recovered bytes and timestamps
 		vector<uint8_t> bytes;
 		vector<uint64_t> starts;
@@ -187,23 +197,48 @@ void EthernetRGMIIDecoder::Refresh()
 			//Start time
 			starts.push_back(ddata.m_offsets[i]);
 
-			//Convert bits to bytes
-			uint8_t dval = 0;
-			for(size_t j=0; j<8; j++)
+			if(ddr)
 			{
-				if(j < 4)
+				//Convert bits to bytes
+				uint8_t dval = 0;
+				for(size_t j=0; j<8; j++)
 				{
-					if(ddata.m_samples[i][j])
+					if(j < 4)
+					{
+						if(ddata.m_samples[i][j])
+							dval |= (1 << j);
+					}
+					else if(ddata.m_samples[i+1][j-4])
 						dval |= (1 << j);
 				}
-				else if(ddata.m_samples[i+1][j-4])
-					dval |= (1 << j);
-			}
-			bytes.push_back(dval);
+				bytes.push_back(dval);
 
-			ends.push_back(ddata.m_offsets[i+1] + ddata.m_durations[i+1]);
-			i += 2;
+				ends.push_back(ddata.m_offsets[i+1] + ddata.m_durations[i+1]);
+				i += 2;
+			}
+
+			else
+			{
+				//Convert bits to bytes
+				uint8_t dval = 0;
+				for(size_t j=0; j<8; j++)
+				{
+					if(j < 4)
+					{
+						if(ddata.m_samples[i][j])
+							dval |= (1 << j);
+					}
+					else if(ddata.m_samples[i+2][j-4])
+						dval |= (1 << j);
+				}
+				bytes.push_back(dval);
+
+				ends.push_back(ddata.m_offsets[i+3] + ddata.m_durations[i+3]);
+				i += 4;
+			}
 		}
+
+		LogDebug("\n");
 
 		//Crunch the data
 		BytesToFrames(bytes, starts, ends, cap);
