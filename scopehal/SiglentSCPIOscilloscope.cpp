@@ -40,6 +40,7 @@ using namespace std;
 SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	: LeCroyOscilloscope(transport)
 	, m_acquiredDataIsSigned(false)
+	, m_hasVdivAttnBug(true)
 {
 	if (m_modelid == MODEL_SIGLENT_SDS2000X)
 	{
@@ -58,6 +59,67 @@ SiglentSCPIOscilloscope::~SiglentSCPIOscilloscope()
 string SiglentSCPIOscilloscope::GetDriverNameInternal()
 {
 	return "siglent";
+}
+
+void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, double range)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	// FIXME: this assumes there are 8 vertical DIVs on the screen. Should this become a per-SKU parameter?
+	double wantedVdiv = range / 8;
+	m_channelVoltageRanges[i] = range;
+
+	// A Siglent SDS2304X has the 2 firmware bugs (FW 1.2.2.2 R19)
+	//
+	// When you program a VOLT_DIV of x, it actually sets a VOLT_DIV of x * probe_attenuation.
+	// That's the value that will show up to the scope UI and also the value that gets read back
+	// for VOLT_DIV?.
+	// So the bug only happens when sending VOLT_DIV, but not when reading it.
+	//
+	// The other bug is that, sometimes, programming VOLT_DIV just doesn't work: the value
+	// gets ignored. However, when you do a VOLT_DIV? immediately after a VOLT_DIV, then
+	// it always seems to work.
+	//
+	// It's unclear which SKUs and FW version have this bug.
+	//
+	// The following work around should be work for all scopes, whether they have the bug or not:
+	// 1. Program the desired value
+	// 2. Read it back the actual value
+	// 3. Program the value again, but this time adjusted by the ratio between desired and actual value.
+	// 4. Read back the value again to make sure it held
+	//
+	// The only disadvantage to this is that UI on the scope will update twice.
+	//
+	// A potential improvement would be to check at the start if the scope exhibits this bug...
+
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), wantedVdiv);
+	m_transport->SendCommand(cmd);
+
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV?", m_channels[i]->GetHwname().c_str());
+	m_transport->SendCommand(cmd);
+
+	string resultStr = m_transport->ReadReply();
+	double actVdiv;
+	sscanf(resultStr.c_str(), "%lf", &actVdiv);
+
+	if (!m_hasVdivAttnBug)
+		return;
+
+	double adjustVdiv = wantedVdiv / actVdiv;
+
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), wantedVdiv * adjustVdiv);
+	m_transport->SendCommand(cmd);
+
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV?", m_channels[i]->GetHwname().c_str());
+	m_transport->SendCommand(cmd);
+
+	resultStr = m_transport->ReadReply();
+	sscanf(resultStr.c_str(), "%lf", &actVdiv);
+
+	adjustVdiv = wantedVdiv / actVdiv;
+
+	LogDebug("Wanted VOLT_DIV: %lf, Actual VOLT_DIV: %lf, ratio: %lf \n", wantedVdiv, actVdiv, adjustVdiv);
 }
 
 //  Somewhat arbitrary. No header has been seen that's larger than 17...
