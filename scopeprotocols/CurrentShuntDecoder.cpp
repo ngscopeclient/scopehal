@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 CurrentShuntDecoder::CurrentShuntDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_POWER)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_AMPS);
 
