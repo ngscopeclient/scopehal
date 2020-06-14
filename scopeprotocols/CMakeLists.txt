@@ -8,6 +8,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	CANDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
+	CurrentShuntDecoder.cpp
 	DCOffsetDecoder.cpp
 	DDR3Decoder.cpp
 	DifferenceDecoder.cpp

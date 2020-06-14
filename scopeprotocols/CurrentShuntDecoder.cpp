@@ -27,72 +27,126 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
- */
+#include "../scopehal/scopehal.h"
+#include "CurrentShuntDecoder.h"
 
-#include "scopeprotocols.h"
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+CurrentShuntDecoder::CurrentShuntDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(CurrentShuntDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurementDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(EyeHeightMeasurementDecoder);
-	AddDecoderClass(EyeJitterMeasurementDecoder);
-	AddDecoderClass(EyePeriodMeasurementDecoder);
-	AddDecoderClass(EyeWidthMeasurementDecoder);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(OvershootMeasurementDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PkPkMeasurementDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(UndershootMeasurementDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+	m_yAxisUnit = Unit(Unit::UNIT_AMPS);
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
+	//Set up channels
+	m_signalNames.push_back("din");
+	m_channels.push_back(NULL);
+
+	m_resistanceName = "Resistance";
+	m_parameters[m_resistanceName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_resistanceName].SetFloatVal(0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool CurrentShuntDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+double CurrentShuntDecoder::GetVoltageRange()
+{
+	double rshunt = m_parameters[m_resistanceName].GetFloatVal();
+	return m_channels[0]->GetVoltageRange() / rshunt;
+}
+
+double CurrentShuntDecoder::GetOffset()
+{
+	double rshunt = m_parameters[m_resistanceName].GetFloatVal();
+	return m_channels[0]->GetOffset() / rshunt;
+}
+
+string CurrentShuntDecoder::GetProtocolName()
+{
+	return "Current Shunt";
+}
+
+bool CurrentShuntDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool CurrentShuntDecoder::NeedsConfig()
+{
+	//need to specify shunt value
+	return true;
+}
+
+void CurrentShuntDecoder::SetDefaultName()
+{
+	Unit uohms(Unit::UNIT_OHMS);
+
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Shunt(%s, %s)",
+		m_channels[0]->m_displayname.c_str(),
+		uohms.PrettyPrint(m_parameters[m_resistanceName].GetFloatVal()).c_str());
+
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void CurrentShuntDecoder::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(!din)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//We need meaningful data
+	auto len = din->m_samples.size() ;
+	if(len == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Set up the output waveform
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(din);
+
+	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
+
+	float* fsrc = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
+	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	float ishunt = 1.0f / rshunt;
+	for(size_t i=0; i<len; i++)
+		fdst[i] = fsrc[i] * ishunt;
+
+	//Copy our time scales from the input
+	cap->m_timescale 		= din->m_timescale;
+	cap->m_startTimestamp 	= din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+
+	SetData(cap);
 }

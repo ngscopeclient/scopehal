@@ -46,6 +46,7 @@
 #include "CANDecoder.h"
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
+#include "CurrentShuntDecoder.h"
 #include "DCOffsetDecoder.h"
 #include "DDR3Decoder.h"
 #include "DifferenceDecoder.h"

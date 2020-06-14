@@ -30,69 +30,34 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of CurrentShuntDecoder
  */
+#ifndef CurrentShuntDecoder_h
+#define CurrentShuntDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class CurrentShuntDecoder : public ProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(CurrentShuntDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurementDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(EyeHeightMeasurementDecoder);
-	AddDecoderClass(EyeJitterMeasurementDecoder);
-	AddDecoderClass(EyePeriodMeasurementDecoder);
-	AddDecoderClass(EyeWidthMeasurementDecoder);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(OvershootMeasurementDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PkPkMeasurementDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(UndershootMeasurementDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
+	CurrentShuntDecoder(std::string color);
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(CurrentShuntDecoder)
+
+protected:
+	std::string m_resistanceName;
+};
+
+#endif
