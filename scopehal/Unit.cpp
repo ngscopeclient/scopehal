@@ -134,6 +134,10 @@ string Unit::PrettyPrint(double value)
 			unit = "Ω";
 			break;
 
+		case UNIT_WATTS:
+			unit = "W";
+			break;
+
 		case UNIT_BITRATE:
 			unit = "bps";
 			break;
@@ -235,4 +239,22 @@ double Unit::ParseString(string str)
 	}
 
 	return ret;
+}
+
+/**
+	@brief Multiplies two units and calculates the resulting unit
+ */
+Unit Unit::operator*(const Unit& rhs)
+{
+	//Voltage times current is power
+	if( ( (m_type == UNIT_VOLTS) && (rhs.m_type == UNIT_AMPS) ) ||
+		( (rhs.m_type == UNIT_VOLTS) && (m_type == UNIT_AMPS) ) )
+	{
+		return Unit(UNIT_WATTS);
+	}
+
+	//Unknown / invalid pairing?
+	//For now, just return the first unit.
+	//TODO: how should we handle this
+	return Unit(m_type);
 }

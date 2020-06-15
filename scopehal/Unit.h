@@ -38,6 +38,8 @@
 
 /**
 	@brief A unit of measurement, plus conversion to pretty-printed output
+
+	TODO: add scale factors too?
  */
 class Unit
 {
@@ -58,6 +60,7 @@ public:
 		UNIT_LOG_BER,		//Dimensionless ratio (log scale)
 		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
 		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
+		UNIT_WATTS,			//Power
 
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordiantes there
 
@@ -82,6 +85,8 @@ public:
 
 	bool operator!=(UnitType rhs)
 	{ return m_type != rhs; }
+
+	Unit operator*(const Unit& rhs);
 
 protected:
 	UnitType m_type;
