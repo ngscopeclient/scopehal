@@ -74,6 +74,7 @@
 #include "JtagDecoder.h"
 #include "MDIODecoder.h"
 #include "MovingAverageDecoder.h"
+#include "MultiplyDecoder.h"
 #include "OvershootMeasurementDecoder.h"
 #include "ParallelBusDecoder.h"
 #include "PkPkMeasurementDecoder.h"
