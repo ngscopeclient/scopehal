@@ -165,7 +165,7 @@ void SPIDecoder::Refresh()
 						if(first)
 						{
 							cap->m_offsets.push_back(bytestart);
-							cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+							cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
 							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
 							first = false;
 						}
@@ -184,7 +184,7 @@ void SPIDecoder::Refresh()
 					if(bitcount == 8)
 					{
 						cap->m_offsets.push_back(bytestart);
-						cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+						cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
 						cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
 
 						bitcount = 0;
@@ -198,7 +198,7 @@ void SPIDecoder::Refresh()
 				else if(cur_cs)
 				{
 					cap->m_offsets.push_back(bytestart);
-					cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
 					bytestart = clk->m_offsets[i];
@@ -216,7 +216,7 @@ void SPIDecoder::Refresh()
 				else if(cur_cs)
 				{
 					cap->m_offsets.push_back(bytestart);
-					cap->m_offsets.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
 					bytestart = clk->m_offsets[i];
