@@ -27,86 +27,142 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
-
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
-
-#include "ACCoupleDecoder.h"
-#include "ADL5205Decoder.h"
-#include "BaseMeasurementDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "CurrentShuntDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DDR3Decoder.h"
-#include "DifferenceDecoder.h"
 #include "DeskewDecoder.h"
-#include "DramRefreshActivateMeasurementDecoder.h"
-#include "DramRowColumnLatencyMeasurementDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "EyeBitRateMeasurementDecoder.h"
-#include "EyeDecoder2.h"
-#include "EyeHeightMeasurementDecoder.h"
-#include "EyeJitterMeasurementDecoder.h"
-#include "EyePeriodMeasurementDecoder.h"
-#include "EyeWidthMeasurementDecoder.h"
-#include "FallMeasurementDecoder.h"
-#include "FFTDecoder.h"
-#include "FrequencyMeasurementDecoder.h"
-#include "HorizontalBathtubDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "MultiplyDecoder.h"
-#include "OvershootMeasurementDecoder.h"
-#include "ParallelBusDecoder.h"
-#include "PkPkMeasurementDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "RiseMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "SPIDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurementDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "UndershootMeasurementDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
 
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-*/
+using namespace std;
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-void ScopeProtocolStaticInit();
+DeskewDecoder::DeskewDecoder(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+{
+	//Set up channels
+	m_signalNames.push_back("din");
+	m_channels.push_back(NULL);
 
-#endif
+	m_skewname = "Skew";
+	m_parameters[m_skewname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_skewname].SetFloatVal(0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool DeskewDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+double DeskewDecoder::GetVoltageRange()
+{
+	return m_channels[0]->GetVoltageRange();
+}
+
+double DeskewDecoder::GetOffset()
+{
+	return m_channels[0]->GetOffset();
+}
+
+string DeskewDecoder::GetProtocolName()
+{
+	return "Deskew";
+}
+
+bool DeskewDecoder::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool DeskewDecoder::NeedsConfig()
+{
+	//we need the offset to be specified, duh
+	return true;
+}
+
+void DeskewDecoder::SetDefaultName()
+{
+	char hwname[256];
+	float offset = m_parameters[m_skewname].GetFloatVal() * 1e12f;
+	if(offset >= 0)
+	{
+		snprintf(
+			hwname,
+			sizeof(hwname),
+			"%s + %s",
+			m_channels[0]->m_displayname.c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
+			);
+	}
+	else
+	{
+		snprintf(
+			hwname,
+			sizeof(hwname),
+			"%s %s",
+			m_channels[0]->m_displayname.c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
+			);
+	}
+
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void DeskewDecoder::Refresh()
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//We need meaningful data
+	size_t len = din->m_samples.size();
+	if(len == 0)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//offset in seconds
+	float offset = m_parameters[m_skewname].GetFloatVal();
+
+	//convert to time ticks
+	int64_t toff = round(offset * 1e12f / din->m_timescale);
+
+	//Shift all of our samples
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
+	int64_t* tout = (int64_t*)__builtin_assume_aligned(&cap->m_offsets[0], 16);
+	int64_t* ta = (int64_t*)__builtin_assume_aligned(&din->m_offsets[0], 16);
+	memcpy((void*)&cap->m_durations[0], (void*)&din->m_durations[0], len * sizeof(int64_t));
+	for(size_t i=0; i<len; i++)
+	{
+		out[i] 		= a[i];
+		tout[i]		= ta[i] + toff;
+	}
+	SetData(cap);
+
+	//Copy our time scales from the input
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
+}

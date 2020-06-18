@@ -49,6 +49,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(CurrentShuntDecoder);
 	AddDecoderClass(DCOffsetDecoder);
 	AddDecoderClass(DDR3Decoder);
+	AddDecoderClass(DeskewDecoder);
 	AddDecoderClass(DifferenceDecoder);
 	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
 	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);

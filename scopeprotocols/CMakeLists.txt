@@ -11,6 +11,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	CurrentShuntDecoder.cpp
 	DCOffsetDecoder.cpp
 	DDR3Decoder.cpp
+	DeskewDecoder.cpp
 	DifferenceDecoder.cpp
 	DramRefreshActivateMeasurementDecoder.cpp
 	DramRowColumnLatencyMeasurementDecoder.cpp
