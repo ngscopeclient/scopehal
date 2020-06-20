@@ -204,7 +204,7 @@ void USB2PCSDecoder::RefreshIterationIdle(
 			}
 
 			state = STATE_SYNC;
-			count = 1;
+			count = 0;
 			break;
 
 		case USB2PMASymbol::TYPE_SE0:
