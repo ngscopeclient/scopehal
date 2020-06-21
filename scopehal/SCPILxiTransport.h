@@ -33,6 +33,8 @@
 	@brief Declaration of SCPILxiTransport
  */
 
+#ifdef HAS_LXI
+
 #ifndef SCPILxiTransport_h
 #define SCPILxiTransport_h
 
@@ -76,5 +78,7 @@ protected:
 	int m_data_offset;
 	bool m_data_depleted;
 };
+
+#endif
 
 #endif
