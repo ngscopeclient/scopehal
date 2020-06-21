@@ -225,4 +225,4 @@ bool SCPILxiTransport::IsCommandBatchingSupported()
 	return false;
 }
 
-#endif HAS_LXI
+#endif
