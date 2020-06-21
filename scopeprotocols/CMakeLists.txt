@@ -68,6 +68,7 @@ add_library(scopeprotocols SHARED
 	${SCOPEPROTOCOLS_SOURCES})
 
 target_link_libraries(scopeprotocols
+	scopehal
 	${LIBFFTS_LIBRARIES})
 
 target_include_directories(scopeprotocols
