@@ -27,8 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef _WIN32
-
 #include "scopehal.h"
 #include "LeCroyOscilloscope.h"
 #include "ProtocolDecoder.h"
@@ -1175,7 +1173,12 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 	basetime = fseconds - seconds;
 	time_t tnow = time(NULL);
 	struct tm tstruc;
+	
+#ifdef _WIN32
+	localtime_s(&tstruc, &tnow);
+#else
 	localtime_r(&tnow, &tstruc);
+#endif
 
 	//Convert the instrument time to a string, then back to a tm
 	//Is there a better way to do this???
@@ -2155,5 +2158,3 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 
 	return skew_ps;
 }
-
-#endif
