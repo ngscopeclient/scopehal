@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _WIN32
+
 #include "scopehal.h"
 #include "LeCroyOscilloscope.h"
 #include "ProtocolDecoder.h"
@@ -2153,3 +2155,5 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 
 	return skew_ps;
 }
+
+#endif
