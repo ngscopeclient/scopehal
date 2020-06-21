@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _WIN32
+
 #include "scopehal.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "ProtocolDecoder.h"
@@ -398,3 +400,5 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 
 	return true;
 }
+
+#endif

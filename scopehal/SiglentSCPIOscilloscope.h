@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _WIN32
+
 #ifndef SiglentSCPIOscilloscope_h
 #define SiglentSCPIOscilloscope_h
 
@@ -202,5 +204,7 @@ struct SiglentWaveformDesc_t
 	*/
 	uint16_t WaveformSource;
 };
+
+#endif
 
 #endif
