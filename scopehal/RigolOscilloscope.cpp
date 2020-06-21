@@ -27,6 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifdef _WIN32
+#include <chrono>
+#include <thread>
+#endif
+
 #include "scopehal.h"
 #include "RigolOscilloscope.h"
 
@@ -463,7 +468,11 @@ void RigolOscilloscope::ResetTriggerConditions()
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
 	//workaround for high latency links to let the UI thread get the mutex
+#ifdef _WIN32
+	std::this_thread::sleep_for(std::chrono::microseconds(1000));
+#else
 	usleep(1000);
+#endif
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -502,7 +511,11 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	bool enabled[4] = {true, true, true, true};
 
 	//workaround for high latency links to let the UI thread get the mutex
+#ifdef _WIN32
+	std::this_thread::sleep_for(std::chrono::microseconds(1000));
+#else
 	usleep(1000);
+#endif
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
