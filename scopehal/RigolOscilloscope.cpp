@@ -111,6 +111,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		for(int i = 0; i < 4; i++)
 			m_transport->SendCommand(m_channels[i]->GetHwname() + ":VERN ON");
 	m_transport->SendCommand("TIM:VERN ON");
+	FlushConfigCache();
 }
 
 RigolOscilloscope::~RigolOscilloscope()
@@ -145,6 +146,7 @@ void RigolOscilloscope::FlushConfigCache()
 	m_triggerTypeValid = false;
 	m_srateValid = false;
 	m_mdepthValid = false;
+	m_triggerOffsetValid = false;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -467,13 +469,6 @@ void RigolOscilloscope::ResetTriggerConditions()
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
-	//workaround for high latency links to let the UI thread get the mutex
-#ifdef _WIN32
-	std::this_thread::sleep_for(std::chrono::microseconds(1000));
-#else
-	usleep(1000);
-#endif
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand("TRIG:STAT?");
@@ -510,13 +505,6 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//TODO
 	bool enabled[4] = {true, true, true, true};
 
-	//workaround for high latency links to let the UI thread get the mutex
-#ifdef _WIN32
-	std::this_thread::sleep_for(std::chrono::microseconds(1000));
-#else
-	usleep(1000);
-#endif
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
@@ -536,7 +524,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		maxpoints = 250 * 1000;
 	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
-	unsigned char* temp_buf = new unsigned char[maxpoints];
+	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
 	map<int, vector<AnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
@@ -905,7 +893,7 @@ uint64_t RigolOscilloscope::GetSampleDepth()
 	sscanf(ret.c_str(), "%lf", &depth);
 	m_mdepth = (uint64_t)depth;
 	m_mdepthValid = true;
-	return depth;
+	return m_mdepth;
 }
 
 void RigolOscilloscope::SetSampleDepth(uint64_t depth)
@@ -971,13 +959,30 @@ void RigolOscilloscope::SetSampleRate(uint64_t rate)
 	m_mdepthValid = false;
 }
 
-void RigolOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	double offsetval = (double)offset / 1E12;
+	char buf[128];
+	snprintf(buf, sizeof(buf), "TIM:MAIN:OFFS %f", offsetval);
+	m_transport->SendCommand(buf);
 }
+
 
 int64_t RigolOscilloscope::GetTriggerOffset()
 {
-	//FIXME
-	return 0;
+	if(m_triggerOffsetValid)
+		return m_triggerOffset;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("TIM:MAIN:OFFS?");
+	string ret = m_transport->ReadReply();
+
+	double offsetval;
+	sscanf(ret.c_str(), "%lf", &offsetval);
+	m_triggerOffset = (uint64_t)(offsetval * 1E12);
+	m_triggerOffsetValid = true;
+	return m_triggerOffset;
 }

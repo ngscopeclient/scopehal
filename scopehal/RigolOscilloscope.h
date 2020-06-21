@@ -116,6 +116,8 @@ protected:
 	uint64_t m_mdepth;
 	bool m_triggerTypeValid;
 	Oscilloscope::TriggerType m_triggerType;
+	bool m_triggerOffsetValid;
+	uint64_t m_triggerOffset;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
