@@ -42,7 +42,10 @@
 #include "RohdeSchwarzOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
 #include <libgen.h>
+
+#ifndef _WIN32
 #include <dlfcn.h>
+#endif
 
 using namespace std;
 
@@ -52,9 +55,12 @@ using namespace std;
 void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
-	AddTransportClass(SCPILxiTransport);
 	AddTransportClass(SCPITMCTransport);
 	AddTransportClass(VICPSocketTransport);
+	
+#ifdef HAS_LXI
+	AddTransportClass(SCPILxiTransport);
+#endif
 }
 
 /**
@@ -65,10 +71,13 @@ void DriverStaticInit()
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);
 	AddDriverClass(AntikernelLogicAnalyzer);
-	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
+	
+#ifndef _WIN32
+	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
+#endif
 }
 
 string GetDefaultChannelColor(int i)
@@ -109,6 +118,7 @@ uint64_t ConvertVectorSignalToScalar(vector<bool> bits)
  */
 void InitializePlugins()
 {
+#ifndef _WIN32
 	char tmp[1024];
 	vector<string> search_dirs;
 	search_dirs.push_back("/usr/lib/scopehal/plugins/");
@@ -157,4 +167,5 @@ void InitializePlugins()
 
 		closedir(hdir);
 	}
+#endif
 }
