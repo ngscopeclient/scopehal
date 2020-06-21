@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _WIN32
+
 #ifndef LeCroyOscilloscope_h
 #define LeCroyOscilloscope_h
 
@@ -241,5 +243,7 @@ public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(LeCroyOscilloscope)
 };
+
+#endif
 
 #endif

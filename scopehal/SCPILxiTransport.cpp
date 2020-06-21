@@ -32,6 +32,8 @@
 	@author Tom Verbeure 
 	@brief Implementation of SCPILxiTransport
  */
+ 
+#ifdef HAS_LXI
 
 extern "C"
 {
@@ -222,3 +224,5 @@ bool SCPILxiTransport::IsCommandBatchingSupported()
 {
 	return false;
 }
+
+#endif

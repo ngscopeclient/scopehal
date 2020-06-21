@@ -31,6 +31,10 @@
 #include "FFTDecoder.h"
 #include <ffts.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,12 +129,23 @@ void FFTDecoder::Refresh()
 	//TODO: handle non-uniform sample rates
 	float* rdin;
 	size_t insize = npoints * sizeof(float);
+	
+#ifdef _WIN32
+	rdin = (float*)_aligned_malloc(insize, 32);
+#else
 	posix_memalign((void**)&rdin, 32, insize);
+#endif
+
 	memcpy(rdin, &din->m_samples[0], insize);
 
 	float* rdout;
 	const size_t nouts = npoints/2 + 1;
+	
+#ifdef _WIN32
+	rdout = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
+#else	
 	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
+#endif 
 
 	//Calculate the FFT
 	auto plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
@@ -175,6 +190,11 @@ void FFTDecoder::Refresh()
 	SetData(cap);
 
 	//Clean up
+#ifdef _WIN32
+	_aligned_free(rdin);
+	_aligned_free(rdout);
+#else
 	free(rdin);
 	free(rdout);
+#endif
 }
