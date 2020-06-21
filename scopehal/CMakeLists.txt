@@ -3,6 +3,14 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
 
+if(LXI_LIB)
+	set(HAS_LXI true)
+	set(LXI_LIBRARIES ${LXI_LIB})
+else()
+	set(HAS_LXI false)
+	set(LXI_LIBRARIES "")
+endif()
+
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
@@ -41,9 +49,13 @@ set(SCOPEHAL_SOURCES
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
-target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp ${LXI_LIB})
+target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp ${LXI_LIBRARIES})
 
 target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(${HAS_LXI})
+	target_compile_definitions(scopehal PUBLIC HAS_LXI)
+endif()
 
 install(TARGETS scopehal LIBRARY DESTINATION /usr/lib)
