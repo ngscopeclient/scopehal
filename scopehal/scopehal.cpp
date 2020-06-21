@@ -45,9 +45,13 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
+#else
+#include <windows.h>
+#include <shlwapi.h>
 #endif
 
 using namespace std;
+
 
 /**
 	@brief Static initialization for SCPI transports
@@ -167,5 +171,99 @@ void InitializePlugins()
 
 		closedir(hdir);
 	}
+#else
+	// Get path of process image
+	TCHAR binPath[MAX_PATH];
+	
+	if( GetModuleFileName(NULL, binPath, MAX_PATH) == 0 )
+	{
+		LogError("Error: GetModuleFileName() failed.\n");
+		return;
+	}
+	
+	// Remove file name from path
+	if( !PathRemoveFileSpec(binPath) )
+	{
+		LogError("Error: PathRemoveFileSpec() failed.\n");
+		return;
+	}
+	
+	TCHAR searchPath[MAX_PATH];
+	if( PathCombine(searchPath, binPath, "plugins\\*.dll") == NULL )
+	{
+		LogError("Error: PathCombine() failed.\n");
+		return;
+	}
+	
+	// For now, we only search in the folder that contains the binary.
+	WIN32_FIND_DATA findData;
+	HANDLE findHandle = INVALID_HANDLE_VALUE;
+	
+	// First file entry
+	findHandle = FindFirstFile(searchPath, &findData);
+	
+	// Is there at least one file?
+	if(findHandle == INVALID_HANDLE_VALUE)
+	{
+		return;
+	}
+	
+	do
+	{
+		// Exclude directories
+		if(!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		{
+			auto fileName = findData.cFileName;
+			auto fileNameCStr = reinterpret_cast<const char*>(fileName);
+			auto extension = PathFindExtension(fileName);
+			
+			// The file name does not contain the full path, which poses a problem since the file is
+			// located in the plugins subdirectory
+			TCHAR filePath[MAX_PATH];
+			
+			if( PathCombine(filePath, "plugins", fileName) == NULL )
+			{
+				LogError("Error: PathCombine() failed.\n");
+				return;
+			}
+			
+			// Try to open it as a library
+			auto module = LoadLibrary(filePath);
+			
+			if(module != NULL)
+			{
+				// Try to retrieve plugin entry point address
+				auto procAddr = GetProcAddress(module, "PluginInit");
+				
+				if(procAddr != NULL)
+				{
+					typedef void (*PluginInit)();
+					auto proc = reinterpret_cast<PluginInit>(procAddr);
+					proc();
+				}
+				else
+				{
+					LogWarning("Warning: Found plugin %s, but has no init symbol\n", fileNameCStr);
+				}
+				
+				FreeLibrary(module);
+			}
+			else
+			{
+				LogWarning("Warning: Found plugin %s, but isn't valid library\n", fileNameCStr);
+			}
+		}
+	}
+	while(0 != FindNextFile(findHandle, &findData));
+	
+	auto error = GetLastError();
+	
+	if(error != ERROR_NO_MORE_FILES)
+	{
+		LogError("Error: Enumeration of plugin files failed.\n");
+	}
+	
+	FindClose(findHandle);
+
 #endif
 }
