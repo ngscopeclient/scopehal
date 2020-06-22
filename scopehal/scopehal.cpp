@@ -77,11 +77,8 @@ void DriverStaticInit()
 	AddDriverClass(AntikernelLogicAnalyzer);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
-	
-#ifndef _WIN32
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
-#endif
 }
 
 string GetDefaultChannelColor(int i)
