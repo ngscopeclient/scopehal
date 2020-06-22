@@ -577,7 +577,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			size_t end = npoint + maxpoints;
 			if(end > npoints)
 				end = npoints;
-			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end + 1);
+			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end); //Here it is zero based, so it gets from 1-1000
 			m_transport->SendCommand(tmp);
 
 			//Ask for the data block
