@@ -239,28 +239,29 @@ void IBM8b10bDecoder::Refresh()
 			7, 6, 2, 0, 3, 4, 0, 0
 		};
 
-		static const int disp3_ctl_table[16] =
-		{
-			 0, 0, -2, 0, -2, 0, 0, 2,
-			-2, 0,  0, 2,  0, 2, 0, 0
-		};
-
 		static const bool err3_table[16] =
 		{
-			 true,  true, false, false, false, false, false, false,
+			 true,  false, false, false, false, false, false, false,
 			false, false, false, false, false, false, false,  true
 		};
 
 		static const int code3_table[16] =
 		{
-			0, 0, 4, 3, 0, 2, 6, 7,
+			0, 7, 4, 3, 0, 2, 6, 7,
 			7, 1, 5, 0, 3, 4, 7, 0
 		};
 
 		static const int disp3_table[16] =
 		{
-			 0, 0, -2, 0, -2, 0, 0, 2,
+			 0, -2, -2, 0, -2, 0, 0, 2,
 			-2, 0,  0, 2,  0, 2, 2, 0
+		};
+
+		//true only for Dx.A7
+		const bool alt3_table[16] =
+		{
+			0, 0, 0, 0, 0, 0, 0, 1,
+			1, 0, 0, 0, 0, 0, 0, 0
 		};
 
 		int code3 = false;
@@ -272,15 +273,14 @@ void IBM8b10bDecoder::Refresh()
 				code3 = code3_pos_ctl_table[code4];
 			else
 				code3 = code3_neg_ctl_table[code4];
-			disp3 = disp3_ctl_table[code4];
 			err3 = err3_ctl_table[code4];
 		}
 		else
 		{
 			code3 = code3_table[code4];
-			disp3 = disp3_table[code4];
 			err3 = err3_table[code4];
 		}
+		disp3 = disp3_table[code4];
 
 		//Disparity tracking
 		int total_disp = disp3 + disp5;
@@ -294,6 +294,7 @@ void IBM8b10bDecoder::Refresh()
 		}
 
 		bool disperr = false;
+		int old_disp = last_disp;
 		if(total_disp > 0 && last_disp > 0)
 		{
 			disperr = true;
@@ -307,9 +308,41 @@ void IBM8b10bDecoder::Refresh()
 		else
 			last_disp += total_disp;
 
-		cap->m_offsets.push_back(data.m_offsets[i]);
+		//Special processing for a few control codes that use the .A7 format
+		bool alt = alt3_table[code4];
+		if(alt)
+		{
+			if( (code5 == 23) || (code5 == 27) || (code5 == 29) || (code5 == 30) )
+				ctl5 = true;
+		}
+
+		//Horizontally shift the decoded symbol back by half a UI
+		//since the recovered clock edge is in the middle of the UI.
+		//We want the decoded signal boundaries to line up with the data edge, not the middle of the UI.
+		cap->m_offsets.push_back(data.m_offsets[i] - data.m_durations[i]/2);
+
 		cap->m_durations.push_back(data.m_offsets[i+10] - data.m_offsets[i]);
 		cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5));
+
+		if(err5 || err3 || disperr)
+		{
+			LogDebug(
+				"Symbol %zu (ctl5 = %d, err5 = %d, err3=%d, disperr=%d, code3=%d, code5=%d, "
+					"old_disp = %d, total_disp = %d, disp3 = %d, disp5 = %d)\n",
+				i,
+				ctl5, err5, err3, disperr, code3, code5, old_disp, total_disp, disp3, disp5);
+		}
+		/*
+		else
+		{
+			if(ctl5)
+				LogDebug("K%d.%d, disp=%d (old_disp = %d, disp3=%d, disp5=%d)\n",
+					code5, code3, last_disp, old_disp, disp3, disp5);
+			else
+				LogDebug("D%d.%d, disp=%d (old_disp = %d, disp3=%d, disp5=%d)\n",
+					code5, code3, last_disp, old_disp,disp3, disp5);
+		}
+		*/
 	}
 
 	SetData(cap);
