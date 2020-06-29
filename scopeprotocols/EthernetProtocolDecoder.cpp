@@ -67,6 +67,7 @@ vector<string> EthernetProtocolDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Dest MAC");
 	ret.push_back("Src MAC");
+	ret.push_back("VLAN");
 	ret.push_back("Ethertype");
 	return ret;
 }
@@ -166,10 +167,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale );
 					cap->m_samples.push_back(segment);
 
-					//Reset for next block of the frame
-					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
-					segment.m_data.clear();
-
 					//Format the content for display
 					char tmp[64];
 					snprintf(tmp, sizeof(tmp), "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -180,6 +177,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 						segment.m_data[4],
 						segment.m_data[5]);
 					pack->m_headers["Dest MAC"] = tmp;
+
+					//Reset for next block of the frame
+					segment.m_type = EthernetFrameSegment::TYPE_SRC_MAC;
+					segment.m_data.clear();
 				}
 
 				break;
@@ -202,10 +203,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
-					//Reset for next block of the frame
-					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
-					segment.m_data.clear();
-
 					//Format the content for display
 					char tmp[64];
 					snprintf(tmp, sizeof(tmp),"%02x:%02x:%02x:%02x:%02x:%02x",
@@ -216,6 +213,10 @@ void EthernetProtocolDecoder::BytesToFrames(
 						segment.m_data[4],
 						segment.m_data[5]);
 					pack->m_headers["Src MAC"] = tmp;
+
+					//Reset for next block of the frame
+					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
+					segment.m_data.clear();
 				}
 
 				break;
@@ -237,10 +238,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 				{
 					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
 					cap->m_samples.push_back(segment);
-
-					//Reset for next block of the frame
-					segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
-					segment.m_data.clear();
 
 					//Format the content for display
 					uint16_t ethertype = (segment.m_data[0] << 8) | segment.m_data[1];
@@ -270,6 +267,46 @@ void EthernetProtocolDecoder::BytesToFrames(
 							pack->m_headers["Ethertype"] = tmp;
 							break;
 					}
+
+					//Reset for next block of the frame
+					segment.m_type = EthernetFrameSegment::TYPE_PAYLOAD;
+					segment.m_data.clear();
+
+					//It's an 802.1q tag, decode the VLAN header
+					if(ethertype == 0x8100)
+						segment.m_type = EthernetFrameSegment::TYPE_VLAN_TAG;
+				}
+
+				break;
+
+			case EthernetFrameSegment::TYPE_VLAN_TAG:
+
+				//Start of tag? Record start time
+				if(segment.m_data.empty())
+				{
+					start = starts[i];
+					cap->m_offsets.push_back(start / cap->m_timescale);
+				}
+
+				//Add the data
+				segment.m_data.push_back(bytes[i]);
+
+				//Are we done? Add it
+				if(segment.m_data.size() == 2)
+				{
+					cap->m_durations.push_back( (ends[i] - start) / cap->m_timescale);
+					cap->m_samples.push_back(segment);
+
+					uint16_t tag = (segment.m_data[0] << 8) | segment.m_data[1];
+
+					//Reset for the internal ethertype
+					segment.m_type = EthernetFrameSegment::TYPE_ETHERTYPE;
+					segment.m_data.clear();
+
+					//Format the content for display
+					char tmp[64];
+					snprintf(tmp, sizeof(tmp),"%d", tag & 0xfff);
+					pack->m_headers["VLAN"] = tmp;
 				}
 
 				break;
@@ -420,7 +457,14 @@ string EthernetProtocolDecoder::GetText(int i)
 
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
 			{
-				return "[unimplemented vlan tag]";
+				uint16_t tag = (sample.m_data[0] << 8) | sample.m_data[1];
+
+				snprintf(tmp, sizeof(tmp), "VLAN %d, PCP %d",
+					tag & 0xfff, tag >> 13);
+				string sret = tmp;
+				if(tag & 0x1000)
+					sret += ", DE";
+				return sret;
 			}
 			break;
 
