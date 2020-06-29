@@ -18,6 +18,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DVIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
+	Ethernet1000BaseXDecoder.cpp
 	EthernetAutonegotiationDecoder.cpp
 	EthernetGMIIDecoder.cpp
 	EthernetRGMIIDecoder.cpp

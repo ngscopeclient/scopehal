@@ -418,6 +418,13 @@ string EthernetProtocolDecoder::GetText(int i)
 				return tmp;
 			}
 
+		case EthernetFrameSegment::TYPE_VLAN_TAG:
+			{
+				return "[unimplemented vlan tag]";
+			}
+			break;
+
+
 		case EthernetFrameSegment::TYPE_ETHERTYPE:
 			{
 				if(sample.m_data.size() != 2)

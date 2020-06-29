@@ -27,87 +27,128 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopeprotocols.h"
+#include <algorithm>
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+using namespace std;
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include "ACCoupleDecoder.h"
-#include "ADL5205Decoder.h"
-#include "BaseMeasurementDecoder.h"
-#include "CANDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "CurrentShuntDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DDR3Decoder.h"
-#include "DifferenceDecoder.h"
-#include "DeskewDecoder.h"
-#include "DramRefreshActivateMeasurementDecoder.h"
-#include "DramRowColumnLatencyMeasurementDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "EyeBitRateMeasurementDecoder.h"
-#include "EyeDecoder2.h"
-#include "EyeHeightMeasurementDecoder.h"
-#include "EyeJitterMeasurementDecoder.h"
-#include "EyePeriodMeasurementDecoder.h"
-#include "EyeWidthMeasurementDecoder.h"
-#include "FallMeasurementDecoder.h"
-#include "FFTDecoder.h"
-#include "FrequencyMeasurementDecoder.h"
-#include "HorizontalBathtubDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "MultiplyDecoder.h"
-#include "OvershootMeasurementDecoder.h"
-#include "ParallelBusDecoder.h"
-#include "PkPkMeasurementDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "RiseMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "SPIDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurementDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "UndershootMeasurementDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
+Ethernet1000BaseXDecoder::Ethernet1000BaseXDecoder(string color)
+	: EthernetProtocolDecoder(color)
+{
+	//Digital inputs, so need to undo some stuff for the PHY layer decodes
+	m_signalNames.clear();
+	m_channels.clear();
 
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-*/
+	//Add inputs. We take a single 8b10b coded stream
+	m_signalNames.push_back("data");
+	m_channels.push_back(NULL);
+}
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-void ScopeProtocolStaticInit();
+string Ethernet1000BaseXDecoder::GetProtocolName()
+{
+	return "Ethernet - 1000BaseX";
+}
 
-#endif
+bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+{
+	if( (i == 0) && (dynamic_cast<IBM8b10bDecoder*>(channel) != NULL) )
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void Ethernet1000BaseXDecoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "1000BaseX(%s)", m_channels[0]->m_displayname.c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+void Ethernet1000BaseXDecoder::Refresh()
+{
+	ClearPackets();
+
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	auto data = dynamic_cast<IBM8b10bWaveform*>(m_channels[0]->GetData());
+	if(data == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	//Create the output capture
+	auto cap = new EthernetWaveform;
+	cap->m_timescale = data->m_timescale;
+	cap->m_startTimestamp = data->m_startTimestamp;
+	cap->m_startPicoseconds = data->m_startPicoseconds;
+
+	size_t len = data->m_samples.size();
+	for(size_t i=0; i < len; i++)
+	{
+		//Ignore idles and autonegotiation for now
+
+		auto symbol = data->m_samples[i];
+
+		//Set of recovered bytes and timestamps
+		vector<uint8_t> bytes;
+		vector<uint64_t> starts;
+		vector<uint64_t> ends;
+
+		//K27.7 is a start-of-frame
+		if(symbol.m_control && (symbol.m_data == 0xfb) )
+		{
+			bytes.push_back(0x55);
+			starts.push_back(data->m_offsets[i]);
+			ends.push_back(data->m_offsets[i] + data->m_durations[i]);
+		}
+
+		//Discard anything else
+		else
+			continue;
+
+		i++;
+
+		//Decode frame data until we see a control or error character.
+		//Any control character would mean end-of-frame or error.
+		bool error = false;
+		while(i < len)
+		{
+			symbol = data->m_samples[i];
+
+			//Expect K29.7 end of frame
+			if(symbol.m_control)
+			{
+				if(symbol.m_data != 0xfd)
+					error = true;
+				break;
+			}
+
+			bytes.push_back(symbol.m_data);
+			starts.push_back(data->m_offsets[i]);
+			ends.push_back(data->m_offsets[i] + data->m_durations[i]);
+			i++;
+		}
+
+		//TODO: if error, create a single giant "ERROR" frame block? or what
+
+		//Crunch the data
+		if(!error)
+			BytesToFrames(bytes, starts, ends, cap);
+	}
+
+	SetData(cap);
+}
