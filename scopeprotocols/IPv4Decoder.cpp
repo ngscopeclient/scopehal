@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 IPv4Decoder::IPv4Decoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MISC)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
 	m_signalNames.push_back("eth");
@@ -123,6 +123,7 @@ void IPv4Decoder::Refresh()
 	for(size_t i=0; i<len; i++)
 	{
 		auto s = din->m_samples[i];
+		int64_t halfdur = din->m_durations[i]/2;
 
 		switch(state)
 		{
@@ -166,7 +167,6 @@ void IPv4Decoder::Refresh()
 					else
 						state = 0;
 				}
-
 				else
 					state = 0;
 
@@ -187,7 +187,6 @@ void IPv4Decoder::Refresh()
 					uint8_t data = s.m_data[0];
 
 					//Expect 0x4-something for IP version
-					int64_t halfdur = din->m_durations[i]/2;
 					if( (data >> 4) == 4)
 					{
 						cap->m_offsets.push_back(din->m_offsets[i]);
@@ -209,7 +208,6 @@ void IPv4Decoder::Refresh()
 
 					state = 6;
 				}
-
 				else
 					state = 0;
 
@@ -224,7 +222,6 @@ void IPv4Decoder::Refresh()
 					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DIFFSERV, s.m_data[0]));
 					state = 7;
 				}
-
 				else
 					state = 0;
 				break;
@@ -238,7 +235,6 @@ void IPv4Decoder::Refresh()
 					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_LENGTH, s.m_data[0]));
 					state = 8;
 				}
-
 				else
 					state = 0;
 				break;
@@ -251,10 +247,185 @@ void IPv4Decoder::Refresh()
 					cap->m_samples[n].m_data.push_back(s.m_data[0]);
 					state = 9;
 				}
-
 				else
 					state = 0;
 				break;
+
+			//Identification
+			case 9:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_ID, s.m_data[0]));
+					state = 10;
+				}
+				else
+					state = 0;
+				break;
+			case 10:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Append to the previous sample
+					size_t n = cap->m_offsets.size() - 1;
+					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
+					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					state = 11;
+				}
+				else
+					state = 0;
+				break;
+
+			//Flags, frag offset
+			case 11:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Flags
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(halfdur);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FLAGS, s.m_data[0] >> 5));
+
+					//Frag offset, high 5 bits
+					cap->m_offsets.push_back(din->m_offsets[i] + halfdur);
+					cap->m_durations.push_back(halfdur);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_FRAG_OFFSET, s.m_data[0] & 0x1f));
+					state = 12;
+				}
+				else
+					state = 0;
+				break;
+			case 12:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Append to the previous sample
+					size_t n = cap->m_offsets.size() - 1;
+					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
+					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					state = 13;
+				}
+				else
+					state = 0;
+				break;
+
+			//TTL
+			case 13:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_TTL, s.m_data[0]));
+					state = 14;
+				}
+				else
+					state = 0;
+				break;
+
+			//Protocol
+			case 14:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_PROTOCOL, s.m_data[0]));
+					state = 15;
+				}
+				else
+					state = 0;
+				break;
+
+			//Header checksum
+			case 15:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_HEADER_CHECKSUM, s.m_data[0]));
+					state = 16;
+				}
+				else
+					state = 0;
+				break;
+			case 16:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Append to the previous sample
+					size_t n = cap->m_offsets.size() - 1;
+					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
+					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					state = 17;
+				}
+				else
+					state = 0;
+				break;
+
+			//Src IP
+			case 17:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_SOURCE_IP, s.m_data[0]));
+					state = 18;
+				}
+				else
+					state = 0;
+				break;
+			case 18:
+			case 19:
+			case 20:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Append to the previous sample
+					size_t n = cap->m_offsets.size() - 1;
+					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
+					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					state++;
+				}
+				else
+					state = 0;
+				break;
+
+			//Dst IP
+			case 21:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DEST_IP, s.m_data[0]));
+					state = 22;
+				}
+				else
+					state = 0;
+				break;
+			case 22:
+			case 23:
+			case 24:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					//Append to the previous sample
+					size_t n = cap->m_offsets.size() - 1;
+					cap->m_durations[n] = din->m_offsets[i] + din->m_durations[i] - cap->m_offsets[n];
+					cap->m_samples[n].m_data.push_back(s.m_data[0]);
+					state++;
+				}
+				else
+					state = 0;
+				break;
+
+			//TODO: support header options
+			case 25:
+				if(s.m_type == EthernetFrameSegment::TYPE_PAYLOAD)
+				{
+					cap->m_offsets.push_back(din->m_offsets[i]);
+					cap->m_durations.push_back(din->m_durations[i]);
+					cap->m_samples.push_back(IPv4Symbol(IPv4Symbol::TYPE_DATA, s.m_data[0]));
+				}
+
+				//terminate the packet on FCS or error
+				else
+					state = 0;
+				break;
+
 		}
 	}
 
@@ -273,14 +444,34 @@ Gdk::Color IPv4Decoder::GetColor(int i)
 
 	switch(data->m_samples[i].m_type)
 	{
-		case IPv4Symbol::TYPE_ERROR:
-			return m_standardColors[COLOR_ERROR];
-
 		case IPv4Symbol::TYPE_VERSION:
 		case IPv4Symbol::TYPE_HEADER_LEN:
+			return m_standardColors[COLOR_PREAMBLE];
+
+		case IPv4Symbol::TYPE_FLAGS:
 		case IPv4Symbol::TYPE_DIFFSERV:
 		case IPv4Symbol::TYPE_LENGTH:
-			return m_standardColors[COLOR_PREAMBLE];
+		case IPv4Symbol::TYPE_ID:
+		case IPv4Symbol::TYPE_FRAG_OFFSET:
+		case IPv4Symbol::TYPE_TTL:
+		case IPv4Symbol::TYPE_PROTOCOL:
+		case IPv4Symbol::TYPE_OPTIONS:
+			return m_standardColors[COLOR_CONTROL];
+
+		//TODO: properly verify checksum
+		case IPv4Symbol::TYPE_HEADER_CHECKSUM:
+			return m_standardColors[COLOR_CHECKSUM_OK];
+
+		case IPv4Symbol::TYPE_SOURCE_IP:
+		case IPv4Symbol::TYPE_DEST_IP:
+			return m_standardColors[COLOR_ADDRESS];
+
+		case IPv4Symbol::TYPE_DATA:
+			return m_standardColors[COLOR_DATA];
+
+		case IPv4Symbol::TYPE_ERROR:
+		default:
+			return m_standardColors[COLOR_ERROR];
 	}
 }
 
@@ -298,12 +489,17 @@ string IPv4Decoder::GetText(int i)
 	switch(sample.m_type)
 	{
 		case IPv4Symbol::TYPE_VERSION:
-			snprintf(tmp, sizeof(tmp), "Version: %d", sample.m_data[0]);
+			snprintf(tmp, sizeof(tmp), "V%d", sample.m_data[0]);
 			return string(tmp);
 
 		case IPv4Symbol::TYPE_HEADER_LEN:
-			snprintf(tmp, sizeof(tmp), "Header len: %d words", sample.m_data[0]);
-			return string(tmp);
+			if(sample.m_data[0] == 5)
+				return "No opts";
+			else
+			{
+				snprintf(tmp, sizeof(tmp), "%d header words", sample.m_data[0]);
+				return string(tmp);
+			}
 
 		case IPv4Symbol::TYPE_DIFFSERV:
 			{
@@ -333,6 +529,82 @@ string IPv4Decoder::GetText(int i)
 		case IPv4Symbol::TYPE_LENGTH:
 			snprintf(tmp, sizeof(tmp), "Length: %d", (sample.m_data[0] << 8) | sample.m_data[1]);
 			return string(tmp);
+
+		case IPv4Symbol::TYPE_ID:
+			snprintf(tmp, sizeof(tmp), "ID: 0x%04x", (sample.m_data[0] << 8) | sample.m_data[1]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_FLAGS:
+			{
+				string ret;
+				if(sample.m_data[0] & 4)
+					ret = "Evil ";
+				if(sample.m_data[0] & 2)
+					ret += "DF ";
+				if(sample.m_data[0] & 1)
+					ret += "MF ";
+				if(ret == "")
+					ret = "No flag";
+				return ret;
+			}
+
+		case IPv4Symbol::TYPE_FRAG_OFFSET:
+			snprintf(tmp, sizeof(tmp), "Offset: 0x%04x", 8*( (sample.m_data[0] << 8) | sample.m_data[1]));
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_TTL:
+			snprintf(tmp, sizeof(tmp), "TTL: %d", sample.m_data[0]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_PROTOCOL:
+			switch(sample.m_data[0])
+			{
+				case 0x01:
+					return "ICMP";
+				case 0x02:
+					return "IGMP";
+				case 0x06:
+					return "TCP";
+				case 0x11:
+					return "UDP";
+				case 0x2f:
+					return "GRE";
+				case 0x58:
+					return "EIGRP";
+				case 0x59:
+					return "OSPF";
+				case 0x73:
+					return "L2TP";
+				case 0x85:
+					return "FCoIP";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "Protocol: 0x%02x", sample.m_data[0]);
+					return string(tmp);
+			}
+			break;
+
+		case IPv4Symbol::TYPE_HEADER_CHECKSUM:
+			snprintf(tmp, sizeof(tmp), "Checksum: 0x%04x", (sample.m_data[0] << 8) | sample.m_data[1]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_SOURCE_IP:
+			snprintf(tmp, sizeof(tmp), "Source: %d.%d.%d.%d",
+				sample.m_data[0], sample.m_data[1], sample.m_data[2], sample.m_data[3]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_DEST_IP:
+			snprintf(tmp, sizeof(tmp), "Dest: %d.%d.%d.%d",
+				sample.m_data[0], sample.m_data[1], sample.m_data[2], sample.m_data[3]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_DATA:
+		case IPv4Symbol::TYPE_OPTIONS:
+			snprintf(tmp, sizeof(tmp), "%02x", sample.m_data[0]);
+			return string(tmp);
+
+		case IPv4Symbol::TYPE_ERROR:
+			return "ERROR";
 	}
 
 	return "";
