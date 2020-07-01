@@ -30,73 +30,73 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of IPv4Decoder
  */
+#ifndef IPv4Decoder_h
+#define IPv4Decoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class IPv4Symbol
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(CurrentShuntDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeskewDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurementDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(EyeHeightMeasurementDecoder);
-	AddDecoderClass(EyeJitterMeasurementDecoder);
-	AddDecoderClass(EyePeriodMeasurementDecoder);
-	AddDecoderClass(EyeWidthMeasurementDecoder);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(MultiplyDecoder);
-	AddDecoderClass(OvershootMeasurementDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PkPkMeasurementDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(UndershootMeasurementDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	enum SegmentType
+	{
+		TYPE_ERROR,
+		TYPE_VERSION,
+		TYPE_HEADER_LEN,
+		TYPE_DIFFSERV,
+		TYPE_LENGTH,
+		TYPE_ID,
+		TYPE_FLAGS,
+		TYPE_FRAG_OFFSET,
+		TYPE_TTL,
+		TYPE_PROTOCOL,
+		TYPE_HEADER_CHECKSUM,
+		TYPE_SOURCE_IP,
+		TYPE_DEST_IP,
+		TYPE_OPTIONS,
+		TYPE_DATA
+	} m_type;
+
+	std::vector<uint8_t> m_data;
+
+	IPv4Symbol()
+	{}
+
+	IPv4Symbol(SegmentType type, uint8_t value)
+		: m_type(type)
+	{ m_data.push_back(value); }
+
+	bool operator==(const IPv4Symbol& rhs) const
+	{
+		return (m_data == rhs.m_data) && (m_type == rhs.m_type);
+	}
+};
+
+typedef Waveform<IPv4Symbol> IPv4Waveform;
+
+class IPv4Decoder : public ProtocolDecoder
+{
+public:
+	IPv4Decoder(std::string color);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(IPv4Decoder)
+};
+
+#endif

@@ -123,7 +123,6 @@ void ADL5205Decoder::Refresh()
 	for(size_t i=0; i<len; i++)
 	{
 		auto s = din->m_samples[i];
-		SetData(NULL);
 
 		switch(phase)
 		{

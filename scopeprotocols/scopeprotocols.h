@@ -73,6 +73,7 @@
 #include "HorizontalBathtubDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
+#include "IPv4Decoder.h"
 #include "JtagDecoder.h"
 #include "MDIODecoder.h"
 #include "MovingAverageDecoder.h"

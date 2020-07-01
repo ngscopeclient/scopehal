@@ -430,7 +430,7 @@ string EthernetProtocolDecoder::GetText(int i)
 				if(sample.m_data.size() != 6)
 					return "[invalid dest MAC length]";
 
-				snprintf(tmp, sizeof(tmp), "Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+				snprintf(tmp, sizeof(tmp), "To %02x:%02x:%02x:%02x:%02x:%02x",
 					sample.m_data[0],
 					sample.m_data[1],
 					sample.m_data[2],
@@ -445,7 +445,7 @@ string EthernetProtocolDecoder::GetText(int i)
 				if(sample.m_data.size() != 6)
 					return "[invalid src MAC length]";
 
-				snprintf(tmp, sizeof(tmp), "Src MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+				snprintf(tmp, sizeof(tmp), "From %02x:%02x:%02x:%02x:%02x:%02x",
 					sample.m_data[0],
 					sample.m_data[1],
 					sample.m_data[2],

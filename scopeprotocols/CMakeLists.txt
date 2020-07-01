@@ -35,6 +35,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	HorizontalBathtubDecoder.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp
+	IPv4Decoder.cpp
 	JtagDecoder.cpp
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
