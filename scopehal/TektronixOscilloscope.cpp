@@ -42,7 +42,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-    /*
+	/*
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;
 	model_number.erase(
@@ -54,18 +54,18 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		model_number.end()
 	);
 	int nchans = std::stoi(model_number) % 10;
-    */
+	*/
 	int nchans = 4;
 
-    // No header in the reply of queries
-    m_transport->SendCommand("HEAD 0");
+	// No header in the reply of queries
+	m_transport->SendCommand("HEAD 0");
 
-    // 8-bit signed data
-    m_transport->SendCommand("DATA:ENC RIB;WID 1");
+	// 8-bit signed data
+	m_transport->SendCommand("DATA:ENC RIB;WID 1");
 
-    m_transport->SendCommand("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
+	m_transport->SendCommand("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
 
-    // FIXME: where to put this?
+	// FIXME: where to put this?
 	m_transport->SendCommand("ACQ:STOPA SEQ;REPE 1");
 
 	for(int i=0; i<nchans; i++)
@@ -129,8 +129,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	vector<string> options;
 
 	for (std::string::size_type prev_pos=0, pos=0;
-	     (pos = reply.find(',', pos)) != std::string::npos;
-	     prev_pos=++pos)
+		 (pos = reply.find(',', pos)) != std::string::npos;
+		 prev_pos=++pos)
 	{
 		std::string opt( reply.substr(prev_pos, pos-prev_pos) );
 		if (opt == "0")
@@ -204,7 +204,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 //	string reply = m_transport->ReadReply();
 //
 	string reply;
-    reply = "1";
+	reply = "1";
 	if(reply == "0")
 	{
 		m_channelsEnabled[i] = false;
@@ -239,8 +239,8 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 {
 	OscilloscopeChannel::CouplingType coupling;
 
-    // FIXME
-    coupling = OscilloscopeChannel::COUPLE_DC_1M;
+	// FIXME
+	coupling = OscilloscopeChannel::COUPLE_DC_1M;
 	m_channelCouplings[i] = coupling;
 	return coupling;
 
@@ -309,8 +309,8 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 			return m_channelAttenuations[i];
 	}
 
-    // FIXME
-    return 1.0;
+	// FIXME
+	return 1.0;
 
 #if 0
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -375,8 +375,8 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-    // FIXME
-    return 8;
+	// FIXME
+	return 8;
 
 #if 0
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
@@ -451,17 +451,17 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 	m_transport->SendCommand("TRIG:STATE?");
 	string ter = m_transport->ReadReply();
 
-    if(ter == "SAV")
+	if(ter == "SAV")
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
 	if(ter != "REA")
-    {
+	{
 		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
-    }
+	}
 
 	//TODO: how to handle auto / normal trigger mode?
 	return TRIGGER_MODE_RUN;
@@ -502,19 +502,19 @@ bool TektronixOscilloscope::AcquireData(bool toQueue)
 //		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 //				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
 
-        for(int j=0;j<10;++j)
-		    m_transport->ReadReply();
+		for(int j=0;j<10;++j)
+			m_transport->ReadReply();
 
-        format = 0;
-        type = 0;
-        average_count = 0;
-        xincrement = 1000;
-        xorigin = 0;
-        xreference = 0;
-        yincrement = 0.01;
-        yorigin = 0;
-        yreference = 0;
-        length = 500;
+		format = 0;
+		type = 0;
+		average_count = 0;
+		xincrement = 1000;
+		xorigin = 0;
+		xreference = 0;
+		yincrement = 0.01;
+		yorigin = 0;
+		yreference = 0;
+		length = 500;
 
 		//Figure out the sample rate
 		int64_t ps_per_sample = round(xincrement * 1e12f);
@@ -538,13 +538,13 @@ bool TektronixOscilloscope::AcquireData(bool toQueue)
 
 		//Read the length header
 		m_transport->ReadRawData(2, (unsigned char*)tmp);
-        tmp[2] = '\0';
+		tmp[2] = '\0';
 		int numDigits = atoi(tmp+1);
 		LogDebug("numDigits = %d", numDigits);
 
-        // Read the number of points
+		// Read the number of points
 		m_transport->ReadRawData(numDigits, (unsigned char*)tmp);
-        tmp[numDigits] = '\0';
+		tmp[numDigits] = '\0';
 		int numPoints = atoi(tmp);
 		LogDebug("numPoints = %d", numPoints);
 
