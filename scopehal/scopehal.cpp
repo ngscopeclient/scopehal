@@ -41,6 +41,7 @@
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
+#include "TektronixOscilloscope.h"
 #include <libgen.h>
 
 #ifndef _WIN32
@@ -79,6 +80,7 @@ void DriverStaticInit()
 	AddDriverClass(RohdeSchwarzOscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
+	AddDriverClass(TektronixOscilloscope);
 }
 
 string GetDefaultChannelColor(int i)
