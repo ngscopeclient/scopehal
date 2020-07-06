@@ -41,7 +41,7 @@ set(SCOPEHAL_SOURCES
 	MockOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
 	RigolOscilloscope.cpp
-    TektronixOscilloscope.cpp
+	TektronixOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
