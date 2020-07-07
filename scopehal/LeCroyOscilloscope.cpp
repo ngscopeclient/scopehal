@@ -1173,7 +1173,7 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 	basetime = fseconds - seconds;
 	time_t tnow = time(NULL);
 	struct tm tstruc;
-	
+
 #ifdef _WIN32
 	localtime_s(&tstruc, &tnow);
 #else
@@ -2118,6 +2118,10 @@ int64_t LeCroyOscilloscope::GetTriggerOffset()
 
 void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 {
+	//Cannot deskew digital/trigger channels
+	if(channel >= m_analogChannelCount)
+		return;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char tmp[128];
@@ -2134,6 +2138,10 @@ void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 
 int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 {
+	//Cannot deskew digital/trigger channels
+	if(channel >= m_analogChannelCount)
+		return 0;
+
 	//Early out if the value is in cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
