@@ -75,7 +75,7 @@ void ProtocolDecoderParameter::ParseString(string str)
 			scale = 1000000000.0f;
 		else if(suffix == 'M')
 			scale = 1000000.0f;
-		else if(suffix == 'K')
+		else if(suffix == 'k')
 			scale = 1000.0f;
 		else if(suffix == 'm')
 			scale = 0.001f;
