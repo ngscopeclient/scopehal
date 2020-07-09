@@ -560,6 +560,11 @@ void AgilentOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void AgilentOscilloscope::ForceTrigger()
+{
+    LogError("Force trigger not supported\n");
+}
+
 bool AgilentOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

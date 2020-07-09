@@ -87,6 +87,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual size_t GetTriggerChannelIndex();
 	virtual void SetTriggerChannelIndex(size_t i);

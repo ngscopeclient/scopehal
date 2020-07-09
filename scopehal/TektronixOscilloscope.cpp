@@ -628,6 +628,11 @@ void TektronixOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void TektronixOscilloscope::ForceTrigger()
+{
+    LogError("Force trigger not supported\n");
+}
+
 bool TektronixOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

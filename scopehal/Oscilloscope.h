@@ -353,6 +353,11 @@ public:
 	virtual void Stop() =0;
 
 	/**
+		@brief Force a single acquistion immediately.
+	 */
+	virtual void ForceTrigger() =0;
+
+	/**
 		@brief Checks if the trigger is currently armed
 	 */
 	virtual bool IsTriggerArmed() =0;

@@ -463,6 +463,11 @@ void AntikernelLogicAnalyzer::Stop()
 	m_triggerArmed = false;
 }
 
+void AntikernelLogicAnalyzer::ForceTrigger()
+{
+    LogError("Force trigger not supported\n");
+}
+
 bool AntikernelLogicAnalyzer::IsTriggerArmed()
 {
 	return m_triggerArmed;

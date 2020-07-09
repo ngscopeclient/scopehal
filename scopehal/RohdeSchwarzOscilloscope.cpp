@@ -526,6 +526,11 @@ void RohdeSchwarzOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void RohdeSchwarzOscilloscope::ForceTrigger()
+{
+    LogError("Force trigger not supported\n");
+}
+
 bool RohdeSchwarzOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

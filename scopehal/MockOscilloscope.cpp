@@ -143,6 +143,11 @@ void MockOscilloscope::Stop()
 	//no-op, we never trigger
 }
 
+void MockOscilloscope::ForceTrigger()
+{
+	//no-op, we never trigger
+}
+
 bool MockOscilloscope::IsTriggerArmed()
 {
 	return false;
