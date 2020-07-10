@@ -61,7 +61,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	}
 	else
 	{
-		m_protocol = MSO5;
+		m_protocol = DS;
 	}
 
 	int nchans = m_modelNumber % 10;
