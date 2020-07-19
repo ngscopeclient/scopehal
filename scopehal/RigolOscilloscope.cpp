@@ -360,7 +360,7 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			break;
 		default:
 			LogError("Invalid attenuation for channel\n");
-			valid = false
+			valid = false;
 	}
 
 	if(valid)
@@ -383,7 +383,7 @@ int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
 	string reply = m_transport->ReadReply();
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	if(reply == "20M")
 		m_channelBandwidthLimits[i] = 20;
 	if(reply == "100M")
@@ -433,13 +433,13 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				break;
 			default:
 				LogError("Invalid model number\n");
-				valid = false
+				valid = false;
 		}
 	}
 	else
 	{
 		LogError("m_bandwidth Limit not implemented for this model\n");
-		valid = false
+		valid = false;
 	}
 
 	if(valid)
@@ -449,13 +449,12 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 			m_channelBandwidthLimits[i] = 20;
 		else if(m_bandwidth == 70)
 			m_channelBandwidthLimits[i] = 70;
-		else if(limit_mhz <= 100 | m_bandwidth == 100)
+		else if((limit_mhz <= 100) | (m_bandwidth == 100))
 			m_channelBandwidthLimits[i] = 100;
-		else if(limit_mhz <= 200 | m_bandwidth == 200)
+		else if((limit_mhz <= 200) | (m_bandwidth == 200))
 			m_channelBandwidthLimits[i] = 200;
 		else
 			m_channelBandwidthLimits[i] = m_bandwidth;	  // 350 MHz
-		break;
 	}
 }
 
@@ -494,7 +493,7 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
 		snprintf(buf, sizeof(buf), "%s:SCALE %f", m_channels[i]->GetHwname().c_str(), range / 8);
 	m_transport->SendCommand(buf);
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 
 	//FIXME
