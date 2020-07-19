@@ -103,6 +103,8 @@ protected:
 	unsigned int m_analogChannelCount;
 
 	//config cache
+	std::map<size_t, double> m_channelAttenuations;
+	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<int, bool> m_channelsEnabled;

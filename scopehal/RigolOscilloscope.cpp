@@ -194,22 +194,30 @@ void RigolOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelCouplings.find(i) != m_channelCouplings.end())
+			return m_channelCouplings[i];
+	}
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
 	string reply = m_transport->ReadReply();
 
 	if(reply == "AC")
-		return OscilloscopeChannel::COUPLE_AC_1M;
+		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_AC_1M;
 	else if(reply == "DC")
-		return OscilloscopeChannel::COUPLE_DC_1M;
+		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_DC_1M;
 	else /* if(reply == "GND") */
-		return OscilloscopeChannel::COUPLE_GND;
+		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_GND;
+	return m_channelCouplings[i];
 }
 
 void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
+	m_channelCouplings[i] = type;
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
@@ -231,19 +239,27 @@ void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupli
 
 double RigolOscilloscope::GetChannelAttenuation(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelAttenuations.find(i) != m_channelAttenuations.end())
+			return m_channelAttenuations[i];
+	}
+
+	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
 
 	string reply = m_transport->ReadReply();
 	double atten;
 	sscanf(reply.c_str(), "%lf", &atten);
+	m_channelAttenuations[i] = atten;
 	return atten;
 }
 
 void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
+	m_channelAttenuations[i] = atten;
 	switch((
 		int)(atten * 10000 +
 			 0.1))	  //+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
