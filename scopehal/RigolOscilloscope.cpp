@@ -408,25 +408,25 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 		{
 			case 70:
 			case 100:
-				if(limit_mhz <= 20)
+				if((limit_mhz <= 20) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
 				break;
 			case 200:
-				if(limit_mhz <= 20)
+				if((limit_mhz <= 20) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
-				else if(limit_mhz <= 100)
+				else if((limit_mhz <= 100) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 100M");
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
 				break;
 			case 350:
-				if(limit_mhz <= 20)
+				if((limit_mhz <= 20) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 20M");
-				else if(limit_mhz <= 100)
+				else if((limit_mhz <= 100) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 100M");
-				else if(limit_mhz <= 200)
+				else if((limit_mhz <= 200) & (limit_mhz != 0))
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL 200M");
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL OFF");
@@ -445,6 +445,8 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 	if(valid)
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(limit_mhz == 0)
+			m_channelBandwidthLimits[i] = m_bandwidth;	  // max
 		if(limit_mhz <= 20)
 			m_channelBandwidthLimits[i] = 20;
 		else if(m_bandwidth == 70)
@@ -760,6 +762,8 @@ size_t RigolOscilloscope::GetTriggerChannelIndex()
 {
 	//Check cache
 	//No locking, worst case we return a result a few seconds old
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	if(m_triggerChannelValid)
 		return m_triggerChannel;
 
