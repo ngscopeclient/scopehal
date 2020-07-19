@@ -138,9 +138,13 @@ void RigolOscilloscope::FlushConfigCache()
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
+	m_channelAttenuations.clear();
+	m_channelCouplings.clear();
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
+	m_channelBandwidthLimits.clear();
+
 	m_triggerChannelValid = false;
 	m_triggerLevelValid = false;
 	m_triggerTypeValid = false;
@@ -217,7 +221,7 @@ OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i
 void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_channelCouplings[i] = type;
+	bool valid = true;
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
@@ -234,6 +238,13 @@ void RigolOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupli
 
 		default:
 			LogError("Invalid coupling for channel\n");
+			valid = false;
+	}
+
+	if(valid)
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_channelCouplings[i] = type;
 	}
 }
 
@@ -252,6 +263,8 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 	string reply = m_transport->ReadReply();
 	double atten;
 	sscanf(reply.c_str(), "%lf", &atten);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelAttenuations[i] = atten;
 	return atten;
 }
@@ -259,7 +272,7 @@ double RigolOscilloscope::GetChannelAttenuation(size_t i)
 void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_channelAttenuations[i] = atten;
+	bool valid = true;
 	switch((
 		int)(atten * 10000 +
 			 0.1))	  //+ 0.1 in case atten is for example 0.049999 or so, to round it to 0.05 which turns to an int of 500
@@ -347,25 +360,47 @@ void RigolOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			break;
 		default:
 			LogError("Invalid attenuation for channel\n");
+			valid = false
+	}
+
+	if(valid)
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_channelAttenuations[i] = (int)(atten * 10000 + 0.1) * 0.0001;
 	}
 }
 
 int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
+			return m_channelBandwidthLimits[i];
+	}
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
 	string reply = m_transport->ReadReply();
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(reply == "20M")
-		return 20;
+		m_channelBandwidthLimits[i] = 20;
+	if(reply == "100M")
+		m_channelBandwidthLimits[i] = 100;
+	if(reply == "200M")
+		m_channelBandwidthLimits[i] = 200;
 	else
-		return 0;
+		m_channelBandwidthLimits[i] = m_bandwidth;
+	return m_channelBandwidthLimits[i];
 }
 
 void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
 	//FIXME
 	lock_guard<recursive_mutex> lock(m_mutex);
+
+	bool valid = true;
 
 	if(m_protocol == MSO5)
 	{
@@ -398,10 +433,30 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 				break;
 			default:
 				LogError("Invalid model number\n");
+				valid = false
 		}
 	}
 	else
+	{
 		LogError("m_bandwidth Limit not implemented for this model\n");
+		valid = false
+	}
+
+	if(valid)
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(limit_mhz <= 20)
+			m_channelBandwidthLimits[i] = 20;
+		else if(m_bandwidth == 70)
+			m_channelBandwidthLimits[i] = 70;
+		else if(limit_mhz <= 100 | m_bandwidth == 100)
+			m_channelBandwidthLimits[i] = 100;
+		else if(limit_mhz <= 200 | m_bandwidth == 200)
+			m_channelBandwidthLimits[i] = 200;
+		else
+			m_channelBandwidthLimits[i] = m_bandwidth;	  // 350 MHz
+		break;
+	}
 }
 
 double RigolOscilloscope::GetChannelVoltageRange(size_t i)
@@ -438,6 +493,8 @@ void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	else if(m_protocol == MSO5)
 		snprintf(buf, sizeof(buf), "%s:SCALE %f", m_channels[i]->GetHwname().c_str(), range / 8);
 	m_transport->SendCommand(buf);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 
 	//FIXME
@@ -465,6 +522,7 @@ double RigolOscilloscope::GetChannelOffset(size_t i)
 	string reply = m_transport->ReadReply();
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
@@ -593,7 +651,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			size_t end = npoint + maxpoints;
 			if(end > npoints)
 				end = npoints;
-			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end); //Here it is zero based, so it gets from 1-1000
+			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end);	//Here it is zero based, so it gets from 1-1000
 			m_transport->SendCommand(tmp);
 
 			//Ask for the data block
@@ -984,7 +1042,6 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 	snprintf(buf, sizeof(buf), "TIM:MAIN:OFFS %f", offsetval);
 	m_transport->SendCommand(buf);
 }
-
 
 int64_t RigolOscilloscope::GetTriggerOffset()
 {
