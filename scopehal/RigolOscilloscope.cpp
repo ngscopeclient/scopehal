@@ -209,6 +209,7 @@ OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
 	string reply = m_transport->ReadReply();
 
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(reply == "AC")
 		m_channelCouplings[i] = OscilloscopeChannel::COUPLE_AC_1M;
 	else if(reply == "DC")
@@ -482,21 +483,25 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 	if(m_protocol == MSO5)
 		range = 8 * range;
 	m_channelVoltageRanges[i] = range;
+
 	return range;
 }
 
 void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_channelVoltageRanges[i] = range;
+	}
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
+
 	if(m_protocol == DS)
 		snprintf(buf, sizeof(buf), "%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range);
 	else if(m_protocol == MSO5)
 		snprintf(buf, sizeof(buf), "%s:SCALE %f", m_channels[i]->GetHwname().c_str(), range / 8);
 	m_transport->SendCommand(buf);
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelVoltageRanges[i] = range;
 
 	//FIXME
 }
@@ -660,7 +665,10 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 			//Read block header
 			unsigned char header[12] = {0};
+			
+			double start = GetTime();
 			m_transport->ReadRawData(11, header);
+			LogWarning("Time %f\n", (GetTime() - start));
 
 			//Look up the block size
 			//size_t blocksize = end - npoints;
@@ -725,6 +733,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	}
 
 	//LogDebug("Acquisition done\n");
+
 	return true;
 }
 
