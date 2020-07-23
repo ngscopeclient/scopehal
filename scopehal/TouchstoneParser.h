@@ -30,74 +30,67 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of TouchstoneParser
  */
 
-#include "scopeprotocols.h"
+#ifndef TouchstoneParser_h
+#define TouchstoneParser_h
 
 /**
-	@brief Static initialization for protocol list
+	@brief A single point in an S-parameter dataset
  */
-void ScopeProtocolStaticInit()
+class SParameterPoint
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(CurrentShuntDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedDecoder);
-	AddDecoderClass(DeskewDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurementDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(EyeHeightMeasurementDecoder);
-	AddDecoderClass(EyeJitterMeasurementDecoder);
-	AddDecoderClass(EyePeriodMeasurementDecoder);
-	AddDecoderClass(EyeWidthMeasurementDecoder);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(MultiplyDecoder);
-	AddDecoderClass(OvershootMeasurementDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PkPkMeasurementDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(UndershootMeasurementDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
+	SParameterPoint()
+	{}
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	SParameterPoint(float f, float a, float p)
+	: m_frequency(f)
+	, m_amplitude(a)
+	, m_phase(p)
+	{
+	}
+
+	float	m_frequency;	//Hz
+	float	m_amplitude;	//magnitude
+	float	m_phase;		//radians
+};
+
+/**
+	@brief A single S-parameter array
+ */
+class SParameterVector
+{
+public:
+
+	SParameterPoint InterpolatePoint(float frequency);
+
+	std::vector<SParameterPoint> m_points;
+};
+
+/**
+	@brief Touchstone (SxP) file parser
+ */
+class TouchstoneParser
+{
+public:
+	TouchstoneParser();
+	virtual ~TouchstoneParser();
+
+	void Clear();
+	bool Load(std::string fname);
+
+	typedef std::pair<int, int> SPair;
+
+	/**
+		@brief Sample a single point from a single S-parameter
+	 */
+	SParameterPoint SamplePoint(int to, int from, float frequency)
+	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
+
+protected:
+	std::map< SPair , SParameterVector*> m_params;
+};
+
+#endif

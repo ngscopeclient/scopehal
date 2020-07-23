@@ -29,6 +29,8 @@ set(SCOPEHAL_SOURCES
 	SCPITMCTransport.cpp
 	SCPIDevice.cpp
 
+	TouchstoneParser.cpp
+
 	Instrument.cpp
 	FunctionGenerator.cpp
 	Oscilloscope.cpp

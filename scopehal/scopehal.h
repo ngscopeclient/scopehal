@@ -54,6 +54,8 @@
 #include "Bijection.h"
 #include "IDTable.h"
 
+#include "TouchstoneParser.h"
+
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
 #include "SCPILxiTransport.h"
