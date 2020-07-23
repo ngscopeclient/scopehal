@@ -176,7 +176,20 @@ void DeEmbedDecoder::Refresh()
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//TODO: Do the de-embed on the "rdout" buffer
+	//Do the actual de-embed
+	for(size_t i=0; i<nouts; i++)
+	{
+		//Calculate frequency of this bin and look up the resampled S21 parameter for it
+		float freq = bin_hz * i;
+		auto point = m_sparams.SamplePoint(2, 1, freq);
+
+		//TODO: Phase correction
+
+		//Amplitude correction
+		//We need to scale both real and imaginary parts
+		rdout[i*2 + 0] /= point.m_amplitude;
+		rdout[i*2 + 1] /= point.m_amplitude;
+	}
 
 	//Set up the inverse FFT
 	float* ddout;
