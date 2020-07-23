@@ -46,28 +46,37 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	size_t pos = len/2;
 	size_t last_lo = 0;
 	size_t last_hi = len - 1;
-	while(true)
+
+	//If out of range, clip
+	if(frequency < m_points[0].m_frequency)
+		return m_points[0];
+	else if(frequency > m_points[len-1].m_frequency)
+		return m_points[len-1];
+	else
 	{
-		SParameterPoint pivot = m_points[pos];
-
-		//Dead on? Stop
-		if( (last_hi - last_lo) <= 1)
-			break;
-
-		//Too high, move down
-		if(pivot.m_frequency > frequency)
+		while(true)
 		{
-			size_t delta = (pos - last_lo);
-			pos = last_lo + delta/2;
-			last_hi = pos;
-		}
+			SParameterPoint pivot = m_points[pos];
 
-		//Too low, move up
-		else
-		{
-			size_t delta = last_hi - pos;
-			pos = last_hi - delta/2;
-			last_lo = pos;
+			//Dead on? Stop
+			if( (last_hi - last_lo) <= 1)
+				break;
+
+			//Too high, move down
+			if(pivot.m_frequency > frequency)
+			{
+				size_t delta = (pos - last_lo);
+				last_hi = pos;
+				pos = last_lo + delta/2;
+			}
+
+			//Too low, move up
+			else
+			{
+				size_t delta = last_hi - pos;
+				last_lo = pos;
+				pos = last_hi - delta/2;
+			}
 		}
 	}
 
