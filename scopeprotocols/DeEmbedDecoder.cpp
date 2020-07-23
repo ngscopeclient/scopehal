@@ -89,12 +89,16 @@ bool DeEmbedDecoder::NeedsConfig()
 
 void DeEmbedDecoder::SetDefaultName()
 {
+	string fname = m_parameters[m_fname].GetFileName();
+	string base = basename(fname.c_str());
+
 	char hwname[256];
 	snprintf(
 		hwname,
 		sizeof(hwname),
-		"DeEmbed(%s)",
-		m_channels[0]->m_displayname.c_str()
+		"DeEmbed(%s, %s)",
+		m_channels[0]->m_displayname.c_str(),
+		base.c_str()
 		);
 
 	m_hwname = hwname;
@@ -179,16 +183,22 @@ void DeEmbedDecoder::Refresh()
 	//Do the actual de-embed
 	for(size_t i=0; i<nouts; i++)
 	{
-		//Calculate frequency of this bin and look up the resampled S21 parameter for it
-		float freq = bin_hz * i;
-		auto point = m_sparams.SamplePoint(2, 1, freq);
+		//Resample the S-parameter file for our point
+		auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
+		float cosval = cos(-point.m_phase);
+		float sinval = sin(-point.m_phase);
 
-		//TODO: Phase correction
+		//Uncorrected complex value
+		float real_orig = rdout[i*2 + 0];
+		float imag_orig = rdout[i*2 + 1];
+
+		//Phase correction
+		float real = real_orig*cosval - imag_orig*sinval;
+		float imag = real_orig*sinval + imag_orig*cosval;
 
 		//Amplitude correction
-		//We need to scale both real and imaginary parts
-		rdout[i*2 + 0] /= point.m_amplitude;
-		rdout[i*2 + 1] /= point.m_amplitude;
+		rdout[i*2 + 0] = real / point.m_amplitude;
+		rdout[i*2 + 1] = imag / point.m_amplitude;
 	}
 
 	//Set up the inverse FFT

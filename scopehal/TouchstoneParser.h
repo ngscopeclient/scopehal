@@ -54,7 +54,7 @@ public:
 
 	float	m_frequency;	//Hz
 	float	m_amplitude;	//magnitude
-	float	m_phase;		//radians
+	float	m_phase;		//radians from -pi to +pi
 };
 
 /**

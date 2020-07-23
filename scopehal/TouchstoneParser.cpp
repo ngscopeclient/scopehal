@@ -92,8 +92,29 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	float amp_hi = m_points[last_hi].m_amplitude;
 	ret.m_amplitude = amp_lo + (amp_hi - amp_lo)*frac;
 
-	//TODO: figure out phase. For now leave it at zero (i.e. don't de-embed phase, just do scalar amplitude correction)
-	ret.m_phase = 0;
+	//Interpolate phase (angles in radians)
+	float phase_lo = m_points[last_lo].m_phase;
+	float phase_hi = m_points[last_hi].m_phase;
+
+	//If both values have the same sign, no wrapping needed.
+	//If values have opposite signs, but are smallish, we cross at 0 vs +/- pi, so also no wrapping needed.
+	if(
+		( (phase_hi > 0) && (phase_lo > 0) ) ||
+		( (fabs(phase_hi) < M_PI_4) && (fabs(phase_lo) < M_PI_4) )
+	  )
+	{
+		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
+	}
+
+	//Wrapping needed.
+	//Shift everything by pi, then interpolate normally, then shift back.
+	else
+	{
+		phase_lo += M_PI;
+		phase_hi += M_PI;
+
+		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac - M_PI;
+	}
 
 	ret.m_frequency = frequency;
 	return ret;
@@ -146,6 +167,7 @@ bool TouchstoneParser::Load(string fname)
 
 	//Read line by line.
 	char line[256];
+	double unit_scale = 1;
 	while(!feof(fp))
 	{
 		fgets(line, sizeof(line), fp);
@@ -168,14 +190,23 @@ bool TouchstoneParser::Load(string fname)
 			}
 
 			//Figure out units
-			if(0 != strcmp(freq_unit, "MHZ"))
+			string funit(freq_unit);
+			if(funit == "MHZ")
+				unit_scale = 1e6;
+			else if(funit == "GHZ")
+				unit_scale = 1e9;
+			else if(funit == "KHZ")
+				unit_scale = 1e3;
+			else if(funit == "HZ")
+				unit_scale = 1;
+			else
 			{
-				LogError("S2P frequency units other than MHZ not yet supported (got %s)\n", freq_unit);
+				LogError("Unrecognized S2P frequency unit (got %s)\n", freq_unit);
 				return false;
 			}
 			if(0 != strcmp(volt_unit, "MA"))
 			{
-				LogError("S2P voltage units other than MA not yet supported (got %s)\n", volt_unit);
+				LogError("S2P formats other than mag-angle not yet supported (got %s)\n", volt_unit);
 				return false;
 			}
 
@@ -183,15 +214,23 @@ bool TouchstoneParser::Load(string fname)
 		}
 
 		//Each S2P line is formatted as freq s11 s21 s12 s22
-		float mhz, s11m, s11p, s21m, s21p, s12m, s12p, s22m, s22p;
-		if(9 != sscanf(line, "%f %f %f %f %f %f %f %f %f", &mhz, &s11m, &s11p, &s21m, &s21p, &s12m, &s12p, &s22m, &s22p))
+		float hz, s11m, s11p, s21m, s21p, s12m, s12p, s22m, s22p;
+		if(9 != sscanf(line, "%f %f %f %f %f %f %f %f %f", &hz, &s11m, &s11p, &s21m, &s21p, &s12m, &s12p, &s22m, &s22p))
 		{
 			LogError("Malformed S2P line \"%s\"", line);
 			return false;
 		}
 
+		//Rescale frequency
+		hz *= unit_scale;
+
+		//Convert angles from degrees to radians
+		s11p *= (M_PI / 180);
+		s21p *= (M_PI / 180);
+		s12p *= (M_PI / 180);
+		s22p *= (M_PI / 180);
+
 		//Save everything
-		float hz = mhz * 1e6;
 		m_params[SPair(1,1)]->m_points.push_back(SParameterPoint(hz, s11m, s11p));
 		m_params[SPair(2,1)]->m_points.push_back(SParameterPoint(hz, s21m, s21p));
 		m_params[SPair(1,2)]->m_points.push_back(SParameterPoint(hz, s12m, s12p));
