@@ -222,10 +222,10 @@ void DeEmbedDecoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 
 	//Copy waveform data after rescaling
-	//We seem to have problems with the first few points, not sure why!
+	//We seem to have problems with the first and last few points, not sure why!
 	//For now, just skip them.
 	float scale = 1.0f / npoints;
-	for(size_t i=1024; i<npoints; i++)
+	for(size_t i=512; i<npoints - 512; i++)
 	{
 		cap->m_offsets.push_back(din->m_offsets[i]);
 		cap->m_durations.push_back(din->m_durations[i]);
