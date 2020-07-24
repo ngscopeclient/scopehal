@@ -184,7 +184,8 @@ void DeEmbedDecoder::Refresh()
 	for(size_t i=0; i<nouts; i++)
 	{
 		//Resample the S-parameter file for our point
-		auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
+		float freq = bin_hz * i;
+		auto point = m_sparams.SamplePoint(2, 1, freq);
 		float cosval = cos(-point.m_phase);
 		float sinval = sin(-point.m_phase);
 

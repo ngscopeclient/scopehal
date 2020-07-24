@@ -100,6 +100,7 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	//If values have opposite signs, but are smallish, we cross at 0 vs +/- pi, so also no wrapping needed.
 	if(
 		( (phase_hi > 0) && (phase_lo > 0) ) ||
+		( (phase_hi < 0) && (phase_lo < 0) ) ||
 		( (fabs(phase_hi) < M_PI_4) && (fabs(phase_lo) < M_PI_4) )
 	  )
 	{
@@ -110,11 +111,20 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	//Shift everything by pi, then interpolate normally, then shift back.
 	else
 	{
-		phase_lo += M_PI;
-		phase_hi += M_PI;
+		//Shift the negative phase by a full circle
+		if(phase_lo < 0)
+			phase_lo += 2*M_PI;
+		if(phase_hi < 0)
+			phase_hi += 2*M_PI;
 
-		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac - M_PI;
+		//Normal interpolation
+		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
+
+		//If we went out of range, rescale
+		if(ret.m_phase > 2*M_PI)
+			ret.m_phase -= 2*M_PI;
 	}
+
 
 	ret.m_frequency = frequency;
 	return ret;
