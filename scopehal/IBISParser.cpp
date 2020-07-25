@@ -47,6 +47,9 @@ float IVCurve::InterpolateCurrent(float voltage)
 	size_t last_lo = 0;
 	size_t last_hi = len - 1;
 
+	if(len == 0)
+		return 0;
+
 	//If out of range, clip
 	if(voltage < m_curve[0].m_voltage)
 		return m_curve[0].m_current;
@@ -86,7 +89,210 @@ float IVCurve::InterpolateCurrent(float voltage)
 
 	//Interpolate current
 	float ilo = m_curve[last_lo].m_current;
-	return ilo + (m_curve[last_hi].m_current - ilo)*frac;
+	float ihi = m_curve[last_hi].m_current;
+	return ilo + (ihi - ilo)*frac;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VTCurve
+
+float VTCurves::InterpolateVoltage(IBISCorner corner, float time)
+{
+	//Binary search to find the points straddling us
+	size_t len = m_curves[corner].size();
+	size_t pos = len/2;
+	size_t last_lo = 0;
+	size_t last_hi = len - 1;
+
+	if(len == 0)
+		return 0;
+
+	//If out of range, clip
+	if(time < m_curves[corner][0].m_time)
+		return m_curves[corner][0].m_voltage;
+	else if(time > m_curves[corner][len-1].m_time)
+		return m_curves[corner][len-1].m_voltage;
+	else
+	{
+		while(true)
+		{
+			//Dead on? Stop
+			if( (last_hi - last_lo) <= 1)
+				break;
+
+			//Too high, move down
+			if(m_curves[corner][pos].m_time > time)
+			{
+				size_t delta = (pos - last_lo);
+				last_hi = pos;
+				pos = last_lo + delta/2;
+			}
+
+			//Too low, move up
+			else
+			{
+				size_t delta = last_hi - pos;
+				last_lo = pos;
+				pos = last_hi - delta/2;
+			}
+		}
+	}
+
+	//Find position between the points for interpolation
+	float tlo = m_curves[corner][last_lo].m_time;
+	float thi = m_curves[corner][last_hi].m_time;
+	float dt = thi - tlo;
+	float frac = (time - tlo) / dt;
+
+	//Interpolate voltage
+	float vlo = m_curves[corner][last_lo].m_voltage;
+	return vlo + (m_curves[corner][last_hi].m_voltage - vlo)*frac;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// IBISModel
+
+/**
+	@brief Get the falling-edge waveform terminated to ground (or lowest available voltage)
+ */
+VTCurves* IBISModel::GetLowestFallingWaveform()
+{
+	VTCurves* ret = &m_falling[0];
+	for(auto& curve : m_falling)
+	{
+		if(curve.m_fixtureVoltage < ret->m_fixtureVoltage)
+			ret = &curve;
+	}
+	return ret;
+}
+
+/**
+	@brief Get the rising-edge waveform terminated to ground (or lowest available voltage)
+ */
+VTCurves* IBISModel::GetLowestRisingWaveform()
+{
+	VTCurves* ret = &m_rising[0];
+	for(auto& curve : m_rising)
+	{
+		if(curve.m_fixtureVoltage < ret->m_fixtureVoltage)
+			ret = &curve;
+	}
+	return ret;
+}
+
+/**
+	@brief Get the falling-edge waveform terminated to Vcc (or highest available voltage)
+ */
+VTCurves* IBISModel::GetHighestFallingWaveform()
+{
+	VTCurves* ret = &m_falling[0];
+	for(auto& curve : m_falling)
+	{
+		if(curve.m_fixtureVoltage > ret->m_fixtureVoltage)
+			ret = &curve;
+	}
+	return ret;
+}
+
+/**
+	@brief Get the rising-edge waveform terminated to Vcc (or lowest available voltage)
+ */
+VTCurves* IBISModel::GetHighestRisingWaveform()
+{
+	VTCurves* ret = &m_rising[0];
+	for(auto& curve : m_rising)
+	{
+		if(curve.m_fixtureVoltage > ret->m_fixtureVoltage)
+			ret = &curve;
+	}
+	return ret;
+}
+
+/**
+	@brief Calculate the turn-on curve for buffer.
+
+	Each output point ranges from 0 (fully off) to 1 (fully on)
+
+	TODO: take in multiple corners so we can use low voltage and high cap, etc
+
+	@param curve	V/T curve to use
+	@param oldstate	I/V curve set for currently-on buffer
+	@param newstate	I/V curve set for currently-off buffer
+	@param corner	Corner to target
+	@param dt		Timestep for the simulation
+	@param rising	True for rising edge, false for falling edge
+ */
+vector<float> IBISModel::CalculateTurnonCurve(
+	VTCurves* curve,
+	IVCurve* pullup,
+	IVCurve* pulldown,
+	IBISCorner corner,
+	float dt,
+	bool rising)
+{
+	vector<float> ret;
+
+	float cap = m_dieCapacitance[corner];
+	float vcc = m_voltages[corner];
+	float last_v = curve->InterpolateVoltage(corner, 0);
+
+	float epsilon = 0.005;
+	int last_percent = 0;
+	for(size_t nstep=0; nstep<2000; nstep ++)
+	{
+		float time = dt*nstep;
+		float v = curve->InterpolateVoltage(corner, time);
+
+		//See how much the capacitor voltage changed in this time, then calculate charge/discharge current
+		float dv = v - last_v;
+		float icap = cap * dv/dt;
+		last_v = v;
+
+		//Total drive current is cap charge/discharge current plus load current pulled by the transmission line
+		float iline = (v - curve->m_fixtureVoltage) / curve->m_fixtureResistance;
+		float idrive = icap + iline;
+
+		//Bruteforce sweep pullup and pulldown current to find the best combination
+		float onfrac = 0;
+		float delta = FLT_MAX;
+		for(int percent=last_percent; percent <= 100; percent ++)
+		{
+			float f = percent / 100.0f;
+
+			float iup, idown;
+			if(rising)
+			{
+				iup = -pullup[corner].InterpolateCurrent(vcc-v) * f;
+				idown = -pulldown[corner].InterpolateCurrent(v) * (1-f);
+			}
+			else
+			{
+				iup = -pullup[corner].InterpolateCurrent(vcc-v) * (1-f);
+				idown = -pulldown[corner].InterpolateCurrent(v) * (f);
+			}
+
+			float itotal = iup + idown;
+			float dnew = fabs(itotal - idrive);
+
+			if(dnew < delta)
+			{
+				last_percent = percent;
+				onfrac = f;
+				delta = dnew;
+			}
+		}
+
+		if(rising)
+			ret.push_back(onfrac);
+		else
+			ret.push_back(1 - onfrac);
+
+		//If we're almost fully on, stop the curve
+		if(fabs(1.0 - onfrac) < epsilon)
+			break;
+	}
+
+	return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +346,7 @@ bool IBISParser::Load(string fname)
 	char command[128];
 	char tmp[128];
 	IBISModel* model = NULL;
+	VTCurves waveform;
 	while(!feof(fp))
 	{
 		if(fgets(line, sizeof(line), fp) == NULL)
@@ -155,6 +362,12 @@ bool IBISParser::Load(string fname)
 			if(1 != sscanf(line, "[%[^]]]", command))
 				continue;
 			string scmd(command);
+
+			//If in a waveform, save it when the block ends
+			if(data_block == BLOCK_RISING_WAVEFORM)
+				model->m_rising.push_back(waveform);
+			else if(data_block == BLOCK_FALLING_WAVEFORM)
+				model->m_falling.push_back(waveform);
 
 			//End of file
 			if(scmd == "END")
@@ -209,9 +422,17 @@ bool IBISParser::Load(string fname)
 			else if(scmd == "POWER_clamp")
 				data_block = BLOCK_POWER_CLAMP;
 			else if(scmd == "Rising Waveform")
+			{
 				data_block = BLOCK_RISING_WAVEFORM;
+				for(int i=0; i<3; i++)
+					waveform.m_curves[i].clear();
+			}
 			else if(scmd == "Falling Waveform")
+			{
 				data_block = BLOCK_FALLING_WAVEFORM;
+				for(int i=0; i<3; i++)
+					waveform.m_curves[i].clear();
+			}
 			else if(scmd == "Model Spec")
 				data_block = BLOCK_MODEL_SPEC;
 			else if(scmd == "Ramp")
@@ -243,18 +464,18 @@ bool IBISParser::Load(string fname)
 				sscanf(
 					line,
 					"[Temperature Range] %f %f %f",
-					&model->m_temps[IBISModel::CORNER_TYP],
-					&model->m_temps[IBISModel::CORNER_MIN],
-					&model->m_temps[IBISModel::CORNER_MAX]);
+					&model->m_temps[CORNER_TYP],
+					&model->m_temps[CORNER_MIN],
+					&model->m_temps[CORNER_MAX]);
 			}
 			else if(scmd == "Voltage Range")
 			{
 				sscanf(
 					line,
 					"[Voltage Range] %f %f %f",
-					&model->m_voltages[IBISModel::CORNER_TYP],
-					&model->m_voltages[IBISModel::CORNER_MIN],
-					&model->m_voltages[IBISModel::CORNER_MAX]);
+					&model->m_voltages[CORNER_TYP],
+					&model->m_voltages[CORNER_MIN],
+					&model->m_voltages[CORNER_MAX]);
 			}
 
 			else
@@ -311,9 +532,9 @@ bool IBISParser::Load(string fname)
 					sscanf(
 						line,
 						"Vinl %f %f %f",
-						&model->m_vil[IBISModel::CORNER_TYP],
-						&model->m_vil[IBISModel::CORNER_MIN],
-						&model->m_vil[IBISModel::CORNER_MAX]);
+						&model->m_vil[CORNER_TYP],
+						&model->m_vil[CORNER_MIN],
+						&model->m_vil[CORNER_MAX]);
 				}
 			}
 			else if(skeyword == "Vinh")
@@ -323,9 +544,9 @@ bool IBISParser::Load(string fname)
 					sscanf(
 						line,
 						"Vinh %f %f %f",
-						&model->m_vih[IBISModel::CORNER_TYP],
-						&model->m_vih[IBISModel::CORNER_MIN],
-						&model->m_vih[IBISModel::CORNER_MAX]);
+						&model->m_vih[CORNER_TYP],
+						&model->m_vih[CORNER_MIN],
+						&model->m_vih[CORNER_MAX]);
 				}
 			}
 
@@ -342,14 +563,39 @@ bool IBISParser::Load(string fname)
 			{}
 			else if(skeyword == "Vref")
 			{}
+
+			//Die capacitance
 			else if(skeyword == "C_comp")
-			{}
+			{
+				char scale[3];
+				sscanf(
+					line,
+					"C_comp %f%cF %f%cF %f%cF",
+					&model->m_dieCapacitance[CORNER_TYP],
+					&scale[CORNER_TYP],
+					&model->m_dieCapacitance[CORNER_MIN],
+					&scale[CORNER_MIN],
+					&model->m_dieCapacitance[CORNER_MAX],
+					&scale[CORNER_MAX]);
+
+				for(int i=0; i<3; i++)
+				{
+					if(scale[i] == 'p')
+						model->m_dieCapacitance[i] *= 1e-12;
+					else if(scale[i] == 'n')
+						model->m_dieCapacitance[i] *= 1e-9;
+					else if(scale[i] == 'u')
+						model->m_dieCapacitance[i] *= 1e-6;
+				}
+			}
 
 			//Fixture properties in waveforms
 			else if(skeyword == "R_fixture")
-			{}
+				sscanf(line, "R_fixture = %f", &waveform.m_fixtureResistance);
+
 			else if(skeyword == "V_fixture")
-			{}
+				sscanf(line, "V_fixture = %f", &waveform.m_fixtureVoltage);
+
 			else if(skeyword == "V_fixture_min")
 			{}
 			else if(skeyword == "V_fixture_max")
@@ -370,57 +616,47 @@ bool IBISParser::Load(string fname)
 			}
 		}
 
-		//If we get here, it's a data value.
+		//If we get here, it's a data table.
 		else
 		{
+			//If not in a data block, do nothing
+			if(data_block == BLOCK_NONE)
+				continue;
+
+			//Crack individual numbers
+			char sindex[32] = {0};
+			char styp[32];
+			char smin[32];
+			char smax[32];
+			if(4 != sscanf(line, " %31[^ ] %31[^ ] %31[^ ] %31[^ \n]", sindex, styp, smin, smax))
+				continue;
+
+			//Parse the numbers
+			float index = ParseNumber(sindex);
+			float vtyp = ParseNumber(styp);
+			float vmin = ParseNumber(smin);
+			float vmax = ParseNumber(smax);
+
 			switch(data_block)
 			{
-				//I/V curves for pullup/down
+				//Curves
 				case BLOCK_PULLDOWN:
+					model->m_pulldown[CORNER_TYP].m_curve.push_back(IVPoint(index, vtyp));
+					model->m_pulldown[CORNER_MIN].m_curve.push_back(IVPoint(index, vmin));
+					model->m_pulldown[CORNER_MAX].m_curve.push_back(IVPoint(index, vmax));
+					break;
+
 				case BLOCK_PULLUP:
-					{
-						char iunits[16][3];
+					model->m_pullup[CORNER_TYP].m_curve.push_back(IVPoint(index, vtyp));
+					model->m_pullup[CORNER_MIN].m_curve.push_back(IVPoint(index, vmin));
+					model->m_pullup[CORNER_MAX].m_curve.push_back(IVPoint(index, vmax));
+					break;
 
-						//Pull out the line
-						float voltage;
-						float current[3];
-						if(7 != sscanf(line, "%f %f%15s %f%15s %f%15s",
-							&voltage,
-							&current[0],
-							iunits[0],
-							&current[1],
-							iunits[1],
-							&current[2],
-							iunits[2]))
-						{
-							continue;
-						}
-
-						//Apply scaling factors as needed
-						for(int j=0; j<3; j++)
-						{
-							if(iunits[j][0] == 'm')
-								current[j] *= 1e-3;
-							else if(iunits[j][0] == 'n')
-								current[j] *= 1e-6;
-							else if(iunits[j][0] == 'p')
-								current[j] *= 1e-9;
-						}
-
-						//Save
-						if(data_block == BLOCK_PULLDOWN)
-						{
-							model->m_pulldown[IBISModel::CORNER_TYP].m_curve.push_back(IVPoint(voltage, current[0]));
-							model->m_pulldown[IBISModel::CORNER_MIN].m_curve.push_back(IVPoint(voltage, current[1]));
-							model->m_pulldown[IBISModel::CORNER_MAX].m_curve.push_back(IVPoint(voltage, current[2]));
-						}
-						else if(data_block == BLOCK_PULLUP)
-						{
-							model->m_pullup[IBISModel::CORNER_TYP].m_curve.push_back(IVPoint(voltage, current[0]));
-							model->m_pullup[IBISModel::CORNER_MIN].m_curve.push_back(IVPoint(voltage, current[1]));
-							model->m_pullup[IBISModel::CORNER_MAX].m_curve.push_back(IVPoint(voltage, current[2]));
-						}
-					}
+				case BLOCK_RISING_WAVEFORM:
+				case BLOCK_FALLING_WAVEFORM:
+					waveform.m_curves[CORNER_TYP].push_back(VTPoint(index, vtyp));
+					waveform.m_curves[CORNER_MIN].push_back(VTPoint(index, vmin));
+					waveform.m_curves[CORNER_MAX].push_back(VTPoint(index, vmax));
 					break;
 
 				//Ignore other curves for now
@@ -432,4 +668,51 @@ bool IBISParser::Load(string fname)
 
 	fclose(fp);
 	return true;
+}
+
+float IBISParser::ParseNumber(const char* str)
+{
+	//Pull out the digits
+	string digits;
+	char scale = ' ';
+	for(size_t i=0; i<32; i++)
+	{
+		char c = str[i];
+
+		if( (c == '-') || (c == '.') || (isdigit(c)))
+			digits += c;
+
+		else if(isspace(c))
+			continue;
+
+		else if(c == '\0')
+			break;
+
+		else
+		{
+			scale = c;
+			break;
+		}
+	}
+
+	float ret;
+	sscanf(digits.c_str(), "%f", &ret);
+
+	switch(scale)
+	{
+		case 'm':
+			return ret * 1e-3;
+
+		case 'u':
+			return ret * 1e-6;
+
+		case 'n':
+			return ret * 1e-9;
+
+		case 'p':
+			return ret * 1e-12;
+
+		default:
+			return ret;
+	}
 }

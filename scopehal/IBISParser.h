@@ -36,6 +36,14 @@
 #ifndef IBISParser_h
 #define IBISParser_h
 
+//Almost all properties are indexed by a corner
+enum IBISCorner
+{
+	CORNER_MIN,
+	CORNER_TYP,
+	CORNER_MAX
+};
+
 /**
 	@brief A single current/voltage point
  */
@@ -68,6 +76,44 @@ public:
 };
 
 /**
+	@brief A single voltage/time point
+ */
+class VTPoint
+{
+public:
+	VTPoint()
+	{}
+
+	VTPoint(float t, float v)
+	: m_time(t)
+	, m_voltage(v)
+	{}
+
+	float m_time;
+	float m_voltage;
+};
+
+/**
+	@brief Voltage/time curves for a waveform
+ */
+class VTCurves
+{
+public:
+	VTCurves()
+	: m_fixtureResistance(50)
+	, m_fixtureVoltage(0)
+	{}
+
+	float InterpolateVoltage(IBISCorner corner, float time);
+
+	float m_fixtureResistance;
+	float m_fixtureVoltage;
+
+	///@brief The raw V/T curve data
+	std::vector<VTPoint> m_curves[3];
+};
+
+/**
 	@brief An IBIS model (for a single type of buffer)
 
 	For now, we only support I/O or output type models and ignore all inputs.
@@ -94,18 +140,15 @@ public:
 	//Name of the model
 	std::string	m_name;
 
-	enum corner_t
-	{
-		CORNER_MIN,
-		CORNER_TYP,
-		CORNER_MAX
-	};
-
-	//I/V curves for each output buffer (indexed by corner)
+	//I/V curves for each output buffer
 	IVCurve m_pulldown[3];
 	IVCurve m_pullup[3];
 
-	//Input thresholds (indexed by corner)
+	//V/T curves for each output buffer
+	std::vector<VTCurves> m_rising;
+	std::vector<VTCurves> m_falling;
+
+	//Input thresholds
 	float m_vil[3];
 	float m_vih[3];
 
@@ -113,7 +156,23 @@ public:
 	float m_temps[3];
 	float m_voltages[3];
 
-	//For now, ignore waveforms
+	//Component capacitance
+	//TODO: support C_comp_pull* separately
+	float m_dieCapacitance[3];
+
+	VTCurves* GetLowestFallingWaveform();
+	VTCurves* GetLowestRisingWaveform();
+
+	VTCurves* GetHighestFallingWaveform();
+	VTCurves* GetHighestRisingWaveform();
+
+	std::vector<float> CalculateTurnonCurve(
+		VTCurves* curve,
+		IVCurve* pullup,
+		IVCurve* pulldown,
+		IBISCorner corner,
+		float dt,
+		bool rising);
 };
 
 /**
@@ -132,6 +191,9 @@ public:
 	std::string m_manufacturer;
 
 	std::map<std::string, IBISModel*> m_models;
+
+protected:
+	float ParseNumber(const char* str);
 };
 
 #endif
