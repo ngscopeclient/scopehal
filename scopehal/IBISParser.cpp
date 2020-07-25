@@ -41,7 +41,52 @@ using namespace std;
 
 float IVCurve::InterpolateCurrent(float voltage)
 {
-	return 0;
+	//Binary search to find the points straddling us
+	size_t len = m_curve.size();
+	size_t pos = len/2;
+	size_t last_lo = 0;
+	size_t last_hi = len - 1;
+
+	//If out of range, clip
+	if(voltage < m_curve[0].m_voltage)
+		return m_curve[0].m_current;
+	else if(voltage > m_curve[len-1].m_voltage)
+		return m_curve[len-1].m_current;
+	else
+	{
+		while(true)
+		{
+			//Dead on? Stop
+			if( (last_hi - last_lo) <= 1)
+				break;
+
+			//Too high, move down
+			if(m_curve[pos].m_voltage > voltage)
+			{
+				size_t delta = (pos - last_lo);
+				last_hi = pos;
+				pos = last_lo + delta/2;
+			}
+
+			//Too low, move up
+			else
+			{
+				size_t delta = last_hi - pos;
+				last_lo = pos;
+				pos = last_hi - delta/2;
+			}
+		}
+	}
+
+	//Find position between the points for interpolation
+	float vlo = m_curve[last_lo].m_voltage;
+	float vhi = m_curve[last_hi].m_voltage;
+	float dv = vhi - vlo;
+	float frac = (voltage - vlo) / dv;
+
+	//Interpolate current
+	float ilo = m_curve[last_lo].m_current;
+	return ilo + (m_curve[last_hi].m_current - ilo)*frac;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
