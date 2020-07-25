@@ -29,6 +29,7 @@ set(SCOPEHAL_SOURCES
 	SCPITMCTransport.cpp
 	SCPIDevice.cpp
 
+	IBISParser.cpp
 	TouchstoneParser.cpp
 
 	Instrument.cpp

@@ -30,58 +30,108 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of IBISParser and related classes
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef IBISParser_h
+#define IBISParser_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+/**
+	@brief A single current/voltage point
+ */
+class IVPoint
+{
+public:
+	IVPoint()
+	{}
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	IVPoint(float v, float i)
+	: m_voltage(v)
+	, m_current(i)
+	{}
 
-#include <yaml-cpp/yaml.h>
+	float m_voltage;
+	float m_current;
+};
 
+/**
+	@brief A generic current/voltage curve
+ */
+class IVCurve
+{
+public:
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	float InterpolateCurrent(float voltage);
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	///@brief The raw I/V curve data
+	std::vector<IVPoint> m_curve;
+};
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+/**
+	@brief An IBIS model (for a single type of buffer)
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPITMCTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	For now, we only support I/O or output type models and ignore all inputs.
+ */
+class IBISModel
+{
+public:
+	IBISModel(std::string name)
+	: m_type(TYPE_IO)
+	, m_name(name)
+	{}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	//Model type
+	enum type_t
+	{
+		TYPE_INPUT,
+		TYPE_IO,
+		TYPE_OPEN_DRAIN,
+		TYPE_OUTPUT,
+		TYPE_SERIES,
+		TYPE_TERMINATOR
+	} m_type;
 
-#include "Statistic.h"
-#include "ProtocolDecoder.h"
+	//Name of the model
+	std::string	m_name;
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	enum corner_t
+	{
+		CORNER_MIN,
+		CORNER_TYP,
+		CORNER_MAX
+	};
 
-std::string GetDefaultChannelColor(int i);
+	//I/V curves for each output buffer (indexed by corner)
+	IVCurve m_pulldown[3];
+	IVCurve m_pullup[3];
 
-void TransportStaticInit();
-void DriverStaticInit();
+	//Input thresholds (indexed by corner)
+	float m_vil[3];
+	float m_vih[3];
 
-void InitializePlugins();
+	//Temperature and voltage values at each corner
+	float m_temps[3];
+	float m_voltages[3];
+
+	//For now, ignore waveforms
+};
+
+/**
+	@brief IBIS file parser (may contain multiple models)
+ */
+class IBISParser
+{
+public:
+	IBISParser();
+	virtual ~IBISParser();
+
+	void Clear();
+	bool Load(std::string fname);
+
+	std::string m_component;
+	std::string m_manufacturer;
+
+	std::map<std::string, IBISModel*> m_models;
+};
 
 #endif
