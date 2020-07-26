@@ -49,7 +49,10 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 
 	//If out of range, clip
 	if(frequency < m_points[0].m_frequency)
-		return m_points[0];
+	{
+		return SParameterPoint(frequency, 1, 0);
+		//return m_points[0];
+	}
 	else if(frequency > m_points[len-1].m_frequency)
 		return SParameterPoint(frequency, 0, 0);
 	else

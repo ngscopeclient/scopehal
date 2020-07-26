@@ -230,16 +230,25 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			//Resample the S-parameter file for our point
 			float freq = bin_hz * i;
 			auto point = m_sparams.SamplePoint(2, 1, freq);
-			float cosval = cos(-point.m_phase);
-			float sinval = sin(-point.m_phase);
+
+			//Zero channel response = flatten
+			if(fabs(point.m_amplitude) < FLT_EPSILON)
+			{
+				rdout[i*2 + 0] = 0;
+				rdout[i*2 + 1] = 0;
+				continue;
+			}
+
+			float cosval = cos(point.m_phase);
+			float sinval = sin(point.m_phase);
 
 			//Uncorrected complex value
 			float real_orig = rdout[i*2 + 0];
 			float imag_orig = rdout[i*2 + 1];
 
 			//Phase correction
-			float real = real_orig;//real_orig*cosval - imag_orig*sinval;
-			float imag = imag_orig;//real_orig*sinval + imag_orig*cosval;
+			float real = real_orig*cosval - imag_orig*sinval;
+			float imag = real_orig*sinval + imag_orig*cosval;
 
 			//Amplitude correction
 			rdout[i*2 + 0] = real * point.m_amplitude;
