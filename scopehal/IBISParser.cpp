@@ -307,17 +307,12 @@ vector<float> IBISModel::CalculateTurnonCurve(
  */
 AnalogWaveform* IBISModel::SimulatePRBS(
 	/*DigitalWaveform* input, */
+	uint32_t seed,
 	IBISCorner corner,
 	int64_t timescale,
 	size_t length,
 	size_t ui)
 {
-	//Look up some properties of this buffer
-	float vcc = m_voltages[corner];
-	auto& pulldown = m_pulldown[corner];
-	auto& pullup = m_pullup[corner];
-	float cap = m_dieCapacitance[corner];
-
 	//Find the rising and falling edge waveform terminated to the highest voltage (Vcc etc)
 	//TODO: make this configurable
 	VTCurves* rising = GetHighestRisingWaveform();
@@ -326,7 +321,7 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 	const float dt = timescale * 1e-12;
 
 	//PRBS-31 generator
-	uint32_t prbs = 0x5eadbeef;
+	uint32_t prbs = seed;
 
 	//Create the output waveform
 	auto ret = new AnalogWaveform;
@@ -345,8 +340,6 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 	bool	current_edge_started	= false;
 	for(size_t nstep=0; nstep<length; nstep ++)
 	{
-		float time = dt*nstep;
-
 		//Advance to next UI
 		if(0 == (nstep % ui))
 		{
@@ -373,15 +366,15 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 		//Get value for current and previous edge
 		float current_v;
 		if(current_bit)
-			current_v = rising->InterpolateVoltage(CORNER_TYP, current_phase*dt);
+			current_v = rising->InterpolateVoltage(corner, current_phase*dt);
 		else
-			current_v = falling->InterpolateVoltage(CORNER_TYP, current_phase*dt);
+			current_v = falling->InterpolateVoltage(corner, current_phase*dt);
 
 		float last_v;
 		if(last_bit)
-			last_v = rising->InterpolateVoltage(CORNER_TYP, last_phase*dt);
+			last_v = rising->InterpolateVoltage(corner, last_phase*dt);
 		else
-			last_v = falling->InterpolateVoltage(CORNER_TYP, last_phase*dt);
+			last_v = falling->InterpolateVoltage(corner, last_phase*dt);
 
 		//See if the current UI's edge has started
 		float delta = current_v - current_v_old;

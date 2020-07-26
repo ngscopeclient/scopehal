@@ -34,8 +34,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIOscilloscope::SCPIOscilloscope(SCPITransport* transport)
-	: SCPIDevice(transport)
+SCPIOscilloscope::SCPIOscilloscope(SCPITransport* transport, bool identify)
+	: SCPIDevice(transport, identify)
 {
 
 }

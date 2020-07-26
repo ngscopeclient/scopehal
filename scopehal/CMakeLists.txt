@@ -26,6 +26,7 @@ set(SCOPEHAL_SOURCES
 	SCPISocketTransport.cpp
 	VICPSocketTransport.cpp
 	SCPILxiTransport.cpp
+	SCPINullTransport.cpp
 	SCPITMCTransport.cpp
 	SCPIDevice.cpp
 
@@ -44,6 +45,7 @@ set(SCOPEHAL_SOURCES
 	MockOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
 	RigolOscilloscope.cpp
+	SignalGeneratorOscilloscope.cpp
 	TektronixOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp

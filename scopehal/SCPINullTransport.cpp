@@ -27,27 +27,72 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIOscilloscope_h
-#define SCPIOscilloscope_h
-
 /**
-	@brief An SCPI-based oscilloscope
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of SCPINullTransport
  */
-class SCPIOscilloscope 	: public Oscilloscope
-						, public SCPIDevice
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include "scopehal.h"
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPINullTransport::SCPINullTransport(string args)
+	: m_args(args)
 {
-public:
-	SCPIOscilloscope(SCPITransport* transport, bool identify = true);
-	virtual ~SCPIOscilloscope();
+}
 
-	virtual std::string IDPing();
+SCPINullTransport::~SCPINullTransport()
+{
 
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
+}
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-};
+bool SCPINullTransport::IsConnected()
+{
+	return true;
+}
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
+
+string SCPINullTransport::GetTransportName()
+{
+	return "null";
+}
+
+string SCPINullTransport::GetConnectionString()
+{
+	return m_args;
+}
+
+bool SCPINullTransport::SendCommand(string /*cmd*/)
+{
+	return true;
+}
+
+string SCPINullTransport::ReadReply()
+{
+	return "";
+}
+
+void SCPINullTransport::SendRawData(size_t /*len*/, const unsigned char* /*buf*/)
+{
+}
+
+void SCPINullTransport::ReadRawData(size_t /*len*/, unsigned char* /*buf*/)
+{
+}
+
+bool SCPINullTransport::IsCommandBatchingSupported()
+{
+	return false;
+}

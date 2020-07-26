@@ -39,25 +39,28 @@ SCPIDevice::SCPIDevice()
 	//mostly used by not-quite-really-scpi devices that use SCPITransport but don't implement *IDN?
 }
 
-SCPIDevice::SCPIDevice(SCPITransport* transport)
+SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify)
 	: m_transport(transport)
 {
-	//Ask for the ID
-	m_transport->SendCommand("*IDN?");
-	string reply = m_transport->ReadReply();
-	char vendor[128] = "";
-	char model[128] = "";
-	char serial[128] = "";
-	char version[128] = "";
-	if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+	if(identify)
 	{
-		LogError("Bad IDN response %s\n", reply.c_str());
-		return;
+		//Ask for the ID
+		m_transport->SendCommand("*IDN?");
+		string reply = m_transport->ReadReply();
+		char vendor[128] = "";
+		char model[128] = "";
+		char serial[128] = "";
+		char version[128] = "";
+		if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+		{
+			LogError("Bad IDN response %s\n", reply.c_str());
+			return;
+		}
+		m_vendor = vendor;
+		m_model = model;
+		m_serial = serial;
+		m_fwVersion = version;
 	}
-	m_vendor = vendor;
-	m_model = model;
-	m_serial = serial;
-	m_fwVersion = version;
 }
 
 SCPIDevice::~SCPIDevice()

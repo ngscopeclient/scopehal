@@ -37,7 +37,7 @@ class SCPIDevice
 {
 public:
 	SCPIDevice();
-	SCPIDevice(SCPITransport* transport);
+	SCPIDevice(SCPITransport* transport, bool identify = true);
 	virtual ~SCPIDevice();
 
 protected:

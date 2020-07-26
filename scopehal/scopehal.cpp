@@ -40,6 +40,7 @@
 #include "LeCroyOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
+#include "SignalGeneratorOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 #include <libgen.h>
@@ -61,8 +62,9 @@ void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
 	AddTransportClass(SCPITMCTransport);
+	AddTransportClass(SCPINullTransport);
 	AddTransportClass(VICPSocketTransport);
-	
+
 #ifdef HAS_LXI
 	AddTransportClass(SCPILxiTransport);
 #endif
@@ -80,6 +82,7 @@ void DriverStaticInit()
 	AddDriverClass(RohdeSchwarzOscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
+	AddDriverClass(SignalGeneratorOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 }
 
@@ -173,40 +176,40 @@ void InitializePlugins()
 #else
 	// Get path of process image
 	TCHAR binPath[MAX_PATH];
-	
+
 	if( GetModuleFileName(NULL, binPath, MAX_PATH) == 0 )
 	{
 		LogError("Error: GetModuleFileName() failed.\n");
 		return;
 	}
-	
+
 	// Remove file name from path
 	if( !PathRemoveFileSpec(binPath) )
 	{
 		LogError("Error: PathRemoveFileSpec() failed.\n");
 		return;
 	}
-	
+
 	TCHAR searchPath[MAX_PATH];
 	if( PathCombine(searchPath, binPath, "plugins\\*.dll") == NULL )
 	{
 		LogError("Error: PathCombine() failed.\n");
 		return;
 	}
-	
+
 	// For now, we only search in the folder that contains the binary.
 	WIN32_FIND_DATA findData;
 	HANDLE findHandle = INVALID_HANDLE_VALUE;
-	
+
 	// First file entry
 	findHandle = FindFirstFile(searchPath, &findData);
-	
+
 	// Is there at least one file?
 	if(findHandle == INVALID_HANDLE_VALUE)
 	{
 		return;
 	}
-	
+
 	do
 	{
 		// Exclude directories
@@ -215,25 +218,25 @@ void InitializePlugins()
 			auto fileName = findData.cFileName;
 			auto fileNameCStr = reinterpret_cast<const char*>(fileName);
 			auto extension = PathFindExtension(fileName);
-			
+
 			// The file name does not contain the full path, which poses a problem since the file is
 			// located in the plugins subdirectory
 			TCHAR filePath[MAX_PATH];
-			
+
 			if( PathCombine(filePath, "plugins", fileName) == NULL )
 			{
 				LogError("Error: PathCombine() failed.\n");
 				return;
 			}
-			
+
 			// Try to open it as a library
 			auto module = LoadLibrary(filePath);
-			
+
 			if(module != NULL)
 			{
 				// Try to retrieve plugin entry point address
 				auto procAddr = GetProcAddress(module, "PluginInit");
-				
+
 				if(procAddr != NULL)
 				{
 					typedef void (*PluginInit)();
@@ -244,7 +247,7 @@ void InitializePlugins()
 				{
 					LogWarning("Warning: Found plugin %s, but has no init symbol\n", fileNameCStr);
 				}
-				
+
 				FreeLibrary(module);
 			}
 			else
@@ -254,14 +257,14 @@ void InitializePlugins()
 		}
 	}
 	while(0 != FindNextFile(findHandle, &findData));
-	
+
 	auto error = GetLastError();
-	
+
 	if(error != ERROR_NO_MORE_FILES)
 	{
 		LogError("Error: Enumeration of plugin files failed.\n");
 	}
-	
+
 	FindClose(findHandle);
 
 #endif

@@ -27,27 +27,39 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIOscilloscope_h
-#define SCPIOscilloscope_h
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SCPINullTransport
+ */
+
+#ifndef SCPINullTransport_h
+#define SCPINullTransport_h
 
 /**
-	@brief An SCPI-based oscilloscope
+	@brief Null SCPITransport for simulated scopes (signal generator etc)
  */
-class SCPIOscilloscope 	: public Oscilloscope
-						, public SCPIDevice
+class SCPINullTransport : public SCPITransport
 {
 public:
-	SCPIOscilloscope(SCPITransport* transport, bool identify = true);
-	virtual ~SCPIOscilloscope();
+	SCPINullTransport(std::string args);
+	virtual ~SCPINullTransport();
 
-	virtual std::string IDPing();
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
+
+	TRANSPORT_INITPROC(SCPINullTransport)
+
+protected:
+	std::string m_args;
 };
 
 #endif

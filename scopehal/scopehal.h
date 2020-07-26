@@ -57,6 +57,7 @@
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
 #include "SCPILxiTransport.h"
+#include "SCPINullTransport.h"
 #include "SCPITMCTransport.h"
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"

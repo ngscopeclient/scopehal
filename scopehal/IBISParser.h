@@ -176,6 +176,7 @@ public:
 
 	AnalogWaveform* SimulatePRBS(
 		/*DigitalWaveform* input, */
+		uint32_t seed,
 		IBISCorner corner,
 		int64_t timescale,
 		size_t length,
