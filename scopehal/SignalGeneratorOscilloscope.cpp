@@ -128,9 +128,9 @@ bool SignalGeneratorOscilloscope::AcquireData(bool toQueue)
 	auto waveform = m_bufmodel->SimulatePRBS(
 		rand(),
 		CORNER_TYP,
-		5,			//200 Gsps
+		10,			//100 Gsps
 		200000,
-		160			//1.25 Gbps
+		80			//1.25 Gbps
 		);
 
 	if(toQueue)

@@ -110,6 +110,14 @@ void DeEmbedDecoder::SetDefaultName()
 
 void DeEmbedDecoder::Refresh()
 {
+	DoRefresh(true);
+}
+
+/**
+	@brief Applies the S-parameters in the forward or reverse direction
+ */
+void DeEmbedDecoder::DoRefresh(bool invert)
+{
 	//Get the input data
 	if(m_channels[0] == NULL)
 	{
@@ -181,25 +189,62 @@ void DeEmbedDecoder::Refresh()
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
 	//Do the actual de-embed
-	for(size_t i=0; i<nouts; i++)
+	if(invert)
 	{
-		//Resample the S-parameter file for our point
-		float freq = bin_hz * i;
-		auto point = m_sparams.SamplePoint(2, 1, freq);
-		float cosval = cos(-point.m_phase);
-		float sinval = sin(-point.m_phase);
+		for(size_t i=0; i<nouts; i++)
+		{
+			//Resample the S-parameter file for our point
+			float freq = bin_hz * i;
+			auto point = m_sparams.SamplePoint(2, 1, freq);
 
-		//Uncorrected complex value
-		float real_orig = rdout[i*2 + 0];
-		float imag_orig = rdout[i*2 + 1];
+			//Zero channel response = flatten
+			if(fabs(point.m_amplitude) < FLT_EPSILON)
+			{
+				rdout[i*2 + 0] = 0;
+				rdout[i*2 + 1] = 0;
+				continue;
+			}
 
-		//Phase correction
-		float real = real_orig*cosval - imag_orig*sinval;
-		float imag = real_orig*sinval + imag_orig*cosval;
+			float cosval = cos(-point.m_phase);
+			float sinval = sin(-point.m_phase);
 
-		//Amplitude correction
-		rdout[i*2 + 0] = real / point.m_amplitude;
-		rdout[i*2 + 1] = imag / point.m_amplitude;
+			//Uncorrected complex value
+			float real_orig = rdout[i*2 + 0];
+			float imag_orig = rdout[i*2 + 1];
+
+			//Phase correction
+			float real = real_orig*cosval - imag_orig*sinval;
+			float imag = real_orig*sinval + imag_orig*cosval;
+
+			//Amplitude correction
+			rdout[i*2 + 0] = real / point.m_amplitude;
+			rdout[i*2 + 1] = imag / point.m_amplitude;
+		}
+	}
+
+	//Forward channel emulation
+	else
+	{
+		for(size_t i=0; i<nouts; i++)
+		{
+			//Resample the S-parameter file for our point
+			float freq = bin_hz * i;
+			auto point = m_sparams.SamplePoint(2, 1, freq);
+			float cosval = cos(-point.m_phase);
+			float sinval = sin(-point.m_phase);
+
+			//Uncorrected complex value
+			float real_orig = rdout[i*2 + 0];
+			float imag_orig = rdout[i*2 + 1];
+
+			//Phase correction
+			float real = real_orig;//real_orig*cosval - imag_orig*sinval;
+			float imag = imag_orig;//real_orig*sinval + imag_orig*cosval;
+
+			//Amplitude correction
+			rdout[i*2 + 0] = real * point.m_amplitude;
+			rdout[i*2 + 1] = imag * point.m_amplitude;
+		}
 	}
 
 	//Set up the inverse FFT

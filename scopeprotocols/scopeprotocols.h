@@ -44,6 +44,7 @@
 #include "ADL5205Decoder.h"
 #include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
+#include "ChannelEmulationDecoder.h"
 #include "ClockJitterDecoder.h"
 #include "ClockRecoveryDecoder.h"
 #include "CurrentShuntDecoder.h"

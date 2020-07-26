@@ -56,6 +56,8 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(DeEmbedDecoder)
 
+	void DoRefresh(bool invert = true);
+
 protected:
 	std::string m_fname;
 

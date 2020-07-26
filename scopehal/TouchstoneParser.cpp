@@ -51,7 +51,7 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	if(frequency < m_points[0].m_frequency)
 		return m_points[0];
 	else if(frequency > m_points[len-1].m_frequency)
-		return m_points[len-1];
+		return SParameterPoint(frequency, 0, 0);
 	else
 	{
 		while(true)

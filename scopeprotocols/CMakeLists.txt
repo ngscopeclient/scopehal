@@ -6,6 +6,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ADL5205Decoder.cpp
 	BaseMeasurementDecoder.cpp
 	CANDecoder.cpp
+	ChannelEmulationDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
 	CurrentShuntDecoder.cpp
