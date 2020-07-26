@@ -54,9 +54,6 @@
 #include "Bijection.h"
 #include "IDTable.h"
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
-
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
 #include "SCPILxiTransport.h"
@@ -74,6 +71,9 @@
 
 #include "Statistic.h"
 #include "ProtocolDecoder.h"
+
+#include "TouchstoneParser.h"
+#include "IBISParser.h"
 
 uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 

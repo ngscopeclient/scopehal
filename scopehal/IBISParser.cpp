@@ -295,6 +295,122 @@ vector<float> IBISModel::CalculateTurnonCurve(
 	return ret;
 }
 
+/**
+	@brief Simulates this model and returns the waveform
+
+	For now, hard coded to PRBS-31 waveform
+
+	@param corner		Process corner to simulate (TODO others)
+	@param timescale	Picoseconds per simulation time step
+	@param length		Number of time steps to simulate
+	@param ui			Unit interval for the PRBS
+ */
+AnalogWaveform* IBISModel::SimulatePRBS(
+	/*DigitalWaveform* input, */
+	IBISCorner corner,
+	int64_t timescale,
+	size_t length,
+	size_t ui)
+{
+	//Look up some properties of this buffer
+	float vcc = m_voltages[corner];
+	auto& pulldown = m_pulldown[corner];
+	auto& pullup = m_pullup[corner];
+	float cap = m_dieCapacitance[corner];
+
+	//Find the rising and falling edge waveform terminated to the highest voltage (Vcc etc)
+	//TODO: make this configurable
+	VTCurves* rising = GetHighestRisingWaveform();
+	VTCurves* falling = GetHighestFallingWaveform();
+
+	const float dt = timescale * 1e-12;
+
+	//PRBS-31 generator
+	uint32_t prbs = 0x5eadbeef;
+
+	//Create the output waveform
+	auto ret = new AnalogWaveform;
+	ret->m_timescale = timescale;
+	ret->m_startTimestamp = 0;		//TODO
+	ret->m_startPicoseconds = 0;
+	ret->m_triggerPhase = 0;
+	ret->Resize(length);
+
+	//Play rising/falling waveforms
+	size_t	last_ui_start			= 0;
+	size_t	ui_start				= 0;
+	bool	current_bit				= false;
+	bool	last_bit				= false;
+	float	current_v_old			= 0;
+	bool	current_edge_started	= false;
+	for(size_t nstep=0; nstep<length; nstep ++)
+	{
+		float time = dt*nstep;
+
+		//Advance to next UI
+		if(0 == (nstep % ui))
+		{
+			last_bit		= current_bit;
+
+			if(nstep != 0)
+			{
+				//PRBS-31 generator
+				uint32_t next = ( (prbs >> 31) ^ (prbs >> 28) ) & 1;
+				prbs = (prbs << 1) | next;
+				current_bit = next ? true : false;
+
+				//Keep the old edge going
+				current_edge_started = false;
+			}
+
+			ui_start		= nstep;
+		}
+
+		//Get phase of current and previous UI
+		size_t	current_phase	= nstep - ui_start;
+		size_t	last_phase		= nstep - last_ui_start;
+
+		//Get value for current and previous edge
+		float current_v;
+		if(current_bit)
+			current_v = rising->InterpolateVoltage(CORNER_TYP, current_phase*dt);
+		else
+			current_v = falling->InterpolateVoltage(CORNER_TYP, current_phase*dt);
+
+		float last_v;
+		if(last_bit)
+			last_v = rising->InterpolateVoltage(CORNER_TYP, last_phase*dt);
+		else
+			last_v = falling->InterpolateVoltage(CORNER_TYP, last_phase*dt);
+
+		//See if the current UI's edge has started
+		float delta = current_v - current_v_old;
+		if(current_phase < 1)
+			delta = 0;
+		if( (fabs(delta) > 0.001) && (last_bit != current_bit) )
+		{
+			last_ui_start	= ui_start;
+			current_edge_started = true;
+		}
+
+		//If so, use the new value. If propagation delay isn't over, keep the old edge going
+		float v;
+		if(current_edge_started)
+			v = current_v;
+		else
+			v = last_v;
+
+		current_v_old	= current_v;
+
+		//Save the voltage
+		ret->m_offsets[nstep] = nstep;
+		ret->m_durations[nstep] = 1;
+		ret->m_samples[nstep] = (double)v;
+	}
+
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IBISParser
 

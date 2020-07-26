@@ -173,6 +173,13 @@ public:
 		IBISCorner corner,
 		float dt,
 		bool rising);
+
+	AnalogWaveform* SimulatePRBS(
+		/*DigitalWaveform* input, */
+		IBISCorner corner,
+		int64_t timescale,
+		size_t length,
+		size_t ui);
 };
 
 /**
