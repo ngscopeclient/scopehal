@@ -92,6 +92,7 @@ protected:
 	{
 		MSO5,	 //MSO5000 series
 		DS,
+		DS_OLD,  //DS1000D/E series
 	};
 
 	OscilloscopeChannel* m_extTrigChannel;
