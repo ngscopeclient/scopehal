@@ -617,6 +617,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
 	map<int, vector<AnalogWaveform*>> pending_waveforms;
+	bool got_data = false;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
@@ -691,6 +692,8 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		//LogDebug("X: %d points, %f origin, ref %f ps/sample %ld\n", npoints, xorigin, xreference, ps_per_sample);
 		//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 
+		if (npoints > 0) got_data = true;
+
 		//Set up the capture we're going to store our data into
 		AnalogWaveform* cap = new AnalogWaveform;
 		cap->m_timescale = ps_per_sample;
@@ -700,7 +703,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
-		for(size_t npoint = 0; npoint < maxpoints; npoint += maxpoints)
+		for(size_t npoint = 0; npoint < npoints; npoint += maxpoints)
 		{
 			if(m_protocol == DS_OLD) {
 			m_transport->SendCommand(":WAV:POIN:MODE RAW"); // FIXME: doesn't work?
@@ -754,18 +757,27 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 				cap->m_durations[npoint + j] = 1;
 				cap->m_samples[npoint + j] = v;
 			}
-
-			//Done, update the data
-			if(npoint == 0 && !toQueue)
-				m_channels[i]->SetData(cap);
-			else
-				pending_waveforms[i].push_back(cap);
 		}
+
+		//Done, update the data
+		if(!toQueue)
+			m_channels[i]->SetData(cap);
+		else
+			pending_waveforms[i].push_back(cap);
+	}
+
+	//Clean up
+	delete[] temp_buf;
+
+	if (!got_data) {
+		/* wtf rigol */
+		m_triggerArmed = true;
+		return false;
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = 0;
+	size_t num_pending = 0; // on Rigol, at most one segment
 	if(toQueue)	   //if saving to queue, the 0'th segment counts too
 		num_pending++;
 	for(size_t i = 0; i < num_pending; i++)
@@ -780,18 +792,16 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	}
 	m_pendingWaveformsMutex.unlock();
 
-	//Clean up
-	delete[] temp_buf;
-
 	//TODO: support digital channels
 
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		if(m_protocol == DS || m_protocol == DS_OLD)
+		m_transport->SendCommand(":SING");
+		/*if(m_protocol == DS || m_protocol == DS_OLD)
 			m_transport->SendCommand(":TRIG_MODE SINGLE");
 		else if(m_protocol == MSO5)
-			m_transport->SendCommand("SING");
+			m_transport->SendCommand("SING");*/
 		m_triggerArmed = true;
 	}
 
