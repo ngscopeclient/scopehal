@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
-	: m_uiWidth(1)
+	: m_uiWidth(0)
 	, m_saturationLevel(1)
 	, m_width(width)
 	, m_height(height)
@@ -311,6 +311,7 @@ void EyeDecoder2::ClearSweeps()
 {
 	if(m_data != NULL)
 	{
+		m_uiWidth = 0;
 		delete m_data;
 		m_data = NULL;
 	}
@@ -376,9 +377,12 @@ void EyeDecoder2::Refresh()
 	//Calculate average period of the clock
 	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
 	//We probably need a preprocessing filter to handle analog etc clock sources.
-	double tlastclk = clock->m_offsets[cend-1] + clock->m_durations[cend-1];
-	m_uiWidth = tlastclk / cend;
-	cap->m_uiWidth = m_uiWidth;
+	if(m_uiWidth == 0)
+	{
+		double tlastclk = clock->m_offsets[cend-1] + clock->m_durations[cend-1];
+		m_uiWidth = tlastclk / cend;
+		cap->m_uiWidth = m_uiWidth;
+	}
 
 	//Process the eye
 	size_t iclock = 0;
@@ -390,7 +394,7 @@ void EyeDecoder2::Refresh()
 	size_t wend = waveform->m_samples.size()-1;
 	int64_t halfwidth = m_uiWidth / 2;
 	float scale = fwidth / m_uiWidth;
-	int64_t tscale = round(m_uiWidth * scale);
+	int64_t tscale = floor(m_uiWidth * scale);
 	for(size_t i=0; i<wend; i++)
 	{
 		//Stop when we get to the end of the clock
@@ -444,10 +448,12 @@ void EyeDecoder2::Refresh()
 		int64_t xpos[] = {pixel_x_round, pixel_x_round + tscale, -tscale + pixel_x_round};
 		for(auto x : xpos)
 		{
-			if( (x < (int64_t)m_width) && (x >= 0) )
+			if( (x+1 < (int64_t)m_width) && (x >= 0) )
 			{
-				row1[x] += bin1;
-				row2[x] += bin2;
+				row1[x+0] += bin1 * dx_frac;
+				row1[x+1] += bin1 * (1-dx_frac);
+				row2[x+0] += bin2 * dx_frac;
+				row2[x+1] += bin2 * (1-dx_frac);
 			}
 		}
 	}

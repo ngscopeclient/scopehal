@@ -109,6 +109,9 @@ protected:
 	IBISParser m_parser;
 	IBISModel* m_bufmodel;
 
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+
 public:
 	static std::string GetDriverNameInternal();
 

@@ -326,8 +326,10 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 	//Create the output waveform
 	auto ret = new AnalogWaveform;
 	ret->m_timescale = timescale;
-	ret->m_startTimestamp = 0;		//TODO
-	ret->m_startPicoseconds = 0;
+	float now = GetTime();
+	float tfrac = fmodf(now, 1);
+	ret->m_startTimestamp = round(now - tfrac);
+	ret->m_startPicoseconds = tfrac * 1e12;
 	ret->m_triggerPhase = 0;
 	ret->Resize(length);
 

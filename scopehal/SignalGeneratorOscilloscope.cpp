@@ -45,6 +45,8 @@ using namespace std;
 SignalGeneratorOscilloscope::SignalGeneratorOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport, false)
 	, m_extTrigger(NULL)
+	, m_triggerArmed(false)
+	, m_triggerOneShot(false)
 {
 	//Create a single channel named "waveform"
 	//TODO: more flexible config
@@ -116,8 +118,10 @@ void SignalGeneratorOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*typ
 
 Oscilloscope::TriggerMode SignalGeneratorOscilloscope::PollTrigger()
 {
-	//Always have more data
-	return TRIGGER_MODE_TRIGGERED;
+	if(m_triggerArmed)
+		return TRIGGER_MODE_TRIGGERED;
+	else
+		return TRIGGER_MODE_STOP;
 }
 
 bool SignalGeneratorOscilloscope::AcquireData(bool toQueue)
@@ -152,33 +156,37 @@ bool SignalGeneratorOscilloscope::AcquireData(bool toQueue)
 	m_channelVoltageRange[0] = delta * 1.2;
 	m_channelOffset[0] = -(lo + delta/2);
 
+	if(m_triggerOneShot)
+		m_triggerArmed = false;
+
 	return true;
 }
 
 void SignalGeneratorOscilloscope::ArmTrigger()
 {
-	//no-op, we never trigger
 }
 
 void SignalGeneratorOscilloscope::StartSingleTrigger()
 {
-	//no-op, we never trigger
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void SignalGeneratorOscilloscope::Start()
 {
-	//no-op, we never trigger
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
 }
 
 void SignalGeneratorOscilloscope::Stop()
 {
-	//no-op, we never trigger
+	m_triggerArmed = false;
+	m_triggerOneShot = false;
 }
 
 bool SignalGeneratorOscilloscope::IsTriggerArmed()
 {
-	//always armed
-	return true;
+	return m_triggerArmed;
 }
 
 void SignalGeneratorOscilloscope::ResetTriggerConditions()
