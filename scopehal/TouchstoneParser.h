@@ -64,9 +64,11 @@ class SParameterVector
 {
 public:
 
-	SParameterPoint InterpolatePoint(float frequency);
+	SParameterPoint InterpolatePoint(float frequency) const;
 
 	std::vector<SParameterPoint> m_points;
+
+	SParameterVector& operator *=(const SParameterVector& rhs);
 };
 
 /**
@@ -76,6 +78,10 @@ class TouchstoneParser
 {
 public:
 	TouchstoneParser();
+
+	TouchstoneParser(std::string fname)
+	{ Load(fname); }
+
 	virtual ~TouchstoneParser();
 
 	void Clear();
@@ -89,7 +95,11 @@ public:
 	SParameterPoint SamplePoint(int to, int from, float frequency)
 	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
 
+	TouchstoneParser& operator *=(const TouchstoneParser& rhs);
+
 protected:
+	void Allocate();
+
 	std::map< SPair , SParameterVector*> m_params;
 };
 

@@ -39,7 +39,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SParameterVector
 
-SParameterPoint SParameterVector::InterpolatePoint(float frequency)
+SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 {
 	//Binary search to find the points straddling us
 	size_t len = m_points.size();
@@ -133,6 +133,33 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency)
 	return ret;
 }
 
+/**
+	@brief Multiplies this vector by another set of S-parameters.
+
+	Sampling points are kept unchanged, and incident points are interpolated as necessary.
+ */
+SParameterVector& SParameterVector::operator *=(const SParameterVector& rhs)
+{
+	size_t len = m_points.size();
+	for(size_t i=0; i<len; i++)
+	{
+		auto& us = m_points[i];
+		auto point = rhs.InterpolatePoint(us.m_frequency);
+
+		//Phases add mod +/- pi
+		us.m_phase += point.m_phase;
+		if(us.m_phase < -M_PI)
+			us.m_phase += 2*M_PI;
+		if(us.m_phase > M_PI)
+			us.m_phase -= 2*M_PI;
+
+		//Amplitudes get multiplied
+		us.m_amplitude *= point.m_amplitude;
+	}
+
+	return *this;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TouchstoneParser
 
@@ -161,14 +188,7 @@ void TouchstoneParser::Clear()
 bool TouchstoneParser::Load(string fname)
 {
 	Clear();
-
-	//Allocate new arrays to hold the S-parameters.
-	//For now, assume full 2 port.
-	for(int d=1; d <= 2; d++)
-	{
-		for(int s=1; s <= 2; s++)
-			m_params[SPair(d, s)] = new SParameterVector;
-	}
+	Allocate();
 
 	//If file doesn't exist, bail early
 	FILE* fp = fopen(fname.c_str(), "r");
@@ -253,7 +273,48 @@ bool TouchstoneParser::Load(string fname)
 	//Clean up
 	fclose(fp);
 
-	LogDebug("Loaded %zu S-parameter points\n", m_params[SPair(2,1)]->m_points.size());
+	LogTrace("Loaded %zu S-parameter points\n", m_params[SPair(2,1)]->m_points.size());
 
 	return true;
+}
+
+void TouchstoneParser::Allocate()
+{
+	//Allocate new arrays to hold the S-parameters.
+	//For now, assume full 2 port.
+	for(int d=1; d <= 2; d++)
+	{
+		for(int s=1; s <= 2; s++)
+			m_params[SPair(d, s)] = new SParameterVector;
+	}
+}
+
+/**
+	@brief Applies a second set of S-parameters after this one
+ */
+TouchstoneParser& TouchstoneParser::operator *=(const TouchstoneParser& rhs)
+{
+	//If we have no parameters, just copy whatever is there
+	if(m_params.empty())
+	{
+		Allocate();
+
+		for(int d=1; d <= 2; d++)
+		{
+			for(int s=1; s <= 2; s++)
+				*m_params[SPair(d, s)] = *rhs.m_params.find(SPair(d,s))->second;
+		}
+	}
+
+	//If we have parameters, append the new ones
+	else
+	{
+		for(int d=1; d <= 2; d++)
+		{
+			for(int s=1; s <= 2; s++)
+				*m_params[SPair(d, s)] *= *rhs.m_params.find(SPair(d,s))->second;
+		}
+	}
+
+	return *this;
 }
