@@ -49,10 +49,7 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 
 	//If out of range, clip
 	if(frequency < m_points[0].m_frequency)
-	{
 		return SParameterPoint(frequency, 1, 0);
-		//return m_points[0];
-	}
 	else if(frequency > m_points[len-1].m_frequency)
 		return SParameterPoint(frequency, 0, 0);
 	else
@@ -87,7 +84,11 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 	float freq_lo = m_points[last_lo].m_frequency;
 	float freq_hi = m_points[last_hi].m_frequency;
 	float dfreq = freq_hi - freq_lo;
-	float frac = (frequency - freq_lo) / dfreq;
+	float frac;
+	if(dfreq > FLT_EPSILON)
+		frac = (frequency - freq_lo) / dfreq;
+	else
+		frac = 0;
 
 	//Interpolate amplitude
 	SParameterPoint ret;
