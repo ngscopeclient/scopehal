@@ -61,7 +61,7 @@ public:
 protected:
 	std::string m_fname;
 
-	std::string m_cachedFileName;
+	std::vector<std::string> m_cachedFileNames;
 
 	TouchstoneParser m_sparams;
 };

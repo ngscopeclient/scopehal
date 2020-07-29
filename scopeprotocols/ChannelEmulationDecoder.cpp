@@ -52,8 +52,14 @@ string ChannelEmulationDecoder::GetProtocolName()
 
 void ChannelEmulationDecoder::SetDefaultName()
 {
-	string fname = m_parameters[m_fname].GetFileName();
-	string base = basename(fname.c_str());
+	vector<string> fnames = m_parameters[m_fname].GetFileNames();
+	string base;
+	for(auto f : fnames)
+	{
+		if(base != "")
+			base += ", ";
+		base += basename(f.c_str());
+	}
 
 	char hwname[256];
 	snprintf(

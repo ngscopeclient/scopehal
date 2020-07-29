@@ -43,8 +43,8 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
 
-	m_fname = "SxP Path";
-	m_parameters[m_fname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FILENAME);
+	m_fname = "S-Parameters";
+	m_parameters[m_fname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FILENAMES);
 	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
 	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
 }
@@ -91,8 +91,14 @@ bool DeEmbedDecoder::NeedsConfig()
 
 void DeEmbedDecoder::SetDefaultName()
 {
-	string fname = m_parameters[m_fname].GetFileName();
-	string base = basename(fname.c_str());
+	vector<string> fnames = m_parameters[m_fname].GetFileNames();
+	string base;
+	for(auto f : fnames)
+	{
+		if(base != "")
+			base += ", ";
+		base += basename(f.c_str());
+	}
 
 	char hwname[256];
 	snprintf(
@@ -133,16 +139,18 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 		return;
 	}
 
-	//Reload the S-parameters from the Touchstone file if the filename has changed
-	string fname = m_parameters[m_fname].GetFileName();
-	if(fname != m_cachedFileName)
+	//Reload the S-parameters from the Touchstone file(s) if the filename has changed
+	vector<string> fnames = m_parameters[m_fname].GetFileNames();
+	if(fnames != m_cachedFileNames)
 	{
-		m_cachedFileName = fname;
-		LogDebug("reloading from %s\n", fname.c_str());
-		m_sparams.Load(fname);
+		m_cachedFileNames = fnames;
+
+		m_sparams.Clear();
+		for(auto f : fnames)
+			m_sparams *= TouchstoneParser(f);
 	}
 
-	//TODO: optimization, resample s-parameters to our sample rate once vs ever waveform update
+	//TODO: optimization, resample s-parameters to our sample rate once vs every waveform update
 
 	//We need meaningful data
 	const size_t npoints_raw = din->m_samples.size();
@@ -154,8 +162,8 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 
 	//Truncate to next power of 2 down
 	const size_t npoints = pow(2,floor(log2(npoints_raw)));
-	LogTrace("DeEmbedDecoder: processing %zu raw points\n", npoints_raw);
-	LogTrace("Rounded to %zu\n", npoints);
+	//LogTrace("DeEmbedDecoder: processing %zu raw points\n", npoints_raw);
+	//LogTrace("Rounded to %zu\n", npoints);
 
 	//Format the input data as raw samples for the FFT
 	//TODO: handle non-uniform sample rates
