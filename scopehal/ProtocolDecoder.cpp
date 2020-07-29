@@ -110,6 +110,7 @@ void ProtocolDecoderParameter::ParseString(string str)
 			break;
 
 		case TYPE_FILENAME:
+		case TYPE_FILENAMES:
 			m_intval = 0;
 			m_floatval = 0;
 			m_filename = str;
@@ -153,6 +154,7 @@ string ProtocolDecoderParameter::ToString()
 			break;
 			break;
 		case TYPE_FILENAME:
+		case TYPE_FILENAMES:
 			return m_filename;
 			break;
 	}
@@ -174,11 +176,17 @@ string ProtocolDecoderParameter::GetFileName()
 	return m_filename;
 }
 
+vector<string> ProtocolDecoderParameter::GetFileNames()
+{
+	return m_filenames;
+}
+
 void ProtocolDecoderParameter::SetIntVal(int i)
 {
 	m_intval = i;
 	m_floatval = i;
 	m_filename = "";
+	m_filenames.clear();
 }
 
 void ProtocolDecoderParameter::SetFloatVal(float f)
@@ -186,6 +194,7 @@ void ProtocolDecoderParameter::SetFloatVal(float f)
 	m_intval = f;
 	m_floatval = f;
 	m_filename = "";
+	m_filenames.clear();
 }
 
 void ProtocolDecoderParameter::SetFileName(string f)
@@ -193,6 +202,19 @@ void ProtocolDecoderParameter::SetFileName(string f)
 	m_intval = 0;
 	m_floatval = 0;
 	m_filename = f;
+	m_filenames.clear();
+	m_filenames.push_back(f);
+}
+
+void ProtocolDecoderParameter::SetFileNames(vector<string> names)
+{
+	m_intval = 0;
+	m_floatval = 0;
+	if(names.empty())
+		m_filename = "";
+	else
+		m_filename = names[0];
+	m_filenames = names;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

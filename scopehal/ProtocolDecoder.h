@@ -46,7 +46,8 @@ public:
 		TYPE_FLOAT,
 		TYPE_INT,
 		TYPE_BOOL,
-		TYPE_FILENAME
+		TYPE_FILENAME,	//one file
+		TYPE_FILENAMES	//multiple files
 	};
 
 	ProtocolDecoderParameter(ParameterTypes type = TYPE_INT);
@@ -60,26 +61,29 @@ public:
 	int GetIntVal();
 	float GetFloatVal();
 	std::string GetFileName();
+	std::vector<std::string> GetFileNames();
 
 	void SetBoolVal(bool b)
 	{ m_intval = b; }
 	void SetIntVal(int i);
 	void SetFloatVal(float f);
 	void SetFileName(std::string f);
+	void SetFileNames(std::vector<std::string> names);
 
 	ParameterTypes GetType()
 	{ return m_type; }
 
-	//File filters for TYPE_FILENAME (otherwise ignored)
+	//File filters for TYPE_FILENAME / TYPE_FILENAMES(otherwise ignored)
 	std::string m_fileFilterMask;
 	std::string m_fileFilterName;
 
 protected:
 	ParameterTypes m_type;
 
-	int m_intval;
-	float m_floatval;
-	std::string m_filename;
+	int							m_intval;
+	float						m_floatval;
+	std::string					m_filename;
+	std::vector<std::string>	m_filenames;
 };
 
 /**
