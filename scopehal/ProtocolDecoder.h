@@ -70,6 +70,10 @@ public:
 	ParameterTypes GetType()
 	{ return m_type; }
 
+	//File filters for TYPE_FILENAME (otherwise ignored)
+	std::string m_fileFilterMask;
+	std::string m_fileFilterName;
+
 protected:
 	ParameterTypes m_type;
 

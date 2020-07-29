@@ -45,6 +45,8 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 
 	m_fname = "SxP Path";
 	m_parameters[m_fname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FILENAME);
+	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
+	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
