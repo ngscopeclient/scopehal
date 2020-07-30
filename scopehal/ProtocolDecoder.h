@@ -58,14 +58,14 @@ public:
 	bool GetBoolVal()
 	{ return (m_intval != 0); }
 
-	int GetIntVal();
+	int64_t GetIntVal();
 	float GetFloatVal();
 	std::string GetFileName();
 	std::vector<std::string> GetFileNames();
 
 	void SetBoolVal(bool b)
 	{ m_intval = b; }
-	void SetIntVal(int i);
+	void SetIntVal(int64_t i);
 	void SetFloatVal(float f);
 	void SetFileName(std::string f);
 	void SetFileNames(std::vector<std::string> names);
@@ -80,7 +80,7 @@ public:
 protected:
 	ParameterTypes m_type;
 
-	int							m_intval;
+	int64_t						m_intval;
 	float						m_floatval;
 	std::string					m_filename;
 	std::vector<std::string>	m_filenames;

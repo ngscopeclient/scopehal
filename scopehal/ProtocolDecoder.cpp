@@ -150,7 +150,7 @@ string ProtocolDecoderParameter::ToString()
 			else if(fabs(m_intval) > 1000.0f)
 				snprintf(str_out, sizeof(str_out), "%f k", m_intval / 1000.0f);
 			else
-				snprintf(str_out, sizeof(str_out), "%d", m_intval);
+				snprintf(str_out, sizeof(str_out), "%ld", m_intval);
 			break;
 			break;
 		case TYPE_FILENAME:
@@ -161,7 +161,7 @@ string ProtocolDecoderParameter::ToString()
 	return str_out;
 }
 
-int ProtocolDecoderParameter::GetIntVal()
+int64_t ProtocolDecoderParameter::GetIntVal()
 {
 	return m_intval;
 }
@@ -181,7 +181,7 @@ vector<string> ProtocolDecoderParameter::GetFileNames()
 	return m_filenames;
 }
 
-void ProtocolDecoderParameter::SetIntVal(int i)
+void ProtocolDecoderParameter::SetIntVal(int64_t i)
 {
 	m_intval = i;
 	m_floatval = i;
