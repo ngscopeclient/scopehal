@@ -29,61 +29,42 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@author Alyssa Milburn
+	@brief Declaration of SCPIUARTTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef SCPIUARTTransport_h
+#define SCPIUARTTransport_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+#include "../xptools/UART.h"
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+/**
+	@brief Abstraction of a transport layer for moving SCPI data between endpoints
+ */
+class SCPIUARTTransport : public SCPITransport
+{
+public:
+	SCPIUARTTransport(std::string args);
+	virtual ~SCPIUARTTransport();
 
-#include <yaml-cpp/yaml.h>
+	virtual std::string GetConnectionString();
+	static std::string GetTransportName();
 
+	virtual bool SendCommand(std::string cmd);
+	virtual std::string ReadReply();
+	virtual void ReadRawData(size_t len, unsigned char* buf);
+	virtual void SendRawData(size_t len, const unsigned char* buf);
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	virtual bool IsCommandBatchingSupported();
+	virtual bool IsConnected();
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	TRANSPORT_INITPROC(SCPIUARTTransport)
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+protected:
+	UART m_uart;
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Statistic.h"
-#include "ProtocolDecoder.h"
-
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
+	std::string m_devfile;
+	unsigned int m_baudrate;
+};
 
 #endif
