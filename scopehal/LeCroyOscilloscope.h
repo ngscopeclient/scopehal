@@ -205,6 +205,7 @@ protected:
 	bool m_hasLA;
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
+	bool m_hasFastSampleRate;	//-M models
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

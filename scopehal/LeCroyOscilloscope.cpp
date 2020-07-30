@@ -43,6 +43,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
+	, m_hasFastSampleRate(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
@@ -125,7 +126,11 @@ void LeCroyOscilloscope::IdentifyHardware()
 	else if(m_model.find("DDA5") == 0)
 		m_modelid = MODEL_DDA_5K;
 	else if(m_model.find("WAVERUNNER8") == 0)
+	{
 		m_modelid = MODEL_WAVERUNNER_8K;
+		if(m_model.find("4M") != string::npos)
+			m_hasFastSampleRate = true;
+	}
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
 	else if (m_vendor.compare("SIGLENT") == 0)
@@ -1876,6 +1881,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		case MODEL_WAVERUNNER_8K:
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
+			if(m_hasFastSampleRate)
+				ret.push_back(20 * g);
 			break;
 
 		case MODEL_HDO_9K:
