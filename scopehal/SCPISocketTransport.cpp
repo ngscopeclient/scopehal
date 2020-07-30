@@ -59,15 +59,16 @@ SCPISocketTransport::SCPISocketTransport(string args)
 
 	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
 
-	m_socket.SetRxTimeout(2000000);
-	m_socket.SetTxTimeout(2000000);
-
 	if(!m_socket.Connect(m_hostname, m_port))
 	{
 		m_socket.Close();
 		LogError("Couldn't connect to socket\n");
 		return;
 	}
+	if(!m_socket.SetRxTimeout(2000000))
+		LogWarning("No Rx timeout: %s\n", strerror(errno));
+	if(!m_socket.SetTxTimeout(2000000))
+		LogWarning("No Tx timeout: %s\n", strerror(errno));
 	if(!m_socket.DisableNagle())
 	{
 		m_socket.Close();
