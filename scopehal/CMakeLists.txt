@@ -28,6 +28,7 @@ set(SCOPEHAL_SOURCES
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
 	SCPITMCTransport.cpp
+	SCPIUARTTransport.cpp
 	SCPIDevice.cpp
 
 	IBISParser.cpp

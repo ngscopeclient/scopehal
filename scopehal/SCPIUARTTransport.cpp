@@ -29,61 +29,104 @@
 
 /**
 	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@author Alyssa Milburn
+	@brief Implementation of SCPIUARTTransport
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#include "scopehal.h"
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+using namespace std;
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <yaml-cpp/yaml.h>
+SCPIUARTTransport::SCPIUARTTransport(string args)
+{
+	char devfile[128];
+	unsigned int baudrate = 0;
+	if(2 != sscanf(args.c_str(), "%127[^:]:%u", devfile, &baudrate))
+	{
+		//default if port not specified
+		m_devfile = args;
+		m_baudrate = 115200;
+	}
+	else
+	{
+		m_devfile = devfile;
+		m_baudrate = baudrate;
+	}
 
+	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_devfile.c_str(), m_baudrate);
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	if(!m_uart.Connect(m_devfile, m_baudrate))
+	{
+		m_uart.Close();
+		LogError("Couldn't connect to UART\n");
+		return;
+	}
+}
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+SCPIUARTTransport::~SCPIUARTTransport()
+{
+}
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+bool SCPIUARTTransport::IsConnected()
+{
+	return m_uart.IsValid();
+}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual transport code
 
-#include "Statistic.h"
-#include "ProtocolDecoder.h"
+string SCPIUARTTransport::GetTransportName()
+{
+	return "uart";
+}
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+string SCPIUARTTransport::GetConnectionString()
+{
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp), "%s:%u", m_devfile.c_str(), m_baudrate);
+	return string(tmp);
+}
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+bool SCPIUARTTransport::SendCommand(string cmd)
+{
+	LogTrace("Sending %s\n", cmd.c_str());
+	string tempbuf = cmd + "\n";
+	return m_uart.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
+}
 
-std::string GetDefaultChannelColor(int i);
+string SCPIUARTTransport::ReadReply()
+{
+	//FIXME: there *has* to be a more efficient way to do this...
+	// (see the same code in Socket)
+	char tmp = ' ';
+	string ret;
+	while(true)
+	{
+		if(!m_uart.Read((unsigned char*)&tmp, 1))
+			break;
+		if( (tmp == '\n') || (tmp == ';') )
+			break;
+		else
+			ret += tmp;
+	}
+	LogTrace("Got %s\n", ret.c_str());
+	return ret;
+}
 
-void TransportStaticInit();
-void DriverStaticInit();
+void SCPIUARTTransport::SendRawData(size_t len, const unsigned char* buf)
+{
+	m_uart.Write(buf, len);
+}
 
-void InitializePlugins();
+void SCPIUARTTransport::ReadRawData(size_t len, unsigned char* buf)
+{
+	m_uart.Read(buf, len);
+}
 
-#endif
+bool SCPIUARTTransport::IsCommandBatchingSupported()
+{
+	return true;
+}
