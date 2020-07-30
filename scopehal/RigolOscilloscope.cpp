@@ -665,11 +665,11 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 			//Read block header
 			unsigned char header[12] = {0};
-			
+
 			double start = GetTime();
 			unsigned char header_size;
 			m_transport->ReadRawData(2, header);
-			LogWarning("Time %f\n", (GetTime() - start));
+			//LogWarning("Time %f\n", (GetTime() - start));
 
 			sscanf((char*)header, "#%c", &header_size);
 			header_size = header_size - '0';
