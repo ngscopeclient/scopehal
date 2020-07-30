@@ -249,6 +249,7 @@ protected:
 
 	//Find interpolated zero crossings of a signal
 	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
 
 public:
 	typedef ProtocolDecoder* (*CreateProcType)(std::string);

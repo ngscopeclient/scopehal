@@ -631,7 +631,7 @@ void ProtocolDecoder::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform
  */
 void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
 {
-	//Find times of the zero crossings (TODO: extract this into reusable function)
+	//Find times of the zero crossings
 	bool first = true;
 	bool last = false;
 	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
@@ -654,6 +654,39 @@ void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, s
 
 		//Midpoint of the sample, plus the zero crossing
 		int64_t t = phoff + data->m_timescale * (data->m_offsets[i] + InterpolateTime(data, i-1, threshold));
+		edges.push_back(t);
+		last = value;
+	}
+}
+
+/**
+	@brief Find zero crossings in a waveform, interpolating as necessary
+ */
+void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	double phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i] > threshold;
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		//Midpoint of the sample, plus the zero crossing
+		double t = phoff + data->m_timescale * (data->m_offsets[i] + InterpolateTime(data, i-1, threshold));
 		edges.push_back(t);
 		last = value;
 	}

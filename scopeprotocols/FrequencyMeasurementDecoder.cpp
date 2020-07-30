@@ -126,7 +126,7 @@ void FrequencyMeasurementDecoder::Refresh()
 	float midpoint = GetAvgVoltage(din);
 
 	//Timestamps of the edges
-	vector<int64_t> edges;
+	vector<double> edges;
 	FindZeroCrossings(din, midpoint, edges);
 	if(edges.size() < 2)
 	{
@@ -143,8 +143,8 @@ void FrequencyMeasurementDecoder::Refresh()
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		int64_t start = edges[i];
-		int64_t end = edges[i+2];
+		double start = edges[i];
+		double end = edges[i+2];
 
 		double delta = 1.0e12 / (end - start);
 

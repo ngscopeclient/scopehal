@@ -150,7 +150,7 @@ void ClockRecoveryDecoder::Refresh()
 	double start = GetTime();
 
 	//Timestamps of the edges
-	vector<int64_t> edges;
+	vector<double> edges;
 	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
 
 	if(edges.empty())
@@ -213,12 +213,12 @@ void ClockRecoveryDecoder::Refresh()
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
-		int64_t tnext = edges[nedge];
+		double tnext = edges[nedge];
 		cycles_open_loop ++;
 		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
 			//Find phase error
-			int64_t delta = (edgepos - tnext) - period;
+			double delta = (edgepos - tnext) - period;
 			total_error += fabs(delta);
 
 			//If the clock is currently gated, re-sync to the edge
