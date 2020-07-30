@@ -164,7 +164,7 @@ void RiseMeasurementDecoder::Refresh()
 		{
 			if( (cur > vstart) && (last <= vstart) )
 			{
-				tedge = tnow - din->m_timescale + InterpolateTime(din, i-1, vstart);
+				tedge = tnow - din->m_timescale + InterpolateTime(din, i-1, vstart)*din->m_timescale;
 				state = 1;
 			}
 		}
@@ -174,8 +174,7 @@ void RiseMeasurementDecoder::Refresh()
 		{
 			if( (cur > vend) && (last <= vend) )
 			{
-				double tlerp = tnow - din->m_timescale + InterpolateTime(din, i-1, vend);
-				double dt = tlerp - tedge;
+				double dt = InterpolateTime(din, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
 
 				cap->m_offsets.push_back(tlast);
 				cap->m_durations.push_back(tnow-tlast);
