@@ -46,6 +46,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasFastSampleRate(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_interleaving(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
@@ -87,8 +88,24 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Always use "max memory" config for setting sample depth
 	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
 
-	//Disable channel interleaving until we support this properly
-	m_transport->SendCommand("COMBINE_CHANNELS 1");
+	//See if we're interleaving
+	m_transport->SendCommand("COMBINE_CHANNELS?");
+	auto reply = m_transport->ReadReply();
+	if(reply[0] == '1')
+		m_interleaving = false;
+	else if(reply[0] == '2')
+	{
+		m_interleaving = true;
+
+		//If interleaving, disable the extra channels
+		m_channelsEnabled[0] = false;
+		m_channelsEnabled[3] = false;
+	}
+	else
+	{
+		LogDebug("Unsupported COMBINE_CHANNELS %s, turning off\n", reply.c_str());
+		m_transport->SendCommand("COMBINE_CHANNELS 1");
+	}
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
@@ -430,6 +447,13 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	//ext trigger should never be displayed
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
+
+	//Disable end channels if interleaving
+	if(m_interleaving)
+	{
+		if( (i == 0) || (i == 3) )
+			return false;
+	}
 
 	//Early-out if status is in cache
 	{
@@ -1885,7 +1909,11 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
 			if(m_hasFastSampleRate)
+			{
 				ret.push_back(20 * g);
+				if(m_interleaving)
+					ret.push_back(40 * g);
+			}
 			break;
 
 		case MODEL_HDO_9K:
@@ -1996,20 +2024,10 @@ uint64_t LeCroyOscilloscope::GetSampleRate()
 	if(!m_sampleRateValid)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("TDIV?");
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SampleRate'");
 		string reply = m_transport->ReadReply();
 
-		/*
-			Instead of having a sane API for accessing the actual sample rate, LeCroy scopes report time per "division".
-			There are ten divisions in the entire plot area... then we have to check the memory depth too!
-		 */
-		float time_per_div;
-		sscanf(reply.c_str(), "%f", &time_per_div);
-		double time_per_plot = time_per_div * 10;
-		uint64_t depth = GetSampleDepth();
-		double time_per_sample = time_per_plot / (double)depth;
-		uint64_t ps_per_sample = round(time_per_sample / 1.0e-12);
-		m_sampleRate = 1000000000000L / ps_per_sample;
+		sscanf(reply.c_str(), "%ld", &m_sampleRate);
 		m_sampleRateValid = true;
 	}
 

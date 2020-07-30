@@ -210,6 +210,8 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
+	bool m_interleaving;
+
 	//Cached configuration
 	bool m_triggerChannelValid;
 	size_t m_triggerChannel;
