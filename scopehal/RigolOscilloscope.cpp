@@ -725,10 +725,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		if(m_protocol == DS)
-			m_transport->SendCommand("TRIG_MODE SINGLE");
-		else if(m_protocol == MSO5)
-			m_transport->SendCommand("SING");
+		m_transport->SendCommand("SING");
 		m_triggerArmed = true;
 	}
 
