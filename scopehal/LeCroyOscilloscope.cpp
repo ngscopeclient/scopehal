@@ -126,11 +126,7 @@ void LeCroyOscilloscope::IdentifyHardware()
 	else if(m_model.find("DDA5") == 0)
 		m_modelid = MODEL_DDA_5K;
 	else if(m_model.find("WAVERUNNER8") == 0)
-	{
 		m_modelid = MODEL_WAVERUNNER_8K;
-		if(m_model.find("4M") != string::npos)
-			m_hasFastSampleRate = true;
-	}
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
 	else if (m_vendor.compare("SIGLENT") == 0)
@@ -206,6 +202,13 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				m_hasFunctionGen = true;
 				LogDebug("* AFG (function generator)\n");
+			}
+
+			//Look for M option (extra sample rate and memory)
+			else if(o == "-M")
+			{
+				m_hasFastSampleRate = true;
+				LogDebug("* -M (extra sample rate and memory)\n");
 			}
 
 			//Ignore protocol decodes, we do those ourselves
