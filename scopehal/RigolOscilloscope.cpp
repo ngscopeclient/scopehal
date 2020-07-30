@@ -648,7 +648,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
-		for(size_t npoint = 0; npoint < maxpoints; npoint += maxpoints)
+		for(size_t npoint = 0; npoint < npoints; )
 		{
 			//Ask for the data
 			char tmp[128];
@@ -667,15 +667,27 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			unsigned char header[12] = {0};
 			
 			double start = GetTime();
-			m_transport->ReadRawData(11, header);
+			unsigned char header_size;
+			m_transport->ReadRawData(2, header);
 			LogWarning("Time %f\n", (GetTime() - start));
+
+			sscanf((char*)header, "#%c", &header_size);
+			header_size = header_size - '0';
+
+			m_transport->ReadRawData(header_size, header);
 
 			//Look up the block size
 			//size_t blocksize = end - npoints;
 			//LogDebug("Block size = %zu\n", blocksize);
 			size_t header_blocksize;
-			sscanf((char*)header, "#9%zu", &header_blocksize);
+			sscanf((char*)header, "%zu", &header_blocksize);
 			//LogDebug("Header block size = %zu\n", header_blocksize);
+
+			if (header_blocksize == 0)
+			{
+				LogWarning("Ran out of data after %d points\n", npoint);
+				break;
+			}
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
@@ -692,12 +704,14 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 				cap->m_samples[npoint + j] = v;
 			}
 
-			//Done, update the data
-			if(npoint == 0 && !toQueue)
-				m_channels[i]->SetData(cap);
-			else
-				pending_waveforms[i].push_back(cap);
+			npoint += header_blocksize;
 		}
+
+		//Done, update the data
+		if(!toQueue)
+			m_channels[i]->SetData(cap);
+		else
+			pending_waveforms[i].push_back(cap);
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
