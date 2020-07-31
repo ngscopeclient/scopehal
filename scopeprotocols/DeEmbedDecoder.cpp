@@ -47,6 +47,11 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 	m_parameters[m_fname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FILENAMES);
 	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
 	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
+
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,12 +69,12 @@ bool DeEmbedDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 double DeEmbedDecoder::GetVoltageRange()
 {
-	return m_channels[0]->GetVoltageRange();
+	return m_range;
 }
 
 double DeEmbedDecoder::GetOffset()
 {
-	return m_channels[0]->GetOffset();
+	return m_offset;
 }
 
 string DeEmbedDecoder::GetProtocolName()
@@ -119,6 +124,14 @@ void DeEmbedDecoder::SetDefaultName()
 void DeEmbedDecoder::Refresh()
 {
 	DoRefresh(true);
+}
+
+void DeEmbedDecoder::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 }
 
 /**
@@ -286,15 +299,24 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	cap->m_timescale = din->m_timescale;
 
 	//Copy waveform data after rescaling
-	//We seem to have problems with the first and last few points, not sure why!
-	//For now, just skip them.
 	float scale = 1.0f / npoints;
-	for(size_t i=512; i<npoints - 512; i++)
+	float vmin = FLT_MAX;
+	float vmax = -FLT_MAX;
+	for(size_t i=0; i<npoints; i++)
 	{
 		cap->m_offsets.push_back(din->m_offsets[i]);
 		cap->m_durations.push_back(din->m_durations[i]);
-		cap->m_samples.push_back(ddout[i] * scale);
+		float v = ddout[i] * scale;
+		vmin = min(v, vmin);
+		vmax = max(v, vmax);
+		cap->m_samples.push_back(v);
 	}
+
+	//Calculate bounds
+	m_max = max(m_max, vmax);
+	m_min = min(m_min, vmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	SetData(cap);
 

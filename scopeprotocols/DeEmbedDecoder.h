@@ -54,6 +54,8 @@ public:
 	virtual double GetOffset();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
+	virtual void ClearSweeps();
+
 	PROTOCOL_DECODER_INITPROC(DeEmbedDecoder)
 
 	void DoRefresh(bool invert = true);
@@ -62,6 +64,11 @@ protected:
 	std::string m_fname;
 
 	std::vector<std::string> m_cachedFileNames;
+
+	float m_min;
+	float m_max;
+	float m_range;
+	float m_offset;
 
 	TouchstoneParser m_sparams;
 };
