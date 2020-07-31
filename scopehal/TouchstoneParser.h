@@ -68,8 +68,18 @@ public:
 
 	std::vector<SParameterPoint> m_points;
 
+	float GetGroupDelay(size_t bin);
+
+	size_t size()
+	{ return m_points.size(); }
+
 	SParameterVector& operator *=(const SParameterVector& rhs);
+
+	SParameterPoint operator[](size_t i)
+	{ return m_points[i]; }
 };
+
+typedef std::pair<int, int> SPair;
 
 /**
 	@brief Touchstone (SxP) file parser
@@ -87,8 +97,6 @@ public:
 	void Clear();
 	bool Load(std::string fname);
 
-	typedef std::pair<int, int> SPair;
-
 	/**
 		@brief Sample a single point from a single S-parameter
 	 */
@@ -96,6 +104,9 @@ public:
 	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
 
 	TouchstoneParser& operator *=(const TouchstoneParser& rhs);
+
+	SParameterVector& operator[] (SPair pair)
+	{ return *m_params[pair]; }
 
 protected:
 	void Allocate();

@@ -292,17 +292,33 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	ffts_execute(plan, &rdout[0], &ddout[0]);
 	ffts_free(plan);
 
+	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
+	auto& s21 = m_sparams[SPair(2,1)];
+	float max_delay = 0;
+	for(size_t i=0; i<s21.size()-1 && i<50; i++)
+		max_delay = max(max_delay, s21.GetGroupDelay(i));
+	int64_t groupdelay_samples = ceil( (max_delay * 1e12) / din->m_timescale);
+
 	//Set up output and copy timestamps
 	auto cap = new AnalogWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 	cap->m_timescale = din->m_timescale;
 
+	//Calculate bounds for the *meaningful* output data.
+	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
+	size_t istart = 0;
+	size_t iend = npoints;
+	if(invert)
+		iend -= groupdelay_samples;
+	else
+		istart += groupdelay_samples;
+
 	//Copy waveform data after rescaling
 	float scale = 1.0f / npoints;
 	float vmin = FLT_MAX;
 	float vmax = -FLT_MAX;
-	for(size_t i=0; i<npoints; i++)
+	for(size_t i=istart; i<iend; i++)
 	{
 		cap->m_offsets.push_back(din->m_offsets[i]);
 		cap->m_durations.push_back(din->m_durations[i]);

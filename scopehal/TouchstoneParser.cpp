@@ -49,7 +49,7 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 
 	//If out of range, clip
 	if(frequency < m_points[0].m_frequency)
-		return SParameterPoint(frequency, 1, 0);
+		return SParameterPoint(frequency, m_points[0].m_amplitude, 0);
 	else if(frequency > m_points[len-1].m_frequency)
 		return SParameterPoint(frequency, 0, 0);
 	else
@@ -159,6 +159,23 @@ SParameterVector& SParameterVector::operator *=(const SParameterVector& rhs)
 	}
 
 	return *this;
+}
+
+/**
+	@brief Gets the group delay at a given bin
+ */
+float SParameterVector::GetGroupDelay(size_t bin)
+{
+	if(bin+1 >= m_points.size())
+		return 0;
+
+	auto a = m_points[bin];
+	auto b = m_points[bin+1+1];
+
+	//frequency is in Hz, not rad/sec, so we need to convert
+	float dfreq = (b.m_frequency - a.m_frequency) * 2*M_PI;
+
+	return (a.m_phase - b.m_phase) / dfreq;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
