@@ -206,7 +206,6 @@ void TouchstoneParser::Clear()
 bool TouchstoneParser::Load(string fname)
 {
 	Clear();
-	Allocate();
 
 	//If file doesn't exist, bail early
 	FILE* fp = fopen(fname.c_str(), "r");
@@ -215,6 +214,8 @@ bool TouchstoneParser::Load(string fname)
 		LogError("Unable to open S-parameter file %s\n", fname.c_str());
 		return false;
 	}
+
+	Allocate();
 
 	//Read line by line.
 	char line[256];
@@ -312,8 +313,13 @@ void TouchstoneParser::Allocate()
  */
 TouchstoneParser& TouchstoneParser::operator *=(const TouchstoneParser& rhs)
 {
+	//Make sure we have parameters to work with
+	if(rhs.empty())
+	{
+	}
+
 	//If we have no parameters, just copy whatever is there
-	if(m_params.empty())
+	else if(m_params.empty())
 	{
 		Allocate();
 

@@ -94,6 +94,9 @@ public:
 
 	virtual ~TouchstoneParser();
 
+	bool empty() const
+	{ return m_params.empty(); }
+
 	void Clear();
 	bool Load(std::string fname);
 

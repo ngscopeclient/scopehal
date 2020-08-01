@@ -163,6 +163,13 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			m_sparams *= TouchstoneParser(f);
 	}
 
+	//Don't die if the file couldn't be loaded
+	if(m_sparams.empty())
+	{
+		SetData(NULL);
+		return;
+	}
+
 	//TODO: optimization, resample s-parameters to our sample rate once vs every waveform update
 
 	//We need meaningful data
