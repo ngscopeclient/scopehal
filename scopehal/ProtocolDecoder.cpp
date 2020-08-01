@@ -110,10 +110,38 @@ void ProtocolDecoderParameter::ParseString(string str)
 			break;
 
 		case TYPE_FILENAME:
-		case TYPE_FILENAMES:
 			m_intval = 0;
 			m_floatval = 0;
 			m_filename = str;
+			m_filenames.push_back(str);
+			break;
+
+		case TYPE_FILENAMES:
+			{
+				m_intval = 0;
+				m_floatval = 0;
+				m_filename = "";
+
+				//Split out semicolon-delimited filenames
+				string tmp;
+				str += ';';
+				for(size_t i=0; i<str.length(); i++)
+				{
+					if(str[i] ==';')
+					{
+						if(tmp.empty())
+							continue;
+
+						if(m_filename == "")
+							m_filename = tmp;
+						m_filenames.push_back(tmp);
+						tmp = "";
+						continue;
+					}
+
+					tmp += str[i];
+				}
+			}
 			break;
 	}
 }
@@ -153,9 +181,22 @@ string ProtocolDecoderParameter::ToString()
 				snprintf(str_out, sizeof(str_out), "%ld", m_intval);
 			break;
 			break;
+
 		case TYPE_FILENAME:
-		case TYPE_FILENAMES:
 			return m_filename;
+			break;
+
+		case TYPE_FILENAMES:
+			{
+				string ret = "";
+				for(auto f : m_filenames)
+				{
+					if(ret != "")
+						ret += ";";
+					ret += f;
+				}
+				return ret;
+			}
 			break;
 	}
 	return str_out;
