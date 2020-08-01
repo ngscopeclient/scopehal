@@ -719,3 +719,13 @@ int64_t AgilentOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool AgilentOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool AgilentOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

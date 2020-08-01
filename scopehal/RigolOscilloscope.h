@@ -86,6 +86,8 @@ public:
 	virtual void SetSampleRate(uint64_t rate);
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
+	virtual bool IsInterleaving();
+	virtual bool SetInterleaving(bool combine);
 
 protected:
 	enum protocol_version

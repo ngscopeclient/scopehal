@@ -360,3 +360,13 @@ int64_t MockOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool MockOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool MockOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

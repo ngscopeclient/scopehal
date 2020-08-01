@@ -395,6 +395,25 @@ public:
 	virtual uint64_t GetSampleRate() =0;
 
 	/**
+		@brief Checks if the scope is currently combining channels
+	 */
+	virtual bool IsInterleaving() =0;
+
+	/**
+		@brief Configures the scope to combine channels.
+
+		This function may fail to enable channel combining if conflicts are present, check the return value!
+
+		@return True if channel combining is enabled, false if not
+	 */
+	virtual bool SetInterleaving(bool combine) =0;
+
+	/**
+		@brief Returns true if we have no interleave conflicts, false if we have conflicts
+	 */
+	virtual bool CanInterleave();
+
+	/**
 		@brief Get the set of conflicting channels.
 
 		If any pair of channels in this list is enabled, channel interleaving is not possible.

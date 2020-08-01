@@ -652,3 +652,13 @@ int64_t AntikernelLogicAnalyzer::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool AntikernelLogicAnalyzer::IsInterleaving()
+{
+	return false;
+}
+
+bool AntikernelLogicAnalyzer::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

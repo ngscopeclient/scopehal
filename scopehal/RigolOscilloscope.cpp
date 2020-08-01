@@ -1082,3 +1082,13 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 	m_triggerOffsetValid = true;
 	return m_triggerOffset;
 }
+
+bool RigolOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool RigolOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

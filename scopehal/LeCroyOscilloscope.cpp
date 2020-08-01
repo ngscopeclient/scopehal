@@ -46,13 +46,14 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasFastSampleRate(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
-	, m_interleaving(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
 	, m_memoryDepthValid(false)
 	, m_memoryDepth(1)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
+	, m_interleaving(false)
+	, m_interleavingValid(false)
 	, m_highDefinition(false)
 {
 	//standard initialization
@@ -88,23 +89,11 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Always use "max memory" config for setting sample depth
 	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
 
-	//See if we're interleaving
-	m_transport->SendCommand("COMBINE_CHANNELS?");
-	auto reply = m_transport->ReadReply();
-	if(reply[0] == '1')
-		m_interleaving = false;
-	else if(reply[0] == '2')
+	//If interleaving, disable the extra channels
+	if(IsInterleaving())
 	{
-		m_interleaving = true;
-
-		//If interleaving, disable the extra channels
 		m_channelsEnabled[0] = false;
 		m_channelsEnabled[3] = false;
-	}
-	else
-	{
-		LogDebug("Unsupported COMBINE_CHANNELS %s, turning off\n", reply.c_str());
-		m_transport->SendCommand("COMBINE_CHANNELS 1");
 	}
 
 	//Clear the state-change register to we get rid of any history we don't care about
@@ -393,6 +382,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
+	m_interleavingValid = false;
 }
 
 /**
@@ -502,7 +492,25 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE ON");
+	{
+		//Disable interleaving if we created a conflict
+		auto chan = m_channels[i];
+		if(IsInterleaving())
+		{
+			auto conflicts = GetInterleaveConflicts();
+			for(auto c : conflicts)
+			{
+				if( (c.first->IsEnabled() || (c.first == chan) ) &&
+					(c.second->IsEnabled() || (c.second == chan) ) )
+				{
+					SetInterleaving(false);
+					break;
+				}
+			}
+		}
+
+		m_transport->SendCommand(chan->GetHwname() + ":TRACE ON");
+	}
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
@@ -1909,11 +1917,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
 			if(m_hasFastSampleRate)
-			{
 				ret.push_back(20 * g);
-				if(m_interleaving)
-					ret.push_back(40 * g);
-			}
 			break;
 
 		case MODEL_HDO_9K:
@@ -1952,8 +1956,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(5 * k);
 	ret.push_back(10 * k);
 	ret.push_back(20 * k);
-	ret.push_back(40 * k);			//hdo9 uses this sometimes
+	ret.push_back(40 * k);			//20/40 Gsps scopes can use values other than 1/2/5.
+									//TODO: figure out which models allow this
 	ret.push_back(50 * k);
+	ret.push_back(80 * k);
 	ret.push_back(100 * k);
 	ret.push_back(200 * k);
 	ret.push_back(500 * k);
@@ -1965,9 +1971,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 	switch(m_modelid)
 	{
-		//TODO: even deeper memory support for 8K-M series
-		case MODEL_WAVERUNNER_8K:
-			ret.push_back(16 * m);
+		//TODO: are there any options between 10M and 24M? is there a 20M?
+		//TODO: XXL option gives 48M
+		case MODEL_DDA_5K:
+			ret.push_back(24 * m);
 			break;
 
 		//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
@@ -1977,6 +1984,17 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(64 * m);
 			break;
 
+		//deep memory option gives us 4x the capacity
+		case MODEL_WAVERUNNER_8K:
+			ret.push_back(16 * m);
+			if(m_hasFastSampleRate)
+			{
+				ret.push_back(32 * m);
+				ret.push_back(64 * m);
+			}
+			break;
+
+		//TODO: add more models here
 		default:
 			break;
 	}
@@ -1991,9 +2009,30 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 
 	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
 
-	//Waverunner 8K allows merging buffers from C2/C3 to get deeper memory
-	if(m_modelid == MODEL_WAVERUNNER_8K)
-		ret.push_back(32 * m);
+	switch(m_modelid)
+	{
+		//DDA5 is weird, not a power of two
+		//TODO: XXL option gives 100M, with 48M on all channels
+		case MODEL_DDA_5K:
+			ret.push_back(48 * m);
+			break;
+
+		//no deep-memory option here
+		case MODEL_HDO_9K:
+			ret.push_back(128 * m);
+			break;
+
+		case MODEL_WAVERUNNER_8K:
+			if(m_hasFastSampleRate)
+				ret.push_back(128 * m);
+			else
+				ret.push_back(32 * m);
+			break;
+
+		//TODO: add more models here
+		default:
+			break;
+	}
 
 	return ret;
 }
@@ -2193,4 +2232,68 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 	m_channelDeskew[channel] = skew_ps;
 
 	return skew_ps;
+}
+
+bool LeCroyOscilloscope::IsInterleaving()
+{
+	//Check cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_interleavingValid)
+			return m_interleaving;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("COMBINE_CHANNELS?");
+	auto reply = m_transport->ReadReply();
+	if(reply[0] == '1')
+		m_interleaving = false;
+	else if(reply[0] == '2')
+		m_interleaving = true;
+
+	//We don't support "auto" mode. Default to off for now
+	else
+	{
+		m_transport->SendCommand("COMBINE_CHANNELS 1");
+		m_interleaving = false;
+	}
+
+	m_interleavingValid = true;
+	return m_interleaving;
+}
+
+bool LeCroyOscilloscope::SetInterleaving(bool combine)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Setting to "off" always is possible
+	if(!combine)
+	{
+		m_transport->SendCommand("COMBINE_CHANNELS 1");
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_interleaving = false;
+		m_interleavingValid = true;
+	}
+
+	//Turning on requires we check for conflicts
+	else if(!CanInterleave())
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_interleaving = false;
+		m_interleavingValid = true;
+	}
+
+	//All good, turn it on for real
+	else
+	{
+		m_transport->SendCommand("COMBINE_CHANNELS 2");
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_interleaving = true;
+		m_interleavingValid = true;
+	}
+
+	return m_interleaving;
 }

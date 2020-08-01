@@ -638,3 +638,13 @@ int64_t AntikernelLabsOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool AntikernelLabsOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool AntikernelLabsOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

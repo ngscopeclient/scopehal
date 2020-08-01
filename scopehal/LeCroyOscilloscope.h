@@ -165,6 +165,8 @@ public:
 	virtual void SetSampleDepth(uint64_t depth);
 	virtual void SetSampleRate(uint64_t rate);
 	virtual void SetUseExternalRefclk(bool external);
+	virtual bool IsInterleaving();
+	virtual bool SetInterleaving(bool combine);
 
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
@@ -210,8 +212,6 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	bool m_interleaving;
-
 	//Cached configuration
 	bool m_triggerChannelValid;
 	size_t m_triggerChannel;
@@ -229,6 +229,8 @@ protected:
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
+	bool m_interleaving;
+	bool m_interleavingValid;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;

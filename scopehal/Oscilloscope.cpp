@@ -365,3 +365,16 @@ int64_t Oscilloscope::GetDeskewForChannel(size_t /*channel*/)
 	//override this function in the driver class if deskew is supported
 	return 0;
 }
+
+bool Oscilloscope::CanInterleave()
+{
+	//Check each conflict in the list
+	auto conflicts = GetInterleaveConflicts();
+	for(auto c : conflicts)
+	{
+		if(c.first->IsEnabled() && c.second->IsEnabled())
+			return false;
+	}
+
+	return true;
+}

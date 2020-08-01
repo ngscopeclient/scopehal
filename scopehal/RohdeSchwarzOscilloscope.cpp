@@ -692,3 +692,14 @@ int64_t RohdeSchwarzOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool RohdeSchwarzOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool RohdeSchwarzOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}
+

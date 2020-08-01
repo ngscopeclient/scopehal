@@ -358,3 +358,13 @@ int64_t SignalGeneratorOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool SignalGeneratorOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool SignalGeneratorOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}

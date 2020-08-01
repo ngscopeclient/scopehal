@@ -800,3 +800,13 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 	//FIXME
 	return 0;
 }
+
+bool TektronixOscilloscope::IsInterleaving()
+{
+	return false;
+}
+
+bool TektronixOscilloscope::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}
