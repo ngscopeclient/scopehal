@@ -111,6 +111,11 @@ void FFTDecoder::Refresh()
 		return;
 	}
 	AnalogWaveform* din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
 
 	//We need meaningful data
 	const size_t npoints_raw = din->m_samples.size();
@@ -129,7 +134,7 @@ void FFTDecoder::Refresh()
 	//TODO: handle non-uniform sample rates
 	float* rdin;
 	size_t insize = npoints * sizeof(float);
-	
+
 #ifdef _WIN32
 	rdin = (float*)_aligned_malloc(insize, 32);
 #else
@@ -140,12 +145,12 @@ void FFTDecoder::Refresh()
 
 	float* rdout;
 	const size_t nouts = npoints/2 + 1;
-	
+
 #ifdef _WIN32
 	rdout = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
-#else	
+#else
 	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
-#endif 
+#endif
 
 	//Calculate the FFT
 	auto plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
