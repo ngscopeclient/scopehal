@@ -94,6 +94,7 @@ protected:
 	{
 		MSO5,	 //MSO5000 series
 		DS,
+		DS_OLD,
 	};
 
 	OscilloscopeChannel* m_extTrigChannel;
@@ -125,6 +126,7 @@ protected:
 	uint64_t m_triggerOffset;
 
 	bool m_triggerArmed;
+	bool m_triggerWasLive;
 	bool m_triggerOneShot;
 
 	int m_modelNumber;
