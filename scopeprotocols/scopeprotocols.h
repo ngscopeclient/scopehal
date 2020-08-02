@@ -64,6 +64,7 @@
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
+#include "Ethernet64b66bDecoder.h"
 #include "EyeBitRateMeasurementDecoder.h"
 #include "EyeDecoder2.h"
 #include "EyeHeightMeasurementDecoder.h"
