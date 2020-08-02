@@ -310,9 +310,7 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	double atten;
-	sscanf(reply.c_str(), "%lf", &atten);
-
+	double atten = stod(reply);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelAttenuations[i] = atten;
 	return atten;
@@ -372,9 +370,7 @@ double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	double range;
-	sscanf(reply.c_str(), "%lf", &range);
-
+	double range = stod(reply);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 	return range;
@@ -407,8 +403,7 @@ double AgilentOscilloscope::GetChannelOffset(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	double offset = stod(reply);
 	offset = -offset;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -643,10 +638,9 @@ float AgilentOscilloscope::GetTriggerVoltage()
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand("TRIG:LEV?");
-	string ret = m_transport->ReadReply();
+	string reply = m_transport->ReadReply();
 
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
+	double level = stod(reply);
 	m_triggerLevel = level;
 	m_triggerLevelValid = true;
 	return level;
