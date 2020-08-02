@@ -22,6 +22,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
 	Ethernet1000BaseXDecoder.cpp
+	Ethernet10GBaseRDecoder.cpp
 	Ethernet64b66bDecoder.cpp
 	EthernetAutonegotiationDecoder.cpp
 	EthernetGMIIDecoder.cpp
