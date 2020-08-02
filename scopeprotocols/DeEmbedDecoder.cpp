@@ -180,8 +180,8 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 		return;
 	}
 
-	//Truncate to next power of 2 down
-	const size_t npoints = pow(2,floor(log2(npoints_raw)));
+	//Zero pad to next power of two up
+	const size_t npoints = pow(2, ceil(log2(npoints_raw)));
 	//LogTrace("DeEmbedDecoder: processing %zu raw points\n", npoints_raw);
 	//LogTrace("Rounded to %zu\n", npoints);
 
@@ -196,7 +196,10 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	posix_memalign((void**)&rdin, 32, insize);
 #endif
 
-	memcpy(rdin, &din->m_samples[0], insize);
+	//Copy the input, then fill any extra space with zeroes
+	memcpy(rdin, &din->m_samples[0], npoints_raw*sizeof(float));
+	for(size_t i=npoints_raw; i<npoints; i++)
+		rdin[i] = 0;
 
 	//Set up the FFT
 	float* rdout;
@@ -315,7 +318,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	//Calculate bounds for the *meaningful* output data.
 	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
 	size_t istart = 0;
-	size_t iend = npoints;
+	size_t iend = npoints_raw;
 	if(invert)
 		iend -= groupdelay_samples;
 	else
