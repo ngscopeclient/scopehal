@@ -47,6 +47,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ChannelEmulationDecoder);
 	AddDecoderClass(ClockRecoveryDecoder);
 	AddDecoderClass(ClockJitterDecoder);
+	AddDecoderClass(CTLEDecoder);
 	AddDecoderClass(CurrentShuntDecoder);
 	AddDecoderClass(DCOffsetDecoder);
 	AddDecoderClass(DDR3Decoder);

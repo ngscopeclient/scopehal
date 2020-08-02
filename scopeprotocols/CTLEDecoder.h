@@ -30,88 +30,46 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of CTLEDecoder
  */
+#ifndef CTLEDecoder_h
+#define CTLEDecoder_h
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
-
-#include "../scopehal/scopehal.h"
 #include "../scopehal/ProtocolDecoder.h"
-//#include "../scopehal/StateDecoder.h"
 
-#include "ACCoupleDecoder.h"
-#include "ADL5205Decoder.h"
-#include "BaseMeasurementDecoder.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationDecoder.h"
-#include "ClockJitterDecoder.h"
-#include "ClockRecoveryDecoder.h"
-#include "CTLEDecoder.h"
-#include "CurrentShuntDecoder.h"
-#include "DCOffsetDecoder.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedDecoder.h"
-#include "DeskewDecoder.h"
-#include "DifferenceDecoder.h"
-#include "DramRefreshActivateMeasurementDecoder.h"
-#include "DramRowColumnLatencyMeasurementDecoder.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "EyeBitRateMeasurementDecoder.h"
-#include "EyeDecoder2.h"
-#include "EyeHeightMeasurementDecoder.h"
-#include "EyeJitterMeasurementDecoder.h"
-#include "EyePeriodMeasurementDecoder.h"
-#include "EyeWidthMeasurementDecoder.h"
-#include "FallMeasurementDecoder.h"
-#include "FFTDecoder.h"
-#include "FrequencyMeasurementDecoder.h"
-#include "HorizontalBathtubDecoder.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "IPv4Decoder.h"
-#include "JtagDecoder.h"
-#include "MDIODecoder.h"
-#include "MovingAverageDecoder.h"
-#include "MultiplyDecoder.h"
-#include "OvershootMeasurementDecoder.h"
-#include "ParallelBusDecoder.h"
-#include "PkPkMeasurementDecoder.h"
-#include "PeriodMeasurementDecoder.h"
-#include "RiseMeasurementDecoder.h"
-#include "SincInterpolationDecoder.h"
-#include "SPIDecoder.h"
-#include "ThresholdDecoder.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurementDecoder.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryDecoder.h"
-#include "UndershootMeasurementDecoder.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "WaterfallDecoder.h"
+class CTLEDecoder : public ProtocolDecoder
+{
+public:
+	CTLEDecoder(std::string color);
 
-/*
-#include "DigitalToAnalogDecoder.h"
-#include "DMADecoder.h"
-#include "RPCDecoder.h"
-#include "RPCNameserverDecoder.h"
-#include "SchmittTriggerDecoder.h"
-*/
+	virtual void Refresh();
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
 
-void ScopeProtocolStaticInit();
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	virtual void ClearSweeps();
+
+	PROTOCOL_DECODER_INITPROC(CTLEDecoder)
+
+protected:
+
+	std::string m_dcGainName;
+	std::string m_zeroFreqName;
+	std::string m_poleFreq1Name;
+	std::string m_poleFreq2Name;
+	std::string m_acGainName;
+
+	float m_min;
+	float m_max;
+	float m_range;
+	float m_offset;
+};
 
 #endif

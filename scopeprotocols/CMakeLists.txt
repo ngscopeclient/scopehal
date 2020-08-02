@@ -9,6 +9,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ChannelEmulationDecoder.cpp
 	ClockJitterDecoder.cpp
 	ClockRecoveryDecoder.cpp
+	CTLEDecoder.cpp
 	CurrentShuntDecoder.cpp
 	DCOffsetDecoder.cpp
 	DDR3Decoder.cpp
