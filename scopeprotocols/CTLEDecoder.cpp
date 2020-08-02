@@ -128,7 +128,7 @@ void CTLEDecoder::SetDefaultName()
 		"CTLE(%s, %s, %s, %s, %s, %s)",
 		m_channels[0]->m_displayname.c_str(),
 		db.PrettyPrint(dcgain).c_str(),
-		db.PrettyPrint(zfreq).c_str(),
+		hz.PrettyPrint(zfreq).c_str(),
 		hz.PrettyPrint(pole1).c_str(),
 		hz.PrettyPrint(pole2).c_str(),
 		db.PrettyPrint(acgain).c_str()

@@ -137,7 +137,8 @@ void ClockRecoveryDecoder::Refresh()
 
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
-	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
+	float period = 1.0e12f / baud;
+	int64_t ps = round(ps);
 	m_nominalPeriod = ps;
 
 	//Create the output waveform and copy our timescales
@@ -166,9 +167,8 @@ void ClockRecoveryDecoder::Refresh()
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
 	int64_t tend = din->m_offsets[din->m_offsets.size() - 1] * din->m_timescale;
-	float period = ps;
 	size_t nedge = 1;
-	//LogDebug("n,delta,period\n");
+	//LogDebug("n, delta, period, freq_ghz\n");
 	double edgepos = edges[0];
 	bool value = false;
 	double total_error = 0;
@@ -243,7 +243,7 @@ void ClockRecoveryDecoder::Refresh()
 
 			cycles_open_loop = 0;
 
-			//LogDebug("%ld,%ld,%.2f\n", nedge, delta, period);
+			//LogDebug("%ld,%f,%.2f, %.4f\n", nedge, delta, period, 1e3f / period);
 			tnext = edges[++nedge];
 		}
 
