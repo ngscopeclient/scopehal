@@ -39,6 +39,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
 	, m_triggerChannelValid(false)
 	, m_triggerLevelValid(false)
+	, m_triggerTypeValid(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
@@ -657,18 +658,60 @@ void AgilentOscilloscope::SetTriggerVoltage(float v)
 	//Update cache
 	m_triggerLevelValid = true;
 	m_triggerLevel = v;
-
 }
 
 Oscilloscope::TriggerType AgilentOscilloscope::GetTriggerType()
 {
-	//FIXME
-	return Oscilloscope::TRIGGER_TYPE_RISING;
+	if (m_triggerTypeValid)
+		return m_triggerType;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_triggerTypeValid = true;
+
+	m_transport->SendCommand("TRIG:MODE?");
+	string reply = m_transport->ReadReply();
+
+	if (reply != "EDGE")
+		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_COMPLEX);
+
+	m_transport->SendCommand("TRIG:SLOPE?");
+	reply = m_transport->ReadReply();
+
+	if (reply == "POS")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING;
+	else if (reply == "NEG")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING;
+	else if (reply == "EITH")
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE;
+	// TODO: support "ALT" when the API allows
+	else
+		m_triggerType = Oscilloscope::TRIGGER_TYPE_COMPLEX;
+
+	return m_triggerType;
 }
 
-void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
+void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch (type)
+	{
+		case Oscilloscope::TRIGGER_TYPE_RISING:
+			m_transport->SendCommand("TRIG:SLOPE POS");
+			break;
+		case Oscilloscope::TRIGGER_TYPE_FALLING:
+			m_transport->SendCommand("TRIG:SLOPE NEG");
+			break;
+		case Oscilloscope::TRIGGER_TYPE_CHANGE:
+			m_transport->SendCommand("TRIG:SLOPE EITH");
+			break;
+		default:
+			return;
+	}
+
+	m_transport->SendCommand("TRIG:MODE EDGE");
+	m_triggerTypeValid = true;
+	m_triggerType = type;
 }
 
 void AgilentOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
