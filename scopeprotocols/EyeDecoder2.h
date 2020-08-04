@@ -67,6 +67,9 @@ public:
 	void IntegrateUIs(size_t uis)
 	{ m_totalUIs += uis; }
 
+	float GetUIWidth()
+	{ return m_uiWidth; }
+
 	float m_uiWidth;
 
 	float m_saturationLevel;
@@ -102,10 +105,6 @@ public:
 
 	virtual void ClearSweeps();
 
-	//TODO: this should be a property of the capture, not the decode
-	int64_t GetUIWidth()
-	{ return m_uiWidth; }
-
 	void SetWidth(size_t width)
 	{
 		m_width = width;
@@ -128,10 +127,8 @@ public:
 
 protected:
 
-	size_t m_width;
 	size_t m_height;
-
-	size_t m_uiWidth;
+	size_t m_width;
 
 	std::string m_saturationName;
 	std::string m_centerName;

@@ -98,7 +98,6 @@ EyeDecoder2::EyeDecoder2(string color)
 	m_signalNames.push_back("clk");
 	m_channels.push_back(NULL);
 
-	m_uiWidth = 0;
 	m_width = 0;
 	m_height = 0;
 
@@ -311,7 +310,6 @@ void EyeDecoder2::ClearSweeps()
 {
 	if(m_data != NULL)
 	{
-		m_uiWidth = 0;
 		delete m_data;
 		m_data = NULL;
 	}
@@ -377,11 +375,10 @@ void EyeDecoder2::Refresh()
 	//Calculate average period of the clock
 	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
 	//We probably need a preprocessing filter to handle analog etc clock sources.
-	if(m_uiWidth == 0)
+	if(cap->m_uiWidth < FLT_EPSILON)
 	{
 		double tlastclk = clock->m_offsets[cend-1] + clock->m_durations[cend-1];
-		m_uiWidth = tlastclk / cend;
-		cap->m_uiWidth = m_uiWidth;
+		cap->m_uiWidth = tlastclk / cend;
 	}
 
 	//Process the eye
@@ -392,9 +389,9 @@ void EyeDecoder2::Refresh()
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	size_t wend = waveform->m_samples.size()-1;
-	int64_t halfwidth = m_uiWidth / 2;
-	float scale = fwidth / m_uiWidth;
-	int64_t tscale = floor(m_uiWidth * scale);
+	int64_t halfwidth = cap->m_uiWidth / 2;
+	float scale = fwidth / cap->m_uiWidth;
+	int64_t tscale = floor(cap->m_uiWidth * scale);
 	for(size_t i=0; i<wend; i++)
 	{
 		//Stop when we get to the end of the clock
