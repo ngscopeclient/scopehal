@@ -624,9 +624,12 @@ size_t AgilentOscilloscope::GetTriggerChannelIndex()
 	}
 }
 
-void AgilentOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
+void AgilentOscilloscope::SetTriggerChannelIndex(size_t i)
 {
-	//FIXME
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("TRIG:SOURCE ") + m_channels[i]->GetHwname());
+	m_triggerChannel = i;
+	m_triggerChannelValid = true;
 }
 
 float AgilentOscilloscope::GetTriggerVoltage()
