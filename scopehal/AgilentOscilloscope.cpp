@@ -377,9 +377,17 @@ double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void AgilentOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void AgilentOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
-	//FIXME
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelVoltageRanges[i] = range;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:RANGE %.4f", m_channels[i]->GetHwname().c_str(), range);
+	m_transport->SendCommand(cmd);
 }
 
 OscilloscopeChannel* AgilentOscilloscope::GetExternalTrigger()
@@ -412,9 +420,17 @@ double AgilentOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void AgilentOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void AgilentOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//FIXME
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelOffsets[i] = offset;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:OFFS %.4f", m_channels[i]->GetHwname().c_str(), -offset);
+	m_transport->SendCommand(cmd);
 }
 
 void AgilentOscilloscope::ResetTriggerConditions()
