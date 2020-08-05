@@ -30,115 +30,155 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeDecoder2
+	@brief Implementation of EyeMask
  */
 
-#ifndef EyeDecoder2_h
-#define EyeDecoder2_h
-
-#include "../scopehal/ProtocolDecoder.h"
+#include "scopeprotocols.h"
 #include "EyeMask.h"
 
-class EyeWaveform : public WaveformBase
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+EyeMask::EyeMask()
+	: m_hitrate(0)
+	, m_timebaseIsRelative(false)
 {
-public:
-	EyeWaveform(size_t width, size_t height, float center);
-	virtual ~EyeWaveform();
+}
 
-	float* GetData()
-	{ return m_outdata; }
-
-	int64_t* GetAccumData()
-	{ return m_accumdata; }
-
-	void Normalize();
-
-	size_t GetTotalUIs()
-	{ return m_totalUIs; }
-
-	float GetCenterVoltage()
-	{ return m_centerVoltage; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
-
-	float GetUIWidth()
-	{ return m_uiWidth; }
-
-	float m_uiWidth;
-
-	float m_saturationLevel;
-
-protected:
-	size_t m_width;
-	size_t m_height;
-
-	float* m_outdata;
-	int64_t* m_accumdata;
-
-	size_t m_totalUIs;
-	float m_centerVoltage;
-};
-
-class EyeDecoder2 : public ProtocolDecoder
+EyeMask::~EyeMask()
 {
-public:
-	EyeDecoder2(std::string color);
+}
 
-	virtual void Refresh();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Mask file parsing
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
-
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
-
-	virtual void ClearSweeps();
-
-	void SetWidth(size_t width)
+bool EyeMask::Load(string path)
+{
+	try
 	{
-		m_width = width;
-		SetData(NULL);
+		m_fname = path;
+		auto docs = YAML::LoadAllFromFile(path);
+		if(!Load(docs[0]))
+			return false;
+	}
+	catch(const YAML::BadFile& ex)
+	{
+		return false;
 	}
 
-	void SetHeight(size_t height)
+	return true;
+}
+
+/**
+	@brief Loads the YAML file
+ */
+bool EyeMask::Load(const YAML::Node& node)
+{
+	//Clear out any previous state
+	m_polygons.clear();
+	m_hitrate = 0;
+	m_timebaseIsRelative = false;
+	m_maskname = "";
+
+	//Load protocol section
+	auto proto = node["protocol"];
+	for(auto it : proto)
 	{
-		m_height = height;
-		SetData(NULL);
+		auto name = it.first.as<string>();
+		if(name == "name")
+			m_maskname = it.second.as<string>();
 	}
 
-	size_t GetWidth() const
-	{ return m_width; }
+	//For now, ignore display limits
 
-	size_t GetHeight() const
-	{ return m_height; }
+	//Load units
+	auto units = node["units"];
+	float yscale = 1;
+	for(auto it : units)
+	{
+		auto name = it.first.as<string>();
+		if(name == "xscale")
+		{
+			auto scale = it.second.as<string>();
+			if(scale == "ui")
+				m_timebaseIsRelative = true;
+			else if(scale == "ps")
+				m_timebaseIsRelative = false;
+			else
+				LogError("Unrecognized xscale \"%s\"\n", scale.c_str());
+		}
+		if(name == "yscale")
+		{
+			auto scale = it.second.as<string>();
+			if(scale == "mv")
+				yscale = 0.001f;
+			else if(scale == "v")
+				yscale = 0.001f;
+			else
+				LogError("Unrecognized yscale \"%s\"\n", scale.c_str());
+		}
+	}
 
-	const EyeMask& GetMask() const
-	{ return m_mask; }
+	//Load pass conditions
+	auto conditions = node["conditions"];
+	for(auto it : conditions)
+	{
+		auto name = it.first.as<string>();
+		if(name == "hitrate")
+			m_hitrate = it.second.as<float>();
+	}
 
-	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
+	//Load actual mask polygons
+	auto mask = node["mask"];
+	for(auto p : mask)
+	{
+		EyeMaskPolygon poly;
 
-protected:
+		auto points = p["points"];
+		for(auto v : points)
+			poly.m_points.push_back(EyeMaskPoint(v["x"].as<float>(), v["y"].as<float>() * yscale));
 
-	size_t m_height;
-	size_t m_width;
+		m_polygons.push_back(poly);
+	}
 
-	std::string m_saturationName;
-	std::string m_centerName;
-	std::string m_maskName;
+	return true;
+}
 
-	EyeMask m_mask;
-};
+void EyeMask::RenderForDisplay(
+	Cairo::RefPtr<Cairo::Context> cr,
+	EyeWaveform* waveform,
+	float xscale,
+	float xoff,
+	float yscale,
+	float yoff,
+	float height) const
+{
+	//Color is hard coded for now
+	cr->set_source_rgba(0, 0, 1, 0.75);
 
-#endif
+	//Draw each polygon
+	for(auto poly : m_polygons)
+	{
+		for(size_t i=0; i<poly.m_points.size(); i++)
+		{
+			auto point = poly.m_points[i];
+
+			//Convert from ps to UI if needed
+			float time = point.m_time;
+			if(m_timebaseIsRelative)
+				time *= waveform->GetUIWidth();
+
+			float x = (time - xoff) * xscale;
+
+			float y = height/2 - ( (point.m_voltage + yoff) * yscale );
+
+			if(i == 0)
+				cr->move_to(x, y);
+			else
+				cr->line_to(x, y);
+		}
+		cr->fill();
+	}
+}

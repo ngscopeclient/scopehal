@@ -30,115 +30,85 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EyeDecoder2
+	@brief Declaration of EyeMask, EyeMaskPoint, and EyeMaskPolygon
  */
+#ifndef EyeMask_h
+#define EyeMask_h
 
-#ifndef EyeDecoder2_h
-#define EyeDecoder2_h
+class EyeDecoder2;
+class EyeWaveform;
 
-#include "../scopehal/ProtocolDecoder.h"
-#include "EyeMask.h"
-
-class EyeWaveform : public WaveformBase
+/**
+	@brief A single point within an EyeMaskPolygon
+ */
+class EyeMaskPoint
 {
 public:
-	EyeWaveform(size_t width, size_t height, float center);
-	virtual ~EyeWaveform();
+	EyeMaskPoint()
+	{}
 
-	float* GetData()
-	{ return m_outdata; }
+	EyeMaskPoint(float t, float v)
+	: m_time(t)
+	, m_voltage(v)
+	{}
 
-	int64_t* GetAccumData()
-	{ return m_accumdata; }
-
-	void Normalize();
-
-	size_t GetTotalUIs()
-	{ return m_totalUIs; }
-
-	float GetCenterVoltage()
-	{ return m_centerVoltage; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
-
-	float GetUIWidth()
-	{ return m_uiWidth; }
-
-	float m_uiWidth;
-
-	float m_saturationLevel;
-
-protected:
-	size_t m_width;
-	size_t m_height;
-
-	float* m_outdata;
-	int64_t* m_accumdata;
-
-	size_t m_totalUIs;
-	float m_centerVoltage;
+	float m_time;		//either ps or UIs, depending on EyeMask units
+	float m_voltage;	//volts
 };
 
-class EyeDecoder2 : public ProtocolDecoder
+/**
+	@brief A single polygon within an EyeMask
+ */
+class EyeMaskPolygon
 {
 public:
-	EyeDecoder2(std::string color);
+	std::vector<EyeMaskPoint> m_points;
+};
 
-	virtual void Refresh();
+/**
+	@brief A mask used for checking eye patterns
+ */
+class EyeMask
+{
+public:
+	EyeMask();
+	virtual ~EyeMask();
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+	bool Load(std::string path);
+	bool Load(const YAML::Node& node);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	std::string GetFileName() const
+	{ return m_fname; }
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	std::string GetMaskName() const
+	{ return m_maskname; }
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	float GetAllowedHitRate() const
+	{ return m_hitrate; }
 
-	virtual void ClearSweeps();
+	void RenderForDisplay(
+		Cairo::RefPtr<Cairo::Context> cr,
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const;
 
-	void SetWidth(size_t width)
-	{
-		m_width = width;
-		SetData(NULL);
-	}
-
-	void SetHeight(size_t height)
-	{
-		m_height = height;
-		SetData(NULL);
-	}
-
-	size_t GetWidth() const
-	{ return m_width; }
-
-	size_t GetHeight() const
-	{ return m_height; }
-
-	const EyeMask& GetMask() const
-	{ return m_mask; }
-
-	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
+	//TODO: function to render to boolean bitmap
+	//TODO: function to render to nice pretty cairo bitmap
 
 protected:
+	std::string m_fname;
+	std::vector<EyeMaskPolygon> m_polygons;
 
-	size_t m_height;
-	size_t m_width;
+	float m_hitrate;
 
-	std::string m_saturationName;
-	std::string m_centerName;
-	std::string m_maskName;
+	//true = time measured in UIs
+	//false = time measured in ps
+	bool m_timebaseIsRelative;
 
-	EyeMask m_mask;
+	std::string m_maskname;
 };
 
 #endif

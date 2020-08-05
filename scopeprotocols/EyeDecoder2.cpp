@@ -108,6 +108,12 @@ EyeDecoder2::EyeDecoder2(string color)
 	m_centerName = "Center Voltage";
 	m_parameters[m_centerName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_centerName].SetFloatVal(0);
+
+	m_maskName = "Mask";
+	m_parameters[m_maskName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FILENAME);
+	m_parameters[m_maskName].SetFileName("");
+	m_parameters[m_maskName].m_fileFilterMask = "*.yml";
+	m_parameters[m_maskName].m_fileFilterName = "YAML files (*.yml)";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,6 +369,11 @@ void EyeDecoder2::Refresh()
 			cap = NULL;
 		}
 	}
+
+	//Load the mask, if needed
+	string maskpath = m_parameters[m_maskName].GetFileName();
+	if(maskpath != m_mask.GetFileName())
+		m_mask.Load(maskpath);
 
 	//Initialize the capture
 	//TODO: timestamps? do we need those?

@@ -791,7 +791,27 @@ string ProtocolDecoder::SerializeConfiguration(IDTable& table)
 	config += tmp;
 	for(auto it : m_parameters)
 	{
-		snprintf(tmp, sizeof(tmp), "            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+		switch(it.second.GetType())
+		{
+			case ProtocolDecoderParameter::TYPE_FLOAT:
+			case ProtocolDecoderParameter::TYPE_INT:
+			case ProtocolDecoderParameter::TYPE_BOOL:
+				snprintf(
+					tmp,
+					sizeof(tmp),
+					"            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+				break;
+
+			case ProtocolDecoderParameter::TYPE_FILENAME:
+			case ProtocolDecoderParameter::TYPE_FILENAMES:
+			default:
+				snprintf(
+					tmp,
+					sizeof(tmp),
+					"            %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
+				break;
+		}
+
 		config += tmp;
 	}
 
