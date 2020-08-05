@@ -75,6 +75,12 @@ public:
 
 	float m_saturationLevel;
 
+	float GetMaskHitRate()
+	{ return m_maskHitRate; }
+
+	void SetMaskHitRate(float rate)
+	{ m_maskHitRate = rate; }
+
 protected:
 	size_t m_width;
 	size_t m_height;
@@ -84,6 +90,8 @@ protected:
 
 	size_t m_totalUIs;
 	float m_centerVoltage;
+
+	float m_maskHitRate;
 };
 
 class EyeDecoder2 : public ProtocolDecoder
@@ -140,6 +148,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(EyeDecoder2)
 
 protected:
+	void DoMaskTest(EyeWaveform* cap);
 
 	size_t m_height;
 	size_t m_width;

@@ -43,6 +43,7 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
 	, m_height(height)
 	, m_totalUIs(0)
 	, m_centerVoltage(center)
+	, m_maskHitRate(0)
 {
 	size_t npix = width*height;
 	m_accumdata = new int64_t[npix];
@@ -471,12 +472,73 @@ void EyeDecoder2::Refresh()
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock->m_samples.size());
-
 	cap->Normalize();
 	SetData(cap);
+
+	//If we have an eye mask, prepare it for processing
+	if(m_mask.GetFileName() != "")
+		DoMaskTest(cap);
 
 	double dt = GetTime() - start;
 	total_frames ++;
 	total_time += dt;
 	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
+}
+
+/**
+	@brief Checks the current capture against the eye mask
+ */
+void EyeDecoder2::DoMaskTest(EyeWaveform* cap)
+{
+	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
+
+	//Create the Cairo surface we're drawing on
+	Cairo::RefPtr< Cairo::ImageSurface > surface =
+		Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, m_width, m_height);
+	Cairo::RefPtr< Cairo::Context > cr = Cairo::Context::create(surface);
+
+	//Set up transformation to match GL's bottom-left origin
+	//cr->translate(0, m_height);
+	//cr->scale(1, -1);
+
+	//Clear to a blank background
+	cr->set_source_rgba(0, 0, 0, 1);
+	cr->rectangle(0, 0, m_width, m_height);
+	cr->fill();
+
+	//Software rendering
+	float yscale = m_height / m_channels[0]->GetVoltageRange();
+	m_mask.RenderForAnalysis(
+		cr,
+		cap,
+		m_xscale,
+		m_xoff,
+		yscale,
+		0,
+		m_height);
+
+	auto accum = cap->GetAccumData();
+
+	//Test each pixel of the eye pattern against the mask
+	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
+	size_t total = 0;
+	size_t hits = 0;
+	for(size_t y=0; y<m_height; y++)
+	{
+		auto row = data + (y*m_width);
+		auto eyerow = accum + (y*m_width);
+		for(size_t x=0; x<m_width; x++)
+		{
+			//Look up the eye pattern pixel
+			auto bin = eyerow[x];
+			total += bin;
+
+			//If mask pixel isn't black, count violations
+			uint32_t pix = row[x];
+			if( (pix & 0xff) != 0)
+				hits += bin;
+		}
+	}
+
+	cap->SetMaskHitRate(hits * 1.0f / total);
 }
