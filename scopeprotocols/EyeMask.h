@@ -95,10 +95,25 @@ public:
 		float yoff,
 		float height) const;
 
-	//TODO: function to render to boolean bitmap
-	//TODO: function to render to nice pretty cairo bitmap
+	void RenderForAnalysis(
+		Cairo::RefPtr<Cairo::Context> cr,
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const;
 
 protected:
+	void RenderInternal(
+		Cairo::RefPtr<Cairo::Context> cr,
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const;
+
 	std::string m_fname;
 	std::vector<EyeMaskPolygon> m_polygons;
 

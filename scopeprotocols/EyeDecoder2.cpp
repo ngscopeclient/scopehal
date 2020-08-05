@@ -90,6 +90,10 @@ void EyeWaveform::Normalize()
 
 EyeDecoder2::EyeDecoder2(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_EYE, color, CAT_ANALYSIS)
+	, m_height(0)
+	, m_width(0)
+	, m_xoff(0)
+	, m_xscale(0)
 {
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -97,9 +101,6 @@ EyeDecoder2::EyeDecoder2(string color)
 
 	m_signalNames.push_back("clk");
 	m_channels.push_back(NULL);
-
-	m_width = 0;
-	m_height = 0;
 
 	m_saturationName = "Saturation Level";
 	m_parameters[m_saturationName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
@@ -395,16 +396,15 @@ void EyeDecoder2::Refresh()
 	//Process the eye
 	size_t iclock = 0;
 	float yscale = m_height / m_channels[0]->GetVoltageRange();
-	int64_t hwidth = m_width / 2;
-	float fwidth = m_width / 2.0f;
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	size_t wend = waveform->m_samples.size()-1;
-	int64_t halfwidth = cap->m_uiWidth / 2;
-	float scale = fwidth / cap->m_uiWidth;
-	int64_t tscale = floor(cap->m_uiWidth * scale);
 	for(size_t i=0; i<wend; i++)
 	{
+		//If scale isn't defined yet, early out
+		if(m_xscale < FLT_EPSILON)
+			break;
+
 		//Stop when we get to the end of the clock
 		if(iclock + 1 >= cend)
 			break;
@@ -414,29 +414,29 @@ void EyeDecoder2::Refresh()
 		int64_t twidth = clock->m_durations[iclock];
 		int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
 		int64_t offset = tstart - clock->m_offsets[iclock] * clock->m_timescale;
-		if(offset < 0)
+		if(offset < -10)
 			continue;
 		if(offset > twidth)
 		{
 			iclock ++;
-			offset -= twidth;
+			offset = tstart - clock->m_offsets[iclock+1] * clock->m_timescale;
 		}
 
-		//Sampling clock is the middle of the UI, not the start.
-		//Anything more than half a UI right of the clock is negative.
-		if(offset > halfwidth)
-			offset = offset - twidth;
-		if(offset < -halfwidth)
-			continue;
+		//LogDebug("%zu, %zd\n", i, offset);
 
 		//Interpolate voltage
 		int64_t dt = (waveform->m_offsets[i+1] - waveform->m_offsets[i]) * waveform->m_timescale;
-		float pixel_x_f = offset * scale;
+		float pixel_x_f = (offset - m_xoff) * m_xscale;
 		float pixel_x_fround = floor(pixel_x_f);
-		int64_t pixel_x_round = pixel_x_fround + hwidth;
 		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
-		float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * scale );
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * m_xscale );
 		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+
+		//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
+		pixel_x_f -= m_xscale * 0.5;
+		pixel_x_f += (rand() & 0xff) * m_xscale / 255.0f;
+
+		//LogDebug("%zu, %zd, %f\n", i, offset, pixel_x_f);
 
 		//Find (and sanity check) the Y coordinate
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;
@@ -452,8 +452,10 @@ void EyeDecoder2::Refresh()
 		int64_t* row2 = row1 + m_width;
 
 		//Plot each point 3 times for center/left/right portions of the eye
-		//Map -twidth to +twidth to 0...m_width
-		int64_t xpos[] = {pixel_x_round, pixel_x_round + tscale, -tscale + pixel_x_round};
+		int64_t pixel_x_round = round(pixel_x_f);
+		int64_t pixel_x_round2 = round(pixel_x_f + m_xscale*cap->m_uiWidth);
+		int64_t pixel_x_round3 = round(pixel_x_f - m_xscale*cap->m_uiWidth);
+		int64_t xpos[] = { pixel_x_round, pixel_x_round2, pixel_x_round3 };
 		for(auto x : xpos)
 		{
 			if( (x+1 < (int64_t)m_width) && (x >= 0) )
@@ -465,6 +467,7 @@ void EyeDecoder2::Refresh()
 			}
 		}
 	}
+	fflush(stdout);
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock->m_samples.size());

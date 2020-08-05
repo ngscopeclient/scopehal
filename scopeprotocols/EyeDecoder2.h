@@ -118,6 +118,16 @@ public:
 		SetData(NULL);
 	}
 
+	void SetXOffset(int64_t xoff)
+	{
+		m_xoff = xoff;
+	}
+
+	void SetXScale(float xscale)
+	{
+		m_xscale = xscale;
+	}
+
 	size_t GetWidth() const
 	{ return m_width; }
 
@@ -133,6 +143,9 @@ protected:
 
 	size_t m_height;
 	size_t m_width;
+
+	int64_t m_xoff;
+	float m_xscale;
 
 	std::string m_saturationName;
 	std::string m_centerName;

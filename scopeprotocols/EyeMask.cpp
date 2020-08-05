@@ -155,9 +155,41 @@ void EyeMask::RenderForDisplay(
 	float yoff,
 	float height) const
 {
-	//Color is hard coded for now
 	cr->set_source_rgba(0, 0, 1, 0.75);
+	RenderInternal(cr, waveform, xscale, xoff, yscale, yoff, height);
+}
 
+void EyeMask::RenderForAnalysis(
+		Cairo::RefPtr<Cairo::Context> cr,
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const
+{
+	//clear background
+	cr->set_source_rgba(0, 0, 0, 1);
+	cr->move_to(-1e5, 0);
+	cr->line_to( 1e5, 0);
+	cr->line_to( 1e5, height);
+	cr->line_to(-1e5, height);
+	cr->fill();
+
+	//draw the mask
+	cr->set_source_rgba(1, 1, 1, 1);
+	RenderInternal(cr, waveform, xscale, xoff, yscale, yoff, height);
+}
+
+void EyeMask::RenderInternal(
+		Cairo::RefPtr<Cairo::Context> cr,
+		EyeWaveform* waveform,
+		float xscale,
+		float xoff,
+		float yscale,
+		float yoff,
+		float height) const
+{
 	//Draw each polygon
 	for(auto poly : m_polygons)
 	{
