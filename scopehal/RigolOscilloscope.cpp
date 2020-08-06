@@ -493,6 +493,8 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(m_protocol == MSO5)
 		range = 8 * range;
+	if(m_protocol == DS_OLD)
+		range = 10 * range;
 	m_channelVoltageRanges[i] = range;
 
 	return range;
@@ -638,11 +640,21 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 
 		if (m_protocol == DS_OLD)
 		{
-			m_transport->SendCommand(string(":WAV:DATA? ") + m_channels[i]->GetHwname());
-			yincrement = 1/256.0f; // FIXME
-			yorigin = 0; // FIXME
-			ps_per_sample = 1; // FIXME
+			yreference = 0;
 			npoints = maxpoints;
+
+			yincrement = GetChannelVoltageRange(i) / 256.0f;
+			yorigin = GetChannelOffset(i);
+
+			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFFS?");
+			string reply = m_transport->ReadReply();
+			sscanf(reply.c_str(), "%lf", &yorigin);
+
+			/* for these scopes, this is seconds per div */
+			m_transport->SendCommand(":TIM:SCAL?");
+			reply = m_transport->ReadReply();
+			sscanf(reply.c_str(), "%lf", &sec_per_sample);
+			ps_per_sample = (sec_per_sample * 12 * 1e12f) / npoints;
 		}
 		else
 		{
@@ -682,32 +694,23 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		{
 			if (m_protocol == DS_OLD)
 			{
-				m_transport->ReadRawData(npoints, temp_buf);
-
-				cap->Resize(npoints);
-				for(size_t j = 0; j < npoints; j++)
-				{
-					float v = (128 - static_cast<float>(temp_buf[j])) * yincrement - yorigin;
-					cap->m_offsets[j] = j;
-					cap->m_durations[j] = 1;
-					cap->m_samples[j] = v;
-				}
-
-				break;
+				m_transport->SendCommand(string(":WAV:DATA? ") + m_channels[i]->GetHwname());
 			}
+			else
+			{
+				//Ask for the data
+				char tmp[128];
+				snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	   //ONE based indexing WTF
+				m_transport->SendCommand(tmp);
+				size_t end = npoint + maxpoints;
+				if(end > npoints)
+					end = npoints;
+				snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end);	//Here it is zero based, so it gets from 1-1000
+				m_transport->SendCommand(tmp);
 
-			//Ask for the data
-			char tmp[128];
-			snprintf(tmp, sizeof(tmp), "WAV:STAR %zu", npoint + 1);	   //ONE based indexing WTF
-			m_transport->SendCommand(tmp);
-			size_t end = npoint + maxpoints;
-			if(end > npoints)
-				end = npoints;
-			snprintf(tmp, sizeof(tmp), "WAV:STOP %zu", end);	//Here it is zero based, so it gets from 1-1000
-			m_transport->SendCommand(tmp);
-
-			//Ask for the data block
-			m_transport->SendCommand("WAV:DATA?");
+				//Ask for the data block
+				m_transport->SendCommand("WAV:DATA?");
+			}
 
 			//Read block header
 			unsigned char header[12] = {0};
@@ -744,6 +747,8 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 			for(size_t j = 0; j < header_blocksize; j++)
 			{
 				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
+				if (m_protocol == DS_OLD)
+					v = (128 - static_cast<float>(temp_buf[j])) * yincrement - ydelta;
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
 				cap->m_offsets[npoint + j] = npoint + j;
 				cap->m_durations[npoint + j] = 1;
