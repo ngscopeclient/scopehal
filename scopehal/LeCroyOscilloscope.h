@@ -197,10 +197,10 @@ protected:
 		time_t ttime,
 		double basetime);
 
-	void FillWaveformHeaders(int64_t* offs, int64_t* durs, size_t count);
-	void FillWaveformHeadersAVX2(int64_t* offs, int64_t* durs, size_t count);
-	void Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count);
-	void Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count);
+	void Convert8BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count);
+	void Convert8BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count);
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

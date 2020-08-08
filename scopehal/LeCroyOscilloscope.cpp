@@ -1296,27 +1296,44 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 
 		cap->Resize(num_per_segment);
 
-		//Fill durations and offsets
-		if(g_hasAvx2)
-			FillWaveformHeadersAVX2((int64_t*)&cap->m_offsets[0], (int64_t*)&cap->m_durations[0], num_per_segment);
-		else
-			FillWaveformHeaders((int64_t*)&cap->m_offsets[0], (int64_t*)&cap->m_durations[0], num_per_segment);
-
 		//Convert raw ADC samples to volts
+		//TODO: Optimized AVX conversion for 16-bit samples
 		float* samps = reinterpret_cast<float*>(&cap->m_samples[0]);
 		if(m_highDefinition)
 		{
 			int16_t* base = wdata + j*num_per_segment;
 
 			for(unsigned int k=0; k<num_per_segment; k++)
+			{
+				cap->m_offsets[k] = k;
+				cap->m_durations[k] = 1;
 				samps[k] = base[k] * v_gain - v_off;
+			}
 		}
 		else
 		{
 			if(g_hasAvx2)
-				Convert8BitSamplesAVX2(samps, bdata + j*num_per_segment, v_gain, v_off, num_per_segment);
+			{
+				Convert8BitSamplesAVX2(
+					(int64_t*)&cap->m_offsets[0],
+					(int64_t*)&cap->m_durations[0],
+					samps,
+					bdata + j*num_per_segment,
+					v_gain,
+					v_off,
+					num_per_segment);
+			}
 			else
-				Convert8BitSamples(samps, bdata + j*num_per_segment, v_gain, v_off, num_per_segment);
+			{
+				Convert8BitSamples(
+					(int64_t*)&cap->m_offsets[0],
+					(int64_t*)&cap->m_durations[0],
+					samps,
+					bdata + j*num_per_segment,
+					v_gain,
+					v_off,
+					num_per_segment);
+			}
 		}
 
 		ret.push_back(cap);
@@ -1328,19 +1345,33 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 /**
 	@brief Converts 8-bit ADC samples to floating point
  */
-void LeCroyOscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count)
+void LeCroyOscilloscope::Convert8BitSamples(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count)
 {
 	for(unsigned int k=0; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
+	}
 }
 
 /**
 	@brief Optimized version of Convert8BitSamples()
  */
 __attribute__((target("avx2")))
-void LeCroyOscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count)
+void LeCroyOscilloscope::Convert8BitSamplesAVX2(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count)
 {
 	unsigned int end = count - (count % 32);
+
+	int64_t ones_x4[] = {1, 1, 1, 1};
+	int64_t fours_x4[] = {4, 4, 4, 4};
+	int64_t count_x4[] = {0, 1, 2, 3};
+
+	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
+	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
+	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
@@ -1353,6 +1384,16 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float 
 
 		//Load all 32 raw ADC samples, without assuming alignment
 		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
 
 		//Extract the low and high 16 samples from the block
 		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
@@ -1368,6 +1409,24 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float 
 		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
 		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
 		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
 
 		//Convert the 32-bit int blocks to float.
 		//Apparently there's no direct epi8 to ps conversion instruction.
@@ -1396,42 +1455,45 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float 
 
 	//Get any extras we didn't get in the SIMD loop
 	for(unsigned int k=end; k<count; k++)
-		pout[k] = pin[k] * gain - offset;
-}
-
-/**
-	@brief Fills offsets with 0...n and durations to all 1s
- */
-void LeCroyOscilloscope::FillWaveformHeaders(int64_t* offs, int64_t* durs, size_t count)
-{
-	for(unsigned int k=0; k<count; k++)
 	{
 		offs[k] = k;
 		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
 	}
 }
 
 /**
 	@brief Optimized version of FillWaveformHeaders()
  */
-__attribute__((target("avx2")))
-void LeCroyOscilloscope::FillWaveformHeadersAVX2(int64_t* offs, int64_t* durs, size_t count)
+/*
+__attribute__((target("avx512f")))
+void LeCroyOscilloscope::FillWaveformHeadersAVX512F(int64_t* offs, int64_t* durs, size_t count)
 {
-	int64_t ones_x4[] = {1, 1, 1, 1};
-	int64_t fours_x4[] = {4, 4, 4, 4};
-	int64_t count_x4[] = {0, 1, 2, 3};
+	int64_t ones_x8[] = {1, 1, 1, 1, 1, 1, 1, 1};
+	int64_t eights_x8[] = {8, 8, 8, 8, 8, 8, 8, 8};
+	int64_t count_x8[] = {0, 1, 2, 3, 4, 5, 6, 7};
 
-	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
-	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+	__m512i all_ones = _mm512_load_epi64(ones_x8);
+	__m512i all_eights = _mm512_load_epi64(eights_x8);
+	__m512i counts = _mm512_load_epi64(count_x8);
 
-	//Unroll four stores to each array per loop iteration
-	unsigned int end = count - (count % 4);
-	for(unsigned int k=0; k<end; k+= 4)
+	//Unroll 32 stores to each array per loop iteration
+	unsigned int end = count - (count % 32);
+	for(unsigned int k=0; k<end; k+= 32)
 	{
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
+		_mm512_store_epi64(durs + k, all_ones);
+		_mm512_store_epi64(durs + k + 8, all_ones);
+		_mm512_store_epi64(durs + k + 16, all_ones);
+		_mm512_store_epi64(durs + k + 24, all_ones);
+
+		_mm512_store_epi64(offs + k, counts);
+		counts = _mm512_add_epi64(counts, all_eights);
+		_mm512_store_epi64(offs + k + 8, counts);
+		counts = _mm512_add_epi64(counts, all_eights);
+		_mm512_store_epi64(offs + k + 16, counts);
+		counts = _mm512_add_epi64(counts, all_eights);
+		_mm512_store_epi64(offs + k + 24, counts);
+		counts = _mm512_add_epi64(counts, all_eights);
 	}
 
 	//Get any extras we didn't get in the SIMD loop
@@ -1441,6 +1503,7 @@ void LeCroyOscilloscope::FillWaveformHeadersAVX2(int64_t* offs, int64_t* durs, s
 		durs[k] = 1;
 	}
 }
+*/
 
 map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 	string& data,
