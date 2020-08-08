@@ -1313,16 +1313,90 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		}
 		else
 		{
-			int8_t* base = bdata + j*num_per_segment;
-
-			for(unsigned int k=0; k<num_per_segment; k++)
-				samps[k] = base[k] * v_gain - v_off;
+			if(g_hasAvx2)
+				Convert8BitSamplesAVX2(samps, bdata + j*num_per_segment, v_gain, v_off, num_per_segment);
+			else
+				Convert8BitSamples(samps, bdata + j*num_per_segment, v_gain, v_off, num_per_segment);
 		}
 
 		ret.push_back(cap);
 	}
 
 	return ret;
+}
+
+/**
+	@brief Converts 8-bit ADC samples to floating point
+ */
+void LeCroyOscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count)
+{
+	for(unsigned int k=0; k<count; k++)
+		pout[k] = pin[k] * gain - offset;
+}
+
+/**
+	@brief Optimized version of Convert8BitSamples()
+ */
+__attribute__((target("avx2")))
+void LeCroyOscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count)
+{
+	unsigned int end = count - (count % 32);
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(unsigned int k=0; k<count; k += 32)
+	{
+		//This is likely a lot faster, but assumes we have 64 byte alignment on pin which is not guaranteed.
+		//TODO: fix alignment
+		//__m256i raw_samples = _mm256_load_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Load all 32 raw ADC samples, without assuming alignment
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Extract the low and high 16 samples from the block
+		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
+		__m128i block23_x8 = _mm256_extracti128_si256(raw_samples, 1);
+
+		//Swap the low and high halves of these vectors
+		//Ugly casting needed because all permute instrinsics expect float/double datatypes
+		__m128i block10_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block01_x8), 1));
+		__m128i block32_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block23_x8), 1));
+
+		//Divide into blocks of 8 samples and sign extend to 32 bit
+		__m256i block0_int = _mm256_cvtepi8_epi32(block01_x8);
+		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
+		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
+		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
+
+		//Convert the 32-bit int blocks to float.
+		//Apparently there's no direct epi8 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_int);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_int);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_int);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_int);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
+
+		block0_float = _mm256_sub_ps(block0_float, offsets);
+		block1_float = _mm256_sub_ps(block1_float, offsets);
+		block2_float = _mm256_sub_ps(block2_float, offsets);
+		block3_float = _mm256_sub_ps(block3_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(unsigned int k=end; k<count; k++)
+		pout[k] = pin[k] * gain - offset;
 }
 
 /**
