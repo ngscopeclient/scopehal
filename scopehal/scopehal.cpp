@@ -54,6 +54,10 @@
 
 using namespace std;
 
+bool g_hasAvx512F = false;
+bool g_hasAvx512DQ = false;
+bool g_hasAvx512VL = false;
+bool g_hasAvx2 = false;
 
 /**
 	@brief Static initialization for SCPI transports
@@ -71,11 +75,31 @@ void TransportStaticInit()
 #endif
 }
 
+void DetectCPUFeatures()
+{
+	//Check CPU features
+	g_hasAvx512F = __builtin_cpu_supports("avx512f");
+	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
+	g_hasAvx512DQ = __builtin_cpu_supports("avx512dq");
+	g_hasAvx2 = __builtin_cpu_supports("avx2");
+
+	if(g_hasAvx2)
+		LogDebug("CPU supports AVX2\n");
+	if(g_hasAvx512F)
+		LogDebug("CPU supports AVX512F\n");
+	if(g_hasAvx512DQ)
+		LogDebug("CPU supports AVX512DQ\n");
+	if(g_hasAvx512VL)
+		LogDebug("CPU supports AVX512VL\n");
+}
+
 /**
 	@brief Static initialization for oscilloscopes
  */
 void DriverStaticInit()
 {
+	DetectCPUFeatures();
+
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);
 	AddDriverClass(AntikernelLogicAnalyzer);

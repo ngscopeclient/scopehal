@@ -32,6 +32,8 @@
 #include "ProtocolDecoder.h"
 #include "base64.h"
 #include <locale>
+#include <xmmintrin.h>
+#include <immintrin.h>
 
 using namespace std;
 
@@ -1292,38 +1294,78 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		else
 			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 
-		//Convert raw ADC samples to volts
 		cap->Resize(num_per_segment);
-		int64_t* offs = reinterpret_cast<int64_t*>(&cap->m_offsets[0]);
-		int64_t* durs = reinterpret_cast<int64_t*>(&cap->m_durations[0]);
+
+		//Fill durations and offsets
+		if(g_hasAvx2)
+			FillWaveformHeadersAVX2((int64_t*)&cap->m_offsets[0], (int64_t*)&cap->m_durations[0], num_per_segment);
+		else
+			FillWaveformHeaders((int64_t*)&cap->m_offsets[0], (int64_t*)&cap->m_durations[0], num_per_segment);
+
+		//Convert raw ADC samples to volts
 		float* samps = reinterpret_cast<float*>(&cap->m_samples[0]);
 		if(m_highDefinition)
 		{
 			int16_t* base = wdata + j*num_per_segment;
 
 			for(unsigned int k=0; k<num_per_segment; k++)
-			{
-				offs[k] = k;
-				durs[k] = 1;
 				samps[k] = base[k] * v_gain - v_off;
-			}
 		}
 		else
 		{
 			int8_t* base = bdata + j*num_per_segment;
 
 			for(unsigned int k=0; k<num_per_segment; k++)
-			{
-				offs[k] = k;
-				durs[k] = 1;
 				samps[k] = base[k] * v_gain - v_off;
-			}
 		}
 
 		ret.push_back(cap);
 	}
 
 	return ret;
+}
+
+/**
+	@brief Fills offsets with 0...n and durations to all 1s
+ */
+void LeCroyOscilloscope::FillWaveformHeaders(int64_t* offs, int64_t* durs, size_t count)
+{
+	for(unsigned int k=0; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
+	}
+}
+
+/**
+	@brief Optimized version of FillWaveformHeaders()
+ */
+__attribute__((target("avx2")))
+void LeCroyOscilloscope::FillWaveformHeadersAVX2(int64_t* offs, int64_t* durs, size_t count)
+{
+	int64_t ones_x4[] = {1, 1, 1, 1};
+	int64_t fours_x4[] = {4, 4, 4, 4};
+	int64_t count_x4[] = {0, 1, 2, 3};
+
+	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
+	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
+	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	//Unroll four stores to each array per loop iteration
+	unsigned int end = count - (count % 4);
+	for(unsigned int k=0; k<end; k+= 4)
+	{
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(unsigned int k=end; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
+	}
 }
 
 map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
@@ -1515,6 +1557,7 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	//Process analog waveforms
 	vector< vector<WaveformBase*> > waveforms;
 	waveforms.resize(m_analogChannelCount);
+	#pragma omp parallel for
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])

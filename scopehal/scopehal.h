@@ -85,5 +85,11 @@ void TransportStaticInit();
 void DriverStaticInit();
 
 void InitializePlugins();
+void DetectCPUFeatures();
+
+extern bool g_hasAvx512F;
+extern bool g_hasAvx512VL;
+extern bool g_hasAvx512DQ;
+extern bool g_hasAvx2;
 
 #endif
