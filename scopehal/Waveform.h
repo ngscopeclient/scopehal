@@ -159,7 +159,7 @@ class Waveform : public WaveformBase
 public:
 
 	///@brief Sample data
-	std::vector<S> m_samples;
+	std::vector< S, AlignedAllocator<S, 64> > m_samples;
 
 	virtual void Resize(size_t size)
 	{
