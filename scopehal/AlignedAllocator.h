@@ -30,156 +30,107 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Waveform
+	@brief Declaration of AlignedAllocator
  */
 
-#ifndef Waveform_h
-#define Waveform_h
-
-#include <vector>
-#include <AlignedAllocator.h>
+#ifndef AlignedAllocator_h
+#define AlignedAllocator_h
 
 /**
-	@brief Wrapper around a primitive data type that has an empty default constructor.
+	@brief Aligned memory allocator for STL containers
 
-	Can be seamlessly casted to that type. This allows STL data structures to be created with explicitly uninitialized
-	members via resize() and avoids a nasty memset that wastes a lot of time.
-*/
-template<class T>
-class EmptyConstructorWrapper
-{
-public:
-	EmptyConstructorWrapper()
-	{}
-
-	EmptyConstructorWrapper(const T& rhs)
-	: m_value(rhs)
-	{}
-
-	operator T&()
-	{ return m_value; }
-
-	T& operator=(const T& rhs)
-	{
-		m_value = rhs;
-		return *this;
-	}
-
-	T m_value;
-};
-
-/**
-	@brief Base class for all Waveform specializations
-
-	One waveform contains a time-series of sample objects as well as scale information etc. The samples may
-	or may not be at regular intervals depending on whether the Oscilloscope uses RLE compression.
-
-	The WaveformBase contains all metadata, but the actual samples are stored in a derived class member.
+	Based on https://devblogs.microsoft.com/cppblog/the-mallocator/
  */
-class WaveformBase
-{
-public:
-	WaveformBase()
-	{
-		m_triggerPhase = 0;
-		m_startTimestamp = 0;
-		m_startPicoseconds = 0;
-	}
-
-	//empty virtual destructor in case any derived classes need one
-	virtual ~WaveformBase()
-	{}
-
-	/**
-		@brief The time scale, in picoseconds per timestep, used by this channel.
-
-		This is used as a scaling factor for individual sample time values as well as to compute the maximum zoom value
-		for the time axis.
-	 */
-	int64_t m_timescale;
-
-	/**
-		@brief Start time of the acquisition, rounded to nearest second
-	 */
-	time_t	m_startTimestamp;
-
-	/**
-		@brief Fractional start time of the acquisition (picoseconds since m_startTimestamp)
-	 */
-	int64_t m_startPicoseconds;
-
-	/**
-		@brief Phase offset, in picoseconds, from the trigger to the sampling clock.
-	 */
-	double m_triggerPhase;
-
-	///@brief Start timestamps of each sample
-	std::vector<
-		EmptyConstructorWrapper<int64_t>,
-		AlignedAllocator< EmptyConstructorWrapper<int64_t>, 64 >
-		> m_offsets;
-
-	///@brief Durations of each sample
-	std::vector<
-		EmptyConstructorWrapper<int64_t>,
-		AlignedAllocator< EmptyConstructorWrapper<int64_t>, 64 >
-		> m_durations;
-
-	virtual void clear()
-	{
-		m_offsets.clear();
-		m_durations.clear();
-	}
-
-	virtual void Resize(size_t size)
-	{
-		m_offsets.resize(size);
-		m_durations.resize(size);
-	}
-
-	/**
-		@brief Copies offsets/durations from one waveform to another.
-
-		Must have been resized to match rhs first.
-	 */
-	void CopyTimestamps(const WaveformBase* rhs)
-	{
-		size_t len = sizeof(int64_t) * rhs->m_offsets.size();
-		memcpy((void*)&m_offsets[0], (void*)&rhs->m_offsets[0], len);
-		memcpy((void*)&m_durations[0], (void*)&rhs->m_durations[0], len);
-	}
-};
-
-/**
-	@brief A waveform that contains actual data
- */
-template<class S>
-class Waveform : public WaveformBase
+template <class T, size_t alignment>
+class AlignedAllocator
 {
 public:
 
-	///@brief Sample data
-	std::vector<S> m_samples;
+	//Standard typedefs
+	typedef T* pointer;
+	typedef const T* const_pointer;
+	typedef T& reference;
+	typedef const T& const_reference;
+	typedef T value_type;
+	typedef size_t size_type;
+	typedef ptrdiff_t difference_type;
 
-	virtual void Resize(size_t size)
+	//Overloads in case somebody overloaded the unary operator&()
+	//(which is pretty weird but the spec allows it)
+	T* address(T& rhs)
+	{ return &rhs; }
+
+	const T* address(T& rhs) const
+	{ return &rhs; }
+
+	size_t max_size() const
+	{ return (static_cast<size_t>(0) - static_cast<size_t>(1)) / sizeof(T); }
+
+	//RTTI and construction helpers
+	template<typename U>
+	struct rebind
 	{
-		m_offsets.resize(size);
-		m_durations.resize(size);
-		m_samples.resize(size);
+		typedef AlignedAllocator<U, alignment> other;
+	};
+
+	bool operator!=(const AlignedAllocator& other) const
+	{ return !(*this == other); }
+
+	//Look at that, a placement new! First time I've ever used one.
+	void construct(T* const p, const T& t) const
+	{ new( static_cast<void*>(p) ) T(t); }
+
+	void destroy(T* const p) const
+	{ p->~T(); }
+
+	//Check if this allocator is functionally equivalent to another
+	//We have no member variables, so all objects of the same type are equivalent
+	bool operator== (const AlignedAllocator& /* unused */) const
+	{ return true; }
+
+	//Default ctors, do nothing
+	AlignedAllocator()
+	{}
+
+	AlignedAllocator(const AlignedAllocator& /* unused */)
+	{}
+
+	template<typename U>
+	AlignedAllocator(const AlignedAllocator<U, alignment>&)
+	{}
+
+	~AlignedAllocator()
+	{}
+
+	//Now for the fun part
+	T* allocate(const size_t n) const
+	{
+		//Fail if we got an invalid size
+		if(n == 0)
+			return NULL;
+		if(n > max_size())
+			throw std::length_error("AlignedAllocator<T>::allocate(): requested size is too large, integer overflow?");
+
+		//Do the actual allocation
+		T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
+
+		//Error check
+		if(ret == NULL)
+			throw std::bad_alloc();
+
+		return ret;
 	}
 
-	virtual void clear()
-	{
-		m_offsets.clear();
-		m_durations.clear();
-		m_samples.clear();
-	}
+	void deallocate(T* const p, const size_t /*unused*/) const
+	{ free(p); }
+
+	//Not quite sure what this is for but apparently we need it?
+	template<typename U>
+	T* allocate(const size_t n, const U* /* const hint */ const)
+	{ return allocate(n); }
+
+	//Disallow assignment
+	AlignedAllocator& operator=(const AlignedAllocator&) = delete;
 };
-
-typedef Waveform<EmptyConstructorWrapper<bool> >	DigitalWaveform;
-typedef Waveform<EmptyConstructorWrapper<float>>	AnalogWaveform;
-
-typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
-typedef Waveform<char>					AsciiWaveform;
 
 #endif
