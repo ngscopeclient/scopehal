@@ -52,6 +52,7 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 	m_offset = 0;
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
+	m_cachedBinSize = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +162,10 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 		m_sparams.Clear();
 		for(auto f : fnames)
 			m_sparams *= TouchstoneParser(f);
+
+		//Clear out cached S-parameters
+		m_cachedBinSize = 0;
+		m_resampledSparams.clear();
 	}
 
 	//Don't die if the file couldn't be loaded
@@ -169,8 +174,6 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 		SetData(NULL);
 		return;
 	}
-
-	//TODO: optimization, resample s-parameters to our sample rate once vs every waveform update
 
 	//We need meaningful data
 	const size_t npoints_raw = din->m_samples.size();
@@ -221,16 +224,23 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
+	//Resample S21 to our FFT bin size
+	if(fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON)
+	{
+		m_cachedBinSize = bin_hz;
+
+		for(size_t i=0; i<nouts; i++)
+			m_resampledSparams.push_back( m_sparams.SamplePoint(2, 1, bin_hz * i) );
+	}
+
 	//Do the actual de-embed
 	if(invert)
 	{
 		for(size_t i=0; i<nouts; i++)
 		{
-			//Resample the S-parameter file for our point
-			float freq = bin_hz * i;
-			auto point = m_sparams.SamplePoint(2, 1, freq);
+			auto &point = m_resampledSparams[i];
 
-			//Zero channel response = flatten
+			//Zero channel response = flatten rather than dividing by zero
 			if(fabs(point.m_amplitude) < FLT_EPSILON)
 			{
 				rdout[i*2 + 0] = 0;
@@ -260,17 +270,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	{
 		for(size_t i=0; i<nouts; i++)
 		{
-			//Resample the S-parameter file for our point
-			float freq = bin_hz * i;
-			auto point = m_sparams.SamplePoint(2, 1, freq);
-
-			//Zero channel response = flatten
-			if(fabs(point.m_amplitude) < FLT_EPSILON)
-			{
-				rdout[i*2 + 0] = 0;
-				rdout[i*2 + 1] = 0;
-				continue;
-			}
+			auto &point = m_resampledSparams[i];
 
 			float cosval = cos(point.m_phase);
 			float sinval = sin(point.m_phase);

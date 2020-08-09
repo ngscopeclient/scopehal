@@ -70,7 +70,11 @@ protected:
 	float m_range;
 	float m_offset;
 
+	double m_cachedBinSize;
+	std::vector<SParameterPoint> m_resampledSparams;
+
 	TouchstoneParser m_sparams;
+
 };
 
 #endif
