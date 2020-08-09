@@ -1244,7 +1244,8 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 }
 
 vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
-	string& data,
+	const char* data,
+	size_t datalen,
 	string& wavedesc,
 	uint32_t num_sequences,
 	time_t ttime,
@@ -1268,9 +1269,9 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	//Raw waveform data
 	size_t num_samples;
 	if(m_highDefinition)
-		num_samples = data.size()/2;
+		num_samples = datalen/2;
 	else
-		num_samples = data.size();
+		num_samples = datalen;
 	size_t num_per_segment = num_samples / num_sequences;
 	int16_t* wdata = (int16_t*)&data[0];
 	int8_t* bdata = (int8_t*)&data[0];
@@ -1648,26 +1649,14 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		//Read the timestamps if we're doing segmented capture
 		ttime = ExtractTimestamp(pdesc, basetime);
 		if(num_sequences > 1)
-		{
-			if(!ReadWaveformBlock(wavetime))
-			{
-				LogError("fail to read wavetime\n");
-				return false;
-			}
-		}
-		pwtime = reinterpret_cast<double*>(&wavetime[0]);
+			wavetime = m_transport->ReadReply();
+		pwtime = reinterpret_cast<double*>(&wavetime[16]);	//skip 16-byte SCPI header
 
 		//Read the data from each analog waveform
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
 			if(enabled[i])
-			{
-				if(!ReadWaveformBlock(analogWaveformData[i]))
-				{
-					LogError("fail to read waveform\n");
-					return false;
-				}
-			}
+				analogWaveformData[i] = m_transport->ReadReply();
 		}
 
 		//Read the data from the digital waveforms, if enabled
@@ -1698,7 +1687,8 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		if(enabled[i])
 		{
 			waveforms[i] = ProcessAnalogWaveform(
-				analogWaveformData[i],
+				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
+				analogWaveformData[i].size() - 16,
 				wavedescs[i],
 				num_sequences,
 				ttime,

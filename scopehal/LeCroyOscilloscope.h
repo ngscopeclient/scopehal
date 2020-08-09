@@ -185,7 +185,8 @@ protected:
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 	std::vector<WaveformBase*> ProcessAnalogWaveform(
-		std::string& data,
+		const char* data,
+		size_t datalen,
 		std::string& wavedesc,
 		uint32_t num_sequences,
 		time_t ttime,

@@ -71,6 +71,10 @@ VICPSocketTransport::VICPSocketTransport(string args)
 		LogError("Couldn't disable Nagle\n");
 		return;
 	}
+
+	//Attempt to set a 32 MB RX buffer.
+	if(!m_socket.SetRxBuffer(32 * 1024 * 1024))
+		LogWarning("Could not set 32 MB RX buffer. Consider increasing /proc/sys/net/core/rmem_max\n");
 }
 
 VICPSocketTransport::~VICPSocketTransport()
@@ -165,29 +169,29 @@ string VICPSocketTransport::ReadReply()
 
 		//Read the message data
 		uint32_t len = (header[4] << 24) | (header[5] << 16) | (header[6] << 8) | header[7];
-		string rxbuf;
-		rxbuf.resize(len);
-		ReadRawData(len, (unsigned char*)&rxbuf[0]);
+		size_t current_size = payload.size();
+		payload.resize(current_size + len);
+		char* rxbuf = &payload[current_size];
+		ReadRawData(len, (unsigned char*)rxbuf);
 
 		//Skip empty blocks, or just newlines
-		if( (len == 0) || (rxbuf == "\n"))
+		if( (len == 0) || (rxbuf[0] == '\n' && len == 1))
 		{
 			//Special handling needed for EOI.
 			if(header[0] & OP_EOI)
 			{
 				//EOI on an empty block is a stop if we have data from previous blocks.
-				if(!payload.empty())
+				if(current_size != 0)
 					break;
 
 				//But if we have no data, hold off and wait for the next frame
 				else
+				{
+					payload = "";
 					continue;
+				}
 			}
 		}
-
-		//Actual frame data
-		else
-			payload += rxbuf;
 
 		//Check EOI flag
 		if(header[0] & OP_EOI)
