@@ -1419,7 +1419,7 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
 
-	for(unsigned int k=0; k<count; k += 32)
+	for(unsigned int k=0; k<end; k += 32)
 	{
 		//This is likely a lot faster, but assumes we have 64 byte alignment on pin which is not guaranteed.
 		//TODO: fix alignment
