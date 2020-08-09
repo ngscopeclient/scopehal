@@ -36,11 +36,13 @@
 #define DeEmbedDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
+#include <ffts/ffts.h>
 
 class DeEmbedDecoder : public ProtocolDecoder
 {
 public:
 	DeEmbedDecoder(std::string color);
+	virtual ~DeEmbedDecoder();
 
 	virtual void Refresh();
 
@@ -75,6 +77,9 @@ protected:
 
 	TouchstoneParser m_sparams;
 
+	ffts_plan_t* m_forwardPlan;
+	ffts_plan_t* m_reversePlan;
+	size_t m_cachedNumPoints;
 };
 
 #endif

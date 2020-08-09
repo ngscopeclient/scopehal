@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "DeEmbedDecoder.h"
-#include <ffts.h>
 
 using namespace std;
 
@@ -53,6 +52,25 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
 	m_cachedBinSize = 0;
+
+	m_forwardPlan = NULL;
+	m_reversePlan = NULL;
+	m_cachedNumPoints = 0;
+}
+
+DeEmbedDecoder::~DeEmbedDecoder()
+{
+	if(m_forwardPlan)
+	{
+		ffts_free(m_forwardPlan);
+		m_forwardPlan = NULL;
+	}
+
+	if(m_reversePlan)
+	{
+		ffts_free(m_reversePlan);
+		m_reversePlan = NULL;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,10 +232,22 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
 #endif
 
-	//Calculate the FFT
-	auto plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-	ffts_execute(plan, &rdin[0], &rdout[0]);
-	ffts_free(plan);
+	//Set up the FFT if we change point count
+	if(m_cachedNumPoints != npoints)
+	{
+		if(m_forwardPlan)
+			ffts_free(m_forwardPlan);
+		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+
+		if(m_reversePlan)
+			ffts_free(m_reversePlan);
+		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+
+		m_cachedNumPoints = npoints;
+	}
+
+	//Do the actual FFT
+	ffts_execute(m_forwardPlan, &rdin[0], &rdout[0]);
 
 	//Calculate size of each bin
 	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
@@ -298,9 +328,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 #endif
 
 	//Calculate the inverse FFT
-	plan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
-	ffts_execute(plan, &rdout[0], &ddout[0]);
-	ffts_free(plan);
+	ffts_execute(m_reversePlan, &rdout[0], &ddout[0]);
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	auto& s21 = m_sparams[SPair(2,1)];
