@@ -1320,7 +1320,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 				if(num_per_segment > 1000000)
 				{
 					//Round blocks to multiples of 32 samples for clean vectorization
-					size_t numblocks = omp_get_max_threads() / 2;	//don't run on all hyperthreads
+					size_t numblocks = omp_get_max_threads();
 					size_t lastblock = numblocks - 1;
 					size_t blocksize = num_per_segment / numblocks;
 					blocksize = blocksize - (blocksize % 32);
