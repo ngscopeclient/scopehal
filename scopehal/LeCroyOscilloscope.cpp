@@ -1314,14 +1314,49 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		{
 			if(g_hasAvx2)
 			{
-				Convert8BitSamplesAVX2(
-					(int64_t*)&cap->m_offsets[0],
-					(int64_t*)&cap->m_durations[0],
-					samps,
-					bdata + j*num_per_segment,
-					v_gain,
-					v_off,
-					num_per_segment);
+				//Divide large waveforms (>1M points) into blocks and multithread them
+				//TODO: tune split
+				if(num_per_segment > 1000000)
+				{
+					//Round blocks to multiples of 32 samples for clean vectorization
+					size_t numblocks = 16;
+					size_t lastblock = numblocks - 1;
+					size_t blocksize = num_per_segment / numblocks;
+					blocksize = blocksize - (blocksize % 32);
+
+					#pragma omp parallel for
+					for(size_t i=0; i<numblocks; i++)
+					{
+						//Last block gets any extra that didn't divide evenly
+						size_t nsamp = blocksize;
+						if(i == lastblock)
+							nsamp = num_per_segment - i*blocksize;
+
+						Convert8BitSamplesAVX2(
+							(int64_t*)&cap->m_offsets[i*blocksize],
+							(int64_t*)&cap->m_durations[i*blocksize],
+							samps + i*blocksize,
+							bdata + j*num_per_segment + i*blocksize,
+							v_gain,
+							v_off,
+							nsamp,
+							i*blocksize);
+					}
+				}
+
+				//Small waveforms get done single threaded to avoid overhead
+				else
+				{
+					Convert8BitSamplesAVX2(
+						(int64_t*)&cap->m_offsets[0],
+						(int64_t*)&cap->m_durations[0],
+						samps,
+						bdata + j*num_per_segment,
+						v_gain,
+						v_off,
+						num_per_segment,
+						0);
+				}
 			}
 			else
 			{
@@ -1332,7 +1367,8 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 					bdata + j*num_per_segment,
 					v_gain,
 					v_off,
-					num_per_segment);
+					num_per_segment,
+					0);
 			}
 		}
 
@@ -1346,11 +1382,11 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	@brief Converts 8-bit ADC samples to floating point
  */
 void LeCroyOscilloscope::Convert8BitSamples(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count)
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	for(unsigned int k=0; k<count; k++)
 	{
-		offs[k] = k;
+		offs[k] = ibase + k;
 		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
 	}
@@ -1361,13 +1397,19 @@ void LeCroyOscilloscope::Convert8BitSamples(
  */
 __attribute__((target("avx2")))
 void LeCroyOscilloscope::Convert8BitSamplesAVX2(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count)
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	unsigned int end = count - (count % 32);
 
 	int64_t ones_x4[] = {1, 1, 1, 1};
 	int64_t fours_x4[] = {4, 4, 4, 4};
-	int64_t count_x4[] = {0, 1, 2, 3};
+	int64_t count_x4[] =
+	{
+		ibase + 0,
+		ibase + 1,
+		ibase + 2,
+		ibase + 3
+	};
 
 	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
 	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
@@ -1456,54 +1498,11 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 	//Get any extras we didn't get in the SIMD loop
 	for(unsigned int k=end; k<count; k++)
 	{
-		offs[k] = k;
+		offs[k] = ibase + k;
 		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
 	}
 }
-
-/**
-	@brief Optimized version of FillWaveformHeaders()
- */
-/*
-__attribute__((target("avx512f")))
-void LeCroyOscilloscope::FillWaveformHeadersAVX512F(int64_t* offs, int64_t* durs, size_t count)
-{
-	int64_t ones_x8[] = {1, 1, 1, 1, 1, 1, 1, 1};
-	int64_t eights_x8[] = {8, 8, 8, 8, 8, 8, 8, 8};
-	int64_t count_x8[] = {0, 1, 2, 3, 4, 5, 6, 7};
-
-	__m512i all_ones = _mm512_load_epi64(ones_x8);
-	__m512i all_eights = _mm512_load_epi64(eights_x8);
-	__m512i counts = _mm512_load_epi64(count_x8);
-
-	//Unroll 32 stores to each array per loop iteration
-	unsigned int end = count - (count % 32);
-	for(unsigned int k=0; k<end; k+= 32)
-	{
-		_mm512_store_epi64(durs + k, all_ones);
-		_mm512_store_epi64(durs + k + 8, all_ones);
-		_mm512_store_epi64(durs + k + 16, all_ones);
-		_mm512_store_epi64(durs + k + 24, all_ones);
-
-		_mm512_store_epi64(offs + k, counts);
-		counts = _mm512_add_epi64(counts, all_eights);
-		_mm512_store_epi64(offs + k + 8, counts);
-		counts = _mm512_add_epi64(counts, all_eights);
-		_mm512_store_epi64(offs + k + 16, counts);
-		counts = _mm512_add_epi64(counts, all_eights);
-		_mm512_store_epi64(offs + k + 24, counts);
-		counts = _mm512_add_epi64(counts, all_eights);
-	}
-
-	//Get any extras we didn't get in the SIMD loop
-	for(unsigned int k=end; k<count; k++)
-	{
-		offs[k] = k;
-		durs[k] = 1;
-	}
-}
-*/
 
 map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 	string& data,
@@ -1694,7 +1693,6 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	//Process analog waveforms
 	vector< vector<WaveformBase*> > waveforms;
 	waveforms.resize(m_analogChannelCount);
-	#pragma omp parallel for
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i])
