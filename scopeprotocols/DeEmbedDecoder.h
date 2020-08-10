@@ -74,7 +74,6 @@ protected:
 	float m_offset;
 
 	double m_cachedBinSize;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamPhases;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamAmplitudes;
@@ -90,8 +89,8 @@ protected:
 	float* m_forwardOutBuf;
 	float* m_reverseOutBuf;
 
-	void ForwardMainLoop(size_t nouts);
-	void ForwardMainLoopAVX2(size_t nouts);
+	void MainLoop(size_t nouts);
+	void MainLoopAVX2(size_t nouts);
 };
 
 #endif

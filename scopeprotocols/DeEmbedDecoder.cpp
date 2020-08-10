@@ -199,7 +199,6 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 
 		//Clear out cached S-parameters
 		m_cachedBinSize = 0;
-		m_resampledSparamPhases.clear();
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
 		m_resampledSparamAmplitudes.clear();
@@ -267,7 +266,8 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Resample S21 to our FFT bin size if needed
+	//Resample S21 to our FFT bin size if needed.
+	//Cache trig function output because there's no AVX instructions for this.
 	if(fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON)
 	{
 		m_cachedBinSize = bin_hz;
@@ -276,54 +276,33 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 		{
 			auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
 
-			m_resampledSparamPhases.push_back(point.m_phase);
-			m_resampledSparamSines.push_back(sin(point.m_phase));
-			m_resampledSparamCosines.push_back(cos(point.m_phase));
-			m_resampledSparamAmplitudes.push_back(point.m_amplitude);
-		}
-	}
-
-	//Do the actual de-embed
-	if(invert)
-	{
-		for(size_t i=0; i<nouts; i++)
-		{
-			float amplitude = m_resampledSparamAmplitudes[i];
-			float phase = m_resampledSparamPhases[i];
-
-			//Zero channel response = flatten rather than dividing by zero
-			if(fabs(amplitude) < FLT_EPSILON)
+			//De-embedding
+			if(invert)
 			{
-				m_forwardOutBuf[i*2 + 0] = 0;
-				m_forwardOutBuf[i*2 + 1] = 0;
-				continue;
+				m_resampledSparamSines.push_back(sin(-point.m_phase));
+				m_resampledSparamCosines.push_back(cos(-point.m_phase));
+
+				if(fabs(point.m_amplitude) < FLT_EPSILON)
+					m_resampledSparamAmplitudes.push_back(0);
+				else
+					m_resampledSparamAmplitudes.push_back(1.0f / point.m_amplitude);
 			}
 
-			float cosval = cos(-phase);
-			float sinval = sin(-phase);
-
-			//Uncorrected complex value
-			float real_orig = m_forwardOutBuf[i*2 + 0];
-			float imag_orig = m_forwardOutBuf[i*2 + 1];
-
-			//Phase correction
-			float real = real_orig*cosval - imag_orig*sinval;
-			float imag = real_orig*sinval + imag_orig*cosval;
-
-			//Amplitude correction
-			m_forwardOutBuf[i*2 + 0] = real / amplitude;
-			m_forwardOutBuf[i*2 + 1] = imag / amplitude;
+			//Channel emulation
+			else
+			{
+				m_resampledSparamSines.push_back(sin(point.m_phase));
+				m_resampledSparamCosines.push_back(cos(point.m_phase));
+				m_resampledSparamAmplitudes.push_back(point.m_amplitude);
+			}
 		}
 	}
 
-	//Forward channel emulation
+	//Do the actual filter operation
+	if(g_hasAvx2)
+		MainLoopAVX2(nouts);
 	else
-	{
-		if(g_hasAvx2)
-			ForwardMainLoopAVX2(nouts);
-		else
-			ForwardMainLoop(nouts);
-	}
+		MainLoop(nouts);
 
 	//Calculate the inverse FFT
 	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
@@ -375,15 +354,13 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	SetData(cap);
 }
 
-void DeEmbedDecoder::ForwardMainLoop(size_t nouts)
+void DeEmbedDecoder::MainLoop(size_t nouts)
 {
 	for(size_t i=0; i<nouts; i++)
 	{
 		float amplitude = m_resampledSparamAmplitudes[i];
-		float phase = m_resampledSparamPhases[i];
-
-		float cosval = cos(phase);
-		float sinval = sin(phase);
+		float cosval = m_resampledSparamSines[i];
+		float sinval = m_resampledSparamCosines[i];
 
 		//Uncorrected complex value
 		float real_orig = m_forwardOutBuf[i*2 + 0];
@@ -400,7 +377,7 @@ void DeEmbedDecoder::ForwardMainLoop(size_t nouts)
 }
 
 __attribute__((target("avx2")))
-void DeEmbedDecoder::ForwardMainLoopAVX2(size_t nouts)
+void DeEmbedDecoder::MainLoopAVX2(size_t nouts)
 {
 	unsigned int end = nouts - (nouts % 8);
 
@@ -468,10 +445,8 @@ void DeEmbedDecoder::ForwardMainLoopAVX2(size_t nouts)
 	for(size_t i=end; i<nouts; i++)
 	{
 		float amplitude = m_resampledSparamAmplitudes[i];
-		float phase = m_resampledSparamPhases[i];
-
-		float cosval = cos(phase);
-		float sinval = sin(phase);
+		float cosval = m_resampledSparamCosines[i];
+		float sinval = m_resampledSparamSines[i];
 
 		//Uncorrected complex value
 		float real_orig = m_forwardOutBuf[i*2 + 0];
