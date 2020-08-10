@@ -55,22 +55,37 @@ DeEmbedDecoder::DeEmbedDecoder(string color)
 
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
+
 	m_cachedNumPoints = 0;
+	m_cachedRawSize = 0;
+
+	m_forwardInBuf = NULL;
+	m_forwardOutBuf = NULL;
+	m_reverseOutBuf = NULL;
 }
 
 DeEmbedDecoder::~DeEmbedDecoder()
 {
 	if(m_forwardPlan)
-	{
 		ffts_free(m_forwardPlan);
-		m_forwardPlan = NULL;
-	}
-
 	if(m_reversePlan)
-	{
 		ffts_free(m_reversePlan);
-		m_reversePlan = NULL;
-	}
+
+	#ifdef _WIN32
+		_aligned_free(m_forwardInBuf);
+		_aligned_free(m_forwardOutBuf);
+		_aligned_free(m_reverseOutBuf);
+	#else
+		free(m_forwardInBuf);
+		free(m_forwardOutBuf);
+		free(m_reverseOutBuf);
+	#endif
+
+	m_forwardPlan = NULL;
+	m_reversePlan = NULL;
+	m_forwardInBuf = NULL;
+	m_forwardOutBuf = NULL;
+	m_reverseOutBuf = NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,33 +222,11 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	//LogTrace("Rounded to %zu\n", npoints);
 
 	//Format the input data as raw samples for the FFT
-	//TODO: handle non-uniform sample rates
-	float* rdin;
-	size_t insize = npoints * sizeof(float);
+	//TODO: handle non-uniform sample rates and resample?
+	size_t nouts = npoints/2 + 1;
 
-#ifdef _WIN32
-	rdin = (float*)_aligned_malloc(insize, 32);
-#else
-	posix_memalign((void**)&rdin, 32, insize);
-#endif
-
-	//Copy the input, then fill any extra space with zeroes
-	memcpy(rdin, &din->m_samples[0], npoints_raw*sizeof(float));
-	for(size_t i=npoints_raw; i<npoints; i++)
-		rdin[i] = 0;
-
-	//Set up the FFT
-	float* rdout;
-	const size_t nouts = npoints/2 + 1;
-
-#ifdef _WIN32
-	rdout = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
-#else
-	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
-#endif
-
-	//Set up the FFT if we change point count
-	if(m_cachedNumPoints != npoints)
+	//Set up the FFT and allocate buffers if we change point count
+	if( (m_cachedNumPoints != npoints) || (m_cachedRawSize != npoints_raw) )
 	{
 		if(m_forwardPlan)
 			ffts_free(m_forwardPlan);
@@ -243,18 +236,34 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			ffts_free(m_reversePlan);
 		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
 
+		#ifdef _WIN32
+			m_forwardInBuf = (float*)_aligned_malloc(npoints * sizeof(float), 32);
+			m_forwardOutBuf = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
+			m_reverseOutBuf = (float*)_aligned_malloc(npoints * sizeof(float), 32);
+		#else
+			posix_memalign((void**)&m_forwardInBuf, 32, npoints * sizeof(float));
+			posix_memalign((void**)&m_forwardOutBuf, 32, 2 * nouts * sizeof(float));
+			posix_memalign((void**)&m_reverseOutBuf, 32, npoints * sizeof(float));
+		#endif
+
 		m_cachedNumPoints = npoints;
+		m_cachedRawSize = npoints_raw;
 	}
 
-	//Do the actual FFT
-	ffts_execute(m_forwardPlan, &rdin[0], &rdout[0]);
+	//Copy the input, then fill any extra space with zeroes
+	memcpy(m_forwardInBuf, &din->m_samples[0], npoints_raw*sizeof(float));
+	for(size_t i=npoints_raw; i<npoints; i++)
+		m_forwardInBuf[i] = 0;
+
+	//Do the forward FFT
+	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
 	//Calculate size of each bin
 	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Resample S21 to our FFT bin size
+	//Resample S21 to our FFT bin size if needed
 	if(fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON)
 	{
 		m_cachedBinSize = bin_hz;
@@ -273,8 +282,8 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			//Zero channel response = flatten rather than dividing by zero
 			if(fabs(point.m_amplitude) < FLT_EPSILON)
 			{
-				rdout[i*2 + 0] = 0;
-				rdout[i*2 + 1] = 0;
+				m_forwardOutBuf[i*2 + 0] = 0;
+				m_forwardOutBuf[i*2 + 1] = 0;
 				continue;
 			}
 
@@ -282,16 +291,16 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			float sinval = sin(-point.m_phase);
 
 			//Uncorrected complex value
-			float real_orig = rdout[i*2 + 0];
-			float imag_orig = rdout[i*2 + 1];
+			float real_orig = m_forwardOutBuf[i*2 + 0];
+			float imag_orig = m_forwardOutBuf[i*2 + 1];
 
 			//Phase correction
 			float real = real_orig*cosval - imag_orig*sinval;
 			float imag = real_orig*sinval + imag_orig*cosval;
 
 			//Amplitude correction
-			rdout[i*2 + 0] = real / point.m_amplitude;
-			rdout[i*2 + 1] = imag / point.m_amplitude;
+			m_forwardOutBuf[i*2 + 0] = real / point.m_amplitude;
+			m_forwardOutBuf[i*2 + 1] = imag / point.m_amplitude;
 		}
 	}
 
@@ -306,29 +315,21 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 			float sinval = sin(point.m_phase);
 
 			//Uncorrected complex value
-			float real_orig = rdout[i*2 + 0];
-			float imag_orig = rdout[i*2 + 1];
+			float real_orig = m_forwardOutBuf[i*2 + 0];
+			float imag_orig = m_forwardOutBuf[i*2 + 1];
 
 			//Phase correction
 			float real = real_orig*cosval - imag_orig*sinval;
 			float imag = real_orig*sinval + imag_orig*cosval;
 
 			//Amplitude correction
-			rdout[i*2 + 0] = real * point.m_amplitude;
-			rdout[i*2 + 1] = imag * point.m_amplitude;
+			m_forwardOutBuf[i*2 + 0] = real * point.m_amplitude;
+			m_forwardOutBuf[i*2 + 1] = imag * point.m_amplitude;
 		}
 	}
 
-	//Set up the inverse FFT
-	float* ddout;
-#ifdef _WIN32
-	ddout = (float*)_aligned_malloc(insize * sizeof(float), 32);
-#else
-	posix_memalign((void**)&ddout, 32, insize * sizeof(float));
-#endif
-
 	//Calculate the inverse FFT
-	ffts_execute(m_reversePlan, &rdout[0], &ddout[0]);
+	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	auto& s21 = m_sparams[SPair(2,1)];
@@ -360,7 +361,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	{
 		cap->m_offsets.push_back(din->m_offsets[i]);
 		cap->m_durations.push_back(din->m_durations[i]);
-		float v = ddout[i] * scale;
+		float v = m_reverseOutBuf[i] * scale;
 		vmin = min(v, vmin);
 		vmax = max(v, vmax);
 		cap->m_samples.push_back(v);
@@ -373,15 +374,4 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	SetData(cap);
-
-	//Clean up
-#ifdef _WIN32
-	_aligned_free(rdin);
-	_aligned_free(rdout);
-	_aligned_free(ddout);
-#else
-	free(rdin);
-	free(rdout);
-	free(ddout);
-#endif
 }

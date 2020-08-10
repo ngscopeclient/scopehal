@@ -80,6 +80,11 @@ protected:
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;
 	size_t m_cachedNumPoints;
+	size_t m_cachedRawSize;
+
+	float* m_forwardInBuf;
+	float* m_forwardOutBuf;
+	float* m_reverseOutBuf;
 };
 
 #endif
