@@ -354,14 +354,16 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	float scale = 1.0f / npoints;
 	float vmin = FLT_MAX;
 	float vmax = -FLT_MAX;
+	size_t outlen = iend - istart;
+	cap->Resize(outlen);
+	memcpy(&cap->m_offsets[0], &din->m_offsets[istart], outlen * sizeof(int64_t));
+	memcpy(&cap->m_durations[0], &din->m_durations[istart], outlen * sizeof(int64_t));
 	for(size_t i=istart; i<iend; i++)
 	{
-		cap->m_offsets.push_back(din->m_offsets[i]);
-		cap->m_durations.push_back(din->m_durations[i]);
 		float v = m_reverseOutBuf[i] * scale;
 		vmin = min(v, vmin);
 		vmax = max(v, vmax);
-		cap->m_samples.push_back(v);
+		cap->m_samples[i-istart] = v;
 	}
 
 	//Calculate bounds
