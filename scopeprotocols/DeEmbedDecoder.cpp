@@ -229,6 +229,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	size_t nouts = npoints/2 + 1;
 
 	//Set up the FFT and allocate buffers if we change point count
+	bool sizechange = false;
 	if( (m_cachedNumPoints != npoints) || (m_cachedRawSize != npoints_raw) )
 	{
 		if(m_forwardPlan)
@@ -251,6 +252,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 
 		m_cachedNumPoints = npoints;
 		m_cachedRawSize = npoints_raw;
+		sizechange = true;
 	}
 
 	//Copy the input, then fill any extra space with zeroes
@@ -268,7 +270,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 
 	//Resample S21 to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
-	if(fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON)
+	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange )
 	{
 		m_cachedBinSize = bin_hz;
 
