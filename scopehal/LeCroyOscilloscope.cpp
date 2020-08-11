@@ -1402,9 +1402,9 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 {
 	unsigned int end = count - (count % 32);
 
-	int64_t ones_x4[] = {1, 1, 1, 1};
-	int64_t fours_x4[] = {4, 4, 4, 4};
-	int64_t count_x4[] =
+	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
+	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
+	int64_t __attribute__ ((aligned(32))) count_x4[] =
 	{
 		ibase + 0,
 		ibase + 1,
