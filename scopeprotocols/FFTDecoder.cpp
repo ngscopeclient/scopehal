@@ -142,7 +142,6 @@ void FFTDecoder::Refresh()
 	LogTrace("Rounded to %zu\n", npoints);
 
 	//Reallocate buffers if needed
-	size_t insize = npoints * sizeof(float);
 	const size_t nouts = npoints/2 + 1;
 	if(m_cachedNumPoints != npoints_raw)
 	{
@@ -179,30 +178,16 @@ void FFTDecoder::Refresh()
 	cap->m_timescale = bin_hz;
 
 	//Normalize magnitudes
-	vector<float> mags;
-	float maxmag = 1;
-	for(size_t i=1; i<nouts; i++)	//don't print (DC offset?) term 0
-									//real fft has symmetric output, ignore the redundant image of the data
-	{
-		float a = m_rdout[i*2];
-		float b = m_rdout[i*2 + 1];
-		float mag = sqrtf(a*a + b*b);
-		//float freq = (0.5f * i * sample_ghz * 1000) / nouts;
-
-		mags.push_back(mag);
-		if(mag > maxmag)
-			maxmag = mag;
-	}
-
 	cap->Resize(nouts);
-	cap->m_offsets[0] = 0;
-	cap->m_durations[0] = 1;
-	cap->m_samples[0] = 1;
-	for(size_t i=1; i<nouts; i++)
+	for(size_t i=0; i<nouts; i++)
 	{
 		cap->m_offsets[i] = i;
 		cap->m_durations[i] = 1;
-		cap->m_samples[i] = mags[i-1] / maxmag;
+
+		float real = m_rdout[i*2];
+		float imag = m_rdout[i*2 + 1];
+
+		cap->m_samples[i] = sqrtf(real*real + imag*imag) / npoints;
 	}
 
 	SetData(cap);
