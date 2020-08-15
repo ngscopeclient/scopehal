@@ -61,9 +61,12 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(DeEmbedDecoder)
 
-	void DoRefresh(bool invert = true);
-
 protected:
+	virtual int64_t GetGroupDelay();
+	void DoRefresh(bool invert = true);
+	virtual bool LoadSparameters();
+	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
+
 	std::string m_fname;
 
 	std::vector<std::string> m_cachedFileNames;

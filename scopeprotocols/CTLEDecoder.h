@@ -35,9 +35,9 @@
 #ifndef CTLEDecoder_h
 #define CTLEDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
+#include "DeEmbedDecoder.h"
 
-class CTLEDecoder : public ProtocolDecoder
+class CTLEDecoder : public DeEmbedDecoder
 {
 public:
 	CTLEDecoder(std::string color);
@@ -50,15 +50,12 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
-
-	virtual void ClearSweeps();
-
 	PROTOCOL_DECODER_INITPROC(CTLEDecoder)
 
 protected:
+	virtual int64_t GetGroupDelay();
+	virtual bool LoadSparameters();
+	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
 	std::string m_dcGainName;
 	std::string m_zeroFreqName;
@@ -66,10 +63,11 @@ protected:
 	std::string m_poleFreq2Name;
 	std::string m_acGainName;
 
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
+	float m_cachedDcGain;
+	float m_cachedZeroFreq;
+	float m_cachedPole1Freq;
+	float m_cachedPole2Freq;
+	float m_cachedAcGain;
 };
 
 #endif

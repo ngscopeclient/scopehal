@@ -169,24 +169,8 @@ void DeEmbedDecoder::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-/**
-	@brief Applies the S-parameters in the forward or reverse direction
- */
-void DeEmbedDecoder::DoRefresh(bool invert)
+bool DeEmbedDecoder::LoadSparameters()
 {
-	//Get the input data
-	if(m_channels[0] == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-
 	//Reload the S-parameters from the Touchstone file(s) if the filename has changed
 	vector<string> fnames = m_parameters[m_fname].GetFileNames();
 	if(fnames != m_cachedFileNames)
@@ -206,6 +190,30 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 
 	//Don't die if the file couldn't be loaded
 	if(m_sparams.empty())
+		return false;
+
+	return true;
+}
+
+/**
+	@brief Applies the S-parameters in the forward or reverse direction
+ */
+void DeEmbedDecoder::DoRefresh(bool invert)
+{
+	//Get the input data
+	if(m_channels[0] == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	if(din == NULL)
+	{
+		SetData(NULL);
+		return;
+	}
+
+	if(!LoadSparameters())
 	{
 		SetData(NULL);
 		return;
@@ -272,32 +280,10 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	//Cache trig function output because there's no AVX instructions for this.
 	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange )
 	{
-		m_cachedBinSize = bin_hz;
-
-		for(size_t i=0; i<nouts; i++)
-		{
-			auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
-
-			//De-embedding
-			if(invert)
-			{
-				m_resampledSparamSines.push_back(sin(-point.m_phase));
-				m_resampledSparamCosines.push_back(cos(-point.m_phase));
-
-				if(fabs(point.m_amplitude) < FLT_EPSILON)
-					m_resampledSparamAmplitudes.push_back(0);
-				else
-					m_resampledSparamAmplitudes.push_back(1.0f / point.m_amplitude);
-			}
-
-			//Channel emulation
-			else
-			{
-				m_resampledSparamSines.push_back(sin(point.m_phase));
-				m_resampledSparamCosines.push_back(cos(point.m_phase));
-				m_resampledSparamAmplitudes.push_back(point.m_amplitude);
-			}
-		}
+		m_resampledSparamCosines.clear();
+		m_resampledSparamSines.clear();
+		m_resampledSparamAmplitudes.clear();
+		InterpolateSparameters(bin_hz, invert, nouts);
 	}
 
 	//Do the actual filter operation
@@ -310,11 +296,7 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
-	auto& s21 = m_sparams[SPair(2,1)];
-	float max_delay = 0;
-	for(size_t i=0; i<s21.size()-1 && i<50; i++)
-		max_delay = max(max_delay, s21.GetGroupDelay(i));
-	int64_t groupdelay_samples = ceil( (max_delay * 1e12) / din->m_timescale);
+	int64_t groupdelay_samples =ceil( GetGroupDelay() / din->m_timescale );
 
 	//Set up output and copy timestamps
 	auto cap = new AnalogWaveform;
@@ -354,6 +336,50 @@ void DeEmbedDecoder::DoRefresh(bool invert)
 	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	SetData(cap);
+}
+
+int64_t DeEmbedDecoder::GetGroupDelay()
+{
+	auto& s21 = m_sparams[SPair(2,1)];
+	float max_delay = 0;
+	for(size_t i=0; i<s21.size()-1 && i<50; i++)
+		max_delay = max(max_delay, s21.GetGroupDelay(i));
+	return max_delay * 1e12;
+}
+
+/**
+	@brief Recalculate the cached S-parameters
+
+	Since there's no AVX sin/cos instructions, precompute sin(phase) and cos(phase)
+ */
+void DeEmbedDecoder::InterpolateSparameters(float bin_hz, bool invert, size_t nouts)
+{
+	m_cachedBinSize = bin_hz;
+
+	for(size_t i=0; i<nouts; i++)
+	{
+		auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
+
+		//De-embedding
+		if(invert)
+		{
+			m_resampledSparamSines.push_back(sin(-point.m_phase));
+			m_resampledSparamCosines.push_back(cos(-point.m_phase));
+
+			if(fabs(point.m_amplitude) < FLT_EPSILON)
+				m_resampledSparamAmplitudes.push_back(0);
+			else
+				m_resampledSparamAmplitudes.push_back(1.0f / point.m_amplitude);
+		}
+
+		//Channel emulation
+		else
+		{
+			m_resampledSparamSines.push_back(sin(point.m_phase));
+			m_resampledSparamCosines.push_back(cos(point.m_phase));
+			m_resampledSparamAmplitudes.push_back(point.m_amplitude);
+		}
+	}
 }
 
 void DeEmbedDecoder::MainLoop(size_t nouts)
