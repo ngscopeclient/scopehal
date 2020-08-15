@@ -224,7 +224,8 @@ void FFTDecoder::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t n
 	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
 	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
-	float norm = 1.0f / npoints;
+	//double since we only look at positive half
+	float norm = 2.0f / npoints;
 	__m256 norm_f = { norm, norm, norm, norm, norm, norm, norm, norm };
 
 	float* pout = (float*)&cap->m_samples[0];
