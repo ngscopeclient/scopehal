@@ -59,6 +59,9 @@ public:
 	PROTOCOL_DECODER_INITPROC(FFTDecoder)
 
 protected:
+	void NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoints);
+	void NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints);
+
 	size_t m_cachedNumPoints;
 	float* m_rdin;
 	float* m_rdout;
