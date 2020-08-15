@@ -185,6 +185,9 @@ void FFTDecoder::Refresh()
 	}
 
 	cap->Resize(nouts);
+	cap->m_offsets[0] = 0;
+	cap->m_durations[0] = 1;
+	cap->m_samples[0] = 1;
 	for(size_t i=1; i<nouts; i++)
 	{
 		cap->m_offsets[i] = i;
