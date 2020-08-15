@@ -36,6 +36,10 @@
 #ifndef AlignedAllocator_h
 #define AlignedAllocator_h
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 /**
 	@brief Aligned memory allocator for STL containers
 
@@ -112,7 +116,11 @@ public:
 			throw std::length_error("AlignedAllocator<T>::allocate(): requested size is too large, integer overflow?");
 
 		//Do the actual allocation
-		T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
+		#ifdef _WIN32
+			T* ret = static_cast<T*>(_aligned_malloc(n*sizeof(T), alignment));
+		#else
+			T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
+		#endif
 
 		//Error check
 		if(ret == NULL)
@@ -122,7 +130,17 @@ public:
 	}
 
 	void deallocate(T* const p, const size_t /*unused*/) const
-	{ free(p); }
+	{
+		#ifdef _WIN32
+			_aligned_free(p);
+		#else
+			free(p);
+		#endif
+	}
+
+	//convenience wrapper
+	void deallocate(T* const p) const
+	{ deallocate(p, 1); }
 
 	//Not quite sure what this is for but apparently we need it?
 	template<typename U>
@@ -132,5 +150,8 @@ public:
 	//Disallow assignment
 	AlignedAllocator& operator=(const AlignedAllocator&) = delete;
 };
+
+//Global allocator for AVX helpers
+extern AlignedAllocator<float, 32> g_floatVectorAllocator;
 
 #endif

@@ -59,6 +59,8 @@ bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 
+AlignedAllocator<float, 32> g_floatVectorAllocator;
+
 /**
 	@brief Static initialization for SCPI transports
  */

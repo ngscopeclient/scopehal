@@ -36,11 +36,13 @@
 #define FFTDecoder_h
 
 #include "../scopehal/ProtocolDecoder.h"
+#include <ffts/ffts.h>
 
 class FFTDecoder : public ProtocolDecoder
 {
 public:
 	FFTDecoder(std::string color);
+	virtual ~FFTDecoder();
 
 	virtual void Refresh();
 
@@ -57,6 +59,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(FFTDecoder)
 
 protected:
+	size_t m_cachedNumPoints;
+	float* m_rdin;
+	float* m_rdout;
+	ffts_plan_t* m_plan;
 };
 
 #endif

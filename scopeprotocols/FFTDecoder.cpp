@@ -28,12 +28,8 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "../scopehal/AlignedAllocator.h"
 #include "FFTDecoder.h"
-#include <ffts.h>
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 using namespace std;
 
@@ -49,6 +45,21 @@ FFTDecoder::FFTDecoder(string color)
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
+
+	m_cachedNumPoints = 0;
+	m_rdin = NULL;
+	m_rdout = NULL;
+	m_plan = NULL;
+}
+
+FFTDecoder::~FFTDecoder()
+{
+	if(m_rdin)
+		g_floatVectorAllocator.deallocate(m_rdin);
+	if(m_rdout)
+		g_floatVectorAllocator.deallocate(m_rdout);
+	if(m_plan)
+		ffts_free(m_plan);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,37 +136,36 @@ void FFTDecoder::Refresh()
 		return;
 	}
 
-	//Truncate to next power of 2 down
-	const size_t npoints = pow(2,floor(log2(npoints_raw)));
+	//Round up to next power of two
+	const size_t npoints = pow(2, ceil(log2(npoints_raw)));
 	LogTrace("FFTDecoder: processing %zu raw points\n", npoints_raw);
 	LogTrace("Rounded to %zu\n", npoints);
 
-	//Format the input data as raw samples for the FFT
-	//TODO: handle non-uniform sample rates
-	float* rdin;
+	//Reallocate buffers if needed
 	size_t insize = npoints * sizeof(float);
-
-#ifdef _WIN32
-	rdin = (float*)_aligned_malloc(insize, 32);
-#else
-	posix_memalign((void**)&rdin, 32, insize);
-#endif
-
-	memcpy(rdin, &din->m_samples[0], insize);
-
-	float* rdout;
 	const size_t nouts = npoints/2 + 1;
+	if(m_cachedNumPoints != npoints_raw)
+	{
+		m_cachedNumPoints = npoints_raw;
 
-#ifdef _WIN32
-	rdout = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
-#else
-	posix_memalign((void**)&rdout, 32, 2 * nouts * sizeof(float));
-#endif
+		if(m_rdin)
+			g_floatVectorAllocator.deallocate(m_rdin);
+		if(m_rdout)
+			g_floatVectorAllocator.deallocate(m_rdout);
+		if(m_plan)
+			ffts_free(m_plan);
+
+		m_rdin = g_floatVectorAllocator.allocate(npoints);
+		m_rdout = g_floatVectorAllocator.allocate(2*nouts);
+		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+	}
+
+	//Copy the input, then zero pad the rest
+	memcpy(m_rdin, &din->m_samples[0], npoints_raw * sizeof(float));
+	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
 	//Calculate the FFT
-	auto plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-	ffts_execute(plan, &rdin[0], &rdout[0]);
-	ffts_free(plan);
+	ffts_execute(m_plan, m_rdin, m_rdout);
 
 	//Set up output and copy timestamps
 	auto cap = new AnalogWaveform;
@@ -174,8 +184,8 @@ void FFTDecoder::Refresh()
 	for(size_t i=1; i<nouts; i++)	//don't print (DC offset?) term 0
 									//real fft has symmetric output, ignore the redundant image of the data
 	{
-		float a = rdout[i*2];
-		float b = rdout[i*2 + 1];
+		float a = m_rdout[i*2];
+		float b = m_rdout[i*2 + 1];
 		float mag = sqrtf(a*a + b*b);
 		//float freq = (0.5f * i * sample_ghz * 1000) / nouts;
 
@@ -196,13 +206,4 @@ void FFTDecoder::Refresh()
 	}
 
 	SetData(cap);
-
-	//Clean up
-#ifdef _WIN32
-	_aligned_free(rdin);
-	_aligned_free(rdout);
-#else
-	free(rdin);
-	free(rdout);
-#endif
 }
