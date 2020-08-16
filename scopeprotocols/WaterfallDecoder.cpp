@@ -72,7 +72,7 @@ WaterfallDecoder::WaterfallDecoder(string color)
 
 bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetYAxisUnits() != Unit::UNIT_DB) )
+	if( (i == 0) && (channel->GetYAxisUnits() != Unit::UNIT_DBM) )
 		return true;
 	return false;
 }

@@ -41,7 +41,7 @@ FFTDecoder::FFTDecoder(string color)
 	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_DB);
+	m_yAxisUnit = Unit(Unit::UNIT_DBM);
 
 	//Set up channels
 	m_signalNames.push_back("din");
@@ -193,6 +193,9 @@ void FFTDecoder::Refresh()
  */
 void FFTDecoder::NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoints)
 {
+	//assume constant 50 ohms for now
+	const float impedance = 50;
+
 	for(size_t i=0; i<nouts; i++)
 	{
 		cap->m_offsets[i] = i;
@@ -201,7 +204,10 @@ void FFTDecoder::NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoin
 		float real = m_rdout[i*2];
 		float imag = m_rdout[i*2 + 1];
 
-		cap->m_samples[i] = sqrtf(real*real + imag*imag) / npoints;
+		float voltage = sqrtf(real*real + imag*imag) / npoints;
+
+		//Convert to dBm
+		cap->m_samples[i] = (10 * log10(voltage*voltage / impedance) + 30);
 	}
 }
 
@@ -227,6 +233,18 @@ void FFTDecoder::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t n
 	//double since we only look at positive half
 	float norm = 2.0f / npoints;
 	__m256 norm_f = { norm, norm, norm, norm, norm, norm, norm, norm };
+
+	//1 / nominal line impedance
+	float impedance = 50;
+	__m256 inv_imp =
+	{
+		1/impedance, 1/impedance, 1/impedance, 1/impedance,
+		1/impedance, 1/impedance, 1/impedance, 1/impedance
+	};
+
+	//Constant values for dBm conversion
+	__m256 const_10 = {10, 10, 10, 10, 10, 10, 10, 10 };
+	__m256 const_30 = {30, 30, 30, 30, 30, 30, 30, 30 };
 
 	float* pout = (float*)&cap->m_samples[0];
 
@@ -266,8 +284,22 @@ void FFTDecoder::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t n
 		__m256 mag = _mm256_sqrt_ps(sum);
 		mag = _mm256_mul_ps(mag, norm_f);
 
-		//Done
-		_mm256_store_ps(pout + k, mag);
+		//Convert to watts
+		__m256 vsq = _mm256_mul_ps(mag, mag);
+		__m256 watts = _mm256_mul_ps(vsq, inv_imp);
+
+		//TODO: figure out better way to do efficient logarithm
+		_mm256_store_ps(pout + k, watts);
+		for(size_t i=k; i<k+8; i++)
+			pout[i] = log10(pout[i]);
+		__m256 logpwr = _mm256_load_ps(pout + k);
+
+		//Final scaling
+		logpwr = _mm256_mul_ps(logpwr, const_10);
+		logpwr = _mm256_add_ps(logpwr, const_30);
+
+		//and store the actual
+		_mm256_store_ps(pout + k, logpwr);
 	}
 
 	//Get any extras we didn't get in the SIMD loop
@@ -279,6 +311,9 @@ void FFTDecoder::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t n
 		float real = m_rdout[k*2];
 		float imag = m_rdout[k*2 + 1];
 
-		cap->m_samples[k] = sqrtf(real*real + imag*imag) / npoints;
+		float voltage = sqrtf(real*real + imag*imag) / npoints;
+
+		//Convert to dBm
+		pout[k] = (10 * log10(voltage*voltage / impedance) + 30);
 	}
 }

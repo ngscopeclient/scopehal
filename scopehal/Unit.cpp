@@ -142,6 +142,13 @@ string Unit::PrettyPrint(double value)
 			unit = "bps";
 			break;
 
+		//dBm are always reported as is, with no SI prefixes
+		case UNIT_DBM:
+			unit = "dBm";
+			scale = "";
+			value_rescaled = value;
+			break;
+
 		//Dimensionless unit, no scaling applied
 		case UNIT_PERCENT:
 			unit = "%";
