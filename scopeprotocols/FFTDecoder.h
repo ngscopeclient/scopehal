@@ -56,6 +56,9 @@ public:
 	virtual double GetOffset();
 	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
 
+	virtual void SetVoltageRange(double range);
+	virtual void SetOffset(double offset);
+
 	PROTOCOL_DECODER_INITPROC(FFTDecoder)
 
 protected:

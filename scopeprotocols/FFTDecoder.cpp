@@ -90,6 +90,16 @@ double FFTDecoder::GetVoltageRange()
 	return m_range;
 }
 
+void FFTDecoder::SetVoltageRange(double range)
+{
+	m_range = range;
+}
+
+void FFTDecoder::SetOffset(double offset)
+{
+	m_offset = offset;
+}
+
 string FFTDecoder::GetProtocolName()
 {
 	return "FFT";
