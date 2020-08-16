@@ -62,6 +62,8 @@ WaterfallDecoder::WaterfallDecoder(string color)
 	, m_width(1)
 	, m_height(1)
 {
+	m_xAxisUnit = Unit(Unit::UNIT_HZ);
+
 	//Set up channels
 	m_signalNames.push_back("din");
 	m_channels.push_back(NULL);
@@ -72,7 +74,7 @@ WaterfallDecoder::WaterfallDecoder(string color)
 
 bool WaterfallDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
-	if( (i == 0) && (channel->GetYAxisUnits() != Unit::UNIT_DBM) )
+	if( (i == 0) && (channel->GetYAxisUnits() == Unit::UNIT_DBM) )
 		return true;
 	return false;
 }
@@ -137,7 +139,7 @@ void WaterfallDecoder::Refresh()
 	}
 
 	//Initialize the capture
-	//TODO: timestamps? do we need those?qui
+	//TODO: timestamps? do we need those?
 	WaterfallWaveform* cap = dynamic_cast<WaterfallWaveform*>(m_data);
 	if(cap == NULL)
 		cap = new WaterfallWaveform(m_width, m_height);
@@ -164,7 +166,7 @@ void WaterfallDecoder::Refresh()
 
 		float value = 0;
 		if(nbin < inlen)
-			value = (-70 - 20 * log10(din->m_samples[nbin])) / -70;
+			value = 1 - ( (din->m_samples[nbin]) / -70 );
 
 		//Cap values to prevent going off-scale-low with our color ramps
 		if(value < vmin)

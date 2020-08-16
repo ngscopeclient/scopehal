@@ -51,6 +51,10 @@ FFTDecoder::FFTDecoder(string color)
 	m_rdin = NULL;
 	m_rdout = NULL;
 	m_plan = NULL;
+
+	//Default config
+	m_range = 70;
+	m_offset = 35;
 }
 
 FFTDecoder::~FFTDecoder()
@@ -78,12 +82,12 @@ bool FFTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 double FFTDecoder::GetOffset()
 {
-	return 0;
+	return m_offset;
 }
 
 double FFTDecoder::GetVoltageRange()
 {
-	return 1;//m_channels[0]->GetVoltageRange();
+	return m_range;
 }
 
 string FFTDecoder::GetProtocolName()

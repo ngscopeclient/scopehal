@@ -66,6 +66,9 @@ protected:
 	float* m_rdin;
 	float* m_rdout;
 	ffts_plan_t* m_plan;
+
+	float m_range;
+	float m_offset;
 };
 
 #endif
