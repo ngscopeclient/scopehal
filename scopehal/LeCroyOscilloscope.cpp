@@ -1560,7 +1560,8 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 			cap->m_startTimestamp = ttime;
 			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
 			cap->Resize(num_samples);
-			#pragma omp parallel for
+
+			//TODO: AVX this
 			for(int j=0; j<num_samples; j++)
 			{
 				cap->m_offsets[j] = j;

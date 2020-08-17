@@ -879,6 +879,23 @@ float ProtocolDecoder::InterpolateTime(AnalogWaveform* cap, size_t a, float volt
 	return delta / slope;
 }
 
+/**
+	@brief Interpolates the actual value of a point between two samples
+
+	@param cap			Waveform to work with
+	@param index		Starting position
+	@param frac_ticks	Fractional position of the sample.
+						Note that this is in timebase ticks, so if some samples are >1 tick apart it's possible for
+						this value to be outside [0, 1].
+ */
+float ProtocolDecoder::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks)
+{
+	float frac = frac_ticks / (cap->m_offsets[index+1] - cap->m_offsets[index]);
+	float v1 = cap->m_samples[index];
+	float v2 = cap->m_samples[index+1];
+	return v1 + (v2-v1)*frac;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Measurement helpers
 

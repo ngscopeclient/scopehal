@@ -225,6 +225,7 @@ public:
 
 	//Helpers for superresolution
 	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
+	static float InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks);
 
 	//Helpers for more complex measurements
 	//TODO: create some process for caching this so we don't waste CPU time
