@@ -43,6 +43,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	JtagDecoder.cpp
+	LOMixDecoder.cpp
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
 	MultiplyDecoder.cpp

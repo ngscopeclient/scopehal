@@ -79,6 +79,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(JtagDecoder);
+	AddDecoderClass(LOMixDecoder);
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MovingAverageDecoder);
 	AddDecoderClass(MultiplyDecoder);
