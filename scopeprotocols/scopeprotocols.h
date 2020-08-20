@@ -42,6 +42,7 @@
 
 #include "ACCoupleDecoder.h"
 #include "ADL5205Decoder.h"
+#include "AutocorrelationDecoder.h"
 #include "BaseMeasurementDecoder.h"
 #include "CANDecoder.h"
 #include "ChannelEmulationDecoder.h"
