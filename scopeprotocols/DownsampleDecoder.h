@@ -30,80 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DownsampleDecoder
  */
+#ifndef DownsampleDecoder_h
+#define DownsampleDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/ProtocolDecoder.h"
 
 /**
-	@brief Static initialization for protocol list
+	@brief Downsample - low-pass filter and decimate a signal
  */
-void ScopeProtocolStaticInit()
+class DownsampleDecoder : public ProtocolDecoder
 {
-	AddDecoderClass(ACCoupleDecoder);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurementDecoder);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationDecoder);
-	AddDecoderClass(ClockRecoveryDecoder);
-	AddDecoderClass(ClockJitterDecoder);
-	AddDecoderClass(CTLEDecoder);
-	AddDecoderClass(CurrentShuntDecoder);
-	AddDecoderClass(DCOffsetDecoder);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedDecoder);
-	AddDecoderClass(DeskewDecoder);
-	AddDecoderClass(DifferenceDecoder);
-	AddDecoderClass(DownsampleDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurementDecoder);
-	AddDecoderClass(DramRowColumnLatencyMeasurementDecoder);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurementDecoder);
-	AddDecoderClass(EyeDecoder2);
-	AddDecoderClass(EyeHeightMeasurementDecoder);
-	AddDecoderClass(EyeJitterMeasurementDecoder);
-	AddDecoderClass(EyePeriodMeasurementDecoder);
-	AddDecoderClass(EyeWidthMeasurementDecoder);
-	AddDecoderClass(FallMeasurementDecoder);
-	AddDecoderClass(FFTDecoder);
-	AddDecoderClass(FrequencyMeasurementDecoder);
-	AddDecoderClass(HorizontalBathtubDecoder);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(LOMixDecoder);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageDecoder);
-	AddDecoderClass(MultiplyDecoder);
-	AddDecoderClass(OvershootMeasurementDecoder);
-	AddDecoderClass(ParallelBusDecoder);
-	AddDecoderClass(PkPkMeasurementDecoder);
-	AddDecoderClass(PeriodMeasurementDecoder);
-	AddDecoderClass(RiseMeasurementDecoder);
-	AddDecoderClass(SincInterpolationDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(ThresholdDecoder);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurementDecoder);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryDecoder);
-	AddDecoderClass(UndershootMeasurementDecoder);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(WaterfallDecoder);
+public:
+	DownsampleDecoder(std::string color);
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+
+	PROTOCOL_DECODER_INITPROC(DownsampleDecoder)
+
+protected:
+	std::string m_factorname;
+};
+
+#endif

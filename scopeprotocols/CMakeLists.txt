@@ -16,6 +16,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DeEmbedDecoder.cpp
 	DeskewDecoder.cpp
 	DifferenceDecoder.cpp
+	DownsampleDecoder.cpp
 	DramRefreshActivateMeasurementDecoder.cpp
 	DramRowColumnLatencyMeasurementDecoder.cpp
 	DVIDecoder.cpp

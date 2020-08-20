@@ -54,6 +54,7 @@
 #include "DeEmbedDecoder.h"
 #include "DeskewDecoder.h"
 #include "DifferenceDecoder.h"
+#include "DownsampleDecoder.h"
 #include "DramRefreshActivateMeasurementDecoder.h"
 #include "DramRowColumnLatencyMeasurementDecoder.h"
 #include "DVIDecoder.h"
