@@ -45,6 +45,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	IPv4Decoder.cpp
 	JtagDecoder.cpp
 	LOMixDecoder.cpp
+	MagnitudeDecoder.cpp
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
 	MultiplyDecoder.cpp

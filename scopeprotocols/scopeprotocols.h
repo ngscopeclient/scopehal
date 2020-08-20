@@ -82,6 +82,7 @@
 #include "IPv4Decoder.h"
 #include "JtagDecoder.h"
 #include "LOMixDecoder.h"
+#include "MagnitudeDecoder.h"
 #include "MDIODecoder.h"
 #include "MovingAverageDecoder.h"
 #include "MultiplyDecoder.h"
