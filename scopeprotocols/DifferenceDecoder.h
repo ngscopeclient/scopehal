@@ -57,6 +57,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(DifferenceDecoder)
 
 protected:
+	void InnerLoop(float* out, float* a, float* b, size_t len);
+	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
 };
 
 #endif

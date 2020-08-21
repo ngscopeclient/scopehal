@@ -30,6 +30,7 @@
 #include "../scopehal/scopehal.h"
 #include "DifferenceDecoder.h"
 #include "FFTDecoder.h"
+#include <immintrin.h>
 
 using namespace std;
 
@@ -132,19 +133,19 @@ void DifferenceDecoder::Refresh()
 		return;
 	}
 
-	//Create the output
+	//Create the output and copy timestamps
 	AnalogWaveform* cap = new AnalogWaveform;
-
-	//Subtract all of our samples
-	//Heap blocks are guaranteed aligned on 64-bit glibc, so this might break on 32 bit.
-	//Does anyone still use that?
 	cap->Resize(len);
 	cap->CopyTimestamps(din_p);
-	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	float* a = (float*)__builtin_assume_aligned(&din_p->m_samples[0], 16);
-	float* b = (float*)__builtin_assume_aligned(&din_n->m_samples[0], 16);
-	for(size_t i=0; i<len; i++)
-		out[i] 		= a[i] - b[i];
+	float* out = (float*)&cap->m_samples[0];
+	float* a = (float*)&din_p->m_samples[0];
+	float* b = (float*)&din_n->m_samples[0];
+
+	//Do the actual subtraction
+	if(g_hasAvx2)
+		InnerLoopAVX2(out, a, b, len);
+	else
+		InnerLoop(out, a, b, len);
 
 	SetData(cap);
 
@@ -153,4 +154,34 @@ void DifferenceDecoder::Refresh()
 	cap->m_timescale 		= din_p->m_timescale;
 	cap->m_startTimestamp 	= din_p->m_startTimestamp;
 	cap->m_startPicoseconds = din_p->m_startPicoseconds;
+}
+
+//We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
+void DifferenceDecoder::InnerLoop(float* out, float* a, float* b, size_t len)
+{
+	out = (float*)__builtin_assume_aligned(out, 64);
+	a = (float*)__builtin_assume_aligned(a, 64);
+	b = (float*)__builtin_assume_aligned(b, 64);
+
+	for(size_t i=0; i<len; i++)
+		out[i] 		= a[i] - b[i];
+}
+
+__attribute__((target("avx2")))
+void DifferenceDecoder::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
+{
+	size_t end = len - (len % 8);
+
+	//AVX2
+	for(size_t i=0; i<end; i+=8)
+	{
+		__m256 pa = _mm256_load_ps(a + i);
+		__m256 pb = _mm256_load_ps(b + i);
+		__m256 o = _mm256_sub_ps(pa, pb);
+		_mm256_store_ps(out+i, o);
+	}
+
+	//Get any extras
+	for(size_t i=end; i<len; i++)
+		out[i] 		= a[i] - b[i];
 }
