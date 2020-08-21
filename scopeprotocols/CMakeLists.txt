@@ -68,6 +68,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
 	WaterfallDecoder.cpp
+	WindowedAutocorrelationDecoder.cpp
 
 	AverageStatistic.cpp
 	MaximumStatistic.cpp

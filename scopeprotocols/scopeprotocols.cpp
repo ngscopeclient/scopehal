@@ -104,6 +104,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(USB2PMADecoder);
 	AddDecoderClass(WaterfallDecoder);
+	AddDecoderClass(WindowedAutocorrelationDecoder);
 
 	AddStatisticClass(AverageStatistic);
 	AddStatisticClass(MaximumStatistic);
