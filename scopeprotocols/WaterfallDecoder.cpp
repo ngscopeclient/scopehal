@@ -123,12 +123,13 @@ void WaterfallDecoder::SetDefaultName()
 void WaterfallDecoder::Refresh()
 {
 	//Get the input data
-	if(m_channels[0] == NULL)
+	auto chin = m_channels[0];
+	if(chin == NULL)
 	{
 		SetData(NULL);
 		return;
 	}
-	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
+	auto din = dynamic_cast<AnalogWaveform*>(chin->GetData());
 
 	//We need meaningful data
 	size_t inlen = din->m_samples.size();
@@ -143,7 +144,7 @@ void WaterfallDecoder::Refresh()
 	WaterfallWaveform* cap = dynamic_cast<WaterfallWaveform*>(m_data);
 	if(cap == NULL)
 		cap = new WaterfallWaveform(m_width, m_height);
-	cap->m_timescale = 1;
+	cap->m_timescale = din->m_timescale;
 	float* data = cap->GetData();
 
 	//Move the whole waterfall down by one row
@@ -158,6 +159,8 @@ void WaterfallDecoder::Refresh()
 	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
 	double bin_offset = m_offsetHz / hz_per_bin;
 	double vmin = 1.0 / 255.0;
+	float vrange = chin->GetVoltageRange();	//db from min to max scale
+	float vfs = vrange/2 - chin->GetOffset();
 	for(size_t x=0; x<m_width; x++)
 	{
 		//Look up the frequency bin for this position
@@ -166,7 +169,10 @@ void WaterfallDecoder::Refresh()
 
 		float value = 0;
 		if(nbin < inlen)
-			value = 1 - ( (din->m_samples[nbin]) / -70 );
+		{
+			float db = din->m_samples[nbin];
+			value = 1 - ( (db - vfs) / -vrange );
+		}
 
 		//Cap values to prevent going off-scale-low with our color ramps
 		if(value < vmin)
