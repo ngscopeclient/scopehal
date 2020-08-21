@@ -30,6 +30,7 @@
 #include "../scopehal/scopehal.h"
 #include "CTLEDecoder.h"
 #include <ffts.h>
+#include <complex>
 
 using namespace std;
 
@@ -48,7 +49,7 @@ CTLEDecoder::CTLEDecoder(string color)
 
 	m_zeroFreqName = "Zero Frequency";
 	m_parameters[m_zeroFreqName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
-	m_parameters[m_zeroFreqName].SetFloatVal(1e9);
+	m_parameters[m_zeroFreqName].SetFloatVal(1e7);
 
 	m_poleFreq1Name = "Pole Frequency 1";
 	m_parameters[m_poleFreq1Name] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
@@ -58,15 +59,10 @@ CTLEDecoder::CTLEDecoder(string color)
 	m_parameters[m_poleFreq2Name] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
 	m_parameters[m_poleFreq2Name].SetFloatVal(2e9);
 
-	m_acGainName = "Peak Gain (dB)";
-	m_parameters[m_acGainName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
-	m_parameters[m_acGainName].SetFloatVal(6);
-
 	m_cachedDcGain = 1;
 	m_cachedZeroFreq = 1;
 	m_cachedPole1Freq = 1;
 	m_cachedPole2Freq = 1;
-	m_cachedAcGain = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,19 +95,16 @@ void CTLEDecoder::SetDefaultName()
 	float pole1 = m_parameters[m_poleFreq1Name].GetFloatVal();
 	float pole2 = m_parameters[m_poleFreq2Name].GetFloatVal();
 
-	float acgain = m_parameters[m_acGainName].GetFloatVal();
-
 	char hwname[256];
 	snprintf(
 		hwname,
 		sizeof(hwname),
-		"CTLE(%s, %s, %s, %s, %s, %s)",
+		"CTLE(%s, %s, %s, %s, %s)",
 		m_channels[0]->m_displayname.c_str(),
 		db.PrettyPrint(dcgain).c_str(),
 		hz.PrettyPrint(zfreq).c_str(),
 		hz.PrettyPrint(pole1).c_str(),
-		hz.PrettyPrint(pole2).c_str(),
-		db.PrettyPrint(acgain).c_str()
+		hz.PrettyPrint(pole2).c_str()
 		);
 
 	m_hwname = hwname;
@@ -136,44 +129,30 @@ void CTLEDecoder::InterpolateSparameters(float bin_hz, bool /*invert*/, size_t n
 {
 	m_cachedBinSize = bin_hz;
 
+	typedef complex<float> fcpx;
+
+	fcpx p0(0, -FreqToPhase(m_cachedPole1Freq));
+	fcpx p1(0, -FreqToPhase(m_cachedPole2Freq));
+	fcpx zero(0, -FreqToPhase(m_cachedZeroFreq));
+
+	//Calculate the prescaler to null out the filter gain
+	float prescale = 1.0f / abs(zero / (p0*p1) );
+
+	//Multiply by our gain (in dB, so we have to convert to V/V)
+	prescale *= pow(10, m_cachedDcGain/20);
+
 	for(size_t i=0; i<nouts; i++)
 	{
-		float freq = bin_hz * i;
+		fcpx s(0, FreqToPhase(bin_hz * i));
+		fcpx h = prescale * (s - zero) / ( (s-p0) * (s-p1) );
 
-		//For now, piecewise response. We should smooth this!
-		//How can we get a nicer looking transfer function?
+		m_resampledSparamAmplitudes.push_back(abs(h));
 
-		//Below zero, use DC gain
-		float db;
-		if(freq <= m_cachedZeroFreq)
-			db = m_cachedDcGain;
-
-		//Then linearly rise to the pole
-		//should we interpolate vs F or log(f)?
-		else if(freq < m_cachedPole1Freq)
-		{
-			float frac = (freq - m_cachedZeroFreq) / (m_cachedPole1Freq - m_cachedZeroFreq);
-			db = m_cachedDcGain + (m_cachedAcGain - m_cachedDcGain) * frac;
-		}
-
-		//Then flat between poles
-		else if(freq <= m_cachedPole2Freq)
-			db = m_cachedAcGain;
-
-		//Then linear falloff
-		else
-		{
-			db = -30;	//FIXME
-			//float scale = (freq - pole2) / pole2;
-			//db = acgain_db / scale;
-		}
-
-		//Gain
-		m_resampledSparamAmplitudes.push_back(pow(10, db/20));
-
-		//Zero phase for now
-		m_resampledSparamSines.push_back(0);
-		m_resampledSparamCosines.push_back(1);
+		//Phase correction seems unnecessary because this transfer function should be constant rotation?
+		//We get weird results when we do this, too.
+		float phase = 0;//arg(h);
+		m_resampledSparamSines.push_back(sin(phase));
+		m_resampledSparamCosines.push_back(cos(phase));
 	}
 }
 
@@ -184,14 +163,12 @@ void CTLEDecoder::Refresh()
 	float zfreq = m_parameters[m_zeroFreqName].GetFloatVal();
 	float pole1 = m_parameters[m_poleFreq1Name].GetFloatVal();
 	float pole2 = m_parameters[m_poleFreq2Name].GetFloatVal();
-	float acgain_db = m_parameters[m_acGainName].GetFloatVal();
 
 	 if(
 		(dcgain_db != m_cachedDcGain) ||
 		(zfreq != m_cachedZeroFreq) ||
 		(pole1 != m_cachedPole1Freq) ||
-		(pole2 != m_cachedPole2Freq) ||
-		(acgain_db != m_cachedAcGain) )
+		(pole2 != m_cachedPole2Freq) )
 	{
 		//force re-interpolation of S-parameters
 		m_cachedBinSize = 0;
@@ -200,7 +177,6 @@ void CTLEDecoder::Refresh()
 		m_cachedZeroFreq = zfreq;
 		m_cachedPole1Freq = pole1;
 		m_cachedPole2Freq = pole2;
-		m_cachedAcGain = acgain_db;
 	}
 
 	//Do the actual refresh operation

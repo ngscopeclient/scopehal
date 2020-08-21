@@ -50,6 +50,14 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	/**
+		@brief Converts a frequency in Hz to a phase velocity in rad/sec
+	 */
+	float FreqToPhase(float hz)
+	{
+		return 2 * M_PI * hz;
+	}
+
 	PROTOCOL_DECODER_INITPROC(CTLEDecoder)
 
 protected:
@@ -61,13 +69,11 @@ protected:
 	std::string m_zeroFreqName;
 	std::string m_poleFreq1Name;
 	std::string m_poleFreq2Name;
-	std::string m_acGainName;
 
 	float m_cachedDcGain;
 	float m_cachedZeroFreq;
 	float m_cachedPole1Freq;
 	float m_cachedPole2Freq;
-	float m_cachedAcGain;
 };
 
 #endif
