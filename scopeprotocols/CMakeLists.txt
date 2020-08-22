@@ -50,6 +50,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MDIODecoder.cpp
 	MovingAverageDecoder.cpp
 	MultiplyDecoder.cpp
+	OFDMDemodulator.cpp
 	OvershootMeasurementDecoder.cpp
 	ParallelBusDecoder.cpp
 	PeriodMeasurementDecoder.cpp

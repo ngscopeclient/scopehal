@@ -63,7 +63,9 @@ protected:
 	double	m_offset;
 	float m_min;
 	float m_max;
+
 	std::string m_windowName;
+	std::string m_periodName;
 };
 
 #endif

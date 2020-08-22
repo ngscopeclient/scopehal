@@ -29,15 +29,15 @@
 
 #include "../scopehal/scopehal.h"
 #include <complex>
-#include "WindowedAutocorrelationDecoder.h"
+#include "OFDMDemodulator.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-WindowedAutocorrelationDecoder::WindowedAutocorrelationDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+OFDMDemodulator::OFDMDemodulator(string color)
+	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	//Set up channels
 	m_signalNames.push_back("I");
@@ -64,7 +64,7 @@ WindowedAutocorrelationDecoder::WindowedAutocorrelationDecoder(string color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool WindowedAutocorrelationDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool OFDMDemodulator::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 {
 	if( (i < 2) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
@@ -74,33 +74,33 @@ bool WindowedAutocorrelationDecoder::ValidateChannel(size_t i, OscilloscopeChann
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double WindowedAutocorrelationDecoder::GetVoltageRange()
+double OFDMDemodulator::GetVoltageRange()
 {
 	return m_range;
 }
 
-double WindowedAutocorrelationDecoder::GetOffset()
+double OFDMDemodulator::GetOffset()
 {
 	return -m_offset;
 }
 
-string WindowedAutocorrelationDecoder::GetProtocolName()
+string OFDMDemodulator::GetProtocolName()
 {
-	return "Windowed Autocorrelation";
+	return "OFDM Demodulator";
 }
 
-bool WindowedAutocorrelationDecoder::IsOverlay()
+bool OFDMDemodulator::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool WindowedAutocorrelationDecoder::NeedsConfig()
+bool OFDMDemodulator::NeedsConfig()
 {
 	return true;
 }
 
-void WindowedAutocorrelationDecoder::SetDefaultName()
+void OFDMDemodulator::SetDefaultName()
 {
 	char hwname[256];
 	Unit ps(Unit::UNIT_PS);
@@ -120,7 +120,7 @@ void WindowedAutocorrelationDecoder::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void WindowedAutocorrelationDecoder::ClearSweeps()
+void OFDMDemodulator::ClearSweeps()
 {
 	m_range = 1;
 	m_offset = 0;
@@ -128,7 +128,7 @@ void WindowedAutocorrelationDecoder::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-void WindowedAutocorrelationDecoder::Refresh()
+void OFDMDemodulator::Refresh()
 {
 	//Get the input data
 	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
@@ -145,6 +145,10 @@ void WindowedAutocorrelationDecoder::Refresh()
 		return;
 	}
 
+	SetData(NULL);
+	return;
+
+	/*
 	//Copy the units
 	m_yAxisUnit = m_channels[0]->GetYAxisUnits();
 
@@ -204,4 +208,5 @@ void WindowedAutocorrelationDecoder::Refresh()
 	cap->m_startPicoseconds = din_i->m_startPicoseconds;
 
 	SetData(cap);
+	*/
 }

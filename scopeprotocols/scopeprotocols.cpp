@@ -86,6 +86,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MovingAverageDecoder);
 	AddDecoderClass(MultiplyDecoder);
+	AddDecoderClass(OFDMDemodulator);
 	AddDecoderClass(OvershootMeasurementDecoder);
 	AddDecoderClass(ParallelBusDecoder);
 	AddDecoderClass(PkPkMeasurementDecoder);
