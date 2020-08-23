@@ -259,7 +259,7 @@ public:
 
 protected:
 	//Common text formatting
-	virtual std::string GetTextForAsciiChannel(int i);
+	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
 
 	//Samples a digital channel on the edges of another channel.
 	//The two channels need not be the same sample rate.

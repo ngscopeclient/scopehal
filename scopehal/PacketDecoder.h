@@ -30,7 +30,7 @@
 #ifndef PacketDecoder_h
 #define PacketDecoder_h
 
-#include "ProtocolDecoder.h"
+#include "Filter.h"
 
 /**
 	@class
@@ -61,7 +61,7 @@ public:
 class PacketDecoder : public Filter
 {
 public:
-	PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, ProtocolDecoder::Category cat);
+	PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Filter::Category cat);
 	virtual ~PacketDecoder();
 
 	const std::vector<Packet*>& GetPackets()

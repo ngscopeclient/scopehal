@@ -228,10 +228,10 @@ Filter::~Filter()
 {
 	m_filters.erase(this);
 
-	for(auto c : m_channels)
+	for(auto c : m_inputs)
 	{
-		if(c != NULL)
-			c->Release();
+		if(c.m_channel != NULL)
+			c.m_channel->Release();
 	}
 }
 
@@ -288,21 +288,26 @@ void Filter::SetInput(size_t i, StreamDescriptor stream)
 {
 	if(i < m_signalNames.size())
 	{
-		if(channel == NULL)	//NULL is always legal
+		if(stream.m_channel == NULL)	//NULL is always legal
 		{
-			m_channels[i] = NULL;
+			m_inputs[i] = StreamDescriptor(NULL, 0);
 			return;
 		}
+
 		if(!ValidateChannel(i, stream))
 		{
-			LogError("Invalid channel format\n");
-			//return;
+			LogError("Invalid channel for input %zu of %s\n", i, m_displayname.c_str());
+			m_inputs[i] = StreamDescriptor(NULL, 0);
+			return;
 		}
 
-		if(m_channels[i] != NULL)
-			m_channels[i]->Release();
-		m_channels[i] = stream;
-		channel->AddRef();
+		//Deref whatever was there (if anything)
+		if(m_inputs[i].m_channel != NULL)
+			m_inputs[i].m_channel->Release();
+
+		//All good, we can save the new input
+		m_inputs[i] = stream;
+		stream.m_channel->AddRef();
 	}
 	else
 	{
@@ -329,11 +334,11 @@ void Filter::SetInput(string name, StreamDescriptor stream)
 StreamDescriptor Filter::GetInput(size_t i)
 {
 	if(i < m_signalNames.size())
-		return m_channels[i];
+		return m_inputs[i];
 	else
 	{
 		LogError("Invalid channel index\n");
-		return NULL;
+		return StreamDescriptor(NULL, 0);
 	}
 }
 
@@ -342,13 +347,13 @@ StreamDescriptor Filter::GetInput(size_t i)
 
 void Filter::RefreshInputsIfDirty()
 {
-	for(auto c : m_channels)
+	for(auto c : m_inputs)
 	{
-		if(!c)
+		if(!c.m_channel)
 			continue;
-		auto decode = dynamic_cast<Filter*>(c);
-		if(decode)
-			decode->RefreshIfDirty();
+		auto f = dynamic_cast<Filter*>(c.m_channel);
+		if(f)
+			f->RefreshIfDirty();
 	}
 }
 
@@ -700,9 +705,25 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 
 void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
 {
+	int index;
+	int stream;
+
 	auto inputs = node["inputs"];
 	for(auto it : inputs)
-		SetInput(it.first.as<string>(),	static_cast<OscilloscopeChannel*>(table[it.second.as<int>()]) );
+	{
+		//Inputs are formatted as %d/%d. Stream index may be omitted.
+		auto sin = it.second.as<string>();
+		if(2 != sscanf(sin.c_str(), "%d/%d", &index, &stream))
+		{
+			index = atoi(sin.c_str());
+			stream = 0;
+		}
+
+		SetInput(
+			it.first.as<string>(),
+			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream)
+			);
+	}
 }
 
 string Filter::SerializeConfiguration(IDTable& table)
@@ -727,13 +748,19 @@ string Filter::SerializeConfiguration(IDTable& table)
 	//Inputs
 	snprintf(tmp, sizeof(tmp), "        inputs: \n");
 	config += tmp;
-	for(size_t i=0; i<m_channels.size(); i++)
+	for(size_t i=0; i<m_inputs.size(); i++)
 	{
-		auto chan = m_channels[i];
-		if(chan == NULL)
+		auto desc = m_inputs[i];
+		if(desc.m_channel == NULL)
 			snprintf(tmp, sizeof(tmp), "            %-20s 0\n", (m_signalNames[i] + ":").c_str());
 		else
-			snprintf(tmp, sizeof(tmp), "            %-20s %d\n", (m_signalNames[i] + ":").c_str(), table.emplace(chan));
+		{
+			snprintf(tmp, sizeof(tmp), "            %-20s %d/%zu\n",
+				(m_signalNames[i] + ":").c_str(),
+				table.emplace(desc.m_channel),
+				desc.m_stream
+			);
+		}
 		config += tmp;
 	}
 
@@ -782,9 +809,9 @@ string Filter::GetText(int /*i*/)
 	return "(unimplemented)";
 }
 
-string Filter::GetTextForAsciiChannel(int i)
+string Filter::GetTextForAsciiChannel(int i, size_t stream)
 {
-	AsciiWaveform* capture = dynamic_cast<AsciiWaveform*>(GetData());
+	AsciiWaveform* capture = dynamic_cast<AsciiWaveform*>(GetData(stream));
 	if(capture != NULL)
 	{
 		char c = capture->m_samples[i];
