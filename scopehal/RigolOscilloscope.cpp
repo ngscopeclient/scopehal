@@ -595,7 +595,7 @@ Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 	}
 }
 
-bool RigolOscilloscope::AcquireData(bool toQueue)
+bool RigolOscilloscope::AcquireData()
 {
 	//LogDebug("Acquiring data\n");
 
@@ -628,11 +628,7 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
-		{
-			if(!toQueue)
-				m_channels[i]->SetData(NULL);
 			continue;
-		}
 
 		//LogDebug("Channel %zu\n", i);
 
@@ -759,17 +755,12 @@ bool RigolOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Done, update the data
-		if(!toQueue)
-			m_channels[i]->SetData(cap);
-		else
-			pending_waveforms[i].push_back(cap);
+		pending_waveforms[i].push_back(cap);
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = 0;
-	if(toQueue)	   //if saving to queue, the 0'th segment counts too
-		num_pending++;
+	size_t num_pending = 1;	//TODO: segmented capture support
 	for(size_t i = 0; i < num_pending; i++)
 	{
 		SequenceSet s;

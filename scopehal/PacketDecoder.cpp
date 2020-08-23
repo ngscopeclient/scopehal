@@ -38,7 +38,7 @@ Packet::~Packet()
 // Construction / destruction
 
 PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat)
-	: ProtocolDecoder(type, color, cat)
+	: Filter(type, color, cat)
 {
 }
 

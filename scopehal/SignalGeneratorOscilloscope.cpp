@@ -124,7 +124,7 @@ Oscilloscope::TriggerMode SignalGeneratorOscilloscope::PollTrigger()
 		return TRIGGER_MODE_STOP;
 }
 
-bool SignalGeneratorOscilloscope::AcquireData(bool toQueue)
+bool SignalGeneratorOscilloscope::AcquireData()
 {
 	//cap waveform rate at 25 wfm/s to avoid saturating cpu etc with channel emulation
 	usleep(40 * 1000);
@@ -137,20 +137,16 @@ bool SignalGeneratorOscilloscope::AcquireData(bool toQueue)
 		80			//1.25 Gbps
 		);
 
-	if(toQueue)
-	{
-		m_pendingWaveformsMutex.lock();
-		SequenceSet s;
-		s[m_channels[0]] = waveform;
-		m_pendingWaveforms.push_back(s);
-		m_pendingWaveformsMutex.unlock();
-	}
-	else
-		m_channels[0]->SetData(waveform);
+	SequenceSet s;
+	s[m_channels[0]] = waveform;
+
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(s);
+	m_pendingWaveformsMutex.unlock();
 
 	//Update channel voltage ranges
-	float lo = ProtocolDecoder::GetMinVoltage(waveform);
-	float hi = ProtocolDecoder::GetMaxVoltage(waveform);
+	float lo = Filter::GetMinVoltage(waveform);
+	float hi = Filter::GetMaxVoltage(waveform);
 	float delta = hi - lo;
 
 	m_channelVoltageRange[0] = delta * 1.2;

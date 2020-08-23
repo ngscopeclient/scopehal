@@ -326,13 +326,9 @@ public:
 	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits)=0;
 
 	/**
-		@brief Reads data for all enabled channels from the instrument.
-
-		@parameter toQueue	If true, acquire the waveform into the pending-waveform queue for future analysis.
-							If false, the waveform (or first segment in sequenced captures), is acquired into
-							the current channel state and any additional segments are queued.
+		@brief Reads a waveform into the queue of pending waveforms
 	 */
-	virtual bool AcquireData(bool toQueue = false) =0;
+	virtual bool AcquireData() =0;
 
 	/**
 		@brief Starts the instrument in continuous trigger mode.
@@ -512,7 +508,7 @@ public:
 	bool HasPendingWaveforms();
 	void ClearPendingWaveforms();
 	size_t GetPendingWaveformCount();
-	virtual bool AcquireDataFifo();
+	virtual bool PopPendingWaveform();
 
 protected:
 	typedef std::map<OscilloscopeChannel*, WaveformBase*> SequenceSet;

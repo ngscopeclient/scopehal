@@ -365,7 +365,7 @@ Oscilloscope::TriggerMode AntikernelLabsOscilloscope::PollTrigger()
 	return TRIGGER_MODE_TRIGGERED;
 }
 
-bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
+bool AntikernelLabsOscilloscope::AcquireData()
 {
 	//Read the waveform data
 	const int depth = 16384;
@@ -398,22 +398,17 @@ bool AntikernelLabsOscilloscope::AcquireData(bool toQueue)
 	//See what the actual voltages are at the zero crossing
 	//TODO: this isn't the actual trigger point??
 	float vtrig = 0;
-	float trigfrac = ProtocolDecoder::InterpolateTime(cap, 57, vtrig);
+	float trigfrac = Filter::InterpolateTime(cap, 57, vtrig);
 	cap->m_triggerPhase = -trigfrac * cap->m_timescale;
 
 	//Done, update
 	lock_guard<recursive_mutex> lock(m_mutex);
 	map<int, vector<AnalogWaveform*> > pending_waveforms;
-	if(!toQueue)
-		m_channels[0]->SetData(cap);
-	else
-		pending_waveforms[0].push_back(cap);
+	pending_waveforms[0].push_back(cap);
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = 0;
-	if(toQueue)				//if saving to queue, the 0'th segment counts too
-		num_pending ++;
+	size_t num_pending = 1;	//single segment only for now
 	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;

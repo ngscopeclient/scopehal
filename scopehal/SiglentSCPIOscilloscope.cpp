@@ -29,7 +29,6 @@
 
 #include "scopehal.h"
 #include "SiglentSCPIOscilloscope.h"
-#include "ProtocolDecoder.h"
 #include "base64.h"
 
 using namespace std;
@@ -125,7 +124,7 @@ void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, double range)
 //  Somewhat arbitrary. No header has been seen that's larger than 17...
 static const int maxWaveHeaderSize = 40;
 
-// "WF?" commands return data that starts with a header. 
+// "WF?" commands return data that starts with a header.
 // On a Siglent SDS2304X, the header of "C0: WF? DESC looks like this: "ALL,#9000000346"
 // On other Siglent scopes, a header may look like this: "C1:WF ALL,#9000000070"
 // So the size of the header is unknown due to the variable lenghth prefix.
@@ -201,7 +200,7 @@ void SiglentSCPIOscilloscope::ReadWaveDescriptorBlock(SiglentWaveformDesc_t *des
 	m_transport->ReadReply();
 }
 
-bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
+bool SiglentSCPIOscilloscope::AcquireData()
 {
 
 	LogDebug("Acquire data\n");
@@ -219,7 +218,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 			enabled[i] = IsChannelEnabled(i);
 
-		// Read the wavedesc for every enabled channel 
+		// Read the wavedesc for every enabled channel
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
 			wavedescs.push_back(new struct SiglentWaveformDesc_t);
@@ -242,11 +241,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			//If the channel is invisible, don't waste time capturing data
 			struct SiglentWaveformDesc_t *wavedesc = wavedescs[chanNr];
 			if(!enabled[chanNr] || string(wavedesc->DescName).empty())
-			{
-				if (!toQueue)
-					m_channels[chanNr]->SetData(NULL);
 				continue;
-			}
 
 			//Set up the capture we're going to store our data into
 			AnalogWaveform* cap = new AnalogWaveform;
@@ -358,10 +353,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 			}
 
 			//Done, update the data
-			if (!toQueue)
-				m_channels[chanNr]->SetData(cap);
-			else
-				pending_waveforms[chanNr].push_back(cap);
+			pending_waveforms[chanNr].push_back(cap);
 		}
 	}
 
@@ -376,11 +368,7 @@ bool SiglentSCPIOscilloscope::AcquireData(bool toQueue)
 	}
 
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = 0;
-
-	if (toQueue)
-		num_pending++;
-
+	size_t num_pending = 1;	//TODO: segmented capture support
 	for(size_t i = 0; i < num_pending; ++i)
 	{
 		SequenceSet s;

@@ -460,7 +460,7 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	}
 }
 
-bool AgilentOscilloscope::AcquireData(bool toQueue)
+bool AgilentOscilloscope::AcquireData()
 {
 	//LogDebug("Acquiring data\n");
 
@@ -481,12 +481,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
-		{
-			if(!toQueue)
-				m_channels[i]->SetData(NULL);
 			continue;
-		}
-
 
 		// Set source & get preamble
 		m_transport->SendCommand(":WAV:SOUR " + m_channels[i]->GetHwname());
@@ -539,10 +534,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 		}
 
 		//Done, update the data
-		if(!toQueue)
-			m_channels[i]->SetData(cap);
-		else
-			pending_waveforms[i].push_back(cap);
+		pending_waveforms[i].push_back(cap);
 
 		//Clean up
 		delete[] temp_buf;
@@ -550,9 +542,7 @@ bool AgilentOscilloscope::AcquireData(bool toQueue)
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = 0;
-	if(toQueue)				//if saving to queue, the 0'th segment counts too
-		num_pending ++;
+	size_t num_pending = 1;	//TODO: segmented capture mode
 	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;

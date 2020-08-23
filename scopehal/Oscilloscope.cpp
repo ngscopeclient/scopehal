@@ -168,16 +168,16 @@ void Oscilloscope::ClearPendingWaveforms()
 }
 
 /**
-	@brief Just like AcquireData(), but only pulls from the fifo
+	@brief Pops the queue of pending waveforms and updates each channel with a new waveform
  */
-bool Oscilloscope::AcquireDataFifo()
+bool Oscilloscope::PopPendingWaveform()
 {
 	lock_guard<mutex> lock(m_pendingWaveformsMutex);
 	if(m_pendingWaveforms.size())
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
-			it.first->SetData(it.second);
+			it.first->SetData(it.second, 0);	//assume stream 0
 		m_pendingWaveforms.pop_front();
 		return true;
 	}

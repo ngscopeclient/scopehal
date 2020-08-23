@@ -58,7 +58,7 @@ public:
 	@class
 	@brief A protocol decoder that outputs packetized data
  */
-class PacketDecoder : public ProtocolDecoder
+class PacketDecoder : public Filter
 {
 public:
 	PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, ProtocolDecoder::Category cat);

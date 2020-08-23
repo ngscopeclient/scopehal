@@ -62,7 +62,7 @@ public:
 	//Triggering
 	virtual void ResetTriggerConditions();
 	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData(bool toQueue = false);
+	virtual bool AcquireData();
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();

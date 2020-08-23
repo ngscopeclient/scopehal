@@ -52,7 +52,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	: m_displaycolor(color)
 	, m_displayname(hwname)
 	, m_scope(scope)
-	, m_data(NULL)
 	, m_type(type)
 	, m_hwname(hwname)
 	, m_width(width)
@@ -62,12 +61,18 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_xAxisUnit(Unit::UNIT_PS)
 	, m_yAxisUnit(Unit::UNIT_VOLTS)
 {
+	//Create a stream for our output.
+	//Normal channels only have one stream.
+	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
+	AddStream("data");
 }
 
 OscilloscopeChannel::~OscilloscopeChannel()
 {
-	delete m_data;
-	m_data = NULL;
+	for(auto p : m_streamData)
+		delete p;
+	m_streamData.clear();
+	m_streamNames.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,12 +198,12 @@ int64_t OscilloscopeChannel::GetDeskew()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void OscilloscopeChannel::SetData(WaveformBase* pNew)
+void OscilloscopeChannel::SetData(WaveformBase* pNew, size_t stream)
 {
-	if(m_data == pNew)
+	if(m_streamData[stream] == pNew)
 		return;
 
-	if(m_data != NULL)
-		delete m_data;
-	m_data = pNew;
+	if(m_streamData[stream] != NULL)
+		delete m_streamData[stream];
+	m_streamData[stream] = pNew;
 }

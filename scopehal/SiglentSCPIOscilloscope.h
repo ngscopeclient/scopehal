@@ -52,7 +52,7 @@ public:
 
 	virtual void SetChannelVoltageRange(size_t i, double range);
 
-	virtual bool AcquireData(bool toQueue);
+	virtual bool AcquireData();
 
 protected:
 

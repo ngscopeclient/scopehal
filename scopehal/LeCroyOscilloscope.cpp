@@ -29,7 +29,6 @@
 
 #include "scopehal.h"
 #include "LeCroyOscilloscope.h"
-#include "ProtocolDecoder.h"
 #include "base64.h"
 #include <locale>
 #include <immintrin.h>
@@ -1582,7 +1581,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 	return ret;
 }
 
-bool LeCroyOscilloscope::AcquireData(bool toQueue)
+bool LeCroyOscilloscope::AcquireData()
 {
 	//State for this acquisition (may be more than one waveform)
 	uint32_t num_sequences = 1;
@@ -1702,27 +1701,11 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
-		{
-			if(!toQueue)
-				m_channels[i]->SetData(NULL);
 			continue;
-		}
+
 		//Done, update the data
-		if(toQueue)
-		{
-			for(size_t j=0; j<num_sequences; j++)
-				pending_waveforms[i].push_back(waveforms[i][j]);
-		}
-		else
-		{
-			for(size_t j=0; j<num_sequences; j++)
-			{
-				if(j == 0)
-					m_channels[i]->SetData(waveforms[i][j]);
-				else
-					pending_waveforms[i].push_back(waveforms[i][j]);
-			}
-		}
+		for(size_t j=0; j<num_sequences; j++)
+			pending_waveforms[i].push_back(waveforms[i][j]);
 	}
 
 	//TODO: proper support for sequenced capture when digital channels are active
@@ -1733,24 +1716,13 @@ bool LeCroyOscilloscope::AcquireData(bool toQueue)
 		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, ttime, basetime);
 
 		//Done, update the data
-		if(toQueue)
-		{
-			for(auto it : digwaves)
-				pending_waveforms[it.first].push_back(it.second);
-		}
-		else
-		{
-			for(auto it : digwaves)
-				m_channels[it.first]->SetData(it.second);
-		}
+		for(auto it : digwaves)
+			pending_waveforms[it.first].push_back(it.second);
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
-	size_t num_pending = num_sequences-1;
-	if(toQueue)				//if saving to queue, the 0'th segment counts too
-		num_pending ++;
-	for(size_t i=0; i<num_pending; i++)
+	for(size_t i=0; i<num_sequences; i++)
 	{
 		SequenceSet s;
 		for(size_t j=0; j<m_channels.size(); j++)

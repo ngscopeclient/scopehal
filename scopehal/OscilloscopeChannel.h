@@ -83,20 +83,28 @@ public:
 	std::string GetHwname()
 	{ return m_hwname; }
 
-	///Get the channel's data
-	WaveformBase* GetData()
-	{ return m_data; }
+	///Get the number of data streams
+	size_t GetStreamCount()
+	{ return m_streamNames.size(); }
+
+	///Gets the name of a stream (for display in the UI)
+	std::string GetStreamName(size_t stream)
+	{ return m_streamNames[stream]; }
+
+	///Get the contents of a data stream
+	WaveformBase* GetData(size_t stream)
+	{ return m_streamData[stream]; }
 
 	///Detach the capture data from this channel
-	WaveformBase* Detach()
+	WaveformBase* Detach(size_t stream)
 	{
-		WaveformBase* tmp = m_data;
-		m_data = NULL;
+		WaveformBase* tmp = m_streamData[stream];
+		m_streamData[stream] = NULL;
 		return tmp;
 	}
 
 	///Set new data, overwriting the old data as appropriate
-	void SetData(WaveformBase* pNew);
+	void SetData(WaveformBase* pNew, size_t stream);
 
 	int GetWidth()
 	{ return m_width; }
@@ -160,10 +168,16 @@ public:
 
 protected:
 
-	Oscilloscope* m_scope;
+	/**
+		@brief Adds a new data stream to the channel
+	 */
+	void AddStream(std::string name)
+	{
+		m_streamNames.push_back(name);
+		m_streamData.push_back(NULL);
+	}
 
-	///Capture data
-	WaveformBase* m_data;
+	Oscilloscope* m_scope;
 
 	///Channel type
 	ChannelType m_type;
@@ -188,6 +202,12 @@ protected:
 
 	///Unit of measurement for our vertical axis
 	Unit m_yAxisUnit;
+
+	///Name of each output stream
+	std::vector<std::string> m_streamNames;
+
+	///Waveform data
+	std::vector<WaveformBase*> m_streamData;
 };
 
 #endif

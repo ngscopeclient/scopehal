@@ -36,7 +36,6 @@
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
 #include "AntikernelLogicAnalyzer.h"
-#include "ProtocolDecoder.h"
 
 using namespace std;
 
@@ -295,7 +294,7 @@ Oscilloscope::TriggerMode AntikernelLogicAnalyzer::PollTrigger()
 	}
 }
 
-bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
+bool AntikernelLogicAnalyzer::AcquireData()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -343,10 +342,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 		}
 
 		//Done, update the data
-		if(!toQueue)
-			chan->SetData(cap);
-		else
-			pending_waveforms[chan] = cap;
+		pending_waveforms[chan] = cap;
 	}
 
 	//Crunch the waveform data (note, LS byte first in each row)
@@ -381,10 +377,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			}
 
 			//Done, update the data
-			if(!toQueue)
-				chan->SetData(cap);
-			else
-				pending_waveforms[chan] = cap;
+			pending_waveforms[chan] = cap;
 		}
 
 		else
@@ -416,10 +409,7 @@ bool AntikernelLogicAnalyzer::AcquireData(bool toQueue)
 			}
 
 			//Done, update the data
-			if(!toQueue)
-				chan->SetData(cap);
-			else
-				pending_waveforms[chan] = cap;
+			pending_waveforms[chan] = cap;
 		}
 	}
 	m_pendingWaveformsMutex.lock();
