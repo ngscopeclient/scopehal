@@ -30,15 +30,15 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ProtocolDecoder
+	@brief Declaration of Filter
  */
 
-#ifndef ProtocolDecoder_h
-#define ProtocolDecoder_h
+#ifndef Filter_h
+#define Filter_h
 
 #include "OscilloscopeChannel.h"
 
-class ProtocolDecoderParameter
+class FilterParameter
 {
 public:
 	enum ParameterTypes
@@ -50,7 +50,11 @@ public:
 		TYPE_FILENAMES	//multiple files
 	};
 
-	ProtocolDecoderParameter(ParameterTypes type = TYPE_INT);
+	FilterParameter()
+	: m_unit(Unit::UNIT_PS)
+	{}
+
+	FilterParameter(ParameterTypes type, Unit unit);
 
 	void ParseString(std::string str);
 	std::string ToString();
@@ -80,6 +84,8 @@ public:
 protected:
 	ParameterTypes m_type;
 
+	Unit						m_unit;
+
 	int64_t						m_intval;
 	float						m_floatval;
 	std::string					m_filename;
@@ -87,9 +93,24 @@ protected:
 };
 
 /**
+	@brief Descriptor for a single stream coming off a channel
+ */
+class StreamDescriptor
+{
+public:
+	StreamDescriptor(OscilloscopeChannel* channel, size_t stream)
+		: m_channel(channel)
+		, m_stream(stream)
+	{}
+
+	OscilloscopeChannel* m_channel;
+	size_t m_stream;
+};
+
+/**
 	@brief Abstract base class for all protocol decoders
  */
-class ProtocolDecoder : public OscilloscopeChannel
+class Filter : public OscilloscopeChannel
 {
 public:
 
@@ -108,17 +129,17 @@ public:
 		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
 	};
 
-	ProtocolDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
-	virtual ~ProtocolDecoder();
+	Filter(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
+	virtual ~Filter();
 
 	virtual void Refresh() =0;
 
 	virtual void AddRef();
 	virtual void Release();
 
-	//Decoder enumeration
-	static std::set<ProtocolDecoder*> EnumDecodes()
-	{ return m_decodes; }
+	//Get all currently existing filters
+	static std::set<Filter*> GetAllInstances()
+	{ return m_filters; }
 
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
@@ -132,15 +153,15 @@ public:
 	//Channels
 	size_t GetInputCount();
 	std::string GetInputName(size_t i);
-	void SetInput(size_t i, OscilloscopeChannel* channel);
-	void SetInput(std::string name, OscilloscopeChannel* channel);
+	void SetInput(size_t i, StreamDescriptor stream);
+	void SetInput(std::string name, StreamDescriptor stream);
 
-	OscilloscopeChannel* GetInput(size_t i);
+	StreamDescriptor GetInput(size_t i);
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel) =0;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
 
-	ProtocolDecoderParameter& GetParameter(std::string s);
-	typedef std::map<std::string, ProtocolDecoderParameter> ParameterMapType;
+	FilterParameter& GetParameter(std::string s);
+	typedef std::map<std::string, FilterParameter> ParameterMapType;
 	ParameterMapType::iterator GetParamBegin()
 	{ return m_parameters.begin(); }
 	ParameterMapType::iterator GetParamEnd()
@@ -209,8 +230,8 @@ protected:
 	//Parameters
 	ParameterMapType m_parameters;
 
-	///The channels corresponding to our signals
-	std::vector<OscilloscopeChannel*> m_channels;
+	///The channel (if any) connected to each of our inputs
+	std::vector<StreamDescriptor> m_inputs;
 
 	///Group used for the display menu
 	Category m_category;
@@ -253,29 +274,29 @@ protected:
 	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
 
 public:
-	typedef ProtocolDecoder* (*CreateProcType)(std::string);
+	typedef Filter* (*CreateProcType)(std::string);
 	static void DoAddDecoderClass(std::string name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
-	static ProtocolDecoder* CreateDecoder(std::string protocol, std::string color);
+	static Filter* CreateDecoder(std::string protocol, std::string color);
 
 protected:
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
 
-	//Decoder enumeration
-	static std::set<ProtocolDecoder*> m_decodes;
+	//Object enumeration
+	static std::set<Filter*> m_filters;
 };
 
 #define PROTOCOL_DECODER_INITPROC(T) \
-	static ProtocolDecoder* CreateInstance(std::string color) \
+	static Filter* CreateInstance(std::string color) \
 	{ \
 		return new T(color); \
 	} \
 	virtual std::string GetProtocolDisplayName() \
 	{ return GetProtocolName(); }
 
-#define AddDecoderClass(T) ProtocolDecoder::DoAddDecoderClass(T::GetProtocolName(), T::CreateInstance)
+#define AddDecoderClass(T) Filter::DoAddDecoderClass(T::GetProtocolName(), T::CreateInstance)
 
 #endif

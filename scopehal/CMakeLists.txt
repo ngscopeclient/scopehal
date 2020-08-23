@@ -54,7 +54,7 @@ set(SCOPEHAL_SOURCES
 	Multimeter.cpp
 	PowerSupply.cpp
 
-	ProtocolDecoder.cpp
+	Filter.cpp
 	PacketDecoder.cpp
 	Statistic.cpp
 	)

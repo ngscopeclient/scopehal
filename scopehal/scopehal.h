@@ -72,7 +72,7 @@
 #include "PowerSupply.h"
 
 #include "Statistic.h"
-#include "ProtocolDecoder.h"
+#include "Filter.h"
 
 #include "TouchstoneParser.h"
 #include "IBISParser.h"

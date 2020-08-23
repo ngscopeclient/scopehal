@@ -30,18 +30,18 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of ProtocolDecoder
+	@brief Implementation of Filter
  */
 
 #include "scopehal.h"
-#include "ProtocolDecoder.h"
+#include "Filter.h"
 
-ProtocolDecoder::CreateMapType ProtocolDecoder::m_createprocs;
-std::set<ProtocolDecoder*> ProtocolDecoder::m_decodes;
+Filter::CreateMapType Filter::m_createprocs;
+std::set<Filter*> Filter::m_filters;
 
 using namespace std;
 
-Gdk::Color ProtocolDecoder::m_standardColors[STANDARD_COLOR_COUNT] =
+Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 {
 	Gdk::Color("#336699"),	//COLOR_DATA
 	Gdk::Color("#c000a0"),	//COLOR_CONTROL
@@ -54,39 +54,19 @@ Gdk::Color ProtocolDecoder::m_standardColors[STANDARD_COLOR_COUNT] =
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ProtocolDecoderParameter
+// FilterParameter
 
-ProtocolDecoderParameter::ProtocolDecoderParameter(ParameterTypes type)
+FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 	: m_type(type)
+	, m_unit(unit)
+	, m_intval(0)
+	, m_floatval(0)
+	, m_filename("")
 {
-	m_intval = 0;
-	m_floatval = 0;
-	m_filename = "";
 }
 
-void ProtocolDecoderParameter::ParseString(string str)
+void FilterParameter::ParseString(string str)
 {
-	//Look up the last character of the string and see if there's a SI scaling factor
-	float scale = 1;
-	if(str != "")
-	{
-		char suffix = str[str.size()-1];
-		if(suffix == 'G')
-			scale = 1000000000.0f;
-		else if(suffix == 'M')
-			scale = 1000000.0f;
-		else if(suffix == 'k')
-			scale = 1000.0f;
-		else if(suffix == 'm')
-			scale = 0.001f;
-		else if(suffix == 'u')	//TODO: handle μ
-			scale = 1e-6f;
-		else if(suffix == 'n')
-			scale = 1e-9f;
-		else if(suffix == 'p')
-			scale = 1e-12f;
-	}
-
 	switch(m_type)
 	{
 		case TYPE_BOOL:
@@ -103,10 +83,8 @@ void ProtocolDecoderParameter::ParseString(string str)
 		//so e.g. 1.5M parses correctly
 		case TYPE_FLOAT:
 		case TYPE_INT:
-			sscanf(str.c_str(), "%20f", &m_floatval);
-			m_floatval *= scale;
+			m_floatval = m_unit.ParseString(str);
 			m_intval = m_floatval;
-			m_filename = "";
 			break;
 
 		case TYPE_FILENAME:
@@ -146,83 +124,56 @@ void ProtocolDecoderParameter::ParseString(string str)
 	}
 }
 
-string ProtocolDecoderParameter::ToString()
+string FilterParameter::ToString()
 {
-	char str_out[20];
+	string ret;
 	switch(m_type)
 	{
 		case TYPE_FLOAT:
-			if(fabs(m_floatval) > 1000000000.0f)
-				snprintf(str_out, sizeof(str_out), "%f G", m_floatval / 1000000000.0f);
-			else if(fabs(m_floatval) > 1000000.0f)
-				snprintf(str_out, sizeof(str_out), "%f M", m_floatval / 1000000.0f);
-			else if(fabs(m_floatval) > 1000.0f)
-				snprintf(str_out, sizeof(str_out), "%f k", m_floatval / 1000.0f);
-			else if(fabs(m_floatval) > 1)
-				snprintf(str_out, sizeof(str_out), "%f", m_floatval);
-			else if(fabs(m_floatval) > 1e-3)
-				snprintf(str_out, sizeof(str_out), "%f m", m_floatval * 1e3f);
-			else if(fabs(m_floatval) > 1e-6)
-				snprintf(str_out, sizeof(str_out), "%f u", m_floatval * 1e6f);
-			else if(fabs(m_floatval) > 1e-9)
-				snprintf(str_out, sizeof(str_out), "%f n", m_floatval * 1e9f);
-			else
-				snprintf(str_out, sizeof(str_out), "%f p", m_floatval * 1e12f);
-			break;
+			return m_unit.PrettyPrint(m_floatval);
+
 		case TYPE_BOOL:
 		case TYPE_INT:
-			if(fabs(m_intval) > 1000000000.0f)
-				snprintf(str_out, sizeof(str_out), "%f G", m_intval / 1000000000.0f);
-			else if(fabs(m_intval) > 1000000.0f)
-				snprintf(str_out, sizeof(str_out), "%f M", m_intval / 1000000.0f);
-			else if(fabs(m_intval) > 1000.0f)
-				snprintf(str_out, sizeof(str_out), "%f k", m_intval / 1000.0f);
-			else
-				snprintf(str_out, sizeof(str_out), "%ld", m_intval);
-			break;
-			break;
+			return m_unit.PrettyPrint(m_intval);
 
 		case TYPE_FILENAME:
 			return m_filename;
-			break;
 
 		case TYPE_FILENAMES:
+			for(auto f : m_filenames)
 			{
-				string ret = "";
-				for(auto f : m_filenames)
-				{
-					if(ret != "")
-						ret += ";";
-					ret += f;
-				}
-				return ret;
+				if(ret != "")
+					ret += ";";
+				ret += f;
 			}
-			break;
+			return ret;
+
+		default:
+			return "unimplemented";
 	}
-	return str_out;
 }
 
-int64_t ProtocolDecoderParameter::GetIntVal()
+int64_t FilterParameter::GetIntVal()
 {
 	return m_intval;
 }
 
-float ProtocolDecoderParameter::GetFloatVal()
+float FilterParameter::GetFloatVal()
 {
 	return m_floatval;
 }
 
-string ProtocolDecoderParameter::GetFileName()
+string FilterParameter::GetFileName()
 {
 	return m_filename;
 }
 
-vector<string> ProtocolDecoderParameter::GetFileNames()
+vector<string> FilterParameter::GetFileNames()
 {
 	return m_filenames;
 }
 
-void ProtocolDecoderParameter::SetIntVal(int64_t i)
+void FilterParameter::SetIntVal(int64_t i)
 {
 	m_intval = i;
 	m_floatval = i;
@@ -230,7 +181,7 @@ void ProtocolDecoderParameter::SetIntVal(int64_t i)
 	m_filenames.clear();
 }
 
-void ProtocolDecoderParameter::SetFloatVal(float f)
+void FilterParameter::SetFloatVal(float f)
 {
 	m_intval = f;
 	m_floatval = f;
@@ -238,7 +189,7 @@ void ProtocolDecoderParameter::SetFloatVal(float f)
 	m_filenames.clear();
 }
 
-void ProtocolDecoderParameter::SetFileName(string f)
+void FilterParameter::SetFileName(string f)
 {
 	m_intval = 0;
 	m_floatval = 0;
@@ -247,7 +198,7 @@ void ProtocolDecoderParameter::SetFileName(string f)
 	m_filenames.push_back(f);
 }
 
-void ProtocolDecoderParameter::SetFileNames(vector<string> names)
+void FilterParameter::SetFileNames(vector<string> names)
 {
 	m_intval = 0;
 	m_floatval = 0;
@@ -261,7 +212,7 @@ void ProtocolDecoderParameter::SetFileNames(vector<string> names)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ProtocolDecoder::ProtocolDecoder(
+Filter::Filter(
 	OscilloscopeChannel::ChannelType type,
 	string color,
 	Category cat)
@@ -270,12 +221,12 @@ ProtocolDecoder::ProtocolDecoder(
 	, m_dirty(true)
 {
 	m_physical = false;
-	m_decodes.emplace(this);
+	m_filters.emplace(this);
 }
 
-ProtocolDecoder::~ProtocolDecoder()
+Filter::~Filter()
 {
-	m_decodes.erase(this);
+	m_filters.erase(this);
 
 	for(auto c : m_channels)
 	{
@@ -287,29 +238,29 @@ ProtocolDecoder::~ProtocolDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void ProtocolDecoder::ClearSweeps()
+void Filter::ClearSweeps()
 {
 	//default no-op implementation
 }
 
-void ProtocolDecoder::AddRef()
+void Filter::AddRef()
 {
 	m_refcount ++;
 }
 
-void ProtocolDecoder::Release()
+void Filter::Release()
 {
 	m_refcount --;
 	if(m_refcount == 0)
 		delete this;
 }
 
-bool ProtocolDecoder::IsOverlay()
+bool Filter::IsOverlay()
 {
 	return true;
 }
 
-ProtocolDecoderParameter& ProtocolDecoder::GetParameter(string s)
+FilterParameter& Filter::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
 		LogError("Invalid parameter name\n");
@@ -317,12 +268,12 @@ ProtocolDecoderParameter& ProtocolDecoder::GetParameter(string s)
 	return m_parameters[s];
 }
 
-size_t ProtocolDecoder::GetInputCount()
+size_t Filter::GetInputCount()
 {
 	return m_signalNames.size();
 }
 
-string ProtocolDecoder::GetInputName(size_t i)
+string Filter::GetInputName(size_t i)
 {
 	if(i < m_signalNames.size())
 		return m_signalNames[i];
@@ -333,7 +284,7 @@ string ProtocolDecoder::GetInputName(size_t i)
 	}
 }
 
-void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
+void Filter::SetInput(size_t i, StreamDescriptor stream)
 {
 	if(i < m_signalNames.size())
 	{
@@ -342,7 +293,7 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 			m_channels[i] = NULL;
 			return;
 		}
-		if(!ValidateChannel(i, channel))
+		if(!ValidateChannel(i, stream))
 		{
 			LogError("Invalid channel format\n");
 			//return;
@@ -350,7 +301,7 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 
 		if(m_channels[i] != NULL)
 			m_channels[i]->Release();
-		m_channels[i] = channel;
+		m_channels[i] = stream;
 		channel->AddRef();
 	}
 	else
@@ -359,14 +310,14 @@ void ProtocolDecoder::SetInput(size_t i, OscilloscopeChannel* channel)
 	}
 }
 
-void ProtocolDecoder::SetInput(string name, OscilloscopeChannel* channel)
+void Filter::SetInput(string name, StreamDescriptor stream)
 {
 	//Find the channel
 	for(size_t i=0; i<m_signalNames.size(); i++)
 	{
 		if(m_signalNames[i] == name)
 		{
-			SetInput(i, channel);
+			SetInput(i, stream);
 			return;
 		}
 	}
@@ -375,7 +326,7 @@ void ProtocolDecoder::SetInput(string name, OscilloscopeChannel* channel)
 	LogError("Invalid channel name\n");
 }
 
-OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
+StreamDescriptor Filter::GetInput(size_t i)
 {
 	if(i < m_signalNames.size())
 		return m_channels[i];
@@ -389,19 +340,19 @@ OscilloscopeChannel* ProtocolDecoder::GetInput(size_t i)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Refreshing
 
-void ProtocolDecoder::RefreshInputsIfDirty()
+void Filter::RefreshInputsIfDirty()
 {
 	for(auto c : m_channels)
 	{
 		if(!c)
 			continue;
-		auto decode = dynamic_cast<ProtocolDecoder*>(c);
+		auto decode = dynamic_cast<Filter*>(c);
 		if(decode)
 			decode->RefreshIfDirty();
 	}
 }
 
-void ProtocolDecoder::RefreshIfDirty()
+void Filter::RefreshIfDirty()
 {
 	if(m_dirty)
 	{
@@ -414,18 +365,18 @@ void ProtocolDecoder::RefreshIfDirty()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void ProtocolDecoder::DoAddDecoderClass(string name, CreateProcType proc)
+void Filter::DoAddDecoderClass(string name, CreateProcType proc)
 {
 	m_createprocs[name] = proc;
 }
 
-void ProtocolDecoder::EnumProtocols(vector<string>& names)
+void Filter::EnumProtocols(vector<string>& names)
 {
 	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
 		names.push_back(it->first);
 }
 
-ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
+Filter* Filter::CreateDecoder(string protocol, string color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](color);
@@ -448,7 +399,7 @@ ProtocolDecoder* ProtocolDecoder::CreateDecoder(string protocol, string color)
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
+void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
@@ -494,7 +445,7 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
+void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
 {
 	samples.clear();
 
@@ -540,7 +491,7 @@ void ProtocolDecoder::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWavef
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
+void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
@@ -586,7 +537,7 @@ void ProtocolDecoder::SampleOnFallingEdges(DigitalWaveform* data, DigitalWavefor
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
+void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
 {
 	samples.clear();
 
@@ -632,7 +583,7 @@ void ProtocolDecoder::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* c
 	@param clock	The clock signal to use
 	@param samples	Output waveform
  */
-void ProtocolDecoder::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
+void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
 {
 	samples.clear();
 
@@ -670,7 +621,7 @@ void ProtocolDecoder::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
@@ -703,7 +654,7 @@ void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, s
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges)
+void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
@@ -736,7 +687,7 @@ void ProtocolDecoder::FindZeroCrossings(AnalogWaveform* data, float threshold, s
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void ProtocolDecoder::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
+void Filter::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 {
 	//id, protocol, color are already loaded
 	m_displayname = node["nick"].as<string>();
@@ -747,14 +698,14 @@ void ProtocolDecoder::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
 }
 
-void ProtocolDecoder::LoadInputs(const YAML::Node& node, IDTable& table)
+void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
 {
 	auto inputs = node["inputs"];
 	for(auto it : inputs)
 		SetInput(it.first.as<string>(),	static_cast<OscilloscopeChannel*>(table[it.second.as<int>()]) );
 }
 
-string ProtocolDecoder::SerializeConfiguration(IDTable& table)
+string Filter::SerializeConfiguration(IDTable& table)
 {
 	//Save basic decode info
 	char tmp[1024];
@@ -793,17 +744,17 @@ string ProtocolDecoder::SerializeConfiguration(IDTable& table)
 	{
 		switch(it.second.GetType())
 		{
-			case ProtocolDecoderParameter::TYPE_FLOAT:
-			case ProtocolDecoderParameter::TYPE_INT:
-			case ProtocolDecoderParameter::TYPE_BOOL:
+			case FilterParameter::TYPE_FLOAT:
+			case FilterParameter::TYPE_INT:
+			case FilterParameter::TYPE_BOOL:
 				snprintf(
 					tmp,
 					sizeof(tmp),
 					"            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
 				break;
 
-			case ProtocolDecoderParameter::TYPE_FILENAME:
-			case ProtocolDecoderParameter::TYPE_FILENAMES:
+			case FilterParameter::TYPE_FILENAME:
+			case FilterParameter::TYPE_FILENAMES:
 			default:
 				snprintf(
 					tmp,
@@ -821,17 +772,17 @@ string ProtocolDecoder::SerializeConfiguration(IDTable& table)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Complex protocol decodes
 
-Gdk::Color ProtocolDecoder::GetColor(int /*i*/)
+Gdk::Color Filter::GetColor(int /*i*/)
 {
 	return m_standardColors[COLOR_ERROR];
 }
 
-string ProtocolDecoder::GetText(int /*i*/)
+string Filter::GetText(int /*i*/)
 {
 	return "(unimplemented)";
 }
 
-string ProtocolDecoder::GetTextForAsciiChannel(int i)
+string Filter::GetTextForAsciiChannel(int i)
 {
 	AsciiWaveform* capture = dynamic_cast<AsciiWaveform*>(GetData());
 	if(capture != NULL)
@@ -863,7 +814,7 @@ string ProtocolDecoder::GetTextForAsciiChannel(int i)
 
 	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
  */
-float ProtocolDecoder::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
+float Filter::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
 {
 	//If the voltage isn't between the two points, abort
 	float fa = cap->m_samples[a];
@@ -888,7 +839,7 @@ float ProtocolDecoder::InterpolateTime(AnalogWaveform* cap, size_t a, float volt
 						Note that this is in timebase ticks, so if some samples are >1 tick apart it's possible for
 						this value to be outside [0, 1].
  */
-float ProtocolDecoder::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks)
+float Filter::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks)
 {
 	float frac = frac_ticks / (cap->m_offsets[index+1] - cap->m_offsets[index]);
 	float v1 = cap->m_samples[index];
@@ -902,7 +853,7 @@ float ProtocolDecoder::InterpolateValue(AnalogWaveform* cap, size_t index, float
 /**
 	@brief Gets the lowest voltage of a waveform
  */
-float ProtocolDecoder::GetMinVoltage(AnalogWaveform* cap)
+float Filter::GetMinVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the minimum
 	float tmp = FLT_MAX;
@@ -917,7 +868,7 @@ float ProtocolDecoder::GetMinVoltage(AnalogWaveform* cap)
 /**
 	@brief Gets the highest voltage of a waveform
  */
-float ProtocolDecoder::GetMaxVoltage(AnalogWaveform* cap)
+float Filter::GetMaxVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the maximum
 	float tmp = -FLT_MAX;
@@ -932,7 +883,7 @@ float ProtocolDecoder::GetMaxVoltage(AnalogWaveform* cap)
 /**
 	@brief Gets the average voltage of a waveform
  */
-float ProtocolDecoder::GetAvgVoltage(AnalogWaveform* cap)
+float Filter::GetAvgVoltage(AnalogWaveform* cap)
 {
 	//Loop over samples and find the average
 	//TODO: more numerically stable summation algorithm for deep captures
@@ -951,7 +902,7 @@ float ProtocolDecoder::GetAvgVoltage(AnalogWaveform* cap)
 	@param high High endpoint of the histogram (volts)
 	@param bins	Number of histogram bins
  */
-vector<size_t> ProtocolDecoder::MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins)
+vector<size_t> Filter::MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins)
 {
 	vector<size_t> ret;
 	for(size_t i=0; i<bins; i++)
@@ -976,7 +927,7 @@ vector<size_t> ProtocolDecoder::MakeHistogram(AnalogWaveform* cap, float low, fl
 /**
 	@brief Gets the most probable "0" level for a digital waveform
  */
-float ProtocolDecoder::GetBaseVoltage(AnalogWaveform* cap)
+float Filter::GetBaseVoltage(AnalogWaveform* cap)
 {
 	float vmin = GetMinVoltage(cap);
 	float vmax = GetMaxVoltage(cap);
@@ -1003,7 +954,7 @@ float ProtocolDecoder::GetBaseVoltage(AnalogWaveform* cap)
 /**
 	@brief Gets the most probable "1" level for a digital waveform
  */
-float ProtocolDecoder::GetTopVoltage(AnalogWaveform* cap)
+float Filter::GetTopVoltage(AnalogWaveform* cap)
 {
 	float vmin = GetMinVoltage(cap);
 	float vmax = GetMaxVoltage(cap);
