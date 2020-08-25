@@ -36,8 +36,6 @@
 #ifndef DDR3Decoder_h
 #define DDR3Decoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class DDR3Symbol
 {
 public:
@@ -75,7 +73,7 @@ public:
 
 typedef Waveform<DDR3Symbol> DDR3Waveform;
 
-class DDR3Decoder : public ProtocolDecoder
+class DDR3Decoder : public Filter
 {
 public:
 	DDR3Decoder(std::string color);
@@ -89,7 +87,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
 

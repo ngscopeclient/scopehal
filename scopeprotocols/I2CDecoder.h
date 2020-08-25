@@ -36,8 +36,6 @@
 #ifndef I2CDecoder_h
 #define I2CDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class I2CSymbol
 {
 public:
@@ -72,7 +70,7 @@ public:
 
 typedef Waveform<I2CSymbol> I2CWaveform;
 
-class I2CDecoder : public ProtocolDecoder
+class I2CDecoder : public Filter
 {
 public:
 	I2CDecoder(std::string color);
@@ -86,7 +84,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(I2CDecoder)
 

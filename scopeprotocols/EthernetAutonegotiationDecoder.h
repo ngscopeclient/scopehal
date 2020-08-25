@@ -36,11 +36,9 @@
 #ifndef EthernetAutonegotiationDecoder_h
 #define EthernetAutonegotiationDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 typedef Waveform<uint16_t> EthernetAutonegotiationWaveform;
 
-class EthernetAutonegotiationDecoder : public ProtocolDecoder
+class EthernetAutonegotiationDecoder : public Filter
 {
 public:
 	EthernetAutonegotiationDecoder(std::string color);
@@ -54,7 +52,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(EthernetAutonegotiationDecoder)
 

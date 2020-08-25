@@ -52,14 +52,9 @@ DVIDecoder::DVIDecoder(string color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("D0 (blue)");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("D1 (green)");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("D2 (red)");
-	m_channels.push_back(NULL);
+	CreateInput("D0 (blue)");
+	CreateInput("D1 (green)");
+	CreateInput("D2 (red)");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,10 +66,14 @@ bool DVIDecoder::NeedsConfig()
 	return true;
 }
 
-bool DVIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool DVIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i <= 2) && (dynamic_cast<TMDSDecoder*>(channel) != NULL ) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i <= 2) && (dynamic_cast<TMDSDecoder*>(stream.m_channel) != NULL ) )
 		return true;
+
 	return false;
 }
 
@@ -87,9 +86,9 @@ void DVIDecoder::SetDefaultName()
 {
 	char hwname[256];
 	snprintf(hwname, sizeof(hwname), "DVI(%s,%s,%s)",
-		m_channels[0]->m_displayname.c_str(),
-		m_channels[1]->m_displayname.c_str(),
-		m_channels[2]->m_displayname.c_str()
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str(),
+		GetInputDisplayName(2).c_str()
 		);
 	m_hwname = hwname;
 	m_displayname = m_hwname;
@@ -115,21 +114,16 @@ void DVIDecoder::Refresh()
 {
 	ClearPackets();
 
-	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) || (m_channels[2] == NULL) )
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	auto dblue = dynamic_cast<TMDSWaveform*>(m_channels[0]->GetData());
-	auto dgreen = dynamic_cast<TMDSWaveform*>(m_channels[1]->GetData());
-	auto dred = dynamic_cast<TMDSWaveform*>(m_channels[2]->GetData());
-	if( (dblue == NULL) || (dgreen == NULL) || (dred == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	//Get the input data
+	auto dblue = dynamic_cast<TMDSWaveform*>(GetInputWaveform(0));
+	auto dgreen = dynamic_cast<TMDSWaveform*>(GetInputWaveform(1));
+	auto dred = dynamic_cast<TMDSWaveform*>(GetInputWaveform(2));
 
 	//Create the capture
 	DVIWaveform* cap = new DVIWaveform;
@@ -291,12 +285,12 @@ void DVIDecoder::Refresh()
 	if(current_packet)
 		delete current_packet;
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color DVIDecoder::GetColor(int i)
 {
-	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData());
+	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		auto s = capture->m_samples[i];
@@ -328,7 +322,7 @@ Gdk::Color DVIDecoder::GetColor(int i)
 
 string DVIDecoder::GetText(int i)
 {
-	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData());
+	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		auto s = capture->m_samples[i];

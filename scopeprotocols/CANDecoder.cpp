@@ -13,22 +13,21 @@ using namespace std;
 // Construction / destruction
 
 CANDecoder::CANDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
-	m_signalNames.push_back("Diff");
-	m_channels.push_back(NULL);
+	CreateInput("din");
 
-	m_tq = "Time Quantum [ns]";
-	m_parameters[m_tq] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
-	m_parameters[m_tq].SetIntVal(156);
+	m_tq = "Time Quantum";
+	m_parameters[m_tq] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_tq].SetIntVal(156000);
 
 	m_bs1 = "Bit Segment 1 [tq]";
-	m_parameters[m_bs1] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_bs1] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_bs1].SetIntVal(7);
 
 	m_bs2 = "Bit Segment 2 [tq]";
-	m_parameters[m_bs2] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_bs2] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_bs2].SetIntVal(5);
 }
 
@@ -40,10 +39,14 @@ bool CANDecoder::NeedsConfig()
 	return true;
 }
 
-bool CANDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool CANDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
+
 	return false;
 }
 
@@ -55,7 +58,7 @@ string CANDecoder::GetProtocolName()
 void CANDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "CAN(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "CAN(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -65,19 +68,15 @@ void CANDecoder::SetDefaultName()
 
 void CANDecoder::Refresh()
 {
-	//Get the input data
-	if( (m_channels[0] == NULL) )
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	auto diff = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	if(diff == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
+	//Get the input data
+	auto diff = dynamic_cast<DigitalWaveform*>(GetInputWaveform(0));
 
 	//Create the capture
 	auto cap = new CANWaveform;
@@ -98,11 +97,10 @@ void CANDecoder::Refresh()
 	uint8_t stuff = 0;
 
 	// Sync_seg + bs1 + bs2
-	// FIXME
 	m_nbt = m_parameters[m_tq].GetIntVal() * ( 1 + m_parameters[m_bs1].GetIntVal() + m_parameters[m_bs2].GetIntVal() );
 
 	size_t len = diff->m_samples.size();
-	int delta1 = ((2 * m_parameters[m_bs1].GetIntVal() + 1) * m_parameters[m_tq].GetIntVal() * 500);
+	int delta1 = ((2 * m_parameters[m_bs1].GetIntVal() + 1) * m_parameters[m_tq].GetIntVal() / 2);
 	for(size_t i = 0; i < len; i++)
 	{
 		if (symbol_start != 0 && current_symbol == CANSymbol::TYPE_SOF &&
@@ -110,8 +108,10 @@ void CANDecoder::Refresh()
 		{
 			// We wait for the next bit
 			continue;
-		} else if (symbol_start != 0 && current_symbol != CANSymbol::TYPE_SOF &&
-		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < (m_nbt * 1e3))
+		}
+
+		else if (symbol_start != 0 && current_symbol != CANSymbol::TYPE_SOF &&
+		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < m_nbt)
 		{
 			// We wait for the next bit
 			continue;
@@ -273,12 +273,12 @@ void CANDecoder::Refresh()
 		last_diff = cur_diff;
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color CANDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<CANWaveform*>(GetData());
+	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const CANSymbol& s = capture->m_samples[i];
@@ -308,7 +308,7 @@ Gdk::Color CANDecoder::GetColor(int i)
 
 string CANDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<CANWaveform*>(GetData());
+	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const CANSymbol& s = capture->m_samples[i];

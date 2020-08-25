@@ -39,17 +39,20 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(string color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("din");
-	m_channels.push_back(NULL);
+	CreateInput("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool EthernetProtocolDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EthernetProtocolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
+
 	return false;
 }
 
@@ -365,7 +368,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData());
+	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
@@ -405,7 +408,7 @@ Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 
 string EthernetProtocolDecoder::GetText(int i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData());
+	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())

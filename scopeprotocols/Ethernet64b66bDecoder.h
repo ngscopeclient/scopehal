@@ -36,8 +36,6 @@
 #ifndef Ethernet64b66bDecoder_h
 #define Ethernet64b66bDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class Ethernet64b66bSymbol
 {
 public:
@@ -60,7 +58,7 @@ public:
 
 typedef Waveform<Ethernet64b66bSymbol> Ethernet64b66bWaveform;
 
-class Ethernet64b66bDecoder : public ProtocolDecoder
+class Ethernet64b66bDecoder : public Filter
 {
 public:
 	Ethernet64b66bDecoder(std::string color);
@@ -74,7 +72,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(Ethernet64b66bDecoder)
 

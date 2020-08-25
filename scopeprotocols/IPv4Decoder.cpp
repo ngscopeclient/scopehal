@@ -37,20 +37,23 @@ using namespace std;
 // Construction / destruction
 
 IPv4Decoder::IPv4Decoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("eth");
-	m_channels.push_back(NULL);
+	CreateInput("eth");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool IPv4Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool IPv4Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<EthernetProtocolDecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<EthernetWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -59,7 +62,7 @@ bool IPv4Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 double IPv4Decoder::GetVoltageRange()
 {
-	return m_channels[0]->GetVoltageRange();
+	return m_inputs[0].m_channel->GetVoltageRange();
 }
 
 string IPv4Decoder::GetProtocolName()
@@ -81,7 +84,7 @@ bool IPv4Decoder::NeedsConfig()
 void IPv4Decoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "IPv4(%s)",	m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "IPv4(%s)", GetInputDisplayName(0).c_str() );
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -91,26 +94,15 @@ void IPv4Decoder::SetDefaultName()
 
 void IPv4Decoder::Refresh()
 {
-	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<EthernetWaveform*>(m_channels[0]->GetData());
-	if(!din)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//We need meaningful data
+	//Get the input data
+	auto din = dynamic_cast<EthernetWaveform*>(GetInputWaveform(0));
 	size_t len = din->m_samples.size();
-	if(len == 0)
-	{
-		SetData(NULL);
-		return;
-	}
 
 	//Loop over the events and process stuff
 	auto cap = new IPv4Waveform;
@@ -431,12 +423,12 @@ void IPv4Decoder::Refresh()
 
 	//TODO: packet decode too
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color IPv4Decoder::GetColor(int i)
 {
-	auto data = dynamic_cast<IPv4Waveform*>(GetData());
+	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
@@ -477,7 +469,7 @@ Gdk::Color IPv4Decoder::GetColor(int i)
 
 string IPv4Decoder::GetText(int i)
 {
-	auto data = dynamic_cast<IPv4Waveform*>(GetData());
+	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())

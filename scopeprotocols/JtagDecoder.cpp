@@ -78,17 +78,10 @@ JtagDecoder::JtagDecoder(string color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
-	m_signalNames.push_back("TDI");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("TDO");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("TMS");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("TCK");
-	m_channels.push_back(NULL);
+	CreateInput("TDI");
+	CreateInput("TDO");
+	CreateInput("TMS");
+	CreateInput("TCK");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,13 +93,21 @@ bool JtagDecoder::NeedsConfig()
 	return true;
 }
 
-bool JtagDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool JtagDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i < 4) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 4) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
+	}
+
 	return false;
 }
-
 string JtagDecoder::GetProtocolName()
 {
 	return "JTAG";
@@ -115,7 +116,7 @@ string JtagDecoder::GetProtocolName()
 void JtagDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "JTAG(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "JTAG(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -136,21 +137,17 @@ void JtagDecoder::Refresh()
 {
 	ClearPackets();
 
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) || (m_channels[2] == NULL) || (m_channels[3] == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-	auto tdi = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto tdo = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	auto tms = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
-	auto tck = dynamic_cast<DigitalWaveform*>(m_channels[3]->GetData());
-	if( (tdi == NULL) || (tdo == NULL) || (tms == NULL) || (tck == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	auto tdi = GetDigitalInputWaveform(0);
+	auto tdo = GetDigitalInputWaveform(1);
+	auto tms = GetDigitalInputWaveform(2);
+	auto tck = GetDigitalInputWaveform(3);
 
 	//Sample the data stream at each clock edge
 	DigitalWaveform dtdi;
@@ -343,12 +340,12 @@ void JtagDecoder::Refresh()
 
 	//LogDebug("%zu packets\n", m_packets.size());
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color JtagDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<JtagWaveform*>(GetData());
+	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const JtagSymbol& s = capture->m_samples[i];
@@ -380,7 +377,7 @@ Gdk::Color JtagDecoder::GetColor(int i)
 
 string JtagDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<JtagWaveform*>(GetData());
+	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const JtagSymbol& s = capture->m_samples[i];

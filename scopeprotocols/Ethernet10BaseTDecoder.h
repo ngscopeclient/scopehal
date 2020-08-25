@@ -35,8 +35,6 @@
 #ifndef Ethernet10BaseTDecoder_h
 #define Ethernet10BaseTDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class Ethernet10BaseTDecoder : public EthernetProtocolDecoder
 {
 public:

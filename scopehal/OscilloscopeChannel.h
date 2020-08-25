@@ -169,6 +169,15 @@ public:
 protected:
 
 	/**
+		@brief Clears out any existing streams
+	 */
+	void ClearStreams()
+	{
+		m_streamNames.clear();
+		m_streamData.clear();
+	}
+
+	/**
 		@brief Adds a new data stream to the channel
 	 */
 	void AddStream(std::string name)

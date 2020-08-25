@@ -35,8 +35,6 @@
 #ifndef ADL5205Decoder_h
 #define ADL5205Decoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class ADL5205Symbol
 {
 public:
@@ -59,7 +57,7 @@ public:
 
 typedef Waveform<ADL5205Symbol> ADL5205Waveform;
 
-class ADL5205Decoder : public ProtocolDecoder
+class ADL5205Decoder : public Filter
 {
 public:
 	ADL5205Decoder(std::string color);
@@ -76,7 +74,7 @@ public:
 	virtual void SetDefaultName();
 
 	virtual double GetVoltageRange();
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(ADL5205Decoder)
 };

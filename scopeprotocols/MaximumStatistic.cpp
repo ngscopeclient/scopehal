@@ -44,7 +44,7 @@ string MaximumStatistic::GetStatisticName()
 bool MaximumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData());
+	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData(0));
 	if(!data)
 		return false;
 

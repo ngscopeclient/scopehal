@@ -36,8 +36,6 @@
 #ifndef TMDSDecoder_h
 #define TMDSDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class TMDSSymbol
 {
 public:
@@ -69,7 +67,7 @@ public:
 
 typedef Waveform<TMDSSymbol> TMDSWaveform;
 
-class TMDSDecoder : public ProtocolDecoder
+class TMDSDecoder : public Filter
 {
 public:
 	TMDSDecoder(std::string color);
@@ -83,7 +81,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(TMDSDecoder)
 

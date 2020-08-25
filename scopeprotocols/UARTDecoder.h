@@ -55,7 +55,7 @@ public:
 
 	virtual std::vector<std::string> GetHeaders();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(UARTDecoder)
 

@@ -35,7 +35,6 @@
 #ifndef EthernetProtocolDecoder_h
 #define EthernetProtocolDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
 #include "../scopehal/PacketDecoder.h"
 
 /**
@@ -85,7 +84,7 @@ public:
 	virtual Gdk::Color GetColor(int i);
 
 	virtual bool NeedsConfig();
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	virtual std::vector<std::string> GetHeaders();
 

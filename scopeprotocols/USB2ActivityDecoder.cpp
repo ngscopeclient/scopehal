@@ -37,20 +37,23 @@ using namespace std;
 // Construction / destruction
 
 USB2ActivityDecoder::USB2ActivityDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("din");
-	m_channels.push_back(NULL);
+	CreateInput("din");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool USB2ActivityDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2ActivityDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<USB2PCSDecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<USB2PCSWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -65,7 +68,7 @@ string USB2ActivityDecoder::GetProtocolName()
 void USB2ActivityDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USB2Activity(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "USB2Activity(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -80,26 +83,16 @@ bool USB2ActivityDecoder::NeedsConfig()
 
 void USB2ActivityDecoder::Refresh()
 {
-	//Get the input data
-	if(m_channels[0] == NULL)
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<USB2PCSWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//Can't do much if we have no samples to work with
+	//Get the input data
+	auto din = dynamic_cast<USB2PCSWaveform*>(GetInputWaveform(0));
 	size_t len = din->m_samples.size();
-	if(len == 0)
-	{
-		SetData(NULL);
-		return;
-	}
 
 	auto cap = new DigitalWaveform;
 
@@ -126,7 +119,7 @@ void USB2ActivityDecoder::Refresh()
 	}
 
 	//Done, copy our time scales from the input
-	SetData(cap);
+	SetData(cap, 0);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;

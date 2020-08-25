@@ -2,24 +2,23 @@ include_directories(${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEPROTOCOLS_SOURCES
-	ACCoupleDecoder.cpp
-	AutocorrelationDecoder.cpp
+	ACCoupleFilter.cpp
 	ADL5205Decoder.cpp
-	BaseMeasurementDecoder.cpp
+	AutocorrelationFilter.cpp
+	BaseMeasurement.cpp
 	CANDecoder.cpp
-	ChannelEmulationDecoder.cpp
-	ClockJitterDecoder.cpp
-	ClockRecoveryDecoder.cpp
-	CTLEDecoder.cpp
-	CurrentShuntDecoder.cpp
-	DCOffsetDecoder.cpp
+	ChannelEmulationFilter.cpp
+	ClockRecoveryFilter.cpp
+	CTLEFilter.cpp
+	CurrentShuntFilter.cpp
+	DCOffsetFilter.cpp
 	DDR3Decoder.cpp
-	DeEmbedDecoder.cpp
-	DeskewDecoder.cpp
-	DifferenceDecoder.cpp
-	DownsampleDecoder.cpp
-	DramRefreshActivateMeasurementDecoder.cpp
-	DramRowColumnLatencyMeasurementDecoder.cpp
+	DeEmbedFilter.cpp
+	DeskewFilter.cpp
+	DownconvertFilter.cpp
+	DownsampleFilter.cpp
+	DramRefreshActivateMeasurement.cpp
+	DramRowColumnLatencyMeasurement.cpp
 	DVIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
@@ -30,46 +29,47 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetGMIIDecoder.cpp
 	EthernetRGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
-	EyeBitRateMeasurementDecoder.cpp
-	EyeDecoder2.cpp
+	EyeBitRateMeasurement.cpp
+	EyePattern.cpp
 	EyeMask.cpp
-	EyeHeightMeasurementDecoder.cpp
-	EyeJitterMeasurementDecoder.cpp
-	EyePeriodMeasurementDecoder.cpp
-	EyeWidthMeasurementDecoder.cpp
-	FallMeasurementDecoder.cpp
-	FFTDecoder.cpp
-	FrequencyMeasurementDecoder.cpp
-	HorizontalBathtubDecoder.cpp
+	EyeHeightMeasurement.cpp
+	EyeJitterMeasurement.cpp
+	EyePeriodMeasurement.cpp
+	EyeWidthMeasurement.cpp
+	FallMeasurement.cpp
+	FFTFilter.cpp
+	FrequencyMeasurement.cpp
+	HorizontalBathtub.cpp
 	I2CDecoder.cpp
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	JtagDecoder.cpp
-	LOMixDecoder.cpp
-	MagnitudeDecoder.cpp
+	MagnitudeFilter.cpp
 	MDIODecoder.cpp
-	MovingAverageDecoder.cpp
-	MultiplyDecoder.cpp
+	MovingAverageFilter.cpp
+	MultiplyFilter.cpp
 	OFDMDemodulator.cpp
-	OvershootMeasurementDecoder.cpp
-	ParallelBusDecoder.cpp
-	PeriodMeasurementDecoder.cpp
-	PkPkMeasurementDecoder.cpp
-	RiseMeasurementDecoder.cpp
-	SincInterpolationDecoder.cpp
+	OvershootMeasurement.cpp
+	ParallelBus.cpp
+	PeriodMeasurement.cpp
+	PkPkMeasurement.cpp
+	RiseMeasurement.cpp
 	SPIDecoder.cpp
-	ThresholdDecoder.cpp
+	SubtractFilter.cpp
+	ThresholdFilter.cpp
+	TIEMeasurement.cpp
 	TMDSDecoder.cpp
-	TopMeasurementDecoder.cpp
+	TopMeasurement.cpp
 	UARTDecoder.cpp
-	UartClockRecoveryDecoder.cpp
-	UndershootMeasurementDecoder.cpp
+	UartClockRecoveryFilter.cpp
+	UndershootMeasurement.cpp
+	UpsampleFilter.cpp
 	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
-	WaterfallDecoder.cpp
-	WindowedAutocorrelationDecoder.cpp
+	Waterfall.cpp
+	WindowedAutocorrelationFilter.cpp
 
 	AverageStatistic.cpp
 	MaximumStatistic.cpp

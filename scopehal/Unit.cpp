@@ -149,12 +149,14 @@ string Unit::PrettyPrint(double value)
 			value_rescaled = value;
 			break;
 
-		//Dimensionless unit, no scaling applied
+		//Convert fractional value to percentage
 		case UNIT_PERCENT:
 			unit = "%";
 			scale = "";
-			value_rescaled = value;
+			value_rescaled = value * 100;
 			break;
+
+		//Dimensionless unit, no scaling applied
 		case UNIT_DB:
 			unit = "dB";
 			scale = "";
@@ -239,6 +241,10 @@ double Unit::ParseString(string str)
 	{
 		case Unit::UNIT_PS:
 			ret *= 1e12;
+			break;
+
+		case Unit::UNIT_PERCENT:
+			ret *= 0.01;
 			break;
 
 		default:

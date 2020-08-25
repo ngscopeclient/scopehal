@@ -36,8 +36,6 @@
 #ifndef IBM8b10bDecoder_h
 #define IBM8b10bDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class IBM8b10bSymbol
 {
 public:
@@ -62,7 +60,7 @@ public:
 
 typedef Waveform<IBM8b10bSymbol> IBM8b10bWaveform;
 
-class IBM8b10bDecoder : public ProtocolDecoder
+class IBM8b10bDecoder : public Filter
 {
 public:
 	IBM8b10bDecoder(std::string color);
@@ -76,7 +74,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(IBM8b10bDecoder)
 

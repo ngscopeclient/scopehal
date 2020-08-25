@@ -35,8 +35,6 @@
 #ifndef USB2PMADecoder_h
 #define USB2PMADecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 /**
 	@brief A single bit on a USB 1.x/2.x differential bus
  */
@@ -67,7 +65,7 @@ public:
 
 typedef Waveform<USB2PMASymbol> USB2PMAWaveform;
 
-class USB2PMADecoder : public ProtocolDecoder
+class USB2PMADecoder : public Filter
 {
 public:
 	USB2PMADecoder(std::string color);
@@ -82,7 +80,7 @@ public:
 
 	virtual double GetVoltageRange();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

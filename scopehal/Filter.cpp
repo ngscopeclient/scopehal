@@ -331,6 +331,9 @@ void Filter::SetInput(string name, StreamDescriptor stream)
 	LogError("Invalid channel name\n");
 }
 
+/**
+	@brief Gets the descriptor for one of our inputs
+ */
 StreamDescriptor Filter::GetInput(size_t i)
 {
 	if(i < m_signalNames.size())
@@ -340,6 +343,20 @@ StreamDescriptor Filter::GetInput(size_t i)
 		LogError("Invalid channel index\n");
 		return StreamDescriptor(NULL, 0);
 	}
+}
+
+/**
+	@brief Gets the display name for one of our inputs.
+
+	This includes the stream name iff the input comes from a multi-stream source.
+ */
+string Filter::GetInputDisplayName(size_t i)
+{
+	auto in = m_inputs[i];
+	if(in.m_channel->GetStreamCount() > 1)
+		return in.m_channel->m_displayname + "/" + in.m_channel->GetStreamName(in.m_stream);
+	else
+		return in.m_channel->m_displayname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -388,6 +405,56 @@ Filter* Filter::CreateDecoder(string protocol, string color)
 
 	LogError("Invalid decoder name: %s\n", protocol.c_str());
 	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input verification helpers
+
+/**
+	@brief Returns true if every input to the filter is non-NULL (and, optionally has a non-empty waveform present)
+ */
+bool Filter::VerifyAllInputsOK(bool allowEmpty)
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == NULL)
+			return false;
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == NULL)
+			return false;
+
+		if(!allowEmpty)
+		{
+			if(data->m_offsets.size() == 0)
+				return false;
+		}
+	}
+
+	return true;
+}
+
+/**
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty analog waveform present
+ */
+bool Filter::VerifyAllInputsOKAndAnalog()
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == NULL)
+			return false;
+
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == NULL)
+			return false;
+		if(data->m_offsets.size() == 0)
+			return false;
+
+		auto adata = dynamic_cast<AnalogWaveform*>(data);
+		if(adata == NULL)
+			return false;
+	}
+
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

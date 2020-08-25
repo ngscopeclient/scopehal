@@ -37,20 +37,22 @@ using namespace std;
 // Construction / destruction
 
 ADL5205Decoder::ADL5205Decoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MISC)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MISC)
 {
-	//Set up channels
-	m_signalNames.push_back("spi");
-	m_channels.push_back(NULL);
+	CreateInput("spi");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ADL5205Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool ADL5205Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<SPIDecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -59,7 +61,7 @@ bool ADL5205Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 
 double ADL5205Decoder::GetVoltageRange()
 {
-	return m_channels[0]->GetVoltageRange();
+	return m_inputs[0].m_channel->GetVoltageRange();
 }
 
 string ADL5205Decoder::GetProtocolName()
@@ -81,7 +83,7 @@ bool ADL5205Decoder::NeedsConfig()
 void ADL5205Decoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ADL5205(%s)",	m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "ADL5205(%s)",	GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -91,26 +93,19 @@ void ADL5205Decoder::SetDefaultName()
 
 void ADL5205Decoder::Refresh()
 {
-	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<SPIWaveform*>(m_channels[0]->GetData());
-	if(!din)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//We need meaningful data
-	size_t len = din->m_samples.size();
-	if(len == 0)
+	auto din = dynamic_cast<SPIWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
+	size_t len = din->m_samples.size();
 
 	//Loop over the SPI events and process stuff
 	auto cap = new ADL5205Waveform;
@@ -179,7 +174,7 @@ void ADL5205Decoder::Refresh()
 		}
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color ADL5205Decoder::GetColor(int /*i*/)
@@ -189,7 +184,7 @@ Gdk::Color ADL5205Decoder::GetColor(int /*i*/)
 
 string ADL5205Decoder::GetText(int i)
 {
-	auto capture = dynamic_cast<ADL5205Waveform*>(GetData());
+	auto capture = dynamic_cast<ADL5205Waveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const ADL5205Symbol& s = capture->m_samples[i];

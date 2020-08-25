@@ -56,7 +56,7 @@ string Ethernet10BaseTDecoder::GetProtocolName()
 void Ethernet10BaseTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "10BaseT(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "10BaseT(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -66,25 +66,14 @@ void Ethernet10BaseTDecoder::Refresh()
 	ClearPackets();
 
 	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOKAndAnalog())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//Can't do much if we have no samples to work with
+	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
-	if(len == 0)
-	{
-		SetData(NULL);
-		return;
-	}
 
 	//Copy our time scales from the input
 	auto cap = new EthernetWaveform;
@@ -240,7 +229,7 @@ void Ethernet10BaseTDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 bool Ethernet10BaseTDecoder::FindFallingEdge(size_t& i, AnalogWaveform* cap)

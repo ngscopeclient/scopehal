@@ -40,15 +40,12 @@ EthernetRGMIIDecoder::EthernetRGMIIDecoder(string color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
 	m_signalNames.clear();
-	m_channels.clear();
+	m_inputs.clear();
 
 	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
-	m_signalNames.push_back("clk");
-	m_channels.push_back(NULL);
-	m_signalNames.push_back("ctl");
-	m_channels.push_back(NULL);
+	CreateInput("data");
+	CreateInput("clk");
+	CreateInput("ctl");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,22 +56,25 @@ string EthernetRGMIIDecoder::GetProtocolName()
 	return "Ethernet - RGMII";
 }
 
-bool EthernetRGMIIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
+	auto chan = stream.m_channel;
+	if(chan == NULL)
+		return false;
+
+	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
 		return false;
 
 	switch(i)
 	{
 		case 0:
-			if(channel->GetWidth() == 4)
+			if(chan->GetWidth() == 4)
 				return true;
 			break;
 
 		case 1:
 		case 2:
-		case 3:
-			if(channel->GetWidth() == 1)
+			if(chan->GetWidth() == 1)
 				return true;
 			break;
 	}
@@ -88,7 +88,7 @@ bool EthernetRGMIIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channe
 void EthernetRGMIIDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "RGMII(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "RGMII(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -97,23 +97,16 @@ void EthernetRGMIIDecoder::Refresh()
 {
 	ClearPackets();
 
-	//Get the input data
-	for(int i=0; i<4; i++)
+	if(!VerifyAllInputsOK())
 	{
-		if(m_channels[i] == NULL)
-		{
-			SetData(NULL);
-			return;
-		}
-	}
-	auto data = dynamic_cast<DigitalBusWaveform*>(m_channels[0]->GetData());
-	auto clk = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	auto ctl = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
-	if( (data == NULL) || (clk == NULL) || (ctl == NULL) )
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
+
+	//Get the input data
+	auto data = GetDigitalBusInputWaveform(0);
+	auto clk = GetDigitalInputWaveform(1);
+	auto ctl = GetDigitalInputWaveform(2);
 
 	//Sample everything on the clock edges
 	DigitalWaveform dctl;
@@ -126,7 +119,7 @@ void EthernetRGMIIDecoder::Refresh()
 	size_t len = min(dctl.m_samples.size(), ddata.m_samples.size());
 	if(len < 100)
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 	len -= 4;
@@ -244,5 +237,5 @@ void EthernetRGMIIDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }

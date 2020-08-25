@@ -40,17 +40,13 @@ EthernetGMIIDecoder::EthernetGMIIDecoder(string color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
 	m_signalNames.clear();
-	m_channels.clear();
+	m_inputs.clear();
 
 	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
-	m_signalNames.push_back("clk");
-	m_channels.push_back(NULL);
-	m_signalNames.push_back("en");
-	m_channels.push_back(NULL);
-	m_signalNames.push_back("er");
-	m_channels.push_back(NULL);
+	CreateInput("data");
+	CreateInput("clk");
+	CreateInput("en");
+	CreateInput("er");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,22 +57,26 @@ string EthernetGMIIDecoder::GetProtocolName()
 	return "Ethernet - GMII";
 }
 
-bool EthernetGMIIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if(channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
+	auto chan = stream.m_channel;
+	if(chan == NULL)
+		return false;
+
+	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
 		return false;
 
 	switch(i)
 	{
 		case 0:
-			if(channel->GetWidth() == 8)
+			if(chan->GetWidth() == 8)
 				return true;
 			break;
 
 		case 1:
 		case 2:
 		case 3:
-			if(channel->GetWidth() == 1)
+			if(chan->GetWidth() == 1)
 				return true;
 			break;
 	}
@@ -90,7 +90,7 @@ bool EthernetGMIIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel
 void EthernetGMIIDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "GMII(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "GMII(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -99,24 +99,17 @@ void EthernetGMIIDecoder::Refresh()
 {
 	ClearPackets();
 
-	//Get the input data
-	for(int i=0; i<4; i++)
+	if(!VerifyAllInputsOK())
 	{
-		if(m_channels[i] == NULL)
-		{
-			SetData(NULL);
-			return;
-		}
-	}
-	auto data = dynamic_cast<DigitalBusWaveform*>(m_channels[0]->GetData());
-	auto clk = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	auto en = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
-	auto er = dynamic_cast<DigitalWaveform*>(m_channels[3]->GetData());
-	if( (data == NULL) || (clk == NULL) || (en == NULL) || (er == NULL) )
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
+
+	//Get the input data
+	auto data = GetDigitalBusInputWaveform(0);
+	auto clk = GetDigitalInputWaveform(1);
+	auto en = GetDigitalInputWaveform(2);
+	auto er = GetDigitalInputWaveform(3);
 
 	//Sample everything on the clock edges
 	DigitalWaveform den;
@@ -166,5 +159,5 @@ void EthernetGMIIDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }

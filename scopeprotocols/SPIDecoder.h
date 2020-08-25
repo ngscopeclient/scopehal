@@ -36,8 +36,6 @@
 #ifndef SPIDecoder_h
 #define SPIDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class SPISymbol
 {
 public:
@@ -68,7 +66,7 @@ public:
 
 typedef Waveform<SPISymbol> SPIWaveform;
 
-class SPIDecoder : public ProtocolDecoder
+class SPIDecoder : public Filter
 {
 public:
 	SPIDecoder(std::string color);
@@ -82,7 +80,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(SPIDecoder)
 

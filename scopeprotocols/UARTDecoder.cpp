@@ -45,11 +45,10 @@ UARTDecoder::UARTDecoder(string color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
-	m_signalNames.push_back("din");
-	m_channels.push_back(NULL);
+	CreateInput("din");
 
 	m_baudname = "Baud rate";
-	m_parameters[m_baudname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_baudname].SetIntVal(115200);
 }
 
@@ -74,10 +73,18 @@ bool UARTDecoder::NeedsConfig()
 	return true;
 }
 
-bool UARTDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool UARTDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
+	}
 	return false;
 }
 
@@ -89,7 +96,7 @@ string UARTDecoder::GetProtocolName()
 void UARTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "UART(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "UART(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -101,18 +108,14 @@ void UARTDecoder::Refresh()
 {
 	ClearPackets();
 
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
-	if(m_channels[0] == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
+	auto din = GetDigitalInputWaveform(0);
 
 	//Get the bit period
 	float bit_period = 1.0f / m_parameters[m_baudname].GetFloatVal();
@@ -216,7 +219,7 @@ void UARTDecoder::Refresh()
 		FinishPacket(pack);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 void UARTDecoder::FinishPacket(Packet* pack)
@@ -242,5 +245,5 @@ Gdk::Color UARTDecoder::GetColor(int /*i*/)
 
 string UARTDecoder::GetText(int i)
 {
-	return ProtocolDecoder::GetTextForAsciiChannel(i);
+	return Filter::GetTextForAsciiChannel(i, 0);
 }

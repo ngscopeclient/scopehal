@@ -35,9 +35,7 @@
 #ifndef USB2ActivityDecoder_h
 #define USB2ActivityDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
-class USB2ActivityDecoder : public ProtocolDecoder
+class USB2ActivityDecoder : public Filter
 {
 public:
 	USB2ActivityDecoder(std::string color);
@@ -49,7 +47,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(USB2ActivityDecoder)
 };

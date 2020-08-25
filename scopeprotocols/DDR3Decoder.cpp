@@ -43,29 +43,15 @@ using namespace std;
 // Construction / destruction
 
 DDR3Decoder::DDR3Decoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
-	//Set up channels
-	m_signalNames.push_back("CLK");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("WE#");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("RAS#");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("CAS#");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("CS#");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("A12");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("A10");
-	m_channels.push_back(NULL);
+	CreateInput("CLK");
+	CreateInput("WE#");
+	CreateInput("RAS#");
+	CreateInput("CAS#");
+	CreateInput("CS#");
+	CreateInput("A12");
+	CreateInput("A10");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,10 +62,17 @@ bool DDR3Decoder::NeedsConfig()
 	return true;
 }
 
-bool DDR3Decoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool DDR3Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i < 7) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 7) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
 		return true;
+
 	return false;
 }
 
@@ -91,7 +84,7 @@ string DDR3Decoder::GetProtocolName()
 void DDR3Decoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DDR3Cmd(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "DDR3Cmd(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -101,23 +94,16 @@ void DDR3Decoder::SetDefaultName()
 
 void DDR3Decoder::Refresh()
 {
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
 	DigitalWaveform* caps[7] = {0};
 	for(int i=0; i<7; i++)
-	{
-		if(m_channels[i] == NULL)
-		{
-			SetData(NULL);
-			return;
-		}
-		auto cap = dynamic_cast<DigitalWaveform*>(m_channels[i]->GetData());
-		if(cap == NULL)
-		{
-			SetData(NULL);
-			return;
-		}
-		caps[i] = cap;
-	}
+		caps[i] = GetDigitalInputWaveform(i);
 
 	//Sample all of the inputs
 	DigitalWaveform* cclk = caps[0];
@@ -200,12 +186,12 @@ void DDR3Decoder::Refresh()
 			cap->m_samples.push_back(sym);
 		}
 	}
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color DDR3Decoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<DDR3Waveform*>(GetData());
+	auto capture = dynamic_cast<DDR3Waveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const DDR3Symbol& s = capture->m_samples[i];
@@ -237,7 +223,7 @@ Gdk::Color DDR3Decoder::GetColor(int i)
 
 string DDR3Decoder::GetText(int i)
 {
-	auto capture = dynamic_cast<DDR3Waveform*>(GetData());
+	auto capture = dynamic_cast<DDR3Waveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const DDR3Symbol& s = capture->m_samples[i];

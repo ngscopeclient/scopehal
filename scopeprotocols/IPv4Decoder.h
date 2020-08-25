@@ -35,8 +35,6 @@
 #ifndef IPv4Decoder_h
 #define IPv4Decoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class IPv4Symbol
 {
 public:
@@ -77,7 +75,7 @@ public:
 
 typedef Waveform<IPv4Symbol> IPv4Waveform;
 
-class IPv4Decoder : public ProtocolDecoder
+class IPv4Decoder : public Filter
 {
 public:
 	IPv4Decoder(std::string color);
@@ -94,7 +92,7 @@ public:
 	virtual void SetDefaultName();
 
 	virtual double GetVoltageRange();
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(IPv4Decoder)
 };

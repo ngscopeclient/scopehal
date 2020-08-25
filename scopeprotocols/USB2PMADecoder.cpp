@@ -38,29 +38,29 @@ using namespace std;
 // Construction / destruction
 
 USB2PMADecoder::USB2PMADecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("D+");
-	m_signalNames.push_back("D-");
-	m_channels.push_back(NULL);
-	m_channels.push_back(NULL);
+	CreateInput("D+");
+	CreateInput("D-");
 
-	//TODO: make this an enum
+	//TODO: make this an enum/bool
 	m_speedname = "Full Speed";
-	m_parameters[m_speedname] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_speedname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_speedname].SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool USB2PMADecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2PMADecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
+
 	return false;
 }
 
@@ -71,7 +71,8 @@ void USB2PMADecoder::SetDefaultName()
 {
 	char hwname[256];
 	snprintf(hwname, sizeof(hwname), "USB2PMA(%s,%s)",
-		m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -101,27 +102,17 @@ double USB2PMADecoder::GetVoltageRange()
 
 void USB2PMADecoder::Refresh()
 {
-	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din_p = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-	auto din_n = dynamic_cast<AnalogWaveform*>(m_channels[1]->GetData());
-	if( (din_p == NULL) || (din_n == NULL) )
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//We need meaningful data
+	//Get the input data
+	auto din_p = GetAnalogInputWaveform(0);
+	auto din_n = GetAnalogInputWaveform(1);
 	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
-	if(len == 0)
-	{
-		SetData(NULL);
-		return;
-	}
 
 	//Figure out our speed so we know what's going on
 	int speed = m_parameters[m_speedname].GetIntVal();
@@ -191,7 +182,7 @@ void USB2PMADecoder::Refresh()
 		cap->m_samples.push_back(type);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 
 	//Copy our time scales from the input
 	//Use the first trace's timestamp as our start time if they differ
@@ -202,7 +193,7 @@ void USB2PMADecoder::Refresh()
 
 Gdk::Color USB2PMADecoder::GetColor(int i)
 {
-	auto data = dynamic_cast<USB2PMAWaveform*>(GetData());
+	auto data = dynamic_cast<USB2PMAWaveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
@@ -228,7 +219,7 @@ Gdk::Color USB2PMADecoder::GetColor(int i)
 
 string USB2PMADecoder::GetText(int i)
 {
-	auto data = dynamic_cast<USB2PMAWaveform*>(GetData());
+	auto data = dynamic_cast<USB2PMAWaveform*>(GetData(0));
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())

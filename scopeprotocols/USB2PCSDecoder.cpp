@@ -36,20 +36,23 @@ using namespace std;
 // Construction / destruction
 
 USB2PCSDecoder::USB2PCSDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("PMA");
-	m_channels.push_back(NULL);
+	CreateInput("PMA");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool USB2PCSDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool USB2PCSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<USB2PMADecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<USB2PMAWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -59,7 +62,7 @@ bool USB2PCSDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
 void USB2PCSDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USB2PCS(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "USB2PCS(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -89,25 +92,16 @@ double USB2PCSDecoder::GetVoltageRange()
 
 void USB2PCSDecoder::Refresh()
 {
-	//Get the input data
-	if(m_channels[0] == NULL)
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<USB2PMAWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
-	size_t len = din->m_samples.size();
-	if(len == 0)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
+	//Get the input data
+	auto din = dynamic_cast<USB2PMAWaveform*>(GetInputWaveform(0));
+	size_t len = din->m_samples.size();
 
 	//Make the capture and copy our time scales from the input
 	auto cap = new USB2PCSWaveform;
@@ -153,7 +147,7 @@ void USB2PCSDecoder::Refresh()
 	}
 
 	//Done
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 void USB2PCSDecoder::RefreshIterationIdle(
@@ -462,7 +456,7 @@ void USB2PCSDecoder::RefreshIterationData(
 
 Gdk::Color USB2PCSDecoder::GetColor(int i)
 {
-	auto data = dynamic_cast<USB2PCSWaveform*>(GetData());
+	auto data = dynamic_cast<USB2PCSWaveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
 	if(i >= (int)data->m_samples.size())
@@ -491,7 +485,7 @@ Gdk::Color USB2PCSDecoder::GetColor(int i)
 
 string USB2PCSDecoder::GetText(int i)
 {
-	auto data = dynamic_cast<USB2PCSWaveform*>(GetData());
+	auto data = dynamic_cast<USB2PCSWaveform*>(GetData(0));
 	if(data == NULL)
 		return "";
 	if(i >= (int)data->m_samples.size())

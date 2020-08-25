@@ -42,14 +42,11 @@ using namespace std;
 // Construction / destruction
 
 Ethernet64b66bDecoder::Ethernet64b66bDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("clk");
-	m_channels.push_back(NULL);
+	CreateInput("data");
+	CreateInput("clk");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,12 +58,19 @@ bool Ethernet64b66bDecoder::NeedsConfig()
 	return true;
 }
 
-bool Ethernet64b66bDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+	)
+	{
 		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
-		return true;
+	}
+
 	return false;
 }
 
@@ -78,7 +82,7 @@ string Ethernet64b66bDecoder::GetProtocolName()
 void Ethernet64b66bDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "64b66b(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "64b66b(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -89,18 +93,13 @@ void Ethernet64b66bDecoder::SetDefaultName()
 void Ethernet64b66bDecoder::Refresh()
 {
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
-	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto clkin = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	if( (din == NULL) || (clkin == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	auto din = GetDigitalInputWaveform(0);
+	auto clkin = GetDigitalInputWaveform(1);
 
 	//Create the capture
 	auto cap = new Ethernet64b66bWaveform;
@@ -193,12 +192,12 @@ void Ethernet64b66bDecoder::Refresh()
 		}
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color Ethernet64b66bDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData());
+	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const Ethernet64b66bSymbol& s = capture->m_samples[i];
@@ -222,7 +221,7 @@ Gdk::Color Ethernet64b66bDecoder::GetColor(int i)
 
 string Ethernet64b66bDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData());
+	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const Ethernet64b66bSymbol& s = capture->m_samples[i];

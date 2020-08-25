@@ -43,17 +43,11 @@ using namespace std;
 // Construction / destruction
 
 SPIDecoder::SPIDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
-	//Set up channels
-	m_signalNames.push_back("clk");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("cs#");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
+	CreateInput("clk");
+	CreateInput("cs#");
+	CreateInput("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,10 +58,20 @@ bool SPIDecoder::NeedsConfig()
 	return true;
 }
 
-bool SPIDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool SPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i < 3) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if(
+		(i < 3) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
+	}
+
 	return false;
 }
 
@@ -79,7 +83,7 @@ string SPIDecoder::GetProtocolName()
 void SPIDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SPI(%s)",	m_channels[2]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "SPI(%s)",	GetInputDisplayName(2).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -89,23 +93,17 @@ void SPIDecoder::SetDefaultName()
 
 void SPIDecoder::Refresh()
 {
-	//Get the input data
-	for(int i=0; i<2; i++)
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
 	{
-		if(m_channels[i] == NULL)
-		{
-			SetData(NULL);
-			return;
-		}
-	}
-	auto clk = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto csn = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	auto data = dynamic_cast<DigitalWaveform*>(m_channels[2]->GetData());
-	if( (clk == NULL) || (csn == NULL) || (data == NULL) )
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
+
+	//Get the input data
+	auto clk = GetDigitalInputWaveform(0);
+	auto csn = GetDigitalInputWaveform(1);
+	auto data = GetDigitalInputWaveform(2);
 
 	//Create the capture
 	auto cap = new SPIWaveform;
@@ -227,12 +225,12 @@ void SPIDecoder::Refresh()
 		}
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color SPIDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<SPIWaveform*>(GetData());
+	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const SPISymbol& s = capture->m_samples[i];
@@ -255,7 +253,7 @@ Gdk::Color SPIDecoder::GetColor(int i)
 
 string SPIDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<SPIWaveform*>(GetData());
+	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const SPISymbol& s = capture->m_samples[i];

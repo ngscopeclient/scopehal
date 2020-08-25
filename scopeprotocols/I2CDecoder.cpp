@@ -43,14 +43,11 @@ using namespace std;
 // Construction / destruction
 
 I2CDecoder::I2CDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
-	m_signalNames.push_back("sda");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("scl");
-	m_channels.push_back(NULL);
+	CreateInput("sda");
+	CreateInput("scl");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,12 +58,19 @@ bool I2CDecoder::NeedsConfig()
 	return true;
 }
 
-bool I2CDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool I2CDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
-		return true;
+	}
+
 	return false;
 }
 
@@ -78,7 +82,10 @@ string I2CDecoder::GetProtocolName()
 void I2CDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "I2C(%s, %s)", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "I2C(%s, %s)",
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str()
+		);
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -88,19 +95,15 @@ void I2CDecoder::SetDefaultName()
 
 void I2CDecoder::Refresh()
 {
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-	auto sda = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto scl = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	if( (sda == NULL) || (scl == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	auto sda = GetDigitalInputWaveform(0);
+	auto scl = GetDigitalInputWaveform(1);
 
 	//Create the capture
 	auto cap = new I2CWaveform;
@@ -224,12 +227,12 @@ void I2CDecoder::Refresh()
 		last_scl = cur_scl;
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color I2CDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<I2CWaveform*>(GetData());
+	auto capture = dynamic_cast<I2CWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const I2CSymbol& s = capture->m_samples[i];
@@ -253,7 +256,7 @@ Gdk::Color I2CDecoder::GetColor(int i)
 
 string I2CDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<I2CWaveform*>(GetData());
+	auto capture = dynamic_cast<I2CWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const I2CSymbol& s = capture->m_samples[i];

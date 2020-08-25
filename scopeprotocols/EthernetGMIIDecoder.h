@@ -35,8 +35,6 @@
 #ifndef EthernetGMIIDecoder_h
 #define EthernetGMIIDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class EthernetGMIIDecoder : public EthernetProtocolDecoder
 {
 public:
@@ -46,7 +44,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(EthernetGMIIDecoder)
 };

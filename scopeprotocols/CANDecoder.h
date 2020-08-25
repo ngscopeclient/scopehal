@@ -7,8 +7,6 @@
 #ifndef CANDecoder_h
 #define CANDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
 class CANSymbol
 {
 public:
@@ -48,7 +46,7 @@ public:
 
 typedef Waveform<CANSymbol> CANWaveform;
 
-class CANDecoder : public ProtocolDecoder
+class CANDecoder : public Filter
 {
 public:
 	CANDecoder(std::string color);
@@ -62,7 +60,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(CANDecoder)
 

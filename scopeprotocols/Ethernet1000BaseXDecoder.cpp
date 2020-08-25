@@ -40,11 +40,10 @@ Ethernet1000BaseXDecoder::Ethernet1000BaseXDecoder(string color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
 	m_signalNames.clear();
-	m_channels.clear();
+	m_inputs.clear();
 
 	//Add inputs. We take a single 8b10b coded stream
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
+	CreateInput("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,10 +54,14 @@ string Ethernet1000BaseXDecoder::GetProtocolName()
 	return "Ethernet - 1000BaseX";
 }
 
-bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<IBM8b10bDecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -68,7 +71,7 @@ bool Ethernet1000BaseXDecoder::ValidateChannel(size_t i, OscilloscopeChannel* ch
 void Ethernet1000BaseXDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "1000BaseX(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "1000BaseX(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -78,17 +81,12 @@ void Ethernet1000BaseXDecoder::Refresh()
 	ClearPackets();
 
 	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
-	auto data = dynamic_cast<IBM8b10bWaveform*>(m_channels[0]->GetData());
-	if(data == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
+	auto data = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
@@ -150,5 +148,5 @@ void Ethernet1000BaseXDecoder::Refresh()
 			BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }

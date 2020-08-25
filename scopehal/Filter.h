@@ -239,6 +239,36 @@ protected:
 	///Indicates if our output is out-of-sync with our input
 	bool m_dirty;
 
+	bool VerifyAllInputsOK(bool allowEmpty = false);
+	bool VerifyAllInputsOKAndAnalog();
+
+	///Gets the waveform attached to the specified input
+	WaveformBase* GetInputWaveform(size_t i)
+	{ return m_inputs[i].m_channel->GetData(m_inputs[i].m_stream); }
+
+	///Gets the analog waveform attached to the specified input
+	AnalogWaveform* GetAnalogInputWaveform(size_t i)
+	{ return dynamic_cast<AnalogWaveform*>(GetInputWaveform(i)); }
+
+	///Gets the digital waveform attached to the specified input
+	DigitalWaveform* GetDigitalInputWaveform(size_t i)
+	{ return dynamic_cast<DigitalWaveform*>(GetInputWaveform(i)); }
+
+	///Gets the digital bus waveform attached to the specified input
+	DigitalBusWaveform* GetDigitalBusInputWaveform(size_t i)
+	{ return dynamic_cast<DigitalBusWaveform*>(GetInputWaveform(i)); }
+
+	/**
+		@brief Creates and names an input signal
+	 */
+	void CreateInput(std::string name)
+	{
+		m_signalNames.push_back(name);
+		m_inputs.push_back(StreamDescriptor(NULL, 0));
+	}
+
+	std::string GetInputDisplayName(size_t i);
+
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
 	virtual Gdk::Color GetColor(int i);

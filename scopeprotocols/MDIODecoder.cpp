@@ -45,11 +45,8 @@ MDIODecoder::MDIODecoder(string color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("mdio");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("mdc");
-	m_channels.push_back(NULL);
+	CreateInput("mdio");
+	CreateInput("mdc");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,12 +57,19 @@ bool MDIODecoder::NeedsConfig()
 	return true;
 }
 
-bool MDIODecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
-		return true;
+	}
+
 	return false;
 }
 
@@ -77,7 +81,9 @@ string MDIODecoder::GetProtocolName()
 void MDIODecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "MDIO(%s, %s)", m_channels[0]->m_displayname.c_str(), m_channels[1]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "MDIO(%s, %s)",
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -92,19 +98,15 @@ void MDIODecoder::Refresh()
 	//Remove old packets from previous decode passes
 	ClearPackets();
 
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-	auto mdio = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto mdc = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	if( (mdio == NULL) || (mdc == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	auto mdio = GetDigitalInputWaveform(0);
+	auto mdc = GetDigitalInputWaveform(1);
 
 	//Create the capture
 	auto cap = new MDIOWaveform;
@@ -470,7 +472,7 @@ void MDIODecoder::Refresh()
 		}
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 vector<string> MDIODecoder::GetHeaders()
@@ -487,7 +489,7 @@ vector<string> MDIODecoder::GetHeaders()
 
 Gdk::Color MDIODecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<MDIOWaveform*>(GetData());
+	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const MDIOSymbol& s = capture->m_samples[i];
@@ -523,7 +525,7 @@ Gdk::Color MDIODecoder::GetColor(int i)
 
 string MDIODecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<MDIOWaveform*>(GetData());
+	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const MDIOSymbol& s = capture->m_samples[i];

@@ -47,7 +47,7 @@ Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(string color)
 void Ethernet100BaseTDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "100BaseTX(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "100BaseTX(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -64,25 +64,14 @@ void Ethernet100BaseTDecoder::Refresh()
 {
 	ClearPackets();
 
-	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOKAndAnalog())
 	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-	if(din == NULL)
-	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	//Can't do much if we have no samples to work with
-	if(din->m_samples.size() == 0)
-	{
-		SetData(NULL);
-		return;
-	}
+	//Get the input data
+	auto din = GetAnalogInputWaveform(0);
 
 	//Copy our time scales from the input
 	EthernetWaveform* cap = new EthernetWaveform;
@@ -399,7 +388,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		cap->m_samples.push_back(seg);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 bool Ethernet100BaseTDecoder::TrySync(

@@ -35,9 +35,7 @@
 #ifndef OFDMDemodulator_h
 #define OFDMDemodulator_h
 
-#include "../scopehal/ProtocolDecoder.h"
-
-class OFDMDemodulator : public ProtocolDecoder
+class OFDMDemodulator : public Filter
 {
 public:
 	OFDMDemodulator(std::string color);
@@ -54,7 +52,7 @@ public:
 
 	virtual double GetVoltageRange();
 	virtual double GetOffset();
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(OFDMDemodulator)
 

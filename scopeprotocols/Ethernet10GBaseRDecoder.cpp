@@ -40,11 +40,10 @@ Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(string color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes
 	m_signalNames.clear();
-	m_channels.clear();
+	m_inputs.clear();
 
 	//Add inputs. We take a single 64b66b coded stream
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
+	CreateInput("data");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,10 +54,14 @@ string Ethernet10GBaseRDecoder::GetProtocolName()
 	return "Ethernet - 10GBaseR";
 }
 
-bool Ethernet10GBaseRDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool Ethernet10GBaseRDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (dynamic_cast<Ethernet64b66bDecoder*>(channel) != NULL) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<Ethernet64b66bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
+
 	return false;
 }
 
@@ -68,7 +71,7 @@ bool Ethernet10GBaseRDecoder::ValidateChannel(size_t i, OscilloscopeChannel* cha
 void Ethernet10GBaseRDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "10GBaseR(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "10GBaseR(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -78,17 +81,13 @@ void Ethernet10GBaseRDecoder::Refresh()
 	ClearPackets();
 
 	//Get the input data
-	if(m_channels[0] == NULL)
+	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
-	auto data = dynamic_cast<Ethernet64b66bWaveform*>(m_channels[0]->GetData());
-	if(data == NULL)
-	{
-		SetData(NULL);
-		return;
-	}
+
+	auto data = dynamic_cast<Ethernet64b66bWaveform*>(GetInputWaveform(0));
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
@@ -306,5 +305,5 @@ void Ethernet10GBaseRDecoder::Refresh()
 		BytesToFrames(bytes, starts, ends, cap);
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }

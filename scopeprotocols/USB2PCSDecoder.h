@@ -35,7 +35,6 @@
 #ifndef USB2PCSDecoder_h
 #define USB2PCSDecoder_h
 
-#include "../scopehal/ProtocolDecoder.h"
 #include "USB2PMADecoder.h"
 
 /**
@@ -73,7 +72,7 @@ public:
 
 typedef Waveform<USB2PCSSymbol> USB2PCSWaveform;
 
-class USB2PCSDecoder : public ProtocolDecoder
+class USB2PCSDecoder : public Filter
 {
 public:
 	USB2PCSDecoder(std::string color);
@@ -91,7 +90,7 @@ public:
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 
-	virtual bool ValidateChannel(size_t i, OscilloscopeChannel* channel);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(USB2PCSDecoder)
 

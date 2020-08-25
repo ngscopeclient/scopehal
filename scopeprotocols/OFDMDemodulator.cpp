@@ -37,14 +37,11 @@ using namespace std;
 // Construction / destruction
 
 OFDMDemodulator::OFDMDemodulator(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	//Set up channels
-	m_signalNames.push_back("I");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("Q");
-	m_channels.push_back(NULL);
+	CreateInput("I");
+	CreateInput("Q");
 
 	m_range = 1;
 	m_offset = 0;
@@ -52,22 +49,28 @@ OFDMDemodulator::OFDMDemodulator(string color)
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
 
+	/*
 	m_windowName = "Window";
-	m_parameters[m_windowName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_FLOAT);
 	m_parameters[m_windowName].SetFloatVal(0.4e-6);
 
 	m_periodName = "Period";
-	m_parameters[m_periodName] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_FLOAT);
+	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_FLOAT);
 	m_parameters[m_periodName].SetFloatVal(3.6e-6);
+	*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool OFDMDemodulator::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool OFDMDemodulator::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i < 2) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
+
 	return false;
 }
 
@@ -103,14 +106,9 @@ bool OFDMDemodulator::NeedsConfig()
 void OFDMDemodulator::SetDefaultName()
 {
 	char hwname[256];
-	Unit ps(Unit::UNIT_PS);
-	float window_ps = m_parameters[m_windowName].GetFloatVal() * 1e12;
-	float period_ps = m_parameters[m_periodName].GetFloatVal() * 1e12;
-	snprintf(hwname, sizeof(hwname), "WindowedAutocorrelation(%s, %s, %s, %s)",
-		m_channels[0]->m_displayname.c_str(),
-		m_channels[1]->m_displayname.c_str(),
-		ps.PrettyPrint(period_ps).c_str(),
-		ps.PrettyPrint(window_ps).c_str()
+	snprintf(hwname, sizeof(hwname), "OFDM(%s, %s)",
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str()
 		);
 
 	m_hwname = hwname;
@@ -130,22 +128,19 @@ void OFDMDemodulator::ClearSweeps()
 
 void OFDMDemodulator::Refresh()
 {
-	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
 	{
-		SetData(NULL);
+		SetData(NULL, 0);
 		return;
 	}
 
-	auto din_i = dynamic_cast<AnalogWaveform*>(m_channels[0]->GetData());
-	auto din_q = dynamic_cast<AnalogWaveform*>(m_channels[1]->GetData());
-	if(!din_i || !din_q)
-	{
-		SetData(NULL);
-		return;
-	}
+	//Get the sample data
+	auto din_i = GetAnalogInputWaveform(0);
+	auto din_q = GetAnalogInputWaveform(1);
 
-	SetData(NULL);
+	//TODO
+	SetData(NULL, 0);
 	return;
 
 	/*

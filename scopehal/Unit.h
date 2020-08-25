@@ -63,7 +63,7 @@ public:
 		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
 		UNIT_WATTS,			//Power
 
-		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordiantes there
+		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 
 		//TODO: more here
 	};

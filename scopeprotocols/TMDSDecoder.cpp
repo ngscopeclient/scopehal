@@ -42,17 +42,14 @@ using namespace std;
 // Construction / destruction
 
 TMDSDecoder::TMDSDecoder(string color)
-	: ProtocolDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels
-	m_signalNames.push_back("data");
-	m_channels.push_back(NULL);
-
-	m_signalNames.push_back("clk");
-	m_channels.push_back(NULL);
+	CreateInput("data");
+	CreateInput("clk");
 
 	m_lanename = "Lane number";
-	m_parameters[m_lanename] = ProtocolDecoderParameter(ProtocolDecoderParameter::TYPE_INT);
+	m_parameters[m_lanename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_lanename].SetIntVal(0);
 }
 
@@ -65,12 +62,19 @@ bool TMDSDecoder::NeedsConfig()
 	return true;
 }
 
-bool TMDSDecoder::ValidateChannel(size_t i, OscilloscopeChannel* channel)
+bool TMDSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	if( (i == 0) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
-	if( (i == 1) && (channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) && (channel->GetWidth() == 1) )
-		return true;
+	}
+
 	return false;
 }
 
@@ -82,7 +86,7 @@ string TMDSDecoder::GetProtocolName()
 void TMDSDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "TMDS(%s)", m_channels[0]->m_displayname.c_str());
+	snprintf(hwname, sizeof(hwname), "TMDS(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -92,19 +96,15 @@ void TMDSDecoder::SetDefaultName()
 
 void TMDSDecoder::Refresh()
 {
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Get the input data
-	if( (m_channels[0] == NULL) || (m_channels[1] == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
-	auto din = dynamic_cast<DigitalWaveform*>(m_channels[0]->GetData());
-	auto clkin = dynamic_cast<DigitalWaveform*>(m_channels[1]->GetData());
-	if( (din == NULL) || (clkin == NULL) )
-	{
-		SetData(NULL);
-		return;
-	}
+	auto din = GetDigitalInputWaveform(0);
+	auto clkin = GetDigitalInputWaveform(1);
 
 	//Create the capture
 	auto cap = new TMDSWaveform;
@@ -263,12 +263,12 @@ void TMDSDecoder::Refresh()
 		last_symbol_type = TYPE_DATA;
 	}
 
-	SetData(cap);
+	SetData(cap, 0);
 }
 
 Gdk::Color TMDSDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<TMDSWaveform*>(GetData());
+	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const TMDSSymbol& s = capture->m_samples[i];
@@ -296,7 +296,7 @@ Gdk::Color TMDSDecoder::GetColor(int i)
 
 string TMDSDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<TMDSWaveform*>(GetData());
+	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const TMDSSymbol& s = capture->m_samples[i];
