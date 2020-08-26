@@ -98,13 +98,39 @@ protected:
 class StreamDescriptor
 {
 public:
+	StreamDescriptor()
+	: m_channel(NULL)
+	, m_stream(0)
+	{}
+
 	StreamDescriptor(OscilloscopeChannel* channel, size_t stream)
 		: m_channel(channel)
 		, m_stream(stream)
 	{}
 
+	std::string GetName();
+
 	OscilloscopeChannel* m_channel;
 	size_t m_stream;
+
+	WaveformBase* GetData()
+	{ return m_channel->GetData(m_stream); }
+
+	bool operator==(const StreamDescriptor& rhs) const
+	{ return (m_channel == rhs.m_channel) && (m_stream == rhs.m_stream); }
+
+	bool operator!=(const StreamDescriptor& rhs) const
+	{ return (m_channel != rhs.m_channel) || (m_stream != rhs.m_stream); }
+
+	bool operator<(const StreamDescriptor& rhs) const
+	{
+		if(m_channel < rhs.m_channel)
+			return true;
+		if( (m_channel == rhs.m_channel) && (m_stream < rhs.m_stream) )
+			return true;
+
+		return false;
+	}
 };
 
 /**
@@ -308,7 +334,7 @@ public:
 	static void DoAddDecoderClass(std::string name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
-	static Filter* CreateDecoder(std::string protocol, std::string color);
+	static Filter* CreateFilter(std::string protocol, std::string color);
 
 protected:
 	//Class enumeration

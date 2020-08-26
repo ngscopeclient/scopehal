@@ -54,6 +54,17 @@ Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// StreamDescriptor
+
+string StreamDescriptor::GetName()
+{
+	string name = m_channel->m_displayname;
+	if(m_channel->GetStreamCount() > 1)
+		name += string(".") + m_channel->GetStreamName(m_stream);
+	return name;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FilterParameter
 
 FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
@@ -398,12 +409,12 @@ void Filter::EnumProtocols(vector<string>& names)
 		names.push_back(it->first);
 }
 
-Filter* Filter::CreateDecoder(string protocol, string color)
+Filter* Filter::CreateFilter(string protocol, string color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](color);
 
-	LogError("Invalid decoder name: %s\n", protocol.c_str());
+	LogError("Invalid filter name: %s\n", protocol.c_str());
 	return NULL;
 }
 

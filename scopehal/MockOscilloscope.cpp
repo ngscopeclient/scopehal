@@ -117,7 +117,7 @@ Oscilloscope::TriggerMode MockOscilloscope::PollTrigger()
 	return TRIGGER_MODE_STOP;
 }
 
-bool MockOscilloscope::AcquireData(bool /*toQueue*/)
+bool MockOscilloscope::AcquireData()
 {
 	//no new data possible
 	return false;
