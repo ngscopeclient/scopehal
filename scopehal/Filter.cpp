@@ -365,7 +365,7 @@ string Filter::GetInputDisplayName(size_t i)
 {
 	auto in = m_inputs[i];
 	if(in.m_channel->GetStreamCount() > 1)
-		return in.m_channel->m_displayname + "/" + in.m_channel->GetStreamName(in.m_stream);
+		return in.m_channel->m_displayname + "." + in.m_channel->GetStreamName(in.m_stream);
 	else
 		return in.m_channel->m_displayname;
 }
