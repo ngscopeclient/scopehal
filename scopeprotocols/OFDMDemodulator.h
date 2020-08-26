@@ -35,10 +35,13 @@
 #ifndef OFDMDemodulator_h
 #define OFDMDemodulator_h
 
+#include <ffts/ffts.h>
+
 class OFDMDemodulator : public Filter
 {
 public:
 	OFDMDemodulator(std::string color);
+	virtual ~OFDMDemodulator();
 
 	virtual void Refresh();
 
@@ -62,8 +65,17 @@ protected:
 	float m_min;
 	float m_max;
 
-	std::string m_windowName;
-	std::string m_periodName;
+	ffts_plan_t* m_fftPlan;
+	ffts_plan_t* m_fftPlan16;
+	float* m_fftInputBuf;
+	float* m_fftOutputBuf;
+	int m_cachedFftSize;
+
+	AlignedAllocator<float, 64> m_allocator;
+
+	std::string m_symbolTimeName;
+	std::string m_guardIntervalName;
+	std::string m_fftSizeName;
 };
 
 #endif

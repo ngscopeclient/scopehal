@@ -221,7 +221,7 @@ double Unit::ParseString(string str)
 			scale = 1000.0;
 		else if(c == 'm')
 			scale = 0.001;
-		else if(c == 'u')	//TODO: handle μ
+		else if( (c == 'u') || (str.find("μ", i) == i) )
 			scale = 1e-6;
 		else if(c == 'n')
 			scale = 1e-9;

@@ -50,11 +50,11 @@ WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(string color)
 	m_max = -FLT_MAX;
 
 	m_windowName = "Window";
-	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
+	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 	m_parameters[m_windowName].SetFloatVal(400000);
 
 	m_periodName = "Period";
-	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
+	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 	m_parameters[m_periodName].SetFloatVal(3600000);
 }
 
@@ -143,9 +143,9 @@ void WindowedAutocorrelationFilter::Refresh()
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
 
 	//Convert window and period to samples
-	float window_ps = m_parameters[m_windowName].GetFloatVal() * 1e12;
+	int window_ps = m_parameters[m_windowName].GetIntVal();
 	size_t window_samples = window_ps / din_i->m_timescale;
-	float period_ps = m_parameters[m_periodName].GetFloatVal() * 1e12;
+	int period_ps = m_parameters[m_periodName].GetIntVal();
 	size_t period_samples = period_ps / din_i->m_timescale;
 	window_samples = min(window_samples, period_samples);
 

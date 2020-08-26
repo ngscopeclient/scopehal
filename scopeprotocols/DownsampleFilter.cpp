@@ -110,10 +110,10 @@ void DownsampleFilter::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
 
-	//Cut off all frequencies shorter than 1.5x our decimation factor
+	//Cut off all frequencies shorter than our decimation factor
 	int64_t factor = m_parameters[m_factorname].GetIntVal();
 	size_t outlen = len / factor;
-	float cutoff_period = factor * 1.5;
+	float cutoff_period = factor;
 	float sigma = cutoff_period / sqrt(2 * log(2));
 	int kernel_radius = ceil(3*sigma);
 
