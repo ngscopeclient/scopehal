@@ -36,7 +36,7 @@
 #define DeEmbedFilter_h
 
 #include "../scopehal/AlignedAllocator.h"
-#include <ffts/ffts.h>
+#include <ffts.h>
 
 class DeEmbedFilter : public Filter
 {

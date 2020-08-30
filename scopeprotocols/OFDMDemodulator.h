@@ -35,7 +35,7 @@
 #ifndef OFDMDemodulator_h
 #define OFDMDemodulator_h
 
-#include <ffts/ffts.h>
+#include <ffts.h>
 
 class OFDMDemodulator : public Filter
 {

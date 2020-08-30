@@ -35,7 +35,7 @@
 #ifndef FFTFilter_h
 #define FFTFilter_h
 
-#include <ffts/ffts.h>
+#include <ffts.h>
 
 class FFTFilter : public Filter
 {
