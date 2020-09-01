@@ -587,7 +587,7 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t i)
 {
-	if(i > m_analogChannelCount)
+	if(i >= m_analogChannelCount)
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -609,9 +609,32 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	return OscilloscopeChannel::COUPLE_SYNTHETIC;
 }
 
-void LeCroyOscilloscope::SetChannelCoupling(size_t /*i*/, OscilloscopeChannel::CouplingType /*type*/)
+void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	//FIXME
+	if(i >= m_analogChannelCount)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(type)
+	{
+		case OscilloscopeChannel::COUPLE_AC_1M:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING A1M");
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_1M:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING D1M");
+			break;
+
+		case OscilloscopeChannel::COUPLE_DC_50:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING D50");
+			break;
+
+		//treat unrecognized as ground
+		case OscilloscopeChannel::COUPLE_GND:
+		default:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING GND");
+			break;
+	}
 }
 
 double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
@@ -633,9 +656,16 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	return d;
 }
 
-void LeCroyOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	//FIXME
+	if(i >= m_analogChannelCount)
+		return;
+
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:ATTENUATION %f", m_channels[i]->GetHwname().c_str(), atten);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(cmd);
 }
 
 int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
