@@ -56,6 +56,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
 	SPIDecoder.cpp
+	SPIFlashDecoder.cpp
 	SubtractFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp

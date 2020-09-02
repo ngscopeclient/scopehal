@@ -30,89 +30,86 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SPIFlashDecoder
  */
+#ifndef SPIFlashDecoder_h
+#define SPIFlashDecoder_h
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+class SPIFlashSymbol
+{
+public:
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
+	enum FlashType
+	{
+		TYPE_COMMAND,
+		TYPE_ADDRESS,
+		TYPE_DATA,
 
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCOffsetFilter.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "IPv4Decoder.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "QSPIDecoder.h"
-#include "RiseMeasurement.h"
-#include "SPIDecoder.h"
-#include "SPIFlashDecoder.h"
-#include "SubtractFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
+		TYPE_DUMMY,
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+		//Winbond W25N specific
+		TYPE_W25N_BLOCK_ADDR,
+		TYPE_W25N_SR_ADDR,			//address of a status register
+		TYPE_W25N_SR_STATUS,
+		TYPE_W25N_SR_CONFIG,
+		TYPE_W25N_SR_PROT
 
-void ScopeProtocolStaticInit();
+	} m_type;
+
+	enum FlashCommand
+	{
+		CMD_READ_STATUS_REGISTER,
+		CMD_WRITE_STATUS_REGISTER,
+		CMD_READ_JEDEC_ID,
+		CMD_READ,			//Read, SPI address, SPI data
+		CMD_READ_1_1_4,		//Fast read, SPI address, QSPI data
+		CMD_READ_1_4_4,		//Fast read, QSPI address, QSPI data
+		CMD_RESET,
+
+		//Winbond W25N specific
+		CMD_W25N_READ_PAGE,
+
+		CMD_UNKNOWN
+	} m_cmd;
+
+	uint32_t m_data;
+
+	SPIFlashSymbol()
+	{}
+
+	SPIFlashSymbol(FlashType type, FlashCommand cmd, uint32_t data)
+	 : m_type(type)
+	 , m_cmd(cmd)
+	 , m_data(data)
+	{}
+
+	bool operator== (const SPIFlashSymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_cmd == s.m_cmd) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<SPIFlashSymbol> SPIFlashWaveform;
+
+class SPIFlashDecoder : public Filter
+{
+public:
+	SPIFlashDecoder(std::string color);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
+};
 
 #endif
