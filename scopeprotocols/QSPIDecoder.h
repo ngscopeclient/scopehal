@@ -30,88 +30,29 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of QSPIDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef QSPIDecoder_h
+#define QSPIDecoder_h
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
-
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCOffsetFilter.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "IPv4Decoder.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "QSPIDecoder.h"
-#include "RiseMeasurement.h"
 #include "SPIDecoder.h"
-#include "SubtractFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+class QSPIDecoder : public SPIDecoder
+{
+public:
+	QSPIDecoder(std::string color);
 
-void ScopeProtocolStaticInit();
+	virtual void Refresh();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(QSPIDecoder)
+
+protected:
+};
 
 #endif

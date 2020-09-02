@@ -89,6 +89,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ParallelBus);
 	AddDecoderClass(PeriodMeasurement);
 	AddDecoderClass(PkPkMeasurement);
+	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(RiseMeasurement);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SubtractFilter);
