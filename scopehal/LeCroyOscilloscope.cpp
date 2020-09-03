@@ -1564,7 +1564,16 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	if(1 != sscanf(tmp.c_str(), "%ld", &timestamp))
 		return ret;
 
-	//Convert Jan 1 2000 in the client's local time zone (assuming this is the same as instrument time) to Unix time
+	//Get the client's local time.
+	//All we need from this is to know whether DST is active
+	tm now;
+	time_t tnow;
+	time(&tnow);
+	localtime_r(&tnow, &now);
+
+	//Convert Jan 1 2000 in the client's local time zone (assuming this is the same as instrument time) to Unix time.
+	//Note that the instrument time zone conversion seems to be broken and not handle DST offsets right.
+	//Move the epoch by an hour if we're currently in DST to compensate.
 	tm epoch;
 	epoch.tm_sec = 0;
 	epoch.tm_min = 0;
@@ -1572,9 +1581,9 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	epoch.tm_mday = 1;
 	epoch.tm_mon = 0;
 	epoch.tm_year = 100;
-	epoch.tm_wday = 6;	//Jan 1 2000 was a Saturday
+	epoch.tm_wday = 6;				//Jan 1 2000 was a Saturday
 	epoch.tm_yday = 0;
-	epoch.tm_isdst = 0;
+	epoch.tm_isdst = now.tm_isdst;
 	time_t epoch_stamp = mktime(&epoch);
 
 	//Pull out nanoseconds from the timestamp and convert to picoseconds since that's the scopehal fine time unit
