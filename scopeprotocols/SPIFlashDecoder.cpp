@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 SPIFlashDecoder::SPIFlashDecoder(string color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	CreateInput("spi_in");
 	CreateInput("spi_out");
@@ -88,11 +88,23 @@ void SPIFlashDecoder::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
+vector<string> SPIFlashDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Op");
+	ret.push_back("Address");
+	ret.push_back("Info");
+	ret.push_back("Len");
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void SPIFlashDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Input/output x1 inputs are required
 	if( (m_inputs[0].m_channel == NULL) || (m_inputs[1].m_channel == NULL) )
 	{
@@ -115,12 +127,15 @@ void SPIFlashDecoder::Refresh()
 	if(dquad)
 		quadlen = dquad->m_samples.size();
 
-	//Loop over the SPI events and process stuff
-	//For now, assume the MISO/MOSI SPI captures are synchronized (sample N is at the same point in time)
+	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
 	auto cap = new SPIFlashWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
+	SetData(cap, 0);
+
+	//Loop over the SPI events and process stuff
+	//For now, assume the MISO/MOSI SPI captures are synchronized (sample N is at the same point in time)
 	SPIFlashSymbol samp;
 	size_t len = din->m_samples.size();
 	enum
@@ -142,9 +157,10 @@ void SPIFlashDecoder::Refresh()
 	int64_t addr_start;
 	SPIFlashSymbol::FlashType data_type = SPIFlashSymbol::TYPE_DATA;
 	SPIFlashSymbol::FlashType addr_type = SPIFlashSymbol::TYPE_ADDRESS;
+	Packet* pack = NULL;
 	for(size_t iin = 0; iin+1 < len; iin ++)
 	{
-		//Figure out what the incoming command is
+		//Figure out what the incoming packet is
 		auto s = din->m_samples[iin];
 
 		switch(state)
@@ -162,6 +178,11 @@ void SPIFlashDecoder::Refresh()
 					state = STATE_IDLE;
 				else
 				{
+					pack = new Packet;
+					pack->m_offset = din->m_offsets[iin] * din->m_timescale;
+					pack->m_len = 0;
+					m_packets.push_back(pack);
+
 					//Parse the command
 					switch(s.m_data)
 					{
@@ -249,6 +270,8 @@ void SPIFlashDecoder::Refresh()
 					cap->m_offsets.push_back(din->m_offsets[iin]);
 					cap->m_durations.push_back(din->m_durations[iin]);
 					cap->m_samples.push_back(SPIFlashSymbol(SPIFlashSymbol::TYPE_COMMAND, current_cmd, 0));
+
+					pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1);
 				}
 				break;
 
@@ -366,6 +389,15 @@ void SPIFlashDecoder::Refresh()
 						cap->m_durations.push_back(din->m_offsets[iin] + din->m_durations[iin] - addr_start);
 						cap->m_samples.push_back(SPIFlashSymbol(
 							addr_type, SPIFlashSymbol::CMD_UNKNOWN, addr));
+
+						if(addr_type == SPIFlashSymbol::TYPE_ADDRESS)
+						{
+							char tmp[128] = "";
+							snprintf(tmp, sizeof(tmp), "%x", addr);
+							pack->m_headers["Address"] = tmp;
+						}
+						else
+							pack->m_headers["Address"] = GetText(cap->m_samples.size() - 1);
 					}
 				}
 
@@ -374,13 +406,26 @@ void SPIFlashDecoder::Refresh()
 			//Read data
 			case STATE_READ_DATA:
 				if(s.m_stype != SPISymbol::TYPE_DATA)
+				{
+					//At the end of a read command, crack status registers if needed
+					if(data_type != SPIFlashSymbol::TYPE_DATA)
+						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+
 					state = STATE_IDLE;
+				}
 				else
 				{
 					cap->m_offsets.push_back(dout->m_offsets[iin]);
 					cap->m_durations.push_back(dout->m_durations[iin]);
 					cap->m_samples.push_back(SPIFlashSymbol(
 						data_type, SPIFlashSymbol::CMD_UNKNOWN, dout->m_samples[iin].m_data));
+
+					//Extend the packet
+					pack->m_data.push_back(dout->m_samples[iin].m_data);
+					pack->m_len = dout->m_offsets[iin] + dout->m_durations[iin] - pack->m_offset;
+					char tmp[128];
+					snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+					pack->m_headers["Len"] = tmp;
 				}
 				break;
 
@@ -408,6 +453,13 @@ void SPIFlashDecoder::Refresh()
 					cap->m_samples.push_back(SPIFlashSymbol(
 						data_type, SPIFlashSymbol::CMD_UNKNOWN, dquad->m_samples[iquad].m_data));
 
+					//Extend the packet
+					pack->m_data.push_back(dquad->m_samples[iquad].m_data);
+					pack->m_len = dquad->m_offsets[iquad] + dquad->m_durations[iquad] - pack->m_offset;
+					char tmp[128];
+					snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+					pack->m_headers["Len"] = tmp;
+
 					iquad ++;
 				}
 
@@ -427,19 +479,30 @@ void SPIFlashDecoder::Refresh()
 			//Write data
 			case STATE_WRITE_DATA:
 				if(s.m_stype != SPISymbol::TYPE_DATA)
+				{
 					state = STATE_IDLE;
+
+					//At the end of a write command, crack status registers if needed
+					if(data_type != SPIFlashSymbol::TYPE_DATA)
+						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+				}
 				else
 				{
 					cap->m_offsets.push_back(din->m_offsets[iin]);
 					cap->m_durations.push_back(din->m_durations[iin]);
 					cap->m_samples.push_back(SPIFlashSymbol(
 						data_type, SPIFlashSymbol::CMD_UNKNOWN, din->m_samples[iin].m_data));
+
+					//Extend the packet
+					pack->m_data.push_back(din->m_samples[iin].m_data);
+					pack->m_len = din->m_offsets[iin] + din->m_durations[iin] - pack->m_offset;
+					char tmp[128];
+					snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+					pack->m_headers["Len"] = tmp;
 				}
 				break;
 		}
 	}
-
-	SetData(cap, 0);
 }
 
 Gdk::Color SPIFlashDecoder::GetColor(int i)

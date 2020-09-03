@@ -35,6 +35,8 @@
 #ifndef SPIFlashDecoder_h
 #define SPIFlashDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+
 class SPIFlashSymbol
 {
 public:
@@ -91,7 +93,7 @@ public:
 
 typedef Waveform<SPIFlashSymbol> SPIFlashWaveform;
 
-class SPIFlashDecoder : public Filter
+class SPIFlashDecoder : public PacketDecoder
 {
 public:
 	SPIFlashDecoder(std::string color);
@@ -103,6 +105,8 @@ public:
 
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
+
+	std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
