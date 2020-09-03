@@ -295,7 +295,15 @@ string Filter::GetInputName(size_t i)
 	}
 }
 
-void Filter::SetInput(size_t i, StreamDescriptor stream)
+/**
+	@brief Connects a stream to the input of this filter
+
+	@param i		Index of the input port to connect
+	@param stream	Input data stream
+	@param force	Forcibly connect this stream without checking to make sure it's the right type.
+					Should only be set true by by Filter::LoadInputs() or in similar specialized situations.
+ */
+void Filter::SetInput(size_t i, StreamDescriptor stream, bool force)
 {
 	if(i < m_signalNames.size())
 	{
@@ -305,11 +313,15 @@ void Filter::SetInput(size_t i, StreamDescriptor stream)
 			return;
 		}
 
-		if(!ValidateChannel(i, stream))
+		//If forcing, don't validate the channel
+		if(!force)
 		{
-			LogError("Invalid channel for input %zu of %s\n", i, m_displayname.c_str());
-			m_inputs[i] = StreamDescriptor(NULL, 0);
-			return;
+			if(!ValidateChannel(i, stream))
+			{
+				LogError("Invalid channel for input %zu of %s\n", i, m_displayname.c_str());
+				m_inputs[i] = StreamDescriptor(NULL, 0);
+				return;
+			}
 		}
 
 		//Deref whatever was there (if anything)
@@ -326,14 +338,22 @@ void Filter::SetInput(size_t i, StreamDescriptor stream)
 	}
 }
 
-void Filter::SetInput(string name, StreamDescriptor stream)
+/**
+	@brief Connects a stream to the input of this filter
+
+	@param name		Name of the input port to connect
+	@param stream	Input data stream
+	@param force	Forcibly connect this stream without checking to make sure it's the right type.
+					Should only be set true by by Filter::LoadInputs() or in similar specialized situations.
+ */
+void Filter::SetInput(string name, StreamDescriptor stream, bool force)
 {
 	//Find the channel
 	for(size_t i=0; i<m_signalNames.size(); i++)
 	{
 		if(m_signalNames[i] == name)
 		{
-			SetInput(i, stream);
+			SetInput(i, stream, force);
 			return;
 		}
 	}
@@ -799,7 +819,8 @@ void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
 
 		SetInput(
 			it.first.as<string>(),
-			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream)
+			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream),
+			true
 			);
 	}
 }

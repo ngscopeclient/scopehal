@@ -93,7 +93,11 @@ public:
 
 	///Get the contents of a data stream
 	WaveformBase* GetData(size_t stream)
-	{ return m_streamData[stream]; }
+	{
+		if(stream >= m_streamData.size())
+			return NULL;
+		return m_streamData[stream];
+	}
 
 	///Detach the capture data from this channel
 	WaveformBase* Detach(size_t stream)

@@ -163,6 +163,9 @@ public:
 	virtual void AddRef();
 	virtual void Release();
 
+	size_t GetRefCount()
+	{ return m_refcount; }
+
 	//Get all currently existing filters
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
@@ -179,8 +182,8 @@ public:
 	//Channels
 	size_t GetInputCount();
 	std::string GetInputName(size_t i);
-	void SetInput(size_t i, StreamDescriptor stream);
-	void SetInput(std::string name, StreamDescriptor stream);
+	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
+	void SetInput(std::string name, StreamDescriptor stream, bool force = false);
 
 	StreamDescriptor GetInput(size_t i);
 
