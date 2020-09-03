@@ -193,10 +193,7 @@ protected:
 		double basetime,
 		double* wavetime
 		);
-	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(
-		std::string& data,
-		time_t ttime,
-		double basetime);
+	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
 
 	void Convert8BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);

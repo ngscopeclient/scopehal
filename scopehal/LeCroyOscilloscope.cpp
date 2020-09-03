@@ -1534,10 +1534,7 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 	}
 }
 
-map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
-	string& data,
-	time_t ttime,
-	double basetime)
+map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data)
 {
 	map<int, DigitalWaveform*> ret;
 
@@ -1560,11 +1557,32 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 	int num_samples = atoi(tmp.c_str());
 	//LogDebug("Expecting %d samples\n", num_samples);
 
-	/*
-	Nanoseconds since Jan 1 2000. Use this instead?
+	//Extract the raw trigger timestamp (nanoseconds since Jan 1 2000)
 	tmp = data.substr(data.find("<FirstEventTime>") + 16);
 	tmp = tmp.substr(0, tmp.find("</FirstEventTime>"));
-	*/
+	int64_t timestamp;
+	if(1 != sscanf(tmp.c_str(), "%ld", &timestamp))
+		return ret;
+
+	//Convert Jan 1 2000 in the client's local time zone (assuming this is the same as instrument time) to Unix time
+	tm epoch;
+	epoch.tm_sec = 0;
+	epoch.tm_min = 0;
+	epoch.tm_hour = 0;
+	epoch.tm_mday = 1;
+	epoch.tm_mon = 0;
+	epoch.tm_year = 100;
+	epoch.tm_wday = 6;	//Jan 1 2000 was a Saturday
+	epoch.tm_yday = 0;
+	epoch.tm_isdst = 0;
+	time_t epoch_stamp = mktime(&epoch);
+
+	//Pull out nanoseconds from the timestamp and convert to picoseconds since that's the scopehal fine time unit
+	const int64_t ns_per_sec = 1000000000;
+	int64_t start_ns = timestamp % ns_per_sec;
+	int64_t start_ps = 1000 * start_ns;
+	int64_t start_sec = (timestamp - start_ns) / ns_per_sec;
+	time_t start_time = epoch_stamp + start_sec;
 
 	//Pull out the actual binary data (Base64 coded)
 	tmp = data.substr(data.find("<BinaryData>") + 12);
@@ -1586,8 +1604,8 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(
 			cap->m_timescale = interval;
 
 			//Capture timestamp
-			cap->m_startTimestamp = ttime;
-			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+			cap->m_startTimestamp = start_time;
+			cap->m_startPicoseconds = start_ps;
 			cap->Resize(num_samples);
 
 			//TODO: AVX this
@@ -1617,8 +1635,8 @@ bool LeCroyOscilloscope::AcquireData()
 	uint32_t num_sequences = 1;
 	map<int, vector<WaveformBase*> > pending_waveforms;
 	double start = GetTime();
-	time_t ttime;
-	double basetime;
+	time_t ttime = 0;
+	double basetime = 0;
 	bool denabled = false;
 	map<int, string> analogWaveformData;
 	string wavetime;
@@ -1637,7 +1655,7 @@ bool LeCroyOscilloscope::AcquireData()
 		if(!ReadWavedescs(wavedescs, enabled, firstEnabledChannel, any_enabled))
 			return false;
 
-		//Figure out how many sequences we have
+		//Grab the WAVEDESC from the first enabled channel
 		unsigned char* pdesc = NULL;
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
@@ -1647,15 +1665,6 @@ bool LeCroyOscilloscope::AcquireData()
 				break;
 			}
 		}
-		if(pdesc == NULL)
-		{
-			//no enabled channels. abort
-			//TODO: handle the case of digital channels enabled, but no analog
-			return false;
-		}
-		uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
-		if(trigtime_len > 0)
-			num_sequences = trigtime_len / 16;
 
 		//See if any digital channels are enabled
 		if(m_digitalChannelCount > 0)
@@ -1672,21 +1681,45 @@ bool LeCroyOscilloscope::AcquireData()
 			m_cacheMutex.unlock();
 		}
 
+		//Pull sequence count out of the WAVEDESC if we have analog channels active
+		if(pdesc)
+		{
+			uint32_t trigtime_len = *reinterpret_cast<uint32_t*>(pdesc + 48);
+			if(trigtime_len > 0)
+				num_sequences = trigtime_len / 16;
+		}
+
+		//No WAVEDESCs, look at digital channels
+		else
+		{
+			//TODO: support sequence capture of digital channels if the instrument supports this
+			//(need to look into it)
+			if(denabled)
+				num_sequences = 1;
+
+			//no enabled channels. abort
+			else
+				return false;
+		}
+
 		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
 		RequestWaveforms(enabled, num_sequences, denabled);
 
-		//Figure out when the first trigger happened.
-		//Read the timestamps if we're doing segmented capture
-		ttime = ExtractTimestamp(pdesc, basetime);
-		if(num_sequences > 1)
-			wavetime = m_transport->ReadReply();
-		pwtime = reinterpret_cast<double*>(&wavetime[16]);	//skip 16-byte SCPI header
-
-		//Read the data from each analog waveform
-		for(unsigned int i=0; i<m_analogChannelCount; i++)
+		if(pdesc)
 		{
-			if(enabled[i])
-				analogWaveformData[i] = m_transport->ReadReply();
+			//Figure out when the first trigger happened.
+			//Read the timestamps if we're doing segmented capture
+			ttime = ExtractTimestamp(pdesc, basetime);
+			if(num_sequences > 1)
+				wavetime = m_transport->ReadReply();
+			pwtime = reinterpret_cast<double*>(&wavetime[16]);	//skip 16-byte SCPI header
+
+			//Read the data from each analog waveform
+			for(unsigned int i=0; i<m_analogChannelCount; i++)
+			{
+				if(enabled[i])
+					analogWaveformData[i] = m_transport->ReadReply();
+			}
 		}
 
 		//Read the data from the digital waveforms, if enabled
@@ -1743,7 +1776,7 @@ bool LeCroyOscilloscope::AcquireData()
 	if(denabled)
 	{
 		//This is a weird XML-y format but I can't find any other way to get it :(
-		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, ttime, basetime);
+		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData);
 
 		//Done, update the data
 		for(auto it : digwaves)
