@@ -43,11 +43,16 @@ public:
 
 	enum FlashType
 	{
+		//Generic
 		TYPE_COMMAND,
 		TYPE_ADDRESS,
 		TYPE_DATA,
 
 		TYPE_DUMMY,
+
+		//ID codes
+		TYPE_VENDOR_ID,
+		TYPE_PART_ID,
 
 		//Winbond W25N specific
 		TYPE_W25N_BLOCK_ADDR,
@@ -113,7 +118,17 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	enum VendorIDs
+	{
+		VENDOR_ID_CYPRESS	= 0x01,
+		VENDOR_ID_MICRON	= 0x20,
+		VENDOR_ID_WINBOND	= 0xef
+	};
+
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
+
+protected:
+	std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
 };
 
 #endif

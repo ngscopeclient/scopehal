@@ -195,7 +195,8 @@ void SPIFlashDecoder::Refresh()
 						//Read the IDCODE
 						case 0x9f:
 							current_cmd = SPIFlashSymbol::CMD_READ_JEDEC_ID;
-							state = STATE_READ_DATA;
+							state = STATE_DUMMY_BEFORE_DATA;
+							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
 							break;
 
 						//Read the status register
@@ -409,16 +410,40 @@ void SPIFlashDecoder::Refresh()
 				{
 					//At the end of a read command, crack status registers if needed
 					if(data_type != SPIFlashSymbol::TYPE_DATA)
-						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+					{
+						//If ID code, crack both
+						if(data_type == SPIFlashSymbol::TYPE_PART_ID)
+						{
+							pack->m_headers["Info"] +=
+								GetText(cap->m_samples.size()-2) +
+								" " +
+								GetText(cap->m_samples.size()-1);
+						}
+						else
+							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+					}
 
 					state = STATE_IDLE;
 				}
 				else
 				{
-					cap->m_offsets.push_back(dout->m_offsets[iin]);
-					cap->m_durations.push_back(dout->m_durations[iin]);
-					cap->m_samples.push_back(SPIFlashSymbol(
-						data_type, SPIFlashSymbol::CMD_UNKNOWN, dout->m_samples[iin].m_data));
+					//See what the last sample we produced was
+					//If it was a part ID, just append to it
+					size_t pos = cap->m_samples.size() - 1;
+					if( (data_type == SPIFlashSymbol::TYPE_PART_ID) &
+						(cap->m_samples[pos].m_type == SPIFlashSymbol::TYPE_PART_ID) )
+					{
+						cap->m_samples[pos].m_data = (cap->m_samples[pos].m_data << 8) | dout->m_samples[iin].m_data;
+					}
+
+					//Normal data
+					else
+					{
+						cap->m_offsets.push_back(dout->m_offsets[iin]);
+						cap->m_durations.push_back(dout->m_durations[iin]);
+						cap->m_samples.push_back(SPIFlashSymbol(
+							data_type, SPIFlashSymbol::CMD_UNKNOWN, dout->m_samples[iin].m_data));
+					}
 
 					//Extend the packet
 					pack->m_data.push_back(dout->m_samples[iin].m_data);
@@ -426,8 +451,20 @@ void SPIFlashDecoder::Refresh()
 					char tmp[128];
 					snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
 					pack->m_headers["Len"] = tmp;
+
+					//If reading multibyte special value (vendor ID etc), handle that
+					switch(data_type)
+					{
+						case SPIFlashSymbol::TYPE_VENDOR_ID:
+							data_type = SPIFlashSymbol::TYPE_PART_ID;
+							break;
+
+						default:
+							break;
+					}
 				}
-				break;
+
+				break;	//STATE_READ_DATA
 
 			//Read data in quad mode
 			case STATE_READ_QUAD_DATA:
@@ -526,6 +563,8 @@ Gdk::Color SPIFlashDecoder::GetColor(int i)
 				return m_standardColors[COLOR_ADDRESS];
 
 			case SPIFlashSymbol::TYPE_DATA:
+			case SPIFlashSymbol::TYPE_VENDOR_ID:
+			case SPIFlashSymbol::TYPE_PART_ID:
 			case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
 			case SPIFlashSymbol::TYPE_W25N_SR_PROT:
 			case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
@@ -551,6 +590,26 @@ string SPIFlashDecoder::GetText(int i)
 		{
 			case SPIFlashSymbol::TYPE_DUMMY:
 				return "Wait state";
+
+			case SPIFlashSymbol::TYPE_VENDOR_ID:
+				switch(s.m_data)
+				{
+					case VENDOR_ID_CYPRESS:
+						return "Cypress";
+					case VENDOR_ID_MICRON:
+						return "Micron";
+					case VENDOR_ID_WINBOND:
+						return "Winbond";
+
+					default:
+						snprintf(tmp, sizeof(tmp), "0x%x", s.m_data);
+						break;
+				}
+				break;
+
+			//Part ID depends on vendor ID
+			case SPIFlashSymbol::TYPE_PART_ID:
+				return GetPartID(capture, s, i);
 
 			case SPIFlashSymbol::TYPE_COMMAND:
 				switch(s.m_cmd)
@@ -676,4 +735,80 @@ string SPIFlashDecoder::GetText(int i)
 		return string(tmp);
 	}
 	return "";
+}
+
+string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i)
+{
+	char tmp[128];
+
+	//Look up the vendor ID
+	auto ivendor = cap->m_samples[i-1];
+	switch(ivendor.m_data)
+	{
+		case VENDOR_ID_CYPRESS:
+			switch(s.m_data)
+			{
+				//QSPI NOR
+				case 0x0217:
+					return "S25FS064x";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "%x", s.m_data);
+					return tmp;
+			}
+			break;
+
+		case VENDOR_ID_MICRON:
+			switch(s.m_data)
+			{
+				//(Q)SPI NOR
+				case 0x2014:
+					return "M25P80";
+				case 0x2018:
+					return "M25P128";
+				case 0x7114:
+					return "M25PX80";
+				case 0x8014:
+					return "M25PE80";
+				case 0xba19:
+					return "N25Q256x";
+				case 0xbb18:
+					return "N25Q128x";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "%x", s.m_data);
+					return tmp;
+			}
+			break;
+
+		case VENDOR_ID_WINBOND:
+			switch(s.m_data)
+			{
+				//QSPI NOR
+				case 0x4014:
+					return "W25Q80xx";
+				case 0x4018:
+					return "W25Q128xx";
+				case 0x6015:
+					return "W25Q16xx";
+				case 0x6016:
+					return "W25Q32xx";
+				case 0x6018:
+					return "W25Q128xx (QPI mode)";
+
+				//QSPI NAND
+				case 0xaa21:
+					return "W25N01GV";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "%x", s.m_data);
+					return tmp;
+			}
+			break;
+
+		//Unknown vendor, print part number as hex
+		default:
+			snprintf(tmp, sizeof(tmp), "%x", s.m_data);
+			return tmp;
+	}
 }
