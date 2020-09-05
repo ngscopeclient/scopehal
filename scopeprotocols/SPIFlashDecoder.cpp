@@ -145,7 +145,7 @@ void SPIFlashDecoder::Refresh()
 		STATE_QUAD_ADDRESS,
 		STATE_ADDRESS,
 		STATE_READ_DATA,
-		STATE_READ_QUAD_DATA,
+		STATE_QUAD_DATA,
 		STATE_WRITE_DATA,
 		STATE_DUMMY_BEFORE_ADDRESS,
 		STATE_DUMMY_BEFORE_DATA
@@ -186,21 +186,52 @@ void SPIFlashDecoder::Refresh()
 					//Parse the command
 					switch(s.m_data)
 					{
-						//Reset should occur by itself, ignore any data after that
-						case 0xff:
-							current_cmd = SPIFlashSymbol::CMD_RESET;
+						////////////////////////////////////////////////////////////////////////////////////////////////
+						// JEDEC standard commands (in numerical order)
+
+						//Write the status register
+						//TODO: address is W25N specific
+						case 0x01:
+						case 0x1f:
+							current_cmd = SPIFlashSymbol::CMD_WRITE_STATUS_REGISTER;
+							state = STATE_ADDRESS;
+							address_bytes_left = 1;
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							break;
+
+						//x1 program
+						case 0x02:
+							current_cmd = SPIFlashSymbol::CMD_PAGE_PROGRAM;
+							state = STATE_ADDRESS;
+							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							break;
+
+						//Slow read (no dummy clocks)
+						case 0x03:
+							current_cmd = SPIFlashSymbol::CMD_READ;
+							state = STATE_ADDRESS;
+							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							break;
+
+						//Clear write enable flag
+						case 0x04:
+							current_cmd = SPIFlashSymbol::CMD_WRITE_DISABLE;
 							state = STATE_IDLE;
 							break;
 
-						//Read the IDCODE
-						case 0x9f:
-							current_cmd = SPIFlashSymbol::CMD_READ_JEDEC_ID;
-							state = STATE_DUMMY_BEFORE_DATA;
-							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
+						//Set write enable flag
+						case 0x06:
+							current_cmd = SPIFlashSymbol::CMD_WRITE_ENABLE;
+							state = STATE_IDLE;
 							break;
 
 						//Read the status register
-						//TODO: this is W25N specific, normal NOR flash jumps right into the data
+						//TODO: address is is W25N specific, normal NOR flash jumps right into the data
 						//(need enum parameters!!!)
 						case 0x0f:
 						case 0x5f:
@@ -211,20 +242,39 @@ void SPIFlashDecoder::Refresh()
 							addr_start = din->m_offsets[iin+1];
 							break;
 
-						//Write the status register
-						//TODO: W25N specific
-						case 0x01:
-						case 0x1f:
-							current_cmd = SPIFlashSymbol::CMD_WRITE_STATUS_REGISTER;
+						//Quad input page program
+						case 0x32:
+							current_cmd = SPIFlashSymbol::CMD_QUAD_PAGE_PROGRAM;
 							state = STATE_ADDRESS;
-							address_bytes_left = 1;
+							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
 							break;
 
+						//0x3b 1-1-2 fast read
+
 						//1-1-4 fast read
 						case 0x6b:
 							current_cmd = SPIFlashSymbol::CMD_READ_1_1_4;
+							state = STATE_ADDRESS;
+							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							break;
+
+						//Read the IDCODE
+						case 0x9f:
+							current_cmd = SPIFlashSymbol::CMD_READ_JEDEC_ID;
+							state = STATE_DUMMY_BEFORE_DATA;
+							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
+							break;
+
+						//0xbb 1-2-2 fast read
+
+						//Erase a block (size is device dependent)
+						//Commonly 64 or 128 Kbytes
+						case 0xd8:
+							current_cmd = SPIFlashSymbol::CMD_BLOCK_ERASE;
 							state = STATE_ADDRESS;
 							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
@@ -240,17 +290,22 @@ void SPIFlashDecoder::Refresh()
 							addr_start = din->m_offsets[iin+1];
 							break;
 
-						//Slow read (no dummy clocks)
-						case 0x03:
-							current_cmd = SPIFlashSymbol::CMD_READ;
-							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
-							addr = 0;
-							addr_start = din->m_offsets[iin+1];
+						//Reset should occur by itself, ignore any data after that
+						case 0xff:
+							current_cmd = SPIFlashSymbol::CMD_RESET;
+							state = STATE_IDLE;
 							break;
 
 						////////////////////////////////////////////////////////////////////////////////////////////////
 						// Winbond W25N specific below here
+
+						//Execute the program operation
+						case 0x10:
+							current_cmd = SPIFlashSymbol::CMD_W25N_PROGRAM_EXECUTE;
+							state = STATE_DUMMY_BEFORE_ADDRESS;
+							address_bytes_left = 2;
+							addr = 0;
+							break;
 
 						//Read a page of NAND
 						case 0x13:
@@ -259,6 +314,17 @@ void SPIFlashDecoder::Refresh()
 							address_bytes_left = 2;
 							addr = 0;
 							break;
+
+						//0x0c fast read with 4 byte address
+						//0x34 quad random load program data
+						//0x3c fast read dual with 4 byte address
+						//0x6c fast read quad with 4 byte address
+						//0x84 random load program data
+						//0xA1 write bad block table
+						//0xA5 read bad block table
+						//0xA9 read last ECC failure address
+						//0xBC fast read dual i/o with 4 byte address
+						//0xEC fast read quad i/o with 4 byte address
 
 						//Drop unknown commands
 						default:
@@ -311,7 +377,7 @@ void SPIFlashDecoder::Refresh()
 					{
 						case SPIFlashSymbol::CMD_READ_1_1_4:
 						case SPIFlashSymbol::CMD_READ_1_4_4:
-							state = STATE_READ_QUAD_DATA;
+							state = STATE_QUAD_DATA;
 							break;
 						default:
 							state = STATE_READ_DATA;
@@ -323,9 +389,44 @@ void SPIFlashDecoder::Refresh()
 
 			//Read address in QSPI mode
 			case STATE_QUAD_ADDRESS:
-				//TODO
-				if(s.m_stype != SPISymbol::TYPE_DATA)
-					state = STATE_IDLE;
+
+				//Discard quad samples until we're lined up with the start of the x1 sample
+				while(iquad < quadlen)
+				{
+					if(dquad->m_offsets[iquad] >= din->m_offsets[iin])
+						break;
+					iquad ++;
+				}
+
+				//Read quad samples until we finish the address
+				while( (iquad < quadlen) && (address_bytes_left > 0) )
+				{
+					auto squad = dquad->m_samples[iquad];
+					if(squad.m_stype != SPISymbol::TYPE_DATA)
+						break;
+
+					//Save the address byte
+					addr = (addr << 8) | squad.m_data;
+					address_bytes_left --;
+
+					iquad ++;
+				}
+
+				//Add the address
+				cap->m_offsets.push_back(addr_start);
+				cap->m_durations.push_back(dquad->m_offsets[iquad] + dquad->m_durations[iquad] - addr_start);
+				cap->m_samples.push_back(SPIFlashSymbol(
+					SPIFlashSymbol::TYPE_ADDRESS, SPIFlashSymbol::CMD_UNKNOWN, addr));
+
+				{
+					char tmp[128] = "";
+					snprintf(tmp, sizeof(tmp), "%x", addr);
+					pack->m_headers["Address"] = tmp;
+				}
+
+				state = STATE_QUAD_DATA;
+				data_type = SPIFlashSymbol::TYPE_DATA;
+
 				break;
 
 			//Read address in SPI mode
@@ -350,6 +451,10 @@ void SPIFlashDecoder::Refresh()
 						{
 							case SPIFlashSymbol::CMD_READ:
 								//W25N is weird and needs dummy clocks even with the slow 0x03 read instruction
+								state = STATE_DUMMY_BEFORE_DATA;
+								break;
+
+							case SPIFlashSymbol::CMD_FAST_READ:
 								state = STATE_DUMMY_BEFORE_DATA;
 								break;
 
@@ -380,6 +485,16 @@ void SPIFlashDecoder::Refresh()
 							//Fast read has dummy clocks before data
 							case SPIFlashSymbol::CMD_READ_1_1_4:
 								state = STATE_DUMMY_BEFORE_DATA;
+								break;
+
+							//Writing a page
+							case SPIFlashSymbol::CMD_PAGE_PROGRAM:
+								state = STATE_WRITE_DATA;
+								break;
+
+							//Writing a page in x4 mode
+							case SPIFlashSymbol::CMD_QUAD_PAGE_PROGRAM:
+								state = STATE_QUAD_DATA;
 								break;
 
 							default:
@@ -466,8 +581,8 @@ void SPIFlashDecoder::Refresh()
 
 				break;	//STATE_READ_DATA
 
-			//Read data in quad mode
-			case STATE_READ_QUAD_DATA:
+			//Read or write data in quad mode
+			case STATE_QUAD_DATA:
 
 				//Discard quad samples until we're lined up with the start of the x1 sample
 				while(iquad < quadlen)
@@ -616,10 +731,12 @@ string SPIFlashDecoder::GetText(int i)
 				{
 					case SPIFlashSymbol::CMD_READ:
 						return "Read";
+					case SPIFlashSymbol::CMD_FAST_READ:
+						return "Read Fast";
 					case SPIFlashSymbol::CMD_READ_1_1_4:
-						return "Quad Read";
+						return "Read Quad";
 					case SPIFlashSymbol::CMD_READ_1_4_4:
-						return "Quad I/O Read";
+						return "Read Quad I/O";
 					case SPIFlashSymbol::CMD_READ_JEDEC_ID:
 						return "Read JEDEC ID";
 					case SPIFlashSymbol::CMD_READ_STATUS_REGISTER:
@@ -628,6 +745,18 @@ string SPIFlashDecoder::GetText(int i)
 						return "Write Status";
 					case SPIFlashSymbol::CMD_RESET:
 						return "Reset";
+					case SPIFlashSymbol::CMD_WRITE_DISABLE:
+						return "Write Disable";
+					case SPIFlashSymbol::CMD_WRITE_ENABLE:
+						return "Write Enable";
+					case SPIFlashSymbol::CMD_BLOCK_ERASE:
+						return "Block Erase";
+					case SPIFlashSymbol::CMD_PAGE_PROGRAM:
+						return "Page Program";
+
+					//W25N specific
+					case SPIFlashSymbol::CMD_W25N_PROGRAM_EXECUTE:
+						return "Program Execute";
 					case SPIFlashSymbol::CMD_W25N_READ_PAGE:
 						return "Read Page";
 
@@ -811,4 +940,29 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 			snprintf(tmp, sizeof(tmp), "%x", s.m_data);
 			return tmp;
 	}
+}
+
+bool SPIFlashDecoder::CanMerge(Packet* a, Packet* b)
+{
+	//Merge read-status packets
+	if( (a->m_headers["Op"] == "Read Status") && (b->m_headers["Op"] == "Read Status") )
+		return true;
+
+	return false;
+}
+
+Packet* SPIFlashDecoder::CreateMergedHeader(Packet* pack)
+{
+	if(pack->m_headers["Op"] == "Read Status")
+	{
+		Packet* ret = new Packet;
+		ret->m_offset = pack->m_offset;
+		ret->m_len = pack->m_len;			//TODO: extend?
+		ret->m_headers["Op"] = "Poll Status";
+
+		//TODO: add other fields?
+		return ret;
+	}
+
+	return NULL;
 }

@@ -72,6 +72,9 @@ public:
 	virtual bool GetShowDataColumn();
 	virtual bool GetShowImageColumn();
 
+	virtual Packet* CreateMergedHeader(Packet* pack);
+	virtual bool CanMerge(Packet* a, Packet* b);
+
 protected:
 	void ClearPackets();
 

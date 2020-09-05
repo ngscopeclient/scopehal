@@ -69,12 +69,19 @@ public:
 		CMD_WRITE_STATUS_REGISTER,
 		CMD_READ_JEDEC_ID,
 		CMD_READ,			//Read, SPI address, SPI data
+		CMD_FAST_READ,		//Fast read, SPI mode, with pipeline delay
 		CMD_READ_1_1_4,		//Fast read, SPI address, QSPI data
 		CMD_READ_1_4_4,		//Fast read, QSPI address, QSPI data
 		CMD_RESET,
+		CMD_WRITE_ENABLE,
+		CMD_WRITE_DISABLE,
+		CMD_BLOCK_ERASE,
+		CMD_PAGE_PROGRAM,
+		CMD_QUAD_PAGE_PROGRAM,
 
 		//Winbond W25N specific
 		CMD_W25N_READ_PAGE,
+		CMD_W25N_PROGRAM_EXECUTE,
 
 		CMD_UNKNOWN
 	} m_cmd;
@@ -124,6 +131,9 @@ public:
 		VENDOR_ID_MICRON	= 0x20,
 		VENDOR_ID_WINBOND	= 0xef
 	};
+
+	virtual bool CanMerge(Packet* a, Packet* b);
+	virtual Packet* CreateMergedHeader(Packet* pack);
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 
