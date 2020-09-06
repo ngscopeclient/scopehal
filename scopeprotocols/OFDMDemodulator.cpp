@@ -149,6 +149,10 @@ void OFDMDemodulator::ClearSweeps()
 
 void OFDMDemodulator::Refresh()
 {
+	//Not implemented, do nothing
+	SetData(NULL, 0);
+	return;
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndAnalog())
 	{
