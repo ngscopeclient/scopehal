@@ -230,6 +230,15 @@ void SPIFlashDecoder::Refresh()
 							state = STATE_IDLE;
 							break;
 
+						//Fast read (with dummy clocks)
+						case 0x0b:
+							current_cmd = SPIFlashSymbol::CMD_FAST_READ;
+							state = STATE_ADDRESS;
+							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							break;
+
 						//Read the status register
 						//TODO: address is is W25N specific, normal NOR flash jumps right into the data
 						//(need enum parameters!!!)
