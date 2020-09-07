@@ -231,8 +231,6 @@ void EthernetRGMIIDecoder::Refresh()
 			}
 		}
 
-		LogDebug("\n");
-
 		//Crunch the data
 		BytesToFrames(bytes, starts, ends, cap);
 	}
