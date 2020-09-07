@@ -217,7 +217,7 @@ double Unit::ParseString(string str)
 			scale = 1000000000.0;
 		else if(c == 'M')
 			scale = 1000000.0;
-		else if(c == 'K')
+		else if(c == 'K' || c == 'k')
 			scale = 1000.0;
 		else if(c == 'm')
 			scale = 0.001;
