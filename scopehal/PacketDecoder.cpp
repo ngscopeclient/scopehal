@@ -30,6 +30,28 @@
 #include "scopehal.h"
 #include "PacketDecoder.h"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Color schemes
+
+Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
+{
+	Gdk::Color("#101010"),		//COLOR_DEFAULT
+	Gdk::Color("#800000"),		//COLOR_ERROR
+	Gdk::Color("#000080"),		//COLOR_STATUS
+	Gdk::Color("#808000"),		//COLOR_CONTROL
+	Gdk::Color("#336699"),		//COLOR_DATA_READ
+	Gdk::Color("#339966"),		//COLOR_DATA_WRITE
+	Gdk::Color("#600050"),		//COLOR_COMMAND
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Packet
+
+Packet::Packet()
+	: m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::COLOR_DEFAULT])
+{
+}
+
 Packet::~Packet()
 {
 }

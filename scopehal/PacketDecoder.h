@@ -39,6 +39,7 @@
 class Packet
 {
 public:
+	Packet();
 	virtual ~Packet();
 
 	///Offset of the packet from the start of the capture (picoseconds)
@@ -52,6 +53,9 @@ public:
 
 	//Packet bytes
 	std::vector<uint8_t> m_data;
+
+	//Background color of the packet
+	Gdk::Color m_displayBackgroundColor;
 };
 
 /**
@@ -74,6 +78,26 @@ public:
 
 	virtual Packet* CreateMergedHeader(Packet* pack);
 	virtual bool CanMerge(Packet* a, Packet* b);
+
+	/**
+		@brief Standard colors for protocol analyzer lines.
+
+		Do not change ordering, add new items to the end only.
+	 */
+	enum
+	{
+		COLOR_DEFAULT,			//Default color if not otherwise specified
+		COLOR_ERROR,			//Malformed packets, or packets indicating an error condition
+		COLOR_STATUS,			//Reading or writing status registers
+		COLOR_CONTROL,			//Reading or writing control registers
+		COLOR_DATA_READ,		//Reading unspecified data
+		COLOR_DATA_WRITE,		//Writing unspecified data
+		COLOR_COMMAND,			//Executing commands of some sort
+
+		STANDARD_COLOR_COUNT
+	} standard_color;
+
+	static Gdk::Color m_backgroundColors[STANDARD_COLOR_COUNT];
 
 protected:
 	void ClearPackets();

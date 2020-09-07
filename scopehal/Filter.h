@@ -231,7 +231,7 @@ public:
 	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
 
 	/**
-		@brief Standard colors for protocol decoder decode overlays.
+		@brief Standard colors for protocol decode overlays.
 
 		Do not change ordering, add new items to the end only.
 	 */
