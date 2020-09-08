@@ -194,7 +194,7 @@ string Unit::PrettyPrint(double value)
 			break;
 
 		default:
-			snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+			snprintf(tmp, sizeof(tmp), "%.4f %s%s", value_rescaled, scale, unit);
 			break;
 	}
 	return string(tmp);

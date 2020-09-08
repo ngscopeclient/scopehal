@@ -119,7 +119,8 @@ double ClockRecoveryFilter::GetVoltageRange()
 
 void ClockRecoveryFilter::Refresh()
 {
-	if(!VerifyAllInputsOK())
+	//Require a data signal, but not necessarily a gate
+	if(!VerifyInputOK(0))
 	{
 		SetData(NULL, 0);
 		return;

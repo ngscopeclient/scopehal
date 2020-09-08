@@ -269,11 +269,21 @@ protected:
 	bool m_dirty;
 
 	bool VerifyAllInputsOK(bool allowEmpty = false);
+	bool VerifyInputOK(size_t i, bool allowEmpty = false);
 	bool VerifyAllInputsOKAndAnalog();
 
-	///Gets the waveform attached to the specified input
+	/**
+		@brief Gets the waveform attached to the specified input.
+
+		This function is safe to call on a NULL input and will return NULL in that case.
+	 */
 	WaveformBase* GetInputWaveform(size_t i)
-	{ return m_inputs[i].m_channel->GetData(m_inputs[i].m_stream); }
+	{
+		auto chan = m_inputs[i].m_channel;
+		if(chan == NULL)
+			return NULL;
+		return chan->GetData(m_inputs[i].m_stream);
+	}
 
 	///Gets the analog waveform attached to the specified input
 	AnalogWaveform* GetAnalogInputWaveform(size_t i)

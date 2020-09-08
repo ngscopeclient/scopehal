@@ -442,23 +442,36 @@ Filter* Filter::CreateFilter(string protocol, string color)
 // Input verification helpers
 
 /**
+	@brief Returns true if a given input to the filter is non-NULL (and, optionally has a non-empty waveform present)
+ */
+bool Filter::VerifyInputOK(size_t i, bool allowEmpty)
+{
+	auto p = m_inputs[i];
+
+	if(p.m_channel == NULL)
+		return false;
+	auto data = p.GetData();
+	if(data == NULL)
+		return false;
+
+	if(!allowEmpty)
+	{
+		if(data->m_offsets.size() == 0)
+			return false;
+	}
+
+	return true;
+}
+
+/**
 	@brief Returns true if every input to the filter is non-NULL (and, optionally has a non-empty waveform present)
  */
 bool Filter::VerifyAllInputsOK(bool allowEmpty)
 {
-	for(auto p : m_inputs)
+	for(size_t i=0; i<m_inputs.size(); i++)
 	{
-		if(p.m_channel == NULL)
+		if(!VerifyInputOK(i, allowEmpty))
 			return false;
-		auto data = p.m_channel->GetData(p.m_stream);
-		if(data == NULL)
-			return false;
-
-		if(!allowEmpty)
-		{
-			if(data->m_offsets.size() == 0)
-				return false;
-		}
 	}
 
 	return true;
