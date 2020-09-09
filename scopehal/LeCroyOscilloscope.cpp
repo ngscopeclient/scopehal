@@ -1554,7 +1554,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 
 	tmp = data.substr(data.find("<NumSamples>") + 12);
 	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
-	int num_samples = atoi(tmp.c_str());
+	size_t num_samples = atoi(tmp.c_str());
 	//LogDebug("Expecting %d samples\n", num_samples);
 
 	//Extract the raw trigger timestamp (nanoseconds since Jan 1 2000)
@@ -1604,6 +1604,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	base64_decode_block(tmp.c_str(), tmp.length(), (char*)block, &bstate);
 
 	//We have each channel's data from start to finish before the next (no interleaving).
+	//TODO: Multithread across waveforms
 	unsigned int icapchan = 0;
 	for(unsigned int i=0; i<m_digitalChannelCount; i++)
 	{
@@ -1615,15 +1616,54 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
 			cap->m_startPicoseconds = start_ps;
+
+			//Preallocate memory assuming no deduplication possible
 			cap->Resize(num_samples);
 
-			//TODO: AVX this
-			for(int j=0; j<num_samples; j++)
+			//Save the first sample (can't merge with sample -1 because that doesn't exist)
+			size_t base = icapchan*num_samples;
+			size_t k = 0;
+			cap->m_offsets[0] = 0;
+			cap->m_durations[0] = 1;
+			cap->m_samples[0] = block[base];
+
+			//Read and de-duplicate the other samples
+			//TODO: can we vectorize this somehow?
+			bool last = block[base];
+			for(size_t j=1; j<num_samples; j++)
 			{
-				cap->m_offsets[j] = j;
-				cap->m_durations[j] = 1;
-				cap->m_samples[j] = block[icapchan*num_samples + j];
+				bool sample = block[base + j];
+
+				//Deduplicate consecutive samples with same value
+				if(last == sample)
+					cap->m_durations[k] ++;
+
+				//Nope, it toggled - store the new value
+				else
+				{
+					k++;
+					cap->m_offsets[k] = j;
+					cap->m_durations[k] = 1;
+					cap->m_samples[k] = sample;
+					last = sample;
+				}
+
 			}
+
+			//Done, shrink any unused space
+			cap->Resize(k);
+			cap->m_offsets.shrink_to_fit();
+			cap->m_durations.shrink_to_fit();
+			cap->m_samples.shrink_to_fit();
+
+			//See how much space we saved
+			/*
+			LogDebug("%s: %zu samples deduplicated to %zu (%.1f %%)\n",
+				m_digitalChannels[i]->m_displayname.c_str(),
+				num_samples,
+				k,
+				(k * 100.0f) / num_samples);
+			*/
 
 			//Done, save data and go on to next
 			ret[m_digitalChannels[i]->GetIndex()] = cap;
