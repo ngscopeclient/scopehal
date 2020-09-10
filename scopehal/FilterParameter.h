@@ -30,67 +30,82 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of FilterParameter
  */
 
-#ifndef scopehal_h
-#define scopehal_h
+#ifndef FilterParameter_h
+#define FilterParameter_h
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+class FilterParameter
+{
+public:
+	enum ParameterTypes
+	{
+		TYPE_FLOAT,
+		TYPE_INT,
+		TYPE_BOOL,
+		TYPE_FILENAME,	//one file
+		TYPE_FILENAMES,	//multiple files
+		TYPE_ENUM		//enumerated constant
+	};
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	FilterParameter()
+	: m_unit(Unit::UNIT_PS)
+	{}
 
-#include <yaml-cpp/yaml.h>
+	FilterParameter(ParameterTypes type, Unit unit);
 
+	void ParseString(std::string str);
+	std::string ToString();
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	bool GetBoolVal()
+	{ return (m_intval != 0); }
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	int64_t GetIntVal();
+	float GetFloatVal();
+	std::string GetFileName();
+	std::vector<std::string> GetFileNames();
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	void SetBoolVal(bool b)
+	{ m_intval = b; }
+	void SetIntVal(int64_t i);
+	void SetFloatVal(float f);
+	void SetFileName(std::string f);
+	void SetFileNames(std::vector<std::string> names);
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+	ParameterTypes GetType()
+	{ return m_type; }
 
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
+	//File filters for TYPE_FILENAME / TYPE_FILENAMES(otherwise ignored)
+	std::string m_fileFilterMask;
+	std::string m_fileFilterName;
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+	//Add an enumerated value
+	void AddEnumValue(std::string name, int value)
+	{
+		m_forwardEnumMap[name] = value;
+		m_reverseEnumMap[value] = name;
+	}
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	//Gets a list of legal values
+	void GetEnumValues(std::vector<std::string>& values)
+	{
+		for(auto it : m_forwardEnumMap)
+			values.push_back(it.first);
+	}
 
-std::string GetDefaultChannelColor(int i);
+protected:
+	ParameterTypes m_type;
 
-void TransportStaticInit();
-void DriverStaticInit();
+	Unit						m_unit;
 
-void InitializePlugins();
-void DetectCPUFeatures();
+	std::map<std::string, int>	m_forwardEnumMap;
+	std::map<int, std::string>	m_reverseEnumMap;
 
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
+	int64_t						m_intval;
+	float						m_floatval;
+	std::string					m_filename;
+	std::vector<std::string>	m_filenames;
+};
 
 #endif

@@ -38,60 +38,6 @@
 
 #include "OscilloscopeChannel.h"
 
-class FilterParameter
-{
-public:
-	enum ParameterTypes
-	{
-		TYPE_FLOAT,
-		TYPE_INT,
-		TYPE_BOOL,
-		TYPE_FILENAME,	//one file
-		TYPE_FILENAMES	//multiple files
-	};
-
-	FilterParameter()
-	: m_unit(Unit::UNIT_PS)
-	{}
-
-	FilterParameter(ParameterTypes type, Unit unit);
-
-	void ParseString(std::string str);
-	std::string ToString();
-
-	bool GetBoolVal()
-	{ return (m_intval != 0); }
-
-	int64_t GetIntVal();
-	float GetFloatVal();
-	std::string GetFileName();
-	std::vector<std::string> GetFileNames();
-
-	void SetBoolVal(bool b)
-	{ m_intval = b; }
-	void SetIntVal(int64_t i);
-	void SetFloatVal(float f);
-	void SetFileName(std::string f);
-	void SetFileNames(std::vector<std::string> names);
-
-	ParameterTypes GetType()
-	{ return m_type; }
-
-	//File filters for TYPE_FILENAME / TYPE_FILENAMES(otherwise ignored)
-	std::string m_fileFilterMask;
-	std::string m_fileFilterName;
-
-protected:
-	ParameterTypes m_type;
-
-	Unit						m_unit;
-
-	int64_t						m_intval;
-	float						m_floatval;
-	std::string					m_filename;
-	std::vector<std::string>	m_filenames;
-};
-
 /**
 	@brief Descriptor for a single stream coming off a channel
  */

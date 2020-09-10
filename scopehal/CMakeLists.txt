@@ -55,6 +55,7 @@ set(SCOPEHAL_SOURCES
 	PowerSupply.cpp
 
 	Filter.cpp
+	FilterParameter.cpp
 	PacketDecoder.cpp
 	Statistic.cpp
 	)
