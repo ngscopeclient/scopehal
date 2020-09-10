@@ -113,11 +113,9 @@ void SPIDecoder::Refresh()
 
 	//TODO: different cpha/cpol modes
 
-	//TODO: packets based on CS# pulses
+	//TODO: packets based on CS# pulses?
 
 	//Loop over the data and look for transactions
-	//For now, assume equal sample rate
-
 	enum
 	{
 		STATE_DESELECTED,
@@ -130,14 +128,22 @@ void SPIDecoder::Refresh()
 	int64_t bytestart		= 0;
 	bool first				= false;
 
-	size_t len = clk->m_samples.size();
-	len = min(len, csn->m_samples.size());
-	len = min(len, data->m_samples.size());
-	for(size_t i=0; i<len; i++)
+	size_t ics			= 0;
+	size_t iclk			= 0;
+	size_t idata		= 0;
+
+	int64_t timestamp	= 0;
+
+	size_t clklen = clk->m_samples.size();
+	size_t cslen = csn->m_samples.size();
+	size_t datalen = data->m_samples.size();
+
+	while(true)
 	{
-		bool cur_cs = csn->m_samples[i];
-		bool cur_clk = clk->m_samples[i];
-		bool cur_data = data->m_samples[i];
+		//Get the current samples
+		bool cur_cs = csn->m_samples[ics];
+		bool cur_clk = clk->m_samples[iclk];
+		bool cur_data = data->m_samples[idata];
 
 		switch(state)
 		{
@@ -148,7 +154,7 @@ void SPIDecoder::Refresh()
 					state = STATE_SELECTED_CLKLO;
 					current_byte = 0;
 					bitcount = 0;
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					first = true;
 				}
 				break;
@@ -163,11 +169,20 @@ void SPIDecoder::Refresh()
 						if(first)
 						{
 							cap->m_offsets.push_back(bytestart);
-							cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+							cap->m_durations.push_back(timestamp - bytestart);
 							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
 							first = false;
 						}
-						bytestart = clk->m_offsets[i];
+
+						//Extend the last byte until this edge
+						else if(!cap->m_samples.empty())
+						{
+							size_t ilast = cap->m_samples.size()-1;
+							if(cap->m_samples[ilast].m_stype == SPISymbol::TYPE_DATA)
+								cap->m_durations[ilast] = timestamp - cap->m_offsets[ilast];
+						}
+
+						bytestart = timestamp;
 					}
 
 					state = STATE_SELECTED_CLKHI;
@@ -182,12 +197,12 @@ void SPIDecoder::Refresh()
 					if(bitcount == 8)
 					{
 						cap->m_offsets.push_back(bytestart);
-						cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+						cap->m_durations.push_back(timestamp - bytestart);
 						cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
 
 						bitcount = 0;
 						current_byte = 0;
-						bytestart = clk->m_offsets[i];
+						bytestart = timestamp;
 					}
 				}
 
@@ -196,10 +211,10 @@ void SPIDecoder::Refresh()
 				else if(cur_cs)
 				{
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					state = STATE_DESELECTED;
 				}
 				break;
@@ -214,16 +229,43 @@ void SPIDecoder::Refresh()
 				else if(cur_cs)
 				{
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					state = STATE_DESELECTED;
 				}
 
 				break;
 		}
+
+		//Get timestamps of next event on each channel
+		int64_t next_cs = timestamp;
+		if( (ics + 1) < cslen)
+			next_cs = csn->m_offsets[ics + 1];
+		int64_t next_clk = timestamp;
+		if( (iclk + 1) < clklen)
+			next_clk = clk->m_offsets[iclk + 1];
+		int64_t next_data = timestamp;
+		if( (idata + 1) < datalen)
+			next_data = data->m_offsets[idata + 1];
+		int64_t next_timestamp = min(next_cs, min(next_clk, next_data));
+
+		//If we can't move forward, stop
+		if(next_timestamp == timestamp)
+			break;
+
+		timestamp = next_timestamp;
+
+		while( ((ics + 1) <= cslen) && (csn->m_offsets[ics + 1] <= timestamp) )
+			ics ++;
+		while( ((iclk + 1) < clklen) && (clk->m_offsets[iclk + 1] <= timestamp) )
+			iclk ++;
+		while( ((idata + 1) < datalen) && (data->m_offsets[idata + 1] <= timestamp) )
+			idata ++;
 	}
+
+	LogDebug("%zu events\n", cap->m_samples.size());
 
 	SetData(cap, 0);
 }
