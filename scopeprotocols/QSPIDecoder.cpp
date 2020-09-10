@@ -121,13 +121,9 @@ void QSPIDecoder::Refresh()
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startPicoseconds = clk->m_startPicoseconds;
 
-	//TODO: different cpha/cpol modes
-
 	//TODO: packets based on CS# pulses
 
 	//Loop over the data and look for transactions
-	//For now, assume equal sample rate
-
 	enum
 	{
 		STATE_DESELECTED,
@@ -135,27 +131,37 @@ void QSPIDecoder::Refresh()
 		STATE_SELECTED_CLKHI
 	} state = STATE_DESELECTED;
 
-	bool high_nibble			= true;
+	bool high_nibble		= true;
 	int64_t bytestart		= 0;
 	uint8_t current_byte	= 0;
 	bool first_byte			= false;
+	size_t last_bytelen 	= 0;
 
-	size_t len = clk->m_samples.size();
-	len = min(len, csn->m_samples.size());
-	len = min(len, data0->m_samples.size());
-	len = min(len, data1->m_samples.size());
-	len = min(len, data2->m_samples.size());
-	len = min(len, data3->m_samples.size());
-	size_t last_bytelen = 0;
-	for(size_t i=0; i<len; i++)
+	size_t clklen = clk->m_samples.size();
+	size_t cslen = csn->m_samples.size();
+	size_t datalen[4] =
 	{
-		bool cur_cs = csn->m_samples[i];
-		bool cur_clk = clk->m_samples[i];
+		data0->m_samples.size(),
+		data1->m_samples.size(),
+		data2->m_samples.size(),
+		data3->m_samples.size()
+	};
+
+	size_t ics			= 0;
+	size_t iclk			= 0;
+	size_t idata[4]		= {0};
+
+	int64_t timestamp	= 0;
+
+	while(true)
+	{
+		bool cur_cs = csn->m_samples[ics];
+		bool cur_clk = clk->m_samples[iclk];
 		uint8_t cur_data =
-			(data3->m_samples[i] ? 0x8 : 0) |
-			(data2->m_samples[i] ? 0x4 : 0) |
-			(data1->m_samples[i] ? 0x2 : 0) |
-			(data0->m_samples[i] ? 0x1 : 0);
+			(data3->m_samples[idata[3]] ? 0x8 : 0) |
+			(data2->m_samples[idata[2]] ? 0x4 : 0) |
+			(data1->m_samples[idata[1]] ? 0x2 : 0) |
+			(data0->m_samples[idata[0]] ? 0x1 : 0);
 
 		switch(state)
 		{
@@ -166,7 +172,7 @@ void QSPIDecoder::Refresh()
 					state = STATE_SELECTED_CLKLO;
 					current_byte = 0;
 					high_nibble = true;
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					first_byte = true;
 				}
 				break;
@@ -184,7 +190,7 @@ void QSPIDecoder::Refresh()
 						if(first_byte)
 						{
 							cap->m_offsets.push_back(bytestart);
-							cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+							cap->m_durations.push_back(timestamp - bytestart);
 							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_SELECT, 0));
 						}
 
@@ -192,13 +198,13 @@ void QSPIDecoder::Refresh()
 						else
 						{
 							cap->m_offsets.push_back(bytestart);
-							last_bytelen = clk->m_offsets[i] - bytestart;
+							last_bytelen = timestamp - bytestart;
 							cap->m_durations.push_back(last_bytelen);
 							cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DATA, current_byte));
 						}
 
 						current_byte = (cur_data << 4);
-						bytestart = clk->m_offsets[i];
+						bytestart = timestamp;
 						first_byte = false;
 					}
 
@@ -220,10 +226,10 @@ void QSPIDecoder::Refresh()
 
 					bytestart += last_bytelen;
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					state = STATE_DESELECTED;
 				}
 				break;
@@ -238,15 +244,33 @@ void QSPIDecoder::Refresh()
 				else if(cur_cs)
 				{
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(clk->m_offsets[i] - bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(SPISymbol(SPISymbol::TYPE_DESELECT, 0));
 
-					bytestart = clk->m_offsets[i];
+					bytestart = timestamp;
 					state = STATE_DESELECTED;
 				}
 
 				break;
 		}
+
+		//Get timestamps of next event on each channel
+		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
+
+		//If we can't move forward, stop (don't bother looking for glitches on data)
+		int64_t next_timestamp = min(next_clk, next_cs);
+		if(next_timestamp == timestamp)
+			break;
+
+		//All good, move on
+		timestamp = next_timestamp;
+		AdvanceToTimestamp(csn, ics, cslen, timestamp);
+		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
+		AdvanceToTimestamp(data0, idata[0], datalen[0], timestamp);
+		AdvanceToTimestamp(data1, idata[1], datalen[1], timestamp);
+		AdvanceToTimestamp(data2, idata[2], datalen[2], timestamp);
+		AdvanceToTimestamp(data3, idata[3], datalen[3], timestamp);
 	}
 
 	SetData(cap, 0);

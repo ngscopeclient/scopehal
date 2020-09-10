@@ -272,6 +272,22 @@ protected:
 	bool VerifyInputOK(size_t i, bool allowEmpty = false);
 	bool VerifyAllInputsOKAndAnalog();
 
+	///Gets the timestamp of the next event (if any) on a waveform
+	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+	{
+		if(i+1 < len)
+			return wfm->m_offsets[i+1];
+		else
+			return timestamp;
+	}
+
+	///Advance the waveform to a given timestamp
+	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+	{
+		while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
+			i ++;
+	}
+
 	/**
 		@brief Gets the waveform attached to the specified input.
 

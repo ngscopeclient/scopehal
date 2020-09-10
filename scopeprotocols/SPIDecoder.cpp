@@ -240,32 +240,20 @@ void SPIDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		int64_t next_cs = timestamp;
-		if( (ics + 1) < cslen)
-			next_cs = csn->m_offsets[ics + 1];
-		int64_t next_clk = timestamp;
-		if( (iclk + 1) < clklen)
-			next_clk = clk->m_offsets[iclk + 1];
-		int64_t next_data = timestamp;
-		if( (idata + 1) < datalen)
-			next_data = data->m_offsets[idata + 1];
-		int64_t next_timestamp = min(next_cs, min(next_clk, next_data));
+		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
 
-		//If we can't move forward, stop
+		//If we can't move forward, stop (don't bother looking for glitches on data)
+		int64_t next_timestamp = min(next_clk, next_cs);
 		if(next_timestamp == timestamp)
 			break;
 
+		//All good, move on
 		timestamp = next_timestamp;
-
-		while( ((ics + 1) <= cslen) && (csn->m_offsets[ics + 1] <= timestamp) )
-			ics ++;
-		while( ((iclk + 1) < clklen) && (clk->m_offsets[iclk + 1] <= timestamp) )
-			iclk ++;
-		while( ((idata + 1) < datalen) && (data->m_offsets[idata + 1] <= timestamp) )
-			idata ++;
+		AdvanceToTimestamp(csn, ics, cslen, timestamp);
+		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
+		AdvanceToTimestamp(data, idata, datalen, timestamp);
 	}
-
-	LogDebug("%zu events\n", cap->m_samples.size());
 
 	SetData(cap, 0);
 }
