@@ -42,6 +42,12 @@ SPIFlashDecoder::SPIFlashDecoder(string color)
 	CreateInput("spi_in");
 	CreateInput("spi_out");
 	CreateInput("qspi");
+
+	m_typename = "Flash Type";
+	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_typename].AddEnumValue("Generic (3-byte address)", FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
+	m_parameters[m_typename].AddEnumValue("Winbond W25N", FLASH_TYPE_WINBOND_W25N);
+	m_parameters[m_typename].SetIntVal(FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +110,8 @@ vector<string> SPIFlashDecoder::GetHeaders()
 void SPIFlashDecoder::Refresh()
 {
 	ClearPackets();
+
+	FlashType flashtype = (FlashType)m_parameters[m_typename].GetIntVal();
 
 	//Input/output x1 inputs are required
 	if( (m_inputs[0].m_channel == NULL) || (m_inputs[1].m_channel == NULL) )
@@ -191,14 +199,22 @@ void SPIFlashDecoder::Refresh()
 						// JEDEC standard commands (in numerical order)
 
 						//Write the status register
-						//TODO: address is W25N specific
 						case 0x01:
 						case 0x1f:
 							current_cmd = SPIFlashSymbol::CMD_WRITE_STATUS_REGISTER;
-							state = STATE_ADDRESS;
-							address_bytes_left = 1;
-							addr = 0;
-							addr_start = din->m_offsets[iin+1];
+
+							//We need an address here
+							if(flashtype == FLASH_TYPE_WINBOND_W25N)
+							{
+								state = STATE_ADDRESS;
+								address_bytes_left = 1;
+								addr = 0;
+								addr_start = din->m_offsets[iin+1];
+							}
+
+							//No address for standard flash
+							else
+								state = STATE_WRITE_DATA;
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_CONTROL];
 							break;
@@ -207,9 +223,20 @@ void SPIFlashDecoder::Refresh()
 						case 0x02:
 							current_cmd = SPIFlashSymbol::CMD_PAGE_PROGRAM;
 							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
 							break;
@@ -218,9 +245,20 @@ void SPIFlashDecoder::Refresh()
 						case 0x03:
 							current_cmd = SPIFlashSymbol::CMD_READ;
 							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
 							break;
@@ -244,24 +282,44 @@ void SPIFlashDecoder::Refresh()
 						//Fast read (with dummy clocks)
 						case 0x0b:
 							current_cmd = SPIFlashSymbol::CMD_FAST_READ;
-							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
+
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									state = STATE_ADDRESS;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									state = STATE_DUMMY_BEFORE_ADDRESS;
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
 							break;
 
 						//Read the status register
-						//TODO: address is is W25N specific, normal NOR flash jumps right into the data
-						//(need enum parameters!!!)
 						case 0x0f:
 						case 0x5f:
 							current_cmd = SPIFlashSymbol::CMD_READ_STATUS_REGISTER;
-							state = STATE_ADDRESS;
-							address_bytes_left = 1;
-							addr = 0;
-							addr_start = din->m_offsets[iin+1];
+
+							//We need an address here
+							if(flashtype == FLASH_TYPE_WINBOND_W25N)
+							{
+								state = STATE_ADDRESS;
+								address_bytes_left = 1;
+								addr = 0;
+								addr_start = din->m_offsets[iin+1];
+							}
+
+							//No address for standard flash
+							else
+								state = STATE_READ_DATA;
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
 							break;
@@ -270,9 +328,20 @@ void SPIFlashDecoder::Refresh()
 						case 0x32:
 							current_cmd = SPIFlashSymbol::CMD_QUAD_PAGE_PROGRAM;
 							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_WRITE];
 							break;
@@ -283,9 +352,20 @@ void SPIFlashDecoder::Refresh()
 						case 0x6b:
 							current_cmd = SPIFlashSymbol::CMD_READ_1_1_4;
 							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
 							break;
@@ -306,9 +386,20 @@ void SPIFlashDecoder::Refresh()
 						case 0xd8:
 							current_cmd = SPIFlashSymbol::CMD_BLOCK_ERASE;
 							state = STATE_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
 							break;
@@ -317,9 +408,20 @@ void SPIFlashDecoder::Refresh()
 						case 0xeb:
 							current_cmd = SPIFlashSymbol::CMD_READ_1_4_4;
 							state = STATE_QUAD_ADDRESS;
-							address_bytes_left = 2;		//TODO: this is device specific, current value is for W25N
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									address_bytes_left = 2;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									address_bytes_left = 3;
+									break;
+							}
 
 							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
 							break;
@@ -492,8 +594,13 @@ void SPIFlashDecoder::Refresh()
 						switch(current_cmd)
 						{
 							case SPIFlashSymbol::CMD_READ:
+
 								//W25N is weird and needs dummy clocks even with the slow 0x03 read instruction
-								state = STATE_DUMMY_BEFORE_DATA;
+								if(flashtype == FLASH_TYPE_WINBOND_W25N)
+									state = STATE_DUMMY_BEFORE_DATA;
+								else
+									state = STATE_READ_DATA;
+
 								break;
 
 							case SPIFlashSymbol::CMD_FAST_READ:

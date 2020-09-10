@@ -132,6 +132,12 @@ public:
 		VENDOR_ID_WINBOND	= 0xef
 	};
 
+	enum FlashType
+	{
+		FLASH_TYPE_GENERIC_3BYTE_ADDRESS,
+		FLASH_TYPE_WINBOND_W25N
+	};
+
 	virtual bool CanMerge(Packet* a, Packet* b);
 	virtual Packet* CreateMergedHeader(Packet* pack);
 
@@ -139,6 +145,8 @@ public:
 
 protected:
 	std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
+
+	std::string m_typename;
 };
 
 #endif
