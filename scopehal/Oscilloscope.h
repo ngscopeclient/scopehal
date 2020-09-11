@@ -530,6 +530,16 @@ public:
 	 */
 	virtual float GetDigitalThreshold(size_t channel);
 
+	/**
+		@brief Sets the hysteresis for a digital input
+	 */
+	virtual void SetDigitalHysteresis(size_t channel, float level);
+
+	/**
+		@brief Gets the threshold for a digital input
+	 */
+	virtual void SetDigitalThreshold(size_t channel, float level);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
 

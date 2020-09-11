@@ -170,6 +170,9 @@ public:
 	virtual Unit GetYAxisUnits()
 	{ return m_yAxisUnit; }
 
+	void SetDigitalHysteresis(float level);
+	void SetDigitalThreshold(float level);
+
 protected:
 
 	/**

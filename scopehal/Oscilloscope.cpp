@@ -412,3 +412,11 @@ float Oscilloscope::GetDigitalThreshold(size_t /*channel*/)
 {
 	return 0.5;
 }
+
+void Oscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
+{
+}
+
+void Oscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
+{
+}

@@ -195,6 +195,18 @@ int64_t OscilloscopeChannel::GetDeskew()
 	return 0;
 }
 
+void OscilloscopeChannel::SetDigitalHysteresis(float level)
+{
+	if(m_scope)
+		m_scope->SetDigitalHysteresis(m_index, level);
+}
+
+void OscilloscopeChannel::SetDigitalThreshold(float level)
+{
+	if(m_scope)
+		m_scope->SetDigitalThreshold(m_index, level);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

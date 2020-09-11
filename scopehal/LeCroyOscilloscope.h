@@ -182,6 +182,8 @@ public:
 	virtual bool IsDigitalThresholdConfigurable();
 	virtual float GetDigitalHysteresis(size_t channel);
 	virtual float GetDigitalThreshold(size_t channel);
+	virtual void SetDigitalHysteresis(size_t channel, float level);
+	virtual void SetDigitalThreshold(size_t channel, float level);
 
 protected:
 	void BulkCheckChannelEnableState();

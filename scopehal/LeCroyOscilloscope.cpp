@@ -267,7 +267,9 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 		m_digitalChannels.push_back(chan);
 	}
 
-	//Enable all of them
+	//Set the threshold to "user defined" vs using a canned family
+	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily0 = \"USERDEFINED\" '");
+	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily1 = \"USERDEFINED\" '");
 }
 
 /**
@@ -2560,12 +2562,12 @@ vector<Oscilloscope::DigitalBank> LeCroyOscilloscope::GetDigitalBanks()
 
 	if(m_hasLA)
 	{
-		for(size_t bank=0; bank<2; bank++)
+		for(size_t n=0; n<2; n++)
 		{
 			DigitalBank bank;
 
 			for(size_t i=0; i<8; i++)
-				bank.push_back(m_digitalChannels[i + bank*8]);
+				bank.push_back(m_digitalChannels[i + n*8]);
 
 			banks.push_back(bank);
 		}
@@ -2625,4 +2627,28 @@ float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxThreshold1'");
 
 	return atof(m_transport->ReadReply().c_str());
+}
+
+void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[128];
+	if(channel <= m_digitalChannels[7]->GetIndex() )
+		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxHysteresis0 = %e'", level);
+	else
+		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxHysteresis1 = %e'", level);
+	m_transport->SendCommand(tmp);
+}
+
+void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	char tmp[128];
+	if(channel <= m_digitalChannels[7]->GetIndex() )
+		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold0 = %e'", level);
+	else
+		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold1 = %e'", level);
+	m_transport->SendCommand(tmp);
 }
