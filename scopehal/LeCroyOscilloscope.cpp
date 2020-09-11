@@ -2557,6 +2557,20 @@ bool LeCroyOscilloscope::SetInterleaving(bool combine)
 vector<Oscilloscope::DigitalBank> LeCroyOscilloscope::GetDigitalBanks()
 {
 	vector<DigitalBank> banks;
+
+	if(m_hasLA)
+	{
+		for(size_t bank=0; bank<2; bank++)
+		{
+			DigitalBank bank;
+
+			for(size_t i=0; i<8; i++)
+				bank.push_back(m_digitalChannels[i + bank*8]);
+
+			banks.push_back(bank);
+		}
+	}
+
 	return banks;
 }
 
