@@ -76,9 +76,16 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	enum DisplayFormat
+	{
+		FORMAT_DOTTED,
+		FORMAT_HEX
+	} m_cachedDisplayFormat;
+
 	PROTOCOL_DECODER_INITPROC(IBM8b10bDecoder)
 
 protected:
+	std::string m_displayformat;
 };
 
 #endif

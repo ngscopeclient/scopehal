@@ -47,6 +47,12 @@ IBM8b10bDecoder::IBM8b10bDecoder(string color)
 	//Set up channels
 	CreateInput("data");
 	CreateInput("clk");
+
+	m_displayformat = "Display Format";
+	m_parameters[m_displayformat] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_displayformat].AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
+	m_parameters[m_displayformat].AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
+	m_parameters[m_displayformat].SetIntVal(FORMAT_DOTTED);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,6 +98,8 @@ void IBM8b10bDecoder::SetDefaultName()
 
 void IBM8b10bDecoder::Refresh()
 {
+	m_cachedDisplayFormat = (DisplayFormat) m_parameters[m_displayformat].GetIntVal();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -380,10 +388,26 @@ string IBM8b10bDecoder::GetText(int i)
 		char tmp[32];
 		if(s.m_error)
 			snprintf(tmp, sizeof(tmp), "ERROR");
-		else if(s.m_control)
-			snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
 		else
-			snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
+		{
+			//Dotted format
+			if(m_cachedDisplayFormat == FORMAT_DOTTED)
+			{
+				if(s.m_control)
+					snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
+				else
+					snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
+			}
+
+			//Hex format
+			else
+			{
+				if(s.m_control)
+					snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
+				else
+					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			}
+		}
 		return string(tmp);
 	}
 	return "";
