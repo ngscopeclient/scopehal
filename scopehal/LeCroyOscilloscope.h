@@ -173,6 +173,16 @@ public:
 	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
 	virtual int64_t GetDeskewForChannel(size_t channel);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Logic analyzer configuration
+
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+	virtual DigitalBank GetDigitalBank(size_t channel);
+	virtual bool IsDigitalHysteresisConfigurable();
+	virtual bool IsDigitalThresholdConfigurable();
+	virtual float GetDigitalHysteresis(size_t channel);
+	virtual float GetDigitalThreshold(size_t channel);
+
 protected:
 	void BulkCheckChannelEnableState();
 

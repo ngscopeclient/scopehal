@@ -490,6 +490,47 @@ public:
 	// Sequenced triggering
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Logic analyzer configuration
+
+	typedef std::vector<OscilloscopeChannel*> DigitalBank;
+
+	/**
+		@brief Gets the digital channel banks for this instrument.
+
+		A bank is a set of one or more channels all sharing a common threshold and hysteresis setting.
+	 */
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+
+	/**
+		@brief Gets the bank containing a given channel
+	 */
+	virtual DigitalBank GetDigitalBank(size_t channel);
+
+	/**
+		@brief Checks if digital input hysteresis is configurable or fixed.
+
+		@return true if configurable, false if fixed
+	 */
+	virtual bool IsDigitalHysteresisConfigurable();
+
+	/**
+		@brief Checks if digital input threshold is configurable or fixed.
+
+		@return true if configurable, false if fixed
+	 */
+	virtual bool IsDigitalThresholdConfigurable();
+
+	/**
+		@brief Gets the hysteresis for a digital input
+	 */
+	virtual float GetDigitalHysteresis(size_t channel);
+
+	/**
+		@brief Gets the threshold for a digital input
+	 */
+	virtual float GetDigitalThreshold(size_t channel);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
 
 	/**

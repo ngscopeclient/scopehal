@@ -2550,3 +2550,65 @@ bool LeCroyOscilloscope::SetInterleaving(bool combine)
 
 	return m_interleaving;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Logic analyzer configuration
+
+vector<Oscilloscope::DigitalBank> LeCroyOscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> banks;
+	return banks;
+}
+
+Oscilloscope::DigitalBank LeCroyOscilloscope::GetDigitalBank(size_t channel)
+{
+	DigitalBank ret;
+	if(m_hasLA)
+	{
+		if(channel <= m_digitalChannels[7]->GetIndex() )
+		{
+			for(size_t i=0; i<8; i++)
+				ret.push_back(m_digitalChannels[i]);
+		}
+		else
+		{
+			for(size_t i=0; i<8; i++)
+				ret.push_back(m_digitalChannels[i+8]);
+		}
+	}
+	return ret;
+}
+
+bool LeCroyOscilloscope::IsDigitalHysteresisConfigurable()
+{
+	return true;
+}
+
+bool LeCroyOscilloscope::IsDigitalThresholdConfigurable()
+{
+	return true;
+}
+
+float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(channel <= m_digitalChannels[7]->GetIndex() )
+		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis0'");
+	else
+		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis1'");
+
+	return atof(m_transport->ReadReply().c_str());
+}
+
+float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(channel <= m_digitalChannels[7]->GetIndex() )
+		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxThreshold0'");
+	else
+		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxThreshold1'");
+
+	return atof(m_transport->ReadReply().c_str());
+}

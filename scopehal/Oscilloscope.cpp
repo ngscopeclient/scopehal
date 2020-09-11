@@ -378,3 +378,37 @@ bool Oscilloscope::CanInterleave()
 
 	return true;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Logic analyzer configuration (default no-op for scopes without MSO feature)
+
+vector<Oscilloscope::DigitalBank> Oscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> ret;
+	return ret;
+}
+
+Oscilloscope::DigitalBank Oscilloscope::GetDigitalBank(size_t /*channel*/)
+{
+	return DigitalBank();
+}
+
+bool Oscilloscope::IsDigitalHysteresisConfigurable()
+{
+	return false;
+}
+
+bool Oscilloscope::IsDigitalThresholdConfigurable()
+{
+	return false;
+}
+
+float Oscilloscope::GetDigitalHysteresis(size_t /*channel*/)
+{
+	return 0.1;
+}
+
+float Oscilloscope::GetDigitalThreshold(size_t /*channel*/)
+{
+	return 0.5;
+}
