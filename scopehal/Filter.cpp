@@ -53,16 +53,7 @@ Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 	Gdk::Color("#404040")	//COLOR_IDLE
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// StreamDescriptor
 
-string StreamDescriptor::GetName()
-{
-	string name = m_channel->m_displayname;
-	if(m_channel->GetStreamCount() > 1)
-		name += string(".") + m_channel->GetStreamName(m_stream);
-	return name;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -113,125 +104,6 @@ void Filter::Release()
 bool Filter::IsOverlay()
 {
 	return true;
-}
-
-FilterParameter& Filter::GetParameter(string s)
-{
-	if(m_parameters.find(s) == m_parameters.end())
-		LogError("Invalid parameter name\n");
-
-	return m_parameters[s];
-}
-
-size_t Filter::GetInputCount()
-{
-	return m_signalNames.size();
-}
-
-string Filter::GetInputName(size_t i)
-{
-	if(i < m_signalNames.size())
-		return m_signalNames[i];
-	else
-	{
-		LogError("Invalid channel index\n");
-		return "";
-	}
-}
-
-/**
-	@brief Connects a stream to the input of this filter
-
-	@param i		Index of the input port to connect
-	@param stream	Input data stream
-	@param force	Forcibly connect this stream without checking to make sure it's the right type.
-					Should only be set true by by Filter::LoadInputs() or in similar specialized situations.
- */
-void Filter::SetInput(size_t i, StreamDescriptor stream, bool force)
-{
-	if(i < m_signalNames.size())
-	{
-		if(stream.m_channel == NULL)	//NULL is always legal
-		{
-			m_inputs[i] = StreamDescriptor(NULL, 0);
-			return;
-		}
-
-		//If forcing, don't validate the channel
-		if(!force)
-		{
-			if(!ValidateChannel(i, stream))
-			{
-				LogError("Invalid channel for input %zu of %s\n", i, m_displayname.c_str());
-				m_inputs[i] = StreamDescriptor(NULL, 0);
-				return;
-			}
-		}
-
-		//Deref whatever was there (if anything)
-		if(m_inputs[i].m_channel != NULL)
-			m_inputs[i].m_channel->Release();
-
-		//All good, we can save the new input
-		m_inputs[i] = stream;
-		stream.m_channel->AddRef();
-	}
-	else
-	{
-		LogError("Invalid channel index\n");
-	}
-}
-
-/**
-	@brief Connects a stream to the input of this filter
-
-	@param name		Name of the input port to connect
-	@param stream	Input data stream
-	@param force	Forcibly connect this stream without checking to make sure it's the right type.
-					Should only be set true by by Filter::LoadInputs() or in similar specialized situations.
- */
-void Filter::SetInput(string name, StreamDescriptor stream, bool force)
-{
-	//Find the channel
-	for(size_t i=0; i<m_signalNames.size(); i++)
-	{
-		if(m_signalNames[i] == name)
-		{
-			SetInput(i, stream, force);
-			return;
-		}
-	}
-
-	//Not found
-	LogError("Invalid channel name\n");
-}
-
-/**
-	@brief Gets the descriptor for one of our inputs
- */
-StreamDescriptor Filter::GetInput(size_t i)
-{
-	if(i < m_signalNames.size())
-		return m_inputs[i];
-	else
-	{
-		LogError("Invalid channel index\n");
-		return StreamDescriptor(NULL, 0);
-	}
-}
-
-/**
-	@brief Gets the display name for one of our inputs.
-
-	This includes the stream name iff the input comes from a multi-stream source.
- */
-string Filter::GetInputDisplayName(size_t i)
-{
-	auto in = m_inputs[i];
-	if(in.m_channel->GetStreamCount() > 1)
-		return in.m_channel->m_displayname + "." + in.m_channel->GetStreamName(in.m_stream);
-	else
-		return in.m_channel->m_displayname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

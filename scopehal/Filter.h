@@ -37,52 +37,13 @@
 #define Filter_h
 
 #include "OscilloscopeChannel.h"
+#include "FlowGraphNode.h"
 
 /**
-	@brief Descriptor for a single stream coming off a channel
+	@brief Abstract base class for all filters and protocol decoders
  */
-class StreamDescriptor
-{
-public:
-	StreamDescriptor()
-	: m_channel(NULL)
-	, m_stream(0)
-	{}
-
-	StreamDescriptor(OscilloscopeChannel* channel, size_t stream)
-		: m_channel(channel)
-		, m_stream(stream)
-	{}
-
-	std::string GetName();
-
-	OscilloscopeChannel* m_channel;
-	size_t m_stream;
-
-	WaveformBase* GetData()
-	{ return m_channel->GetData(m_stream); }
-
-	bool operator==(const StreamDescriptor& rhs) const
-	{ return (m_channel == rhs.m_channel) && (m_stream == rhs.m_stream); }
-
-	bool operator!=(const StreamDescriptor& rhs) const
-	{ return (m_channel != rhs.m_channel) || (m_stream != rhs.m_stream); }
-
-	bool operator<(const StreamDescriptor& rhs) const
-	{
-		if(m_channel < rhs.m_channel)
-			return true;
-		if( (m_channel == rhs.m_channel) && (m_stream < rhs.m_stream) )
-			return true;
-
-		return false;
-	}
-};
-
-/**
-	@brief Abstract base class for all protocol decoders
- */
-class Filter : public OscilloscopeChannel
+class Filter	: public OscilloscopeChannel
+				, public FlowGraphNode
 {
 public:
 
@@ -124,23 +85,6 @@ public:
 	virtual void ClearSweeps();
 
 	virtual void SetDefaultName() =0;
-
-	//Channels
-	size_t GetInputCount();
-	std::string GetInputName(size_t i);
-	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
-	void SetInput(std::string name, StreamDescriptor stream, bool force = false);
-
-	StreamDescriptor GetInput(size_t i);
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
-
-	FilterParameter& GetParameter(std::string s);
-	typedef std::map<std::string, FilterParameter> ParameterMapType;
-	ParameterMapType::iterator GetParamBegin()
-	{ return m_parameters.begin(); }
-	ParameterMapType::iterator GetParamEnd()
-	{ return m_parameters.end(); }
 
 	Category GetCategory()
 	{ return m_category; }
@@ -199,15 +143,6 @@ public:
 
 protected:
 
-	///Names of signals we take as input
-	std::vector<std::string> m_signalNames;
-
-	//Parameters
-	ParameterMapType m_parameters;
-
-	///The channel (if any) connected to each of our inputs
-	std::vector<StreamDescriptor> m_inputs;
-
 	///Group used for the display menu
 	Category m_category;
 
@@ -233,42 +168,6 @@ protected:
 		while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
 			i ++;
 	}
-
-	/**
-		@brief Gets the waveform attached to the specified input.
-
-		This function is safe to call on a NULL input and will return NULL in that case.
-	 */
-	WaveformBase* GetInputWaveform(size_t i)
-	{
-		auto chan = m_inputs[i].m_channel;
-		if(chan == NULL)
-			return NULL;
-		return chan->GetData(m_inputs[i].m_stream);
-	}
-
-	///Gets the analog waveform attached to the specified input
-	AnalogWaveform* GetAnalogInputWaveform(size_t i)
-	{ return dynamic_cast<AnalogWaveform*>(GetInputWaveform(i)); }
-
-	///Gets the digital waveform attached to the specified input
-	DigitalWaveform* GetDigitalInputWaveform(size_t i)
-	{ return dynamic_cast<DigitalWaveform*>(GetInputWaveform(i)); }
-
-	///Gets the digital bus waveform attached to the specified input
-	DigitalBusWaveform* GetDigitalBusInputWaveform(size_t i)
-	{ return dynamic_cast<DigitalBusWaveform*>(GetInputWaveform(i)); }
-
-	/**
-		@brief Creates and names an input signal
-	 */
-	void CreateInput(std::string name)
-	{
-		m_signalNames.push_back(name);
-		m_inputs.push_back(StreamDescriptor(NULL, 0));
-	}
-
-	std::string GetInputDisplayName(size_t i);
 
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes

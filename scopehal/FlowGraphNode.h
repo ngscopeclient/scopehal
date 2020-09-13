@@ -30,68 +30,133 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of FlowGraphNode
  */
+#ifndef FlowGraphNode_h
+#define FlowGraphNode_h
 
-#ifndef scopehal_h
-#define scopehal_h
+/**
+	@brief Descriptor for a single stream coming off a channel
+ */
+class StreamDescriptor
+{
+public:
+	StreamDescriptor()
+	: m_channel(NULL)
+	, m_stream(0)
+	{}
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	StreamDescriptor(OscilloscopeChannel* channel, size_t stream)
+		: m_channel(channel)
+		, m_stream(stream)
+	{}
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	std::string GetName();
 
-#include <yaml-cpp/yaml.h>
+	OscilloscopeChannel* m_channel;
+	size_t m_stream;
 
+	WaveformBase* GetData()
+	{ return m_channel->GetData(m_stream); }
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	bool operator==(const StreamDescriptor& rhs) const
+	{ return (m_channel == rhs.m_channel) && (m_stream == rhs.m_stream); }
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+	bool operator!=(const StreamDescriptor& rhs) const
+	{ return (m_channel != rhs.m_channel) || (m_stream != rhs.m_stream); }
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	bool operator<(const StreamDescriptor& rhs) const
+	{
+		if(m_channel < rhs.m_channel)
+			return true;
+		if( (m_channel == rhs.m_channel) && (m_stream < rhs.m_stream) )
+			return true;
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "OscilloscopeChannel.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
+		return false;
+	}
+};
 
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "FlowGraphNode.h"
+/**
+	@brief Abstract base class for a node in the signal flow graph.
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters,
+ */
+class FlowGraphNode
+{
+public:
+	FlowGraphNode();
+	virtual ~FlowGraphNode();
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+	//Inputs
+public:
+	size_t GetInputCount();
+	std::string GetInputName(size_t i);
 
-std::string GetDefaultChannelColor(int i);
+	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
+	void SetInput(std::string name, StreamDescriptor stream, bool force = false);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
 
-void TransportStaticInit();
-void DriverStaticInit();
+	StreamDescriptor GetInput(size_t i);
 
-void InitializePlugins();
-void DetectCPUFeatures();
+	//Parameters
+public:
+	FilterParameter& GetParameter(std::string s);
+	typedef std::map<std::string, FilterParameter> ParameterMapType;
 
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
+	ParameterMapType::iterator GetParamBegin()
+	{ return m_parameters.begin(); }
+
+	ParameterMapType::iterator GetParamEnd()
+	{ return m_parameters.end(); }
+
+	//Input handling helpers
+protected:
+
+	/**
+		@brief Gets the waveform attached to the specified input.
+
+		This function is safe to call on a NULL input and will return NULL in that case.
+	 */
+	WaveformBase* GetInputWaveform(size_t i)
+	{
+		auto chan = m_inputs[i].m_channel;
+		if(chan == NULL)
+			return NULL;
+		return chan->GetData(m_inputs[i].m_stream);
+	}
+
+	///Gets the analog waveform attached to the specified input
+	AnalogWaveform* GetAnalogInputWaveform(size_t i)
+	{ return dynamic_cast<AnalogWaveform*>(GetInputWaveform(i)); }
+
+	///Gets the digital waveform attached to the specified input
+	DigitalWaveform* GetDigitalInputWaveform(size_t i)
+	{ return dynamic_cast<DigitalWaveform*>(GetInputWaveform(i)); }
+
+	///Gets the digital bus waveform attached to the specified input
+	DigitalBusWaveform* GetDigitalBusInputWaveform(size_t i)
+	{ return dynamic_cast<DigitalBusWaveform*>(GetInputWaveform(i)); }
+
+	/**
+		@brief Creates and names an input signal
+	 */
+	void CreateInput(std::string name)
+	{
+		m_signalNames.push_back(name);
+		m_inputs.push_back(StreamDescriptor(NULL, 0));
+	}
+
+	std::string GetInputDisplayName(size_t i);
+
+protected:
+	///Names of signals we take as input
+	std::vector<std::string> m_signalNames;
+
+	///The channel (if any) connected to each of our inputs
+	std::vector<StreamDescriptor> m_inputs;
+
+	//Parameters
+	ParameterMapType m_parameters;
+};
 
 #endif

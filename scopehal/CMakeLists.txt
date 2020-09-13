@@ -56,6 +56,7 @@ set(SCOPEHAL_SOURCES
 
 	Filter.cpp
 	FilterParameter.cpp
+	FlowGraphNode.cpp
 	PacketDecoder.cpp
 	Statistic.cpp
 	)
