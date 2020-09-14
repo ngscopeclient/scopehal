@@ -30,6 +30,8 @@
 #ifndef RohdeSchwarzOscilloscope_h
 #define RohdeSchwarzOscilloscope_h
 
+class EdgeTrigger;
+
 class RohdeSchwarzOscilloscope : public SCPIOscilloscope
 {
 public:
@@ -66,12 +68,8 @@ public:
 	virtual void StartSingleTrigger();
 	virtual void Stop();
 	virtual bool IsTriggerArmed();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void PushTrigger();
+	virtual void PullTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -101,13 +99,12 @@ protected:
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<int, bool> m_channelsEnabled;
-	bool m_triggerChannelValid;
-	size_t m_triggerChannel;
-	bool m_triggerLevelValid;
-	float m_triggerLevel;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+	void PullEdgeTrigger();
+	void PushEdgeTrigger(EdgeTrigger* trig);
 
 public:
 	static std::string GetDriverNameInternal();

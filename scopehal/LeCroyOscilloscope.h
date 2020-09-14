@@ -33,10 +33,12 @@
 #include <mutex>
 #include "../xptools/Socket.h"
 
-/**
-	@brief A LeCroy VICP oscilloscope
+class EdgeTrigger;
 
-	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
+/**
+	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
+
+	May not work on lower-end instruments that are rebranded third-party hardware.
  */
 class LeCroyOscilloscope
 	: public SCPIOscilloscope
@@ -87,12 +89,8 @@ public:
 	virtual void StartSingleTrigger();
 	virtual void Stop();
 	virtual bool IsTriggerArmed();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void PushTrigger();
+	virtual void PullTrigger();
 	virtual void EnableTriggerOutput();
 
 	//DMM acquisition
@@ -184,6 +182,9 @@ public:
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
 protected:
+	void PullEdgeTrigger();
+	void PushEdgeTrigger(EdgeTrigger* trig);
+
 	void BulkCheckChannelEnableState();
 
 	bool ReadWaveformBlock(std::string& data);
@@ -226,12 +227,6 @@ protected:
 	bool m_triggerOneShot;
 
 	//Cached configuration
-	bool m_triggerChannelValid;
-	size_t m_triggerChannel;
-	bool m_triggerLevelValid;
-	float m_triggerLevel;
-	bool m_triggerTypeValid;
-	TriggerType m_triggerType;
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<size_t, double> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;

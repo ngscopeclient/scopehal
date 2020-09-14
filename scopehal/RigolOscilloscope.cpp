@@ -34,6 +34,7 @@
 
 #include "scopehal.h"
 #include "RigolOscilloscope.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -41,7 +42,10 @@ using namespace std;
 //Construction / destruction
 
 RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerOneShot(false), m_triggerWasLive(false)
+	: SCPIOscilloscope(transport)
+	, m_triggerArmed(false)
+	, m_triggerWasLive(false)
+	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
 	if(1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))
@@ -118,8 +122,10 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		m_transport->SendCommand(":WAV:MODE RAW");
 	}
 	if(m_protocol == MSO5 || m_protocol == DS_OLD)
-		for(int i = 0; i < m_analogChannelCount; i++)
+	{
+		for(size_t i = 0; i < m_analogChannelCount; i++)
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":VERN ON");
+	}
 	if(m_protocol == MSO5 || m_protocol == DS)
 		m_transport->SendCommand(":TIM:VERN ON");
 	FlushConfigCache();
@@ -156,12 +162,12 @@ void RigolOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_channelBandwidthLimits.clear();
 
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
-	m_triggerTypeValid = false;
 	m_srateValid = false;
 	m_mdepthValid = false;
 	m_triggerOffsetValid = false;
+
+	delete m_trigger;
+	m_trigger = NULL;
 }
 
 bool RigolOscilloscope::IsChannelEnabled(size_t i)
@@ -706,7 +712,6 @@ bool RigolOscilloscope::AcquireData()
 			//Read block header
 			unsigned char header[12] = {0};
 
-			double start = GetTime();
 			unsigned char header_size;
 			m_transport->ReadRawData(2, header);
 			//LogWarning("Time %f\n", (GetTime() - start));
@@ -725,7 +730,7 @@ bool RigolOscilloscope::AcquireData()
 
 			if (header_blocksize == 0)
 			{
-				LogWarning("Ran out of data after %d points\n", npoint);
+				LogWarning("Ran out of data after %zu points\n", npoint);
 				break;
 			}
 
@@ -832,116 +837,6 @@ void RigolOscilloscope::Stop()
 bool RigolOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
-}
-
-size_t RigolOscilloscope::GetTriggerChannelIndex()
-{
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//This is nasty because there are separate commands to see what the trigger source is
-	//depending on what the trigger type is!!!
-	//FIXME: For now assume edge
-	m_transport->SendCommand(":TRIG:EDGE:SOUR?");
-	string ret = m_transport->ReadReply();
-	LogDebug("Trigger source: %s\n", ret.c_str());
-
-	for(size_t i = 0; i < m_channels.size(); i++)
-	{
-		// DS_OLD
-		string chnamehack = string("CH1");
-		chnamehack[2] += i;
-
-		if(m_channels[i]->GetHwname() == ret || chnamehack == ret)
-		{
-			m_triggerChannel = i;
-			m_triggerChannelValid = true;
-			return i;
-		}
-	}
-
-	LogWarning("Unknown trigger source %s\n", ret.c_str());
-	return 0;
-}
-
-void RigolOscilloscope::SetTriggerChannelIndex(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":TRIG:EDGE:SOUR " + m_channels[i]->GetHwname());
-	m_triggerChannelValid = false;
-}
-
-float RigolOscilloscope::GetTriggerVoltage()
-{
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//This is nasty because there are separate commands to see what the trigger source is
-	//depending on what the trigger type is!!!
-	//FIXME: For now assume edge
-	m_transport->SendCommand(":TRIG:EDGE:LEV?");
-	string ret = m_transport->ReadReply();
-
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-}
-
-void RigolOscilloscope::SetTriggerVoltage(float v)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":TRIG:EDGE:LEV %f", v);
-	m_transport->SendCommand(buf);
-	m_triggerLevelValid = false;
-}
-
-Oscilloscope::TriggerType RigolOscilloscope::GetTriggerType()
-{
-	if(m_triggerTypeValid)
-		return m_triggerType;
-	m_transport->SendCommand(":TRIG:EDGE:SLOPE?");
-	string ret = m_transport->ReadReply();
-
-	if(ret == "POS")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING;
-	else if(ret == "NEG")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING;
-	else if(ret == "RFAL")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE;
-
-	return m_triggerType;
-}
-
-void RigolOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
-{
-	switch(type)
-	{
-		case Oscilloscope::TRIGGER_TYPE_RISING:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE POS");
-			break;
-		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE NEG");
-			break;
-		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE RFAL");
-			break;
-		default:
-			LogError("Invalid trigger type\n");
-	}
-	//FIXME
 }
 
 vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()
@@ -1146,4 +1041,112 @@ bool RigolOscilloscope::IsInterleaving()
 bool RigolOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void RigolOscilloscope::PullTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Figure out what kind of trigger is active.
+	m_transport->SendCommand(":TRIG:MODE?");
+	string reply = m_transport->ReadReply();
+	if (reply == "EDGE")
+		PullEdgeTrigger();
+
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+		m_trigger = NULL;
+		return;
+	}
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void RigolOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	m_transport->SendCommand(":TRIG:EDGE:SOUR?");
+	string reply = m_transport->ReadReply();
+	auto chan = GetChannelByHwName(reply);
+	et->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand(":TRIG:EDGE:LEV?");
+	reply = m_transport->ReadReply();
+	et->SetLevel(stof(reply));
+
+	//Edge slope
+	m_transport->SendCommand(":TRIG:EDGE:SLOPE?");
+	reply = m_transport->ReadReply();
+	if (reply == "POS")
+		et->SetType(EdgeTrigger::EDGE_RISING);
+	else if (reply == "NEG")
+		et->SetType(EdgeTrigger::EDGE_FALLING);
+	else if (reply == "RFAL")
+		et->SetType(EdgeTrigger::EDGE_ANY);
+}
+
+void RigolOscilloscope::PushTrigger()
+{
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	if(et)
+		PushEdgeTrigger(et);
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void RigolOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Type
+	m_transport->SendCommand(":TRIG:MODE EDGE");
+
+	//Source
+	m_transport->SendCommand(":TRIG:EDGE:SOUR " + trig->GetInput(0).m_channel->GetHwname());
+
+	//Level
+	char buf[128];
+	snprintf(buf, sizeof(buf), ":TRIG:EDGE:LEV %f", trig->GetLevel());
+	m_transport->SendCommand(buf);
+
+	//Slope
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommand(":TRIG:EDGE:SLOPE POS");
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommand(":TRIG:EDGE:SLOPE NEG");
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommand(":TRIG:EDGE:SLOPE RFAL");
+			break;
+		default:
+			LogWarning("Unknown edge type\n");
+			return;
+	}
 }

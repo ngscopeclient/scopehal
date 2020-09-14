@@ -51,11 +51,17 @@ Oscilloscope::CreateMapType Oscilloscope::m_createprocs;
 
 Oscilloscope::Oscilloscope()
 {
-
+	m_trigger = NULL;
 }
 
 Oscilloscope::~Oscilloscope()
 {
+	if(m_trigger)
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
 	for(size_t i=0; i<m_channels.size(); i++)
 		delete m_channels[i];
 	m_channels.clear();
@@ -114,10 +120,20 @@ OscilloscopeChannel* Oscilloscope::GetChannel(size_t i)
 
 OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
 {
-	for(size_t i=0; i<m_channels.size(); i++)
+	for(auto c : m_channels)
 	{
-		if(m_channels[i]->m_displayname == name)
-			return m_channels[i];
+		if(c->m_displayname == name)
+			return c;
+	}
+	return NULL;
+}
+
+OscilloscopeChannel* Oscilloscope::GetChannelByHwName(string name)
+{
+	for(auto c : m_channels)
+	{
+		if(c->GetHwname() == name)
+			return c;
 	}
 	return NULL;
 }

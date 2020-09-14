@@ -101,16 +101,6 @@ string MockOscilloscope::GetSerial()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering
 
-Oscilloscope::TriggerType MockOscilloscope::GetTriggerType()
-{
-	return TRIGGER_TYPE_RISING;
-}
-
-void MockOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//no-op, we never trigger
-}
-
 Oscilloscope::TriggerMode MockOscilloscope::PollTrigger()
 {
 	//we never trigger
@@ -146,26 +136,6 @@ void MockOscilloscope::Stop()
 bool MockOscilloscope::IsTriggerArmed()
 {
 	return false;
-}
-
-size_t MockOscilloscope::GetTriggerChannelIndex()
-{
-	return 0;
-}
-
-void MockOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
-{
-	//no-op, we never trigger
-}
-
-float MockOscilloscope::GetTriggerVoltage()
-{
-	return 0;
-}
-
-void MockOscilloscope::SetTriggerVoltage(float /*v*/)
-{
-	//no-op, we never trigger
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -359,4 +329,14 @@ bool MockOscilloscope::IsInterleaving()
 bool MockOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void MockOscilloscope::PushTrigger()
+{
+	//no-op
+}
+
+void MockOscilloscope::PullTrigger()
+{
+	//no-op
 }

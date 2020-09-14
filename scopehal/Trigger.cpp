@@ -27,90 +27,21 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SignalGeneratorOscilloscope
- */
+#include "scopehal.h"
 
-#ifndef SignalGeneratorOscilloscope_h
-#define SignalGeneratorOscilloscope_h
+using namespace std;
 
-#include "IBISParser.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-class SignalGeneratorOscilloscope : public SCPIOscilloscope
+Trigger::Trigger(Oscilloscope* scope)
+	: m_scope(scope)
 {
-public:
-	SignalGeneratorOscilloscope(SCPITransport* transport);
-	virtual ~SignalGeneratorOscilloscope();
+	m_levelname = "Level";
+	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+}
 
-	virtual std::string IDPing();
+Trigger::~Trigger()
+{
 
-	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
-
-	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
-
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
-
-	virtual unsigned int GetInstrumentTypes();
-
-protected:
-	void ArmTrigger();
-
-	OscilloscopeChannel* m_extTrigger;
-
-	std::map<size_t, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCoupling;
-	std::map<size_t, double> m_channelAttenuation;
-	std::map<size_t, unsigned int> m_channelBandwidth;
-	std::map<size_t, double> m_channelVoltageRange;
-	std::map<size_t, double> m_channelOffset;
-
-	IBISParser m_parser;
-	IBISModel* m_bufmodel;
-
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
-public:
-	static std::string GetDriverNameInternal();
-
-	OSCILLOSCOPE_INITPROC(SignalGeneratorOscilloscope)
-};
-
-#endif
-
+}

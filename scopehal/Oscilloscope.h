@@ -102,6 +102,11 @@ public:
 	OscilloscopeChannel* GetChannelByDisplayName(std::string name);
 
 	/**
+		@brief Gets a channel given the hardware name
+	 */
+	OscilloscopeChannel* GetChannelByHwName(std::string name);
+
+	/**
 		@brief Checks if a channel is enabled in hardware.
 	 */
 	virtual bool IsChannelEnabled(size_t i) =0;
@@ -260,54 +265,46 @@ public:
 	 */
 	bool WaitForTrigger(int timeout);
 
-	enum TriggerType
+	/**
+		@brief Sets a new trigger on the instrument and pushes changes.
+
+		Calling SetTrigger() with the currently selected trigger is legal and is equivalent to calling PushTrigger().
+
+		Ownership of the trigger object is transferred to the Oscilloscope.
+	 */
+	void SetTrigger(Trigger* trigger)
 	{
-		TRIGGER_TYPE_LOW		= 0,
-		TRIGGER_TYPE_HIGH 		= 1,
-		TRIGGER_TYPE_FALLING	= 2,
-		TRIGGER_TYPE_RISING		= 3,
-		TRIGGER_TYPE_CHANGE		= 4,
-		TRIGGER_TYPE_DONTCARE	= 5,
-		TRIGGER_TYPE_COMPLEX	= 6	//complex pattern/protocol trigger
-	};
+		//If we have an old trigger that's not the same, free it
+		if(m_trigger != trigger)
+			delete m_trigger;
+
+		//Set the new trigger and sync to hardware
+		m_trigger = trigger;
+		PushTrigger();
+	}
 
 	/**
-		@brief Gets the index of the channel currently selected for trigger
+		@brief Pushes changes made to m_trigger to the instrument
 	 */
-	virtual size_t GetTriggerChannelIndex() =0;
+	virtual void PushTrigger() =0;
 
 	/**
-		@brief Sets the scope to trigger on the selected channel
+		@brief Gets the current trigger.
 
-		@param i	Zero-based index of channel to use as trigger
+		Ownership of the trigger object is retained by the Oscilloscope. This pointer may be invalidated by any future
+		call to GetTrigger() or PullTrigger().
 	 */
-	virtual void SetTriggerChannelIndex(size_t i) =0;
+	Trigger* GetTrigger(bool sync = true)
+	{
+		if(sync || (m_trigger == NULL) )
+			PullTrigger();
+		return m_trigger;
+	}
 
 	/**
-		@brief Gets the threshold of the current trigger, in volts
+		@brief Updates m_trigger with any changes made from the instrument side
 	 */
-	virtual float GetTriggerVoltage() =0;
-
-	 /**
-		@brief Sets the threshold of the current trigger
-
-		@param v	Trigger threshold, in volts
-	 */
-	virtual void SetTriggerVoltage(float v) =0;
-
-	/**
-		@brief Gets the type of trigger configured for the instrument.
-
-		Complex pattern, dropout, etc triggers are not yet supported.
-	 */
-	virtual Oscilloscope::TriggerType GetTriggerType() =0;
-
-	/**
-		@brief Sets the type of trigger configured for the instrument.
-
-		Complex pattern, dropout, etc triggers are not yet supported.
-	 */
-	virtual void SetTriggerType(Oscilloscope::TriggerType type) =0;
+	virtual void PullTrigger() =0;
 
 	/**
 		@brief Reads a waveform into the queue of pending waveforms
@@ -555,6 +552,9 @@ protected:
 
 	///The channels
 	std::vector<OscilloscopeChannel*> m_channels;
+
+	//The trigger
+	Trigger* m_trigger;
 
 public:
 	typedef Oscilloscope* (*CreateProcType)(SCPITransport*);

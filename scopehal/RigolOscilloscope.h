@@ -30,6 +30,8 @@
 #ifndef RigolOscilloscope_h
 #define RigolOscilloscope_h
 
+class EdgeTrigger;
+
 class RigolOscilloscope : public SCPIOscilloscope
 {
 public:
@@ -65,12 +67,8 @@ public:
 	virtual void StartSingleTrigger();
 	virtual void Stop();
 	virtual bool IsTriggerArmed();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void PushTrigger();
+	virtual void PullTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -110,18 +108,12 @@ protected:
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<size_t, unsigned int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
-	bool m_triggerChannelValid;
-	size_t m_triggerChannel;
-	bool m_triggerLevelValid;
-	float m_triggerLevel;
 	bool m_srateValid;
 	uint64_t m_srate;
 	bool m_mdepthValid;
 	uint64_t m_mdepth;
-	bool m_triggerTypeValid;
-	Oscilloscope::TriggerType m_triggerType;
+	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
-	uint64_t m_triggerOffset;
 
 	bool m_triggerArmed;
 	bool m_triggerWasLive;
@@ -131,6 +123,9 @@ protected:
 	unsigned int m_bandwidth;
 	bool m_opt200M;
 	protocol_version m_protocol;
+
+	void PushEdgeTrigger(EdgeTrigger* trig);
+	void PullEdgeTrigger();
 
 public:
 	static std::string GetDriverNameInternal();

@@ -46,7 +46,6 @@
 
 #include <yaml-cpp/yaml.h>
 
-
 #include "../log/log.h"
 #include "../graphwidget/Graph.h"
 
@@ -63,10 +62,13 @@
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
 
+#include "OscilloscopeChannel.h"
+#include "FlowGraphNode.h"
+#include "Trigger.h"
+
 #include "Instrument.h"
 #include "FunctionGenerator.h"
 #include "Multimeter.h"
-#include "OscilloscopeChannel.h"
 #include "Oscilloscope.h"
 #include "SCPIOscilloscope.h"
 #include "PowerSupply.h"
@@ -74,7 +76,6 @@
 #include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
-#include "FlowGraphNode.h"
 
 #include "TouchstoneParser.h"
 #include "IBISParser.h"

@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "RohdeSchwarzOscilloscope.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -37,8 +38,6 @@ using namespace std;
 
 RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
-	, m_triggerChannelValid(false)
-	, m_triggerLevelValid(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
@@ -135,12 +134,12 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	LogDebug("Installed options:\n");
 	if(options.empty())
 		LogDebug("* None\n");
-	for(auto opt : options)
+	for(auto sopt : options)
 	{
 		if(opt == "B243")
 			LogDebug("* 350 MHz bandwidth upgrade for RTM3004\n");
 		else
-			LogDebug("* %s (unknown)\n", opt.c_str());
+			LogDebug("* %s (unknown)\n", sopt.c_str());
 	}
 }
 
@@ -171,8 +170,9 @@ void RohdeSchwarzOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
+
+	delete m_trigger;
+	m_trigger = NULL;
 }
 
 bool RohdeSchwarzOscilloscope::IsChannelEnabled(size_t i)
@@ -385,7 +385,7 @@ Oscilloscope::TriggerMode RohdeSchwarzOscilloscope::PollTrigger()
 		return TRIGGER_MODE_RUN;
 	else if( (stat == "STOP") || (stat == "BRE") )
 		return TRIGGER_MODE_STOP;
-	else if(stat == "COMP")
+	else /*if(stat == "COMP")*/
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
@@ -438,18 +438,18 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		m_transport->ReadRawData(2, (unsigned char*)tmp);
 		int num_digits = atoi(tmp+1);
 		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		int actual_len = atoi(tmp);
+		//int actual_len = atoi(tmp);
 
 		//Read the actual data
 		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)temp_buf);
 
 		//Format the capture
 		cap->Resize(length);
-		for(size_t i=0; i<length; i++)
+		for(size_t j=0; j<length; j++)
 		{
-			cap->m_offsets[i] = i;
-			cap->m_durations[i] = 1;
-			cap->m_samples[i] = temp_buf[i];
+			cap->m_offsets[j] = j;
+			cap->m_durations[j] = 1;
+			cap->m_samples[j] = temp_buf[j];
 		}
 
 		//Done, update the data
@@ -514,84 +514,6 @@ void RohdeSchwarzOscilloscope::Stop()
 bool RohdeSchwarzOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
-}
-
-size_t RohdeSchwarzOscilloscope::GetTriggerChannelIndex()
-{
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Look it up
-	m_transport->SendCommand("TRIG:A:SOUR?");
-	string ret = m_transport->ReadReply();
-
-	//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
-	if(ret.find("CH") == 0)
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+2) - 1;
-		return m_triggerChannel;
-	}
-	else if(ret == "EXT")
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-		return m_triggerChannel;
-	}
-	else
-	{
-		m_triggerChannelValid = false;
-		LogWarning("Unknown trigger source %s\n", ret.c_str());
-		return 0;
-	}
-}
-
-void RohdeSchwarzOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
-{
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::SetTriggerChannelIndex unimplemented\n");
-}
-
-float RohdeSchwarzOscilloscope::GetTriggerVoltage()
-{
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:A:LEV?");
-	string ret = m_transport->ReadReply();
-
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-}
-
-void RohdeSchwarzOscilloscope::SetTriggerVoltage(float /*v*/)
-{
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::SetTriggerVoltage unimplemented\n");
-}
-
-Oscilloscope::TriggerType RohdeSchwarzOscilloscope::GetTriggerType()
-{
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::GetTriggerType unimplemented\n");
-	return Oscilloscope::TRIGGER_TYPE_RISING;
-}
-
-void RohdeSchwarzOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::SetTriggerType unimplemented\n");
 }
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesNonInterleaved()
@@ -682,3 +604,78 @@ bool RohdeSchwarzOscilloscope::SetInterleaving(bool /*combine*/)
 	return false;
 }
 
+void RohdeSchwarzOscilloscope::PullTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//TODO: Figure out trigger type
+	if(true)
+		PullEdgeTrigger();
+
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger type\n");
+		delete m_trigger;
+		m_trigger = NULL;
+		return;
+	}
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void RohdeSchwarzOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
+	m_transport->SendCommand("TRIG:A:SOUR?");
+	string reply = m_transport->ReadReply();
+	if(reply.find("CH") == 0)
+		et->SetInput(0, StreamDescriptor(m_channels[atoi(reply.c_str()+2) - 1], 0), true);
+	else if(reply == "EXT")
+		et->SetInput(0, StreamDescriptor(m_extTrigChannel, 0), true);
+	else
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand("TRIG:A:LEV?");
+	reply = m_transport->ReadReply();
+	et->SetLevel(stof(reply));
+
+	//TODO: Edge slope
+}
+
+void RohdeSchwarzOscilloscope::PushTrigger()
+{
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	if(et)
+		PushEdgeTrigger(et);
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* /*trig*/ )
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//TODO unimplemented
+}

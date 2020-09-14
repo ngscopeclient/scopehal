@@ -34,6 +34,10 @@ set(SCOPEHAL_SOURCES
 	IBISParser.cpp
 	TouchstoneParser.cpp
 
+	FlowGraphNode.cpp
+	Trigger.cpp
+	EdgeTrigger.cpp
+
 	Instrument.cpp
 	FunctionGenerator.cpp
 	Oscilloscope.cpp
@@ -56,7 +60,6 @@ set(SCOPEHAL_SOURCES
 
 	Filter.cpp
 	FilterParameter.cpp
-	FlowGraphNode.cpp
 	PacketDecoder.cpp
 	Statistic.cpp
 	)

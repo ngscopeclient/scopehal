@@ -40,6 +40,8 @@
 
 /**
 	@brief A SCPI transport tunneled over LeCroy's Virtual Instrument Control Protocol
+
+	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
  */
 class VICPSocketTransport : public SCPITransport
 {

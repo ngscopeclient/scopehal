@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "SCPISocketTransport.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -38,8 +39,7 @@ using namespace std;
 
 AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
-	/*, m_triggerChannelValid(false)
-	, m_triggerLevelValid(false)
+	/*
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)*/
 {
@@ -144,8 +144,6 @@ void AntikernelLabsOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	/*
 	m_channelsEnabled.clear();
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
 	*/
 }
 
@@ -460,90 +458,6 @@ bool AntikernelLabsOscilloscope::IsTriggerArmed()
 	return true;
 }
 
-size_t AntikernelLabsOscilloscope::GetTriggerChannelIndex()
-{
-	/*
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Look it up
-	m_transport->SendCommand("TRIG:A:SOUR?");
-	string ret = m_transport->ReadReply();
-
-	//This is a bit annoying because the hwname's used here are DIFFERENT than everywhere else!
-	if(ret.find("CH") == 0)
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+2) - 1;
-		return m_triggerChannel;
-	}
-	else if(ret == "EXT")
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-		return m_triggerChannel;
-	}
-	else
-	{
-		m_triggerChannelValid = false;
-		LogWarning("Unknown trigger source %s\n", ret.c_str());
-		return 0;
-	}
-	*/
-	return 0;
-}
-
-void AntikernelLabsOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
-{
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::SetTriggerChannelIndex unimplemented\n");
-}
-
-float AntikernelLabsOscilloscope::GetTriggerVoltage()
-{
-	/*
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:A:LEV?");
-	string ret = m_transport->ReadReply();
-
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-	*/
-	return 0;
-}
-
-void AntikernelLabsOscilloscope::SetTriggerVoltage(float /*v*/)
-{
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::SetTriggerVoltage unimplemented\n");
-}
-
-Oscilloscope::TriggerType AntikernelLabsOscilloscope::GetTriggerType()
-{
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::GetTriggerType unimplemented\n");
-	return Oscilloscope::TRIGGER_TYPE_RISING;
-}
-
-void AntikernelLabsOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::SetTriggerType unimplemented\n");
-}
-
 vector<uint64_t> AntikernelLabsOscilloscope::GetSampleRatesNonInterleaved()
 {
 	LogWarning("AntikernelLabsOscilloscope::GetSampleRatesNonInterleaved unimplemented\n");
@@ -630,4 +544,29 @@ bool AntikernelLabsOscilloscope::IsInterleaving()
 bool AntikernelLabsOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void AntikernelLabsOscilloscope::PullTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	//Default setup
+	et->SetInput(0, StreamDescriptor(m_channels[0], 0), true);
+	et->SetLevel(0.5);
+	et->SetType(EdgeTrigger::EDGE_RISING);
+}
+
+void AntikernelLabsOscilloscope::PushTrigger()
+{
+	//no-op for now
 }

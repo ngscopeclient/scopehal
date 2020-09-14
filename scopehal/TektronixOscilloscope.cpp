@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "TektronixOscilloscope.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -37,8 +38,6 @@ using namespace std;
 
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
-	, m_triggerChannelValid(false)
-	, m_triggerLevelValid(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
@@ -179,8 +178,9 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
+
+	delete m_trigger;
+	m_trigger = NULL;
 }
 
 bool TektronixOscilloscope::IsChannelEnabled(size_t i)
@@ -469,13 +469,13 @@ bool TektronixOscilloscope::AcquireData()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
-	unsigned int format;
-	unsigned int type;
+	//unsigned int format;
+	//unsigned int type;
 	size_t length;
-	unsigned int average_count;
+	//unsigned int average_count;
 	double xincrement;
-	double xorigin;
-	double xreference;
+	//double xorigin;
+	//double xreference;
 	double yincrement;
 	double yorigin;
 	double yreference;
@@ -496,12 +496,12 @@ bool TektronixOscilloscope::AcquireData()
 		for(int j=0;j<10;++j)
 			m_transport->ReadReply();
 
-		format = 0;
-		type = 0;
-		average_count = 0;
+		//format = 0;
+		//type = 0;
+		//average_count = 0;
 		xincrement = 1000;
-		xorigin = 0;
-		xreference = 0;
+		//xorigin = 0;
+		//xreference = 0;
 		yincrement = 0.01;
 		yorigin = 0;
 		yreference = 0;
@@ -619,101 +619,6 @@ bool TektronixOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-size_t TektronixOscilloscope::GetTriggerChannelIndex()
-{
-	m_triggerChannelValid = true;
-	m_triggerChannel = 1;
-	return m_triggerChannel;
-
-#if 0
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Look it up
-	m_transport->SendCommand("TRIG:SOUR?");
-	string ret = m_transport->ReadReply();
-
-	if(ret.find("CHAN") == 0)
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+4) - 1;
-		return m_triggerChannel;
-	}
-	else if(ret == "EXT")
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-		return m_triggerChannel;
-	}
-	else
-	{
-		m_triggerChannelValid = false;
-		LogWarning("Unknown trigger source %s\n", ret.c_str());
-		return 0;
-	}
-#endif
-}
-
-void TektronixOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
-{
-	//FIXME
-}
-
-float TektronixOscilloscope::GetTriggerVoltage()
-{
-	double level = 0;
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-
-#if 0
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:LEV?");
-	string ret = m_transport->ReadReply();
-
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-#endif
-}
-
-void TektronixOscilloscope::SetTriggerVoltage(float v)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", v);
-	m_transport->SendCommand(tmp);
-
-	//Update cache
-	m_triggerLevelValid = true;
-	m_triggerLevel = v;
-
-}
-
-Oscilloscope::TriggerType TektronixOscilloscope::GetTriggerType()
-{
-	//FIXME
-	return Oscilloscope::TRIGGER_TYPE_RISING;
-}
-
-void TektronixOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//FIXME
-}
-
 vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
@@ -790,4 +695,134 @@ bool TektronixOscilloscope::IsInterleaving()
 bool TektronixOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void TektronixOscilloscope::PullTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//TODO: check trigger types
+	if(1)
+		PullEdgeTrigger();
+
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger\n");
+		delete m_trigger;
+		m_trigger = NULL;
+		return;
+	}
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void TektronixOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	//EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	/*
+	//Check cache
+	//No locking, worst case we return a result a few seconds old
+	if(m_triggerChannelValid)
+		return m_triggerChannel;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Look it up
+	m_transport->SendCommand("TRIG:SOUR?");
+	string ret = m_transport->ReadReply();
+
+	if(ret.find("CHAN") == 0)
+	{
+		m_triggerChannelValid = true;
+		m_triggerChannel = atoi(ret.c_str()+4) - 1;
+		return m_triggerChannel;
+	}
+	else if(ret == "EXT")
+	{
+		m_triggerChannelValid = true;
+		m_triggerChannel = m_extTrigChannel->GetIndex();
+		return m_triggerChannel;
+	}
+	else
+	{
+		m_triggerChannelValid = false;
+		LogWarning("Unknown trigger source %s\n", ret.c_str());
+		return 0;
+	}
+
+	//Check cache.
+	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
+	if(m_triggerLevelValid)
+		return m_triggerLevel;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("TRIG:LEV?");
+	string ret = m_transport->ReadReply();
+
+	double level;
+	sscanf(ret.c_str(), "%lf", &level);
+	m_triggerLevel = level;
+	m_triggerLevelValid = true;
+	return level;
+	*/
+}
+
+void TektronixOscilloscope::PushTrigger()
+{
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	if(et)
+		PushEdgeTrigger(et);
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//TODO: Source
+	//m_transport->SendCommand(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
+
+	//Level
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
+	m_transport->SendCommand(tmp);
+
+	//TODO: Slope
+	/*
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommand("TRIG:SLOPE POS");
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommand("TRIG:SLOPE NEG");
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommand("TRIG:SLOPE EITH");
+			break;
+		default:
+			return;
+	}
+	*/
 }

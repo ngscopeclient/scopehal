@@ -30,6 +30,8 @@
 #ifndef TektronixOscilloscope_h
 #define TektronixOscilloscope_h
 
+class EdgeTrigger;
+
 class TektronixOscilloscope : public SCPIOscilloscope
 {
 public:
@@ -66,12 +68,8 @@ public:
 	virtual void StartSingleTrigger();
 	virtual void Stop();
 	virtual bool IsTriggerArmed();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void PushTrigger();
+	virtual void PullTrigger();
 
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
@@ -110,6 +108,9 @@ protected:
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+	void PullEdgeTrigger();
+	void PushEdgeTrigger(EdgeTrigger* trig);
 
 public:
 	static std::string GetDriverNameInternal();

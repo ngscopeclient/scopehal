@@ -106,16 +106,6 @@ unsigned int SignalGeneratorOscilloscope::GetInstrumentTypes()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering
 
-Oscilloscope::TriggerType SignalGeneratorOscilloscope::GetTriggerType()
-{
-	return TRIGGER_TYPE_RISING;
-}
-
-void SignalGeneratorOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//no-op, we never trigger
-}
-
 Oscilloscope::TriggerMode SignalGeneratorOscilloscope::PollTrigger()
 {
 	if(m_triggerArmed)
@@ -183,26 +173,6 @@ void SignalGeneratorOscilloscope::Stop()
 bool SignalGeneratorOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
-}
-
-size_t SignalGeneratorOscilloscope::GetTriggerChannelIndex()
-{
-	return 0;
-}
-
-void SignalGeneratorOscilloscope::SetTriggerChannelIndex(size_t /*i*/)
-{
-	//no-op, we never trigger
-}
-
-float SignalGeneratorOscilloscope::GetTriggerVoltage()
-{
-	return 0;
-}
-
-void SignalGeneratorOscilloscope::SetTriggerVoltage(float /*v*/)
-{
-	//no-op, we never trigger
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -353,4 +323,14 @@ bool SignalGeneratorOscilloscope::IsInterleaving()
 bool SignalGeneratorOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void SignalGeneratorOscilloscope::PushTrigger()
+{
+	//no-op
+}
+
+void SignalGeneratorOscilloscope::PullTrigger()
+{
+	//no-op
 }

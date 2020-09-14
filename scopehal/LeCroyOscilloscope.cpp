@@ -33,6 +33,7 @@
 #include <locale>
 #include <immintrin.h>
 #include <omp.h>
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -374,10 +375,10 @@ void LeCroyOscilloscope::FlushConfigCache()
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
-	m_triggerType = TRIGGER_TYPE_DONTCARE;
-	m_triggerTypeValid = false;
+	if(m_trigger)
+		delete m_trigger;
+	m_trigger = NULL;
+
 	m_channelVoltageRanges.clear();
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
@@ -1881,158 +1882,6 @@ void LeCroyOscilloscope::Stop()
 	ClearPendingWaveforms();
 }
 
-size_t LeCroyOscilloscope::GetTriggerChannelIndex()
-{
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG_SELECT?");
-	string reply = m_transport->ReadReply();
-
-	char ignored1[32];
-	char ignored2[32];
-	char source[32] = "";
-	sscanf(reply.c_str(), "%31[^,],%31[^,],%31[^,],\n", ignored1, ignored2, source);
-
-	//Update cache
-	if(source[0] == 'D')					//Digital channel numbers are 0 based
-	{
-		int digitalChannelNum = atoi(source+1);
-		if((unsigned)digitalChannelNum >= m_digitalChannelCount)
-		{
-			m_triggerChannel = 0;
-			LogWarning("Trigger is configured for digital channel %s, but we only have %u digital channels\n",
-				source, m_digitalChannelCount);
-		}
-
-		else
-			m_triggerChannel = m_digitalChannels[digitalChannelNum]->GetIndex();
-	}
-	else if(isdigit(source[1]))				//but analog are 1 based, yay!
-		m_triggerChannel = source[1] - '1';
-	else if(strstr(source, "EX") == source)	//EX or EX10 for /1 or /10
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-	else
-	{
-		LogError("Unknown source %s (reply %s)\n", source, reply.c_str());
-		m_triggerChannel = 0;
-	}
-	m_triggerChannelValid = true;
-	return m_triggerChannel;
-}
-
-void LeCroyOscilloscope::SetTriggerChannelIndex(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//For now, always set trigger mode to edge
-	m_transport->SendCommand(string("TRIG_SELECT EDGE,SR,") + m_channels[i]->GetHwname());
-
-	//TODO: support digital channels
-
-	//Update cache
-	m_triggerChannel = i;
-	m_triggerChannelValid = true;
-}
-
-float LeCroyOscilloscope::GetTriggerVoltage()
-{
-	//Digital channels don't have a meaningful trigger voltage
-	if(GetTriggerChannelIndex() > m_extTrigChannel->GetIndex())
-		return 0;
-
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//If we have the MSO option installed, the last channel we touched might have been digital.
-	//If this is the case the scope will be derpy and drop the command even if the trigger source is an analog channel!
-	//The fix is to explicitly query the trigger voltage on the actual analog channel.
-	if(m_hasLA)
-		m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRLV?");
-	else
-		m_transport->SendCommand("TRLV?");
-
-
-	string reply = m_transport->ReadReply();
-	sscanf(reply.c_str(), "%f", &m_triggerLevel);
-	m_triggerLevelValid = true;
-	return m_triggerLevel;
-}
-
-void LeCroyOscilloscope::SetTriggerVoltage(float v)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "%s:TRLV %.3f V", m_channels[m_triggerChannel]->GetHwname().c_str(), v);
-	m_transport->SendCommand(tmp);
-
-	//Update cache
-	m_triggerLevelValid = true;
-	m_triggerLevel = v;
-}
-
-Oscilloscope::TriggerType LeCroyOscilloscope::GetTriggerType()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	if(m_triggerTypeValid)
-		return m_triggerType;
-
-	m_transport->SendCommand("TRIG_SLOPE?");
-	string reply = m_transport->ReadReply();
-
-	m_triggerTypeValid = true;
-
-	//TODO: TRIG_SELECT to verify its an edge trigger
-
-	//note newline at end of reply
-	if(reply == "POS\n")
-		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING);
-	else if(reply == "NEG\n")
-		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING);
-	else if(reply == "EIT\n")
-		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE);
-
-	//TODO: handle other types
-	return (m_triggerType = Oscilloscope::TRIGGER_TYPE_DONTCARE);
-}
-
-void LeCroyOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_triggerType = type;
-	m_triggerTypeValid = true;
-
-	switch(type)
-	{
-		case Oscilloscope::TRIGGER_TYPE_RISING:
-			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL POS");
-			break;
-
-		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL NEG");
-			break;
-
-		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			m_transport->SendCommand(m_channels[m_triggerChannel]->GetHwname() + ":TRSL EIT");
-			break;
-
-		default:
-			LogWarning("Unsupported trigger type\n");
-			break;
-	}
-}
-
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
 {
 	//not meaningful for trigger or digital channels
@@ -2640,4 +2489,126 @@ void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 	else
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold1 = %e'", level);
 	m_transport->SendCommand(tmp);
+}
+
+void LeCroyOscilloscope::PullTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Figure out what kind of trigger is active.
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Type'");
+	string reply = m_transport->ReadReply();
+	if (reply == "Edge")
+		PullEdgeTrigger();
+
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+		m_trigger = NULL;
+		return;
+	}
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void LeCroyOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	//Source channel
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Source'");
+	string reply = m_transport->ReadReply();
+	auto chan = GetChannelByHwName(reply);
+	et->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
+	et->SetLevel(stof(m_transport->ReadReply()));
+
+	//TODO: OptimizeForHF (changes hysteresis for fast signals)
+
+	//Slope
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
+	reply = m_transport->ReadReply();
+	if(reply == "Positive")
+		et->SetType(EdgeTrigger::EDGE_RISING);
+	else if(reply == "Negative")
+		et->SetType(EdgeTrigger::EDGE_FALLING);
+	else if(reply == "Either")
+		et->SetType(EdgeTrigger::EDGE_ANY);
+	else
+		LogDebug("Unknown trigger slope %s\n", reply.c_str());
+}
+
+void LeCroyOscilloscope::PushTrigger()
+{
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	if(et)
+		PushEdgeTrigger(et);
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Type
+	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
+
+	//Source
+	char tmp[128];
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Source = \"%s\"'",
+		trig->GetInput(0).m_channel->GetHwname().c_str());
+	m_transport->SendCommand(tmp);
+
+	//Level
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Edge.Level = \"%f\"'",
+		trig->GetLevel());
+	m_transport->SendCommand(tmp);
+
+	//Slope
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Positive\"'");
+			break;
+
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Negative\"'");
+			break;
+
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Either\"'");
+			break;
+
+		default:
+			LogWarning("Invalid trigger type %d\n", trig->GetType());
+			break;
+	}
 }

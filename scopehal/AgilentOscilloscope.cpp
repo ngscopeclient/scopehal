@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "AgilentOscilloscope.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -37,9 +38,6 @@ using namespace std;
 
 AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
-	, m_triggerChannelValid(false)
-	, m_triggerLevelValid(false)
-	, m_triggerTypeValid(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
@@ -170,8 +168,9 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
-	m_triggerChannelValid = false;
-	m_triggerLevelValid = false;
+
+	delete m_trigger;
+	m_trigger = NULL;
 }
 
 bool AgilentOscilloscope::IsChannelEnabled(size_t i)
@@ -592,132 +591,6 @@ bool AgilentOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-size_t AgilentOscilloscope::GetTriggerChannelIndex()
-{
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Look it up
-	m_transport->SendCommand("TRIG:SOUR?");
-	string ret = m_transport->ReadReply();
-
-	if(ret.find("CHAN") == 0)
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+4) - 1;
-		return m_triggerChannel;
-	}
-	else if(ret == "EXT")
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-		return m_triggerChannel;
-	}
-	else
-	{
-		m_triggerChannelValid = false;
-		LogWarning("Unknown trigger source %s\n", ret.c_str());
-		return 0;
-	}
-}
-
-void AgilentOscilloscope::SetTriggerChannelIndex(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("TRIG:SOURCE ") + m_channels[i]->GetHwname());
-	m_triggerChannel = i;
-	m_triggerChannelValid = true;
-}
-
-float AgilentOscilloscope::GetTriggerVoltage()
-{
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:LEV?");
-	string reply = m_transport->ReadReply();
-
-	double level = stod(reply);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-}
-
-void AgilentOscilloscope::SetTriggerVoltage(float v)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", v);
-	m_transport->SendCommand(tmp);
-
-	//Update cache
-	m_triggerLevelValid = true;
-	m_triggerLevel = v;
-}
-
-Oscilloscope::TriggerType AgilentOscilloscope::GetTriggerType()
-{
-	if (m_triggerTypeValid)
-		return m_triggerType;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_triggerTypeValid = true;
-
-	m_transport->SendCommand("TRIG:MODE?");
-	string reply = m_transport->ReadReply();
-
-	if (reply != "EDGE")
-		return (m_triggerType = Oscilloscope::TRIGGER_TYPE_COMPLEX);
-
-	m_transport->SendCommand("TRIG:SLOPE?");
-	reply = m_transport->ReadReply();
-
-	if (reply == "POS")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_RISING;
-	else if (reply == "NEG")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_FALLING;
-	else if (reply == "EITH")
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_CHANGE;
-	// TODO: support "ALT" when the API allows
-	else
-		m_triggerType = Oscilloscope::TRIGGER_TYPE_COMPLEX;
-
-	return m_triggerType;
-}
-
-void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	switch (type)
-	{
-		case Oscilloscope::TRIGGER_TYPE_RISING:
-			m_transport->SendCommand("TRIG:SLOPE POS");
-			break;
-		case Oscilloscope::TRIGGER_TYPE_FALLING:
-			m_transport->SendCommand("TRIG:SLOPE NEG");
-			break;
-		case Oscilloscope::TRIGGER_TYPE_CHANGE:
-			m_transport->SendCommand("TRIG:SLOPE EITH");
-			break;
-		default:
-			return;
-	}
-
-	m_transport->SendCommand("TRIG:MODE EDGE");
-	m_triggerTypeValid = true;
-	m_triggerType = type;
-}
-
 vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 {
 	//FIXME
@@ -794,4 +667,110 @@ bool AgilentOscilloscope::IsInterleaving()
 bool AgilentOscilloscope::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void AgilentOscilloscope::PullTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Figure out what kind of trigger is active.
+	m_transport->SendCommand("TRIG:MODE?");
+	string reply = m_transport->ReadReply();
+	if (reply == "EDGE")
+		PullEdgeTrigger();
+
+	//Unrecognized trigger type
+	else
+	{
+		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+		m_trigger = NULL;
+		return;
+	}
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void AgilentOscilloscope::PullEdgeTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	m_transport->SendCommand("TRIG:SOUR?");
+	string reply = m_transport->ReadReply();
+	auto chan = GetChannelByHwName(reply);
+	et->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand("TRIG:LEV?");
+	reply = m_transport->ReadReply();
+	et->SetLevel(stof(reply));
+
+	//Edge slope
+	m_transport->SendCommand("TRIG:SLOPE?");
+	reply = m_transport->ReadReply();
+	if (reply == "POS")
+		et->SetType(EdgeTrigger::EDGE_RISING);
+	else if (reply == "NEG")
+		et->SetType(EdgeTrigger::EDGE_FALLING);
+	else if (reply == "EITH")
+		et->SetType(EdgeTrigger::EDGE_ANY);
+
+	// TODO: support "ALT" when the API allows
+}
+
+void AgilentOscilloscope::PushTrigger()
+{
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	if(et)
+		PushEdgeTrigger(et);
+
+	else
+		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	m_transport->SendCommand(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
+
+	//Level
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
+	m_transport->SendCommand(tmp);
+
+	//Slope
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			m_transport->SendCommand("TRIG:SLOPE POS");
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			m_transport->SendCommand("TRIG:SLOPE NEG");
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			m_transport->SendCommand("TRIG:SLOPE EITH");
+			break;
+		default:
+			return;
+	}
 }

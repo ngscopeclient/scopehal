@@ -35,6 +35,11 @@
 #ifndef FlowGraphNode_h
 #define FlowGraphNode_h
 
+class OscilloscopeChannel;
+class WaveformBase;
+
+#include "FilterParameter.h"
+
 /**
 	@brief Descriptor for a single stream coming off a channel
  */
@@ -79,7 +84,7 @@ public:
 /**
 	@brief Abstract base class for a node in the signal flow graph.
 
-	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters,
+	A FlowGraphNode has one or more channel inputs, zero or more configuration parameters.
  */
 class FlowGraphNode
 {

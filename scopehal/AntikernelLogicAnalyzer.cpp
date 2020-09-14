@@ -36,6 +36,7 @@
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
 #include "AntikernelLogicAnalyzer.h"
+#include "EdgeTrigger.h"
 
 using namespace std;
 
@@ -273,16 +274,6 @@ void AntikernelLogicAnalyzer::LoadChannels()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering
 
-Oscilloscope::TriggerType AntikernelLogicAnalyzer::GetTriggerType()
-{
-	return TRIGGER_TYPE_COMPLEX;
-}
-
-void AntikernelLogicAnalyzer::SetTriggerType(Oscilloscope::TriggerType /*type*/)
-{
-	//no op, always complex pattern trigger
-}
-
 Oscilloscope::TriggerMode AntikernelLogicAnalyzer::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -468,26 +459,6 @@ bool AntikernelLogicAnalyzer::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-size_t AntikernelLogicAnalyzer::GetTriggerChannelIndex()
-{
-	return 0;
-}
-
-void AntikernelLogicAnalyzer::SetTriggerChannelIndex(size_t /*i*/)
-{
-
-}
-
-float AntikernelLogicAnalyzer::GetTriggerVoltage()
-{
-	return 0;
-}
-
-void AntikernelLogicAnalyzer::SetTriggerVoltage(float /*v*/)
-{
-	//no-op, all channels are digital
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Channel configuration. Mostly empty stubs.
 
@@ -636,4 +607,29 @@ bool AntikernelLogicAnalyzer::IsInterleaving()
 bool AntikernelLogicAnalyzer::SetInterleaving(bool /*combine*/)
 {
 	return false;
+}
+
+void AntikernelLogicAnalyzer::PullTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new EdgeTrigger(this);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+
+	//Default setup
+	et->SetInput(0, StreamDescriptor(m_channels[0], 0), true);
+	et->SetLevel(0.5);
+	et->SetType(EdgeTrigger::EDGE_RISING);
+}
+
+void AntikernelLogicAnalyzer::PushTrigger()
+{
+	//no-op for now
 }

@@ -73,14 +73,9 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
-
 	virtual bool IsTriggerArmed();
-	virtual size_t GetTriggerChannelIndex();
-	virtual void SetTriggerChannelIndex(size_t i);
-	virtual float GetTriggerVoltage();
-	virtual void SetTriggerVoltage(float v);
-	virtual Oscilloscope::TriggerType GetTriggerType();
-	virtual void SetTriggerType(Oscilloscope::TriggerType type);
+	virtual void PushTrigger();
+	virtual void PullTrigger();
 
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
