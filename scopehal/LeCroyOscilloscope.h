@@ -250,6 +250,8 @@ protected:
 	//Mutexing for thread safety
 	std::recursive_mutex m_cacheMutex;
 
+	std::string Trim(std::string str);
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC(LeCroyOscilloscope)

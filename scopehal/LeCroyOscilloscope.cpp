@@ -2497,7 +2497,7 @@ void LeCroyOscilloscope::PullTrigger()
 
 	//Figure out what kind of trigger is active.
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Type'");
-	string reply = m_transport->ReadReply();
+	string reply = Trim(m_transport->ReadReply());
 	if (reply == "Edge")
 		PullEdgeTrigger();
 
@@ -2530,11 +2530,11 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	//Source channel
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Source'");
-	string reply = m_transport->ReadReply();
+	string reply = Trim(m_transport->ReadReply());
 	auto chan = GetChannelByHwName(reply);
 	et->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
-		LogWarning("Unknown trigger source %s\n", reply.c_str());
+		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
 
 	//Level
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
@@ -2544,7 +2544,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
-	reply = m_transport->ReadReply();
+	reply = Trim(m_transport->ReadReply());
 	if(reply == "Positive")
 		et->SetType(EdgeTrigger::EDGE_RISING);
 	else if(reply == "Negative")
@@ -2588,7 +2588,7 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	snprintf(
 		tmp,
 		sizeof(tmp),
-		"VBS? 'app.Acquisition.Edge.Level = \"%f\"'",
+		"VBS? 'app.Acquisition.Trigger.Edge.Level = %f'",
 		trig->GetLevel());
 	m_transport->SendCommand(tmp);
 
@@ -2611,4 +2611,36 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			LogWarning("Invalid trigger type %d\n", trig->GetType());
 			break;
 	}
+}
+
+/**
+	@brief Removes whitespace from the start and end of a string
+ */
+string LeCroyOscilloscope::Trim(string str)
+{
+	string ret;
+	string tmp;
+
+	//Skip leading spaces
+	size_t i=0;
+	for(; i<str.length() && isspace(str[i]); i++)
+	{}
+
+	//Read non-space stuff
+	for(; i<str.length(); i++)
+	{
+		//Non-space
+		char c = str[i];
+		if(!isspace(c))
+		{
+			ret = ret + tmp + c;
+			tmp = "";
+		}
+
+		//Space. Save it, only append if we have non-space after
+		else
+			tmp += c;
+	}
+
+	return ret;
 }
