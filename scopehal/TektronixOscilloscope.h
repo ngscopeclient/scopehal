@@ -60,7 +60,6 @@ public:
 	virtual void SetChannelOffset(size_t i, double offset);
 
 	//Triggering
-	virtual void ResetTriggerConditions();
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
 	virtual void Start();
@@ -73,7 +72,6 @@ public:
 	virtual void SetTriggerVoltage(float v);
 	virtual Oscilloscope::TriggerType GetTriggerType();
 	virtual void SetTriggerType(Oscilloscope::TriggerType type);
-	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
 
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();

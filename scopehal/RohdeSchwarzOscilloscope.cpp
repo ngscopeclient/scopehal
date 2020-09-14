@@ -374,12 +374,6 @@ void RohdeSchwarzOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 	LogWarning("RohdeSchwarzOscilloscope::SetChannelOffset unimplemented\n");
 }
 
-void RohdeSchwarzOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::ResetTriggerConditions unimplemented\n");
-}
-
 Oscilloscope::TriggerMode RohdeSchwarzOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -598,12 +592,6 @@ void RohdeSchwarzOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/
 {
 	//FIXME
 	LogWarning("RohdeSchwarzOscilloscope::SetTriggerType unimplemented\n");
-}
-
-void RohdeSchwarzOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//unimplemented, no LA support
-	LogWarning("RohdeSchwarzOscilloscope::SetTriggerForChannel unimplemented\n");
 }
 
 vector<uint64_t> RohdeSchwarzOscilloscope::GetSampleRatesNonInterleaved()

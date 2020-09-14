@@ -433,11 +433,6 @@ void AgilentOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_transport->SendCommand(cmd);
 }
 
-void AgilentOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-}
-
 Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 {
 	if (!m_triggerArmed)
@@ -721,11 +716,6 @@ void AgilentOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 	m_transport->SendCommand("TRIG:MODE EDGE");
 	m_triggerTypeValid = true;
 	m_triggerType = type;
-}
-
-void AgilentOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//unimplemented, no LA support
 }
 
 vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()

@@ -148,16 +148,6 @@ bool MockOscilloscope::IsTriggerArmed()
 	return false;
 }
 
-void MockOscilloscope::ResetTriggerConditions()
-{
-	//no-op, we never trigger
-}
-
-void MockOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//no-op, we never trigger
-}
-
 size_t MockOscilloscope::GetTriggerChannelIndex()
 {
 	return 0;

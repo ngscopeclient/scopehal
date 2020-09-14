@@ -185,16 +185,6 @@ bool SignalGeneratorOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-void SignalGeneratorOscilloscope::ResetTriggerConditions()
-{
-	//no-op, we never trigger
-}
-
-void SignalGeneratorOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//no-op, we never trigger
-}
-
 size_t SignalGeneratorOscilloscope::GetTriggerChannelIndex()
 {
 	return 0;

@@ -434,11 +434,6 @@ void TektronixOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
 	//FIXME
 }
 
-void TektronixOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-}
-
 Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -717,11 +712,6 @@ Oscilloscope::TriggerType TektronixOscilloscope::GetTriggerType()
 void TektronixOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type*/)
 {
 	//FIXME
-}
-
-void TektronixOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//unimplemented, no LA support
 }
 
 vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()

@@ -80,8 +80,18 @@ AntikernelLogicAnalyzer::AntikernelLogicAnalyzer(SCPITransport* transport)
 	m_fwVersion = "1.0";
 	m_serial = "NoSerial";
 
+	//Set the trigger to be ch1 equal
+	SendCommand(CMD_SET_TRIG_MODE, 0, 2);
+
+	//Set target to 1
+	unsigned char tmp[6] =
+	{ CMD_SET_COMPARE_TARGET, 0, 0,0,0,1 };
+	m_transport->SendRawData(sizeof(tmp), tmp);
+
+	//Set offset to 32 samples
+	SendCommand(CMD_SET_TRIG_OFFSET, 0, 32);
+
 	LoadChannels();
-	ResetTriggerConditions();
 }
 
 AntikernelLogicAnalyzer::~AntikernelLogicAnalyzer()
@@ -456,31 +466,6 @@ void AntikernelLogicAnalyzer::Stop()
 bool AntikernelLogicAnalyzer::IsTriggerArmed()
 {
 	return m_triggerArmed;
-}
-
-void AntikernelLogicAnalyzer::ResetTriggerConditions()
-{
-	//Set the trigger to be ch1 equal
-	SendCommand(CMD_SET_TRIG_MODE, 0, 2);
-
-	//Set target to 1
-	unsigned char tmp[6] =
-	{ CMD_SET_COMPARE_TARGET, 0, 0,0,0,1 };
-	m_transport->SendRawData(sizeof(tmp), tmp);
-
-	//Set offset to 32 samples
-	SendCommand(CMD_SET_TRIG_OFFSET, 0, 32);
-
-	//SendCommand(CMD_SET_COMPARE_TARGET, 0, 1);
-
-	/*
-	for(size_t i=0; i<m_triggers.size(); i++)
-		m_triggers[i] = TRIGGER_TYPE_DONTCARE;
-	*/
-}
-
-void AntikernelLogicAnalyzer::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
 }
 
 size_t AntikernelLogicAnalyzer::GetTriggerChannelIndex()

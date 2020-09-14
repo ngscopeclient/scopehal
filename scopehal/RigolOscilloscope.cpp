@@ -555,11 +555,6 @@ void RigolOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_transport->SendCommand(buf);
 }
 
-void RigolOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-}
-
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -947,11 +942,6 @@ void RigolOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 			LogError("Invalid trigger type\n");
 	}
 	//FIXME
-}
-
-void RigolOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//unimplemented, no LA support
 }
 
 vector<uint64_t> RigolOscilloscope::GetSampleRatesNonInterleaved()

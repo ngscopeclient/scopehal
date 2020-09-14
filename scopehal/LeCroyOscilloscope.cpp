@@ -1027,11 +1027,6 @@ void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering
 
-void LeCroyOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-}
-
 bool LeCroyOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
@@ -2036,12 +2031,6 @@ void LeCroyOscilloscope::SetTriggerType(Oscilloscope::TriggerType type)
 			LogWarning("Unsupported trigger type\n");
 			break;
 	}
-}
-
-void LeCroyOscilloscope::SetTriggerForChannel(
-	OscilloscopeChannel* /*channel*/,
-	vector<TriggerType> /*triggerbits*/)
-{
 }
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)

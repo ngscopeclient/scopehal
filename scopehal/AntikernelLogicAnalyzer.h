@@ -99,9 +99,6 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
-	virtual void ResetTriggerConditions();
-	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits);
-
 	virtual unsigned int GetInstrumentTypes();
 
 protected:

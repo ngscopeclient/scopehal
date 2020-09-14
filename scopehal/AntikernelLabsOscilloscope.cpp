@@ -352,12 +352,6 @@ void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_channelOffsets[i] = offset;
 }
 
-void AntikernelLabsOscilloscope::ResetTriggerConditions()
-{
-	//FIXME
-	LogWarning("AntikernelLabsOscilloscope::ResetTriggerConditions unimplemented\n");
-}
-
 Oscilloscope::TriggerMode AntikernelLabsOscilloscope::PollTrigger()
 {
 	//Always report "triggered" for now, since waveforms come nonstop.
@@ -548,12 +542,6 @@ void AntikernelLabsOscilloscope::SetTriggerType(Oscilloscope::TriggerType /*type
 {
 	//FIXME
 	LogWarning("AntikernelLabsOscilloscope::SetTriggerType unimplemented\n");
-}
-
-void AntikernelLabsOscilloscope::SetTriggerForChannel(OscilloscopeChannel* /*channel*/, vector<TriggerType> /*triggerbits*/)
-{
-	//unimplemented, no LA support
-	LogWarning("AntikernelLabsOscilloscope::SetTriggerForChannel unimplemented\n");
 }
 
 vector<uint64_t> AntikernelLabsOscilloscope::GetSampleRatesNonInterleaved()

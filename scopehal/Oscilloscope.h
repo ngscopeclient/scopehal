@@ -310,22 +310,6 @@ public:
 	virtual void SetTriggerType(Oscilloscope::TriggerType type) =0;
 
 	/**
-		@brief Clear out all existing trigger conditions
-
-		This function is used for complex LA triggers and isn't yet supported by glscopeclient.
-		Simple instruments should just override with an empty function.
-	 */
-	virtual void ResetTriggerConditions() =0;
-
-	/**
-		@brief Sets the trigger condition for a single channel
-
-		This function is used for complex LA triggers and isn't yet supported by glscopeclient.
-		Simple instruments should just override with an empty function.
-	 */
-	virtual void SetTriggerForChannel(OscilloscopeChannel* channel, std::vector<TriggerType> triggerbits)=0;
-
-	/**
 		@brief Reads a waveform into the queue of pending waveforms
 	 */
 	virtual bool AcquireData() =0;
