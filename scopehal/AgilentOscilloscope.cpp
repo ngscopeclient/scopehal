@@ -29,7 +29,7 @@
 
 #include "scopehal.h"
 #include "AgilentOscilloscope.h"
-#include "EdgeTrigger.h"
+#include "AgilentEdgeTrigger.h"
 
 using namespace std;
 
@@ -694,7 +694,7 @@ void AgilentOscilloscope::PullTrigger()
 void AgilentOscilloscope::PullEdgeTrigger()
 {
 	//Clear out any triggers of the wrong type
-	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
+	if( (m_trigger != NULL) && (dynamic_cast<AgilentEdgeTrigger*>(m_trigger) != NULL) )
 	{
 		delete m_trigger;
 		m_trigger = NULL;
@@ -702,8 +702,8 @@ void AgilentOscilloscope::PullEdgeTrigger()
 
 	//Create a new trigger if necessary
 	if(m_trigger == NULL)
-		m_trigger = new EdgeTrigger(this);
-	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+		m_trigger = new AgilentEdgeTrigger(this);
+	AgilentEdgeTrigger* et = dynamic_cast<AgilentEdgeTrigger*>(m_trigger);
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -729,8 +729,8 @@ void AgilentOscilloscope::PullEdgeTrigger()
 		et->SetType(EdgeTrigger::EDGE_FALLING);
 	else if (reply == "EITH")
 		et->SetType(EdgeTrigger::EDGE_ANY);
-
-	// TODO: support "ALT" when the API allows
+	else if (reply == "ALT")
+		et->SetTypeExt(AgilentEdgeTrigger::EDGE_ALTERNATING);
 }
 
 void AgilentOscilloscope::PushTrigger()
@@ -759,7 +759,7 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	m_transport->SendCommand(tmp);
 
 	//Slope
-	switch(trig->GetType())
+	switch((int)trig->GetType())
 	{
 		case EdgeTrigger::EDGE_RISING:
 			m_transport->SendCommand("TRIG:SLOPE POS");
@@ -770,6 +770,11 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 		case EdgeTrigger::EDGE_ANY:
 			m_transport->SendCommand("TRIG:SLOPE EITH");
 			break;
+
+		case AgilentEdgeTrigger::EDGE_ALTERNATING:
+			m_transport->SendCommand("TRIG:SLOPE ALT");
+			break;
+
 		default:
 			return;
 	}
