@@ -294,7 +294,7 @@ public:
 		Ownership of the trigger object is retained by the Oscilloscope. This pointer may be invalidated by any future
 		call to GetTrigger() or PullTrigger().
 	 */
-	Trigger* GetTrigger(bool sync = true)
+	Trigger* GetTrigger(bool sync = false)
 	{
 		if(sync || (m_trigger == NULL) )
 			PullTrigger();
