@@ -148,6 +148,11 @@ void LeCroyOscilloscope::IdentifyHardware()
 	}
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
+	else if(m_model.find("WM") == 0)
+	{
+		if(m_model.find("ZI-B") != string::npos)
+			m_modelid = MODEL_WAVEMASTER_8ZI_B;
+	}
 	else if(m_model.find("WAVERUNNER8") == 0)
 	{
 		m_modelid = MODEL_WAVERUNNER_8K;
@@ -416,10 +421,20 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Protocol decode";
 				desc = "10/100 Ethernet";
 			}
+			else if(o == "10G-ENET-BUS")
+			{
+				type = "Protocol decode";
+				desc = "10G Ethernet";
+			}
 			else if(o == "8B10B-BUS")
 			{
 				type = "Protocol decode";
 				desc = "8B/10B";
+			}
+			else if(o == "64B66B-BUS")
+			{
+				type = "Protocol decode";
+				desc = "64B/66B";
 			}
 			else if(
 				(o == "ARINC429") ||
@@ -448,6 +463,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Protocol decode";
 				desc = "Manchester";
+			}
+			else if(o == "MDIO")
+			{
+				type = "Protocol decode";
+				desc = "Ethernet MDIO";
 			}
 			else if(o == "MPHY-DECODE")
 				desc = "MIPI M-PHY";
@@ -487,6 +507,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Signal Integrity";
 				desc = "DDR3 Debug";
+			}
+			else if(o == "DDR4DEBUG")
+			{
+				type = "Signal Integrity";
+				desc = "DDR4 Debug";
 			}
 			else if(o == "DPHY-PHY")
 			{
@@ -2479,6 +2504,17 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(10 * g);
 			break;
 
+		case MODEL_WAVEMASTER_8ZI_B:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			ret.push_back(1 * g);
+			ret.push_back(2500 * m);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			ret.push_back(20 * g);
+			ret.push_back(40 * g);
+			break;
+
 		case MODEL_WAVEPRO_HD:
 			ret.push_back(250 * m);
 			ret.push_back(500 * m);
@@ -2537,6 +2573,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
+		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVERUNNER_8K_HD:
 			break;
 
@@ -2621,6 +2658,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(50 * m);
 			break;
 
+		//standard memory
+		case MODEL_WAVEMASTER_8ZI_B:
+			break;
+
 		case MODEL_WAVEPRO_HD:
 			ret.push_back(25 * m);
 
@@ -2696,6 +2737,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
+		case MODEL_WAVEMASTER_8ZI_B:
 			break;
 
 		case MODEL_WAVEPRO_HD:
