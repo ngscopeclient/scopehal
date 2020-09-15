@@ -140,6 +140,7 @@ public:
 	{
 		MODEL_WAVESURFER_3K,
 		MODEL_WAVERUNNER_8K,
+		MODEL_WAVERUNNER_8K_HD,
 		MODEL_WAVERUNNER_9K,
 		MODEL_HDO_4KA,
 		MODEL_HDO_6KA,
@@ -228,6 +229,7 @@ protected:
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
 	bool m_hasFastSampleRate;	//-M models
+	int m_memoryDepthOption;	//0 = base, 1 = first possible expansion, 2 = second possible expansion, etc
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;

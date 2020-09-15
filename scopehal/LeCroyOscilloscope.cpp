@@ -46,6 +46,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
 	, m_hasFastSampleRate(false)
+	, m_memoryDepthOption(0)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
@@ -148,7 +149,12 @@ void LeCroyOscilloscope::IdentifyHardware()
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
 	else if(m_model.find("WAVERUNNER8") == 0)
+	{
 		m_modelid = MODEL_WAVERUNNER_8K;
+
+		if(m_model.find("HD") != string::npos)
+			m_modelid = MODEL_WAVERUNNER_8K_HD;
+	}
 	else if(m_model.find("WAVERUNNER9") == 0)
 		m_modelid = MODEL_WAVERUNNER_9K;
 	else if(m_model.find("WS3") == 0)
@@ -258,12 +264,50 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Look for M option (extra sample rate and memory)
+			//Extra sample rate and memory for WaveRunner 8000
 			else if(o == "-M")
 			{
 				m_hasFastSampleRate = true;
+				m_memoryDepthOption = 1;
 				type = "Hardware";
 				desc = "Extra sample rate and memory";
+				action = "Enabled";
+			}
+
+			//Extra memory depth for WaveRunner 8000HD
+			else if(o == "200MS")
+			{
+				m_memoryDepthOption = 1;
+				type = "Hardware";
+				desc = "200M point memory";
+				action = "Enabled";
+			}
+			else if(o == "500MS")
+			{
+				m_memoryDepthOption = 2;
+				type = "Hardware";
+				desc = "500M point memory";
+				action = "Enabled";
+			}
+			else if(o == "1000MS")
+			{
+				m_memoryDepthOption = 3;
+				type = "Hardware";
+				desc = "1000M point memory";
+				action = "Enabled";
+			}
+			else if(o == "2000MS")
+			{
+				m_memoryDepthOption = 4;
+				type = "Hardware";
+				desc = "2000M point memory";
+				action = "Enabled";
+			}
+			else if(o == "5000MS")
+			{
+				m_memoryDepthOption = 5;
+				type = "Hardware";
+				desc = "5000M point memory";
 				action = "Enabled";
 			}
 
@@ -2344,7 +2388,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		case MODEL_MDA_800:
 			ret.push_back(200 * m);
 			ret.push_back(500 * m);
-			ret.push_back(1250 * m);	//not the normal 1-2-5-10 sequence!
+			ret.push_back(1250 * m);
 			ret.push_back(2500 * m);
 			ret.push_back(10 * g);
 			break;
@@ -2360,6 +2404,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(20 * g);
 			break;
 
+		case MODEL_WAVERUNNER_8K_HD:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			ret.push_back(1250 * m);
+			ret.push_back(2500 * m);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
 		case MODEL_WAVERUNNER_9K:
 			ret.push_back(250 * m);
 			ret.push_back(500 * m);
@@ -2367,7 +2420,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(2 * g);
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
-			//TODO: is there -a M option here?
+			if(m_hasFastSampleRate)
+				ret.push_back(20 * g);
 			break;
 
 		default:
@@ -2388,6 +2442,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
+		case MODEL_WAVERUNNER_8K_HD:
 			break;
 
 		//Same as non-interleaved, plus double, for all other known scopes
@@ -2471,11 +2526,32 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(50 * m);
 			break;
 
+		case MODEL_WAVERUNNER_8K_HD:
+			ret.push_back(25 * m);
+			ret.push_back(50 * m);
+
+			//FIXME: largest depth is 2-channel mode only
+			//Second largest is 2/4 channel mode only
+			//All others can be used in 8 channel
+			ret.push_back(100 * m);
+
+			if(m_memoryDepthOption >= 1)
+				ret.push_back(200 * m);
+			if(m_memoryDepthOption >= 2)
+				ret.push_back(500 * m);
+			if(m_memoryDepthOption >= 3)
+				ret.push_back(1000 * m);
+			if(m_memoryDepthOption >= 4)
+				ret.push_back(2000 * m);
+			if(m_memoryDepthOption >= 5)
+				ret.push_back(5000 * m);
+			break;
+
 		//deep memory option gives us 4x the capacity
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_9K:
 			ret.push_back(16 * m);
-			if(m_hasFastSampleRate)
+			if(m_memoryDepthOption == 1)
 			{
 				ret.push_back(32 * m);
 				ret.push_back(64 * m);
@@ -2518,6 +2594,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
+			break;
+
+		//TODO: multiple levels of channel combining to deal with?
+		case MODEL_WAVERUNNER_8K_HD:
 			break;
 
 		case MODEL_WAVERUNNER_8K:
