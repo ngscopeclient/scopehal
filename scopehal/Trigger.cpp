@@ -31,6 +31,8 @@
 
 using namespace std;
 
+Trigger::CreateMapType Trigger::m_createprocs;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -44,4 +46,27 @@ Trigger::Trigger(Oscilloscope* scope)
 Trigger::~Trigger()
 {
 
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
+
+void Trigger::DoAddTriggerClass(string name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
+
+void Trigger::EnumTriggers(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
+{
+	if(m_createprocs.find(name) != m_createprocs.end())
+		return m_createprocs[name](scope);
+
+	LogError("Invalid trigger name: %s\n", name.c_str());
+	return NULL;
 }

@@ -92,6 +92,7 @@ public:
 	virtual void PushTrigger();
 	virtual void PullTrigger();
 	virtual void EnableTriggerOutput();
+	virtual std::vector<std::string> GetTriggerTypes();
 
 	//DMM acquisition
 	virtual double GetVoltage();
@@ -222,6 +223,9 @@ protected:
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
 	bool m_hasFastSampleRate;	//-M models
+	bool m_hasI2cTrigger;
+	bool m_hasSpiTrigger;
+	bool m_hasUartTrigger;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

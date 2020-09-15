@@ -59,6 +59,9 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(EdgeTrigger);
+
 protected:
 	std::string m_typename;
 };

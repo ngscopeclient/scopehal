@@ -53,6 +53,9 @@ public:
 
 	void SetTypeExt(AgilentEdgeType type)
 	{ m_parameters[m_typename].SetIntVal(type); }
+
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(AgilentEdgeTrigger);
 };
 
 #endif

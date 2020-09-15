@@ -46,6 +46,9 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)
 	, m_hasFastSampleRate(false)
+	, m_hasI2cTrigger(false)
+	, m_hasSpiTrigger(false)
+	, m_hasUartTrigger(false)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
@@ -219,10 +222,21 @@ void LeCroyOscilloscope::DetectOptions()
 				LogDebug("* -M (extra sample rate and memory)\n");
 			}
 
-			//Ignore protocol decodes, we do those ourselves
-			else if( (o == "I2C") || (o == "UART") || (o == "SPI") )
+			//Protocol decode options are mostly ignored, but enable hardware trigger if we have it
+			else if(o == "I2C")
 			{
-				LogDebug("* %s (protocol decode, ignoring)\n", o.c_str());
+				m_hasI2cTrigger = true;
+				LogDebug("* I2C (I2C trigger/decode)\n");
+			}
+			else if(o == "SPI")
+			{
+				m_hasI2cTrigger = true;
+				LogDebug("* SPI (I2C trigger/decode)\n");
+			}
+			else if(o == "UART")
+			{
+				m_hasI2cTrigger = true;
+				LogDebug("* UART (UART trigger/decode)\n");
 			}
 
 			//Ignore UI options
@@ -2642,5 +2656,14 @@ string LeCroyOscilloscope::Trim(string str)
 			tmp += c;
 	}
 
+	return ret;
+}
+
+vector<string> LeCroyOscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(EdgeTrigger::GetTriggerName());
+
+	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;
 }

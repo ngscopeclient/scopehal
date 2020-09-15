@@ -779,3 +779,11 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			return;
 	}
 }
+
+vector<string> AgilentOscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(AgilentEdgeTrigger::GetTriggerName());
+	return ret;
+}
+

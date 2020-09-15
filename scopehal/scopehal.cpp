@@ -34,6 +34,8 @@
  */
 #include "scopehal.h"
 #include <gtkmm/drawingarea.h>
+#include <libgen.h>
+
 #include "AgilentOscilloscope.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
@@ -43,7 +45,9 @@
 #include "SignalGeneratorOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
-#include <libgen.h>
+
+#include "AgilentEdgeTrigger.h"
+#include "EdgeTrigger.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -111,6 +115,9 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(SignalGeneratorOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
+
+	AddTriggerClass(AgilentEdgeTrigger);
+	AddTriggerClass(EdgeTrigger);
 }
 
 string GetDefaultChannelColor(int i)

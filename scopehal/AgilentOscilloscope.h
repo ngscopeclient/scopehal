@@ -70,6 +70,7 @@ public:
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
+	virtual std::vector<std::string> GetTriggerTypes();
 
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();

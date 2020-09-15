@@ -42,6 +42,8 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+#include "EdgeTrigger.h"
+
 using namespace std;
 
 Oscilloscope::CreateMapType Oscilloscope::m_createprocs;
@@ -435,4 +437,14 @@ void Oscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
 
 void Oscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Trigger configuration
+
+vector<string> Oscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(EdgeTrigger::GetTriggerName());
+	return ret;
 }

@@ -302,6 +302,11 @@ public:
 	}
 
 	/**
+		@brief Gets a list of triggers this instrument supports
+	 */
+	virtual std::vector<std::string> GetTriggerTypes();
+
+	/**
 		@brief Updates m_trigger with any changes made from the instrument side
 	 */
 	virtual void PullTrigger() =0;

@@ -55,6 +55,28 @@ public:
 protected:
 	Oscilloscope* m_scope;
 	std::string m_levelname;
+
+public:
+	virtual std::string GetTriggerDisplayName() =0;
+
+	typedef Trigger* (*CreateProcType)(Oscilloscope*);
+	static void DoAddTriggerClass(std::string name, CreateProcType proc);
+
+	static void EnumTriggers(std::vector<std::string>& names);
+	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
 };
+
+#define TRIGGER_INITPROC(T) \
+	static Trigger* CreateInstance(Oscilloscope* scope) \
+	{ return new T(scope); } \
+	virtual std::string GetTriggerDisplayName() \
+	{ return GetTriggerName(); }
+
+#define AddTriggerClass(T) Trigger::DoAddTriggerClass(T::GetTriggerName(), T::CreateInstance)
 
 #endif
