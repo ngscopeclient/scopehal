@@ -138,18 +138,27 @@ public:
 	//We only distinguish down to the series of scope, exact SKU is irrelevant.
 	enum Model
 	{
-		MODEL_WAVESURFER_3K,
-		MODEL_WAVERUNNER_8K,
-		MODEL_WAVERUNNER_8K_HD,
-		MODEL_WAVERUNNER_9K,
+		MODEL_DDA_5K,
+
 		MODEL_HDO_4KA,
 		MODEL_HDO_6KA,
 		MODEL_HDO_9K,
-		MODEL_DDA_5K,
-		MODEL_SDA_3K,
-		MODEL_SIGLENT_SDS2000X,
+
 		MODEL_LABMASTER_ZI_A,
+
 		MODEL_MDA_800,
+
+		MODEL_SDA_3K,
+
+		MODEL_WAVEPRO_HD,
+
+		MODEL_WAVERUNNER_8K,
+		MODEL_WAVERUNNER_8K_HD,
+		MODEL_WAVERUNNER_9K,
+
+		MODEL_WAVESURFER_3K,
+
+		MODEL_SIGLENT_SDS2000X,
 
 		MODEL_UNKNOWN
 	};
@@ -229,7 +238,7 @@ protected:
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
 	bool m_hasFastSampleRate;	//-M models
-	int m_memoryDepthOption;	//0 = base, 1 = first possible expansion, 2 = second possible expansion, etc
+	int m_memoryDepthOption;	//0 = base, after that number is max sample count in millions
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;

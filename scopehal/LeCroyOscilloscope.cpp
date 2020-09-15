@@ -155,6 +155,11 @@ void LeCroyOscilloscope::IdentifyHardware()
 		if(m_model.find("HD") != string::npos)
 			m_modelid = MODEL_WAVERUNNER_8K_HD;
 	}
+	else if(m_model.find("WP") == 0)
+	{
+		if(m_model.find("HD") != string::npos)
+			m_modelid = MODEL_WAVEPRO_HD;
+	}
 	else if(m_model.find("WAVERUNNER9") == 0)
 		m_modelid = MODEL_WAVERUNNER_9K;
 	else if(m_model.find("WS3") == 0)
@@ -226,12 +231,14 @@ void LeCroyOscilloscope::DetectOptions()
 			string action = "Ignoring";
 
 			//Default types
-			if(o.find("TDME") != string::npos)
+			if(o.find("_TDME") != string::npos)
 				type = "Trig/decode/measure/eye";
-			else if(o.find("TDG") != string::npos)
+			else if(o.find("_TDG") != string::npos)
 				type = "Trig/decode/graph";
-			else if(o.find("TD") != string::npos)
+			else if(o.find("_TD") != string::npos)
 				type = "Trig/decode";
+			else if( (o.find("_D") != string::npos) || (o.find("-DECODE") != string::npos) )
+				type = "Protocol decode";
 
 			//If we have an LA module installed, add the digital channels
 			if( (o == "MSXX") && !m_hasLA)
@@ -268,44 +275,51 @@ void LeCroyOscilloscope::DetectOptions()
 			else if(o == "-M")
 			{
 				m_hasFastSampleRate = true;
-				m_memoryDepthOption = 1;
+				m_memoryDepthOption = 128;
 				type = "Hardware";
 				desc = "Extra sample rate and memory";
 				action = "Enabled";
 			}
 
-			//Extra memory depth for WaveRunner 8000HD
+			//Extra memory depth for WaveRunner 8000HD and WavePro HD
+			else if(o == "100MS")
+			{
+				m_memoryDepthOption = 100;
+				type = "Hardware";
+				desc = "100M point memory";
+				action = "Enabled";
+			}
 			else if(o == "200MS")
 			{
-				m_memoryDepthOption = 1;
+				m_memoryDepthOption = 200;
 				type = "Hardware";
 				desc = "200M point memory";
 				action = "Enabled";
 			}
 			else if(o == "500MS")
 			{
-				m_memoryDepthOption = 2;
+				m_memoryDepthOption = 500;
 				type = "Hardware";
 				desc = "500M point memory";
 				action = "Enabled";
 			}
 			else if(o == "1000MS")
 			{
-				m_memoryDepthOption = 3;
+				m_memoryDepthOption = 1000;
 				type = "Hardware";
 				desc = "1000M point memory";
 				action = "Enabled";
 			}
 			else if(o == "2000MS")
 			{
-				m_memoryDepthOption = 4;
+				m_memoryDepthOption = 2000;
 				type = "Hardware";
 				desc = "2000M point memory";
 				action = "Enabled";
 			}
 			else if(o == "5000MS")
 			{
-				m_memoryDepthOption = 5;
+				m_memoryDepthOption = 5000;
 				type = "Hardware";
 				desc = "5000M point memory";
 				action = "Enabled";
@@ -402,6 +416,11 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Protocol decode";
 				desc = "10/100 Ethernet";
 			}
+			else if(o == "8B10B-BUS")
+			{
+				type = "Protocol decode";
+				desc = "8B/10B";
+			}
 			else if(
 				(o == "ARINC429") ||
 				(o == "ARINC429_DME_SYMB") )
@@ -414,6 +433,12 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Protocol decode";
 				desc = "Automotive Ethernet";
 			}
+			else if(o == "DIGRF_3G_D")
+				desc = "DigRF (3G)";
+			else if(o == "DIGRF_V4_D")
+				desc = "DigRF (V4)";
+			else if(o == "DPHY-DECODE")
+				desc = "MIPI D-PHY";
 			else if(o == "ET")
 			{
 				type = "Protocol decode";
@@ -424,6 +449,10 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Protocol decode";
 				desc = "Manchester";
 			}
+			else if(o == "MPHY-DECODE")
+				desc = "MIPI M-PHY";
+			else if(o == "PCIE_D")
+				desc = "PCIe gen 1";
 			else if(o == "SPACEWIRE")
 			{
 				type = "Protocol decode";
@@ -431,15 +460,72 @@ void LeCroyOscilloscope::DetectOptions()
 			}
 			else if(o == "NRZ-BUS")
 			{
-				type = "Protocol decode";
 				desc = "NRZ";
+				type = "Protocol decode";
 			}
+			else if(o == "UNIPRO-DECODE")
+				desc = "UniPro";
 
 			//Miscellaneous software option
 			//Print out name but otherwise ignore
+			else if(o == "CBL_DBED")
+			{
+				type = "Math";
+				desc = "Cable De-Embedding";
+			}
+			else if(o == "DDM2")
+			{
+				type = "Math";
+				desc = "Disk Drive Measurement";
+			}
+			else if(o == "DDR2DEBUG")
+			{
+				type = "Signal Integrity";
+				desc = "DDR2 Debug";
+			}
+			else if(o == "DDR3DEBUG")
+			{
+				type = "Signal Integrity";
+				desc = "DDR3 Debug";
+			}
+			else if(o == "DPHY-PHY")
+			{
+				type = "Signal Integrity";
+				desc = "MIPI D-PHY";
+			}
+			else if(o == "MPHY-PHY")
+			{
+				type = "Signal Integrity";
+				desc = "MIPI M-PHY";
+			}
+			else if(o == "EYEDR2")
+			{
+				type = "Signal Integrity";
+				desc = "Eye Doctor";
+			}
+			else if(o == "EYEDR_EQ")
+			{
+				type = "Signal Integrity";
+				desc = "Eye Doctor Equalization";
+			}
+			else if(o == "EYEDR_VP")
+			{
+				type = "Signal Integrity";
+				desc = "Eye Doctor Virtual Probe";
+			}
+			else if(o == "VPROBE")
+			{
+				type = "Signal Integrity";
+				desc = "Virtual Probe";
+			}
+			else if(o == "XTALK")
+			{
+				type = "Signal Integrity";
+				desc = "Crosstalk Analysis";
+			}
 			else if(o == "DFP2")
 			{
-				type = "Miscellaneous";
+				type = "Math";
 				desc = "DSP Filter";
 			}
 			else if(o == "DIGPWRMGMT")
@@ -462,12 +548,12 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "Power Analysis";
 			}
-			else if( (o == "SDA2") || (o == "SDA3") )
+			else if( (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") )
 			{
-				type = "Miscellaneous";
+				type = "Signal Integrity";
 				desc = "Serial Data Analysis";
 			}
-			else if(o == "THREEPHASEHARMONICS")
+			else if( (o == "THREEPHASEHARMONICS") || (o == "THREEPHASEPOWER") )
 			{
 				type = "Miscellaneous";
 				desc = "3-Phase Power Analysis";
@@ -476,7 +562,7 @@ void LeCroyOscilloscope::DetectOptions()
 			//UI etc options
 			else if(o == "SPECTRUM")
 			{
-				type = "RF";
+				type = "Math";
 				desc = "Spectrum analyzer";
 			}
 			else if(o == "XWEB")
@@ -2393,6 +2479,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(10 * g);
 			break;
 
+		case MODEL_WAVEPRO_HD:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			ret.push_back(1 * g);
+			ret.push_back(2500 * m);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
 		case MODEL_WAVERUNNER_8K:
 			ret.push_back(200 * m);
 			ret.push_back(500 * m);
@@ -2526,6 +2621,13 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(50 * m);
 			break;
 
+		case MODEL_WAVEPRO_HD:
+			ret.push_back(25 * m);
+
+			if(m_memoryDepthOption >= 100)
+				ret.push_back(50 * m);
+			break;
+
 		case MODEL_WAVERUNNER_8K_HD:
 			ret.push_back(25 * m);
 			ret.push_back(50 * m);
@@ -2535,15 +2637,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			//All others can be used in 8 channel
 			ret.push_back(100 * m);
 
-			if(m_memoryDepthOption >= 1)
+			if(m_memoryDepthOption >= 200)
 				ret.push_back(200 * m);
-			if(m_memoryDepthOption >= 2)
+			if(m_memoryDepthOption >= 500)
 				ret.push_back(500 * m);
-			if(m_memoryDepthOption >= 3)
+			if(m_memoryDepthOption >= 1000)
 				ret.push_back(1000 * m);
-			if(m_memoryDepthOption >= 4)
+			if(m_memoryDepthOption >= 2000)
 				ret.push_back(2000 * m);
-			if(m_memoryDepthOption >= 5)
+			if(m_memoryDepthOption >= 5000)
 				ret.push_back(5000 * m);
 			break;
 
@@ -2551,7 +2653,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_9K:
 			ret.push_back(16 * m);
-			if(m_memoryDepthOption == 1)
+			if(m_memoryDepthOption == 128)
 			{
 				ret.push_back(32 * m);
 				ret.push_back(64 * m);
@@ -2596,13 +2698,18 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_MDA_800:
 			break;
 
+		case MODEL_WAVEPRO_HD:
+			if(m_memoryDepthOption == 100)
+				ret.push_back(100 * m);
+			break;
+
 		//TODO: multiple levels of channel combining to deal with?
 		case MODEL_WAVERUNNER_8K_HD:
 			break;
 
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_9K:
-			if(m_hasFastSampleRate)
+			if(m_memoryDepthOption == 128)
 				ret.push_back(128 * m);
 			else
 				ret.push_back(32 * m);
