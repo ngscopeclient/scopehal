@@ -35,7 +35,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PulseWidthTrigger::PulseWidthTrigger()
+PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
+	: EdgeTrigger(scope)
 {
 	m_lowername = "Lower Bound";
 	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
@@ -54,4 +55,12 @@ PulseWidthTrigger::PulseWidthTrigger()
 PulseWidthTrigger::~PulseWidthTrigger()
 {
 
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string PulseWidthTrigger::GetTriggerName()
+{
+	return "Pulse Width";
 }

@@ -33,7 +33,9 @@
 #include <locale>
 #include <immintrin.h>
 #include <omp.h>
+
 #include "EdgeTrigger.h"
+#include "PulseWidthTrigger.h"
 
 using namespace std;
 
@@ -3284,6 +3286,7 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(PulseWidthTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;

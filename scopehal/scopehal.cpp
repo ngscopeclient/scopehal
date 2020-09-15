@@ -48,6 +48,7 @@
 
 #include "AgilentEdgeTrigger.h"
 #include "EdgeTrigger.h"
+#include "PulseWidthTrigger.h"
 
 #ifndef _WIN32
 #include <dlfcn.h>
@@ -118,6 +119,7 @@ void DriverStaticInit()
 
 	AddTriggerClass(AgilentEdgeTrigger);
 	AddTriggerClass(EdgeTrigger);
+	AddTriggerClass(PulseWidthTrigger);
 }
 
 string GetDefaultChannelColor(int i)

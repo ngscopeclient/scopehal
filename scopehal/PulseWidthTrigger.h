@@ -35,13 +35,15 @@
 #ifndef PulseWidthTrigger_h
 #define PulseWidthTrigger_h
 
+#include "EdgeTrigger.h"
+
 /**
 	@brief Trigger on a pulse meeting certain width criteria
  */
 class PulseWidthTrigger : public EdgeTrigger
 {
 public:
-	PulseWidthTrigger();
+	PulseWidthTrigger(Oscilloscope* scope);
 	virtual ~PulseWidthTrigger();
 
 	enum WidthType
@@ -51,6 +53,9 @@ public:
 		WIDTH_BETWEEN,
 		WIDTH_OUTSIDE
 	};
+
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(PulseWidthTrigger);
 
 protected:
 	std::string m_widthtypename;
