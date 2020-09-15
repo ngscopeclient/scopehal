@@ -134,6 +134,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_DDA_5K;
 	else if( (m_model.find("HDO4") == 0) && (m_model.find("A") != string::npos) )
 		m_modelid = MODEL_HDO_4KA;
+	else if( (m_model.find("HDO6") == 0) && (m_model.find("A") != string::npos) )
+		m_modelid = MODEL_HDO_6KA;
 	else if(m_model.find("HDO9") == 0)
 		m_modelid = MODEL_HDO_9K;
 	else if(m_model == "MCM-ZI-A")
@@ -263,8 +265,8 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Print out full names for protocol trigger options
-			//and enable trigger mode
+			//Print out full names for protocol trigger options and enable trigger mode.
+			//Note that many of these options don't have _TD in the base (non-TDME) option code!
 			else if(o.find("I2C") == 0)
 			{
 				m_hasI2cTrigger = true;
@@ -292,11 +294,14 @@ void LeCroyOscilloscope::DetectOptions()
 				if(o == "UART")
 					type = "Trig/decode";
 			}
-			else if(o == "SMBUS_TD")
+			else if(o.find("SMBUS") == 0)
 			{
 				m_hasI2cTrigger = true;
 				desc = "SMBus";
 				//TODO: enable any SMBus specific stuff
+
+				if(o == "SMBUS")
+					type = "Trig/decode";
 			}
 
 			//Currently unsupported protocol decode with trigger capability, but no _TD in the option code
@@ -315,6 +320,14 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Trig/decode";
 				desc = "MIL-STD-1553";
+			}
+
+			//Decode only, not a trigger.
+			//Has to be before USB2 to match properly.
+			else if(o == "USB2-HSIC-BUS")
+			{
+				type = "Protocol decode";
+				desc = "USB2 HSIC";
 			}
 
 			//Currently unsupported trigger/decodes, to be added in the future
@@ -359,11 +372,6 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Protocol decode";
 				desc = "SpaceWire";
-			}
-			else if(o == "USB2-HSIC-BUS")
-			{
-				type = "Protocol decode";
-				desc = "USB2 HSIC";
 			}
 			else if(o == "NRZ-BUS")
 			{
@@ -2280,6 +2288,15 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(10 * g);
 			break;
 
+		case MODEL_HDO_6KA:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			ret.push_back(1250 * m);
+			ret.push_back(2500 * m);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
 		case MODEL_HDO_9K:
 			ret.push_back(200 * m);
 			ret.push_back(500 * m);
@@ -2388,6 +2405,11 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(5 * m);
 			ret.push_back(10 * m);
 			ret.push_back(12500 * k);
+			break;
+
+		case MODEL_HDO_6KA:
+			ret.push_back(25 * m);
+			ret.push_back(50 * m);
 			break;
 
 		//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
