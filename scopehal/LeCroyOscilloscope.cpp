@@ -132,6 +132,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 
 	if(m_model.find("DDA5") == 0)
 		m_modelid = MODEL_DDA_5K;
+	else if( (m_model.find("HDO4") == 0) && (m_model.find("A") != string::npos) )
+		m_modelid = MODEL_HDO_4KA;
 	else if(m_model.find("HDO9") == 0)
 		m_modelid = MODEL_HDO_9K;
 	else if(m_model == "MCM-ZI-A")
@@ -156,13 +158,21 @@ void LeCroyOscilloscope::IdentifyHardware()
 			m_modelid = MODEL_SIGLENT_SDS2000X;
 	}
 
-	//TODO: better way of doing this?
+	else
+	{
+		LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
+			m_model.c_str());
+	}
+
+	//Enable HD mode by default if model name contains "HD" at any point
 	if(m_model.find("HD") != string::npos)
 		m_highDefinition = true;
 }
 
 void LeCroyOscilloscope::DetectOptions()
 {
+	LogDebug("\n");
+
 	m_transport->SendCommand("*OPT?");
 	string reply = m_transport->ReadReply();
 	if(reply.length() > 3)
@@ -208,7 +218,9 @@ void LeCroyOscilloscope::DetectOptions()
 			//Default types
 			if(o.find("TDME") != string::npos)
 				type = "Trig/decode/measure/eye";
-			if(o.find("TD") != string::npos)
+			else if(o.find("TDG") != string::npos)
+				type = "Trig/decode/graph";
+			else if(o.find("TD") != string::npos)
 				type = "Trig/decode";
 
 			//If we have an LA module installed, add the digital channels
@@ -251,87 +263,145 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
-			//Protocol decode options are mostly ignored, but enable hardware trigger if we have it
-			else if(o == "I2C")
+			//Print out full names for protocol trigger options
+			//and enable trigger mode
+			else if(o.find("I2C") == 0)
 			{
 				m_hasI2cTrigger = true;
-				type = "Trig/decode";
 				desc = "I2C";	//seems like UTF-8 characters mess up printf width specifiers
 				action = "Enabling trigger";
+
+				if(o == "I2C")
+					type = "Trig/decode";
 			}
-			else if(o == "I2C_TDME")
+			else if(o.find("SPI") == 0)
+			{
+				m_hasSpiTrigger = true;
+				desc = "SPI";
+				action = "Enabling trigger";
+
+				if(o == "SPI")
+					type = "Trig/decode";
+			}
+			else if(o.find("UART") == 0)
+			{
+				m_hasUartTrigger = true;
+				desc = "UART";
+				action = "Enabling trigger";
+
+				if(o == "UART")
+					type = "Trig/decode";
+			}
+			else if(o == "SMBUS_TD")
 			{
 				m_hasI2cTrigger = true;
-				desc = "I2C";
-				action = "Enabling trigger";
+				desc = "SMBus";
+				//TODO: enable any SMBus specific stuff
 			}
-			else if(o == "SPI")
+
+			//Currently unsupported protocol decode with trigger capability, but no _TD in the option code
+			//Print out names but ignore for now
+			else if(o.find("FLX") == 0)
 			{
-				m_hasSpiTrigger = true;
 				type = "Trig/decode";
-				desc = "SPI";
-				action = "Enabling trigger";
+				desc = "FlexRay";
 			}
-			else if(o == "SPI_TDME")
+			else if(o.find("LIN") == 0)
 			{
-				m_hasSpiTrigger = true;
-				desc = "SPI";
-				action = "Enabling trigger";
-			}
-			else if(o == "UART")
-			{
-				m_hasUartTrigger = true;
 				type = "Trig/decode";
-				desc = "UART";
-				action = "Enabling trigger";
+				desc = "LIN";
 			}
-			else if(o == "UART_TDME")
+			else if(o.find("MIL1553") == 0)
 			{
-				m_hasUartTrigger = true;
-				type = "Trig/decode/measure/eye";
-				desc = "UART";
+				type = "Trig/decode";
+				desc = "MIL-STD-1553";
 			}
 
-			else if(
-				(o == "10-100M-ENET-BUS") ||
-				(o == "ARINC429_DME_SYMB") ||
-				(o == "AUTOENETDEBUG") ||
-				(o == "MANCHESTER-BUS") ||
-				(o == "SPACEWIRE") ||
-				(o == "USB2-HSIC-BUS") )
+			//Currently unsupported trigger/decodes, to be added in the future
+			else if(o.find("CAN_FD") == 0)
+				desc = "CAN FD";
+			else if(o.find("I2S") == 0)
+				desc = "I2S";
+			else if(o.find("I3C") == 0)
+				desc = "I3C";
+			else if(o.find("SENT") == 0)
+				desc = "SENT";
+			else if(o.find("SPMI") == 0)
+				desc = "SPMI";
+			else if(o.find("USB2") == 0)
+				desc = "USB2";
+
+			//Protocol decodes without trigger capability
+			//Print out name but otherwise ignore
+			else if(o == "10-100M-ENET-BUS")
 			{
-				//Protocol decode without trigger capability
-				//Ignore it
+				type = "Protocol decode";
+				desc = "10/100 Ethernet";
+			}
+			else if(
+				(o == "ARINC429") ||
+				(o == "ARINC429_DME_SYMB") )
+			{
+				type = "Protocol decode";
+				desc = "ARINC 429";
+			}
+			else if(o == "AUTOENETDEBUG")
+			{
+				type = "Protocol decode";
+				desc = "Automotive Ethernet";
+			}
+			else if(o == "MANCHESTER-BUS")
+			{
+				type = "Protocol decode";
+				desc = "Manchester";
+			}
+			else if(o == "SPACEWIRE")
+			{
+				type = "Protocol decode";
+				desc = "SpaceWire";
+			}
+			else if(o == "USB2-HSIC-BUS")
+			{
+				type = "Protocol decode";
+				desc = "USB2 HSIC";
+			}
+			else if(o == "NRZ-BUS")
+			{
+				type = "Protocol decode";
+				desc = "NRZ";
 			}
 
-			else if(
-				(o == "CAN_FD_TD") ||
-				(o == "CAN_FT_TDME_SYMB") ||
-				(o == "FLX_TDME") ||
-				(o == "I2S_TDG") ||
-				(o == "I3C_TDME") ||
-				(o == "LIN_TDME") ||
-				(o == "MIL1553_TDME") ||
-				(o == "SENT_TDME") ||
-				(o == "SMBUS_TDME") ||
-				(o == "SPMI_TDME") ||
-				(o == "USB2_TDME")
-				)
+			//Miscellaneous software option
+			//Print out name but otherwise ignore
+			else if(o == "DFP2")
 			{
-				//Protocol decode with trigger capability, not yet supported
+				type = "Miscellaneous";
+				desc = "DSP Filter";
 			}
-
-			else if(
-				(o == "DFP2") ||
-				(o == "DIGPWRMGMT") ||
-				(o == "EMC") ||
-				(o == "JITKIT") ||
-				(o == "PWR_ANALYSIS") ||
-				(o == "THREEPHASEHARMONICS")
-				 )
+			else if(o == "DIGPWRMGMT")
 			{
-				//Miscellaneous software option
-				//Ignore for now
+				type = "Miscellaneous";
+				desc = "Power Management";
+			}
+			else if(o == "EMC")
+			{
+				type = "Miscellaneous";
+				desc = "EMC Pulse Analysis";
+			}
+			else if( (o == "JITKIT") || (o == "JTA2") )
+			{
+				type = "Miscellaneous";
+				desc = "Jitter/Timing Analysis";
+			}
+			else if(o == "PWR_ANALYSIS")
+			{
+				type = "Miscellaneous";
+				desc = "Power Analysis";
+			}
+			else if(o == "THREEPHASEHARMONICS")
+			{
+				type = "Miscellaneous";
+				desc = "3-Phase Power Analysis";
 			}
 
 			//UI etc options
@@ -375,6 +445,8 @@ void LeCroyOscilloscope::DetectOptions()
 	//If we don't have a code for the LA software option, but are a -MS scope, add the LA
 	if(!m_hasLA && (m_model.find("-MS") != string::npos))
 		AddDigitalChannels(16);
+
+	LogDebug("\n");
 }
 
 /**
@@ -2186,20 +2258,31 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	ret.push_back(20 * m);
 	ret.push_back(50 * m);
 	ret.push_back(100 * m);
-	ret.push_back(200 * m);
-	ret.push_back(500 * m);
 
 	//Some scopes can go faster
 	switch(m_modelid)
 	{
 		case MODEL_DDA_5K:
+			ret.push_back(200 * m);
+			ret.push_back(500 * m);
 			ret.push_back(1 * g);
 			ret.push_back(2 * g);
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
 			break;
 
+		case MODEL_HDO_4KA:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			//no 1 Gsps mode, we go straight from 2.5 Gsps to 500 Msps
+			ret.push_back(2500 * m);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			break;
+
 		case MODEL_HDO_9K:
+			ret.push_back(200 * m);
+			ret.push_back(500 * m);
 			ret.push_back(1 * g);
 			ret.push_back(2 * g);
 			ret.push_back(5 * g);
@@ -2208,6 +2291,8 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		case MODEL_LABMASTER_ZI_A:
+			ret.push_back(200 * m);
+			ret.push_back(500 * m);
 			ret.push_back(1 * g);
 			ret.push_back(2 * g);
 			ret.push_back(5 * g);
@@ -2222,12 +2307,16 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		case MODEL_MDA_800:
+			ret.push_back(200 * m);
+			ret.push_back(500 * m);
 			ret.push_back(1250 * m);	//not the normal 1-2-5-10 sequence!
 			ret.push_back(2500 * m);
 			ret.push_back(10 * g);
 			break;
 
 		case MODEL_WAVERUNNER_8K:
+			ret.push_back(200 * m);
+			ret.push_back(500 * m);
 			ret.push_back(1 * g);
 			ret.push_back(2 * g);
 			ret.push_back(5 * g);
@@ -2288,6 +2377,19 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(24 * m);
 			break;
 
+		//VERY limited range of depths here
+		case MODEL_HDO_4KA:
+			ret.clear();
+			ret.push_back(500);
+			ret.push_back(10 * k);
+			ret.push_back(100 * k);
+			ret.push_back(1 * m);
+			ret.push_back(2500 * k);
+			ret.push_back(5 * m);
+			ret.push_back(10 * m);
+			ret.push_back(12500 * k);
+			break;
+
 		//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
 		case MODEL_HDO_9K:
 			ret.push_back(25 * m);
@@ -2338,9 +2440,18 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 			ret.push_back(48 * m);
 			break;
 
+		case MODEL_HDO_4KA:
+			ret.push_back(25 * m);
+			break;
+
 		//no deep-memory option here
 		case MODEL_HDO_9K:
 			ret.push_back(128 * m);
+			break;
+
+		//memory is dedicated per channel, no interleaving possible
+		case MODEL_LABMASTER_ZI_A:
+		case MODEL_MDA_800:
 			break;
 
 		case MODEL_WAVERUNNER_8K:
