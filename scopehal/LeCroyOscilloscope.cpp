@@ -130,18 +130,24 @@ void LeCroyOscilloscope::IdentifyHardware()
 	//Look up model info
 	m_modelid = MODEL_UNKNOWN;
 
-	if(m_model.find("WS3") == 0)
-		m_modelid = MODEL_WAVESURFER_3K;
+	if(m_model.find("DDA5") == 0)
+		m_modelid = MODEL_DDA_5K;
 	else if(m_model.find("HDO9") == 0)
 		m_modelid = MODEL_HDO_9K;
-	else if(m_model.find("DDA5") == 0)
-		m_modelid = MODEL_DDA_5K;
-	else if(m_model.find("WAVERUNNER8") == 0)
-		m_modelid = MODEL_WAVERUNNER_8K;
-	else if(m_model.find("SDA3") == 0)
-		m_modelid = MODEL_SDA_3K;
 	else if(m_model == "MCM-ZI-A")
 		m_modelid = MODEL_LABMASTER_ZI_A;
+	else if(m_model.find("MDA8") == 0)
+	{
+		m_modelid = MODEL_MDA_800;
+		m_highDefinition = true;	//Doesn't have "HD" in the name but is still 12 bit resolution
+	}
+	else if(m_model.find("SDA3") == 0)
+		m_modelid = MODEL_SDA_3K;
+	else if(m_model.find("WAVERUNNER8") == 0)
+		m_modelid = MODEL_WAVERUNNER_8K;
+	else if(m_model.find("WS3") == 0)
+		m_modelid = MODEL_WAVESURFER_3K;
+
 	else if (m_vendor.compare("SIGLENT") == 0)
 	{
 		// TODO: if LeCroy and Siglent classes get split, then this should obviously
@@ -190,14 +196,28 @@ void LeCroyOscilloscope::DetectOptions()
 
 		//Print out the option list and do processing for each
 		LogDebug("Installed options:\n");
+		LogDebug("  %-20s %-25s %-35s %-20s\n", "Code", "Type", "Description", "Action");
 		if(options.empty())
 			LogDebug("* None\n");
 		for(auto o : options)
 		{
+			string type = "Unknown";
+			string desc = "Unknown";
+			string action = "Ignoring";
+
+			//Default types
+			if(o.find("TDME") != string::npos)
+				type = "Trig/decode/measure/eye";
+			if(o.find("TD") != string::npos)
+				type = "Trig/decode";
+
 			//If we have an LA module installed, add the digital channels
 			if( (o == "MSXX") && !m_hasLA)
 			{
-				LogDebug("* MSXX (logic analyzer)\n");
+				type = "Hardware";
+				desc = "16-channel MSO probe";
+				action = "Enabled";
+
 				AddDigitalChannels(16);
 			}
 
@@ -205,7 +225,10 @@ void LeCroyOscilloscope::DetectOptions()
 			else if(o == "DVM")
 			{
 				m_hasDVM = true;
-				LogDebug("* DVM (digital voltmeter / frequency counter)\n");
+
+				type = "Hardware";
+				desc = "Digital multimeter";
+				action = "Enabled";
 
 				SetMeterAutoRange(false);
 			}
@@ -214,57 +237,138 @@ void LeCroyOscilloscope::DetectOptions()
 			else if(o == "AFG")
 			{
 				m_hasFunctionGen = true;
-				LogDebug("* AFG (function generator)\n");
+				type = "Hardware";
+				desc = "Function generator";
+				action = "Enabled";
 			}
 
 			//Look for M option (extra sample rate and memory)
 			else if(o == "-M")
 			{
 				m_hasFastSampleRate = true;
-				LogDebug("* -M (extra sample rate and memory)\n");
+				type = "Hardware";
+				desc = "Extra sample rate and memory";
+				action = "Enabled";
 			}
 
 			//Protocol decode options are mostly ignored, but enable hardware trigger if we have it
 			else if(o == "I2C")
 			{
 				m_hasI2cTrigger = true;
-				LogDebug("* I2C (I2C trigger/decode)\n");
+				type = "Trig/decode";
+				desc = "I2C";	//seems like UTF-8 characters mess up printf width specifiers
+				action = "Enabling trigger";
 			}
 			else if(o == "I2C_TDME")
 			{
 				m_hasI2cTrigger = true;
-				LogDebug("* I2C_TDME (I2C trigger/decode/measure/eye)\n");
+				desc = "I2C";
+				action = "Enabling trigger";
 			}
 			else if(o == "SPI")
 			{
 				m_hasSpiTrigger = true;
-				LogDebug("* SPI (SPI trigger/decode)\n");
+				type = "Trig/decode";
+				desc = "SPI";
+				action = "Enabling trigger";
 			}
 			else if(o == "SPI_TDME")
 			{
 				m_hasSpiTrigger = true;
-				LogDebug("* SPI (SPI trigger/decode/measure/eye)\n");
+				desc = "SPI";
+				action = "Enabling trigger";
 			}
 			else if(o == "UART")
 			{
 				m_hasUartTrigger = true;
-				LogDebug("* UART (UART trigger/decode)\n");
+				type = "Trig/decode";
+				desc = "UART";
+				action = "Enabling trigger";
 			}
 			else if(o == "UART_TDME")
 			{
 				m_hasUartTrigger = true;
-				LogDebug("* UART (UART trigger/decode/measure/eye)\n");
+				type = "Trig/decode/measure/eye";
+				desc = "UART";
 			}
 
-			//Ignore UI options
+			else if(
+				(o == "10-100M-ENET-BUS") ||
+				(o == "ARINC429_DME_SYMB") ||
+				(o == "AUTOENETDEBUG") ||
+				(o == "MANCHESTER-BUS") ||
+				(o == "SPACEWIRE") ||
+				(o == "USB2-HSIC-BUS") )
+			{
+				//Protocol decode without trigger capability
+				//Ignore it
+			}
+
+			else if(
+				(o == "CAN_FD_TD") ||
+				(o == "CAN_FT_TDME_SYMB") ||
+				(o == "FLX_TDME") ||
+				(o == "I2S_TDG") ||
+				(o == "I3C_TDME") ||
+				(o == "LIN_TDME") ||
+				(o == "MIL1553_TDME") ||
+				(o == "SENT_TDME") ||
+				(o == "SMBUS_TDME") ||
+				(o == "SPMI_TDME") ||
+				(o == "USB2_TDME")
+				)
+			{
+				//Protocol decode with trigger capability, not yet supported
+			}
+
+			else if(
+				(o == "DFP2") ||
+				(o == "DIGPWRMGMT") ||
+				(o == "EMC") ||
+				(o == "JITKIT") ||
+				(o == "PWR_ANALYSIS") ||
+				(o == "THREEPHASEHARMONICS")
+				 )
+			{
+				//Miscellaneous software option
+				//Ignore for now
+			}
+
+			//UI etc options
+			else if(o == "SPECTRUM")
+			{
+				type = "RF";
+				desc = "Spectrum analyzer";
+			}
 			else if(o == "XWEB")
 			{
-				LogDebug("* %s (UI option, ignoring)\n", o.c_str());
+				type = "UI";
+				desc = "Processing web";
+			}
+			else if(o == "QSCAPE")
+			{
+				type = "UI";
+				desc = "Tabbed display";
+			}
+			else if(o == "XDEV")
+			{
+				type = "SDK";
+				desc = "Software development kit";
 			}
 
-			//No idea what it is
-			else
-				LogDebug("* %s (not yet implemented)\n", o.c_str());
+			//Ignore meta-options
+			else if(o == "DEMO-BUNDLE")
+			{
+				type = "Informational";
+				desc = "Software licenses are demo/trial";
+			}
+			else if(o == "SIM")
+			{
+				type = "Informational";
+				desc = "Instrument is a simulation";
+			}
+
+			LogDebug("* %-20s %-25s %-35s %-20s\n", o.c_str(), type.c_str(), desc.c_str(), action.c_str());
 		}
 	}
 
@@ -328,6 +432,11 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 			nchans = 4;
 			break;
 
+		//MDA800 models all have 8 channels
+		case MODEL_MDA_800:
+			nchans = 8;
+			break;
+
 		//LabMaster MCM could have any number of channels.
 		//This is ugly and produces errors in the remote log each time we start up, but does work.
 		case MODEL_LABMASTER_ZI_A:
@@ -385,24 +494,42 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 		string chname = string("C1");
 		chname[1] += i;
 
-		//Color the channels based on LeCroy's standard color sequence (yellow-pink-cyan-green)
+		//Color the channels based on LeCroy's standard color sequence
+		//yellow-pink-cyan-green-lightgreen-purple-red-brown
+		//After that, for LabMaster, repeat the same colors
 		string color = "#ffffff";
-		switch(i)
+		switch(i % 8)
 		{
 			case 0:
-				color = "#ffff80";
+				color = "#ffff00";
 				break;
 
 			case 1:
-				color = "#ff8080";
+				color = "#ff6abc";
 				break;
 
 			case 2:
-				color = "#80ffff";
+				color = "#00ffff";
 				break;
 
 			case 3:
-				color = "#80ff80";
+				color = "#00c100";
+				break;
+
+			case 4:
+				color = "#d7ffd7";
+				break;
+
+			case 5:
+				color = "#8482ff";
+				break;
+
+			case 6:
+				color = "#ff0000";
+				break;
+
+			case 7:
+				color = "#ff8000";
 				break;
 		}
 
@@ -2062,40 +2189,51 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	ret.push_back(200 * m);
 	ret.push_back(500 * m);
 
-	ret.push_back(1 * g);
-	ret.push_back(2 * g);
-
 	//Some scopes can go faster
 	switch(m_modelid)
 	{
 		case MODEL_DDA_5K:
+			ret.push_back(1 * g);
+			ret.push_back(2 * g);
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
-			break;
-
-		case MODEL_WAVERUNNER_8K:
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			if(m_hasFastSampleRate)
-				ret.push_back(20 * g);
 			break;
 
 		case MODEL_HDO_9K:
+			ret.push_back(1 * g);
+			ret.push_back(2 * g);
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
 			ret.push_back(20 * g);
 			break;
 
 		case MODEL_LABMASTER_ZI_A:
+			ret.push_back(1 * g);
+			ret.push_back(2 * g);
 			ret.push_back(5 * g);
 			ret.push_back(10 * g);
-			ret.push_back(20 * g);	//FIXME: 20 and 40 Gsps give garbage data in the MAUI Studio simulator.
-			ret.push_back(40 * g);	//Data looks wrong in MAUI as well as glscopeclient so doesn't seem to be something
-									//that we did. Looks like bits and pieces of waveform with gaps or overlap.
-									//Unclear if sim bug or actual issue, no testing on actual LabMaster hardware
-									//has been performed to date.
+			ret.push_back(20 * g);		//FIXME: 20 and 40 Gsps give garbage data in the MAUI Studio simulator.
+			ret.push_back(40 * g);		//Data looks wrong in MAUI as well as glscopeclient so doesn't seem to be something
+										//that we did. Looks like bits and pieces of waveform with gaps or overlap.
+										//Unclear if sim bug or actual issue, no testing on actual LabMaster hardware
+										//has been performed to date.
 			ret.push_back(80 * g);
 			//TODO: exact sample rates may depend on the acquisition module(s) connected
+			break;
+
+		case MODEL_MDA_800:
+			ret.push_back(1250 * m);	//not the normal 1-2-5-10 sequence!
+			ret.push_back(2500 * m);
+			ret.push_back(10 * g);
+			break;
+
+		case MODEL_WAVERUNNER_8K:
+			ret.push_back(1 * g);
+			ret.push_back(2 * g);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			if(m_hasFastSampleRate)
+				ret.push_back(20 * g);
 			break;
 
 		default:
@@ -2122,7 +2260,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 	//Standard sample depths for everything.
 	//The front panel allows going as low as 2 samples on some instruments, but don't allow that here.
-	//Going below 1K has no measurable perfomance boost.
+	ret.push_back(500);
 	ret.push_back(1 * k);
 	ret.push_back(2 * k);
 	ret.push_back(5 * k);
@@ -2134,6 +2272,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(80 * k);
 	ret.push_back(100 * k);
 	ret.push_back(200 * k);
+	ret.push_back(250 * k);
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
@@ -2156,6 +2295,16 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			ret.push_back(64 * m);
 			break;
 
+		//standard memory, are there options to increase this?
+		case MODEL_LABMASTER_ZI_A:
+			ret.push_back(20 * m);
+			break;
+
+		case MODEL_MDA_800:
+			ret.push_back(25 * m);
+			ret.push_back(50 * m);
+			break;
+
 		//deep memory option gives us 4x the capacity
 		case MODEL_WAVERUNNER_8K:
 			ret.push_back(16 * m);
@@ -2165,10 +2314,6 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(64 * m);
 			}
 			break;
-
-		//standard memory
-		case MODEL_LABMASTER_ZI_A:
-			ret.push_back(20 * m);
 
 		//TODO: add more models here
 		default:
