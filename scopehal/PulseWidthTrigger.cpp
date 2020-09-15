@@ -49,7 +49,7 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	m_parameters[m_widthtypename].AddEnumValue("Less than", WIDTH_LESS);
 	m_parameters[m_widthtypename].AddEnumValue("Greater than", WIDTH_GREATER);
 	m_parameters[m_widthtypename].AddEnumValue("Between", WIDTH_BETWEEN);
-	m_parameters[m_widthtypename].AddEnumValue("Outside", WIDTH_OUTSIDE);
+	m_parameters[m_widthtypename].AddEnumValue("Not between", WIDTH_NOT_BETWEEN);
 }
 
 PulseWidthTrigger::~PulseWidthTrigger()

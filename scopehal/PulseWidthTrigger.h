@@ -51,7 +51,7 @@ public:
 		WIDTH_LESS,
 		WIDTH_GREATER,
 		WIDTH_BETWEEN,
-		WIDTH_OUTSIDE
+		WIDTH_NOT_BETWEEN
 	};
 
 	static std::string GetTriggerName();
