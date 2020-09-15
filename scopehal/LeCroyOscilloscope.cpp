@@ -140,6 +140,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_WAVERUNNER_8K;
 	else if(m_model.find("SDA3") == 0)
 		m_modelid = MODEL_SDA_3K;
+	else if(m_model == "MCM-ZI-A")
+		m_modelid = MODEL_LABMASTER_ZI_A;
 	else if (m_vendor.compare("SIGLENT") == 0)
 	{
 		// TODO: if LeCroy and Siglent classes get split, then this should obviously
@@ -228,15 +230,30 @@ void LeCroyOscilloscope::DetectOptions()
 				m_hasI2cTrigger = true;
 				LogDebug("* I2C (I2C trigger/decode)\n");
 			}
-			else if(o == "SPI")
+			else if(o == "I2C_TDME")
 			{
 				m_hasI2cTrigger = true;
-				LogDebug("* SPI (I2C trigger/decode)\n");
+				LogDebug("* I2C_TDME (I2C trigger/decode/measure/eye)\n");
+			}
+			else if(o == "SPI")
+			{
+				m_hasSpiTrigger = true;
+				LogDebug("* SPI (SPI trigger/decode)\n");
+			}
+			else if(o == "SPI_TDME")
+			{
+				m_hasSpiTrigger = true;
+				LogDebug("* SPI (SPI trigger/decode/measure/eye)\n");
 			}
 			else if(o == "UART")
 			{
-				m_hasI2cTrigger = true;
+				m_hasUartTrigger = true;
 				LogDebug("* UART (UART trigger/decode)\n");
+			}
+			else if(o == "UART_TDME")
+			{
+				m_hasUartTrigger = true;
+				LogDebug("* UART (UART trigger/decode/measure/eye)\n");
 			}
 
 			//Ignore UI options
@@ -296,35 +313,71 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	* WAVERUNNER8104-MS has 4 channels (plus 16 digital)
 	* DDA5005 / DDA5005A have 4 channels
 	* SDA3010 have 4 channels
+	* LabMaster just calls itself "MCM-Zi-A" and there's no information on the number of modules!
  */
 void LeCroyOscilloscope::DetectAnalogChannels()
 {
-	//General model format is family, number, suffix. Not all are always present.
-	//Trim off alphabetic characters from the start of the model number
-	size_t pos;
-	for(pos=0; pos < m_model.length(); pos++)
+	int nchans = 1;
+
+	switch(m_modelid)
 	{
-		if(isalpha(m_model[pos]))
-			continue;
-		else if(isdigit(m_model[pos]))
+		//DDA5005 and similar have 4 channels despite a model number ending in 5
+		//SDA3010 have 4 channels despite a model number ending in 0
+		case MODEL_DDA_5K:
+		case MODEL_SDA_3K:
+			nchans = 4;
 			break;
-		else
-		{
-			LogError("Unrecognized character (not alphanumeric) in model number %s\n", m_model.c_str());
-			return;
-		}
+
+		//LabMaster MCM could have any number of channels.
+		//This is ugly and produces errors in the remote log each time we start up, but does work.
+		case MODEL_LABMASTER_ZI_A:
+			{
+				char tmp[128];
+				for(int i=1; i<80; i++)
+				{
+					snprintf(tmp, sizeof(tmp), "VBS? 'return=IsObject(app.Acquisition.C%d)'", i);
+
+					m_transport->SendCommand(tmp);
+					string reply = m_transport->ReadReply();
+
+					//All good
+					if(Trim(reply) == "-1")
+						nchans = i;
+
+					//Anything else is probably an error:
+					//Object doesn't support this property or method: 'app.Acquisition.C5'
+					else
+						break;
+				}
+			}
+			break;
+
+		//General model format is family, number, suffix. Not all are always present.
+		default:
+			{
+				//Trim off alphabetic characters from the start of the model number
+				size_t pos;
+				for(pos=0; pos < m_model.length(); pos++)
+				{
+					if(isalpha(m_model[pos]))
+						continue;
+					else if(isdigit(m_model[pos]))
+						break;
+					else
+					{
+						LogError("Unrecognized character (not alphanumeric) in model number %s\n", m_model.c_str());
+						return;
+					}
+				}
+
+				//Now we should be able to read the model number
+				int modelNum = atoi(m_model.c_str() + pos);
+
+				//Last digit of the model number is normally the number of channels (WAVESURFER3022, HDO8108)
+				nchans = modelNum % 10;
+			}
+			break;
 	}
-
-	//Now we should be able to read the model number
-	int modelNum = atoi(m_model.c_str() + pos);
-
-	//Last digit of the model number is normally the number of channels (WAVESURFER3022, HDO8108)
-	int nchans = modelNum % 10;
-
-	//DDA5005 and similar have 4 channels despite a model number ending in 5
-	//SDA3010 have 4 channels despite a model number ending in 0
-	if(m_modelid == MODEL_DDA_5K || m_modelid == MODEL_SDA_3K)
-		nchans = 4;
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -2033,6 +2086,18 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(20 * g);
 			break;
 
+		case MODEL_LABMASTER_ZI_A:
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			ret.push_back(20 * g);	//FIXME: 20 and 40 Gsps give garbage data in the MAUI Studio simulator.
+			ret.push_back(40 * g);	//Data looks wrong in MAUI as well as glscopeclient so doesn't seem to be something
+									//that we did. Looks like bits and pieces of waveform with gaps or overlap.
+									//Unclear if sim bug or actual issue, no testing on actual LabMaster hardware
+									//has been performed to date.
+			ret.push_back(80 * g);
+			//TODO: exact sample rates may depend on the acquisition module(s) connected
+			break;
+
 		default:
 			break;
 	}
@@ -2100,6 +2165,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(64 * m);
 			}
 			break;
+
+		//standard memory
+		case MODEL_LABMASTER_ZI_A:
+			ret.push_back(20 * m);
 
 		//TODO: add more models here
 		default:
