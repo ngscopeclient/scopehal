@@ -149,6 +149,8 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_SDA_3K;
 	else if(m_model.find("WAVERUNNER8") == 0)
 		m_modelid = MODEL_WAVERUNNER_8K;
+	else if(m_model.find("WAVERUNNER9") == 0)
+		m_modelid = MODEL_WAVERUNNER_9K;
 	else if(m_model.find("WS3") == 0)
 		m_modelid = MODEL_WAVESURFER_3K;
 
@@ -343,6 +345,11 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "SPMI";
 			else if(o.find("USB2") == 0)
 				desc = "USB2";
+			else if(o == "HDTV")
+			{
+				type = "Trigger";		//FIXME: Is this just 1080p analog trigger support?
+				desc = "HD analog TV";
+			}
 
 			//Protocol decodes without trigger capability
 			//Print out name but otherwise ignore
@@ -362,6 +369,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Protocol decode";
 				desc = "Automotive Ethernet";
+			}
+			else if(o == "ET")
+			{
+				type = "Protocol decode";
+				desc = "Electrical Telecom";
 			}
 			else if(o == "MANCHESTER-BUS")
 			{
@@ -405,6 +417,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Miscellaneous";
 				desc = "Power Analysis";
+			}
+			else if( (o == "SDA2") || (o == "SDA3") )
+			{
+				type = "Miscellaneous";
+				desc = "Serial Data Analysis";
 			}
 			else if(o == "THREEPHASEHARMONICS")
 			{
@@ -2242,6 +2259,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	vector<uint64_t> ret;
 
 	//Not all scopes can go this slow
+	//TODO: complete list
 	if(m_modelid == MODEL_WAVERUNNER_8K)
 		ret.push_back(1000);
 
@@ -2342,6 +2360,16 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(20 * g);
 			break;
 
+		case MODEL_WAVERUNNER_9K:
+			ret.push_back(250 * m);
+			ret.push_back(500 * m);
+			ret.push_back(1 * g);
+			ret.push_back(2 * g);
+			ret.push_back(5 * g);
+			ret.push_back(10 * g);
+			//TODO: is there -a M option here?
+			break;
+
 		default:
 			break;
 	}
@@ -2351,9 +2379,23 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleRatesInterleaved()
 {
-	//Same as non-interleaved, plus double, for all known scopes
 	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
-	ret.push_back(ret[ret.size()-1] * 2);
+
+	switch(m_modelid)
+	{
+		//A few models do not have interleaving capability at all.
+		case MODEL_HDO_4KA:
+		case MODEL_HDO_6KA:
+		case MODEL_LABMASTER_ZI_A:
+		case MODEL_MDA_800:
+			break;
+
+		//Same as non-interleaved, plus double, for all other known scopes
+		default:
+			ret.push_back(ret[ret.size()-1] * 2);
+			break;
+	}
+
 	return ret;
 }
 
@@ -2431,6 +2473,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 		//deep memory option gives us 4x the capacity
 		case MODEL_WAVERUNNER_8K:
+		case MODEL_WAVERUNNER_9K:
 			ret.push_back(16 * m);
 			if(m_hasFastSampleRate)
 			{
@@ -2472,11 +2515,13 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 			break;
 
 		//memory is dedicated per channel, no interleaving possible
+		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
 			break;
 
 		case MODEL_WAVERUNNER_8K:
+		case MODEL_WAVERUNNER_9K:
 			if(m_hasFastSampleRate)
 				ret.push_back(128 * m);
 			else
