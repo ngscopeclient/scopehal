@@ -644,7 +644,7 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	char chn[32];
 	for(unsigned int i=0; i<count; i++)
 	{
-		snprintf(chn, sizeof(chn), "Digital%d", i);
+		snprintf(chn, sizeof(chn), "D%d", i);
 		auto chan = new OscilloscopeChannel(
 			this,
 			chn,
