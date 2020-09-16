@@ -28,48 +28,27 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "WindowTrigger.h"
+#include "TwoLevelTrigger.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-WindowTrigger::WindowTrigger(Oscilloscope* scope)
-	: TwoLevelTrigger(scope)
+TwoLevelTrigger::TwoLevelTrigger(Oscilloscope* scope)
+	: Trigger(scope)
 {
-	CreateInput("din");
+	//Redefine the upper level signal name
+	m_parameters.clear();
+	m_levelname = "Upper Bound";
+	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+
+	m_lowername = "Lower Bound";
+	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 }
 
-WindowTrigger::~WindowTrigger()
+TwoLevelTrigger::~TwoLevelTrigger()
 {
 
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string WindowTrigger::GetTriggerName()
-{
-	return "Window";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Input validation
-
-bool WindowTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//We only can take one input
-	if(i > 0)
-		return false;
-
-	//There has to be a signal to trigger on
-	if(stream.m_channel == NULL)
-		return false;
-
-	//It has to be from the same instrument we're trying to trigger on
-	if(stream.m_channel->GetScope() != m_scope)
-		return false;
-
-	return true;
-}

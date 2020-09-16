@@ -35,10 +35,12 @@
 #ifndef WindowTrigger_h
 #define WindowTrigger_h
 
+#include "TwoLevelTrigger.h"
+
 /**
 	@brief Window trigger - detect when the signal leaves a specified range
  */
-class WindowTrigger : public Trigger
+class WindowTrigger : public TwoLevelTrigger
 {
 public:
 	WindowTrigger(Oscilloscope* scope);
@@ -48,23 +50,6 @@ public:
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(WindowTrigger);
-
-	//Upper bound of range is the base class "trigger level"
-	float GetUpperBound()
-	{ return GetLevel(); }
-
-	void SetUpperBound(float f)
-	{ SetLevel(f); }
-
-	//Lower bound
-	float GetLowerBound()
-	{ return m_parameters[m_lowername].GetFloatVal(); }
-
-	void SetLowerBound(float level)
-	{ m_parameters[m_lowername].SetFloatVal(level); }
-
-protected:
-	std::string m_lowername;
 };
 
 #endif

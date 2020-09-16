@@ -27,49 +27,39 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "WindowTrigger.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of TwoLevelTrigger
+ */
+#ifndef TwoLevelTrigger_h
+#define TwoLevelTrigger_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-WindowTrigger::WindowTrigger(Oscilloscope* scope)
-	: TwoLevelTrigger(scope)
+/**
+	@brief Base class for all triggers that have two thresholds rather than one
+ */
+class TwoLevelTrigger : public Trigger
 {
-	CreateInput("din");
-}
+public:
+	TwoLevelTrigger(Oscilloscope* scope);
+	virtual ~TwoLevelTrigger();
 
-WindowTrigger::~WindowTrigger()
-{
+	//Upper bound of range is the base class "trigger level"
+	float GetUpperBound()
+	{ return GetLevel(); }
 
-}
+	void SetUpperBound(float f)
+	{ SetLevel(f); }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	//Lower bound
+	float GetLowerBound()
+	{ return m_parameters[m_lowername].GetFloatVal(); }
 
-string WindowTrigger::GetTriggerName()
-{
-	return "Window";
-}
+	void SetLowerBound(float level)
+	{ m_parameters[m_lowername].SetFloatVal(level); }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Input validation
+protected:
+	std::string m_lowername;
+};
 
-bool WindowTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//We only can take one input
-	if(i > 0)
-		return false;
-
-	//There has to be a signal to trigger on
-	if(stream.m_channel == NULL)
-		return false;
-
-	//It has to be from the same instrument we're trying to trigger on
-	if(stream.m_channel->GetScope() != m_scope)
-		return false;
-
-	return true;
-}
+#endif
