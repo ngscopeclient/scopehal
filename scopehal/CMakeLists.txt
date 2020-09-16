@@ -36,7 +36,6 @@ set(SCOPEHAL_SOURCES
 
 	FlowGraphNode.cpp
 	Trigger.cpp
-	AgilentEdgeTrigger.cpp
 	EdgeTrigger.cpp
 	PulseWidthTrigger.cpp
 

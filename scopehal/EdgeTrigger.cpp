@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "EdgeTrigger.h"
+#include "AgilentOscilloscope.h"
 
 using namespace std;
 
@@ -45,6 +46,10 @@ EdgeTrigger::EdgeTrigger(Oscilloscope* scope)
 	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
 	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
 	m_parameters[m_typename].AddEnumValue("Any", EDGE_ANY);
+
+	//Only Agilent scopes are known to support this
+	if(dynamic_cast<AgilentOscilloscope*>(scope) != NULL)
+		m_parameters[m_typename].AddEnumValue("Alternating", EDGE_ALTERNATING);
 }
 
 EdgeTrigger::~EdgeTrigger()

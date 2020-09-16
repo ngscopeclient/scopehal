@@ -48,7 +48,8 @@ public:
 	{
 		EDGE_RISING,
 		EDGE_FALLING,
-		EDGE_ANY
+		EDGE_ANY,
+		EDGE_ALTERNATING
 	};
 
 	void SetType(EdgeType type)
