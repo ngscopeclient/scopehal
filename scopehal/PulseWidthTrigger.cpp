@@ -47,13 +47,13 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 
 	m_conditionname = "Condition";
 	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", WIDTH_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", WIDTH_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", WIDTH_BETWEEN);
+	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
+	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
+	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
 
 	//So far only LeCroy is known to support this
 	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
-		m_parameters[m_conditionname].AddEnumValue("Not between", WIDTH_NOT_BETWEEN);
+		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 }
 
 PulseWidthTrigger::~PulseWidthTrigger()

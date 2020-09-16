@@ -28,27 +28,66 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "TwoLevelTrigger.h"
+#include "SlewRateTrigger.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TwoLevelTrigger::TwoLevelTrigger(Oscilloscope* scope)
-	: Trigger(scope)
+SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
+	: TwoLevelTrigger(scope)
 {
-	//Redefine the upper level signal name
-	m_parameters.clear();
-	m_levelname = "Upper Level";
-	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	CreateInput("din");
 
-	m_lowername = "Lower Level";
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_lowerintname = "Lower Interval";
+	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+
+	m_upperintname = "Upper Interval";
+	m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+
+	m_conditionname = "Condition";
+	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
+	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
+	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+
+	m_slopename = "Edge Slope";
+	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
+	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
 }
 
-TwoLevelTrigger::~TwoLevelTrigger()
+SlewRateTrigger::~SlewRateTrigger()
 {
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string SlewRateTrigger::GetTriggerName()
+{
+	return "Slew Rate";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
+
+bool SlewRateTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	//We only can take one input
+	if(i > 0)
+		return false;
+
+	//There has to be a signal to trigger on
+	if(stream.m_channel == NULL)
+		return false;
+
+	//It has to be from the same instrument we're trying to trigger on
+	if(stream.m_channel->GetScope() != m_scope)
+		return false;
+
+	return true;
+}

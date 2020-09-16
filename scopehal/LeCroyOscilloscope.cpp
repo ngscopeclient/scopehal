@@ -36,6 +36,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
 
 using namespace std;
@@ -3129,6 +3130,9 @@ void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 	m_transport->SendCommand(tmp);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Triggering
+
 void LeCroyOscilloscope::PullTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -3138,6 +3142,8 @@ void LeCroyOscilloscope::PullTrigger()
 	string reply = Trim(m_transport->ReadReply());
 	if (reply == "Edge")
 		PullEdgeTrigger();
+	else if (reply == "SlewRate")
+		PullSlewRateTrigger();
 	else if (reply == "Width")
 		PullPulseWidthTrigger();
 	else if (reply == "Window")
@@ -3195,7 +3201,7 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
-	ProcessTriggerSlope(et, Trim(m_transport->ReadReply()));
+	GetTriggerSlope(et, Trim(m_transport->ReadReply()));
 }
 
 /**
@@ -3221,15 +3227,7 @@ void LeCroyOscilloscope::PullPulseWidthTrigger()
 
 	//Condition
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Condition'");
-	auto reply = Trim(m_transport->ReadReply());
-	if(reply == "LessThan")
-		pt->SetCondition(PulseWidthTrigger::WIDTH_LESS);
-	else if(reply == "GreaterThan")
-		pt->SetCondition(PulseWidthTrigger::WIDTH_GREATER);
-	else if(reply == "InRange")
-		pt->SetCondition(PulseWidthTrigger::WIDTH_BETWEEN);
-	else if(reply == "OutOfRange")
-		pt->SetCondition(PulseWidthTrigger::WIDTH_NOT_BETWEEN);
+	pt->SetCondition(GetCondition(m_transport->ReadReply()));
 
 	//Min range
 	Unit ps(Unit::UNIT_PS);
@@ -3242,22 +3240,55 @@ void LeCroyOscilloscope::PullPulseWidthTrigger()
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
-	ProcessTriggerSlope(pt, Trim(m_transport->ReadReply()));
+	GetTriggerSlope(pt, Trim(m_transport->ReadReply()));
 }
 
 /**
-	@brief Processes the slope for an edge or edge-derived trigger
+	@brief Reads settings for a slew rate trigger from the instrument
  */
-void LeCroyOscilloscope::ProcessTriggerSlope(EdgeTrigger* trig, string reply)
+void LeCroyOscilloscope::PullSlewRateTrigger()
 {
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<SlewRateTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new SlewRateTrigger(this);
+	SlewRateTrigger* st = dynamic_cast<SlewRateTrigger*>(m_trigger);
+
+	//Lower bound
+	Unit v(Unit::UNIT_VOLTS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.LowerLevel'");
+	st->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+
+	//Upper bound
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.UpperLevel'");
+	st->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+
+	//Lower interval
+	Unit ps(Unit::UNIT_PS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeLow'");
+	st->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+
+	//Upper interval
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeHigh'");
+	st->SetUpperInterval(ps.ParseString(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.Slope'");
+	auto reply = Trim(m_transport->ReadReply());
 	if(reply == "Positive")
-		trig->SetType(EdgeTrigger::EDGE_RISING);
+		st->SetSlope(SlewRateTrigger::EDGE_RISING);
 	else if(reply == "Negative")
-		trig->SetType(EdgeTrigger::EDGE_FALLING);
-	else if(reply == "Either")
-		trig->SetType(EdgeTrigger::EDGE_ANY);
-	else
-		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
+
+	//Condition
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.Condition'");
+	st->SetCondition(GetCondition(m_transport->ReadReply()));
 }
 
 /**
@@ -3287,6 +3318,43 @@ void LeCroyOscilloscope::PullWindowTrigger()
 	wt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
 }
 
+/**
+	@brief Processes the slope for an edge or edge-derived trigger
+ */
+void LeCroyOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+{
+	reply = Trim(reply);
+
+	if(reply == "Positive")
+		trig->SetType(EdgeTrigger::EDGE_RISING);
+	else if(reply == "Negative")
+		trig->SetType(EdgeTrigger::EDGE_FALLING);
+	else if(reply == "Either")
+		trig->SetType(EdgeTrigger::EDGE_ANY);
+	else
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+}
+
+/**
+	@brief Parses a trigger condition
+ */
+Trigger::Condition LeCroyOscilloscope::GetCondition(string reply)
+{
+	reply = Trim(reply);
+
+	if(reply == "LessThan")
+		return Trigger::CONDITION_LESS;
+	else if(reply == "GreaterThan")
+		return Trigger::CONDITION_GREATER;
+	else if(reply == "InRange")
+		return Trigger::CONDITION_BETWEEN;
+	else if(reply == "OutOfRange")
+		return Trigger::CONDITION_NOT_BETWEEN;
+
+	//unknown
+	return Trigger::CONDITION_LESS;
+}
+
 void LeCroyOscilloscope::PushTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -3303,6 +3371,7 @@ void LeCroyOscilloscope::PushTrigger()
 	//The rest depends on the type
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(pt)
 	{
@@ -3313,6 +3382,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
 		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
+	}
+	else if(st)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"SlewRate\"");
+		PushSlewRateTrigger(st);
 	}
 	else if(wt)
 	{
@@ -3330,14 +3404,7 @@ void LeCroyOscilloscope::PushTrigger()
 void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, string tree)
 {
 	//Level
-	char tmp[128];
-	snprintf(
-		tmp,
-		sizeof(tmp),
-		"VBS? '%s.Level = %f'",
-		tree.c_str(),
-		trig->GetLevel());
-	m_transport->SendCommand(tmp);
+	PushFloat(tree + ".Level", trig->GetLevel());
 
 	//Slope
 	switch(trig->GetType())
@@ -3361,49 +3428,31 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, string tree)
 }
 
 /**
-	@brief Pushes settings for an edge trigger to the instrument
+	@brief Pushes settings for a pulse width trigger to the instrument
  */
 void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
-	//Push common settings for the edge trigger
 	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Width");
+	PushCondition("app.Acquisition.Trigger.Width.Condition", trig->GetCondition());
+	PushFloat("app.Acquisition.Trigger.Width.TimeHigh", trig->GetUpperBound() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Width.TimeLow", trig->GetLowerBound() * 1e-12f);
+}
 
-	//Condition
-	switch(trig->GetCondition())
-	{
-		case PulseWidthTrigger::WIDTH_LESS:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"LessThan\"'");
-			break;
+/**
+	@brief Pushes settings for a slew rate trigger to the instrument
+ */
+void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
+{
+	PushCondition("app.Acquisition.Trigger.SlewRate.Condition", trig->GetCondition());
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperBound());
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerBound());
 
-		case PulseWidthTrigger::WIDTH_GREATER:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"GreaterThan\"'");
-			break;
-
-		case PulseWidthTrigger::WIDTH_BETWEEN:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"InRange\"'");
-			break;
-
-		case PulseWidthTrigger::WIDTH_NOT_BETWEEN:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"OutOfRange\"'");
-			break;
-	}
-
-	//Time high
-	char tmp[128];
-	snprintf(
-		tmp,
-		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Width.TimeHigh = \"%e\"'",
-		trig->GetUpperBound() * 1e-12f);
-	m_transport->SendCommand(tmp);
-
-	//Time low
-	snprintf(
-		tmp,
-		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Width.TimeLow = \"%e\"'",
-		trig->GetLowerBound() * 1e-12f);
-	m_transport->SendCommand(tmp);
+	if(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Positive\"");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Negative\"");
 }
 
 /**
@@ -3411,54 +3460,42 @@ void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
  */
 void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
-	//Lower bound
+	PushFloat("app.Acquisition.Trigger.Window.LowerLevel", trig->GetLowerBound());
+	PushFloat("app.Acquisition.Trigger.Window.UpperLevel", trig->GetUpperBound());
+}
+
+void LeCroyOscilloscope::PushCondition(string path, Trigger::Condition cond)
+{
+	switch(cond)
+	{
+		case Trigger::CONDITION_LESS:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"LessThan\"'");
+			break;
+
+		case Trigger::CONDITION_GREATER:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterThan\"'");
+			break;
+
+		case Trigger::CONDITION_BETWEEN:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
+			break;
+
+		case Trigger::CONDITION_NOT_BETWEEN:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"OutOfRange\"'");
+			break;
+	}
+}
+
+void LeCroyOscilloscope::PushFloat(string path, float f)
+{
 	char tmp[128];
 	snprintf(
 		tmp,
 		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Window.LowerLevel = %f'",
-		trig->GetLowerBound());
+		"VBS? '%s = %e'",
+		path.c_str(),
+		f);
 	m_transport->SendCommand(tmp);
-
-	//Upper bound bound
-	snprintf(
-		tmp,
-		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Window.UpperLevel = %f'",
-		trig->GetUpperBound());
-	m_transport->SendCommand(tmp);
-}
-
-/**
-	@brief Removes whitespace from the start and end of a string
- */
-string LeCroyOscilloscope::Trim(string str)
-{
-	string ret;
-	string tmp;
-
-	//Skip leading spaces
-	size_t i=0;
-	for(; i<str.length() && isspace(str[i]); i++)
-	{}
-
-	//Read non-space stuff
-	for(; i<str.length(); i++)
-	{
-		//Non-space
-		char c = str[i];
-		if(!isspace(c))
-		{
-			ret = ret + tmp + c;
-			tmp = "";
-		}
-
-		//Space. Save it, only append if we have non-space after
-		else
-			tmp += c;
-	}
-
-	return ret;
 }
 
 vector<string> LeCroyOscilloscope::GetTriggerTypes()
@@ -3466,6 +3503,7 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(SlewRateTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger

@@ -52,6 +52,15 @@ public:
 	void SetLevel(float level)
 	{ m_parameters[m_levelname].SetFloatVal(level); }
 
+	//Conditions for filters
+	enum Condition
+	{
+		CONDITION_LESS,
+		CONDITION_GREATER,
+		CONDITION_BETWEEN,
+		CONDITION_NOT_BETWEEN
+	};
+
 protected:
 	Oscilloscope* m_scope;
 	std::string m_levelname;

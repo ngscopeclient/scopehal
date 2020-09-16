@@ -48,6 +48,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
 
 #ifndef _WIN32
@@ -119,6 +120,7 @@ void DriverStaticInit()
 
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(PulseWidthTrigger);
+	AddTriggerClass(SlewRateTrigger);
 	AddTriggerClass(WindowTrigger);
 }
 
@@ -304,4 +306,36 @@ void InitializePlugins()
 	FindClose(findHandle);
 
 #endif
+}
+
+/**
+	@brief Removes whitespace from the start and end of a string
+ */
+string Trim(string str)
+{
+	string ret;
+	string tmp;
+
+	//Skip leading spaces
+	size_t i=0;
+	for(; i<str.length() && isspace(str[i]); i++)
+	{}
+
+	//Read non-space stuff
+	for(; i<str.length(); i++)
+	{
+		//Non-space
+		char c = str[i];
+		if(!isspace(c))
+		{
+			ret = ret + tmp + c;
+			tmp = "";
+		}
+
+		//Space. Save it, only append if we have non-space after
+		else
+			tmp += c;
+	}
+
+	return ret;
 }

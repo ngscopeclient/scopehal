@@ -46,14 +46,6 @@ public:
 	PulseWidthTrigger(Oscilloscope* scope);
 	virtual ~PulseWidthTrigger();
 
-	enum Condition
-	{
-		WIDTH_LESS,
-		WIDTH_GREATER,
-		WIDTH_BETWEEN,
-		WIDTH_NOT_BETWEEN
-	};
-
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(PulseWidthTrigger);
 

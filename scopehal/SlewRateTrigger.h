@@ -27,28 +27,69 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SlewRateTrigger
+ */
+#ifndef SlewRateTrigger_h
+#define SlewRateTrigger_h
+
 #include "TwoLevelTrigger.h"
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-TwoLevelTrigger::TwoLevelTrigger(Oscilloscope* scope)
-	: Trigger(scope)
+/**
+	@brief Slew rate trigger - trigger when an edge rate meets the specified conditions
+ */
+class SlewRateTrigger : public TwoLevelTrigger
 {
-	//Redefine the upper level signal name
-	m_parameters.clear();
-	m_levelname = "Upper Level";
-	m_parameters[m_levelname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+public:
+	SlewRateTrigger(Oscilloscope* scope);
+	virtual ~SlewRateTrigger();
 
-	m_lowername = "Lower Level";
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-}
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-TwoLevelTrigger::~TwoLevelTrigger()
-{
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(SlewRateTrigger);
 
-}
+	//Upper interval
+	int64_t GetUpperInterval()
+	{ return m_parameters[m_upperintname].GetIntVal(); }
 
+	void SetUpperInterval(int64_t interval)
+	{ m_parameters[m_upperintname].SetIntVal(interval); }
+
+	//Lower interval
+	int64_t GetLowerInterval()
+	{ return m_parameters[m_lowerintname].GetIntVal(); }
+
+	void SetLowerInterval(int64_t interval)
+	{ m_parameters[m_lowerintname].SetIntVal(interval); }
+
+	//Condition
+	void SetCondition(Condition type)
+	{ m_parameters[m_conditionname].SetIntVal(type); }
+
+	Condition GetCondition()
+	{ return (Condition) m_parameters[m_conditionname].GetIntVal(); }
+
+	//Types
+	enum EdgeType
+	{
+		EDGE_RISING,
+		EDGE_FALLING
+	};
+
+	void SetSlope(EdgeType type)
+	{ m_parameters[m_slopename].SetIntVal(type); }
+
+	EdgeType GetSlope()
+	{ return (EdgeType) m_parameters[m_slopename].GetIntVal(); }
+
+protected:
+	std::string m_conditionname;
+	std::string m_lowerintname;
+	std::string m_upperintname;
+	std::string m_slopename;
+};
+
+#endif

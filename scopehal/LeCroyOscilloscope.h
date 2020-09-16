@@ -34,6 +34,7 @@
 
 class EdgeTrigger;
 class PulseWidthTrigger;
+class SlewRateTrigger;
 class WindowTrigger;
 
 /**
@@ -203,12 +204,18 @@ public:
 protected:
 	void PullEdgeTrigger();
 	void PullPulseWidthTrigger();
+	void PullSlewRateTrigger();
 	void PullWindowTrigger();
 	void PullTriggerSource(Trigger* trig);
-	void ProcessTriggerSlope(EdgeTrigger* trig, std::string reply);
+
+	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
+	Trigger::Condition GetCondition(std::string reply);
 
 	void PushEdgeTrigger(EdgeTrigger* trig, std::string tree);
+	void PushCondition(std::string path, Trigger::Condition cond);
+	void PushFloat(std::string path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
+	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
 
 	void BulkCheckChannelEnableState();
@@ -279,8 +286,6 @@ protected:
 
 	//Mutexing for thread safety
 	std::recursive_mutex m_cacheMutex;
-
-	std::string Trim(std::string str);
 
 public:
 	static std::string GetDriverNameInternal();
