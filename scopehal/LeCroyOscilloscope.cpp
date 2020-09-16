@@ -80,7 +80,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Add the external trigger input
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
-		"EX",
+		"Ext",
 		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
 		1,
