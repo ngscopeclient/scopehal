@@ -3137,6 +3137,8 @@ void LeCroyOscilloscope::PullTrigger()
 	string reply = Trim(m_transport->ReadReply());
 	if (reply == "Edge")
 		PullEdgeTrigger();
+	else if (reply == "Width")
+		PullPulseWidthTrigger();
 
 	//Unrecognized trigger type
 	else
@@ -3145,6 +3147,24 @@ void LeCroyOscilloscope::PullTrigger()
 		m_trigger = NULL;
 		return;
 	}
+
+	//Pull the source (same for all types of trigger)
+	PullTriggerSource(m_trigger);
+
+	//TODO: holdoff
+}
+
+/**
+	@brief Reads the source of a trigger from the instrument
+ */
+void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
+{
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Source'");		//not visible in XStream Browser?
+	string reply = Trim(m_transport->ReadReply());
+	auto chan = GetChannelByHwName(reply);
+	trig->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
 }
 
 /**
@@ -3164,15 +3184,6 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	//Source channel
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Source'");
-	string reply = Trim(m_transport->ReadReply());
-	auto chan = GetChannelByHwName(reply);
-	et->SetInput(0, StreamDescriptor(chan, 0), true);
-	if(!chan)
-		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
-
 	//Level
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
 	et->SetLevel(stof(m_transport->ReadReply()));
@@ -3181,22 +3192,97 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
-	reply = Trim(m_transport->ReadReply());
+	ProcessTriggerSlope(et, Trim(m_transport->ReadReply()));
+}
+
+/**
+	@brief Reads settings for an edge trigger from the instrument
+ */
+void LeCroyOscilloscope::PullPulseWidthTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new PulseWidthTrigger(this);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+
+	//Level
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Level'");
+	pt->SetLevel(stof(m_transport->ReadReply()));
+
+	//Condition
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Condition'");
+	auto reply = Trim(m_transport->ReadReply());
+	if(reply == "LessThan")
+		pt->SetCondition(PulseWidthTrigger::WIDTH_LESS);
+	else if(reply == "GreaterThan")
+		pt->SetCondition(PulseWidthTrigger::WIDTH_GREATER);
+	else if(reply == "InRange")
+		pt->SetCondition(PulseWidthTrigger::WIDTH_BETWEEN);
+	else if(reply == "OutOfRange")
+		pt->SetCondition(PulseWidthTrigger::WIDTH_NOT_BETWEEN);
+
+	//Min range
+	Unit ps(Unit::UNIT_PS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeLow'");
+	pt->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+
+	//Max range
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeHigh'");
+	pt->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
+	ProcessTriggerSlope(pt, Trim(m_transport->ReadReply()));
+}
+
+/**
+	@brief Processes the slope for an edge or edge-derived trigger
+ */
+void LeCroyOscilloscope::ProcessTriggerSlope(EdgeTrigger* trig, string reply)
+{
 	if(reply == "Positive")
-		et->SetType(EdgeTrigger::EDGE_RISING);
+		trig->SetType(EdgeTrigger::EDGE_RISING);
 	else if(reply == "Negative")
-		et->SetType(EdgeTrigger::EDGE_FALLING);
+		trig->SetType(EdgeTrigger::EDGE_FALLING);
 	else if(reply == "Either")
-		et->SetType(EdgeTrigger::EDGE_ANY);
+		trig->SetType(EdgeTrigger::EDGE_ANY);
 	else
-		LogDebug("Unknown trigger slope %s\n", reply.c_str());
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
 }
 
 void LeCroyOscilloscope::PushTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source is the same for every channel
+	char tmp[128];
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Source = \"%s\"'",
+		m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+	m_transport->SendCommand(tmp);
+
+	//The rest depends on the type
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(et)
-		PushEdgeTrigger(et);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	if(pt)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
+		PushPulseWidthTrigger(pt);
+	}
+	else if(et)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
+		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
+	}
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
@@ -3205,27 +3291,15 @@ void LeCroyOscilloscope::PushTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
+void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, string tree)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Type
-	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
-
-	//Source
+	//Level
 	char tmp[128];
 	snprintf(
 		tmp,
 		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Source = \"%s\"'",
-		trig->GetInput(0).m_channel->GetHwname().c_str());
-	m_transport->SendCommand(tmp);
-
-	//Level
-	snprintf(
-		tmp,
-		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Edge.Level = %f'",
+		"VBS? '%s.Level = %f'",
+		tree.c_str(),
 		trig->GetLevel());
 	m_transport->SendCommand(tmp);
 
@@ -3233,21 +3307,67 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	switch(trig->GetType())
 	{
 		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Positive\"'");
+			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Positive\"'");
 			break;
 
 		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Negative\"'");
+			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Negative\"'");
 			break;
 
 		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Edge.Slope = \"Either\"'");
+			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Either\"'");
 			break;
 
 		default:
 			LogWarning("Invalid trigger type %d\n", trig->GetType());
 			break;
 	}
+}
+
+/**
+	@brief Pushes settings for an edge trigger to the instrument
+ */
+void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
+{
+	//Push common settings for the edge trigger
+	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Width");
+
+	//Condition
+	switch(trig->GetCondition())
+	{
+		case PulseWidthTrigger::WIDTH_LESS:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"LessThan\"'");
+			break;
+
+		case PulseWidthTrigger::WIDTH_GREATER:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"GreaterThan\"'");
+			break;
+
+		case PulseWidthTrigger::WIDTH_BETWEEN:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"InRange\"'");
+			break;
+
+		case PulseWidthTrigger::WIDTH_NOT_BETWEEN:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Width.Condition = \"OutOfRange\"'");
+			break;
+	}
+
+	//Time high
+	char tmp[128];
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Width.TimeHigh = \"%e\"'",
+		trig->GetUpperBound() * 1e-12f);
+	m_transport->SendCommand(tmp);
+
+	//Time low
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Width.TimeLow = \"%e\"'",
+		trig->GetLowerBound() * 1e-12f);
+	m_transport->SendCommand(tmp);
 }
 
 /**

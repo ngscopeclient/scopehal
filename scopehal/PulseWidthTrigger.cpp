@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "PulseWidthTrigger.h"
+#include "LeCroyOscilloscope.h"
 
 using namespace std;
 
@@ -44,12 +45,15 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	m_uppername = "Upper Bound";
 	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
 
-	m_widthtypename = "Condition";
-	m_parameters[m_widthtypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_widthtypename].AddEnumValue("Less than", WIDTH_LESS);
-	m_parameters[m_widthtypename].AddEnumValue("Greater than", WIDTH_GREATER);
-	m_parameters[m_widthtypename].AddEnumValue("Between", WIDTH_BETWEEN);
-	m_parameters[m_widthtypename].AddEnumValue("Not between", WIDTH_NOT_BETWEEN);
+	m_conditionname = "Condition";
+	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_conditionname].AddEnumValue("Less than", WIDTH_LESS);
+	m_parameters[m_conditionname].AddEnumValue("Greater than", WIDTH_GREATER);
+	m_parameters[m_conditionname].AddEnumValue("Between", WIDTH_BETWEEN);
+
+	//So far only LeCroy is known to support this
+	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
+		m_parameters[m_conditionname].AddEnumValue("Not between", WIDTH_NOT_BETWEEN);
 }
 
 PulseWidthTrigger::~PulseWidthTrigger()

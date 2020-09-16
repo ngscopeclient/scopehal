@@ -34,6 +34,7 @@
 #include "../xptools/Socket.h"
 
 class EdgeTrigger;
+class PulseWidthTrigger;
 
 /**
 	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
@@ -201,7 +202,12 @@ public:
 
 protected:
 	void PullEdgeTrigger();
-	void PushEdgeTrigger(EdgeTrigger* trig);
+	void PullPulseWidthTrigger();
+	void PullTriggerSource(Trigger* trig);
+	void ProcessTriggerSlope(EdgeTrigger* trig, std::string reply);
+
+	void PushEdgeTrigger(EdgeTrigger* trig, std::string tree);
+	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 
 	void BulkCheckChannelEnableState();
 

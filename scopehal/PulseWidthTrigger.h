@@ -46,7 +46,7 @@ public:
 	PulseWidthTrigger(Oscilloscope* scope);
 	virtual ~PulseWidthTrigger();
 
-	enum WidthType
+	enum Condition
 	{
 		WIDTH_LESS,
 		WIDTH_GREATER,
@@ -57,8 +57,26 @@ public:
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(PulseWidthTrigger);
 
+	void SetCondition(Condition type)
+	{ m_parameters[m_conditionname].SetIntVal(type); }
+
+	Condition GetCondition()
+	{ return (Condition) m_parameters[m_conditionname].GetIntVal(); }
+
+	int64_t GetLowerBound()
+	{ return m_parameters[m_lowername].GetIntVal(); }
+
+	void SetLowerBound(int64_t bound)
+	{ m_parameters[m_lowername].SetIntVal(bound); }
+
+	int64_t GetUpperBound()
+	{ return m_parameters[m_uppername].GetIntVal(); }
+
+	void SetUpperBound(int64_t bound)
+	{ m_parameters[m_uppername].SetIntVal(bound); }
+
 protected:
-	std::string m_widthtypename;
+	std::string m_conditionname;
 	std::string m_lowername;
 	std::string m_uppername;
 };
