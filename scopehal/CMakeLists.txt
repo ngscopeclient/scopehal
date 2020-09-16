@@ -38,6 +38,7 @@ set(SCOPEHAL_SOURCES
 	Trigger.cpp
 	EdgeTrigger.cpp
 	PulseWidthTrigger.cpp
+	WindowTrigger.cpp
 
 	Instrument.cpp
 	FunctionGenerator.cpp

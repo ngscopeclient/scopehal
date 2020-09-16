@@ -36,6 +36,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "WindowTrigger.h"
 
 using namespace std;
 
@@ -3139,6 +3140,8 @@ void LeCroyOscilloscope::PullTrigger()
 		PullEdgeTrigger();
 	else if (reply == "Width")
 		PullPulseWidthTrigger();
+	else if (reply == "Window")
+		PullWindowTrigger();
 
 	//Unrecognized trigger type
 	else
@@ -3257,6 +3260,33 @@ void LeCroyOscilloscope::ProcessTriggerSlope(EdgeTrigger* trig, string reply)
 		LogWarning("Unknown trigger slope %s\n", reply.c_str());
 }
 
+/**
+	@brief Reads settings for a window trigger from the instrument
+ */
+void LeCroyOscilloscope::PullWindowTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<WindowTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new WindowTrigger(this);
+	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
+
+	//Lower bound
+	Unit v(Unit::UNIT_VOLTS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Window.LowerLevel'");
+	wt->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+
+	//Upper bound
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Window.UpperLevel'");
+	wt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+}
+
 void LeCroyOscilloscope::PushTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -3273,6 +3303,7 @@ void LeCroyOscilloscope::PushTrigger()
 	//The rest depends on the type
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(pt)
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
@@ -3282,6 +3313,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
 		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
+	}
+	else if(wt)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Window\"");
+		PushWindowTrigger(wt);
 	}
 
 	else
@@ -3371,6 +3407,29 @@ void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 }
 
 /**
+	@brief Pushes settings for a window trigger to the instrument
+ */
+void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
+{
+	//Lower bound
+	char tmp[128];
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Window.LowerLevel = %f'",
+		trig->GetLowerBound());
+	m_transport->SendCommand(tmp);
+
+	//Upper bound bound
+	snprintf(
+		tmp,
+		sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Window.UpperLevel = %f'",
+		trig->GetUpperBound());
+	m_transport->SendCommand(tmp);
+}
+
+/**
 	@brief Removes whitespace from the start and end of a string
  */
 string LeCroyOscilloscope::Trim(string str)
@@ -3407,6 +3466,7 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;
