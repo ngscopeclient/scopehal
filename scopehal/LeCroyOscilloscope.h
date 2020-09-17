@@ -34,6 +34,7 @@
 
 class EdgeTrigger;
 class PulseWidthTrigger;
+class RuntTrigger;
 class SlewRateTrigger;
 class WindowTrigger;
 
@@ -204,6 +205,7 @@ public:
 protected:
 	void PullEdgeTrigger();
 	void PullPulseWidthTrigger();
+	void PullRuntTrigger();
 	void PullSlewRateTrigger();
 	void PullWindowTrigger();
 	void PullTriggerSource(Trigger* trig);
@@ -215,6 +217,7 @@ protected:
 	void PushCondition(std::string path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
+	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
 

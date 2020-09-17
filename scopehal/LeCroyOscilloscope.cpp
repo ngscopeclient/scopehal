@@ -36,6 +36,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
 
@@ -3142,6 +3143,8 @@ void LeCroyOscilloscope::PullTrigger()
 	string reply = Trim(m_transport->ReadReply());
 	if (reply == "Edge")
 		PullEdgeTrigger();
+	else if (reply == "Runt")
+		PullRuntTrigger();
 	else if (reply == "SlewRate")
 		PullSlewRateTrigger();
 	else if (reply == "Width")
@@ -3241,6 +3244,54 @@ void LeCroyOscilloscope::PullPulseWidthTrigger()
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
 	GetTriggerSlope(pt, Trim(m_transport->ReadReply()));
+}
+
+/**
+	@brief Reads settings for a runt-pulse trigger from the instrument
+ */
+void LeCroyOscilloscope::PullRuntTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<RuntTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new RuntTrigger(this);
+	RuntTrigger* rt = dynamic_cast<RuntTrigger*>(m_trigger);
+
+	//Lower bound
+	Unit v(Unit::UNIT_VOLTS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.LowerLevel'");
+	rt->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+
+	//Upper bound
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.UpperLevel'");
+	rt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+
+	//Lower interval
+	Unit ps(Unit::UNIT_PS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeLow'");
+	rt->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+
+	//Upper interval
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeHigh'");
+	rt->SetUpperInterval(ps.ParseString(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.Slope'");
+	auto reply = Trim(m_transport->ReadReply());
+	if(reply == "Positive")
+		rt->SetSlope(RuntTrigger::EDGE_RISING);
+	else if(reply == "Negative")
+		rt->SetSlope(RuntTrigger::EDGE_FALLING);
+
+	//Condition
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.Condition'");
+	rt->SetCondition(GetCondition(m_transport->ReadReply()));
 }
 
 /**
@@ -3371,6 +3422,7 @@ void LeCroyOscilloscope::PushTrigger()
 	//The rest depends on the type
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(pt)
@@ -3382,6 +3434,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
 		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
+	}
+	else if(rt)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Runt\"");
+		PushRuntTrigger(rt);
 	}
 	else if(st)
 	{
@@ -3439,6 +3496,22 @@ void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 }
 
 /**
+	@brief Pushes settings for a runt trigger to the instrument
+ */
+void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
+{
+	PushCondition("app.Acquisition.Trigger.Runt.Condition", trig->GetCondition());
+	PushFloat("app.Acquisition.Trigger.Runt.TimeHigh", trig->GetUpperInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Runt.TimeLow", trig->GetLowerInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Runt.UpperLevel", trig->GetUpperBound());
+	PushFloat("app.Acquisition.Trigger.Runt.LowerLevel", trig->GetLowerBound());
+
+	if(trig->GetSlope() == RuntTrigger::EDGE_RISING)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Positive\"");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Negative\"");
+}
+/**
 	@brief Pushes settings for a slew rate trigger to the instrument
  */
 void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
@@ -3446,8 +3519,8 @@ void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 	PushCondition("app.Acquisition.Trigger.SlewRate.Condition", trig->GetCondition());
 	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperInterval() * 1e-12f);
 	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerInterval() * 1e-12f);
-	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperBound());
-	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerBound());
+	PushFloat("app.Acquisition.Trigger.SlewRate.UpperLevel", trig->GetUpperBound());
+	PushFloat("app.Acquisition.Trigger.SlewRate.LowerLevel", trig->GetLowerBound());
 
 	if(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Positive\"");
@@ -3503,6 +3576,7 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(RuntTrigger::GetTriggerName());
 	ret.push_back(SlewRateTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 

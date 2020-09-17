@@ -48,6 +48,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
 
@@ -120,6 +121,7 @@ void DriverStaticInit()
 
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(PulseWidthTrigger);
+	AddTriggerClass(RuntTrigger);
 	AddTriggerClass(SlewRateTrigger);
 	AddTriggerClass(WindowTrigger);
 }
