@@ -71,5 +71,12 @@ bool WindowTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel->GetScope() != m_scope)
 		return false;
 
+	//It has to be analog or external trigger, digital inputs make no sense
+	if( (stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER) )
+	{
+		return false;
+	}
+
 	return true;
 }
