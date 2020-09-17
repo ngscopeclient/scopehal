@@ -36,6 +36,7 @@ set(SCOPEHAL_SOURCES
 
 	FlowGraphNode.cpp
 	Trigger.cpp
+	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	PulseWidthTrigger.cpp
 	RuntTrigger.cpp

@@ -28,35 +28,33 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "PulseWidthTrigger.h"
-#include "LeCroyOscilloscope.h"
+#include "DropoutTrigger.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
-	: EdgeTrigger(scope)
+DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
+	: Trigger(scope)
 {
-	m_lowername = "Lower Bound";
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	CreateInput("din");
 
-	m_uppername = "Upper Bound";
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_typename = "Edge";
+	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
+	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
 
-	m_conditionname = "Condition";
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	m_timename = "Dropout Time";
+	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 
-	//So far only LeCroy is known to support this
-	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+	m_resetname = "Reset Mode";
+	m_parameters[m_resetname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_resetname].AddEnumValue("Opposite Edge", RESET_OPPOSITE);
+	m_parameters[m_resetname].AddEnumValue("None", RESET_NONE);
 }
 
-PulseWidthTrigger::~PulseWidthTrigger()
+DropoutTrigger::~DropoutTrigger()
 {
 
 }
@@ -64,7 +62,27 @@ PulseWidthTrigger::~PulseWidthTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string PulseWidthTrigger::GetTriggerName()
+string DropoutTrigger::GetTriggerName()
 {
-	return "Pulse Width";
+	return "Dropout";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
+
+bool DropoutTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	//We only can take one input
+	if(i > 0)
+		return false;
+
+	//There has to be a signal to trigger on
+	if(stream.m_channel == NULL)
+		return false;
+
+	//It has to be from the same instrument we're trying to trigger on
+	if(stream.m_channel->GetScope() != m_scope)
+		return false;
+
+	return true;
 }

@@ -34,6 +34,7 @@
 #include <immintrin.h>
 #include <omp.h>
 
+#include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
@@ -3141,7 +3142,9 @@ void LeCroyOscilloscope::PullTrigger()
 	//Figure out what kind of trigger is active.
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Type'");
 	string reply = Trim(m_transport->ReadReply());
-	if (reply == "Edge")
+	if (reply == "Dropout")
+		PullDropoutTrigger();
+	else if (reply == "Edge")
 		PullEdgeTrigger();
 	else if (reply == "Runt")
 		PullRuntTrigger();
@@ -3177,6 +3180,47 @@ void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+/**
+	@brief Reads settings for a dropout trigger from the instrument
+ */
+void LeCroyOscilloscope::PullDropoutTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<DropoutTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new DropoutTrigger(this);
+	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
+
+	//Level
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
+	dt->SetLevel(stof(m_transport->ReadReply()));
+
+	//Dropout time
+	Unit ps(Unit::UNIT_PS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
+	dt->SetDropoutTime(ps.ParseString(m_transport->ReadReply()));
+
+	//Edge type
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
+	if(Trim(m_transport->ReadReply()) == "Positive")
+		dt->SetType(DropoutTrigger::EDGE_RISING);
+	else
+		dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+	//Reset type
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
+	if(Trim(m_transport->ReadReply()) == "0")
+		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+	else
+		dt->SetResetType(DropoutTrigger::RESET_NONE);
 }
 
 /**
@@ -3420,12 +3464,18 @@ void LeCroyOscilloscope::PushTrigger()
 	m_transport->SendCommand(tmp);
 
 	//The rest depends on the type
+	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-	if(pt)
+	if(dt)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"");
+		PushDropoutTrigger(dt);
+	}
+	else if(pt)	//must be before edge trigger
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
 		PushPulseWidthTrigger(pt);
@@ -3453,6 +3503,25 @@ void LeCroyOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for a dropout trigger to the instrument
+ */
+void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
+{
+	PushFloat("app.Acquisition.Trigger.Dropout.Level", trig->GetLevel());
+	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * 1e-12f);
+
+	if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+
+	if(trig->GetType() == DropoutTrigger::EDGE_RISING)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
 }
 
 /**
@@ -3574,6 +3643,7 @@ void LeCroyOscilloscope::PushFloat(string path, float f)
 vector<string> LeCroyOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
+	ret.push_back(DropoutTrigger::GetTriggerName());
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	ret.push_back(RuntTrigger::GetTriggerName());

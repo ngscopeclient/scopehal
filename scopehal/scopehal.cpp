@@ -46,6 +46,7 @@
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
+#include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
@@ -119,6 +120,7 @@ void DriverStaticInit()
 	AddDriverClass(SignalGeneratorOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 
+	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(PulseWidthTrigger);
 	AddTriggerClass(RuntTrigger);

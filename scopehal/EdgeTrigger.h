@@ -65,7 +65,6 @@ public:
 
 protected:
 	std::string m_typename;
-	std::string m_slopename;
 };
 
 #endif

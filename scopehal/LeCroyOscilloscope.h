@@ -32,6 +32,7 @@
 
 #include <mutex>
 
+class DropoutTrigger;
 class EdgeTrigger;
 class PulseWidthTrigger;
 class RuntTrigger;
@@ -203,6 +204,7 @@ public:
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
 protected:
+	void PullDropoutTrigger();
 	void PullEdgeTrigger();
 	void PullPulseWidthTrigger();
 	void PullRuntTrigger();
@@ -213,6 +215,7 @@ protected:
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
+	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, std::string tree);
 	void PushCondition(std::string path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);

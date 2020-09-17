@@ -27,44 +27,62 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "PulseWidthTrigger.h"
-#include "LeCroyOscilloscope.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of DropoutTrigger
+ */
+#ifndef DropoutTrigger_h
+#define DropoutTrigger_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
-	: EdgeTrigger(scope)
+/**
+	@brief Trigger when a signal stops toggling for some amount of time
+ */
+class DropoutTrigger : public Trigger
 {
-	m_lowername = "Lower Bound";
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+public:
+	DropoutTrigger(Oscilloscope* scope);
+	virtual ~DropoutTrigger();
 
-	m_uppername = "Upper Bound";
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	enum EdgeType
+	{
+		EDGE_RISING,
+		EDGE_FALLING
+	};
 
-	m_conditionname = "Condition";
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	void SetType(EdgeType type)
+	{ m_parameters[m_typename].SetIntVal(type); }
 
-	//So far only LeCroy is known to support this
-	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
-}
+	EdgeType GetType()
+	{ return (EdgeType) m_parameters[m_typename].GetIntVal(); }
 
-PulseWidthTrigger::~PulseWidthTrigger()
-{
+	enum ResetType
+	{
+		RESET_OPPOSITE,	//
+		RESET_NONE
+	};
 
-}
+	void SetResetType(ResetType type)
+	{ m_parameters[m_resetname].SetIntVal(type); }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	ResetType GetResetType()
+	{ return (ResetType) m_parameters[m_resetname].GetIntVal(); }
 
-string PulseWidthTrigger::GetTriggerName()
-{
-	return "Pulse Width";
-}
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	int64_t GetDropoutTime()
+	{ return m_parameters[m_timename].GetIntVal(); }
+
+	void SetDropoutTime(int64_t t)
+	{ m_parameters[m_timename].SetIntVal(t); }
+
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(DropoutTrigger);
+
+protected:
+	std::string m_typename;
+	std::string m_timename;
+	std::string m_resetname;
+};
+
+#endif
