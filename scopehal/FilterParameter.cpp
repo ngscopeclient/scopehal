@@ -46,8 +46,9 @@ FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 	, m_unit(unit)
 	, m_intval(0)
 	, m_floatval(0)
-	, m_filename("")
+	, m_string("")
 {
+
 }
 
 void FilterParameter::ParseString(string str)
@@ -55,7 +56,7 @@ void FilterParameter::ParseString(string str)
 	switch(m_type)
 	{
 		case TYPE_BOOL:
-			m_filename = "";
+			m_string = "";
 			if( (str == "1") || (str == "true") )
 				m_intval = 1;
 			else
@@ -73,9 +74,10 @@ void FilterParameter::ParseString(string str)
 			break;
 
 		case TYPE_FILENAME:
+		case TYPE_STRING:
 			m_intval = 0;
 			m_floatval = 0;
-			m_filename = str;
+			m_string = str;
 			m_filenames.push_back(str);
 			break;
 
@@ -83,7 +85,7 @@ void FilterParameter::ParseString(string str)
 			{
 				m_intval = 0;
 				m_floatval = 0;
-				m_filename = "";
+				m_string = "";
 
 				//Split out semicolon-delimited filenames
 				string tmp;
@@ -95,8 +97,8 @@ void FilterParameter::ParseString(string str)
 						if(tmp.empty())
 							continue;
 
-						if(m_filename == "")
-							m_filename = tmp;
+						if(m_string == "")
+							m_string = tmp;
 						m_filenames.push_back(tmp);
 						tmp = "";
 						continue;
@@ -110,7 +112,7 @@ void FilterParameter::ParseString(string str)
 		case TYPE_ENUM:
 			m_intval = 0;
 			m_floatval = 0;
-			m_filename = str;
+			m_string = str;
 			m_filenames.push_back(str);
 
 			if(m_forwardEnumMap.find(str) != m_forwardEnumMap.end())
@@ -133,7 +135,8 @@ string FilterParameter::ToString()
 			return m_unit.PrettyPrint(m_intval);
 
 		case TYPE_FILENAME:
-			return m_filename;
+		case TYPE_STRING:
+			return m_string;
 
 		case TYPE_FILENAMES:
 			for(auto f : m_filenames)
@@ -164,7 +167,7 @@ float FilterParameter::GetFloatVal()
 
 string FilterParameter::GetFileName()
 {
-	return m_filename;
+	return m_string;
 }
 
 vector<string> FilterParameter::GetFileNames()
@@ -176,13 +179,13 @@ void FilterParameter::SetIntVal(int64_t i)
 {
 	m_intval = i;
 	m_floatval = i;
-	m_filename = "";
+	m_string = "";
 	m_filenames.clear();
 
 	if(m_reverseEnumMap.find(i) != m_reverseEnumMap.end())
 	{
-		m_filename = m_reverseEnumMap[i];
-		m_filenames.push_back(m_filename);
+		m_string = m_reverseEnumMap[i];
+		m_filenames.push_back(m_string);
 	}
 }
 
@@ -190,7 +193,7 @@ void FilterParameter::SetFloatVal(float f)
 {
 	m_intval = f;
 	m_floatval = f;
-	m_filename = "";
+	m_string = "";
 	m_filenames.clear();
 }
 
@@ -198,7 +201,7 @@ void FilterParameter::SetFileName(string f)
 {
 	m_intval = 0;
 	m_floatval = 0;
-	m_filename = f;
+	m_string = f;
 	m_filenames.clear();
 	m_filenames.push_back(f);
 }
@@ -208,8 +211,8 @@ void FilterParameter::SetFileNames(vector<string> names)
 	m_intval = 0;
 	m_floatval = 0;
 	if(names.empty())
-		m_filename = "";
+		m_string = "";
 	else
-		m_filename = names[0];
+		m_string = names[0];
 	m_filenames = names;
 }

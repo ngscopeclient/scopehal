@@ -46,7 +46,8 @@ public:
 		TYPE_BOOL,
 		TYPE_FILENAME,	//one file
 		TYPE_FILENAMES,	//multiple files
-		TYPE_ENUM		//enumerated constant
+		TYPE_ENUM,		//enumerated constant
+		TYPE_STRING		//arbitrary string
 	};
 
 	FilterParameter()
@@ -104,7 +105,7 @@ protected:
 
 	int64_t						m_intval;
 	float						m_floatval;
-	std::string					m_filename;
+	std::string					m_string;
 	std::vector<std::string>	m_filenames;
 };
 
