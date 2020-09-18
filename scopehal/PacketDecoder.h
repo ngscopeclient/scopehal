@@ -54,6 +54,9 @@ public:
 	//Packet bytes
 	std::vector<uint8_t> m_data;
 
+	//Text color of the packet
+	Gdk::Color m_displayForegroundColor;
+
 	//Background color of the packet
 	Gdk::Color m_displayBackgroundColor;
 };

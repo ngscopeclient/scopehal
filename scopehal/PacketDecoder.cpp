@@ -49,6 +49,7 @@ Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
 
 Packet::Packet()
 	: m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::COLOR_DEFAULT])
+	, m_displayForegroundColor(Gdk::Color("#ffffff"))
 {
 }
 
