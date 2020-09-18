@@ -27,87 +27,85 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "PacketDecoder.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of UartTrigger
+ */
+#ifndef UartTrigger_h
+#define UartTrigger_h
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Color schemes
+#include "SerialTrigger.h"
 
-Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
+/**
+	@brief Trigger when a UART sees a certain data pattern
+ */
+class UartTrigger : public SerialTrigger
 {
-	Gdk::Color("#101010"),		//COLOR_DEFAULT
-	Gdk::Color("#800000"),		//COLOR_ERROR
-	Gdk::Color("#000080"),		//COLOR_STATUS
-	Gdk::Color("#808000"),		//COLOR_CONTROL
-	Gdk::Color("#336699"),		//COLOR_DATA_READ
-	Gdk::Color("#339966"),		//COLOR_DATA_WRITE
-	Gdk::Color("#600050"),		//COLOR_COMMAND
+public:
+	UartTrigger(Oscilloscope* scope);
+	virtual ~UartTrigger();
+
+	enum ParityType
+	{
+		PARITY_NONE,
+		PARITY_ODD,
+		PARITY_EVEN
+	};
+
+	void SetParityType(ParityType type)
+	{ m_parameters[m_ptypename].SetIntVal(type); }
+
+	ParityType GetParityType()
+	{ return (ParityType) m_parameters[m_ptypename].GetIntVal(); }
+
+	enum MatchType
+	{
+		TYPE_DATA,
+		TYPE_PARITY_ERR
+	};
+
+	void SetMatchType(MatchType type)
+	{ m_parameters[m_typename].SetIntVal(type); }
+
+	MatchType GetMatchType()
+	{ return (MatchType) m_parameters[m_typename].GetIntVal(); }
+
+	enum Polarity
+	{
+		IDLE_HIGH,
+		IDLE_LOW
+	};
+
+	void SetPolarity(Polarity type)
+	{ m_parameters[m_polarname].SetIntVal(type); }
+
+	Polarity GetPolarity()
+	{ return (Polarity) m_parameters[m_polarname].GetIntVal(); }
+
+	int64_t GetBitRate()
+	{ return m_parameters[m_baudname].GetIntVal(); }
+
+	void SetBitRate(int64_t t)
+	{ m_parameters[m_baudname].SetIntVal(t); }
+
+	float GetStopBits()
+	{ return m_parameters[m_stopname].GetFloatVal(); }
+
+	void SetStopBits(float n)
+	{ m_parameters[m_stopname].SetFloatVal(n); }
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	static std::string GetTriggerName();
+	TRIGGER_INITPROC(UartTrigger);
+
+protected:
+	std::string m_baudname;
+	std::string m_ptypename;
+	std::string m_typename;
+	std::string m_stopname;
+	std::string m_polarname;
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Packet
-
-Packet::Packet()
-	: m_displayForegroundColor(Gdk::Color("#ffffff"))
-	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::COLOR_DEFAULT])
-{
-}
-
-Packet::~Packet()
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat)
-	: Filter(type, color, cat)
-{
-}
-
-PacketDecoder::~PacketDecoder()
-{
-	ClearPackets();
-}
-
-void PacketDecoder::ClearPackets()
-{
-	for(auto p : m_packets)
-		delete p;
-	m_packets.clear();
-}
-
-bool PacketDecoder::GetShowDataColumn()
-{
-	return true;
-}
-
-bool PacketDecoder::GetShowImageColumn()
-{
-	return false;
-}
-
-/**
-	@brief Checks if two packets can be merged under a single heading in the protocol analyzer view.
-
-	This can be used to collapse polling loops, acknowledgements, etc in order to minimize clutter in the view.
-
-	The default implementation in PacketDecoder always returns false so packets are not merged.
-
-	@param a Packet 1
-	@param b Packet 2
-
-	@return true if packets can be merged, false otherwise
- */
-bool PacketDecoder::CanMerge(Packet* /*a*/, Packet* /*b*/)
-{
-	return false;
-}
-
-/**
-	@brief Creates a summary packet for one or more merged packets
- */
-Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/)
-{
-	return NULL;
-}
+#endif

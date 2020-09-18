@@ -39,6 +39,7 @@
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
+#include "UartTrigger.h"
 #include "WindowTrigger.h"
 
 using namespace std;
@@ -2797,7 +2798,9 @@ uint64_t LeCroyOscilloscope::GetSampleRate()
 	if(!m_sampleRateValid)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SampleRate'");
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SamplingRate'");
+		//What's the difference between SampleRate and SamplingRate?
+		//Seems like at low speed we want to use SamplingRate, not SampleRate
 		string reply = m_transport->ReadReply();
 
 		sscanf(reply.c_str(), "%ld", &m_sampleRate);
@@ -3150,6 +3153,8 @@ void LeCroyOscilloscope::PullTrigger()
 		PullRuntTrigger();
 	else if (reply == "SlewRate")
 		PullSlewRateTrigger();
+	else if (reply == "UART")
+		PullUartTrigger();
 	else if (reply == "Width")
 		PullPulseWidthTrigger();
 	else if (reply == "Window")
@@ -3387,6 +3392,119 @@ void LeCroyOscilloscope::PullSlewRateTrigger()
 }
 
 /**
+	@brief Reads settings for a UART trigger from the instrument
+ */
+void LeCroyOscilloscope::PullUartTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<UartTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new UartTrigger(this);
+	UartTrigger* ut = dynamic_cast<UartTrigger*>(m_trigger);
+
+	//Bit rate
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.BitRate'");
+	ut->SetBitRate(stoi(m_transport->ReadReply()));
+
+	//Level
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.LevelAbsolute'");
+	ut->SetLevel(stof(m_transport->ReadReply()));
+
+	//Ignore ByteBitOrder, assume LSB for now
+	//Ignore NumDataBits, assume 8 for now
+
+	/*
+		Ignore these as they seem redundant or have unknown functionality:
+		* BytesPerStreamWrite
+		* DataBytesLenValue1
+		* DataBytesLenValue2
+		* DataCondition
+		* DefaultLevel
+		* FrameDelimiter
+		* HeaderByteVal
+		* InterFrameMinBits
+		* NeedDualLevels
+		* NeededSources
+		* PatternLength
+		* PatternPosition
+		* RS232Mode (how is this different from polarity inversion?)
+		* SupportsDigital
+		* UARTCondition
+		* ViewingMode
+	*/
+
+	//Parity
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.ParityType'");
+	auto reply = Trim(m_transport->ReadReply());
+	if(reply == "None")
+		ut->SetParityType(UartTrigger::PARITY_NONE);
+	else if(reply == "Even")
+		ut->SetParityType(UartTrigger::PARITY_EVEN);
+	else if(reply == "Odd")
+		ut->SetParityType(UartTrigger::PARITY_ODD);
+
+	//Operator
+	bool ignore_p2 = true;
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternOperator'");
+	reply = Trim(m_transport->ReadReply());
+	if(reply == "Equal")
+		ut->SetCondition(Trigger::CONDITION_EQUAL);
+	else if(reply == "NotEqual")
+		ut->SetCondition(Trigger::CONDITION_NOT_EQUAL);
+	else if(reply == "Smaller")
+		ut->SetCondition(Trigger::CONDITION_LESS);
+	else if(reply == "SmallerOrEqual")
+		ut->SetCondition(Trigger::CONDITION_LESS_OR_EQUAL);
+	else if(reply == "Greater")
+		ut->SetCondition(Trigger::CONDITION_GREATER);
+	else if(reply == "GreaterOrEqual")
+		ut->SetCondition(Trigger::CONDITION_GREATER_OR_EQUAL);
+	else if(reply == "InRange")
+	{
+		ignore_p2 = false;
+		ut->SetCondition(Trigger::CONDITION_BETWEEN);
+	}
+	else if(reply == "OutRange")
+	{
+		ignore_p2 = false;
+		ut->SetCondition(Trigger::CONDITION_NOT_BETWEEN);
+	}
+
+	//Idle polarity
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.Polarity'");
+	reply = Trim(m_transport->ReadReply());
+	if(reply == "IdleHigh")
+		ut->SetPolarity(UartTrigger::IDLE_HIGH);
+	else if(reply == "IdleLow")
+		ut->SetPolarity(UartTrigger::IDLE_LOW);
+
+	//Stop bits
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.StopBitLength'");
+	ut->SetStopBits(stof(Trim(m_transport->ReadReply())));
+
+	//Trigger type
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.TrigOnBadParity'");
+	reply = Trim(m_transport->ReadReply());
+	if(reply == "-1")
+		ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
+	else
+		ut->SetMatchType(UartTrigger::TYPE_DATA);
+
+	//PatternValue1 / 2
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue'");
+	string p1 = Trim(m_transport->ReadReply());
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue2'");
+	string p2 = Trim(m_transport->ReadReply());
+	ut->SetPatterns(p1, p2, ignore_p2);
+}
+
+/**
 	@brief Reads settings for a window trigger from the instrument
  */
 void LeCroyOscilloscope::PullWindowTrigger()
@@ -3469,6 +3587,7 @@ void LeCroyOscilloscope::PushTrigger()
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
+	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(dt)
 	{
@@ -3494,6 +3613,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"SlewRate\"");
 		PushSlewRateTrigger(st);
+	}
+	else if(ut)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"UART\"");
+		PushUartTrigger(ut);
 	}
 	else if(wt)
 	{
@@ -3580,6 +3704,7 @@ void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	else
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Negative\"");
 }
+
 /**
 	@brief Pushes settings for a slew rate trigger to the instrument
  */
@@ -3598,6 +3723,97 @@ void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 }
 
 /**
+	@brief Pushes settings for a UART trigger to the instrument
+ */
+void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
+{
+	//Special parameter for trigger level
+	PushFloat("app.Acquisition.Trigger.Serial.LevelAbsolute", trig->GetLevel());
+
+	//AtPosition
+	//Bit9State
+	PushFloat("app.Acquisition.Trigger.Serial.UART.BitRate", trig->GetBitRate());
+	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ByteBitOrder = \"LSB\"");
+	//DataBytesLenValue1
+	//DataBytesLenValue2
+	//DataCondition
+	//FrameDelimiter
+	//InterframeMinBits
+	//NeedDualLevels
+	//NeededSources
+	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.NumDataBits = \"8\"");
+
+	switch(trig->GetParityType())
+	{
+		case UartTrigger::PARITY_NONE:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"None\"");
+			break;
+
+		case UartTrigger::PARITY_ODD:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Odd\"");
+			break;
+
+		case UartTrigger::PARITY_EVEN:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Even\"");
+			break;
+	}
+
+	//Pattern length depends on the current format.
+	//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
+	auto pattern1 = trig->GetPattern1();
+	char tmp[256];
+	snprintf(tmp, sizeof(tmp),
+		"VBS? 'app.Acquisition.Trigger.Serial.UART.PatternLength = \"%d\"",
+		(int)pattern1.length() / 8);
+	m_transport->SendCommand(tmp);
+
+	PushPatternCondition("app.Acquisition.Trigger.Serial.UART.PatternOperator", trig->GetCondition());
+
+	//PatternPosition
+
+	m_transport->SendCommand(
+		string("VBS? 'app.Acquisition.Trigger.Serial.UART.PatternValue = \"") + pattern1 + " \"'");
+
+	//PatternValue2 only for Between/NotBetween
+	switch(trig->GetCondition())
+	{
+		case Trigger::CONDITION_BETWEEN:
+		case Trigger::CONDITION_NOT_BETWEEN:
+			m_transport->SendCommand(
+				string("VBS? 'app.Acquisition.Trigger.Serial.UART.PatternValue2 = \"") + trig->GetPattern2() + " \"'");
+			break;
+
+		default:
+			break;
+	}
+
+	//Polarity
+	if(trig->GetPolarity() == UartTrigger::IDLE_HIGH)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleHigh\"");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleLow\"");
+
+	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.RS232Mode = \"0\" ");
+
+	auto nstop = trig->GetStopBits();
+	if(nstop == 1)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1bit\"");
+	else if(nstop == 2)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"2bits\"");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1.5bit\"");
+
+	//Match type
+	if(trig->GetMatchType() == UartTrigger::TYPE_DATA)
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"0\"");
+	else
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"-1\"");
+
+	//UARTCondition
+	//ViewingMode
+}
+
+/**
 	@brief Pushes settings for a window trigger to the instrument
  */
 void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
@@ -3606,6 +3822,9 @@ void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 	PushFloat("app.Acquisition.Trigger.Window.UpperLevel", trig->GetUpperBound());
 }
 
+/**
+	@brief Pushes settings for a trigger condition under a .Condition field
+ */
 void LeCroyOscilloscope::PushCondition(string path, Trigger::Condition cond)
 {
 	switch(cond)
@@ -3624,6 +3843,53 @@ void LeCroyOscilloscope::PushCondition(string path, Trigger::Condition cond)
 
 		case Trigger::CONDITION_NOT_BETWEEN:
 			m_transport->SendCommand(string("VBS? '") + path + " = \"OutOfRange\"'");
+			break;
+
+		//Other values are not legal here, it seems
+		default:
+			break;
+	}
+}
+
+/**
+	@brief Pushes settings for a trigger condition under a .PatternOperator field
+ */
+void LeCroyOscilloscope::PushPatternCondition(string path, Trigger::Condition cond)
+{
+	//Note that these enum strings are NOT THE SAME as used by PushCondition()!
+	//For example CONDITION_LESS is "Smaller" vs "LessThan"
+	switch(cond)
+	{
+		case Trigger::CONDITION_EQUAL:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"Equal\"'");
+			break;
+
+		case Trigger::CONDITION_NOT_EQUAL:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"NotEqual\"'");
+			break;
+
+		case Trigger::CONDITION_LESS:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"Smaller\"'");
+			break;
+
+		case Trigger::CONDITION_LESS_OR_EQUAL:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"SmallerOrEqual\"'");
+			break;
+
+		case Trigger::CONDITION_GREATER:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"Greater\"'");
+			break;
+
+		case Trigger::CONDITION_GREATER_OR_EQUAL:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterOrEqual\"'");
+			break;
+
+		case Trigger::CONDITION_BETWEEN:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
+			break;
+
+		case Trigger::CONDITION_NOT_BETWEEN:
+			m_transport->SendCommand(string("VBS? '") + path + " = \"OutRange\"'");
 			break;
 	}
 }
@@ -3648,6 +3914,8 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	ret.push_back(RuntTrigger::GetTriggerName());
 	ret.push_back(SlewRateTrigger::GetTriggerName());
+	if(m_hasUartTrigger)
+		ret.push_back(UartTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger

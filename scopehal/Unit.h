@@ -62,6 +62,7 @@ public:
 		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
 		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
 		UNIT_WATTS,			//Power
+		UNIT_UI,			//Unit interval (relative to signal bit rate)
 
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 

@@ -28,86 +28,70 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "PacketDecoder.h"
+#include "UartTrigger.h"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Color schemes
-
-Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
-{
-	Gdk::Color("#101010"),		//COLOR_DEFAULT
-	Gdk::Color("#800000"),		//COLOR_ERROR
-	Gdk::Color("#000080"),		//COLOR_STATUS
-	Gdk::Color("#808000"),		//COLOR_CONTROL
-	Gdk::Color("#336699"),		//COLOR_DATA_READ
-	Gdk::Color("#339966"),		//COLOR_DATA_WRITE
-	Gdk::Color("#600050"),		//COLOR_COMMAND
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Packet
-
-Packet::Packet()
-	: m_displayForegroundColor(Gdk::Color("#ffffff"))
-	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::COLOR_DEFAULT])
-{
-}
-
-Packet::~Packet()
-{
-}
+using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat)
-	: Filter(type, color, cat)
+UartTrigger::UartTrigger(Oscilloscope* scope)
+	: SerialTrigger(scope)
 {
+	CreateInput("din");
+
+	m_baudname = "Bit Rate";
+	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+
+	m_ptypename = "Parity Mode";
+	m_parameters[m_ptypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_ptypename].AddEnumValue("None", PARITY_NONE);
+	m_parameters[m_ptypename].AddEnumValue("Even", PARITY_EVEN);
+	m_parameters[m_ptypename].AddEnumValue("Odd", PARITY_ODD);
+
+	m_typename = "Trigger Type";
+	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_typename].AddEnumValue("Data", TYPE_DATA);
+	m_parameters[m_typename].AddEnumValue("Parity error", TYPE_PARITY_ERR);
+
+	m_stopname = "Stop Bits";
+	m_parameters[m_stopname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_UI));
+
+	m_polarname = "Polarity";
+	m_parameters[m_polarname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_polarname].AddEnumValue("Idle High", IDLE_HIGH);
+	m_parameters[m_polarname].AddEnumValue("Idle Low", IDLE_LOW);
 }
 
-PacketDecoder::~PacketDecoder()
+UartTrigger::~UartTrigger()
 {
-	ClearPackets();
+
 }
 
-void PacketDecoder::ClearPackets()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string UartTrigger::GetTriggerName()
 {
-	for(auto p : m_packets)
-		delete p;
-	m_packets.clear();
+	return "UART";
 }
 
-bool PacketDecoder::GetShowDataColumn()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input validation
+
+bool UartTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 {
+	//We only can take one input
+	if(i > 0)
+		return false;
+
+	//There has to be a signal to trigger on
+	if(stream.m_channel == NULL)
+		return false;
+
+	//It has to be from the same instrument we're trying to trigger on
+	if(stream.m_channel->GetScope() != m_scope)
+		return false;
+
 	return true;
-}
-
-bool PacketDecoder::GetShowImageColumn()
-{
-	return false;
-}
-
-/**
-	@brief Checks if two packets can be merged under a single heading in the protocol analyzer view.
-
-	This can be used to collapse polling loops, acknowledgements, etc in order to minimize clutter in the view.
-
-	The default implementation in PacketDecoder always returns false so packets are not merged.
-
-	@param a Packet 1
-	@param b Packet 2
-
-	@return true if packets can be merged, false otherwise
- */
-bool PacketDecoder::CanMerge(Packet* /*a*/, Packet* /*b*/)
-{
-	return false;
-}
-
-/**
-	@brief Creates a summary packet for one or more merged packets
- */
-Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/)
-{
-	return NULL;
 }

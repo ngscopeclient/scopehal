@@ -141,6 +141,9 @@ string Unit::PrettyPrint(double value)
 		case UNIT_BITRATE:
 			unit = "bps";
 			break;
+		case UNIT_UI:
+			unit = "UI";
+			break;
 
 		//dBm are always reported as is, with no SI prefixes
 		case UNIT_DBM:

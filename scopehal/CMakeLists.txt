@@ -40,8 +40,10 @@ set(SCOPEHAL_SOURCES
 	EdgeTrigger.cpp
 	PulseWidthTrigger.cpp
 	RuntTrigger.cpp
+	SerialTrigger.cpp
 	SlewRateTrigger.cpp
 	TwoLevelTrigger.cpp
+	UartTrigger.cpp
 	WindowTrigger.cpp
 
 	Instrument.cpp

@@ -37,6 +37,7 @@ class EdgeTrigger;
 class PulseWidthTrigger;
 class RuntTrigger;
 class SlewRateTrigger;
+class UartTrigger;
 class WindowTrigger;
 
 /**
@@ -209,6 +210,7 @@ protected:
 	void PullPulseWidthTrigger();
 	void PullRuntTrigger();
 	void PullSlewRateTrigger();
+	void PullUartTrigger();
 	void PullWindowTrigger();
 	void PullTriggerSource(Trigger* trig);
 
@@ -218,10 +220,12 @@ protected:
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, std::string tree);
 	void PushCondition(std::string path, Trigger::Condition cond);
+	void PushPatternCondition(std::string path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
+	void PushUartTrigger(UartTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
 
 	void BulkCheckChannelEnableState();

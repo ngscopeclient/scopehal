@@ -51,6 +51,7 @@
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
+#include "UartTrigger.h"
 #include "WindowTrigger.h"
 
 #ifndef _WIN32
@@ -87,6 +88,9 @@ void TransportStaticInit()
 
 void DetectCPUFeatures()
 {
+	LogDebug("Detecting CPU features...\n");
+	LogIndenter li;
+
 	//Check CPU features
 	g_hasAvx512F = __builtin_cpu_supports("avx512f");
 	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
@@ -94,13 +98,14 @@ void DetectCPUFeatures()
 	g_hasAvx2 = __builtin_cpu_supports("avx2");
 
 	if(g_hasAvx2)
-		LogDebug("CPU supports AVX2\n");
+		LogDebug("* AVX2\n");
 	if(g_hasAvx512F)
-		LogDebug("CPU supports AVX512F\n");
+		LogDebug("* AVX512F\n");
 	if(g_hasAvx512DQ)
-		LogDebug("CPU supports AVX512DQ\n");
+		LogDebug("* AVX512DQ\n");
 	if(g_hasAvx512VL)
-		LogDebug("CPU supports AVX512VL\n");
+		LogDebug("* AVX512VL\n");
+	LogDebug("\n");
 }
 
 /**
@@ -125,6 +130,7 @@ void DriverStaticInit()
 	AddTriggerClass(PulseWidthTrigger);
 	AddTriggerClass(RuntTrigger);
 	AddTriggerClass(SlewRateTrigger);
+	AddTriggerClass(UartTrigger);
 	AddTriggerClass(WindowTrigger);
 }
 
