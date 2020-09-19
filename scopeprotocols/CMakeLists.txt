@@ -53,6 +53,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ParallelBus.cpp
 	PeriodMeasurement.cpp
 	PkPkMeasurement.cpp
+	QuadratureDecoder.cpp
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
 	SPIDecoder.cpp

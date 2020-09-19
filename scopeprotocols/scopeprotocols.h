@@ -90,6 +90,7 @@
 #include "PeriodMeasurement.h"
 #include "PkPkMeasurement.h"
 #include "QSPIDecoder.h"
+#include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"

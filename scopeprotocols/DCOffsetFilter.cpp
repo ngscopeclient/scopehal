@@ -123,7 +123,7 @@ void DCOffsetFilter::Refresh()
 	for(size_t i=0; i<len; i++)
 		out[i] 		= a[i] + offset;
 
-	SetData(cap, len);
+	SetData(cap, 0);
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;

@@ -145,6 +145,13 @@ string Unit::PrettyPrint(double value)
 			unit = "UI";
 			break;
 
+		//Degrees do not use SI prefixes
+		case UNIT_DEGREES:
+			unit = "°";
+			scale = "";
+			value_rescaled = value;
+			break;
+
 		//dBm are always reported as is, with no SI prefixes
 		case UNIT_DBM:
 			unit = "dBm";
