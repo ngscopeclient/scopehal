@@ -54,6 +54,14 @@ FFTFilter::FFTFilter(string color)
 	//Default config
 	m_range = 70;
 	m_offset = 35;
+
+	m_numpeaksname = "Number of Peaks";
+	m_parameters[m_numpeaksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_numpeaksname].SetIntVal(10);
+
+	m_peakwindowname = "Peak Window";
+	m_parameters[m_peakwindowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_peakwindowname].SetFloatVal(500000); //500 kHz between peaks
 }
 
 FFTFilter::~FFTFilter()
@@ -189,6 +197,49 @@ void FFTFilter::Refresh()
 		NormalizeOutputAVX2(cap, nouts, npoints);
 	else
 		NormalizeOutput(cap, nouts, npoints);
+
+	//Peak search
+	int64_t max_peaks = m_parameters[m_numpeaksname].GetIntVal();
+	if(max_peaks > 0)
+	{
+		//Get peak search width in bins
+		float search_hz = m_parameters[m_peakwindowname].GetIntVal();
+		int64_t search_bins = ceil(search_hz / bin_hz);
+		int64_t search_rad = search_bins/2;
+
+		//Find peaks (TODO: can we vectorize/multithread this?)
+		//Start at index 1 so we don't waste a marker on the DC peak
+		vector<FFTPeak> peaks;
+		for(ssize_t i=1; i<(ssize_t)nouts; i++)
+		{
+			ssize_t max_delta = 0;
+			float max_value = -FLT_MAX;
+
+			for(ssize_t delta = -search_rad; delta <= search_rad; delta ++)
+			{
+				ssize_t index = i+delta ;
+				if( (index < 0) || (index >= (ssize_t)nouts) )
+					continue;
+
+				float amp = cap->m_samples[index];
+				if(amp > max_value)
+				{
+					max_value = amp;
+					max_delta = delta;
+				}
+			}
+
+			//If the highest point in the search window is at our location, we're a peak
+			if(max_delta == 0)
+				peaks.push_back(FFTPeak(bin_hz * i, max_value));
+		}
+
+		//Sort the peak table and pluck out the requested count
+		sort(peaks.rbegin(), peaks.rend(), less<FFTPeak>());
+		m_peaks.clear();
+		for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
+			m_peaks.push_back(peaks[i]);
+	}
 
 	SetData(cap, 0);
 }
