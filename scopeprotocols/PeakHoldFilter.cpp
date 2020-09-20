@@ -27,91 +27,135 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
- */
+#include "../scopehal/scopehal.h"
+#include "PeakHoldFilter.h"
 
-#include "scopeprotocols.h"
+using namespace std;
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+PeakHoldFilter::PeakHoldFilter(string color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
-	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurement);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationFilter);
-	AddDecoderClass(ClockRecoveryFilter);
-	AddDecoderClass(CTLEFilter);
-	AddDecoderClass(CurrentShuntFilter);
-	AddDecoderClass(DCOffsetFilter);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedFilter);
-	AddDecoderClass(DeskewFilter);
-	AddDecoderClass(DownconvertFilter);
-	AddDecoderClass(DownsampleFilter);
-	AddDecoderClass(DramRefreshActivateMeasurement);
-	AddDecoderClass(DramRowColumnLatencyMeasurement);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurement);
-	AddDecoderClass(EyePattern);
-	AddDecoderClass(EyeHeightMeasurement);
-	AddDecoderClass(EyeJitterMeasurement);
-	AddDecoderClass(EyePeriodMeasurement);
-	AddDecoderClass(EyeWidthMeasurement);
-	AddDecoderClass(FallMeasurement);
-	AddDecoderClass(FFTFilter);
-	AddDecoderClass(FrequencyMeasurement);
-	AddDecoderClass(HorizontalBathtub);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MagnitudeFilter);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
-	AddDecoderClass(OvershootMeasurement);
-	AddDecoderClass(ParallelBus);
-	AddDecoderClass(PeakHoldFilter);
-	AddDecoderClass(PeriodMeasurement);
-	AddDecoderClass(PkPkMeasurement);
-	AddDecoderClass(QSPIDecoder);
-	AddDecoderClass(QuadratureDecoder);
-	AddDecoderClass(RiseMeasurement);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(SPIFlashDecoder);
-	AddDecoderClass(SubtractFilter);
-	AddDecoderClass(TIEMeasurement);
-	AddDecoderClass(ThresholdFilter);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurement);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryFilter);
-	AddDecoderClass(UndershootMeasurement);
-	AddDecoderClass(UpsampleFilter);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(Waterfall);
-	AddDecoderClass(WindowedAutocorrelationFilter);
+	//Set up channels
+	CreateInput("din");
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
+	//Copy input unit
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool PeakHoldFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
+
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+double PeakHoldFilter::GetVoltageRange()
+{
+	return m_inputs[0].m_channel->GetVoltageRange();
+}
+
+double PeakHoldFilter::GetOffset()
+{
+	return m_inputs[0].m_channel->GetOffset();
+}
+
+string PeakHoldFilter::GetProtocolName()
+{
+	return "Peak Hold";
+}
+
+bool PeakHoldFilter::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool PeakHoldFilter::NeedsConfig()
+{
+	return false;
+}
+
+void PeakHoldFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "PeakHold(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+void PeakHoldFilter::ClearSweeps()
+{
+	SetData(NULL, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void PeakHoldFilter::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Copy units
+	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
+	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+
+	auto din = GetAnalogInputWaveform(0);
+
+	//Create waveform if we don't have one already
+	size_t len = din->m_samples.size();
+	auto cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	bool first = false;
+	if(cap == NULL)
+	{
+		cap = new AnalogWaveform;
+		cap->Resize(len);
+		SetData(cap, 0);
+		first = true;
+	}
+
+	//If sample size changed, clear it out
+	if(cap->m_samples.size() != len)
+	{
+		cap->Resize(len);
+		first = true;
+	}
+
+	//Copy timestamps from the input
+	cap->CopyTimestamps(din);
+
+	//First waveform just copies the input
+	if(first)
+	{
+		for(size_t i=0; i<len; i++)
+			cap->m_samples[i] = din->m_samples[i];
+	}
+
+	//otherwise actually do peak holding
+	else
+	{
+		for(size_t i=0; i<len; i++)
+			cap->m_samples[i] = max((float)cap->m_samples[i], (float)din->m_samples[i]);
+	}
+
+	//Copy our time scales from the input
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startPicoseconds = din->m_startPicoseconds;
 }

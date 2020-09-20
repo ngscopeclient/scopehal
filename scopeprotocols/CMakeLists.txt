@@ -51,6 +51,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OFDMDemodulator.cpp
 	OvershootMeasurement.cpp
 	ParallelBus.cpp
+	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
 	PkPkMeasurement.cpp
 	QuadratureDecoder.cpp

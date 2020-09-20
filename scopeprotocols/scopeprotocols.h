@@ -87,6 +87,7 @@
 #include "OFDMDemodulator.h"
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
+#include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
 #include "PkPkMeasurement.h"
 #include "QSPIDecoder.h"
