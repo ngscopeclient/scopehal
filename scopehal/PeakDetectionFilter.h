@@ -30,72 +30,45 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of PeakDetectionFilter
  */
+#ifndef PeakDetectionFilter_h
+#define PeakDetectionFilter_h
 
-#ifndef scopehal_h
-#define scopehal_h
+class Peak
+{
+public:
+	Peak(int64_t x, float y)
+		: m_x(x)
+		, m_y(y)
+	{}
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
+	bool operator<(const Peak& rhs) const
+	{ return (m_y < rhs.m_y); }
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	int64_t m_x;
+	float m_y;
+};
 
-#include <yaml-cpp/yaml.h>
+/**
+ */
+class PeakDetectionFilter : public Filter
+{
+public:
+	PeakDetectionFilter(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
+	virtual ~PeakDetectionFilter();
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+	const std::vector<Peak>& GetPeaks()
+	{ return m_peaks; }
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+protected:
+	void FindPeaks(AnalogWaveform* cap);
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	std::string m_numpeaksname;
+	std::string m_peakwindowname;
 
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "PeakDetectionFilter.h"
-
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-std::string Trim(std::string str);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
-void DetectCPUFeatures();
-
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
+	std::vector<Peak> m_peaks;
+};
 
 #endif
+

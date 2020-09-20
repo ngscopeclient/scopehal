@@ -27,75 +27,79 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
-
-#ifndef scopehal_h
-#define scopehal_h
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
-
-#include <yaml-cpp/yaml.h>
-
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
-
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
-
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
-
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
+#include "../scopehal/scopehal.h"
+#include "../scopehal/AlignedAllocator.h"
 #include "PeakDetectionFilter.h"
+#include <immintrin.h>
 
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+using namespace std;
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-std::string GetDefaultChannelColor(int i);
+PeakDetectionFilter::PeakDetectionFilter(OscilloscopeChannel::ChannelType type, string color, Category cat)
+	: Filter(type, color, cat)
+{
+	m_numpeaksname = "Number of Peaks";
+	m_parameters[m_numpeaksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_numpeaksname].SetIntVal(10);
 
-std::string Trim(std::string str);
+	m_peakwindowname = "Peak Window";
+	m_parameters[m_peakwindowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_peakwindowname].SetFloatVal(500000); //500 kHz between peaks
+}
 
-void TransportStaticInit();
-void DriverStaticInit();
+PeakDetectionFilter::~PeakDetectionFilter()
+{
 
-void InitializePlugins();
-void DetectCPUFeatures();
+}
 
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
 
-#endif
+void PeakDetectionFilter::FindPeaks(AnalogWaveform* cap)
+{
+	int64_t max_peaks = m_parameters[m_numpeaksname].GetIntVal();
+	size_t nouts = cap->m_samples.size();
+	if(max_peaks > 0)
+	{
+		//Get peak search width in bins
+		float search_hz = m_parameters[m_peakwindowname].GetIntVal();
+		int64_t search_bins = ceil(search_hz / cap->m_timescale);
+		search_bins = min(search_bins, (int64_t)512);	//TODO: reasonable limit
+		int64_t search_rad = search_bins/2;
+
+		//Find peaks (TODO: can we vectorize/multithread this?)
+		//Start at index 1 so we don't waste a marker on the DC peak
+		vector<Peak> peaks;
+		for(ssize_t i=1; i<(ssize_t)nouts; i++)
+		{
+			ssize_t max_delta = 0;
+			float max_value = -FLT_MAX;
+
+			for(ssize_t delta = -search_rad; delta <= search_rad; delta ++)
+			{
+				ssize_t index = i+delta ;
+				if( (index < 0) || (index >= (ssize_t)nouts) )
+					continue;
+
+				float amp = cap->m_samples[index];
+				if(amp > max_value)
+				{
+					max_value = amp;
+					max_delta = delta;
+				}
+			}
+
+			//If the highest point in the search window is at our location, we're a peak
+			if(max_delta == 0)
+				peaks.push_back(Peak(i, max_value));
+		}
+
+		//Sort the peak table and pluck out the requested count
+		sort(peaks.rbegin(), peaks.rend(), less<Peak>());
+		m_peaks.clear();
+		for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
+			m_peaks.push_back(peaks[i]);
+	}
+}

@@ -35,7 +35,7 @@
 #ifndef PeakHoldFilter_h
 #define PeakHoldFilter_h
 
-class PeakHoldFilter : public Filter
+class PeakHoldFilter : public PeakDetectionFilter
 {
 public:
 	PeakHoldFilter(std::string color);

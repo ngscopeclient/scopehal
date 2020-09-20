@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 PeakHoldFilter::PeakHoldFilter(string color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels
 	CreateInput("din");
@@ -84,7 +84,7 @@ bool PeakHoldFilter::IsOverlay()
 
 bool PeakHoldFilter::NeedsConfig()
 {
-	return false;
+	return true;
 }
 
 void PeakHoldFilter::SetDefaultName()
@@ -153,6 +153,8 @@ void PeakHoldFilter::Refresh()
 		for(size_t i=0; i<len; i++)
 			cap->m_samples[i] = max((float)cap->m_samples[i], (float)din->m_samples[i]);
 	}
+
+	FindPeaks(cap);
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;

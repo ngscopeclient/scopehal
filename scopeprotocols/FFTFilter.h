@@ -37,22 +37,7 @@
 
 #include <ffts.h>
 
-class FFTPeak
-{
-public:
-	FFTPeak(int64_t freq, float mag)
-		: m_freq(freq)
-		, m_mag(mag)
-	{}
-
-	bool operator<(const FFTPeak& rhs) const
-	{ return (m_mag < rhs.m_mag); }
-
-	int64_t m_freq;
-	float m_mag;
-};
-
-class FFTFilter : public Filter
+class FFTFilter : public PeakDetectionFilter
 {
 public:
 	FFTFilter(std::string color);
@@ -73,9 +58,6 @@ public:
 	virtual void SetVoltageRange(double range);
 	virtual void SetOffset(double offset);
 
-	const std::vector<FFTPeak>& GetPeaks()
-	{ return m_peaks; }
-
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
@@ -89,11 +71,6 @@ protected:
 
 	float m_range;
 	float m_offset;
-
-	std::string m_numpeaksname;
-	std::string m_peakwindowname;
-
-	std::vector<FFTPeak> m_peaks;
 };
 
 #endif
