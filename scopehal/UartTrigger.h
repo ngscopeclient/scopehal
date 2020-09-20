@@ -37,6 +37,14 @@
 
 #include "SerialTrigger.h"
 
+#ifdef _WIN32
+//Our parity type definitions are also found in windows.h!
+//Undefine those so we can use ours instead.
+#undef PARITY_NONE
+#undef PARITY_ODD
+#undef PARITY_EVEN
+#endif
+
 /**
 	@brief Trigger when a UART sees a certain data pattern
  */
