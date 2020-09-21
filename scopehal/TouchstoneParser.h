@@ -37,84 +37,15 @@
 #define TouchstoneParser_h
 
 /**
-	@brief A single point in an S-parameter dataset
- */
-class SParameterPoint
-{
-public:
-	SParameterPoint()
-	{}
-
-	SParameterPoint(float f, float a, float p)
-	: m_frequency(f)
-	, m_amplitude(a)
-	, m_phase(p)
-	{
-	}
-
-	float	m_frequency;	//Hz
-	float	m_amplitude;	//magnitude
-	float	m_phase;		//radians from -pi to +pi
-};
-
-/**
-	@brief A single S-parameter array
- */
-class SParameterVector
-{
-public:
-
-	SParameterPoint InterpolatePoint(float frequency) const;
-
-	std::vector<SParameterPoint> m_points;
-
-	float GetGroupDelay(size_t bin);
-
-	size_t size()
-	{ return m_points.size(); }
-
-	SParameterVector& operator *=(const SParameterVector& rhs);
-
-	SParameterPoint operator[](size_t i)
-	{ return m_points[i]; }
-};
-
-typedef std::pair<int, int> SPair;
-
-/**
 	@brief Touchstone (SxP) file parser
  */
 class TouchstoneParser
 {
 public:
 	TouchstoneParser();
-
-	TouchstoneParser(std::string fname)
-	{ Load(fname); }
-
 	virtual ~TouchstoneParser();
 
-	bool empty() const
-	{ return m_params.empty(); }
-
-	void Clear();
-	bool Load(std::string fname);
-
-	/**
-		@brief Sample a single point from a single S-parameter
-	 */
-	SParameterPoint SamplePoint(int to, int from, float frequency)
-	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
-
-	TouchstoneParser& operator *=(const TouchstoneParser& rhs);
-
-	SParameterVector& operator[] (SPair pair)
-	{ return *m_params[pair]; }
-
-protected:
-	void Allocate();
-
-	std::map< SPair , SParameterVector*> m_params;
+	bool Load(std::string fname, SParameters& params);
 };
 
 #endif

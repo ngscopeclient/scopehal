@@ -181,8 +181,15 @@ bool DeEmbedFilter::LoadSparameters()
 		m_cachedFileNames = fnames;
 
 		m_sparams.Clear();
+		TouchstoneParser parser;
+		SParameters temp;
 		for(auto f : fnames)
-			m_sparams *= TouchstoneParser(f);
+		{
+			if(!parser.Load(f, temp))
+				return false;
+
+			m_sparams *= temp;
+		}
 
 		//Clear out cached S-parameters
 		m_cachedBinSize = 0;

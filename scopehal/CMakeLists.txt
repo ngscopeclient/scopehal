@@ -32,6 +32,7 @@ set(SCOPEHAL_SOURCES
 	SCPIDevice.cpp
 
 	IBISParser.cpp
+	SParameters.cpp
 	TouchstoneParser.cpp
 
 	FlowGraphNode.cpp

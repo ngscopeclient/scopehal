@@ -80,7 +80,7 @@ protected:
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamAmplitudes;
 
-	TouchstoneParser m_sparams;
+	SParameters m_sparams;
 
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;

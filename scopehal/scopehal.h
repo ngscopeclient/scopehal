@@ -78,6 +78,7 @@
 #include "Filter.h"
 #include "PeakDetectionFilter.h"
 
+#include "SParameters.h"
 #include "TouchstoneParser.h"
 #include "IBISParser.h"
 

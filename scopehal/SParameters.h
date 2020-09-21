@@ -30,117 +30,89 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of TouchstoneParser
+	@brief Declaration of SParameters and related classes
  */
-#include "scopehal.h"
-
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TouchstoneParser
-
-TouchstoneParser::TouchstoneParser()
-{
-}
-
-TouchstoneParser::~TouchstoneParser()
-{
-
-}
+#ifndef SParameters_h
+#define SParameters_h
 
 /**
-	@brief Reads a SxP file
+	@brief A single point in an S-parameter dataset
  */
-bool TouchstoneParser::Load(string fname, SParameters& params)
+class SParameterPoint
 {
-	params.Clear();
+public:
+	SParameterPoint()
+	{}
 
-	//If file doesn't exist, bail early
-	FILE* fp = fopen(fname.c_str(), "r");
-	if(!fp)
+	SParameterPoint(float f, float a, float p)
+	: m_frequency(f)
+	, m_amplitude(a)
+	, m_phase(p)
 	{
-		LogError("Unable to open S-parameter file %s\n", fname.c_str());
-		return false;
 	}
 
-	params.Allocate();
+	float	m_frequency;	//Hz
+	float	m_amplitude;	//magnitude
+	float	m_phase;		//radians from -pi to +pi
+};
 
-	//Read line by line.
-	char line[256];
-	double unit_scale = 1;
-	while(!feof(fp))
-	{
-		fgets(line, sizeof(line), fp);
+/**
+	@brief A single S-parameter array
+ */
+class SParameterVector
+{
+public:
 
-		//Comments start with a !
-		if(line[0] == '!')
-			continue;
+	SParameterPoint InterpolatePoint(float frequency) const;
 
-		//Header line with metadata starts with a #
-		if(line[0] == '#')
-		{
-			//Format: # [freq unit] S [MA|DB] R [impedance]
-			char freq_unit[32];
-			char volt_unit[32];
-			int impedance;
-			if(3 != sscanf(line, "# %31s S %31s R %d", freq_unit, volt_unit, &impedance))
-			{
-				LogError("Failed to parse S2P header line \"%s\"\n", line);
-				return false;
-			}
+	std::vector<SParameterPoint> m_points;
 
-			//Figure out units
-			string funit(freq_unit);
-			if(funit == "MHZ")
-				unit_scale = 1e6;
-			else if(funit == "GHZ")
-				unit_scale = 1e9;
-			else if(funit == "KHZ")
-				unit_scale = 1e3;
-			else if(funit == "HZ")
-				unit_scale = 1;
-			else
-			{
-				LogError("Unrecognized S2P frequency unit (got %s)\n", freq_unit);
-				return false;
-			}
-			if(0 != strcmp(volt_unit, "MA"))
-			{
-				LogError("S2P formats other than mag-angle not yet supported (got %s)\n", volt_unit);
-				return false;
-			}
+	float GetGroupDelay(size_t bin);
 
-			continue;
-		}
+	size_t size()
+	{ return m_points.size(); }
 
-		//Each S2P line is formatted as freq s11 s21 s12 s22
-		float hz, s11m, s11p, s21m, s21p, s12m, s12p, s22m, s22p;
-		if(9 != sscanf(line, "%f %f %f %f %f %f %f %f %f", &hz, &s11m, &s11p, &s21m, &s21p, &s12m, &s12p, &s22m, &s22p))
-		{
-			LogError("Malformed S2P line \"%s\"", line);
-			return false;
-		}
+	SParameterVector& operator *=(const SParameterVector& rhs);
 
-		//Rescale frequency
-		hz *= unit_scale;
+	SParameterPoint operator[](size_t i)
+	{ return m_points[i]; }
+};
 
-		//Convert angles from degrees to radians
-		s11p *= (M_PI / 180);
-		s21p *= (M_PI / 180);
-		s12p *= (M_PI / 180);
-		s22p *= (M_PI / 180);
+typedef std::pair<int, int> SPair;
 
-		//Save everything
-		params.m_params[SPair(1,1)]->m_points.push_back(SParameterPoint(hz, s11m, s11p));
-		params.m_params[SPair(2,1)]->m_points.push_back(SParameterPoint(hz, s21m, s21p));
-		params.m_params[SPair(1,2)]->m_points.push_back(SParameterPoint(hz, s12m, s12p));
-		params.m_params[SPair(2,2)]->m_points.push_back(SParameterPoint(hz, s22m, s22p));
-	}
+/**
+	@brief A set of S-parameters.
 
-	//Clean up
-	fclose(fp);
+	For now, only supports full 2-port.
+ */
+class SParameters
+{
+public:
+	SParameters();
+	virtual ~SParameters();
 
-	LogTrace("Loaded %zu S-parameter points\n", params.m_params[SPair(2,1)]->m_points.size());
+	void Clear();
 
-	return true;
-}
+	bool empty() const
+	{ return m_params.empty(); }
+
+	/**
+		@brief Sample a single point from a single S-parameter
+	 */
+	SParameterPoint SamplePoint(int to, int from, float frequency)
+	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
+
+	SParameters& operator *=(const SParameters& rhs);
+
+	SParameterVector& operator[] (SPair pair)
+	{ return *m_params[pair]; }
+
+	friend class TouchstoneParser;
+
+protected:
+	void Allocate();
+
+	std::map< SPair , SParameterVector*> m_params;
+};
+
+#endif
