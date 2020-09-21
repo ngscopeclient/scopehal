@@ -33,6 +33,7 @@
 	@brief Implementation of TouchstoneParser
  */
 #include "scopehal.h"
+#include <math.h>
 
 using namespace std;
 
