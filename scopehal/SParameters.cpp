@@ -33,6 +33,7 @@
 	@brief Implementation of SParameters
  */
 #include "scopehal.h"
+#include <math.h>
 
 using namespace std;
 
