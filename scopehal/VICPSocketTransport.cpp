@@ -41,7 +41,9 @@ using namespace std;
 // Construction / destruction
 
 VICPSocketTransport::VICPSocketTransport(string args)
-	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	: m_nextSequence(1)
+	, m_lastSequence(1)
+	, m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 {
 	char hostname[128];
 	unsigned int port = 0;
