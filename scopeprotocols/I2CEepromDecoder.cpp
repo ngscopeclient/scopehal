@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 I2CEepromDecoder::I2CEepromDecoder(string color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	CreateInput("i2c");
 
@@ -97,6 +97,15 @@ bool I2CEepromDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+vector<string> I2CEepromDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Address");
+	ret.push_back("Len");
+	return ret;
+}
+
 double I2CEepromDecoder::GetVoltageRange()
 {
 	return m_inputs[0].m_channel->GetVoltageRange();
@@ -130,6 +139,8 @@ void I2CEepromDecoder::SetDefaultName()
 
 void I2CEepromDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -184,6 +195,7 @@ void I2CEepromDecoder::Refresh()
 	int addr_count = 0;
 	size_t ntype = 0;
 	uint8_t last_device_addr = 0;
+	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
 	{
 		auto s = din->m_samples[i];
@@ -198,6 +210,18 @@ void I2CEepromDecoder::Refresh()
 				{
 					tstart = din->m_offsets[i];
 					state = 1;
+
+					//Create a new packet. If we already have an incomplete one that got aborted, reset it
+					if(pack)
+					{
+						pack->m_data.clear();
+						pack->m_headers.clear();
+					}
+					else
+						pack = new Packet;
+
+					pack->m_offset = din->m_offsets[i] * din->m_timescale;
+					pack->m_len = 0;
 				}
 				break;
 
@@ -277,6 +301,10 @@ void I2CEepromDecoder::Refresh()
 					if(s.m_data)
 					{
 						cap->m_samples[nlast].m_type = I2CEepromSymbol::TYPE_POLL_BUSY;
+						pack->m_headers["Type"] = "Poll - Busy";
+						pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+						m_packets.push_back(pack);
+						pack = NULL;
 						state = 0;
 					}
 				}
@@ -301,6 +329,10 @@ void I2CEepromDecoder::Refresh()
 				else if( (s.m_stype == I2CSymbol::TYPE_STOP) && (addr_count == 0) )
 				{
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_POLL_OK;
+					pack->m_headers["Type"] = "Poll - OK";
+					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+					m_packets.push_back(pack);
+					pack = NULL;
 					state = 0;
 				}
 
@@ -327,6 +359,20 @@ void I2CEepromDecoder::Refresh()
 							cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_ADDRESS, ptr));
 							tstart = end;
 							state = 5;
+
+							char tmp[128];
+							if(raw_bits > 16)
+								snprintf(tmp, sizeof(tmp), "%05x", ptr);
+							else if(raw_bits > 12)
+								snprintf(tmp, sizeof(tmp), "%04x", ptr);
+							else if(raw_bits > 8)
+								snprintf(tmp, sizeof(tmp), "%03x", ptr);
+							else if(raw_bits > 4)
+								snprintf(tmp, sizeof(tmp), "%02x", ptr);
+							else
+								snprintf(tmp, sizeof(tmp), "%01x", ptr);
+
+							pack->m_headers["Address"] = tmp;
 						}
 
 						//No, more address bytes to follow
@@ -345,6 +391,8 @@ void I2CEepromDecoder::Refresh()
 				{
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_SELECT_READ;
 					state = 6;
+					pack->m_headers["Type"] = "Read";
+					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
 				}
 				else if(s.m_stype == I2CSymbol::TYPE_DATA)
 				{
@@ -359,6 +407,8 @@ void I2CEepromDecoder::Refresh()
 
 					//Update type of the transaction
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_SELECT_WRITE;
+					pack->m_headers["Type"] = "Write";
+					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_WRITE];
 				}
 				else
 					state = 0;
@@ -413,10 +463,22 @@ void I2CEepromDecoder::Refresh()
 					cap->m_offsets.push_back(tstart);
 					cap->m_durations.push_back(end - tstart);
 					cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_DATA, s.m_data));
+
+					pack->m_data.push_back(s.m_data);
 					state = 9;
 				}
 				else
+				{
+					if(s.m_stype == I2CSymbol::TYPE_STOP)
+					{
+						m_packets.push_back(pack);
+						char tmp[128];
+						snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+						pack->m_headers["Len"] = tmp;
+						pack = NULL;
+					}
 					state = 0;
+				}
 				break;
 
 			//Expect an ACK/NAK
@@ -431,13 +493,26 @@ void I2CEepromDecoder::Refresh()
 					//Done if NAK.
 					//Otherwise move on to the next data byte
 					if(s.m_data)
+					{
 						state = 0;
+						char tmp[128];
+						snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
+						pack->m_headers["Len"] = tmp;
+						m_packets.push_back(pack);
+						pack = NULL;
+					}
 					else
 						state = 8;
 				}
+
+				else
+					state = 0;
 				break;
 		}
 	}
+
+	if(pack)
+		delete pack;
 
 	SetData(cap, 0);
 }
@@ -524,3 +599,28 @@ string I2CEepromDecoder::GetText(int i)
 	return string(tmp);
 }
 
+bool I2CEepromDecoder::CanMerge(Packet* a, Packet* b)
+{
+	//Merge polling packets
+	if( (a->m_headers["Type"].find("Poll") == 0) && (b->m_headers["Type"].find("Poll") == 0 ) )
+		return true;
+
+	return false;
+}
+
+Packet* I2CEepromDecoder::CreateMergedHeader(Packet* pack)
+{
+	if(pack->m_headers["Type"].find("Poll")  == 0)
+	{
+		Packet* ret = new Packet;
+		ret->m_offset = pack->m_offset;
+		ret->m_len = pack->m_len;				//TODO: extend?
+		ret->m_headers["Type"] = "Poll";
+		ret->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+
+		//TODO: add other fields?
+		return ret;
+	}
+
+	return NULL;
+}

@@ -35,6 +35,8 @@
 #ifndef I2CEepromDecoder_h
 #define I2CEepromDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+
 class I2CEepromSymbol
 {
 public:
@@ -68,7 +70,7 @@ public:
 
 typedef Waveform<I2CEepromSymbol> I2CEepromWaveform;
 
-class I2CEepromDecoder : public Filter
+class I2CEepromDecoder : public PacketDecoder
 {
 public:
 	I2CEepromDecoder(std::string color);
@@ -84,8 +86,13 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	std::vector<std::string> GetHeaders();
+
 	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	bool CanMerge(Packet* a, Packet* b);
+	Packet* CreateMergedHeader(Packet* pack);
 
 	PROTOCOL_DECODER_INITPROC(I2CEepromDecoder)
 
