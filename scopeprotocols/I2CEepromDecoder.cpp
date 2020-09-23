@@ -150,8 +150,6 @@ void I2CEepromDecoder::Refresh()
 	if(raw_bits > 16)
 		device_bits = raw_bits - 16;
 	int pointer_bits = min(16, raw_bits);
-	LogDebug("Base address is 0x%02x\n", base_addr);
-	LogDebug("%d device bits, %d pointer bits\n", device_bits, pointer_bits);
 
 	//Set up output
 	auto cap = new I2CEepromWaveform;
@@ -241,11 +239,16 @@ void I2CEepromDecoder::Refresh()
 					//Expect ACK/NAK then move on
 					else
 					{
-						//TODO: offset if device_bits is nonzero
+						//Offset left if device_bits is nonzero
+						size_t ui = (din->m_durations[i]) / 8;
+						end -= device_bits * ui;
+
 						cap->m_offsets.push_back(tstart);
 						cap->m_durations.push_back(end - tstart);
 						cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_SELECT_READ, 0));
 						state = 2;
+
+						tstart = end;
 					}
 				}
 				else
@@ -257,11 +260,13 @@ void I2CEepromDecoder::Refresh()
 			case 2:
 				if(s.m_stype == I2CSymbol::TYPE_ACK)
 				{
-					//Extend the address sample if no device bits
+					//Extend the address sample as needed
 					size_t nlast = cap->m_offsets.size() - 1;
 					if(device_bits == 0)
-						cap->m_durations[nlast] = end - tstart;
-					tstart = end;
+					{
+						cap->m_durations[nlast] += din->m_durations[i];
+						tstart += din->m_durations[i];
+					}
 
 					//Move on to the memory address
 					state = 3;
