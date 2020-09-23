@@ -117,7 +117,7 @@ Oscilloscope::TriggerMode SignalGeneratorOscilloscope::PollTrigger()
 bool SignalGeneratorOscilloscope::AcquireData()
 {
 	//cap waveform rate at 25 wfm/s to avoid saturating cpu etc with channel emulation
-	usleep(40 * 1000);
+	std::this_thread::sleep_for(std::chrono::microseconds(40 * 1000));
 
 	auto waveform = m_bufmodel->SimulatePRBS(
 		rand(),

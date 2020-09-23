@@ -40,6 +40,8 @@
 #include <string>
 #include <map>
 #include <stdint.h>
+#include <chrono>
+#include <thread>
 
 #include <sigc++/sigc++.h>
 #include <cairomm/context.h>
