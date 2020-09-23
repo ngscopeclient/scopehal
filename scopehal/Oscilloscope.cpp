@@ -149,7 +149,7 @@ bool Oscilloscope::WaitForTrigger(int timeout)
 	{
 		if(HasPendingWaveforms())
 			return true;
-		usleep(10 * 1000);
+		std::this_thread::sleep_for(std::chrono::microseconds(10 * 1000));
 	}
 
 	return false;
