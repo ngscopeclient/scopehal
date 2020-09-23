@@ -245,6 +245,13 @@ Gdk::Color I2CDecoder::GetColor(int i)
 				return m_standardColors[COLOR_ADDRESS];
 			case I2CSymbol::TYPE_DATA:
 				return m_standardColors[COLOR_DATA];
+
+			case I2CSymbol::TYPE_ACK:
+				if(s.m_data)
+					return m_standardColors[COLOR_IDLE];
+				else
+					return m_standardColors[COLOR_CHECKSUM_OK];
+
 			default:
 				return m_standardColors[COLOR_CONTROL];
 		}

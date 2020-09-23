@@ -77,6 +77,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FrequencyMeasurement);
 	AddDecoderClass(HorizontalBathtub);
 	AddDecoderClass(I2CDecoder);
+	AddDecoderClass(I2CEepromDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(JtagDecoder);

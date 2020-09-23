@@ -41,6 +41,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FrequencyMeasurement.cpp
 	HorizontalBathtub.cpp
 	I2CDecoder.cpp
+	I2CEepromDecoder.cpp
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	JtagDecoder.cpp
