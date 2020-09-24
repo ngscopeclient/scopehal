@@ -103,8 +103,6 @@ protected:
 	std::map<int, bool> m_channelsEnabled;
 	bool m_triggerChannelValid;
 	size_t m_triggerChannel;
-	bool m_triggerLevelValid;
-	float m_triggerLevel;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
@@ -114,7 +112,8 @@ protected:
 
 	enum Family
 	{
-		FAMILY_MSO5_6,
+		FAMILY_MSO5,
+		FAMILY_MSO6,
 		FAMILY_UNKNOWN
 	} m_family;
 

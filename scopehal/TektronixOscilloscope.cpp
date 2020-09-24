@@ -44,8 +44,10 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 {
 	//Figure out what device family we are
-	if( (m_model.find("MSO5") == 0) || (m_model.find("MSO6") == 0) )
-		m_family = FAMILY_MSO5_6;
+	if(m_model.find("MSO5") == 0)
+		m_family = FAMILY_MSO5;
+	else if(m_model.find("MSO6") == 0)
+		m_family = FAMILY_MSO6;
 	else
 		m_family = FAMILY_UNKNOWN;
 
@@ -67,7 +69,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	//Device specific initialization
 	switch(m_family)
 	{
-		case FAMILY_MSO5_6:
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
 			m_transport->SendCommand("ACQ:MOD SAM");		//actual sampled data, no averaging etc
 			m_transport->SendCommand("VERB OFF");			//Disable verbose mode (send shorter commands)
 			m_transport->SendCommand("DAT:ENC SRI");		//signed, little endian binary
@@ -84,6 +87,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			break;
 	}
 
+	//TODO: get colors for channels 5-8 on wide instruments
 	const char* colors_default[4] = { "#ffff00", "#32ff00", "#5578ff", "#ff0084" };	//yellow-green-violet-pink
 	const char* colors_mso56[4] = { "#ffff00", "#20d3d8", "#f23f59", "#f16727" };	//yellow-cyan-pink-orange
 
@@ -97,12 +101,13 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		string color = "#ffffff";
 		switch(m_family)
 		{
-			case FAMILY_MSO5_6:
-				color = colors_mso56[i];
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				color = colors_mso56[i % 4];
 				break;
 
 			default:
-				color = colors_default[i];
+				color = colors_default[i % 4];
 				break;
 		}
 
@@ -123,15 +128,37 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	m_analogChannelCount = nchans;
 
 	//Add the external trigger input
-	m_extTrigChannel = new OscilloscopeChannel(
-		this,
-		"EX",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
-		"",
-		1,
-		m_channels.size(),
-		true);
-	m_channels.push_back(m_extTrigChannel);
+	switch(m_family)
+	{
+		//MSO5 does not appear to have an external trigger input
+		case FAMILY_MSO5:
+			m_extTrigChannel = NULL;
+			break;
+
+		case FAMILY_MSO6:
+			m_extTrigChannel = new OscilloscopeChannel(
+				this,
+				"AUX",
+				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
+				"",
+				1,
+				m_channels.size(),
+				true);
+			m_channels.push_back(m_extTrigChannel);
+			break;
+
+		default:
+			m_extTrigChannel = new OscilloscopeChannel(
+				this,
+				"EX",
+				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
+				"",
+				1,
+				m_channels.size(),
+				true);
+			m_channels.push_back(m_extTrigChannel);
+			break;
+	}
 
 	//See what options we have
 	//FIXME: this code is completely broken on MSO5/6
@@ -450,13 +477,13 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 	m_transport->SendCommand("TRIG:STATE?");
 	string ter = m_transport->ReadReply();
 
-	if( (ter == "SAV") || (ter == "SAVE") )
+	if(ter == "SAV")
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
-	if( (ter == "REA") || (ter == "READY") )
+	if(ter == "REA")
 	{
 		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
@@ -468,7 +495,7 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 
 bool TektronixOscilloscope::AcquireData()
 {
-	LogDebug("Acquiring data\n");
+	//LogDebug("Acquiring data\n");
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
@@ -478,7 +505,8 @@ bool TektronixOscilloscope::AcquireData()
 	char tmp[128];
 	switch(m_family)
 	{
-		case FAMILY_MSO5_6:
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
 			{
 				m_transport->SendCommand("HOR:RECO?");
 				string reply = m_transport->ReadReply();
@@ -504,14 +532,15 @@ bool TektronixOscilloscope::AcquireData()
 		if(!IsChannelEnabled(i))
 			continue;
 
-		LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
 		LogIndenter li2;
 
 		// Set source & get preamble+data
 		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
 		switch(m_family)
 		{
-			case FAMILY_MSO5_6:
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
 				{
 					//Ask for the waveform preamble
 					m_transport->SendCommand("WFMO?");
@@ -809,17 +838,28 @@ void TektronixOscilloscope::PullTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//TODO: check trigger types
-	if(1)
-		PullEdgeTrigger();
-
-	//Unrecognized trigger type
-	else
+	switch(m_family)
 	{
-		LogWarning("Unknown trigger\n");
-		delete m_trigger;
-		m_trigger = NULL;
-		return;
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand("TRIG:A:TYP?");
+				string reply = m_transport->ReadReply();
+
+				if(reply == "EDG")
+					PullEdgeTrigger();
+				else
+				{
+					LogWarning("Unknown trigger type %s\n", reply.c_str());
+					delete m_trigger;
+					m_trigger = NULL;
+				}
+			}
+			break;
+
+		default:
+			LogWarning("PullTrigger() not implemented for this scope family\n");
+			break;
 	}
 }
 
@@ -838,57 +878,90 @@ void TektronixOscilloscope::PullEdgeTrigger()
 	//Create a new trigger if necessary
 	if(m_trigger == NULL)
 		m_trigger = new EdgeTrigger(this);
-	//EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	/*
-	//Check cache
-	//No locking, worst case we return a result a few seconds old
-	if(m_triggerChannelValid)
-		return m_triggerChannel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Look it up
-	m_transport->SendCommand("TRIG:SOUR?");
-	string ret = m_transport->ReadReply();
-
-	if(ret.find("CHAN") == 0)
+	switch(m_family)
 	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = atoi(ret.c_str()+4) - 1;
-		return m_triggerChannel;
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Source channel
+				m_transport->SendCommand("TRIG:A:EDGE:SOU?");
+				auto reply = m_transport->ReadReply();
+				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+
+				//Trigger level
+				m_transport->SendCommand("TRIG:A:LEV?");
+				et->SetLevel(stof(m_transport->ReadReply()));
+
+				//For some reason we get 3 more values after this. Discard them.
+				for(int i=0; i<3; i++)
+					m_transport->ReadReply();
+
+				//Edge slope
+				m_transport->SendCommand("TRIG:A:EDGE:SLO?");
+				reply = m_transport->ReadReply();
+				if(reply == "RIS")
+					et->SetType(EdgeTrigger::EDGE_RISING);
+				else if(reply == "FALL")
+					et->SetType(EdgeTrigger::EDGE_FALLING);
+				else if(reply == "EIT")
+					et->SetType(EdgeTrigger::EDGE_ANY);
+			}
+			break;
+
+		default:
+			/*
+			//Check cache
+			//No locking, worst case we return a result a few seconds old
+			if(m_triggerChannelValid)
+				return m_triggerChannel;
+
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			//Look it up
+			m_transport->SendCommand("TRIG:SOUR?");
+			string ret = m_transport->ReadReply();
+
+			if(ret.find("CHAN") == 0)
+			{
+				m_triggerChannelValid = true;
+				m_triggerChannel = atoi(ret.c_str()+4) - 1;
+				return m_triggerChannel;
+			}
+			else if(ret == "EXT")
+			{
+				m_triggerChannelValid = true;
+				m_triggerChannel = m_extTrigChannel->GetIndex();
+				return m_triggerChannel;
+			}
+			else
+			{
+				m_triggerChannelValid = false;
+				LogWarning("Unknown trigger source %s\n", ret.c_str());
+				return 0;
+			}
+
+			//Check cache.
+			//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
+			if(m_triggerLevelValid)
+				return m_triggerLevel;
+
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			m_transport->SendCommand("TRIG:LEV?");
+			string ret = m_transport->ReadReply();
+
+			double level;
+			sscanf(ret.c_str(), "%lf", &level);
+			m_triggerLevel = level;
+			m_triggerLevelValid = true;
+			return level;
+			*/
+			break;
 	}
-	else if(ret == "EXT")
-	{
-		m_triggerChannelValid = true;
-		m_triggerChannel = m_extTrigChannel->GetIndex();
-		return m_triggerChannel;
-	}
-	else
-	{
-		m_triggerChannelValid = false;
-		LogWarning("Unknown trigger source %s\n", ret.c_str());
-		return 0;
-	}
-
-	//Check cache.
-	//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
-	if(m_triggerLevelValid)
-		return m_triggerLevel;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("TRIG:LEV?");
-	string ret = m_transport->ReadReply();
-
-	double level;
-	sscanf(ret.c_str(), "%lf", &level);
-	m_triggerLevel = level;
-	m_triggerLevelValid = true;
-	return level;
-	*/
 }
 
 void TektronixOscilloscope::PushTrigger()
@@ -908,29 +981,42 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//TODO: Source
-	//m_transport->SendCommand(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
-
-	//Level
-	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
-	m_transport->SendCommand(tmp);
-
-	//TODO: Slope
-	/*
-	switch(trig->GetType())
+	switch(m_family)
 	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("TRIG:SLOPE POS");
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand(string("TRIG:A:EDGE:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
+					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetLevel()));
+
+				switch(trig->GetType())
+				{
+					case EdgeTrigger::EDGE_RISING:
+						m_transport->SendCommand("TRIG:A:EDGE:SLO RIS");
+						break;
+
+					case EdgeTrigger::EDGE_FALLING:
+						m_transport->SendCommand("TRIG:A:EDGE:SLO FALL");
+						break;
+
+					case EdgeTrigger::EDGE_ANY:
+						m_transport->SendCommand("TRIG:A:EDGE:SLO ANY");
+						break;
+
+					default:
+						break;
+				}
+			}
 			break;
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("TRIG:SLOPE NEG");
-			break;
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("TRIG:SLOPE EITH");
-			break;
+
 		default:
-			return;
+			{
+				char tmp[32];
+				snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
+				m_transport->SendCommand(tmp);
+			}
+			break;
 	}
-	*/
 }
