@@ -114,7 +114,7 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(TektronixOscilloscope)
+	OSCILLOSCOPE_INITPROC_H(TektronixOscilloscope)
 };
 
 #endif

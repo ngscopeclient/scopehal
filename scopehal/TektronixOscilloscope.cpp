@@ -36,11 +36,16 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
+OSCILLOSCOPE_INITPROC_CPP(TektronixOscilloscope)
+
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
+	//DEBUG
+	LogDebug("sizeof(TektronixOscilloscope) = %zu\n", sizeof(TektronixOscilloscope));
+
 	/*
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;

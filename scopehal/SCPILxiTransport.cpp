@@ -29,10 +29,10 @@
 
 /**
 	@file
-	@author Tom Verbeure 
+	@author Tom Verbeure
 	@brief Implementation of SCPILxiTransport
  */
- 
+
 #ifdef HAS_LXI
 
 extern "C"
@@ -81,8 +81,8 @@ SCPILxiTransport::SCPILxiTransport(string args)
 	strcpy(instname_dup, "inst0");
 
 	m_device = lxi_connect(hostname_dup, m_port, instname_dup, m_timeout, VXI11);
-	delete hostname_dup;
-	delete instname_dup;
+	delete[] hostname_dup;
+	delete[] instname_dup;
 
 	if (m_device == LXI_ERROR)
 	{

@@ -152,7 +152,7 @@ void OFDMDemodulator::Refresh()
 	//Not implemented, do nothing
 	SetData(NULL, 0);
 	return;
-
+	/*
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndAnalog())
 	{
@@ -321,11 +321,13 @@ void OFDMDemodulator::Refresh()
 	}
 	driftPer800ns /= 12;
 	ampScale /= 12;
+
 	float driftPerSymbol = 5 * driftPer800ns;
 
 	//Skip 1.6us (32 sample) guard interval
 	imax += 32;
 	startingPhase += 2*driftPer800ns;
+	*/
 
 	//We should now have two OFDM BPSK training symbols with no guard interval
 	//Carrier in columns 8, 12, 16, 20, 24, 40, 44, 48, 52, 56, 60??
@@ -360,8 +362,8 @@ void OFDMDemodulator::Refresh()
 	}*/
 
 	//Skip these training symbols
-	imax += 128;
-	startingPhase += 8*driftPer800ns;
+	//imax += 128;
+	//startingPhase += 8*driftPer800ns;
 
 	//Actual symbol data
 	/*
