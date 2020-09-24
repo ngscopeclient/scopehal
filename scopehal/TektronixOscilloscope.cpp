@@ -49,7 +49,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	else
 		m_family = FAMILY_UNKNOWN;
 
-	/*
 	//Last digit of the model number is the number of channels
 	std::string model_number = m_model;
 	model_number.erase(
@@ -60,9 +59,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		),
 		model_number.end()
 	);
-	int nchans = std::stoi(model_number) % 10;
-	*/
-	int nchans = 4;
+	int nchans = stoi(model_number) % 10;
 
 	// No header in the reply of queries
 	m_transport->SendCommand("HEAD 0");
@@ -74,6 +71,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_transport->SendCommand("ACQ:MOD SAM");		//actual sampled data, no averaging etc
 			m_transport->SendCommand("VERB OFF");			//Disable verbose mode (send shorter commands)
 			m_transport->SendCommand("DAT:ENC SRI");		//signed, little endian binary
+			m_transport->SendCommand("DAT:WID 2");			//16-bit data
 			break;
 
 		default:
@@ -570,6 +568,10 @@ bool TektronixOscilloscope::AcquireData()
 					char* rxbuf = new char[msglen];
 					m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
 
+					//convert bytes to samples
+					size_t nsamples = msglen/2;
+					int16_t* samples = (int16_t*)rxbuf;
+
 					//TODO: seems like we might have more than one block of data to process??
 
 					//Set up the capture we're going to store our data into
@@ -580,14 +582,14 @@ bool TektronixOscilloscope::AcquireData()
 					cap->m_startTimestamp = time(NULL);
 					double t = GetTime();
 					cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
-					cap->Resize(msglen);
+					cap->Resize(nsamples);
 
 					//Convert to volts
-					for(int j=0; j<msglen; j++)
+					for(size_t j=0; j<nsamples; j++)
 					{
 						cap->m_offsets[j] = j;
 						cap->m_durations[j] = 1;
-						cap->m_samples[j] = ymult*rxbuf[j] + yoff;
+						cap->m_samples[j] = ymult*samples[j] + yoff;
 					}
 
 					//Done, update the data
@@ -603,83 +605,82 @@ bool TektronixOscilloscope::AcquireData()
 
 			default:
 				//m_transport->SendCommand("WFMPRE:" + m_channels[i]->GetHwname() + "?");
+						/*
+		//		string reply = m_transport->ReadReply();
+		//		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
+		//				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
+
+				for(int j=0;j<10;++j)
+					m_transport->ReadReply();
+
+				//format = 0;
+				//type = 0;
+				//average_count = 0;
+				xincrement = 1000;
+				//xorigin = 0;
+				//xreference = 0;
+				yincrement = 0.01;
+				yorigin = 0;
+				yreference = 0;
+				length = 500;
+
+				//Figure out the sample rate
+				int64_t ps_per_sample = round(xincrement * 1e12f);
+				//LogDebug("%ld ps/sample\n", ps_per_sample);
+
+				//LogDebug("length = %d\n", length);
+
+				//Set up the capture we're going to store our data into
+				//(no TDC data available on Tektronix scopes?)
+				AnalogWaveform* cap = new AnalogWaveform;
+				cap->m_timescale = ps_per_sample;
+				cap->m_triggerPhase = 0;
+				cap->m_startTimestamp = time(NULL);
+				double t = GetTime();
+				cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+
+				//Ask for the data
+				m_transport->SendCommand("CURV?");
+
+				char tmp[16] = {0};
+
+				//Read the length header
+				m_transport->ReadRawData(2, (unsigned char*)tmp);
+				tmp[2] = '\0';
+				int numDigits = atoi(tmp+1);
+				LogDebug("numDigits = %d\n", numDigits);
+
+				// Read the number of points
+				m_transport->ReadRawData(numDigits, (unsigned char*)tmp);
+				tmp[numDigits] = '\0';
+				int numPoints = atoi(tmp);
+				LogDebug("numPoints = %d\n", numPoints);
+
+				uint8_t* temp_buf = new uint8_t[numPoints / sizeof(uint8_t)];
+
+				//Read the actual data
+				m_transport->ReadRawData(numPoints, (unsigned char*)temp_buf);
+				//Discard trailing newline
+				m_transport->ReadRawData(1, (unsigned char*)tmp);
+
+				//Format the capture
+				cap->Resize(length);
+				for(size_t j=0; j<length; j++)
+				{
+					cap->m_offsets[j] = j;
+					cap->m_durations[j] = 1;
+					cap->m_samples[j] = yincrement * (temp_buf[j] - yreference) + yorigin;
+				}
+
+				//Done, update the data
+				pending_waveforms[i].push_back(cap);
+
+				//Clean up
+				delete[] temp_buf;
+				*/
 				break;
 		}
 
-
-		/*
-//		string reply = m_transport->ReadReply();
-//		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
-//				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
-
-		for(int j=0;j<10;++j)
-			m_transport->ReadReply();
-
-		//format = 0;
-		//type = 0;
-		//average_count = 0;
-		xincrement = 1000;
-		//xorigin = 0;
-		//xreference = 0;
-		yincrement = 0.01;
-		yorigin = 0;
-		yreference = 0;
-		length = 500;
-
-		//Figure out the sample rate
-		int64_t ps_per_sample = round(xincrement * 1e12f);
-		//LogDebug("%ld ps/sample\n", ps_per_sample);
-
-		//LogDebug("length = %d\n", length);
-
-		//Set up the capture we're going to store our data into
-		//(no TDC data available on Tektronix scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = ps_per_sample;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
-
-		//Ask for the data
-		m_transport->SendCommand("CURV?");
-
-		char tmp[16] = {0};
-
-		//Read the length header
-		m_transport->ReadRawData(2, (unsigned char*)tmp);
-		tmp[2] = '\0';
-		int numDigits = atoi(tmp+1);
-		LogDebug("numDigits = %d\n", numDigits);
-
-		// Read the number of points
-		m_transport->ReadRawData(numDigits, (unsigned char*)tmp);
-		tmp[numDigits] = '\0';
-		int numPoints = atoi(tmp);
-		LogDebug("numPoints = %d\n", numPoints);
-
-		uint8_t* temp_buf = new uint8_t[numPoints / sizeof(uint8_t)];
-
-		//Read the actual data
-		m_transport->ReadRawData(numPoints, (unsigned char*)temp_buf);
-		//Discard trailing newline
-		m_transport->ReadRawData(1, (unsigned char*)tmp);
-
-		//Format the capture
-		cap->Resize(length);
-		for(size_t j=0; j<length; j++)
-		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = yincrement * (temp_buf[j] - yreference) + yorigin;
-		}
-
-		//Done, update the data
-		pending_waveforms[i].push_back(cap);
-
-		//Clean up
-		delete[] temp_buf;
-		*/
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
