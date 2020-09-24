@@ -215,11 +215,9 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-//	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP?");
-//	string reply = m_transport->ReadReply();
-//
-	string reply;
-	reply = "1";
+	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE?");
+	string reply = m_transport->ReadReply();
+
 	if(reply == "0")
 	{
 		m_channelsEnabled[i] = false;
@@ -235,7 +233,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 void TektronixOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-//	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
+	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE ON");
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = true;
@@ -244,7 +242,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 void TektronixOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-//	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
+	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE OFF");
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = false;
@@ -486,8 +484,6 @@ bool TektronixOscilloscope::AcquireData()
 				string reply = m_transport->ReadReply();
 				sscanf(reply.c_str(), "%zu", &length);
 
-				LogDebug("Record length: %zu points\n", length);
-
 				m_transport->SendCommand("DAT:START 0");
 				snprintf(tmp, sizeof(tmp), "DAT:STOP %zu", length);
 				m_transport->SendCommand(tmp);
@@ -505,11 +501,11 @@ bool TektronixOscilloscope::AcquireData()
 	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
-		LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
-		LogIndenter li2;
-
 		if(!IsChannelEnabled(i))
 			continue;
+
+		LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+		LogIndenter li2;
 
 		// Set source & get preamble+data
 		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
