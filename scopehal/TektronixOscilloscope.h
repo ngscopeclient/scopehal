@@ -112,6 +112,12 @@ protected:
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
+	enum Family
+	{
+		FAMILY_MSO5_6,
+		FAMILY_UNKNOWN
+	} m_family;
+
 public:
 	static std::string GetDriverNameInternal();
 	OSCILLOSCOPE_INITPROC_H(TektronixOscilloscope)

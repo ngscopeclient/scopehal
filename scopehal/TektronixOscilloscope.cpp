@@ -43,8 +43,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 {
-	//DEBUG
-	LogDebug("sizeof(TektronixOscilloscope) = %zu\n", sizeof(TektronixOscilloscope));
+	//Figure out what device family we are
+	if( (m_model.find("MSO5") == 0) || (m_model.find("MSO6") == 0) )
+		m_family = FAMILY_MSO5_6;
+	else
+		m_family = FAMILY_UNKNOWN;
 
 	/*
 	//Last digit of the model number is the number of channels
@@ -64,13 +67,27 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	// No header in the reply of queries
 	m_transport->SendCommand("HEAD 0");
 
-	// 8-bit signed data
-	m_transport->SendCommand("DATA:ENC RIB;WID 1");
+	//Device specific initialization
+	switch(m_family)
+	{
+		case FAMILY_MSO5_6:
+			m_transport->SendCommand("ACQ:MOD SAM");		//actual sampled data, no averaging etc
+			m_transport->SendCommand("VERB OFF");			//Disable verbose mode (send shorter commands)
+			m_transport->SendCommand("DAT:ENC SRI");		//signed, little endian binary
+			break;
 
-	m_transport->SendCommand("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
+		default:
+			// 8-bit signed data
+			m_transport->SendCommand("DATA:ENC RIB;WID 1");
+			m_transport->SendCommand("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
 
-	// FIXME: where to put this?
-	m_transport->SendCommand("ACQ:STOPA SEQ;REPE 1");
+			// FIXME: where to put this?
+			m_transport->SendCommand("ACQ:STOPA SEQ;REPE 1");
+			break;
+	}
+
+	const char* colors_default[4] = { "#ffff00", "#32ff00", "#5578ff", "#ff0084" };	//yellow-green-violet-pink
+	const char* colors_mso56[4] = { "#ffff00", "#20d3d8", "#f23f59", "#f16727" };	//yellow-cyan-pink-orange
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -78,24 +95,16 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		string chname = string("CH1");
 		chname[2] += i; // FIXME
 
-		//Color the channels based on Tektronix's standard color sequence (yellow-green-violet-pink)
+		//Color the channels based on Tektronix's standard color sequence
 		string color = "#ffffff";
-		switch(i)
+		switch(m_family)
 		{
-			case 0:
-				color = "#ffff00";
+			case FAMILY_MSO5_6:
+				color = colors_mso56[i];
 				break;
 
-			case 1:
-				color = "#32ff00";
-				break;
-
-			case 2:
-				color = "#5578ff";
-				break;
-
-			case 3:
-				color = "#ff0084";
+			default:
+				color = colors_default[i];
 				break;
 		}
 
@@ -127,6 +136,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	m_channels.push_back(m_extTrigChannel);
 
 	//See what options we have
+	//FIXME: this code is completely broken on MSO5/6
+	/*
 	m_transport->SendCommand("*OPT?");
 	string reply = m_transport->ReadReply();
 
@@ -153,6 +164,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	{
 		LogDebug("* %s (unknown)\n", opt.c_str());
 	}
+	*/
 }
 
 TektronixOscilloscope::~TektronixOscilloscope()
@@ -380,19 +392,16 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	// FIXME
-	return 8;
-
-#if 0
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
-
+	m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
 	string reply = m_transport->ReadReply();
-	double range;
-	sscanf(reply.c_str(), "%lf", &range);
+	double vdiv;
+	sscanf(reply.c_str(), "%lf", &vdiv);
+
+	double range = vdiv * 10;
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 	return range;
-#endif
 }
 
 void TektronixOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
@@ -408,11 +417,6 @@ OscilloscopeChannel* TektronixOscilloscope::GetExternalTrigger()
 
 double TektronixOscilloscope::GetChannelOffset(size_t i)
 {
-	double offset = 0;
-	m_channelOffsets[i] = offset;
-	return offset;
-
-#if 0
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -421,17 +425,16 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	}
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
-
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
-
 	string reply = m_transport->ReadReply();
+
 	double offset;
 	sscanf(reply.c_str(), "%lf", &offset);
 	offset = -offset;
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
-#endif
 }
 
 void TektronixOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
@@ -451,49 +454,160 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 	m_transport->SendCommand("TRIG:STATE?");
 	string ter = m_transport->ReadReply();
 
-	if(ter == "SAV")
+	if( (ter == "SAV") || (ter == "SAVE") )
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
-	if(ter != "REA")
+	if( (ter == "REA") || (ter == "READY") )
 	{
 		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
 	}
 
-	//TODO: how to handle auto / normal trigger mode?
+	//TODO: AUTO, TRIGGER. For now consider that same as RUN
 	return TRIGGER_MODE_RUN;
 }
 
 bool TektronixOscilloscope::AcquireData()
 {
-	//LogDebug("Acquiring data\n");
+	LogDebug("Acquiring data\n");
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
+	//Get record length
+	size_t length = 0;
+	char tmp[128];
+	switch(m_family)
+	{
+		case FAMILY_MSO5_6:
+			{
+				m_transport->SendCommand("HOR:RECO?");
+				string reply = m_transport->ReadReply();
+				sscanf(reply.c_str(), "%zu", &length);
+
+				LogDebug("Record length: %zu points\n", length);
+
+				snprintf(tmp, sizeof(tmp), "DAT:START 0;DAT:STOP %zu", length);
+				m_transport->SendCommand(tmp);
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	double xincrement = 0;
+	double ymult = 0;
+	double yoff = 0;
+
+	/*
 	//unsigned int format;
 	//unsigned int type;
 	size_t length;
 	//unsigned int average_count;
-	double xincrement;
 	//double xorigin;
 	//double xreference;
 	double yincrement;
 	double yorigin;
 	double yreference;
+	*/
 	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
+		LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+		LogIndenter li2;
+
 		if(!IsChannelEnabled(i))
 			continue;
 
-		// Set source & get preamble
-		m_transport->SendCommand("DATA:SOURCE " + m_channels[i]->GetHwname());
-		m_transport->SendCommand("WFMPRE:" + m_channels[i]->GetHwname() + "?");
+		// Set source & get preamble+data
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
+		switch(m_family)
+		{
+			case FAMILY_MSO5_6:
+				{
+					//Ask for the waveform preamble and info
+					m_transport->SendCommand("WAVF?");
 
+					//Get the preamble
+					for(int j=0; j<22; j++)
+					{
+						string reply = m_transport->ReadReply();
+
+						//LogDebug("preamble block %d = %s\n", j, reply.c_str());
+
+						if(j == 11)
+						{
+							xincrement = stof(reply) * 1e12;	//scope gives sec, not ps
+							//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrement).c_str());
+						}
+						else if(j == 15)
+						{
+							ymult = stof(reply);
+							//LogDebug("ymult = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(ymult).c_str());
+						}
+						else if(j == 17)
+						{
+							yoff = stof(reply);
+							m_channelOffsets[i] = -yoff;
+							//LogDebug("yoff = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(yoff).c_str());
+						}
+					}
+
+					//Read length of the actual data
+					char tmplen[3] = {0};
+					m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+					int ndigits = atoi(tmplen+1);
+
+					char digits[10] = {0};
+					m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+					int msglen = atoi(digits);
+
+					//Read the actual data
+					char* rxbuf = new char[msglen];
+					m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
+
+					//TODO: seems like we might have more than one block of data to process??
+
+					//Set up the capture we're going to store our data into
+					//(no TDC data or fine timestamping available on Tektronix scopes?)
+					AnalogWaveform* cap = new AnalogWaveform;
+					cap->m_timescale = xincrement;
+					cap->m_triggerPhase = 0;
+					cap->m_startTimestamp = time(NULL);
+					double t = GetTime();
+					cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+					cap->Resize(msglen);
+
+					//Convert to volts
+					for(int j=0; j<msglen; j++)
+					{
+						cap->m_offsets[j] = j;
+						cap->m_durations[j] = 1;
+						cap->m_samples[j] = ymult*rxbuf[j] + yoff;
+					}
+
+					//Done, update the data
+					pending_waveforms[i].push_back(cap);
+
+					//Done
+					delete[] rxbuf;
+
+					//Throw out garbage at the end of the message (why is this needed?)
+					m_transport->ReadReply();
+				}
+				break;
+
+			default:
+				//m_transport->SendCommand("WFMPRE:" + m_channels[i]->GetHwname() + "?");
+				break;
+		}
+
+
+		/*
 //		string reply = m_transport->ReadReply();
 //		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 //				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
@@ -536,13 +650,13 @@ bool TektronixOscilloscope::AcquireData()
 		m_transport->ReadRawData(2, (unsigned char*)tmp);
 		tmp[2] = '\0';
 		int numDigits = atoi(tmp+1);
-		LogDebug("numDigits = %d", numDigits);
+		LogDebug("numDigits = %d\n", numDigits);
 
 		// Read the number of points
 		m_transport->ReadRawData(numDigits, (unsigned char*)tmp);
 		tmp[numDigits] = '\0';
 		int numPoints = atoi(tmp);
-		LogDebug("numPoints = %d", numPoints);
+		LogDebug("numPoints = %d\n", numPoints);
 
 		uint8_t* temp_buf = new uint8_t[numPoints / sizeof(uint8_t)];
 
@@ -565,6 +679,7 @@ bool TektronixOscilloscope::AcquireData()
 
 		//Clean up
 		delete[] temp_buf;
+		*/
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
