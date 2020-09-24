@@ -488,7 +488,8 @@ bool TektronixOscilloscope::AcquireData()
 
 				LogDebug("Record length: %zu points\n", length);
 
-				snprintf(tmp, sizeof(tmp), "DAT:START 0;DAT:STOP %zu", length);
+				m_transport->SendCommand("DAT:START 0");
+				snprintf(tmp, sizeof(tmp), "DAT:STOP %zu", length);
 				m_transport->SendCommand(tmp);
 			}
 			break;
@@ -501,17 +502,6 @@ bool TektronixOscilloscope::AcquireData()
 	double ymult = 0;
 	double yoff = 0;
 
-	/*
-	//unsigned int format;
-	//unsigned int type;
-	size_t length;
-	//unsigned int average_count;
-	//double xorigin;
-	//double xreference;
-	double yincrement;
-	double yorigin;
-	double yreference;
-	*/
 	map<int, vector<AnalogWaveform*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -527,8 +517,8 @@ bool TektronixOscilloscope::AcquireData()
 		{
 			case FAMILY_MSO5_6:
 				{
-					//Ask for the waveform preamble and info
-					m_transport->SendCommand("WAVF?");
+					//Ask for the waveform preamble
+					m_transport->SendCommand("WFMO?");
 
 					//Get the preamble
 					for(int j=0; j<22; j++)
@@ -555,6 +545,9 @@ bool TektronixOscilloscope::AcquireData()
 						}
 					}
 
+					//Read the data blocks
+					m_transport->SendCommand("CURV?");
+
 					//Read length of the actual data
 					char tmplen[3] = {0};
 					m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
@@ -571,8 +564,6 @@ bool TektronixOscilloscope::AcquireData()
 					//convert bytes to samples
 					size_t nsamples = msglen/2;
 					int16_t* samples = (int16_t*)rxbuf;
-
-					//TODO: seems like we might have more than one block of data to process??
 
 					//Set up the capture we're going to store our data into
 					//(no TDC data or fine timestamping available on Tektronix scopes?)
