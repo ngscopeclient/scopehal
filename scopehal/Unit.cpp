@@ -187,7 +187,6 @@ string Unit::PrettyPrint(double value)
 			return "Invalid unit";
 	}
 
-	//TODO: allow user to specify how many sigfigs they want
 	char tmp[128];
 	switch(m_type)
 	{
@@ -195,26 +194,21 @@ string Unit::PrettyPrint(double value)
 			snprintf(tmp, sizeof(tmp), "1e%.0f", value);
 			break;
 
-		case UNIT_SAMPLERATE:
+		default:
 			{
-				//If sample rate isn't a round number, add more digits (up to 3)
+				//If not a round number, add more digits (up to 4)
+				//TODO: allow user to specify how many sigfigs they want
 				if( fabs(round(value_rescaled) - value_rescaled) < 0.1 )
 					snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
 				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.1)
 					snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
 				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.1 )
 					snprintf(tmp, sizeof(tmp), "%.2f %s%s", value_rescaled, scale, unit);
-				else
+				else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.1 )
 					snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+				else
+					snprintf(tmp, sizeof(tmp), "%.4f %s%s", value_rescaled, scale, unit);
 			}
-			break;
-
-		case UNIT_SAMPLEDEPTH:
-			snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
-			break;
-
-		default:
-			snprintf(tmp, sizeof(tmp), "%.4f %s%s", value_rescaled, scale, unit);
 			break;
 	}
 	return string(tmp);
