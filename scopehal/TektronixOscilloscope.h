@@ -32,6 +32,26 @@
 
 class EdgeTrigger;
 
+/**
+	@brief Driver for Tektronix oscilloscopes
+
+	Tek scopes appear to adhere strictly to the LXI-style request-response model.
+	Sending a new command while another is currently executing will result in one or both commands aborting.
+	Unfortunately, this poses significant problems getting good performance over a high-latency WAN.
+
+	Additionally, at least the 5/6 series appear to maintain state in the SCPI parser across connections.
+	If a command is sent and the connection is immediately dropped, reconnecting may result in seeing the reply!!
+
+	To read the error log (helpful for driver development):
+	ALLEV?
+		Should print one of the following messages:
+		* 0,"No events to report - queue empty"
+		* 1,"No events to report - new events pending *ESR?"
+	*ESR?
+		Prints a status register, not quite sure what this does
+	ALLEV?
+		Prints the error log in a somewhat confusing and not-human-readable format
+ */
 class TektronixOscilloscope : public SCPIOscilloscope
 {
 public:

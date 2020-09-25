@@ -302,8 +302,8 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 			case FAMILY_MSO6:
 				{
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TER?");
 					string coup = m_transport->ReadReply();
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TER?");
 					float nterm = stof(m_transport->ReadReply());
 
 					//TODO: Tek's 1 GHz passive probes are 250K ohm impedance at the scope side.
@@ -418,27 +418,76 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 			return m_channelAttenuations[i];
 	}
 
-	// FIXME
-	return 1.0;
-
-#if 0
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:GAIN?");
+				float probegain = stof(m_transport->ReadReply());
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBEF:EXTA?");
+				float extatten = stof(m_transport->ReadReply());
 
-	string reply = m_transport->ReadReply();
-	double atten;
-	sscanf(reply.c_str(), "%lf", &atten);
+				//Calculate the overall system attenuation.
+				//Note that probes report *gain* while the external is *attenuation*.
+				double atten = extatten / probegain;
+				m_channelAttenuations[i] = atten;
+				return atten;
+			}
+			break;
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelAttenuations[i] = atten;
-	return atten;
-#endif
+		default:
+			// FIXME
+
+			/*
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+
+			string reply = m_transport->ReadReply();
+			double atten;
+			sscanf(reply.c_str(), "%lf", &atten);
+
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			m_channelAttenuations[i] = atten;
+			return atten;
+			*/
+
+			return 1.0;
+	}
 }
 
-void TektronixOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	//FIXME
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//This function takes the overall system attenuation as an argument.
+				//We need to scale this by the probe gain to figure out the necessary external attenuation.
+				//At the moment, this isn't cached, but we probably should do this in the future.
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:GAIN?");
+				float probegain = stof(m_transport->ReadReply());
+
+				float extatten = atten * probegain;
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBEF:EXTA " + to_string(extatten));
+			}
+			break;
+
+		default:
+			//FIXME
+			break;
+	}
 }
 
 int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
