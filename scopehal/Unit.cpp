@@ -196,7 +196,17 @@ string Unit::PrettyPrint(double value)
 			break;
 
 		case UNIT_SAMPLERATE:
-			snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
+			{
+				//If sample rate isn't a round number, add more digits (up to 3)
+				if( fabs(round(value_rescaled) - value_rescaled) < 0.1 )
+					snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
+				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.1)
+					snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
+				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.1 )
+					snprintf(tmp, sizeof(tmp), "%.2f %s%s", value_rescaled, scale, unit);
+				else
+					snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+			}
 			break;
 
 		case UNIT_SAMPLEDEPTH:
