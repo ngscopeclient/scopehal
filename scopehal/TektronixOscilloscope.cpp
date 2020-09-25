@@ -693,17 +693,15 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 	m_transport->SendCommand("DAT:START 0");
 	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
 
-	double xincrement = 0;
-	double ymult = 0;
-	double yoff = 0;
+	map<size_t, double> xincrements;
+	map<size_t, double> ymults;
+	map<size_t, double> yoffs;
 
+	//Ask for the preambles
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
 			continue;
-
-		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
-		LogIndenter li2;
 
 		// Set source & get preamble+data
 		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
@@ -711,7 +709,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		//Ask for the waveform preamble
 		m_transport->SendCommand("WFMO?");
 
-		//Get the preamble
+		//Process it
 		for(int j=0; j<22; j++)
 		{
 			string reply = m_transport->ReadReply();
@@ -720,23 +718,35 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 
 			if(j == 11)
 			{
-				xincrement = stof(reply) * 1e12;	//scope gives sec, not ps
+				xincrements[i] = stof(reply) * 1e12;	//scope gives sec, not ps
 				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrement).c_str());
 			}
 			else if(j == 15)
 			{
-				ymult = stof(reply);
+				ymults[i] = stof(reply);
 				//LogDebug("ymult = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(ymult).c_str());
 			}
 			else if(j == 17)
 			{
-				yoff = stof(reply);
-				m_channelOffsets[i] = -yoff;
+				yoffs[i] = stof(reply);
+				m_channelOffsets[i] = -yoffs[i];
 				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(yoff).c_str());
 			}
 		}
+	}
+
+	//Ask for and get the data
+	//(seems like batching here doesn't work)
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		if(!IsChannelEnabled(i))
+			continue;
+
+		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+		LogIndenter li2;
 
 		//Read the data blocks
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
 		m_transport->SendCommand("CURV?");
 
 		//Read length of the actual data
@@ -759,7 +769,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = xincrement;
+		cap->m_timescale = xincrements[i];
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
@@ -767,6 +777,8 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		cap->Resize(nsamples);
 
 		//Convert to volts
+		float ymult = ymults[i];
+		float yoff = yoffs[i];
 		for(size_t j=0; j<nsamples; j++)
 		{
 			cap->m_offsets[j] = j;
