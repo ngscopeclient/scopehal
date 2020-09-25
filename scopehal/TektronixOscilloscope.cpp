@@ -853,7 +853,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 			if(j == 11)
 			{
 				xincrements[i] = stof(reply) * 1e12;	//scope gives sec, not ps
-				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrement).c_str());
+				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrements[i]).c_str());
 			}
 			else if(j == 15)
 			{
@@ -903,7 +903,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = xincrements[i];
+		cap->m_timescale = round(xincrements[i]);
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
@@ -964,8 +964,50 @@ bool TektronixOscilloscope::IsTriggerArmed()
 
 vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
+
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+	const int64_t g = k*m;
+
+	uint64_t bases[] = { 1000, 1250, 2500, 3125, 5000, 6250 };
+	uint64_t scales_mso6[] = {1, 10, 100, 1*k, 10*k};
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+			break;
+
+		case FAMILY_MSO6:
+			{
+				for(auto b : bases)
+					ret.push_back(b / 10);
+
+				for(auto scale : scales_mso6)
+				{
+					for(auto b : bases)
+						ret.push_back(b * scale);
+				}
+
+				//We break with the pattern on the upper end of the frequency range
+				ret.push_back(125 * m);
+				ret.push_back(250 * m);
+				ret.push_back(312500 * k);
+				ret.push_back(625 * m);
+				ret.push_back(1250 * m);
+				ret.push_back(1562500 * k);
+				ret.push_back(3125 * m);
+				ret.push_back(6250 * m);
+				ret.push_back(12500 * m);
+				ret.push_back(25 * g);		//8 bits, not 12.
+											//TODO: we can save bandwidth by using 8 bit waveform download for this
+			}
+			break;
+
+		default:
+			break;
+	}
+
 	return ret;
 }
 
@@ -977,23 +1019,59 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> TektronixOscilloscope::GetInterleaveConflicts()
 {
-	//FIXME
+	//MSO5/6 have no interleaving
 	set<Oscilloscope::InterleaveConflict> ret;
 	return ret;
 }
 
 vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
+
+	const int64_t k = 1000;
+	const int64_t m = k*k;
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+			break;
+
+		//The scope allows extremely granular specification of memory depth.
+		//For our purposes, only show a bunch of common step values.
+		//No need for super fine granularity since record length isn't tied to the UI display width.
+		case FAMILY_MSO6:
+			{
+				ret.push_back(500);
+				ret.push_back(1 * k);
+				ret.push_back(2 * k);
+				ret.push_back(5 * k);
+				ret.push_back(10 * k);
+				ret.push_back(20 * k);
+				ret.push_back(50 * k);
+				ret.push_back(100 * k);
+				ret.push_back(200 * k);
+				ret.push_back(500 * k);
+				ret.push_back(1 * m);
+				ret.push_back(2 * m);
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(20 * m);
+				ret.push_back(50 * m);
+				ret.push_back(62500 * k);
+			}
+			break;
+
+		default:
+			break;
+	}
+
 	return ret;
 }
 
 vector<uint64_t> TektronixOscilloscope::GetSampleDepthsInterleaved()
 {
-	//FIXME
-	vector<uint64_t> ret;
-	return ret;
+	//MSO5/6 have no interleaving
+	return GetSampleDepthsNonInterleaved();
 }
 
 uint64_t TektronixOscilloscope::GetSampleRate()
@@ -1031,11 +1109,13 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 
 bool TektronixOscilloscope::IsInterleaving()
 {
+	//MSO5/6 have no interleaving
 	return false;
 }
 
 bool TektronixOscilloscope::SetInterleaving(bool /*combine*/)
 {
+	//MSO5/6 have no interleaving
 	return false;
 }
 
