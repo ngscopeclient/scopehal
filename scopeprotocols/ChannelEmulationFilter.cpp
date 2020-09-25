@@ -33,11 +33,6 @@
 
 using namespace std;
 
-inline string string_base_name(string const & path)
-{
-	return path.substr(path.find_last_of("/\\") + 1);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -62,7 +57,7 @@ void ChannelEmulationFilter::SetDefaultName()
 	{
 		if(base != "")
 			base += ", ";
-		base += string_base_name(f);
+		base += BaseName(f);
 	}
 
 	char hwname[256];

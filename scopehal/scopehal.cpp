@@ -349,3 +349,8 @@ string Trim(string str)
 
 	return ret;
 }
+
+string BaseName(string const & path)
+{
+	return path.substr(path.find_last_of("/\\") + 1);
+}

@@ -33,11 +33,6 @@
 
 using namespace std;
 
-inline std::string string_base_name(std::string const & path)
-{
-	return path.substr(path.find_last_of("/\\") + 1);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -145,7 +140,7 @@ void DeEmbedFilter::SetDefaultName()
 	{
 		if(base != "")
 			base += ", ";
-		base += string_base_name(f);
+		base += BaseName(f);
 	}
 
 	char hwname[256];

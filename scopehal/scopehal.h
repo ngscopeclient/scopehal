@@ -89,6 +89,7 @@ uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
 std::string GetDefaultChannelColor(int i);
 
 std::string Trim(std::string str);
+std::string BaseName(std::string const& path);
 
 void TransportStaticInit();
 void DriverStaticInit();
