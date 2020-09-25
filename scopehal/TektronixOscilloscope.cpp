@@ -545,6 +545,7 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	//Update cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelBandwidthLimits[i] = limit_mhz;
@@ -581,56 +582,90 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 			return m_channelVoltageRanges[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
-
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
-	string reply = m_transport->ReadReply();
-	double vdiv;
-	sscanf(reply.c_str(), "%lf", &vdiv);
-
-	double range = vdiv * 10;
+	//We want total range, not per division
+	double range;
+	{
+		lock_guard<recursive_mutex> lock2(m_mutex);
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
+		range = stof(m_transport->ReadReply()) * 10;
+	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 	return range;
 }
 
-void TektronixOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
-	//FIXME
+	//Update cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelVoltageRanges[i] = range;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
+			break;
+
+		default:
+			break;
+	}
 }
 
 OscilloscopeChannel* TektronixOscilloscope::GetExternalTrigger()
 {
-	//FIXME
-	return NULL;
+	return m_extTrigChannel;
 }
 
 double TektronixOscilloscope::GetChannelOffset(size_t i)
 {
+	//Check cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
-
 		if(m_channelOffsets.find(i) != m_channelOffsets.end())
 			return m_channelOffsets[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
-	string reply = m_transport->ReadReply();
-
+	//Read offset
 	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
-	offset = -offset;
+	{
+		lock_guard<recursive_mutex> lock2(m_mutex);
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+		string reply = m_transport->ReadReply();
+		offset = -stof(m_transport->ReadReply());
+	}
 
+	//Update cache
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void TektronixOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//FIXME
+	//Update cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelOffsets[i] = offset;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
+			break;
+
+		default:
+			break;
+	}
 }
 
 Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
@@ -936,9 +971,8 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> TektronixOscilloscope::GetSampleRatesInterleaved()
 {
-	//FIXME
-	vector<uint64_t> ret;
-	return ret;
+	//MSO5/6 have no interleaving
+	return GetSampleRatesNonInterleaved();
 }
 
 set<Oscilloscope::InterleaveConflict> TektronixOscilloscope::GetInterleaveConflicts()
