@@ -102,4 +102,11 @@ extern bool g_hasAvx512VL;
 extern bool g_hasAvx512DQ;
 extern bool g_hasAvx2;
 
+//string to size_t conversion
+#ifdef _WIN32
+#define stos(str) static_cast<size_t>(stoll(str))
+#else
+#define stos(str) static_cast<size_t>(stol(str))
+#endif
+
 #endif

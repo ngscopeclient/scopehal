@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg, Mike Walters                                                            *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -87,6 +87,9 @@ public:
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
+
+	//acquisition
+	bool AcquireDataMSO56(std::map<int, std::vector<AnalogWaveform*> >& pending_waveforms);
 
 	//Mutexing for thread safety
 	std::recursive_mutex m_cacheMutex;
