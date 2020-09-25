@@ -42,6 +42,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_bandwidth(1000)
 {
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
@@ -76,6 +77,9 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_transport->SendCommand("DAT:ENC SRI");		//signed, little endian binary
 			m_transport->SendCommand("DAT:WID 2");			//16-bit data
 			m_transport->SendCommand("ACQ:STOPA SEQ");		//Stop after acquiring a single waveform
+			m_transport->SendCommand("CONFIG:ANALO:BANDW?");
+			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;
+			LogDebug("Instrument has %d MHz bandwidth\n", m_bandwidth);
 			break;
 
 		default:
@@ -492,35 +496,81 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
-	int bwl = 0;
-	m_channelBandwidthLimits[i] = bwl;
-	return bwl;
-
-#if 0
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
 			return m_channelBandwidthLimits[i];
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
+	int bwl = 0;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
-	string reply = m_transport->ReadReply();
-	int bwl;
-	if(reply == "1")
-		bwl = 25;
-	else
-		bwl = 0;
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				{
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN?");
+					string reply = m_transport->ReadReply();
+					if(reply == "FUL")		//no limit
+						bwl = 0;
+					else
+						bwl = stof(reply) * 1e-6;
 
+					//If the returned bandwidth is the same as the instrument's upper bound, report "no limit"
+					if(bwl == m_bandwidth)
+						bwl = 0;
+				}
+				break;
+
+			default:
+				/*
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
+				string reply = m_transport->ReadReply();
+				int bwl;
+				if(reply == "1")
+					bwl = 25;
+				else
+					bwl = 0;
+				*/
+				break;
+		}
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelBandwidthLimits[i] = bwl;
 	return bwl;
-#endif
 }
 
-void TektronixOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	//FIXME
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelBandwidthLimits[i] = limit_mhz;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Instrument wants Hz, not MHz, or "FUL" for no limit
+				size_t limit_hz = limit_mhz;
+				limit_hz *= 1000 * 1000;
+
+				if(limit_mhz == 0)
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN FUL");
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN " + to_string(limit_hz));
+			}
+			break;
+
+		default:
+			break;
+	}
 }
 
 double TektronixOscilloscope::GetChannelVoltageRange(size_t i)

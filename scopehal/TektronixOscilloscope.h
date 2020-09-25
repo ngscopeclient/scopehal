@@ -133,6 +133,9 @@ protected:
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
+	//available instrument bandwidth in MHz
+	int m_bandwidth;
+
 	enum Family
 	{
 		FAMILY_MSO5,
