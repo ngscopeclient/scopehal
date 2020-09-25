@@ -105,17 +105,28 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
+	virtual int64_t GetDeskewForChannel(size_t channel);
+
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//acquisition
 	bool AcquireDataMSO56(std::map<int, std::vector<AnalogWaveform*> >& pending_waveforms);
 
+	void DetectProbes();
+
 	//Mutexing for thread safety
 	std::recursive_mutex m_cacheMutex;
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
+
+	enum ProbeType
+	{
+		PROBE_TYPE_ANALOG,
+		PROBE_TYPE_DIGITAL_8BIT
+	};
 
 	//config cache
 	std::map<size_t, double> m_channelOffsets;
@@ -126,6 +137,11 @@ protected:
 	std::map<int, bool> m_channelsEnabled;
 	bool m_triggerChannelValid;
 	size_t m_triggerChannel;
+	bool m_sampleRateValid;
+	uint64_t m_sampleRate;
+	bool m_sampleDepthValid;
+	uint64_t m_sampleDepth;
+	std::map<size_t, ProbeType> m_probeTypes;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

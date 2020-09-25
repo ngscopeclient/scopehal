@@ -40,6 +40,10 @@ OSCILLOSCOPE_INITPROC_CPP(TektronixOscilloscope)
 
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	: SCPIOscilloscope(transport)
+	, m_sampleRateValid(false)
+	, m_sampleRate(0)
+	, m_sampleDepthValid(false)
+	, m_sampleDepth(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_bandwidth(1000)
@@ -202,6 +206,9 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	{
 		LogDebug("* %s (unknown)\n", opt.c_str());
 	}
+
+	//Figure out what probes we have connected
+	DetectProbes();
 }
 
 TektronixOscilloscope::~TektronixOscilloscope()
@@ -224,6 +231,39 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device interface functions
 
+void TektronixOscilloscope::DetectProbes()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+
+			//Figure out what kind of probe is attached (analog or digital).
+			//If a digital probe (TLP058), disable this channel and mark as not usable
+			for(size_t i=0; i<m_analogChannelCount; i++)
+			{
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:ID:TYP?");
+				string reply = m_transport->ReadReply();
+
+				//Note that probe type comes back in quotes, which is a little bit funny but w/e.
+				if(reply == "\"TLP058\"")
+				{
+					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
+				}
+
+				//Treat anything else as analog
+				else
+					m_probeTypes[i] = PROBE_TYPE_ANALOG;
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 void TektronixOscilloscope::FlushConfigCache()
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -232,9 +272,16 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
+	m_probeTypes.clear();
+
+	m_sampleRateValid = false;
+	m_sampleDepthValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
+
+	//Once we've flushed everything, re-detect what probes are present
+	DetectProbes();
 }
 
 bool TektronixOscilloscope::IsChannelEnabled(size_t i)
@@ -243,14 +290,21 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//TODO: handle digital channels, for now just claim they're off
+	//Ignore digital channels for now
 	if(i >= m_analogChannelCount)
 		return false;
 
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-	if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-		return m_channelsEnabled[i];
+		//If we're an analog channel with a digital probe connected, the analog channel is unusable
+		if(m_probeTypes[i] != PROBE_TYPE_ANALOG)
+			return false;
+
+		//Check the cache
+		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+			return m_channelsEnabled[i];
+	}
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
@@ -271,8 +325,18 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 void TektronixOscilloscope::EnableChannel(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE ON");
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		//If we're an analog channel with a digital probe connected, the analog channel is unusable
+		if( (i < m_analogChannelCount) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+			return;
+	}
+
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE ON");
+	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = true;
@@ -280,8 +344,18 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 
 void TektronixOscilloscope::DisableChannel(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE OFF");
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		//If we're an analog channel with a digital probe connected, the analog channel is unusable
+		if( (i < m_analogChannelCount) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+			return;
+	}
+
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE OFF");
+	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = false;
@@ -824,6 +898,8 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 	//Get record length
 	m_transport->SendCommand("HOR:RECO?");
 	size_t length = stos(m_transport->ReadReply());
+	m_sampleDepth = length;
+	m_sampleDepthValid = true;
 	m_transport->SendCommand("DAT:START 0");
 	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
 
@@ -1019,8 +1095,24 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> TektronixOscilloscope::GetInterleaveConflicts()
 {
-	//MSO5/6 have no interleaving
 	set<Oscilloscope::InterleaveConflict> ret;
+
+	switch(m_family)
+	{
+		//MSO5/6 have no interleaving.
+		//Every channel conflicts with itself
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				for(size_t i=0; i<m_analogChannelCount; i++)
+					ret.emplace(InterleaveConflict(m_channels[i], m_channels[i]));
+			}
+			break;
+
+		default:
+			break;
+	}
+
 	return ret;
 }
 
@@ -1076,14 +1168,49 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t TektronixOscilloscope::GetSampleRate()
 {
-	//FIXME
-	return 1;
+	//don't bother with mutexing, worst case we return slightly stale data
+	if(m_sampleRateValid)
+		return m_sampleRate;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("HOR:SAMPLER?");
+			m_sampleRate = stod(m_transport->ReadReply());	//stoull seems to not handle scientific notation
+			break;
+
+		default:
+			return 1;
+	}
+
+	m_sampleRateValid = true;
+	return m_sampleRate;
 }
 
 uint64_t TektronixOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	if(m_sampleDepthValid)
+		return m_sampleDepth;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("HOR:RECO?");
+			m_sampleDepth = stos(m_transport->ReadReply());
+			break;
+
+		default:
+			return 1;
+	}
+
+	m_sampleDepthValid = true;
+	return m_sampleDepth;
 }
 
 void TektronixOscilloscope::SetSampleDepth(uint64_t /*depth*/)
@@ -1104,6 +1231,15 @@ void TektronixOscilloscope::SetTriggerOffset(int64_t /*offset*/)
 int64_t TektronixOscilloscope::GetTriggerOffset()
 {
 	//FIXME
+	return 0;
+}
+
+void TektronixOscilloscope::SetDeskewForChannel(size_t /*channel*/, int64_t /*skew*/)
+{
+}
+
+int64_t TektronixOscilloscope::GetDeskewForChannel(size_t /*channel*/)
+{
 	return 0;
 }
 
