@@ -76,14 +76,14 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommand("ACQ:MOD SAM");		//actual sampled data, no averaging etc
-			m_transport->SendCommand("VERB OFF");			//Disable verbose mode (send shorter commands)
-			m_transport->SendCommand("DAT:ENC SRI");		//signed, little endian binary
-			m_transport->SendCommand("DAT:WID 2");			//16-bit data
-			m_transport->SendCommand("ACQ:STOPA SEQ");		//Stop after acquiring a single waveform
-			m_transport->SendCommand("CONFIG:ANALO:BANDW?");
-			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;
-			LogDebug("Instrument has %d MHz bandwidth\n", m_bandwidth);
+			m_transport->SendCommand("ACQ:MOD SAM");				//actual sampled data, no averaging etc
+			m_transport->SendCommand("VERB OFF");					//Disable verbose mode (send shorter commands)
+			m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
+			m_transport->SendCommand("DAT:WID 2");					//16-bit data
+			m_transport->SendCommand("ACQ:STOPA SEQ");				//Stop after acquiring a single waveform
+			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
+			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
+			m_transport->SendCommand("HOR:MODE MAN");				//Enable manual sample rate and record length
 			break;
 
 		default:
@@ -1066,6 +1066,10 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 				}
 
 				//We break with the pattern on the upper end of the frequency range
+				ret.push_back(12500 * k);
+				ret.push_back(25 * m);
+				ret.push_back(31250 * k);
+				ret.push_back(62500 * k);
 				ret.push_back(125 * m);
 				ret.push_back(250 * m);
 				ret.push_back(312500 * k);
@@ -1178,7 +1182,7 @@ uint64_t TektronixOscilloscope::GetSampleRate()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommand("HOR:SAMPLER?");
+			m_transport->SendCommand("HOR:MODE:SAMPLER?");
 			m_sampleRate = stod(m_transport->ReadReply());	//stoull seems to not handle scientific notation
 			break;
 
@@ -1201,7 +1205,7 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommand("HOR:RECO?");
+			m_transport->SendCommand("HOR:MODE:RECO?");
 			m_sampleDepth = stos(m_transport->ReadReply());
 			break;
 
@@ -1213,14 +1217,52 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 	return m_sampleDepth;
 }
 
-void TektronixOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//FIXME
+	//Update the cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_sampleDepth = depth;
+		m_sampleDepthValid = true;
+	}
+
+	//Send it
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(string("HOR:MODE:RECO ") + to_string(depth));
+			break;
+
+		default:
+			break;
+	}
 }
 
-void TektronixOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void TektronixOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//FIXME
+	//Update the cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_sampleRate = rate;
+		m_sampleRateValid = true;
+	}
+
+	//Send it
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(string("HOR:MODE:SAMPLER ") + to_string(rate));
+			break;
+
+		default:
+			break;
+	}
 }
 
 void TektronixOscilloscope::SetTriggerOffset(int64_t /*offset*/)
