@@ -44,6 +44,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_sampleRate(0)
 	, m_sampleDepthValid(false)
 	, m_sampleDepth(0)
+	, m_triggerOffsetValid(false)
+	, m_triggerOffset(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_bandwidth(1000)
@@ -84,6 +86,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
 			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
 			m_transport->SendCommand("HOR:MODE MAN");				//Enable manual sample rate and record length
+			m_transport->SendCommand("HOR:DEL:MOD ON");				//Horizontal position is in time units
 			break;
 
 		default:
@@ -276,6 +279,7 @@ void TektronixOscilloscope::FlushConfigCache()
 
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
+	m_triggerOffsetValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -1265,15 +1269,40 @@ void TektronixOscilloscope::SetSampleRate(uint64_t rate)
 	}
 }
 
-void TektronixOscilloscope::SetTriggerOffset(int64_t /*offset*/)
+void TektronixOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	//FIXME
+	//Instrument reports position of trigger from the midpoint of the display
+	//but we want to know position from the start of the capture
+	double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
+	double offset_sec = offset * 1e-12f;
+	double center_offset_sec = capture_len_sec/2 - offset_sec;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
+
+	m_triggerOffsetValid = true;
+	m_triggerOffset = offset;
 }
 
 int64_t TektronixOscilloscope::GetTriggerOffset()
 {
-	//FIXME
-	return 0;
+	if(m_triggerOffsetValid)
+		return m_triggerOffset;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Instrument reports position of trigger from the midpoint of the display
+	m_transport->SendCommand("HOR:DELAY:TIME?");
+	double center_offset_sec = stod(m_transport->ReadReply());
+
+	//but we want to know position from the start of the capture
+	double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
+	double offset_sec = capture_len_sec/2 - center_offset_sec;
+
+	//All good, convert to ps and we're done
+	m_triggerOffset = round(offset_sec * 1e12);
+	m_triggerOffsetValid = true;
+	return m_triggerOffset;
 }
 
 void TektronixOscilloscope::SetDeskewForChannel(size_t /*channel*/, int64_t /*skew*/)

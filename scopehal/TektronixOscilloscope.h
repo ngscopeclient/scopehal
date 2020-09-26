@@ -141,6 +141,8 @@ protected:
 	uint64_t m_sampleRate;
 	bool m_sampleDepthValid;
 	uint64_t m_sampleDepth;
+	bool m_triggerOffsetValid;
+	int64_t m_triggerOffset;
 	std::map<size_t, ProbeType> m_probeTypes;
 
 	bool m_triggerArmed;
