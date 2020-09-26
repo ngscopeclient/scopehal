@@ -276,6 +276,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelCouplings.clear();
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
+	m_channelDeskew.clear();
 
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
@@ -1271,17 +1272,29 @@ void TektronixOscilloscope::SetSampleRate(uint64_t rate)
 
 void TektronixOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	//Instrument reports position of trigger from the midpoint of the display
-	//but we want to know position from the start of the capture
-	double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
-	double offset_sec = offset * 1e-12f;
-	double center_offset_sec = capture_len_sec/2 - offset_sec;
-
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
 
-	m_triggerOffsetValid = true;
-	m_triggerOffset = offset;
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+		{
+			//Instrument reports position of trigger from the midpoint of the display
+			//but we want to know position from the start of the capture
+			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
+			double offset_sec = offset * 1e-12f;
+			double center_offset_sec = capture_len_sec/2 - offset_sec;
+
+			m_transport->SendCommand(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
+
+			//Don't update the cache because the scope is likely to round the offset we ask for.
+			//If we query the instrument later, the cache will be updated then.
+			m_triggerOffsetValid = false;
+		}
+
+		default:
+			break;
+	}
 }
 
 int64_t TektronixOscilloscope::GetTriggerOffset()
@@ -1291,27 +1304,90 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//Instrument reports position of trigger from the midpoint of the display
-	m_transport->SendCommand("HOR:DELAY:TIME?");
-	double center_offset_sec = stod(m_transport->ReadReply());
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+		{
+			//Instrument reports position of trigger from the midpoint of the display
+			m_transport->SendCommand("HOR:DELAY:TIME?");
+			double center_offset_sec = stod(m_transport->ReadReply());
 
-	//but we want to know position from the start of the capture
-	double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
-	double offset_sec = capture_len_sec/2 - center_offset_sec;
+			//but we want to know position from the start of the capture
+			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
+			double offset_sec = capture_len_sec/2 - center_offset_sec;
 
-	//All good, convert to ps and we're done
-	m_triggerOffset = round(offset_sec * 1e12);
-	m_triggerOffsetValid = true;
-	return m_triggerOffset;
+			//All good, convert to ps and we're done
+			m_triggerOffset = round(offset_sec * 1e12);
+			m_triggerOffsetValid = true;
+			return m_triggerOffset;
+		}
+
+		default:
+			return 0;
+	}
 }
 
-void TektronixOscilloscope::SetDeskewForChannel(size_t /*channel*/, int64_t /*skew*/)
+void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 {
+	//Don't update the cache because the scope is likely to round the offset we ask for.
+	//If we query the instrument later, the cache will be updated then.
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		auto it = m_channelDeskew.find(channel);
+		if(it != m_channelDeskew.end())
+			m_channelDeskew.erase(it);
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
+			m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-12");
+			break;
+
+		default:
+			break;
+	}
 }
 
-int64_t TektronixOscilloscope::GetDeskewForChannel(size_t /*channel*/)
+int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 {
-	return 0;
+	//Cannot deskew digital/trigger channels
+	//TODO: are flex digital channels deskewable?
+	if(channel >= m_analogChannelCount)
+		return 0;
+
+	//Early out if the value is in cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelDeskew.find(channel) != m_channelDeskew.end())
+			return m_channelDeskew[channel];
+	}
+
+	int64_t deskew = 0;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
+				m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK?");
+				deskew = -round(1e12 * stof(m_transport->ReadReply()));
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelDeskew[channel] = deskew;
+	return deskew;
 }
 
 bool TektronixOscilloscope::IsInterleaving()
