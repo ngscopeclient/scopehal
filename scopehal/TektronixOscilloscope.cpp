@@ -81,7 +81,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		case FAMILY_MSO6:
 			m_transport->SendCommand("ACQ:MOD SAM");				//actual sampled data, no averaging etc
 			m_transport->SendCommand("VERB OFF");					//Disable verbose mode (send shorter commands)
-			m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 			m_transport->SendCommand("ACQ:STOPA SEQ");				//Stop after acquiring a single waveform
 			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
 			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
@@ -1080,11 +1079,12 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	m_transport->SendCommand("DAT:START 0");
 	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
 
-	map<size_t, double> ymults;
-	map<size_t, double> yoffs;
+	double ymult = 0;
+	double yoff = 0;
 
-	//Ask for the analog preambles
+	//Ask for the analog data
 	m_transport->SendCommand("DAT:WID 2");					//16-bit data
+	m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -1111,32 +1111,23 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			}
 			else if(j == 15)
 			{
-				ymults[i] = stof(reply);
+				ymult = stof(reply);
 				//LogDebug("ymult = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(ymult).c_str());
 			}
 			else if(j == 17)
 			{
-				yoffs[i] = stof(reply);
-				m_channelOffsets[i] = -yoffs[i];
+				yoff = stof(reply);
+				m_channelOffsets[i] = -yoff;
 				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(yoff).c_str());
 			}
 
 			//TODO: xzero is trigger time
 		}
-	}
-
-	//Ask for and get the analog data
-	//(seems like batching here doesn't work)
-	for(size_t i=0; i<m_analogChannelCount; i++)
-	{
-		if(!IsChannelEnabled(i))
-			continue;
 
 		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
 		LogIndenter li2;
 
 		//Read the data blocks
-		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
 		m_transport->SendCommand("CURV?");
 
 		//Read length of the actual data
@@ -1167,8 +1158,6 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->Resize(nsamples);
 
 		//Convert to volts
-		float ymult = ymults[i];
-		float yoff = yoffs[i];
 		for(size_t j=0; j<nsamples; j++)
 		{
 			cap->m_offsets[j] = j;
@@ -1186,12 +1175,103 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		m_transport->ReadReply();
 	}
 
-	//TODO: RF stuff
-	//CHx_SV_NORMAL,
-	//CHx_SV_BASEBAND_IQ
+	//Get the spectrum stuff
+	m_transport->SendCommand("DAT:WID 8");					//double precision floating point data
+	m_transport->SendCommand("DAT:ENC SFPB");				//IEEE754 float
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		auto nchan = m_spectrumChannelBase + i;
+		if(!IsChannelEnabled(nchan))
+			continue;
+
+		// Set source & get preamble+data
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[nchan]->GetHwname() + "_SV_NORMAL");
+
+		//Ask for the waveform preamble
+		m_transport->SendCommand("WFMO?");
+
+		//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
+		//LogIndenter li2;
+
+		//Process it
+		double hzbase;
+		for(int j=0; j<22; j++)
+		{
+			string reply = m_transport->ReadReply();
+
+			//LogDebug("preamble block %d = %s\n", j, reply.c_str());
+
+			if(j == 11)
+			{
+				hzbase = round(stof(reply));
+				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(hzbase).c_str());
+			}
+			else if(j == 15)
+			{
+				ymult = stof(reply);
+				//LogDebug("ymult = %s\n", Unit(Unit::UNIT_DBM).PrettyPrint(ymult).c_str());
+			}
+			else if(j == 17)
+			{
+				yoff = stof(reply);
+				m_channelOffsets[i] = -yoff;
+				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_DBM).PrettyPrint(yoff).c_str());
+			}
+
+			//TODO: xzero is trigger time
+		}
+
+		//Read the data block
+		m_transport->SendCommand("CURV?");
+
+		//Read length of the actual data
+		char tmplen[3] = {0};
+		m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+		int ndigits = atoi(tmplen+1);
+
+		char digits[10] = {0};
+		m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+		int msglen = atoi(digits);
+
+		//Read the actual data
+		char* rxbuf = new char[msglen];
+		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
+
+		//convert bytes to samples
+		size_t nsamples = msglen/8;
+		double* samples = (double*)rxbuf;
+
+		//Set up the capture we're going to store our data into
+		//(no TDC data or fine timestamping available on Tektronix scopes?)
+		AnalogWaveform* cap = new AnalogWaveform;
+		cap->m_timescale = hzbase;
+		cap->m_triggerPhase = 0;
+		cap->m_startTimestamp = time(NULL);
+		double t = GetTime();
+		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->Resize(nsamples);
+
+		//We get dBm from the instrument, so just have to convert double to single precision
+		for(size_t j=0; j<nsamples; j++)
+		{
+			cap->m_offsets[j] = j;
+			cap->m_durations[j] = 1;
+			cap->m_samples[j] = ymult*samples[j] + yoff;
+		}
+
+		//Done, update the data
+		pending_waveforms[nchan].push_back(cap);
+
+		//Done
+		delete[] rxbuf;
+
+		//Throw out garbage at the end of the message (why is this needed?)
+		m_transport->ReadReply();
+	}
 
 	//Get the digital stuff
 	m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
+	m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		//Skip anything without a digital probe connected
@@ -1279,12 +1359,6 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Throw out garbage at the end of the message (why is this needed?)
 		m_transport->ReadReply();
-	}
-
-	//Get the spectrum stuff
-	for(size_t i=0; i<m_analogChannelCount; i++)
-	{
-		pending_waveforms[m_spectrumChannelBase + i].push_back(NULL);
 	}
 
 	return true;
