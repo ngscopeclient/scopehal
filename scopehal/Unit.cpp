@@ -198,13 +198,13 @@ string Unit::PrettyPrint(double value)
 			{
 				//If not a round number, add more digits (up to 4)
 				//TODO: allow user to specify how many sigfigs they want
-				if( fabs(round(value_rescaled) - value_rescaled) < 0.1 )
+				if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
 					snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
-				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.1)
+				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.001)
 					snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
-				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.1 )
+				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.001 )
 					snprintf(tmp, sizeof(tmp), "%.2f %s%s", value_rescaled, scale, unit);
-				else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.1 )
+				else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
 					snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
 				else
 					snprintf(tmp, sizeof(tmp), "%.4f %s%s", value_rescaled, scale, unit);
