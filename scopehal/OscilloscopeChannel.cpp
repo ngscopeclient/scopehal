@@ -67,6 +67,34 @@ OscilloscopeChannel::OscilloscopeChannel(
 	AddStream("data");
 }
 
+OscilloscopeChannel::OscilloscopeChannel(
+	Oscilloscope* scope,
+	string hwname,
+	OscilloscopeChannel::ChannelType type,
+	string color,
+	Unit xunit,
+	Unit yunit,
+	int width,
+	size_t index,
+	bool physical)
+	: m_displaycolor(color)
+	, m_displayname(hwname)
+	, m_scope(scope)
+	, m_type(type)
+	, m_hwname(hwname)
+	, m_width(width)
+	, m_index(index)
+	, m_physical(physical)
+	, m_refcount(0)
+	, m_xAxisUnit(xunit)
+	, m_yAxisUnit(yunit)
+{
+	//Create a stream for our output.
+	//Normal channels only have one stream.
+	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
+	AddStream("data");
+}
+
 OscilloscopeChannel::~OscilloscopeChannel()
 {
 	for(auto p : m_streamData)

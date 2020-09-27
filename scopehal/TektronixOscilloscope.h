@@ -165,12 +165,35 @@ protected:
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelLanes;
 
 	size_t m_digitalChannelBase;
+	size_t m_spectrumChannelBase;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
+
+	//Helpers for figuring out type of a channel by the index
+	bool IsAnalog(size_t index)
+	{ return index < m_analogChannelCount; }
+
+	bool IsDigital(size_t index)
+	{
+		if(index < m_digitalChannelBase)
+			return false;
+		if(index >= (m_digitalChannelBase + 8*m_analogChannelCount) )
+			return false;
+		return true;
+	}
+
+	bool IsSpectrum(size_t index)
+	{
+		if(index < m_spectrumChannelBase)
+			return false;
+		if(index >= (m_spectrumChannelBase + m_analogChannelCount) )
+			return false;
+		return true;
+	}
 
 	//available instrument bandwidth in MHz
 	int m_bandwidth;

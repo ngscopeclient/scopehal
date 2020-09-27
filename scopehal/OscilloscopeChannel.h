@@ -68,6 +68,16 @@ public:
 		int width = 1,
 		size_t index = 0,
 		bool physical = false);
+	OscilloscopeChannel(
+		Oscilloscope* scope,
+		std::string hwname,
+		OscilloscopeChannel::ChannelType type,
+		std::string color,
+		Unit xunit,
+		Unit yunit,
+		int width = 1,
+		size_t index = 0,
+		bool physical = false);
 	virtual ~OscilloscopeChannel();
 
 	///Display color (any valid GDK format)

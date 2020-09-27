@@ -105,9 +105,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 	for(int i=0; i<nchans; i++)
 	{
-		//Hardware name of the channel
-		string chname = string("CH") + to_string(i+1);
-
 		//Color the channels based on Tektronix's standard color sequence
 		string color = "#ffffff";
 		switch(m_family)
@@ -126,7 +123,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		m_channels.push_back(
 			new OscilloscopeChannel(
 			this,
-			chname,
+			string("CH") + to_string(i+1),
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
 			1,
@@ -134,6 +131,64 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			true));
 	}
 	m_analogChannelCount = nchans;
+
+	//Add spectrum view channels
+	m_spectrumChannelBase = m_channels.size();
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			for(size_t i=0; i<m_analogChannelCount; i++)
+			{
+				m_channels.push_back(
+					new OscilloscopeChannel(
+					this,
+					string("CH") + to_string(i+1),	//same hwname as the base channel
+					OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+					colors_mso56[i % 4],
+					Unit(Unit::UNIT_HZ),
+					Unit(Unit::UNIT_DBM),
+					1,
+					m_channels.size(),
+					true));
+			}
+			break;
+
+		default:
+			//no spectrum view
+			break;
+	}
+
+	//Add all possible digital channels
+	m_digitalChannelBase = m_channels.size();
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			for(size_t i=0; i<m_analogChannelCount; i++)
+			{
+				for(size_t j=0; j<8; j++)
+				{
+					//TODO: pick colors properly
+					auto chan = new OscilloscopeChannel(
+						this,
+						m_channels[i]->GetHwname() + "_D" + to_string(j),
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						m_channels[i]->m_displaycolor,
+						1,
+						m_channels.size(),
+						true);
+
+					m_flexChannelParents[chan] = i;
+					m_flexChannelLanes[chan] = j;
+					m_channels.push_back(chan);
+				}
+			}
+			break;
+
+		default:
+			break;
+	}
 
 	//Add the external trigger input
 	switch(m_family)
@@ -167,37 +222,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				m_channels.size(),
 				true);
 			m_channels.push_back(m_extTrigChannel);
-			break;
-	}
-
-	//Add all possible digital channels
-	m_digitalChannelBase = m_channels.size();
-	switch(m_family)
-	{
-		case FAMILY_MSO5:
-		case FAMILY_MSO6:
-			for(size_t i=0; i<m_analogChannelCount; i++)
-			{
-				for(size_t j=0; j<8; j++)
-				{
-					//TODO: pick colors properly
-					auto chan = new OscilloscopeChannel(
-						this,
-						m_channels[i]->GetHwname() + "_D" + to_string(j),
-						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-						m_channels[i]->m_displaycolor,
-						1,
-						m_channels.size(),
-						true);
-
-					m_flexChannelParents[chan] = i;
-					m_flexChannelLanes[chan] = j;
-					m_channels.push_back(chan);
-				}
-			}
-			break;
-
-		default:
 			break;
 	}
 
@@ -278,14 +302,11 @@ void TektronixOscilloscope::DetectProbes()
 			//If a digital probe (TLP058), disable this channel and mark as not usable
 			for(size_t i=0; i<m_analogChannelCount; i++)
 			{
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:ID:TYP?");
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBETYPE?");
 				string reply = m_transport->ReadReply();
 
-				//Note that probe type comes back in quotes, which is a little bit funny but w/e.
-				if(reply == "\"TLP058\"")
-				{
+				if(reply == "DIG")
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
-				}
 
 				//Treat anything else as analog
 				else
@@ -326,8 +347,8 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//Digital channels
-	if(i >= m_analogChannelCount)
+	//Pre-checks based on type
+	if(IsDigital(i))
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -335,40 +356,63 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 		size_t parent = m_flexChannelParents[m_channels[i]];
 		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
 			return false;
-
-		//Check the cache
-		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
-			return m_channelsEnabled[i];
 	}
-
-	//Analog channels
-	else
+	else if(IsAnalog(i))
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
 		if(m_probeTypes[i] != PROBE_TYPE_ANALOG)
 			return false;
+	}
+	else if(IsSpectrum(i))
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-		//Check the cache
+		//If we're an analog channel with a digital probe connected, the analog channel is unusable
+		if(m_probeTypes[i - m_spectrumChannelBase] != PROBE_TYPE_ANALOG)
+			return false;
+	}
+
+	//Check the cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
 	}
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+
+			//Undocumented command to toggle spectrum view state
+			if(IsSpectrum(i))
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE?");
+			else
+				m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
+			break;
+
+		default:
+			break;
+	}
+
 	string reply = m_transport->ReadReply();
 
-	if(reply == "0")
 	{
-		m_channelsEnabled[i] = false;
-		return false;
-	}
-	else
-	{
-		m_channelsEnabled[i] = true;
-		return true;
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(reply == "0")
+		{
+			m_channelsEnabled[i] = false;
+			return false;
+		}
+		else
+		{
+			m_channelsEnabled[i] = true;
+			return true;
+		}
 	}
 }
 
@@ -378,7 +422,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if( (i < m_analogChannelCount) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+		if( IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
 			return;
 
 		//If we're a digital channel with an analog probe connected, we're unusable
@@ -386,7 +430,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				if(i >= m_digitalChannelBase)
+				if(IsDigital(i))
 				{
 					//If the parent analog channel doesn't have a digital probe, we're disabled
 					size_t parent = m_flexChannelParents[m_channels[i]];
@@ -402,7 +446,19 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(IsSpectrum(i))
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE ON");
+				else
+					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
+				break;
+
+			default:
+				break;
+		}
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -415,13 +471,27 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if( (i < m_analogChannelCount) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+		if( IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
 			return;
 	}
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
+
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(IsSpectrum(i))
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE OFF");
+				else
+					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
+				break;
+
+			default:
+				break;
+		}
+
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -737,14 +807,28 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 	}
 
 	//If not analog, return a placeholder value
-	if(i > m_analogChannelCount)
+	if(!IsAnalog(i) && !IsSpectrum(i))
 		return 1;
 
 	//We want total range, not per division
 	double range;
 	{
 		lock_guard<recursive_mutex> lock2(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
+
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(IsSpectrum(i))
+					return 70;	//FIXME
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
+				break;
+
+			default:
+				break;
+		}
+
 		range = stof(m_transport->ReadReply()) * 10;
 	}
 
@@ -762,7 +846,7 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	}
 
 	//If not analog, skip it
-	if(i > m_analogChannelCount)
+	if(!IsAnalog(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -794,7 +878,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	}
 
 	//If not analog, return a placeholder value
-	if(i > m_analogChannelCount)
+	if(!IsAnalog(i))
 		return 0;
 
 	//Read offset
@@ -1102,6 +1186,10 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		m_transport->ReadReply();
 	}
 
+	//TODO: RF stuff
+	//CHx_SV_NORMAL,
+	//CHx_SV_BASEBAND_IQ
+
 	//Get the digital stuff
 	m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
 	for(size_t i=0; i<m_analogChannelCount; i++)
@@ -1113,6 +1201,20 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(NULL);
 			continue;
 		}
+
+		//Only grab waveform if at least one channel is enabled
+		bool enabled = false;
+		for(size_t j=0; j<8; j++)
+		{
+			size_t nchan = m_digitalChannelBase + i*8 + j;
+			if(IsChannelEnabled(nchan))
+			{
+				enabled = true;
+				break;
+			}
+		}
+		if(!enabled)
+			continue;
 
 		//Ask for all of the data
 		m_transport->SendCommand(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
@@ -1177,6 +1279,12 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Throw out garbage at the end of the message (why is this needed?)
 		m_transport->ReadReply();
+	}
+
+	//Get the spectrum stuff
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		pending_waveforms[m_spectrumChannelBase + i].push_back(NULL);
 	}
 
 	return true;
