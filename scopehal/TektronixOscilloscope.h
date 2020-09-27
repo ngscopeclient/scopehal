@@ -108,6 +108,18 @@ public:
 	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
 	virtual int64_t GetDeskewForChannel(size_t channel);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Logic analyzer configuration
+
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+	virtual DigitalBank GetDigitalBank(size_t channel);
+	virtual bool IsDigitalHysteresisConfigurable();
+	virtual bool IsDigitalThresholdConfigurable();
+	virtual float GetDigitalHysteresis(size_t channel);
+	virtual float GetDigitalThreshold(size_t channel);
+	virtual void SetDigitalHysteresis(size_t channel, float level);
+	virtual void SetDigitalThreshold(size_t channel, float level);
+
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
@@ -148,6 +160,9 @@ protected:
 
 	///The analog channel for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelParents;
+
+	//The lane number for each flex channel
+	std::map<OscilloscopeChannel*, size_t> m_flexChannelLanes;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

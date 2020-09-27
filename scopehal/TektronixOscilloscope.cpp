@@ -190,6 +190,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 						true);
 
 					m_flexChannelParents[chan] = i;
+					m_flexChannelLanes[chan] = j;
 					m_channels.push_back(chan);
 				}
 			}
@@ -1412,6 +1413,10 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 			m_channelDeskew.erase(it);
 	}
 
+	//Cannot deskew digital/trigger channels
+	if(channel >= m_analogChannelCount)
+		return;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_family)
@@ -1430,7 +1435,6 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 {
 	//Cannot deskew digital/trigger channels
-	//TODO: are flex digital channels deskewable?
 	if(channel >= m_analogChannelCount)
 		return 0;
 
@@ -1658,6 +1662,109 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 				snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
 				m_transport->SendCommand(tmp);
 			}
+			break;
+	}
+}
+
+vector<Oscilloscope::DigitalBank> TektronixOscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> ret;
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			for(auto it : m_flexChannelParents)
+			{
+				DigitalBank bank;
+				bank.push_back(it.first);
+				ret.push_back(bank);
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	return ret;
+}
+
+Oscilloscope::DigitalBank TektronixOscilloscope::GetDigitalBank(size_t channel)
+{
+	DigitalBank ret;
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			ret.push_back(m_channels[channel]);
+			break;
+
+		default:
+			break;
+	}
+
+	return ret;
+}
+
+bool TektronixOscilloscope::IsDigitalHysteresisConfigurable()
+{
+	return false;
+}
+
+bool TektronixOscilloscope::IsDigitalThresholdConfigurable()
+{
+	return true;
+}
+
+float TektronixOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
+{
+	return 0;
+}
+
+float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
+{
+	//TODO: caching?
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	auto chan = m_channels[channel];
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			//note, group IDs are one based but lane IDs are zero based!
+			m_transport->SendCommand(string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
+				":D" + to_string(m_flexChannelLanes[chan]) + ":THR?");
+			return stof(m_transport->ReadReply());
+
+		default:
+			break;
+	}
+	return -1;
+}
+
+void TektronixOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
+{
+	//not configurable
+}
+
+void TektronixOscilloscope::SetDigitalThreshold(size_t channel, float level)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	auto chan = m_channels[channel];
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			//note, group IDs are one based but lane IDs are zero based!
+			m_transport->SendCommand(string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
+				":D" + to_string(m_flexChannelLanes[chan]) + ":THR " + to_string(level));
+			break;
+
+		default:
 			break;
 	}
 }
