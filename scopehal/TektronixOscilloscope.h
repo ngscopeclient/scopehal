@@ -146,6 +146,9 @@ protected:
 	std::map<size_t, int64_t> m_channelDeskew;
 	std::map<size_t, ProbeType> m_probeTypes;
 
+	///The analog channel for each flex channel
+	std::map<OscilloscopeChannel*, size_t> m_flexChannelParents;
+
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 

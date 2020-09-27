@@ -170,6 +170,35 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			break;
 	}
 
+	//Add all possible digital channels
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			for(size_t i=0; i<m_analogChannelCount; i++)
+			{
+				for(size_t j=0; j<8; j++)
+				{
+					//TODO: pick colors properly
+					auto chan = new OscilloscopeChannel(
+						this,
+						m_channels[i]->GetHwname() + "_D" + to_string(j),
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						m_channels[i]->m_displaycolor,
+						1,
+						m_channels.size(),
+						true);
+
+					m_flexChannelParents[chan] = i;
+					m_channels.push_back(chan);
+				}
+			}
+			break;
+
+		default:
+			break;
+	}
+
 	//See what options we have
 	vector<string> options;
 	/*
@@ -295,10 +324,26 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//Ignore digital channels for now
+	//Digital channels
 	if(i >= m_analogChannelCount)
-		return false;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
+		//If the parent analog channel doesn't have a digital probe, we're disabled
+		size_t parent = m_flexChannelParents[m_channels[i]];
+		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
+			return false;
+
+		//Check the cache
+		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
+			return m_channelsEnabled[i];
+
+		//DEBUG: always enabled
+		return true;
+	}
+
+	//Analog channels
+	else
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -655,11 +700,16 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 
 double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 {
+	//Check cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
 			return m_channelVoltageRanges[i];
 	}
+
+	//If not analog, return a placeholder value
+	if(i > m_analogChannelCount)
+		return 1;
 
 	//We want total range, not per division
 	double range;
@@ -681,6 +731,10 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelVoltageRanges[i] = range;
 	}
+
+	//If not analog, skip it
+	if(i > m_analogChannelCount)
+		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -710,6 +764,10 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 			return m_channelOffsets[i];
 	}
 
+	//If not analog, return a placeholder value
+	if(i > m_analogChannelCount)
+		return 0;
+
 	//Read offset
 	double offset;
 	{
@@ -732,6 +790,10 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelOffsets[i] = offset;
 	}
+
+	//If not analog, skip it
+	if(i > m_analogChannelCount)
+		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
