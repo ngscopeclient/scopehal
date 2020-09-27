@@ -142,7 +142,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				m_channels.push_back(
 					new OscilloscopeChannel(
 					this,
-					string("CH") + to_string(i+1),	//same hwname as the base channel
+					string("CH") + to_string(i+1) + "_SPECTRUM",
 					OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 					colors_mso56[i % 4],
 					Unit(Unit::UNIT_HZ),
@@ -389,7 +389,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 			//Undocumented command to toggle spectrum view state
 			if(IsSpectrum(i))
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE?");
+				m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE?");
 			else
 				m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 			break;
@@ -450,7 +450,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE ON");
+					m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE ON");
 				else
 					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
 				break;
@@ -482,7 +482,7 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SV:STATE OFF");
+					m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE OFF");
 				else
 					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
 				break;
@@ -507,7 +507,7 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 	}
 
 	//If not analog, return default
-	if(i >= m_analogChannelCount)
+	if(!IsAnalog(i))
 		return OscilloscopeChannel::COUPLE_DC_50;
 
 	OscilloscopeChannel::CouplingType coupling = OscilloscopeChannel::COUPLE_DC_1M;
@@ -572,6 +572,9 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 
 void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
+	if(!IsAnalog(i))
+		return;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_family)
@@ -637,7 +640,7 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 	}
 
 	//If not analog, return default
-	if(i >= m_analogChannelCount)
+	if(!IsAnalog(i))
 		return 1;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -683,6 +686,9 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 
 void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
+	if(!IsAnalog(i))
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelAttenuations[i] = atten;
@@ -714,15 +720,15 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
+	//If not analog, return default
+	if(!IsAnalog(i))
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
 			return m_channelBandwidthLimits[i];
 	}
-
-	//If not analog, return default
-	if(i >= m_analogChannelCount)
-		return 0;
 
 	int bwl = 0;
 	{
@@ -767,6 +773,9 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
+	if(!IsAnalog(i))
+		return;
+
 	//Update cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1185,7 +1194,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 
 		// Set source & get preamble+data
-		m_transport->SendCommand(string("DAT:SOU ") + m_channels[nchan]->GetHwname() + "_SV_NORMAL");
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
 
 		//Ask for the waveform preamble
 		m_transport->SendCommand("WFMO?");
@@ -1194,7 +1203,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//LogIndenter li2;
 
 		//Process it
-		double hzbase;
+		double hzbase = 0;
 		for(int j=0; j<22; j++)
 		{
 			string reply = m_transport->ReadReply();
