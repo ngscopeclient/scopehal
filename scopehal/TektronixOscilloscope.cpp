@@ -337,9 +337,6 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 		//Check the cache
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
-
-		//DEBUG: always enabled
-		return true;
 	}
 
 	//Analog channels
@@ -358,7 +355,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE?");
+	m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 	string reply = m_transport->ReadReply();
 
 	if(reply == "0")
@@ -385,7 +382,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE ON");
+		m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -404,7 +401,7 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(string("DISP:GLOB:") + m_channels[i]->GetHwname() + ":STATE OFF");
+		m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -419,6 +416,10 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 		if(m_channelCouplings.find(i) != m_channelCouplings.end())
 			return m_channelCouplings[i];
 	}
+
+	//If not analog, return default
+	if(i >= m_analogChannelCount)
+		return OscilloscopeChannel::COUPLE_DC_50;
 
 	OscilloscopeChannel::CouplingType coupling = OscilloscopeChannel::COUPLE_DC_1M;
 	{
@@ -546,6 +547,10 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 			return m_channelAttenuations[i];
 	}
 
+	//If not analog, return default
+	if(i >= m_analogChannelCount)
+		return 1;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_family)
@@ -625,6 +630,10 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 		if(m_channelBandwidthLimits.find(i) != m_channelBandwidthLimits.end())
 			return m_channelBandwidthLimits[i];
 	}
+
+	//If not analog, return default
+	if(i >= m_analogChannelCount)
+		return 0;
 
 	int bwl = 0;
 	{
@@ -1009,6 +1018,8 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 				m_channelOffsets[i] = -yoffs[i];
 				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(yoff).c_str());
 			}
+
+			//TODO: xzero is trigger time
 		}
 	}
 
