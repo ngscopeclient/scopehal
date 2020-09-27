@@ -124,7 +124,7 @@ protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
 	//acquisition
-	bool AcquireDataMSO56(std::map<int, std::vector<AnalogWaveform*> >& pending_waveforms);
+	bool AcquireDataMSO56(std::map<int, std::vector<WaveformBase*> >& pending_waveforms);
 
 	void DetectProbes();
 
@@ -163,6 +163,8 @@ protected:
 
 	//The lane number for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelLanes;
+
+	size_t m_digitalChannelBase;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

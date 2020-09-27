@@ -46,6 +46,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_sampleDepth(0)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
+	, m_digitalChannelBase(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_bandwidth(1000)
@@ -81,7 +82,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_transport->SendCommand("ACQ:MOD SAM");				//actual sampled data, no averaging etc
 			m_transport->SendCommand("VERB OFF");					//Disable verbose mode (send shorter commands)
 			m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
-			m_transport->SendCommand("DAT:WID 2");					//16-bit data
 			m_transport->SendCommand("ACQ:STOPA SEQ");				//Stop after acquiring a single waveform
 			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
 			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
@@ -171,6 +171,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	}
 
 	//Add all possible digital channels
+	m_digitalChannelBase = m_channels.size();
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -379,6 +380,24 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
 		if( (i < m_analogChannelCount) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
 			return;
+
+		//If we're a digital channel with an analog probe connected, we're unusable
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(i >= m_digitalChannelBase)
+				{
+					//If the parent analog channel doesn't have a digital probe, we're disabled
+					size_t parent = m_flexChannelParents[m_channels[i]];
+					if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
+						return;
+				}
+				break;
+
+			default:
+				break;
+		}
 	}
 
 	{
@@ -783,7 +802,6 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	{
 		lock_guard<recursive_mutex> lock2(m_mutex);
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
-		string reply = m_transport->ReadReply();
 		offset = -stof(m_transport->ReadReply());
 	}
 
@@ -851,7 +869,7 @@ bool TektronixOscilloscope::AcquireData()
 {
 	//LogDebug("Acquiring data\n");
 
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	map<int, vector<WaveformBase*> > pending_waveforms;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
@@ -948,7 +966,7 @@ bool TektronixOscilloscope::AcquireData()
 	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;
-		for(size_t j=0; j<m_analogChannelCount; j++)
+		for(size_t j=0; j<m_channels.size(); j++)
 		{
 			if(IsChannelEnabled(j))
 				s[m_channels[j]] = pending_waveforms[j][i];
@@ -956,8 +974,6 @@ bool TektronixOscilloscope::AcquireData()
 		m_pendingWaveforms.push_back(s);
 	}
 	m_pendingWaveformsMutex.unlock();
-
-	//TODO: support digital channels
 
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
@@ -970,7 +986,7 @@ bool TektronixOscilloscope::AcquireData()
 	return true;
 }
 
-bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >& pending_waveforms)
+bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Get record length
 	m_transport->SendCommand("HOR:RECO?");
@@ -980,11 +996,12 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 	m_transport->SendCommand("DAT:START 0");
 	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
 
-	map<size_t, double> xincrements;
 	map<size_t, double> ymults;
 	map<size_t, double> yoffs;
 
-	//Ask for the preambles
+	//Ask for the analog preambles
+	m_transport->SendCommand("DAT:WID 2");					//16-bit data
+	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
@@ -1005,7 +1022,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 
 			if(j == 11)
 			{
-				xincrements[i] = stof(reply) * 1e12;	//scope gives sec, not ps
+				timebase = round(stof(reply) * 1e12);	//scope gives sec, not ps
 				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrements[i]).c_str());
 			}
 			else if(j == 15)
@@ -1024,7 +1041,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		}
 	}
 
-	//Ask for and get the data
+	//Ask for and get the analog data
 	//(seems like batching here doesn't work)
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -1058,7 +1075,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = round(xincrements[i]);
+		cap->m_timescale = timebase;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
@@ -1077,6 +1094,83 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<AnalogWaveform*> >&
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
+
+		//Done
+		delete[] rxbuf;
+
+		//Throw out garbage at the end of the message (why is this needed?)
+		m_transport->ReadReply();
+	}
+
+	//Get the digital stuff
+	m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		//Skip anything without a digital probe connected
+		if(m_probeTypes[i] != PROBE_TYPE_DIGITAL_8BIT)
+		{
+			for(size_t j=0; j<8; j++)
+				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(NULL);
+			continue;
+		}
+
+		//Ask for all of the data
+		m_transport->SendCommand(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
+
+		//Ask for the waveform preamble
+		m_transport->SendCommand("WFMO?");
+
+		//Process it
+		for(int j=0; j<22; j++)
+		{
+			string reply = m_transport->ReadReply();
+
+			//LogDebug("preamble block %d = %s\n", j, reply.c_str());
+
+			if(j == 11)
+				timebase = round(stof(reply) * 1e12);	//scope gives sec, not ps
+		}
+
+		m_transport->SendCommand("CURV?");
+
+		//Read length of the actual data
+		char tmplen[3] = {0};
+		m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+		int ndigits = atoi(tmplen+1);
+
+		char digits[10] = {0};
+		m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+		int msglen = atoi(digits);
+
+		//Read the actual data
+		char* rxbuf = new char[msglen];
+		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
+
+		//Process the data for each channel
+		for(int j=0; j<8; j++)
+		{
+			//Set up the capture we're going to store our data into
+			//(no TDC data or fine timestamping available on Tektronix scopes?)
+			DigitalWaveform* cap = new DigitalWaveform;
+			cap->m_timescale = timebase;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time(NULL);
+			double t = GetTime();
+			cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+			cap->Resize(msglen);
+
+			//Extract sample data
+			int mask = (1 << j);
+			for(int k=0; k<msglen; k++)
+			{
+				cap->m_offsets[k] = k;
+				cap->m_durations[k] = 1;
+				cap->m_samples[k] = (rxbuf[k] & mask) ? true : false;
+			}
+
+			//Done, update the data
+			pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
+		}
 
 		//Done
 		delete[] rxbuf;
