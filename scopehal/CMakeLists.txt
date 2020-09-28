@@ -72,6 +72,7 @@ set(SCOPEHAL_SOURCES
 	PacketDecoder.cpp
 	PeakDetectionFilter.cpp
 	Statistic.cpp
+	SpectrumChannel.cpp
 	)
 
 add_library(scopehal SHARED

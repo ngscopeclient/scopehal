@@ -140,14 +140,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			for(size_t i=0; i<m_analogChannelCount; i++)
 			{
 				m_channels.push_back(
-					new OscilloscopeChannel(
+					new SpectrumChannel(
 					this,
 					string("CH") + to_string(i+1) + "_SPECTRUM",
 					OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 					colors_mso56[i % 4],
-					Unit(Unit::UNIT_HZ),
-					Unit(Unit::UNIT_DBM),
-					1,
 					m_channels.size(),
 					true));
 			}
@@ -1276,6 +1273,10 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Throw out garbage at the end of the message (why is this needed?)
 		m_transport->ReadReply();
+
+		//Look for peaks
+		//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
+		dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000);
 	}
 
 	//Get the digital stuff

@@ -27,87 +27,25 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopehal.h"
 
-#ifndef scopehal_h
-#define scopehal_h
+using namespace std;
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-#include <chrono>
-#include <thread>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+SpectrumChannel::SpectrumChannel(
+	Oscilloscope* scope,
+	string hwname,
+	OscilloscopeChannel::ChannelType type,
+	string color,
+	size_t index,
+	bool physical
+	)
+	: OscilloscopeChannel(scope, hwname, type, color, Unit(Unit::UNIT_HZ), Unit(Unit::UNIT_DBM), 1, index, physical)
+{
+}
 
-#include <yaml-cpp/yaml.h>
-
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
-
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
-
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
-
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "PeakDetectionFilter.h"
-#include "SpectrumChannel.h"
-
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
-
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
-
-std::string GetDefaultChannelColor(int i);
-
-std::string Trim(std::string str);
-std::string BaseName(std::string const& path);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
-void DetectCPUFeatures();
-
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
-
-//string to size_t conversion
-#ifdef _WIN32
-#define stos(str) static_cast<size_t>(stoll(str))
-#else
-#define stos(str) static_cast<size_t>(stol(str))
-#endif
-
-#endif
+SpectrumChannel::~SpectrumChannel()
+{
+}
