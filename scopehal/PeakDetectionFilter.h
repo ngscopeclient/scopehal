@@ -50,24 +50,37 @@ public:
 	float m_y;
 };
 
+class PeakDetector
+{
+public:
+	PeakDetector();
+	virtual ~PeakDetector();
+
+	const std::vector<Peak>& GetPeaks()
+	{ return m_peaks; }
+
+	void FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float search_hz);
+
+protected:
+	std::vector<Peak> m_peaks;
+};
+
 /**
+	@brief A filter that does peak detection
  */
-class PeakDetectionFilter : public Filter
+class PeakDetectionFilter
+	: public Filter
+	, public PeakDetector
 {
 public:
 	PeakDetectionFilter(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
 	virtual ~PeakDetectionFilter();
-
-	const std::vector<Peak>& GetPeaks()
-	{ return m_peaks; }
 
 protected:
 	void FindPeaks(AnalogWaveform* cap);
 
 	std::string m_numpeaksname;
 	std::string m_peakwindowname;
-
-	std::vector<Peak> m_peaks;
 };
 
 #endif

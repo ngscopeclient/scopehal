@@ -35,36 +35,22 @@
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
+// PeakDetector
 
-PeakDetectionFilter::PeakDetectionFilter(OscilloscopeChannel::ChannelType type, string color, Category cat)
-	: Filter(type, color, cat)
+PeakDetector::PeakDetector()
 {
-	m_numpeaksname = "Number of Peaks";
-	m_parameters[m_numpeaksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_numpeaksname].SetIntVal(10);
-
-	m_peakwindowname = "Peak Window";
-	m_parameters[m_peakwindowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_peakwindowname].SetFloatVal(500000); //500 kHz between peaks
 }
 
-PeakDetectionFilter::~PeakDetectionFilter()
+PeakDetector::~PeakDetector()
 {
-
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void PeakDetectionFilter::FindPeaks(AnalogWaveform* cap)
+void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float search_hz)
 {
-	int64_t max_peaks = m_parameters[m_numpeaksname].GetIntVal();
 	size_t nouts = cap->m_samples.size();
 	if(max_peaks > 0)
 	{
 		//Get peak search width in bins
-		float search_hz = m_parameters[m_peakwindowname].GetIntVal();
 		int64_t search_bins = ceil(search_hz / cap->m_timescale);
 		search_bins = min(search_bins, (int64_t)512);	//TODO: reasonable limit
 		int64_t search_rad = search_bins/2;
@@ -102,4 +88,35 @@ void PeakDetectionFilter::FindPeaks(AnalogWaveform* cap)
 		for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
 			m_peaks.push_back(peaks[i]);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+PeakDetectionFilter::PeakDetectionFilter(OscilloscopeChannel::ChannelType type, string color, Category cat)
+	: Filter(type, color, cat)
+{
+	m_numpeaksname = "Number of Peaks";
+	m_parameters[m_numpeaksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_numpeaksname].SetIntVal(10);
+
+	m_peakwindowname = "Peak Window";
+	m_parameters[m_peakwindowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_peakwindowname].SetFloatVal(500000); //500 kHz between peaks
+}
+
+PeakDetectionFilter::~PeakDetectionFilter()
+{
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void PeakDetectionFilter::FindPeaks(AnalogWaveform* cap)
+{
+	PeakDetector::FindPeaks(
+		cap,
+		m_parameters[m_numpeaksname].GetIntVal(),
+		m_parameters[m_peakwindowname].GetFloatVal());
 }
