@@ -334,11 +334,11 @@ void IBM8b10bDecoder::Refresh()
 
 		if(err5 || err3 || disperr)
 		{
-			LogDebug(
+			/*LogDebug(
 				"Symbol %zu (ctl5 = %d, err5 = %d, err3=%d, disperr=%d, code3=%d, code5=%d, "
 					"old_disp = %d, total_disp = %d, disp3 = %d, disp5 = %d)\n",
 				i,
-				ctl5, err5, err3, disperr, code3, code5, old_disp, total_disp, disp3, disp5);
+				ctl5, err5, err3, disperr, code3, code5, old_disp, total_disp, disp3, disp5);*/
 		}
 		/*
 		else
