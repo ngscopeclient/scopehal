@@ -825,7 +825,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
-					return 70;	//FIXME
+					m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:SCA?");
 				else
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
 				break;
@@ -851,7 +851,7 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	}
 
 	//If not analog, skip it
-	if(!IsAnalog(i))
+	if(!IsAnalog(i) && !IsSpectrum(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -860,7 +860,20 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
+			if(IsSpectrum(i))
+			{
+				double divsize = range/10;
+				double offset_div = (GetChannelOffset(i) / divsize) - 5;
+
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+					":VERT:SCA " + to_string(divsize));
+
+				//This seems to also mess up vertical position, so update that too to keep us centered
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+					":VERT:POS " + to_string(offset_div));
+			}
+			else
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
 			break;
 
 		default:
@@ -883,15 +896,36 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	}
 
 	//If not analog, return a placeholder value
-	if(!IsAnalog(i))
+	if(!IsAnalog(i) && !IsSpectrum(i))
 		return 0;
 
 	//Read offset
-	double offset;
+	double offset = 0;
 	{
 		lock_guard<recursive_mutex> lock2(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
-		offset = -stof(m_transport->ReadReply());
+
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(IsSpectrum(i))
+				{
+					//Position is reported in divisions, not dBm.
+					//It also seems to be negative, and reported from the top of the display rather than the middle.
+					m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?");
+					float pos = stof(m_transport->ReadReply());
+					offset = (pos+5) * (GetChannelVoltageRange(i)/10);
+				}
+				else
+				{
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+					offset = -stof(m_transport->ReadReply());
+				}
+				break;
+
+			default:
+				break;
+		}
 	}
 
 	//Update cache
@@ -909,7 +943,7 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 	}
 
 	//If not analog, skip it
-	if(i > m_analogChannelCount)
+	if(!IsAnalog(i) && !IsSpectrum(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -918,7 +952,16 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
+			if(IsSpectrum(i))
+			{
+				double divsize = GetChannelVoltageRange(i) / 10;
+				double offset_div = (offset / divsize) - 5;
+
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+					":VERT:POS " + to_string(offset_div));
+			}
+			else
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
 			break;
 
 		default:
