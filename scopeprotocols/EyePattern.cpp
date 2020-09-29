@@ -91,8 +91,8 @@ void EyeWaveform::Normalize()
 
 EyePattern::EyePattern(string color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_EYE, color, CAT_ANALYSIS)
-	, m_height(0)
-	, m_width(0)
+	, m_height(1)
+	, m_width(1)
 	, m_xoff(0)
 	, m_xscale(0)
 {
@@ -409,6 +409,8 @@ void EyePattern::Refresh()
 		if(offset > twidth)
 		{
 			iclock ++;
+			if(iclock + 1 >= cend)
+				break;
 			offset = tstart - clock->m_offsets[iclock+1] * clock->m_timescale;
 		}
 
@@ -446,9 +448,10 @@ void EyePattern::Refresh()
 		int64_t pixel_x_round2 = round(pixel_x_f + m_xscale*cap->m_uiWidth);
 		int64_t pixel_x_round3 = round(pixel_x_f - m_xscale*cap->m_uiWidth);
 		int64_t xpos[] = { pixel_x_round, pixel_x_round2, pixel_x_round3 };
+		int64_t w = m_width;
 		for(auto x : xpos)
 		{
-			if( (x+1 < (int64_t)m_width) && (x >= 0) )
+			if( (x+1 < w) && (x >= 0) )
 			{
 				row1[x+0] += bin1 * dx_frac;
 				row1[x+1] += bin1 * (1-dx_frac);

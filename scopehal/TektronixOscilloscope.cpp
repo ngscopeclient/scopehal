@@ -1258,6 +1258,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->Resize(nsamples);
 
 		//We get dBm from the instrument, so just have to convert double to single precision
+		//TODO: are other units possible here?
 		for(size_t j=0; j<nsamples; j++)
 		{
 			cap->m_offsets[j] = j;
