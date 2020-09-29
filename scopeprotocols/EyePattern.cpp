@@ -317,12 +317,7 @@ bool EyeDecoder::DetectModulationLevels(AnalogCapture* din, EyeCapture* cap)
 
 void EyePattern::ClearSweeps()
 {
-	auto pdata = GetData(0);
-	if(pdata != NULL)
-	{
-		delete pdata;
-		SetData(NULL, 0);
-	}
+	SetData(NULL, 0);
 }
 
 double EyePattern::GetOffset()
