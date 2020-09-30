@@ -19,6 +19,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DownsampleFilter.cpp
 	DramRefreshActivateMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
+	DutyCycleMeasurement.cpp
 	DVIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
