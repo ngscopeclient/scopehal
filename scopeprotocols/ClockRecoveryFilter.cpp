@@ -132,7 +132,7 @@ void ClockRecoveryFilter::Refresh()
 	//Convert nominal baud period to ps
 	//Round nominal period to nearest ps, but use the floating point value for the CDR PLL
 	float period = 1.0e12f / m_parameters[m_baudname].GetFloatVal();
-	int64_t ps = round(ps);
+	int64_t ps = round(period);
 	m_nominalPeriod = ps;
 
 	//Create the output waveform and copy our timescales
