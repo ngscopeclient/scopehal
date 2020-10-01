@@ -41,7 +41,7 @@ class Instrument;
 #include "SCPITransport.h"
 
 /**
-	@brief Generic representation of an oscilloscope or logic analyzer.
+	@brief Generic representation of an oscilloscope, logic analyzer, or spectrum analyzer.
 
 	An Oscilloscope contains triggering logic and one or more OscilloscopeChannel objects.
  */
@@ -525,6 +525,53 @@ public:
 		@brief Gets the threshold for a digital input
 	 */
 	virtual void SetDigitalThreshold(size_t channel, float level);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Frequency domain channel configuration
+
+	/**
+		@brief Sets the span for frequency-domain channels
+
+		@param span		Span, in Hz
+	 */
+	virtual void SetSpan(int64_t span);
+
+	/**
+		@brief Gets the span for frequency-domain channels
+	 */
+	virtual int64_t GetSpan();
+
+	/**
+		@brief Sets the center frequency for frequency-domain channels
+
+		@param channel	Channel number
+		@param freq		Center frequency, in Hz
+	 */
+	virtual void SetCenterFrequency(size_t channel, int64_t freq);
+
+	/**
+		@brief Gets the center frequency for a frequency-domain channel
+
+		@param channel	Channel number
+	 */
+	virtual int64_t GetCenterFrequency(size_t channel);
+
+	/**
+		@brief Gets the resolution bandwidth for frequency-domain channels
+	 */
+	virtual void SetResolutionBandwidth(int64_t rbw);
+
+	/**
+		@brief Gets the resolution bandwidth for frequency-domain channels
+	 */
+	virtual int64_t GetResolutionBandwidth();
+
+	/**
+		@brief Returns true if the instrument has at least one frequency-domain channel
+	 */
+	virtual bool HasFrequencyControls();
+
+	//TODO: window controls
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage

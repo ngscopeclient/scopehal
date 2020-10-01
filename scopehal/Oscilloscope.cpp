@@ -448,3 +448,38 @@ vector<string> Oscilloscope::GetTriggerTypes()
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	return ret;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Spectrum analyzer configuration (default no-op for scopes without SA feature)
+
+void Oscilloscope::SetSpan(int64_t /*span*/)
+{
+}
+
+int64_t Oscilloscope::GetSpan()
+{
+	return 1;
+}
+
+void Oscilloscope::SetCenterFrequency(size_t /*channel*/, int64_t /*freq*/)
+{
+}
+
+int64_t Oscilloscope::GetCenterFrequency(size_t /*channel*/)
+{
+	return 0;
+}
+
+void Oscilloscope::SetResolutionBandwidth(int64_t /*freq*/)
+{
+}
+
+int64_t Oscilloscope::GetResolutionBandwidth()
+{
+	return 1;
+}
+
+bool Oscilloscope::HasFrequencyControls()
+{
+	return false;
+}
