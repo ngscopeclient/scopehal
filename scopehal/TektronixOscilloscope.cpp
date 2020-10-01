@@ -86,6 +86,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
 			m_transport->SendCommand("HOR:MODE MAN");				//Enable manual sample rate and record length
 			m_transport->SendCommand("HOR:DEL:MOD ON");				//Horizontal position is in time units
+			m_transport->SendCommand("SV:RBWMODE MAN");				//Manual resolution bandwidth control
+			m_transport->SendCommand("SV:LOCKCENTER 0");			//Allow separate center freq per channel
 			break;
 
 		default:
@@ -1244,6 +1246,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Process it
 		double hzbase = 0;
+		double hzoff = 0;
 		for(int j=0; j<22; j++)
 		{
 			string reply = m_transport->ReadReply();
@@ -1254,6 +1257,11 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			{
 				hzbase = round(stof(reply));
 				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(hzbase).c_str());
+			}
+			else if(j == 12)
+			{
+				hzoff = round(stof(reply));
+				//LogDebug("xzero = %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(hzbase).c_str());
 			}
 			else if(j == 15)
 			{
@@ -1266,8 +1274,6 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 				m_channelOffsets[i] = -yoff;
 				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_DBM).PrettyPrint(yoff).c_str());
 			}
-
-			//TODO: xzero is trigger time
 		}
 
 		//Read the data block
@@ -1302,9 +1308,10 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//We get dBm from the instrument, so just have to convert double to single precision
 		//TODO: are other units possible here?
+		int64_t ibase = hzoff / hzbase;
 		for(size_t j=0; j<nsamples; j++)
 		{
-			cap->m_offsets[j] = j;
+			cap->m_offsets[j] = j + ibase;
 			cap->m_durations[j] = 1;
 			cap->m_samples[j] = ymult*samples[j] + yoff;
 		}
@@ -2096,5 +2103,99 @@ void TektronixOscilloscope::SetDigitalThreshold(size_t channel, float level)
 
 		default:
 			break;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Spectrum analyzer configuration
+
+bool TektronixOscilloscope::HasFrequencyControls()
+{
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+void TektronixOscilloscope::SetSpan(int64_t span)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(string("SV:SPAN ") + to_string(span));
+			break;
+
+		default:
+			break;
+	}
+}
+
+int64_t TektronixOscilloscope::GetSpan()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("SV:SPAN?");
+			return round(stod(m_transport->ReadReply()));
+
+		default:
+			return 1;
+	}
+}
+
+void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//CH1:SV:CENTERFREQUENCY 100.0000E+6;
+}
+
+int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	return 1;
+}
+
+void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(string("SV:RBW ") + to_string(rbw));
+			break;
+
+		default:
+			break;
+	}
+}
+
+int64_t TektronixOscilloscope::GetResolutionBandwidth()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("SV:RBW?");
+			return round(stod(m_transport->ReadReply()));
+
+		default:
+			return 1;
 	}
 }

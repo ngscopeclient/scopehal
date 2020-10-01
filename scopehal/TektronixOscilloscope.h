@@ -120,6 +120,17 @@ public:
 	virtual void SetDigitalHysteresis(size_t channel, float level);
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Spectrum analyzer configuration
+
+	virtual bool HasFrequencyControls();
+	virtual void SetSpan(int64_t span);
+	virtual int64_t GetSpan();
+	virtual void SetCenterFrequency(size_t channel, int64_t freq);
+	virtual int64_t GetCenterFrequency(size_t channel);
+	virtual void SetResolutionBandwidth(int64_t rbw);
+	virtual int64_t GetResolutionBandwidth();
+
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
