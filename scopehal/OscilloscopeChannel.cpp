@@ -235,6 +235,12 @@ void OscilloscopeChannel::SetDigitalThreshold(float level)
 		m_scope->SetDigitalThreshold(m_index, level);
 }
 
+void OscilloscopeChannel::SetCenterFrequency(int64_t freq)
+{
+	if(m_scope)
+		m_scope->SetCenterFrequency(m_index, freq);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

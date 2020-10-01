@@ -183,6 +183,8 @@ public:
 	void SetDigitalHysteresis(float level);
 	void SetDigitalThreshold(float level);
 
+	void SetCenterFrequency(int64_t freq);
+
 protected:
 
 	/**

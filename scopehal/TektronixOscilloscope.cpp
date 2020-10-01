@@ -2158,14 +2158,34 @@ void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//CH1:SV:CENTERFREQUENCY 100.0000E+6;
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(
+				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY " + to_string(freq));
+			break;
+
+		default:
+			break;
+	}
 }
 
 int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	return 1;
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(
+				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?");
+			return round(stof(m_transport->ReadReply()));
+
+		default:
+			return 0;
+	}
 }
 
 void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)
