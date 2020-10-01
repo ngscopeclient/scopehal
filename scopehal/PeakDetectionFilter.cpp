@@ -79,7 +79,7 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 
 			//If the highest point in the search window is at our location, we're a peak
 			if(max_delta == 0)
-				peaks.push_back(Peak(i, max_value));
+				peaks.push_back(Peak(cap->m_offsets[i], max_value));
 		}
 
 		//Sort the peak table and pluck out the requested count
