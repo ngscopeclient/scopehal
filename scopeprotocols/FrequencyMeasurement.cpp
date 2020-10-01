@@ -136,14 +136,15 @@ void FrequencyMeasurement::Refresh()
 		double start = edges[i];
 		double end = edges[i+2];
 
-		double delta = 1.0e12 / (end - start);
+		double delta = end - start;
+		double freq = 1.0e12 / delta;
 
 		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(delta);
-		cap->m_samples.push_back(delta);
+		cap->m_durations.push_back(round(delta));
+		cap->m_samples.push_back(freq);
 
-		rmin = min(rmin, delta);
-		rmax = max(rmax, delta);
+		rmin = min(rmin, freq);
+		rmax = max(rmax, freq);
 	}
 
 	m_range = rmax - rmin;

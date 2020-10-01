@@ -62,6 +62,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
 	SubtractFilter.cpp
+	TachometerFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	TMDSDecoder.cpp

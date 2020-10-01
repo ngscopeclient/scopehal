@@ -144,6 +144,9 @@ string Unit::PrettyPrint(double value)
 		case UNIT_UI:
 			unit = "UI";
 			break;
+		case UNIT_RPM:
+			unit = "RPM";
+			break;
 
 		//Degrees do not use SI prefixes
 		case UNIT_DEGREES:
