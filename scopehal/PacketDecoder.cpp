@@ -33,15 +33,15 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Color schemes
 
-Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
+Gdk::Color PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
 {
-	Gdk::Color("#101010"),		//COLOR_DEFAULT
-	Gdk::Color("#800000"),		//COLOR_ERROR
-	Gdk::Color("#000080"),		//COLOR_STATUS
-	Gdk::Color("#808000"),		//COLOR_CONTROL
-	Gdk::Color("#336699"),		//COLOR_DATA_READ
-	Gdk::Color("#339966"),		//COLOR_DATA_WRITE
-	Gdk::Color("#600050"),		//COLOR_COMMAND
+	Gdk::Color("#101010"),		//PROTO_COLOR_DEFAULT
+	Gdk::Color("#800000"),		//PROTO_COLOR_ERROR
+	Gdk::Color("#000080"),		//PROTO_COLOR_STATUS
+	Gdk::Color("#808000"),		//PROTO_COLOR_CONTROL
+	Gdk::Color("#336699"),		//PROTO_COLOR_DATA_READ
+	Gdk::Color("#339966"),		//PROTO_COLOR_DATA_WRITE
+	Gdk::Color("#600050"),		//PROTO_COLOR_COMMAND
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +49,7 @@ Gdk::Color PacketDecoder::m_backgroundColors[STANDARD_COLOR_COUNT] =
 
 Packet::Packet()
 	: m_displayForegroundColor(Gdk::Color("#ffffff"))
-	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::COLOR_DEFAULT])
+	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::PROTO_COLOR_DEFAULT])
 {
 }
 

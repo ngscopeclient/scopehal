@@ -216,7 +216,7 @@ void SPIFlashDecoder::Refresh()
 							else
 								state = STATE_WRITE_DATA;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_CONTROL];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
 							break;
 
 						//x1 program
@@ -238,7 +238,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
 						//Slow read (no dummy clocks)
@@ -260,7 +260,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						//Clear write enable flag
@@ -268,7 +268,7 @@ void SPIFlashDecoder::Refresh()
 							current_cmd = SPIFlashSymbol::CMD_WRITE_DISABLE;
 							state = STATE_IDLE;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_CONTROL];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
 							break;
 
 						//Set write enable flag
@@ -276,7 +276,7 @@ void SPIFlashDecoder::Refresh()
 							current_cmd = SPIFlashSymbol::CMD_WRITE_ENABLE;
 							state = STATE_IDLE;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_CONTROL];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
 							break;
 
 						//Fast read (with dummy clocks)
@@ -300,7 +300,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						//Read the status register
@@ -321,7 +321,7 @@ void SPIFlashDecoder::Refresh()
 							else
 								state = STATE_READ_DATA;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 							break;
 
 						//Quad input page program
@@ -343,7 +343,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_WRITE];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							break;
 
 						//0x3b 1-1-2 fast read
@@ -367,7 +367,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						//Read the IDCODE
@@ -376,7 +376,7 @@ void SPIFlashDecoder::Refresh()
 							state = STATE_DUMMY_BEFORE_DATA;
 							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 							break;
 
 						//0xbb 1-2-2 fast read
@@ -401,7 +401,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
 						//1-4-4 fast read
@@ -423,7 +423,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 							}
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						//Reset should occur by itself, ignore any data after that
@@ -431,7 +431,7 @@ void SPIFlashDecoder::Refresh()
 							current_cmd = SPIFlashSymbol::CMD_RESET;
 							state = STATE_IDLE;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
 						////////////////////////////////////////////////////////////////////////////////////////////////
@@ -444,7 +444,7 @@ void SPIFlashDecoder::Refresh()
 							address_bytes_left = 2;
 							addr = 0;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
 						//Read a page of NAND
@@ -454,7 +454,7 @@ void SPIFlashDecoder::Refresh()
 							address_bytes_left = 2;
 							addr = 0;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_COMMAND];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
 						//0x0c fast read with 4 byte address
@@ -473,7 +473,7 @@ void SPIFlashDecoder::Refresh()
 							current_cmd = SPIFlashSymbol::CMD_UNKNOWN;
 							state = STATE_IDLE;
 
-							pack->m_displayBackgroundColor = m_backgroundColors[COLOR_ERROR];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							break;
 					}
 
@@ -1108,7 +1108,7 @@ Packet* SPIFlashDecoder::CreateMergedHeader(Packet* pack)
 		ret->m_offset = pack->m_offset;
 		ret->m_len = pack->m_len;			//TODO: extend?
 		ret->m_headers["Op"] = "Poll Status";
-		ret->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 
 		//TODO: add other fields?
 		return ret;

@@ -302,7 +302,7 @@ void I2CEepromDecoder::Refresh()
 					{
 						cap->m_samples[nlast].m_type = I2CEepromSymbol::TYPE_POLL_BUSY;
 						pack->m_headers["Type"] = "Poll - Busy";
-						pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 						m_packets.push_back(pack);
 						pack = NULL;
 						state = 0;
@@ -330,7 +330,7 @@ void I2CEepromDecoder::Refresh()
 				{
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_POLL_OK;
 					pack->m_headers["Type"] = "Poll - OK";
-					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 					m_packets.push_back(pack);
 					pack = NULL;
 					state = 0;
@@ -392,7 +392,7 @@ void I2CEepromDecoder::Refresh()
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_SELECT_READ;
 					state = 6;
 					pack->m_headers["Type"] = "Read";
-					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_READ];
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 				}
 				else if(s.m_stype == I2CSymbol::TYPE_DATA)
 				{
@@ -408,7 +408,7 @@ void I2CEepromDecoder::Refresh()
 					//Update type of the transaction
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_SELECT_WRITE;
 					pack->m_headers["Type"] = "Write";
-					pack->m_displayBackgroundColor = m_backgroundColors[COLOR_DATA_WRITE];
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 				}
 				else
 					state = 0;
@@ -616,7 +616,7 @@ Packet* I2CEepromDecoder::CreateMergedHeader(Packet* pack)
 		ret->m_offset = pack->m_offset;
 		ret->m_len = pack->m_len;				//TODO: extend?
 		ret->m_headers["Type"] = "Poll";
-		ret->m_displayBackgroundColor = m_backgroundColors[COLOR_STATUS];
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 
 		//TODO: add other fields?
 		return ret;
