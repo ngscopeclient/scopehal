@@ -55,8 +55,14 @@ bool FrequencyMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if(i > 0)
+		return false;
+
+	if( (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) ||
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	{
 		return true;
+	}
 
 	return false;
 }
@@ -105,19 +111,26 @@ double FrequencyMeasurement::GetOffset()
 void FrequencyMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
 
-	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(din);
-
-	//Timestamps of the edges
+	auto din = GetInputWaveform(0);
+	auto din_analog = GetAnalogInputWaveform(0);
+	auto din_digital = GetDigitalInputWaveform(0);
 	vector<double> edges;
-	FindZeroCrossings(din, midpoint, edges);
+
+	//Auto-threshold analog signals at 50% of full scale range
+	if(din_analog)
+		FindZeroCrossings(din_analog, GetAvgVoltage(din_analog), edges);
+
+	//Just find edges in digital signals
+	else
+		FindZeroCrossings(din_digital, edges);
+
+	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
 		SetData(NULL, 0);

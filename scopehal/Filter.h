@@ -203,6 +203,10 @@ protected:
 	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
 
+	//Find edges in a signal (discarding repeated samples)
+	void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
+	void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
+
 public:
 	typedef Filter* (*CreateProcType)(std::string);
 	static void DoAddDecoderClass(std::string name, CreateProcType proc);
