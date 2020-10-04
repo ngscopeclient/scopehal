@@ -277,6 +277,7 @@ void SWDDecoder::Refresh()
 						state = STATE_DATA;
 
 					tstart = off+dur;
+					bitcount = 0;
 				}
 				break;
 
@@ -292,6 +293,7 @@ void SWDDecoder::Refresh()
 				break;
 
 			case STATE_DATA:
+
 				//read LSB first data
 				current_word >>= 1;
 				if(samples.m_samples[i])
@@ -327,16 +329,11 @@ void SWDDecoder::Refresh()
 				break;
 
 			case STATE_READ_TURNAROUND:
-				bitcount ++;
+				state = STATE_IDLE;
 
-				if(bitcount == read_turn)
-				{
-					state = STATE_IDLE;
-
-					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back(last_dur);
-					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_TURNAROUND, samples.m_samples[i]));
-				}
+				cap->m_offsets.push_back(tstart);
+				cap->m_durations.push_back(last_dur);
+				cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_TURNAROUND, samples.m_samples[i]));
 				break;
 		}
 
