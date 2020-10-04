@@ -91,9 +91,6 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(SWDDecoder)
-
-protected:
-	std::string m_readTurnaround;
 };
 
 #endif

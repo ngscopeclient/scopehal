@@ -47,10 +47,6 @@ SWDDecoder::SWDDecoder(string color)
 {
 	CreateInput("SWCLK");
 	CreateInput("SWDIO");
-
-	m_readTurnaround = "Read Turnaround Cycles";
-	m_parameters[m_readTurnaround] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_readTurnaround].SetIntVal(4);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,8 +102,6 @@ void SWDDecoder::Refresh()
 	//Get the input data
 	auto clk = GetDigitalInputWaveform(0);
 	auto data = GetDigitalInputWaveform(1);
-
-	int read_turn = m_parameters[m_readTurnaround].GetIntVal();
 
 	//Create the capture
 	auto cap = new SWDWaveform;
