@@ -140,11 +140,14 @@ void SWDMemAPDecoder::Refresh()
 		STATE_DATA,
 		STATE_DATA_PARITY
 	} state = STATE_IDLE;
+	int64_t packstart = 0;
 	int64_t tstart = 0;
 	uint8_t reg_addr = 0;
 	uint32_t reg_data = 0;
 	uint32_t tar = 0;
 	bool reading = true;
+	bool access_is_ap = false;
+	bool first_read = false;
 	char tmp[128];
 	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
@@ -158,7 +161,7 @@ void SWDMemAPDecoder::Refresh()
 			case STATE_IDLE:
 				if(s.m_stype == SWDSymbol::TYPE_START)
 				{
-					tstart = din->m_offsets[i];
+					packstart = din->m_offsets[i];
 					state = STATE_TYPE;
 
 					//Create a new packet. If we already have an incomplete one that got aborted, reset it
@@ -179,14 +182,14 @@ void SWDMemAPDecoder::Refresh()
 			case STATE_TYPE:
 				if(s.m_stype == SWDSymbol::TYPE_AP_NDP)
 				{
-					//It's an AP access.
-					//For now, assume we're talking to a MEM-AP.
+					//For now, assume we're talking to a MEM-AP if it's an AP
+					//(no JTAG-AP support)
 					if(s.m_data == 1)
-						state = STATE_RW;
-
-					//DP register access (ignore)
+						access_is_ap = true;
 					else
-						state = STATE_IDLE;
+						access_is_ap = false;
+
+					state = STATE_RW;
 				}
 				else
 					state = STATE_IDLE;
@@ -278,8 +281,46 @@ void SWDMemAPDecoder::Refresh()
 			case STATE_DATA_PARITY:
 				if(s.m_stype == SWDSymbol::TYPE_PARITY_OK)
 				{
-					//DRW
-					if(reg_addr == 0xc)
+					bool mem_access = false;
+
+					if(access_is_ap)
+					{
+						//MEM-AP DRW
+						if(reg_addr == 0xc)
+						{
+							//This is the first time we've read DRW.
+							//This initiates the read, but doesn't actually give us the data.
+							if(first_read && reading)
+								first_read = false;
+
+							else
+								mem_access = true;
+						}
+
+						//MEM-AP TAR
+						//Save transfer address, not actually doing a memory access
+						if(!reading && (reg_addr == 0x4) )
+						{
+							tar = reg_data;
+							first_read = true;
+							tstart = packstart;
+						}
+					}
+
+					else
+					{
+						//DP register 4 is CTRL/STAT, ignore
+
+						//TODO: DP register 8 read is READ RESEND
+						//DP register 8 write is AP SELECT, ignore
+
+						//SW-DP RDBUFF
+						if(reg_addr == 0xc)
+							mem_access = true;
+					}
+
+					//This transaction completes a memory access
+					if(mem_access)
 					{
 						cap->m_offsets.push_back(tstart);
 						cap->m_durations.push_back(end - tstart);
@@ -301,11 +342,9 @@ void SWDMemAPDecoder::Refresh()
 						pack->m_headers["Data"] = tmp;
 						m_packets.push_back(pack);
 						pack = NULL;
-					}
 
-					//Save transfer address, not actually doing a memory access
-					if(!reading && (reg_addr == 0x4) )
-						tar = reg_data;
+						tstart = end;
+					}
 
 					//Done (ignore turnaround after data)
 					state = STATE_IDLE;
