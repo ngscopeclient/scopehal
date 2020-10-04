@@ -2086,7 +2086,9 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 				bool sample = block[base + j];
 
 				//Deduplicate consecutive samples with same value
-				if(last == sample)
+				//FIXME: temporary workaround for rendering bugs
+				//if(last == sample)
+				if( (last == sample) && ((j+3) < num_samples) )
 					cap->m_durations[k] ++;
 
 				//Nope, it toggled - store the new value
