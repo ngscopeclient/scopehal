@@ -98,6 +98,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
 	AddDecoderClass(SubtractFilter);
+	AddDecoderClass(SWDDecoder);
 	AddDecoderClass(TachometerFilter);
 	AddDecoderClass(ThresholdFilter);
 	AddDecoderClass(TIEMeasurement);

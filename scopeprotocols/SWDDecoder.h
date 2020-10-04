@@ -30,95 +30,69 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SWDDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef SWDDecoder_h
+#define SWDDecoder_h
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
+class SWDSymbol
+{
+public:
+	enum stype
+	{
+		TYPE_START,
+		TYPE_AP_NDP,
+		TYPE_R_NW,
+		TYPE_ADDRESS,
+		TYPE_PARITY_OK,
+		TYPE_PARITY_BAD,
+		TYPE_STOP,
+		TYPE_PARK,
+		TYPE_TURNAROUND,
+		TYPE_ACK,
+		TYPE_DATA,
+		TYPE_ERROR
+	};
 
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCOffsetFilter.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DutyCycleMeasurement.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "I2CEepromDecoder.h"
-#include "IPv4Decoder.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PeakHoldFilter.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "QSPIDecoder.h"
-#include "QuadratureDecoder.h"
-#include "RiseMeasurement.h"
-#include "SPIDecoder.h"
-#include "SPIFlashDecoder.h"
-#include "SubtractFilter.h"
-#include "SWDDecoder.h"
-#include "TachometerFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
+	SWDSymbol()
+	{}
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+	SWDSymbol(stype t, uint32_t d)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
 
-void ScopeProtocolStaticInit();
+	stype m_stype;
+	uint32_t m_data;
+
+	bool operator== (const SWDSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<SWDSymbol> SWDWaveform;
+
+class SWDDecoder : public Filter
+{
+public:
+	SWDDecoder(std::string color);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(SWDDecoder)
+
+protected:
+};
 
 #endif
