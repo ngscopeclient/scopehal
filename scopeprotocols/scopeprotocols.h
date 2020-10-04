@@ -99,6 +99,7 @@
 #include "SPIFlashDecoder.h"
 #include "SubtractFilter.h"
 #include "SWDDecoder.h"
+#include "SWDMemAPDecoder.h"
 #include "TachometerFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"

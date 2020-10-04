@@ -30,93 +30,62 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of SWDMemAPDecoder
  */
+#ifndef SWDMemAPDecoder_h
+#define SWDMemAPDecoder_h
 
-#include "scopeprotocols.h"
+#include "../scopehal/PacketDecoder.h"
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class SWDMemAPSymbol
 {
-	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurement);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationFilter);
-	AddDecoderClass(ClockRecoveryFilter);
-	AddDecoderClass(CTLEFilter);
-	AddDecoderClass(CurrentShuntFilter);
-	AddDecoderClass(DCOffsetFilter);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedFilter);
-	AddDecoderClass(DeskewFilter);
-	AddDecoderClass(DownconvertFilter);
-	AddDecoderClass(DownsampleFilter);
-	AddDecoderClass(DramRefreshActivateMeasurement);
-	AddDecoderClass(DramRowColumnLatencyMeasurement);
-	AddDecoderClass(DutyCycleMeasurement);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurement);
-	AddDecoderClass(EyePattern);
-	AddDecoderClass(EyeHeightMeasurement);
-	AddDecoderClass(EyeJitterMeasurement);
-	AddDecoderClass(EyePeriodMeasurement);
-	AddDecoderClass(EyeWidthMeasurement);
-	AddDecoderClass(FallMeasurement);
-	AddDecoderClass(FFTFilter);
-	AddDecoderClass(FrequencyMeasurement);
-	AddDecoderClass(HorizontalBathtub);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MagnitudeFilter);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
-	AddDecoderClass(OvershootMeasurement);
-	AddDecoderClass(ParallelBus);
-	AddDecoderClass(PeakHoldFilter);
-	AddDecoderClass(PeriodMeasurement);
-	AddDecoderClass(PkPkMeasurement);
-	AddDecoderClass(QSPIDecoder);
-	AddDecoderClass(QuadratureDecoder);
-	AddDecoderClass(RiseMeasurement);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(SPIFlashDecoder);
-	AddDecoderClass(SubtractFilter);
-	AddDecoderClass(SWDDecoder);
-	AddDecoderClass(SWDMemAPDecoder);
-	AddDecoderClass(TachometerFilter);
-	AddDecoderClass(ThresholdFilter);
-	AddDecoderClass(TIEMeasurement);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurement);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryFilter);
-	AddDecoderClass(UndershootMeasurement);
-	AddDecoderClass(UpsampleFilter);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(Waterfall);
-	AddDecoderClass(WindowedAutocorrelationFilter);
+public:
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	SWDMemAPSymbol()
+	{}
+
+	SWDMemAPSymbol(bool write, uint32_t addr, uint32_t data)
+	 : m_write(write)
+	 , m_addr(addr)
+	 , m_data(data)
+	{}
+
+	bool m_write;
+	uint32_t m_addr;
+	uint32_t m_data;
+
+	bool operator== (const SWDMemAPSymbol& s) const
+	{
+		return (m_write == s.m_write) && (m_addr == s.m_addr) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<SWDMemAPSymbol> SWDMemAPWaveform;
+
+class SWDMemAPDecoder : public PacketDecoder
+{
+public:
+	SWDMemAPDecoder(std::string color);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	std::vector<std::string> GetHeaders();
+
+	virtual double GetVoltageRange();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(SWDMemAPDecoder)
+
+protected:
+};
+
+#endif
