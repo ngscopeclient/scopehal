@@ -143,7 +143,7 @@ bool VICPSocketTransport::SendCommand(string cmd)
 	return true;
 }
 
-string VICPSocketTransport::ReadReply()
+string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSemicolon, VICP has different framing
 {
 	string payload;
 	while(true)

@@ -79,7 +79,7 @@ bool SCPINullTransport::SendCommand(string /*cmd*/)
 	return true;
 }
 
-string SCPINullTransport::ReadReply()
+string SCPINullTransport::ReadReply(bool /*endOnSemicolon*/)
 {
 	return "";
 }

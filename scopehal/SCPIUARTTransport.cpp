@@ -97,7 +97,7 @@ bool SCPIUARTTransport::SendCommand(string cmd)
 	return m_uart.Write((unsigned char*)tempbuf.c_str(), tempbuf.length());
 }
 
-string SCPIUARTTransport::ReadReply()
+string SCPIUARTTransport::ReadReply(bool endOnSemicolon)
 {
 	//FIXME: there *has* to be a more efficient way to do this...
 	// (see the same code in Socket)
@@ -107,7 +107,7 @@ string SCPIUARTTransport::ReadReply()
 	{
 		if(!m_uart.Read((unsigned char*)&tmp, 1))
 			break;
-		if( (tmp == '\n') || (tmp == ';') )
+		if( (tmp == '\n') || ( (tmp == ';') && endOnSemicolon ) )
 			break;
 		else
 			ret += tmp;

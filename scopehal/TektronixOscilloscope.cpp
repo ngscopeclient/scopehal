@@ -1130,8 +1130,29 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	m_transport->SendCommand("DAT:START 0");
 	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
 
-	double ymult = 0;
-	double yoff = 0;
+	//Preamble fields (not all are used)
+	int byte_num;
+	int bit_num;
+	char encoding[32];
+	char bin_format[32];
+	char asc_format[32];
+	char byte_order[32];
+	char wfid[256];
+	int nr_pt;
+	char pt_fmt[32];
+	char pt_order[32];
+	char xunit[32];
+	double xincrement;
+	double xzero;
+	int pt_off;
+	char yunit[32];
+	double ymult;
+	double yoff;
+	double yzero;
+	char domain[32];
+	char wfmtype[32];
+	double centerfreq;
+	double span;
 
 	//Ask for the analog data
 	m_transport->SendCommand("DAT:WID 2");					//16-bit data
@@ -1148,32 +1169,16 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Ask for the waveform preamble
 		m_transport->SendCommand("WFMO?");
 
-		//Process it
-		for(int j=0; j<22; j++)
-		{
-			string reply = m_transport->ReadReply();
+		//Process it (grab the whole block, semicolons and all)
+		string preamble = m_transport->ReadReply(false);
+		sscanf(preamble.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
+			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
 
-			//LogDebug("preamble block %d = %s\n", j, reply.c_str());
-
-			if(j == 11)
-			{
-				timebase = round(stof(reply) * 1e12);	//scope gives sec, not ps
-				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_PS).PrettyPrint(xincrements[i]).c_str());
-			}
-			else if(j == 15)
-			{
-				ymult = stof(reply);
-				//LogDebug("ymult = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(ymult).c_str());
-			}
-			else if(j == 17)
-			{
-				yoff = stof(reply);
-				m_channelOffsets[i] = -yoff;
-				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_VOLTS).PrettyPrint(yoff).c_str());
-			}
-
-			//TODO: xzero is trigger time
-		}
+		timebase = xincrement * 1e12;	//scope gives sec, not ps
+		m_channelOffsets[i] = -yoff;
 
 		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
 		LogIndenter li2;
@@ -1247,34 +1252,13 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Process it
 		double hzbase = 0;
 		double hzoff = 0;
-		for(int j=0; j<22; j++)
-		{
-			string reply = m_transport->ReadReply();
-
-			//LogDebug("preamble block %d = %s\n", j, reply.c_str());
-
-			if(j == 11)
-			{
-				hzbase = round(stof(reply));
-				//LogDebug("xincrement = %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(hzbase).c_str());
-			}
-			else if(j == 12)
-			{
-				hzoff = round(stof(reply));
-				//LogDebug("xzero = %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(hzbase).c_str());
-			}
-			else if(j == 15)
-			{
-				ymult = stof(reply);
-				//LogDebug("ymult = %s\n", Unit(Unit::UNIT_DBM).PrettyPrint(ymult).c_str());
-			}
-			else if(j == 17)
-			{
-				yoff = stof(reply);
-				m_channelOffsets[i] = -yoff;
-				//LogDebug("yoff = %s\n", Unit(Unit::UNIT_DBM).PrettyPrint(yoff).c_str());
-			}
-		}
+		string preamble = m_transport->ReadReply(false);
+		sscanf(preamble.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
+			xunit, &hzbase, &hzoff,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
+		m_channelOffsets[i] = -yoff;
 
 		//Read the data block
 		m_transport->SendCommand("CURV?");
@@ -1364,15 +1348,13 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		m_transport->SendCommand("WFMO?");
 
 		//Process it
-		for(int j=0; j<22; j++)
-		{
-			string reply = m_transport->ReadReply();
-
-			//LogDebug("preamble block %d = %s\n", j, reply.c_str());
-
-			if(j == 11)
-				timebase = round(stof(reply) * 1e12);	//scope gives sec, not ps
-		}
+		string preamble = m_transport->ReadReply(false);
+		sscanf(preamble.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
+			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
+		timebase = xincrement * 1e12;	//scope gives sec, not ps
 
 		m_transport->SendCommand("CURV?");
 

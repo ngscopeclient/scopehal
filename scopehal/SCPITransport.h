@@ -49,7 +49,7 @@ public:
 	virtual std::string GetName() =0;
 
 	virtual bool SendCommand(std::string cmd) =0;
-	virtual std::string ReadReply() =0;
+	virtual std::string ReadReply(bool endOnSemicolon = true) =0;
 	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
 	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
 

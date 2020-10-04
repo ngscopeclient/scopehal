@@ -147,7 +147,7 @@ bool SCPILxiTransport::SendCommand(string cmd)
 	return (result != LXI_ERROR);
 }
 
-string SCPILxiTransport::ReadReply()
+string SCPILxiTransport::ReadReply(bool endOnSemicolon)
 {
 	string ret;
 
@@ -161,7 +161,7 @@ string SCPILxiTransport::ReadReply()
 		if (m_data_depleted)
 			break;
 		ReadRawData(1, (unsigned char *)&tmp);
-		if( (tmp == '\n') || (tmp == ';') )
+		if( (tmp == '\n') || ( (tmp == ';') && endOnSemicolon ) )
 			break;
 		else
 			ret += tmp;
