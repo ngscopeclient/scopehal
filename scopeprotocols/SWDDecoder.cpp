@@ -47,6 +47,10 @@ SWDDecoder::SWDDecoder(string color)
 {
 	CreateInput("SWCLK");
 	CreateInput("SWDIO");
+
+	m_readTurnaround = "Read Turnaround Cycles";
+	m_parameters[m_readTurnaround] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_readTurnaround].SetIntVal(4);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -103,6 +107,8 @@ void SWDDecoder::Refresh()
 	auto clk = GetDigitalInputWaveform(0);
 	auto data = GetDigitalInputWaveform(1);
 
+	int read_turn = m_parameters[m_readTurnaround].GetIntVal();
+
 	//Create the capture
 	auto cap = new SWDWaveform;
 	cap->m_timescale = 1;
@@ -128,8 +134,7 @@ void SWDDecoder::Refresh()
 		STATE_WRITE_TURNAROUND,
 		STATE_DATA,
 		STATE_DATA_PARITY,
-		STATE_READ_TURNAROUND,
-		STATE_WAIT_FOR_HIGH
+		STATE_READ_TURNAROUND
 	} state = STATE_IDLE;
 
 	uint32_t	current_word	= 0;
@@ -313,27 +318,25 @@ void SWDDecoder::Refresh()
 				tstart += dur;
 
 				if(!writing)
+				{
+					bitcount = 0;
 					state = STATE_READ_TURNAROUND;
+				}
 				else
 					state = STATE_IDLE;
 				break;
 
 			case STATE_READ_TURNAROUND:
-				state = STATE_IDLE;
+				bitcount ++;
 
-				cap->m_offsets.push_back(tstart);
-				cap->m_durations.push_back(dur);
-				cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_TURNAROUND, samples.m_samples[i]));
-
-				if(!samples.m_samples[i])
-					state = STATE_WAIT_FOR_HIGH;
-				break;
-
-			//Wait for one clock with SWCLK high
-			//(not sure why this is needed? spec is unclear)
-			case STATE_WAIT_FOR_HIGH:
-				if(samples.m_samples[i])
+				if(bitcount == read_turn)
+				{
 					state = STATE_IDLE;
+
+					cap->m_offsets.push_back(tstart);
+					cap->m_durations.push_back(last_dur);
+					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_TURNAROUND, samples.m_samples[i]));
+				}
 				break;
 		}
 

@@ -93,6 +93,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SWDDecoder)
 
 protected:
+	std::string m_readTurnaround;
 };
 
 #endif
