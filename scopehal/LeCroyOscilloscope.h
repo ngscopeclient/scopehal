@@ -74,6 +74,7 @@ public:
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
+	virtual bool CanEnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);
 	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);

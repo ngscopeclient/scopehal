@@ -466,6 +466,32 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 	m_channelsEnabled[i] = true;
 }
 
+bool TektronixOscilloscope::CanEnableChannel(size_t i)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	//If we're an analog channel with a digital probe connected, the analog channel is unusable
+	if(IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+		return false;
+
+	//Can't use spectrum view if the parent channel has a digital channel connected
+	if(IsSpectrum(i))
+	{
+		if(m_probeTypes[i - m_spectrumChannelBase] != PROBE_TYPE_ANALOG)
+			return false;
+	}
+
+	//If the parent analog channel doesn't have a digital probe, we're unusable
+	if(IsDigital(i))
+	{
+		size_t parent = m_flexChannelParents[m_channels[i]];
+		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
+			return false;
+	}
+
+	return true;
+}
+
 void TektronixOscilloscope::DisableChannel(size_t i)
 {
 	{

@@ -119,6 +119,20 @@ public:
 	virtual void EnableChannel(size_t i) =0;
 
 	/**
+		@brief Determines if a channel can be enabled.
+
+		@return False if the channel cannot currently be used
+				(due to interleave conflicts or other hardware limitations).
+
+				True if the channel is available.
+
+		@param i Zero-based index of channel
+
+		The default implementation always returns true.
+	 */
+	virtual bool CanEnableChannel(size_t i);
+
+	/**
 		@brief Turn a channel off, given the index.
 
 		This function may optionally configure channel interleaving, if supported in hardware.

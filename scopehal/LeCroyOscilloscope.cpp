@@ -1002,6 +1002,39 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 	m_channelsEnabled[i] = true;
 }
 
+bool LeCroyOscilloscope::CanEnableChannel(size_t i)
+{
+	//All channels are always legal if we're not interleaving
+	if(!m_interleaving)
+		return true;
+
+	//We are interleaving. Disable channels we're not allowed to use.
+	switch(m_modelid)
+	{
+		case MODEL_DDA_5K:
+		case MODEL_HDO_9K:
+		case MODEL_SDA_3K:
+		case MODEL_HDO_4KA:
+		case MODEL_WAVERUNNER_8K:
+		case MODEL_WAVERUNNER_8K_HD:		//TODO: seems like multiple levels of interleaving possible
+		case MODEL_WAVEMASTER_8ZI_B:
+		case MODEL_WAVEPRO_HD:
+		case MODEL_WAVERUNNER_9K:
+		case MODEL_SIGLENT_SDS2000X:
+			return (i == 1) || (i == 2);
+
+		case MODEL_WAVESURFER_3K:			//TODO: can use ch1 if not 2, and ch3 if not 4
+			return (i == 1) || (i == 2);
+
+		//No interleaving possible, ignore
+		case MODEL_HDO_6KA:
+		case MODEL_LABMASTER_ZI_A:
+		case MODEL_MDA_800:
+		default:
+			return true;
+	}
+}
+
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
 	//LogDebug("enable channel %d\n", i);
@@ -2784,12 +2817,17 @@ set<LeCroyOscilloscope::InterleaveConflict> LeCroyOscilloscope::GetInterleaveCon
 	if(m_analogChannelCount > 2)
 		ret.emplace(InterleaveConflict(m_channels[2], m_channels[3]));
 
-	//Waverunner 8 only allows interleaving of 2 and 3.
-	//Any use of 1 or 4 disqualifies interleaving.
-	if(m_modelid == MODEL_WAVERUNNER_8K)
+	switch(m_modelid)
 	{
-		ret.emplace(InterleaveConflict(m_channels[0], m_channels[0]));
-		ret.emplace(InterleaveConflict(m_channels[3], m_channels[3]));
+		//Any use of 1 or 4 disqualifies interleaving in these models
+		case MODEL_HDO_9K:
+		case MODEL_WAVERUNNER_8K:
+			ret.emplace(InterleaveConflict(m_channels[0], m_channels[0]));
+			ret.emplace(InterleaveConflict(m_channels[3], m_channels[3]));
+			break;
+
+		default:
+			break;
 	}
 
 	return ret;

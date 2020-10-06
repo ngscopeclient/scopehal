@@ -140,6 +140,11 @@ OscilloscopeChannel* Oscilloscope::GetChannelByHwName(string name)
 	return NULL;
 }
 
+bool Oscilloscope::CanEnableChannel(size_t /*i*/)
+{
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Triggering helpers
 
