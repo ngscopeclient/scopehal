@@ -46,6 +46,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_sampleDepth(0)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
+	, m_rbwValid(false)
+	, m_rbw(0)
 	, m_digitalChannelBase(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -331,6 +333,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
 	m_triggerOffsetValid = false;
+	m_rbwValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -2172,6 +2175,9 @@ int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 
 void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)
 {
+	m_rbw = rbw;
+	m_rbwValid = true;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_family)
@@ -2188,6 +2194,9 @@ void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)
 
 int64_t TektronixOscilloscope::GetResolutionBandwidth()
 {
+	if(m_rbwValid)
+		return m_rbw;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_family)
@@ -2195,7 +2204,9 @@ int64_t TektronixOscilloscope::GetResolutionBandwidth()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			m_transport->SendCommand("SV:RBW?");
-			return round(stod(m_transport->ReadReply()));
+			m_rbw = round(stod(m_transport->ReadReply()));
+			m_rbwValid = true;
+			return m_rbw;
 
 		default:
 			return 1;

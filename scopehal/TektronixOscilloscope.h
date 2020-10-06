@@ -168,6 +168,8 @@ protected:
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
 	std::map<size_t, ProbeType> m_probeTypes;
+	bool m_rbwValid;
+	int64_t m_rbw;
 
 	///The analog channel for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelParents;
