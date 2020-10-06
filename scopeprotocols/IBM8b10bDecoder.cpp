@@ -302,7 +302,7 @@ void IBM8b10bDecoder::Refresh()
 		}
 
 		bool disperr = false;
-		int old_disp = last_disp;
+		//int old_disp = last_disp;
 		if(total_disp > 0 && last_disp > 0)
 		{
 			disperr = true;
