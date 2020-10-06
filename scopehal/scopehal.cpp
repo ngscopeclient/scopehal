@@ -39,6 +39,7 @@
 #include "AgilentOscilloscope.h"
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
+#include "DemoOscilloscope.h"
 #include "LeCroyOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
@@ -118,6 +119,7 @@ void DriverStaticInit()
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);
 	AddDriverClass(AntikernelLogicAnalyzer);
+	AddDriverClass(DemoOscilloscope);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
@@ -353,4 +355,12 @@ string Trim(string str)
 string BaseName(string const & path)
 {
 	return path.substr(path.find_last_of("/\\") + 1);
+}
+
+/**
+	@brief Converts a frequency in Hz to a phase velocity in rad/sec
+ */
+float FreqToPhase(float hz)
+{
+	return 2 * M_PI * hz;
 }

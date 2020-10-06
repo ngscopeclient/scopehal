@@ -148,10 +148,6 @@ bool SignalGeneratorOscilloscope::AcquireData()
 	return true;
 }
 
-void SignalGeneratorOscilloscope::ArmTrigger()
-{
-}
-
 void SignalGeneratorOscilloscope::StartSingleTrigger()
 {
 	m_triggerArmed = true;

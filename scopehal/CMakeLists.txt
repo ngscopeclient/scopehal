@@ -55,6 +55,7 @@ set(SCOPEHAL_SOURCES
 	AgilentOscilloscope.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
+	DemoOscilloscope.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
@@ -77,10 +78,12 @@ set(SCOPEHAL_SOURCES
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
-target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp ${LXI_LIBRARIES} ${WIN_LIBS})
+target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp
+	${LXI_LIBRARIES} ${WIN_LIBS} ${LIBFFTS_LIBRARIES})
 
 target_include_directories(scopehal
-PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+	${LIBFFTS_INCLUDE_DIR})
 
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)

@@ -30,21 +30,25 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SignalGeneratorOscilloscope
+	@brief Declaration of DemoOscilloscope
  */
 
-#ifndef SignalGeneratorOscilloscope_h
-#define SignalGeneratorOscilloscope_h
+#ifndef DemoOscilloscope_h
+#define DemoOscilloscope_h
 
-#include "IBISParser.h"
+#include "../scopehal/AlignedAllocator.h"
+#include <ffts.h>
 
-class SignalGeneratorOscilloscope : public SCPIOscilloscope
+class DemoOscilloscope : public SCPIOscilloscope
 {
 public:
-	SignalGeneratorOscilloscope(SCPITransport* transport);
-	virtual ~SignalGeneratorOscilloscope();
+	DemoOscilloscope(SCPITransport* transport);
+	virtual ~DemoOscilloscope();
 
 	virtual std::string IDPing();
+
+	virtual std::string GetTransportConnectionString();
+	virtual std::string GetTransportName();
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
@@ -87,6 +91,7 @@ public:
 	virtual bool SetInterleaving(bool combine);
 
 	virtual unsigned int GetInstrumentTypes();
+	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
 
@@ -99,16 +104,60 @@ protected:
 	std::map<size_t, double> m_channelVoltageRange;
 	std::map<size_t, double> m_channelOffset;
 
-	IBISParser m_parser;
-	IBISModel* m_bufmodel;
-
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+
+	//Helpers for waveform generation
+	WaveformBase* GenerateNoisySinewave(
+		float amplitude,
+		float startphase,
+		int64_t period,
+		int64_t sampleperiod,
+		size_t depth);
+
+	WaveformBase* GenerateNoisySinewaveMix(
+		float amplitude,
+		float startphase1,
+		float startphase2,
+		float period1,
+		float period2,
+		int64_t sampleperiod,
+		size_t depth);
+
+	WaveformBase* GeneratePRBS31(
+		float amplitude,
+		float period,
+		int64_t sampleperiod,
+		size_t depth);
+
+	WaveformBase* Generate8b10b(
+		float amplitude,
+		float period,
+		int64_t sampleperiod,
+		size_t depth);
+
+	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth);
+
+	//FFT stuff
+	AlignedAllocator<float, 32> m_allocator;
+	ffts_plan_t* m_forwardPlan;
+	ffts_plan_t* m_reversePlan;
+	size_t m_cachedNumPoints;
+	size_t m_cachedRawSize;
+
+	float* m_forwardInBuf;
+	float* m_forwardOutBuf;
+	float* m_reverseOutBuf;
+
+	float m_sweepFreq;
+
+	size_t m_depth;
+	size_t m_rate;
 
 public:
 	static std::string GetDriverNameInternal();
 
-	OSCILLOSCOPE_INITPROC(SignalGeneratorOscilloscope)
+	OSCILLOSCOPE_INITPROC(DemoOscilloscope)
 };
 
 #endif
