@@ -930,7 +930,9 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	else
 	{
 		//See if the channel is on
-		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + "'");
+		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
+		size_t nchan = i - (m_analogChannelCount+1);
+		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'");
 		string str = m_transport->ReadReply();
 		if(str == "0")
 			m_channelsEnabled[i] = false;
@@ -992,7 +994,9 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
 
 		//Enable this channel on the hardware
-		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 1'");
+		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
+		size_t nchan = i - (m_analogChannelCount+1);
+		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 1'");
 		char tmp[128];
 		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
 		snprintf(tmp, sizeof(tmp), "VBS 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
@@ -1021,10 +1025,10 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_WAVEPRO_HD:
 		case MODEL_WAVERUNNER_9K:
 		case MODEL_SIGLENT_SDS2000X:
-			return (i == 1) || (i == 2);
+			return (i == 1) || (i == 2) || (i > m_analogChannelCount);
 
 		case MODEL_WAVESURFER_3K:			//TODO: can use ch1 if not 2, and ch3 if not 4
-			return (i == 1) || (i == 2);
+			return (i == 1) || (i == 2) || (i > m_analogChannelCount);
 
 		//No interleaving possible, ignore
 		case MODEL_HDO_6KA:
@@ -1070,7 +1074,8 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
 
 		//Disable this channel
-		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.") + m_channels[i]->GetHwname() + " = 0'");
+		size_t nchan = i - (m_analogChannelCount+1);
+		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 0'");
 	}
 }
 
