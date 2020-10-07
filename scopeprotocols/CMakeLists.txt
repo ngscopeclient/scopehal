@@ -59,6 +59,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
+	SDCmdDecoder.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
 	SubtractFilter.cpp

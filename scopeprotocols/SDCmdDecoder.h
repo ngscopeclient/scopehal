@@ -30,97 +30,74 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of SDCmdDecoder
  */
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#ifndef SDCmdDecoder_h
+#define SDCmdDecoder_h
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
+#include "PacketDecoder.h"
 
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCOffsetFilter.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DutyCycleMeasurement.h"
-#include "DVIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "I2CEepromDecoder.h"
-#include "IPv4Decoder.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PeakHoldFilter.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "QSPIDecoder.h"
-#include "QuadratureDecoder.h"
-#include "RiseMeasurement.h"
-#include "SDCmdDecoder.h"
-#include "SPIDecoder.h"
-#include "SPIFlashDecoder.h"
-#include "SubtractFilter.h"
-#include "SWDDecoder.h"
-#include "SWDMemAPDecoder.h"
-#include "TachometerFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
+class SDCmdSymbol
+{
+public:
+	enum stype
+	{
+		TYPE_HEADER,
+		TYPE_COMMAND,
+		TYPE_COMMAND_ARGS,
+		TYPE_RESPONSE_ARGS,
+		TYPE_CRC_OK,
+		TYPE_CRC_BAD,
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+		TYPE_ERROR
+	};
 
-void ScopeProtocolStaticInit();
+	SDCmdSymbol()
+	{}
+
+	SDCmdSymbol(stype t, uint32_t d)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint32_t m_data;
+
+	bool operator== (const SDCmdSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<SDCmdSymbol> SDCmdWaveform;
+
+
+/**
+	@brief Decodes the SD card command bus protocol
+ */
+class SDCmdDecoder : public PacketDecoder
+{
+public:
+	SDCmdDecoder(std::string color);
+
+	virtual void Refresh();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool NeedsConfig();
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	std::vector<std::string> GetHeaders();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(SDCmdDecoder)
+
+protected:
+};
 
 #endif
