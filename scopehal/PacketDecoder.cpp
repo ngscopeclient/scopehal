@@ -106,8 +106,11 @@ bool PacketDecoder::CanMerge(Packet* /*a*/, Packet* /*b*/)
 
 /**
 	@brief Creates a summary packet for one or more merged packets
+
+	@param pack		The first packet in the merge string
+	@param i		Index of pack within m_packets
  */
-Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/)
+Packet* PacketDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
 {
 	return NULL;
 }

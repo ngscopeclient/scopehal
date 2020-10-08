@@ -139,7 +139,7 @@ public:
 	};
 
 	virtual bool CanMerge(Packet* a, Packet* b);
-	virtual Packet* CreateMergedHeader(Packet* pack);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 

@@ -1100,7 +1100,7 @@ bool SPIFlashDecoder::CanMerge(Packet* a, Packet* b)
 	return false;
 }
 
-Packet* SPIFlashDecoder::CreateMergedHeader(Packet* pack)
+Packet* SPIFlashDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
 {
 	if(pack->m_headers["Op"] == "Read Status")
 	{

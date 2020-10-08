@@ -92,7 +92,7 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	bool CanMerge(Packet* a, Packet* b);
-	Packet* CreateMergedHeader(Packet* pack);
+	Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(I2CEepromDecoder)
 

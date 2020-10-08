@@ -608,7 +608,7 @@ bool I2CEepromDecoder::CanMerge(Packet* a, Packet* b)
 	return false;
 }
 
-Packet* I2CEepromDecoder::CreateMergedHeader(Packet* pack)
+Packet* I2CEepromDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
 {
 	if(pack->m_headers["Type"].find("Poll")  == 0)
 	{
