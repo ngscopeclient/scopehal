@@ -91,7 +91,7 @@ public:
 	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	bool CanMerge(Packet* a, Packet* b);
+	bool CanMerge(Packet* first, Packet* cur, Packet* next);
 	Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(I2CEepromDecoder)

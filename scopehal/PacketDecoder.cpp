@@ -88,18 +88,19 @@ bool PacketDecoder::GetShowImageColumn()
 }
 
 /**
-	@brief Checks if two packets can be merged under a single heading in the protocol analyzer view.
+	@brief Checks if multiple packets can be merged under a single heading in the protocol analyzer view.
 
 	This can be used to collapse polling loops, acknowledgements, etc in order to minimize clutter in the view.
 
 	The default implementation in PacketDecoder always returns false so packets are not merged.
 
-	@param a Packet 1
-	@param b Packet 2
+	@param first		The first packet in the merge group
+	@param cur			The most recently merged packet
+	@param next			The candidate packet to be merged
 
 	@return true if packets can be merged, false otherwise
  */
-bool PacketDecoder::CanMerge(Packet* /*a*/, Packet* /*b*/)
+bool PacketDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
 {
 	return false;
 }

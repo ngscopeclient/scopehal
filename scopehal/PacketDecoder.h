@@ -80,7 +80,7 @@ public:
 	virtual bool GetShowImageColumn();
 
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
-	virtual bool CanMerge(Packet* a, Packet* b);
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
 
 	/**
 		@brief Standard colors for protocol analyzer lines.

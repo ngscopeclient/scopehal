@@ -1091,10 +1091,10 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 	}
 }
 
-bool SPIFlashDecoder::CanMerge(Packet* a, Packet* b)
+bool SPIFlashDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 {
 	//Merge read-status packets
-	if( (a->m_headers["Op"] == "Read Status") && (b->m_headers["Op"] == "Read Status") )
+	if( (first->m_headers["Op"] == "Read Status") && (next->m_headers["Op"] == "Read Status") )
 		return true;
 
 	return false;

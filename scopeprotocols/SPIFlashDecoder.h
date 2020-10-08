@@ -138,7 +138,7 @@ public:
 		FLASH_TYPE_WINBOND_W25N
 	};
 
-	virtual bool CanMerge(Packet* a, Packet* b);
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)

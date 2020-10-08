@@ -599,10 +599,10 @@ string I2CEepromDecoder::GetText(int i)
 	return string(tmp);
 }
 
-bool I2CEepromDecoder::CanMerge(Packet* a, Packet* b)
+bool I2CEepromDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 {
 	//Merge polling packets
-	if( (a->m_headers["Type"].find("Poll") == 0) && (b->m_headers["Type"].find("Poll") == 0 ) )
+	if( (first->m_headers["Type"].find("Poll") == 0) && (next->m_headers["Type"].find("Poll") == 0 ) )
 		return true;
 
 	return false;
