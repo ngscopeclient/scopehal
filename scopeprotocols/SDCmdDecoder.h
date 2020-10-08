@@ -56,17 +56,26 @@ public:
 	SDCmdSymbol()
 	{}
 
-	SDCmdSymbol(stype t, uint32_t d)
+	SDCmdSymbol(stype t, uint32_t d, uint32_t e=0, uint32_t f=0, uint32_t g=0)
 	 : m_stype(t)
 	 , m_data(d)
+	 , m_extdata1(e)
+	 , m_extdata2(f)
+	 , m_extdata3(g)
 	{}
 
 	stype m_stype;
 	uint32_t m_data;
 
+	//Extended data for a few special responses
+	uint32_t m_extdata1;
+	uint32_t m_extdata2;
+	uint32_t m_extdata3;
+
 	bool operator== (const SDCmdSymbol& s) const
 	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
+		return (m_stype == s.m_stype) && (m_data == s.m_data) &&
+			(m_extdata1 == s.m_extdata1) && (m_extdata2 == s.m_extdata2) && (m_extdata3 == s.m_extdata3);
 	}
 };
 
@@ -91,7 +100,12 @@ public:
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 
+	virtual bool GetShowDataColumn();
+
 	std::vector<std::string> GetHeaders();
+
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

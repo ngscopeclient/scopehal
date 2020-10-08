@@ -93,6 +93,8 @@ void SDCmdDecoder::SetDefaultName()
 
 void SDCmdDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
@@ -112,6 +114,7 @@ void SDCmdDecoder::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startPicoseconds = clk->m_startPicoseconds;
+	SetData(cap, 0);
 
 	enum
 	{
@@ -131,16 +134,18 @@ void SDCmdDecoder::Refresh()
 	int64_t tstart = 0;
 	int nbit = 0;
 	uint32_t data = 0;
+	uint32_t extdata[4] = {0};
 
 	//Reference: SD Physical Layer Simplified Specification v.8.00
 
 	int last_cmd = 0;
 	bool app_cmd = false;
+	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
 	{
 		bool b = dcmd.m_samples[i];
-		int64_t off = dcmd.m_offsets[i];
-		int64_t dur = dcmd.m_durations[i];
+		int64_t off = dcmd.m_offsets[i];		//no need to multiply by timescale
+		int64_t dur = dcmd.m_durations[i];		//because SampleOnRisingEdges() always uses 1ps timesteps
 		int64_t end = off + dur;
 
 		switch(state)
@@ -151,6 +156,18 @@ void SDCmdDecoder::Refresh()
 				{
 					tstart = off;
 					state = STATE_TYPE;
+
+					//Create a new packet. If we already have an incomplete one that got aborted, reset it
+					if(pack)
+					{
+						pack->m_data.clear();
+						pack->m_headers.clear();
+					}
+					else
+						pack = new Packet;
+
+					pack->m_offset = dcmd.m_offsets[i];
+					pack->m_len = 0;
 				}
 				break;
 
@@ -165,9 +182,15 @@ void SDCmdDecoder::Refresh()
 				nbit = 0;
 				data = 0;
 				if(b)
+				{
 					state = STATE_COMMAND_HEADER;
+					pack->m_headers["Type"] = "Command";
+				}
 				else
+				{
 					state = STATE_RESPONSE_HEADER;
+					pack->m_headers["Type"] = "Reply";
+				}
 
 				break;
 
@@ -200,10 +223,37 @@ void SDCmdDecoder::Refresh()
 						}
 					}
 
+					//Save the command code so we know how to parse replies
+					if(state == STATE_COMMAND_HEADER)
+						last_cmd = data;
+
 					cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_COMMAND, data));
 
-					//Save the command code so we know how to parse replies
-					last_cmd = data;
+					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1);
+
+					if(last_cmd >= 100)
+						pack->m_headers["Code"] = string("ACMD") + to_string(last_cmd - 100);
+					else
+						pack->m_headers["Code"] = string("CMD") + to_string(last_cmd);
+
+					//Set packet color based on command
+					if(state == STATE_RESPONSE_HEADER)
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+					else
+					{
+						switch(data)
+						{
+							//READ_SINGLE_BLOCK
+							case 17:
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+								break;
+
+							//Default everything else to "control"
+							default:
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+								break;
+						}
+					}
 
 					data = 0;
 					nbit = 0;
@@ -219,6 +269,7 @@ void SDCmdDecoder::Refresh()
 			case STATE_COMMAND_BODY:
 				data = (data << 1) | b;
 				nbit ++;
+
 				if(nbit == 32)
 				{
 					cap->m_offsets.push_back(tstart);
@@ -229,6 +280,8 @@ void SDCmdDecoder::Refresh()
 					nbit = 0;
 					tstart = end;
 					state = STATE_CRC;
+
+					pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
 				}
 				break;
 
@@ -236,18 +289,39 @@ void SDCmdDecoder::Refresh()
 			case STATE_RESPONSE_BODY:
 				{
 					//Figure out the expected reply format (4.7.4)
-					int reply_len = 0;
-					switch(last_cmd)
-					{
-						//32-bit reply for all other commands
-						default:
-							reply_len = 32;
-							break;
-					}
-
 					data = (data << 1) | b;
 					nbit ++;
-					if(nbit == reply_len)
+
+					//CMD2 has a 128-bit response with no CRC
+					if(last_cmd == 2)
+					{
+						if(nbit == 32)
+							extdata[0] = data;
+						if(nbit == 64)
+							extdata[1] = data;
+						if(nbit == 96)
+							extdata[2] = data;
+						if(nbit == 128)
+						{
+							extdata[3] = data;
+
+							cap->m_offsets.push_back(tstart);
+							cap->m_durations.push_back(end - tstart);
+							cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_RESPONSE_ARGS,
+								extdata[0], extdata[1], extdata[2], extdata[3]));
+
+							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+
+							//no CRC
+							//stop bit is parsed as last data bit
+							state = STATE_IDLE;
+
+							//end the packet now
+							m_packets.push_back(pack);
+							pack = NULL;
+						}
+					}
+					else if(nbit == 32)
 					{
 						cap->m_offsets.push_back(tstart);
 						cap->m_durations.push_back(end - tstart);
@@ -257,12 +331,15 @@ void SDCmdDecoder::Refresh()
 						nbit = 0;
 						tstart = end;
 						state = STATE_CRC;
+
+						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
 					}
 
 				}
 				break;
 
 			//Reads the CRC
+			//ACMD41 response always has 0x7F here for some reason and not a real CRC (4.9.4)
 			case STATE_CRC:
 				data = (data << 1) | b;
 				nbit ++;
@@ -286,6 +363,9 @@ void SDCmdDecoder::Refresh()
 					cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_ERROR, b));
 				}
 
+				m_packets.push_back(pack);
+				pack = NULL;
+
 				state = STATE_IDLE;
 				break;
 
@@ -294,7 +374,13 @@ void SDCmdDecoder::Refresh()
 		}
 	}
 
-	SetData(cap, 0);
+	if(pack)
+		delete pack;
+}
+
+bool SDCmdDecoder::GetShowDataColumn()
+{
+	return false;
 }
 
 Gdk::Color SDCmdDecoder::GetColor(int i)
@@ -331,7 +417,7 @@ Gdk::Color SDCmdDecoder::GetColor(int i)
 
 string SDCmdDecoder::GetText(int i)
 {
-	char tmp[32];
+	char tmp[128];
 
 	auto capture = dynamic_cast<SDCmdWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -358,14 +444,92 @@ string SDCmdDecoder::GetText(int i)
 
 					switch(s.m_data)
 					{
-						case 0:
-							return ret + " GO_IDLE_STATE";
+						case 0:		return "GO_IDLE_STATE";
+						//CMD1 reserved
+						case 2:		return "ALL_SEND_CID";
+						case 3:		return "SEND_RELATIVE_ADDR";
+						case 4:		return "SET_DSR";
+						//CMD5 reserved for SDIO
+						case 6:		return "SWITCH_FUNC";
+						case 7:		return "SELECT_DESELECT_CARD";
+						case 8:		return "SEND_IF_COND";
+						case 9:		return "SEND_CSD";
+						case 10:	return "SEND_CID";
+						case 11:	return "VOLTAGE_SWITCH";
+						case 12:	return "STOP_TRANSMISSION";
+						case 13:	return "SEND_STATUS";
+						//CMD14 reserved
+						case 15:	return "GO_INACTIVE_STATE";
+						case 16:	return "SET_BLOCKLEN";
+						case 17:	return "READ_SINGLE_BLOCK";
+						case 18:	return "READ_MULTIPLE_BLOCK";
+						case 19:	return "SEND_TUNING_BLOCK";
+						case 20:	return "SPEED_CLASS_CONTROL";
+						//CMD21 reserved
+						case 22:	return "ADDRESS_EXTENSION";
+						case 23:	return "SET_BLOCK_COUNT";
+						case 24:	return "WRITE_BLOCK";
+						case 25:	return "WRITE_MULTIPLE_BLOCK";
+						//CMD26 reserved for manufacturer
+						case 27:	return "PROGRAM_CSD";
+						case 28:	return "SET_WRITE_PROT";
+						case 29:	return "CLR_WRITE_PROT";
+						case 30:	return "SEND_WRITE_PROT";
+						//CMD31 reserved
+						case 32:	return "ERASE_WR_BLK_START";
+						case 33:	return "ERASE_WR_BLK_END";
+						//CMD34-38 TODO
+						case 38:	return "ERASE";
+						//CMD39 reserved
+						//CMD40 defined by "DPS Spec" whatever that is
+						//CMD41 reserved
+						case 42:	return "LOCK_UNLOCK";
 
-						case 8:
-							return ret + " SEND_IF_COND";
+						//CMD52-54 reserved for SDIO mode
 
 						case 55:
-							return ret + " APP_CMD";
+						case 155:	//What is the "RCA"?
+							return "APP_CMD";
+
+						case 56:	return "GEN_CMD";
+						//CMD60-63 reserved for manufacturer
+
+						//Parse CMD63 response depending on what the previous command was
+						case 63:
+						{
+							//Should be a command at i-4
+							if(i < 4)
+								return "ERROR";
+							return GetText(i-4);
+						}
+
+						//ACMD1-5 reserved
+						case 106:	return "SET_BUS_WIDTH";
+						//ACMD7-12 reserved
+						case 113:	return "SD_STATUS";
+						//ACMD14-16 reserved for DPS Specification
+						//ACMD17 reserved
+						//ACMD18 reserved for SD Security
+						//ACMD19-21 reserved
+						case 122:	return "SEND_NUM_WR_BLOCKS";
+						case 123:	return "SET_WR_BLK_ERASE_COUNT";
+						//ACMD24 reserved
+						//ACMD25-26 reserved for SD Security
+						//ACMD27 "shall not use"
+						//ACMD28 reserved for DPS Specification
+						//ACMD29 reserved
+						//ACMD30-35 reserved for Security Specification
+						//ACMD36-37 reserved
+						//ACMD38 reserved for SD Security
+						//ACMD39-40 reserved
+						case 141:	return "SEND_OP_COND";
+						case 142:	return "SET_CLR_CARD_DETECT";
+						//ACMD43-49 reserved for SD Security
+						//ACMD50?
+						case 151:	return "SEND_SCR";
+						//ACMD52-54 reserved for SD Security
+						//ACMD55 is just CMD55
+						//ACMD56-59 reserved for SD Security
 
 						default:
 							return ret;
@@ -384,6 +548,17 @@ string SDCmdDecoder::GetText(int i)
 
 					switch(type)
 					{
+						//No arguments
+						case 0:
+						case 2:
+							return "";
+
+						//CMD7 Select/Deselect Card
+						case 7:
+							snprintf(tmp, sizeof(tmp), "RCA=%04x", s.m_data >> 16);
+							ret = tmp;
+							break;
+
 						//CMD8 Send Interface Condition (4.3.13)
 						case 8:
 							{
@@ -400,16 +575,117 @@ string SDCmdDecoder::GetText(int i)
 									ret += " 3V3";
 								else
 									ret += " Vunknown";
-
-
 							}
 							break;
 
-
-						//31:12 reserved
-						//11:8 = supply voltage
-						//7:0 = check pattern
+						//CMD16 Set Block Length
+						case 16:
+							snprintf(tmp, sizeof(tmp), "Block size = %d", s.m_data);
+							ret = tmp;
 							break;
+
+						//CMD17 Read Single Block
+						//CMD18 Read Multiple Block
+						//CMD24 Write Block
+						//CMD25 Write Multiple Block
+						case 17:
+						case 18:
+						case 24:
+						case 25:
+							snprintf(tmp, sizeof(tmp), "LBA = %08x", s.m_data);
+							ret = tmp;
+							break;
+
+						//ACMD6 SET_BUS_WIDTH
+						case 106:
+							if( (s.m_data & 3) == 0)
+								ret = "x1";
+							else if( (s.m_data & 3) == 2)
+								ret = "x4";
+							else
+								ret = "Invalid bus width";
+							break;
+
+						//ACMD41 SD_SEND_OP_COND
+						//30 HCS
+						//28 XPC
+						//24 S18R
+						//23:0 VDD range
+						case 141:
+							{
+								ret = "";
+								if(s.m_data & 0x40000000)
+									ret += "HCS ";
+								if(s.m_data & 0x10000000)
+									ret += "XPC ";
+
+								//VDD voltage window
+								uint32_t window = s.m_data & 0xffffff;
+								if(window == 0)
+									ret += "Voltage?";
+								else
+								{
+									float vmax = 0;
+									float vmin = 3.6;
+
+									if(window & 0x00800000)
+									{
+										vmax = max(vmax, 3.6f);
+										vmin = min(vmin, 3.5f);
+									}
+									if(window & 0x00400000)
+									{
+										vmax = max(vmax, 3.5f);
+										vmin = min(vmin, 3.4f);
+									}
+									if(window & 0x00200000)
+									{
+										vmax = max(vmax, 3.4f);
+										vmin = min(vmin, 3.3f);
+									}
+									if(window & 0x00100000)
+									{
+										vmax = max(vmax, 3.3f);
+										vmin = min(vmin, 3.2f);
+									}
+									if(window & 0x00080000)
+									{
+										vmax = max(vmax, 3.2f);
+										vmin = min(vmin, 3.1f);
+									}
+									if(window & 0x00040000)
+									{
+										vmax = max(vmax, 3.1f);
+										vmin = min(vmin, 3.0f);
+									}
+									if(window & 0x00020000)
+									{
+										vmax = max(vmax, 3.0f);
+										vmin = min(vmin, 2.9f);
+									}
+									if(window & 0x00010000)
+									{
+										vmax = max(vmax, 2.9f);
+										vmin = min(vmin, 2.8f);
+									}
+									if(window & 0x00008000)
+									{
+										vmax = max(vmax, 2.8f);
+										vmin = min(vmin, 2.7f);
+									}
+
+									snprintf(tmp, sizeof(tmp), "Vdd = %.1f - %.1f", vmin, vmax);
+									ret += tmp;
+								}
+							}
+							break;
+
+						//ACMD42 SET_CLR_CARD_DETECT
+						case 142:
+							if(s.m_data & 1)
+								ret = "CD/DAT3 pullup enable";
+							else
+								ret = "CD/DAT3 pullup disable";
 
 						default:
 							break;
@@ -424,11 +700,100 @@ string SDCmdDecoder::GetText(int i)
 					//(TYPE_RESPONSE_ARGS can never be the first sample in a waveform)
 					auto type = capture->m_samples[i-1].m_data;
 
+					//Back up by 5 (previous command) and figure out what we got
+					if(i >= 5)
+					{
+						type = capture->m_samples[i-5].m_data;
+					}
+
 					snprintf(tmp, sizeof(tmp), "%08x", s.m_data);
 					string ret = tmp;
 
 					switch(type)
 					{
+						//4.9.3 R2 (CID or CSD register)
+						case 2:
+							{
+								snprintf(tmp, sizeof(tmp), "%08x %08x %08x %08x ",
+									s.m_data, s.m_extdata1, s.m_extdata2, s.m_extdata3);
+								ret = tmp;
+							}
+							break;
+
+						//4.9.5 R6 (Published RCA response)
+						case 3:
+							{
+								snprintf(tmp, sizeof(tmp), "RCA=%04x ", s.m_data >> 16);
+								ret = tmp;
+
+								//Low 16 bits have same meaning as 23, 22, 19, 12:0 from normal card status
+
+								if(s.m_data & 0x00008000)
+									ret += "COM_CRC_ERROR ";
+								if(s.m_data & 0x00004000)
+									ret += "ILLEGAL_COMMAND ";
+								if(s.m_data & 0x00002000)
+									ret += "ERROR ";
+								if(s.m_data & 0x00000100)
+									ret += "READY_FOR_DATA ";
+								if(s.m_data & 0x00000040)
+									ret += "FX_EVENT ";
+								if(s.m_data & 0x00000020)
+									ret += "APP_CMD ";
+								if(s.m_data & 0x00000010)
+									ret += "RESERVED_SDIO ";
+								if(s.m_data & 0x00000008)
+									ret += "AKE_SEQ_ERR ";
+								if(s.m_data & 0x00060084)
+									ret += "RESERVED ";
+
+								//12:9 CURRENT_STATE
+								uint32_t state = (s.m_data >> 9) & 0xf;
+								switch(state)
+								{
+									case 0:
+										ret += "idle";
+										break;
+
+									case 1:
+										ret += "ready";
+										break;
+
+									case 2:
+										ret += "ident";
+										break;
+
+									case 3:
+										ret += "stby";
+										break;
+
+									case 4:
+										ret += "tran";
+										break;
+
+									case 5:
+										ret += "data";
+										break;
+
+									case 6:
+										ret += "rcv";
+										break;
+
+									case 7:
+										ret += "prg";
+										break;
+
+									case 8:
+										ret += "dis";
+										break;
+
+									default:
+										ret += "reserved_state";
+								}
+							}
+							break;
+
+
 						//R7 Card Interface Condition (4.9.6)
 						case 8:
 							{
@@ -446,6 +811,88 @@ string SDCmdDecoder::GetText(int i)
 								else
 									ret += " Vunknown";
 
+							}
+							break;
+
+						//R3 OCR Register (4.9.4, 5.1). Operation Conditions Register Register :)
+						case 141:
+							{
+								ret = "";
+								if( (s.m_data & 0x80000000) == 0)
+									ret += "BUSY ";
+
+								//CCS bit is only valid after powerup is complete
+								else
+								{
+									if(s.m_data & 0x08000000)
+										ret += "UC";
+									else if(s.m_data & 0x40000000)
+										ret += "HC/XC ";
+									else
+										ret += "SC ";
+								}
+
+								if(s.m_data & 0x01000000)
+									ret += "S18A ";
+
+								//VDD voltage window
+								uint32_t window = s.m_data & 0xffffff;
+								if(window == 0)
+									ret += "Voltage?";
+								else
+								{
+									float vmax = 0;
+									float vmin = 3.6;
+
+									if(window & 0x00800000)
+									{
+										vmax = max(vmax, 3.6f);
+										vmin = min(vmin, 3.5f);
+									}
+									if(window & 0x00400000)
+									{
+										vmax = max(vmax, 3.5f);
+										vmin = min(vmin, 3.4f);
+									}
+									if(window & 0x00200000)
+									{
+										vmax = max(vmax, 3.4f);
+										vmin = min(vmin, 3.3f);
+									}
+									if(window & 0x00100000)
+									{
+										vmax = max(vmax, 3.3f);
+										vmin = min(vmin, 3.2f);
+									}
+									if(window & 0x00080000)
+									{
+										vmax = max(vmax, 3.2f);
+										vmin = min(vmin, 3.1f);
+									}
+									if(window & 0x00040000)
+									{
+										vmax = max(vmax, 3.1f);
+										vmin = min(vmin, 3.0f);
+									}
+									if(window & 0x00020000)
+									{
+										vmax = max(vmax, 3.0f);
+										vmin = min(vmin, 2.9f);
+									}
+									if(window & 0x00010000)
+									{
+										vmax = max(vmax, 2.9f);
+										vmin = min(vmin, 2.8f);
+									}
+									if(window & 0x00008000)
+									{
+										vmax = max(vmax, 2.8f);
+										vmin = min(vmin, 2.7f);
+									}
+
+									snprintf(tmp, sizeof(tmp), "Vdd = %.1f - %.1f", vmin, vmax);
+									ret += tmp;
+								}
 							}
 							break;
 
@@ -566,9 +1013,91 @@ string SDCmdDecoder::GetText(int i)
 vector<string> SDCmdDecoder::GetHeaders()
 {
 	vector<string> ret;
-	ret.push_back("Op");
-	ret.push_back("Address");
+	ret.push_back("Type");
+	ret.push_back("Code");
+	ret.push_back("Command");
 	ret.push_back("Info");
-	ret.push_back("Len");
 	return ret;
+}
+
+
+bool SDCmdDecoder::CanMerge(Packet* /*first*/, Packet* cur, Packet* next)
+{
+	//Merge reply with the preceding command
+	if( (cur->m_headers["Type"] == "Command") && (next->m_headers["Type"] == "Reply") )
+		return true;
+
+	//If the previous is a CMD55 reply, we can merge the ACMD request with it
+	if( (cur->m_headers["Type"] == "Reply") && (cur->m_headers["Code"] == "CMD55") &&
+		(next->m_headers["Type"] == "Command") )
+	{
+		return true;
+	}
+
+	//If the previous is an ACMD41 reply, and this is an ACMD request, merge the powerup polling
+	//FIXME: this will falsely merge other ACMDs after!!
+	if( (cur->m_headers["Type"] == "Reply") && (cur->m_headers["Code"] == "ACMD41") &&
+		(next->m_headers["Type"] == "Command") && (next->m_headers["Code"] == "CMD55") )
+	{
+		return true;
+	}
+
+	return false;
+}
+
+Packet* SDCmdDecoder::CreateMergedHeader(Packet* pack, size_t i)
+{
+	if(pack->m_headers["Type"] == "Command")
+	{
+		Packet* ret = new Packet;
+		ret->m_offset = pack->m_offset;
+		ret->m_len = pack->m_len;
+
+		//Default to copying everything
+		ret->m_headers["Type"] = "Command";
+		ret->m_headers["Code"] = pack->m_headers["Code"];
+		ret->m_headers["Command"] = pack->m_headers["Command"];
+		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+		ret->m_headers["Info"] = pack->m_headers["Info"];
+
+		//If the header is a CMD55 packet, check the actual ACMD and use that instead
+		if( (pack->m_headers["Code"] == "CMD55") && (i+2 < m_packets.size()) )
+		{
+			Packet* next = m_packets[i+2];
+
+			ret->m_headers["Command"] = next->m_headers["Command"];
+			ret->m_headers["Code"] = next->m_headers["Code"];
+			ret->m_displayBackgroundColor = next->m_displayBackgroundColor;
+			ret->m_headers["Info"] = next->m_headers["Info"];
+
+			//Summarize ACMD41 with reply data
+			if(next->m_headers["Code"] == "ACMD41")
+			{
+				//Keep on looking at replies until we see the final ACMD41
+				size_t last = i+2;
+				for(size_t j=i; j<m_packets.size(); j++)
+				{
+					if(m_packets[j]->m_headers["Type"] != "Reply")
+						continue;
+					else if(m_packets[j]->m_headers["Code"] == "CMD55")
+						continue;
+					else if(m_packets[j]->m_headers["Code"] == "ACMD41")
+						last = j;
+					else
+						break;
+				}
+				ret->m_headers["Info"] += string(", got ") + m_packets[last]->m_headers["Info"];
+			}
+		}
+
+		//Summarize CMD2 and CMD3 with reply data
+		if( (pack->m_headers["Code"] == "CMD2") && (i+1 < m_packets.size()) )
+			ret->m_headers["Info"] = m_packets[i+1]->m_headers["Info"];
+		if( (pack->m_headers["Code"] == "CMD3") && (i+1 < m_packets.size()) )
+			ret->m_headers["Info"] = m_packets[i+1]->m_headers["Info"];
+
+		return ret;
+	}
+
+	return NULL;
 }
