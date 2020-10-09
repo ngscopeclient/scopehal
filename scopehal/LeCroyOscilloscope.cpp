@@ -1305,7 +1305,7 @@ int LeCroyOscilloscope::GetMeterChannelCount()
 string LeCroyOscilloscope::GetMeterChannelName(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	return m_channels[chan]->m_displayname;
+	return m_channels[chan]->GetDisplayName();
 }
 
 int LeCroyOscilloscope::GetCurrentMeterChannel()
@@ -2150,7 +2150,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 			//See how much space we saved
 			/*
 			LogDebug("%s: %zu samples deduplicated to %zu (%.1f %%)\n",
-				m_digitalChannels[i]->m_displayname.c_str(),
+				m_digitalChannels[i]->GetDisplayName().c_str(),
 				num_samples,
 				k,
 				(k * 100.0f) / num_samples);

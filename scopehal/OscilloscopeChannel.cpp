@@ -241,6 +241,22 @@ void OscilloscopeChannel::SetCenterFrequency(int64_t freq)
 		m_scope->SetCenterFrequency(m_index, freq);
 }
 
+void OscilloscopeChannel::SetDisplayName(string name)
+{
+	if(m_scope)
+		m_scope->SetChannelDisplayName(m_index, name);
+	else
+		m_displayname = name;
+}
+
+string OscilloscopeChannel::GetDisplayName()
+{
+	if(m_scope)
+		return m_scope->GetChannelDisplayName(m_index);
+	else
+		return m_displayname;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

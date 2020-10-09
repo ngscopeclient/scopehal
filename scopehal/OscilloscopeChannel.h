@@ -83,9 +83,6 @@ public:
 	///Display color (any valid GDK format)
 	std::string m_displaycolor;
 
-	///Display name (user defined, defaults to m_hwname)
-	std::string m_displayname;
-
 	//Stuff here is set once at init and can't be changed
 	ChannelType GetType()
 	{ return m_type; }
@@ -132,6 +129,9 @@ public:
 	size_t GetRefCount()
 	{ return m_refcount; }
 
+	void SetDisplayName(std::string name);
+	std::string GetDisplayName();
+
 	//Hardware configuration
 public:
 	bool IsEnabled();
@@ -140,7 +140,8 @@ public:
 	void Enable();
 	void Disable();
 
-	//These functions are preferred in GUI or other environments with multiple loads
+	//These functions are preferred in GUI or other environments with multiple consumers of waveform data.
+	//The channel is reference counted and only turned off when all consumers have released it.
 	virtual void AddRef();
 	virtual void Release();
 
@@ -205,6 +206,18 @@ protected:
 		m_streamData.push_back(NULL);
 	}
 
+	/**
+		@brief Display name (user defined, defaults to m_hwname)
+
+		This is ONLY used if m_scope is NULL.
+	 */
+	std::string m_displayname;
+
+	/**
+		@brief The oscilloscope (if any) we are part of.
+
+		Note that filters and other special channels are not attached to a scope.
+	 */
 	Oscilloscope* m_scope;
 
 	///Channel type

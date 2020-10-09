@@ -96,10 +96,10 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_depth = 100e3;
 	m_rate = 50e9;
 
-	m_channels[0]->m_displayname = "Tone";
-	m_channels[1]->m_displayname = "Ramp";
-	m_channels[2]->m_displayname = "PRBS31";
-	m_channels[3]->m_displayname = "8B10B";
+	m_channels[0]->SetDisplayName("Tone");
+	m_channels[1]->SetDisplayName("Ramp");
+	m_channels[2]->SetDisplayName("PRBS31");
+	m_channels[3]->SetDisplayName("8B10B");
 }
 
 DemoOscilloscope::~DemoOscilloscope()

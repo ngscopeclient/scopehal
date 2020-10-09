@@ -124,7 +124,7 @@ OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
 {
 	for(auto c : m_channels)
 	{
-		if(c->m_displayname == name)
+		if(c->GetDisplayName() == name)
 			return c;
 	}
 	return NULL;
@@ -251,7 +251,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                color:       \"%s\"\n", chan->m_displaycolor.c_str());
 		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                nick:        \"%s\"\n", chan->m_displayname.c_str());
+		snprintf(tmp, sizeof(tmp), "                nick:        \"%s\"\n", chan->GetDisplayName().c_str());
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                name:        \"%s\"\n", chan->GetHwname().c_str());
 		config += tmp;
@@ -335,7 +335,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		//These are only needed for offline scopes to create a representation of the original instrument.
 
 		chan->m_displaycolor = cnode["color"].as<string>();
-		chan->m_displayname = cnode["nick"].as<string>();
+		chan->SetDisplayName(cnode["nick"].as<string>());
 
 		if(cnode["enabled"].as<int>())
 			chan->Enable();
@@ -400,6 +400,16 @@ bool Oscilloscope::CanInterleave()
 	}
 
 	return true;
+}
+
+void Oscilloscope::SetChannelDisplayName(size_t i, string name)
+{
+	m_channelDisplayNames[m_channels[i]] = name;
+}
+
+string Oscilloscope::GetChannelDisplayName(size_t i)
+{
+	return m_channelDisplayNames[m_channels[i]];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -36,7 +36,7 @@ using namespace std;
 
 string StreamDescriptor::GetName()
 {
-	string name = m_channel->m_displayname;
+	string name = m_channel->GetDisplayName();
 	if(m_channel->GetStreamCount() > 1)
 		name += string(".") + m_channel->GetStreamName(m_stream);
 	return name;
@@ -170,7 +170,7 @@ string FlowGraphNode::GetInputDisplayName(size_t i)
 {
 	auto in = m_inputs[i];
 	if(in.m_channel->GetStreamCount() > 1)
-		return in.m_channel->m_displayname + "." + in.m_channel->GetStreamName(in.m_stream);
+		return in.m_channel->GetDisplayName() + "." + in.m_channel->GetStreamName(in.m_stream);
 	else
-		return in.m_channel->m_displayname;
+		return in.m_channel->GetDisplayName();
 }

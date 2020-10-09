@@ -156,6 +156,33 @@ public:
 	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) =0;
 
 	/**
+		@brief Gets the display name for a channel. This is an arbitrary user-selected string.
+
+		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
+		driver should override this function.
+
+		The default function simply stores the display name in the Oscilloscope object, and is appropriate for
+		instruments which have no concept of a nickname or display name.
+
+		@param i Zero-based index of channel
+	 */
+	virtual std::string GetChannelDisplayName(size_t i);
+
+	/**
+		@brief Sets the display name for a channel. This is an arbitrary user-selected string.
+
+		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
+		driver should override this function.
+
+		The default function simply stores the display name in the Oscilloscope object, and is appropriate for
+		instruments which have no concept of a nickname or display name.
+
+		@param i	Zero-based index of channel
+		@param name	Name of the channel
+	 */
+	virtual void SetChannelDisplayName(size_t i, std::string name);
+
+	/**
 		@brief Gets the probe attenuation for an input channel.
 
 		Note that this function returns attenuation, not gain.
@@ -618,6 +645,9 @@ protected:
 
 	///The channels
 	std::vector<OscilloscopeChannel*> m_channels;
+
+	///Display names for channels
+	std::map<OscilloscopeChannel*, std::string> m_channelDisplayNames;
 
 	//The trigger
 	Trigger* m_trigger;
