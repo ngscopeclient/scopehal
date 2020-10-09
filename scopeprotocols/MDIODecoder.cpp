@@ -118,40 +118,45 @@ void MDIODecoder::Refresh()
 	DigitalWaveform dmdio;
 	SampleOnRisingEdges(mdio, mdc, dmdio);
 	size_t dlen = dmdio.m_samples.size();
+	LogDebug("Starting decode\n");
+	LogIndenter li;
 	for(size_t i=0; i<dlen; i++)
 	{
+		//Abort if we don't have space for a whole frame
+		if(i + 63 >= dlen)
+		{
+			LogDebug("aborting at i=%zu, %s\n", i, Unit(Unit::UNIT_PS).PrettyPrint(dmdio.m_offsets[i]).c_str());
+			break;
+		}
+
 		//Start by looking for a preamble
 		size_t start = dmdio.m_offsets[i];
 		bool err = false;
-		size_t len = 0;
+		size_t end = 0;
 		for(size_t j=0; j<32; j++)
 		{
-			len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
-
-			//Abort if we don't have space for a whole frame
-			if(i+j+1 == len)
-			{
-				err = true;
-				break;
-			}
+			end = dmdio.m_offsets[i+j] + dmdio.m_durations[i+j];
 
 			//Expect 32 "1" bits in a row. If we see any non-1 bits, declare an error
 			if(dmdio.m_samples[i+j] != true)
 			{
+				LogDebug("Err: some 0 bits\n");
 				err = true;
 				break;
 			}
 		}
-		i += 32;
+		size_t len = end - start;
 
-		//If we don't have a valid preamble, stop
+		//If we don't have a valid preamble, move on
 		if(err)
-		{
-			cap->m_offsets.push_back(start);
-			cap->m_durations.push_back(len);
-			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_ERROR, 0));
 			continue;
-		}
+
+		//The first bit in the SOF has to be a 0.
+		//If it's not, we've got an overly long preamble (>32 bits), so wait until we get a real SOF.
+		if(dmdio.m_samples[i+32])
+			continue;
+
+		i += 32;
 
 		//Good preamble
 		cap->m_offsets.push_back(start);
@@ -162,10 +167,8 @@ void MDIODecoder::Refresh()
 		Packet* pack = new Packet;
 		pack->m_offset = start;
 
-		//TODO: safely ignore extra preamble bits
-
 		//Next 2 bits are start delimiter
-		if(i+2 >= dlen)
+		if(i+2 > dlen)
 		{
 			delete pack;
 			break;
@@ -188,7 +191,7 @@ void MDIODecoder::Refresh()
 			i += 2;
 
 			//Next 2 bits are opcode
-			if(i+2 >= dlen)
+			if(i+2 > dlen)
 			{
 				delete pack;
 				break;
@@ -212,7 +215,7 @@ void MDIODecoder::Refresh()
 			i += 2;
 
 			//Next 5 bits are PHY address
-			if(i+5 >= dlen)
+			if(i+5 > dlen)
 				break;
 			uint16_t addr = 0;
 			start = dmdio.m_offsets[i];
@@ -232,7 +235,7 @@ void MDIODecoder::Refresh()
 			pack->m_headers["PHY"] = tmp;
 
 			//Next 5 bits are reg address
-			if(i+5 >= dlen)
+			if(i+5 > dlen)
 			{
 				delete pack;
 				break;
@@ -255,7 +258,7 @@ void MDIODecoder::Refresh()
 			pack->m_headers["Reg"] = tmp;
 
 			//Next 2 bits are bus turnaround
-			if(i+2 >= dlen)
+			if(i+2 > dlen)
 				break;
 			cap->m_offsets.push_back(dmdio.m_offsets[i]);
 			cap->m_durations.push_back((dmdio.m_offsets[i+1] - dmdio.m_offsets[i]) + dmdio.m_durations[i+1]);
@@ -263,7 +266,7 @@ void MDIODecoder::Refresh()
 			i += 2;
 
 			//Next 16 bits are frame data
-			if(i+16 >= dlen)
+			if(i+16 > dlen)
 			{
 				delete pack;
 				break;
@@ -280,7 +283,7 @@ void MDIODecoder::Refresh()
 			cap->m_offsets.push_back(start);
 			cap->m_durations.push_back(len);
 			cap->m_samples.push_back(MDIOSymbol(MDIOSymbol::TYPE_DATA, value));
-			i += 16;
+			i += 15;	//next increment will be done by the i++ at the top of the loop
 
 			snprintf(tmp, sizeof(tmp), "%04x", value);
 			pack->m_headers["Value"] = tmp;
