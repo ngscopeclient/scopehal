@@ -87,6 +87,8 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger();
 	virtual double GetChannelOffset(size_t i);
 	virtual void SetChannelOffset(size_t i, double offset);
+	virtual std::string GetChannelDisplayName(size_t i);
+	virtual void SetChannelDisplayName(size_t i, std::string name);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -231,6 +233,8 @@ protected:
 
 	void BulkCheckChannelEnableState();
 
+	std::string GetPossiblyEmptyString(std::string property);
+
 	bool ReadWaveformBlock(std::string& data);
 	bool ReadWavedescs(
 		std::vector<std::string>& wavedescs,
@@ -258,6 +262,7 @@ protected:
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 	unsigned int m_digitalChannelCount;
+	size_t m_digitalChannelBase;
 
 	Model m_modelid;
 

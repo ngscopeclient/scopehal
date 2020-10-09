@@ -645,6 +645,7 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	LogIndenter li;
 
 	m_digitalChannelCount = count;
+	m_digitalChannelBase = m_channels.size();
 
 	char chn[32];
 	for(unsigned int i=0; i<count; i++)
@@ -665,6 +666,9 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	//Set the threshold to "user defined" vs using a canned family
 	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily0 = \"USERDEFINED\" '");
 	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily1 = \"USERDEFINED\" '");
+
+	//Select display to be "CUSTOM" so we can assign nicknames to the bits
+	m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.Labels=\"CUSTOM\"'");
 }
 
 /**
@@ -836,6 +840,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
+	m_channelDisplayNames.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
@@ -1217,6 +1222,94 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
 	m_transport->SendCommand(cmd);
+}
+
+void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)
+{
+	auto chan = m_channels[i];
+
+	//External trigger cannot be renamed in hardware.
+	//TODO: allow clientside renaming?
+	if(chan == m_extTrigChannel)
+		return;
+
+	//Update cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelDisplayNames[m_channels[i]] = name;
+	}
+
+	//Update in hardware
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(i < m_analogChannelCount)
+		m_transport->SendCommand(string("VBS 'app.Acquisition.") + chan->GetHwname() + ".Alias = \"" + name + "\"");
+
+	else
+	{
+		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.CustomBitName") +
+			to_string(i - m_digitalChannelBase) + " = \"" + name + "\"");
+	}
+}
+
+string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
+{
+	auto chan = m_channels[i];
+
+	//External trigger cannot be renamed in hardware.
+	//TODO: allow clientside renaming?
+	if(chan == m_extTrigChannel)
+		return m_extTrigChannel->GetHwname();
+
+	//Check cache first
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelDisplayNames.find(chan) != m_channelDisplayNames.end())
+			return m_channelDisplayNames[chan];
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Analog and digital channels use completely different namespaces, as usual.
+	//Because clean, orthogonal APIs are apparently for losers?
+	string name;
+	if(i < m_analogChannelCount)
+		name = GetPossiblyEmptyString(string("app.Acquisition.") + chan->GetHwname() + ".Alias");
+	else
+	{
+		auto prop = string("app.LogicAnalyzer.Digital1.CustomBitName") + to_string(i - m_digitalChannelBase);
+		name = GetPossiblyEmptyString(prop);
+
+		//Default name, change it to the hwname for now
+		if(name.find("Custom.") == 0)
+		{
+			m_transport->SendCommand(string("VBS '") + prop + " = \"" + chan->GetHwname() + "\"'");
+			name = "";
+		}
+	}
+
+	//Default to using hwname if no alias defined
+	if(name == "")
+		name = chan->GetHwname();
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDisplayNames[chan] = name;
+
+	return name;
+}
+
+/**
+	@brief Get an
+ */
+string LeCroyOscilloscope::GetPossiblyEmptyString(string property)
+{
+	//Get string length first since reading empty strings is problematic over SCPI
+	m_transport->SendCommand(string("VBS? 'return = Len(") + property + ")'");
+	string slen = Trim(m_transport->ReadReply());
+	if(slen == "0")
+		return "";
+
+	m_transport->SendCommand(string("VBS? 'return = ") + property + "'");
+	return Trim(m_transport->ReadReply());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
