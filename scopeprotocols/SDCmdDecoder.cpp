@@ -450,7 +450,7 @@ string SDCmdDecoder::GetText(int i)
 						case 3:		return "SEND_RELATIVE_ADDR";
 						case 4:		return "SET_DSR";
 						//CMD5 reserved for SDIO
-						case 6:		return "SWITCH_FUNC";
+						case 6:		return "SET_BUS_WIDTH";
 						case 7:		return "SELECT_DESELECT_CARD";
 						case 8:		return "SEND_IF_COND";
 						case 9:		return "SEND_CSD";
