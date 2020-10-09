@@ -352,6 +352,38 @@ string Trim(string str)
 	return ret;
 }
 
+/**
+	@brief Removes quotes from the start and end of a string
+ */
+string TrimQuotes(string str)
+{
+	string ret;
+	string tmp;
+
+	//Skip leading spaces
+	size_t i=0;
+	for(; i<str.length() && (str[i] == '\"'); i++)
+	{}
+
+	//Read non-space stuff
+	for(; i<str.length(); i++)
+	{
+		//Non-quote
+		char c = str[i];
+		if(c != '\"')
+		{
+			ret = ret + tmp + c;
+			tmp = "";
+		}
+
+		//Quote. Save it, only append if we have non-quote after
+		else
+			tmp += c;
+	}
+
+	return ret;
+}
+
 string BaseName(string const & path)
 {
 	return path.substr(path.find_last_of("/\\") + 1);

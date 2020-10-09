@@ -81,6 +81,8 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger();
 	virtual double GetChannelOffset(size_t i);
 	virtual void SetChannelOffset(size_t i, double offset);
+	virtual std::string GetChannelDisplayName(size_t i);
+	virtual void SetChannelDisplayName(size_t i, std::string name);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();

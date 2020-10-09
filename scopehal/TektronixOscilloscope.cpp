@@ -329,6 +329,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
 	m_channelDeskew.clear();
+	m_channelDisplayNames.clear();
 
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
@@ -915,6 +916,98 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 OscilloscopeChannel* TektronixOscilloscope::GetExternalTrigger()
 {
 	return m_extTrigChannel;
+}
+
+string TektronixOscilloscope::GetChannelDisplayName(size_t i)
+{
+	auto chan = m_channels[i];
+
+	//External trigger cannot be renamed in hardware.
+	//TODO: allow clientside renaming?
+	if(chan == m_extTrigChannel)
+		return m_extTrigChannel->GetHwname();
+
+	//Check cache first
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelDisplayNames.find(chan) != m_channelDisplayNames.end())
+			return m_channelDisplayNames[chan];
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Spectrum channels don't have separate names from the time domain ones.
+	//Store our own nicknames clientside for them.
+	string name;
+	if(!IsSpectrum(i))
+	{
+		switch(m_family)
+		{
+			//What a shocker!
+			//Completely orthogonal design for analog and digital, and it even handles empty strings well!
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				m_transport->SendCommand(chan->GetHwname() + ":LAB:NAM?");
+				name = TrimQuotes(m_transport->ReadReply());
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	//Default to using hwname if no alias defined
+	if(name == "")
+		name = chan->GetHwname();
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelDisplayNames[chan] = name;
+
+	return name;
+}
+
+void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
+{
+	auto chan = m_channels[i];
+
+	//External trigger cannot be renamed in hardware.
+	//TODO: allow clientside renaming?
+	if(chan == m_extTrigChannel)
+		return;
+
+	//Update cache
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelDisplayNames[m_channels[i]] = name;
+	}
+
+	//Update in hardware
+	//(spectrum channels only have clientside naming)
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(!IsSpectrum(i))
+	{
+		//Hide the name if we type the channel name, no reason to have two labels
+		if(name == chan->GetHwname())
+			name = "";
+
+		//Special case: analog channels are named CHx in hardware but displayed as Cx on the scope
+		//We want this to be treated as "no name" too.
+		if(name == string("C") + to_string(i+1))
+			name = "";
+
+		switch(m_family)
+		{
+			//What a shocker!
+			//Completely orthogonal design for analog and digital, and it even handles empty strings well!
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				m_transport->SendCommand(chan->GetHwname() + ":LAB:NAM \"" + name + "\"");
+				break;
+
+			default:
+				break;
+		}
+	}
 }
 
 double TektronixOscilloscope::GetChannelOffset(size_t i)
