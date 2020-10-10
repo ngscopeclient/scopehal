@@ -118,8 +118,6 @@ void MDIODecoder::Refresh()
 	DigitalWaveform dmdio;
 	SampleOnRisingEdges(mdio, mdc, dmdio);
 	size_t dlen = dmdio.m_samples.size();
-	LogDebug("Starting decode\n");
-	LogIndenter li;
 	for(size_t i=0; i<dlen; i++)
 	{
 		//Abort if we don't have space for a whole frame
