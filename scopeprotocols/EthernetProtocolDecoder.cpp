@@ -40,6 +40,23 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(string color)
 {
 	//Set up channels
 	CreateInput("din");
+
+	//Add parameter for the file name
+	m_outfile = "PCAP Output";
+	m_parameters[m_outfile] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_outfile].m_fileFilterMask = "*.pcap";
+	m_parameters[m_outfile].m_fileFilterName = "PCAP files (*.pcap)";
+
+	m_fpOut = NULL;
+}
+
+EthernetProtocolDecoder::~EthernetProtocolDecoder()
+{
+	if(m_fpOut)
+	{
+		fclose(m_fpOut);
+		m_fpOut = NULL;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +101,38 @@ void EthernetProtocolDecoder::BytesToFrames(
 		vector<uint64_t>& ends,
 		EthernetWaveform* cap)
 {
+	//Look up the file name, if any
+	auto fname = m_parameters[m_outfile].GetFileName();
+	if(m_cachedOutputFname != fname)
+	{
+		m_cachedOutputFname = fname;
+		if(m_fpOut)
+			fclose(m_fpOut);
+		m_fpOut = fopen(fname.c_str(), "wb");
+
+		//TODO: error logging if valid filename we can't open
+		//TODO: pull in libpcap headers and just write a pcap_hdr_s instead?
+		if(m_fpOut)
+		{
+			uint32_t magic = 0xa1b2c3d4;				//timestamps in sec+us
+			fwrite(&magic, sizeof(magic), 1, m_fpOut);
+			uint16_t major = 2;
+			uint16_t minor = 4;
+			fwrite(&major, sizeof(major), 1, m_fpOut);
+			fwrite(&minor, sizeof(minor), 1, m_fpOut);
+
+			int32_t reserved = 0;
+			fwrite(&reserved, sizeof(reserved), 1, m_fpOut);
+			fwrite(&reserved, sizeof(reserved), 1, m_fpOut);
+
+			uint32_t max_packet = 65535;
+			fwrite(&max_packet, sizeof(max_packet), 1, m_fpOut);
+
+			uint32_t network_type = 1;
+			fwrite(&network_type, sizeof(network_type), 1, m_fpOut);
+		}
+	}
+
 	Packet* pack = NULL;
 
 	EthernetFrameSegment segment;
@@ -138,6 +187,36 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Set up for data
 					segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
 					segment.m_data.clear();
+
+					//Save to the PCAP file, if open
+					if(m_fpOut)
+					{
+						//Calculate the start time of the packet
+						time_t tstart = cap->m_startTimestamp;
+						int64_t ps = cap->m_startPicoseconds + start;
+						const int64_t ps_per_second = 1e12;
+						if(ps >= ps_per_second)
+						{
+							tstart += (ps / ps_per_second);
+							ps %= ps_per_second;
+						}
+
+						//Convert timestamp to PCAP format: 32-bit sec + us
+						uint32_t sec = tstart;
+						uint32_t us = ps / 1000000;
+						fwrite(&sec, sizeof(sec), 1, m_fpOut);
+						fwrite(&us, sizeof(us), 1, m_fpOut);
+
+						//Length of the packet (not including preamble or SFD, which we truncate)
+						//Write twice: captured length and actual length
+						uint32_t packet_len = bytes.size() - (i+1);
+						fwrite(&packet_len, sizeof(packet_len), 1, m_fpOut);
+						fwrite(&packet_len, sizeof(packet_len), 1, m_fpOut);
+
+						//Write the actual packet data
+						fwrite(&bytes[i+1], packet_len, 1, m_fpOut);
+						fflush(m_fpOut);
+					}
 				}
 
 				//No SFD, just add the preamble byte
