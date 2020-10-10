@@ -1282,6 +1282,8 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 
 		case MODEL_WAVEMASTER_8ZI_B:
 			ret.push_back(1000);
+			if(m_maxBandwidth >= 4000)
+				ret.push_back(3000);
 			if(m_maxBandwidth >= 6000)
 				ret.push_back(4000);
 			if(m_maxBandwidth >= 8000)
@@ -1375,6 +1377,8 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 	char cmd[128];
 	if(limit_mhz == 0)
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", m_channels[i]->GetHwname().c_str());
+	else if(limit_mhz >= 1000)
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uGHZ", m_channels[i]->GetHwname().c_str(), limit_mhz/1000);
 	else
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
