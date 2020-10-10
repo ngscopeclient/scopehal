@@ -47,6 +47,12 @@ MDIODecoder::MDIODecoder(string color)
 	//Set up channels
 	CreateInput("mdio");
 	CreateInput("mdc");
+
+	m_typename = "PHY Type";
+	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_typename].AddEnumValue("Generic", PHY_TYPE_GENERIC);
+	m_parameters[m_typename].AddEnumValue("KSZ9031", PHY_TYPE_KSZ9031);
+	m_parameters[m_typename].SetIntVal(PHY_TYPE_GENERIC);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,6 +113,8 @@ void MDIODecoder::Refresh()
 	//Get the input data
 	auto mdio = GetDigitalInputWaveform(0);
 	auto mdc = GetDigitalInputWaveform(1);
+
+	int phytype = m_parameters[m_typename].GetIntVal();
 
 	//Create the capture
 	auto cap = new MDIOWaveform;
@@ -310,7 +318,16 @@ void MDIODecoder::Refresh()
 				//802.3 Basic Control
 				case 0x00:
 					{
-						info = "Basic Status: ";
+						info = "Basic Control: ";
+
+						if(value & 0x8000)
+							info += "Reset ";
+						if(value & 0x4000)
+							info += "Loopback ";
+						if(value & 0x0400)
+							info += "Isolate ";
+						if(value & 0x0200)
+							info += "AnegRestart ";
 
 						uint8_t speed = 0;
 						if(value & 0x0040)
@@ -321,32 +338,32 @@ void MDIODecoder::Refresh()
 						switch(speed)
 						{
 							case 0:
-								info += "Speed 10M";
+								info += "10M";
 								break;
 
 							case 1:
-								info += "Speed 100M";
+								info += "100M";
 								break;
 
 							case 2:
-								info += "Speed 1G";
+								info += "1G";
 								break;
 
 							default:
-								info += "Speed invalid";
+								info += "BadSpeed";
 								break;
 						}
 
-						if( (value & 0x0100) == 0)
-							info += "/full";
+						if(value & 0x0100)
+							info += "/full ";
 						else
-							info += "/half";
+							info += "/half ";
 
 						if( (value & 0x1000) == 0)
-							info += ", Aneg disable";
+							info += "AnegDisable ";
 
-						if( (value & 0x0800) == 0)
-							info += ", Power down";
+						if(value & 0x0800)
+							info += "PowerDown ";
 					}
 					break;
 
@@ -354,32 +371,128 @@ void MDIODecoder::Refresh()
 				case 0x1:
 					info = "Basic Status: ";
 
-					if(value & 0x20)
-						info += "Aneg complete";
-					else
-						info += "Aneg not complete";
-
 					if(value & 0x4)
-						info += ", Link up";
+						info += "Up ";
 					else
-						info += ", Link down";
+						info += "Down ";
+					if(value & 0x20)
+						info += "AnegDone ";
+
+					if(value & 0x0100)
+						info += "ExtStatus ";
+					if(value & 0x01)
+						info += "ExtCaps ";
+
+					if(value & 0x0040)
+						info += "PreambleSupp ";
+					if(value & 0x10)
+						info += "RemoteFault ";
+					if(value & 0x08)
+						info += "AnegCapable ";
+					if(value & 0x02)
+						info += "JabberDetect ";
+
+					info += "PMAs: ";
+					if(value & 0x8000)
+						info += "100baseT4 ";
+					if(value & 0x4000)
+						info += "100baseTX/full ";
+					if(value & 0x2000)
+						info += "100baseTX/half ";
+					if(value & 0x1000)
+						info += "10baseT/full ";
+					if(value & 0x0800)
+						info += "10baseT/half ";
 
 					break;
 
 				//PHY ID
 				case 0x2:
 					info = "PHY ID 1";
+					switch(phytype)
+					{
+						case PHY_TYPE_KSZ9031:
+							if(value != 0x0022)
+								info += ": ERROR, should be 0x0022 for KSZ9031";
+							else
+								info += ": Kendin/Micrel/Microchip";
+							break;
+
+						default:
+							break;
+					}
+
 					break;
 				case 0x3:
 					info = "PHY ID 2";
+					switch(phytype)
+					{
+						case PHY_TYPE_KSZ9031:
+							if( ((value >> 10) & 0x3f) != 0x5)
+								info += ": ERROR, vendor ID should be 0x5 for KSZ9031";
+							else
+							{
+								if( ((value >> 4) & 0x3f) != 0x22)
+									info += ": ERROR, model ID should be 0x22 for KSZ9031";
+								else
+									info += string(": KSZ9031 stepping ") + to_string(value & 0xf);
+							}
+							break;
+
+						default:
+							break;
+					}
 					break;
 
 				//Autonegotiation
 				case 0x4:
-					info = "ANEG Advertisement";
+					info = "ANEG Advertisement: ";
+					if( (value & 0x1F) != 1)
+						info += "NotEthernet ";
+					if(value & 0x8000)
+						info += "NextPage ";
+					if(value & 0x2000)
+						info += "RemFltSupp ";
+					if(value & 0x0800)
+						info += "AsymPause ";
+					if(value & 0x0400)
+						info += "SymPause ";
+					if(value & 0x0200)
+						info += "100baseT4 ";
+					if(value & 0x0100)
+						info += "100baseTX/full ";
+					if(value & 0x0080)
+						info += "100baseTX/half ";
+					if(value & 0x0040)
+						info += "10baseTX/full ";
+					if(value & 0x0020)
+						info += "10baseTX/half ";
 					break;
 				case 0x5:
 					info = "ANEG Partner Ability";
+
+					if( (value & 0x1F) != 1)
+						info += "NotEthernet ";
+					if(value & 0x8000)
+						info += "NextPage ";
+					if(value & 0x4000)
+						info += "ACK ";
+					if(value & 0x2000)
+						info += "RemoteFault ";
+					if(value & 0x0800)
+						info += "AsymPause ";
+					if(value & 0x0400)
+						info += "SymPause ";
+					if(value & 0x0200)
+						info += "100baseT4 ";
+					if(value & 0x0100)
+						info += "100baseTX/full ";
+					if(value & 0x0080)
+						info += "100baseTX/half ";
+					if(value & 0x0040)
+						info += "10baseTX/full ";
+					if(value & 0x0020)
+						info += "10baseTX/half ";
 					break;
 				case 0x6:
 					info = "ANEG Expansion";
@@ -643,6 +756,8 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 	ret->m_headers["Info"] = pack->m_headers["Info"];
 	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
 
+	int phytype = m_parameters[m_typename].GetIntVal();
+
 	//Search forward until we find the actual MMD data access, then update our color/type based on that
 	unsigned int mmd_reg_addr = 0;
 	unsigned int mmd_device = 0;
@@ -674,6 +789,8 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 			else
 			{
 				ret->m_headers["Op"] = p->m_headers["Op"];
+				ret->m_headers["Reg"] = p->m_headers["Reg"];
+				ret->m_headers["Value"] = p->m_headers["Value"];
 				ret->m_displayBackgroundColor = p->m_displayBackgroundColor;
 
 				mmd_value = pvalue;
@@ -682,7 +799,66 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 		}
 	}
 
-	LogDebug("MMD %x reg %x = %x\n", mmd_device, mmd_reg_addr, mmd_value);
+	//Default for unknown PHY type or unknown register
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "MMD %02x reg %04x = %04x", mmd_device, mmd_reg_addr, mmd_value);
+	string info = tmp;
+
+	switch(phytype)
+	{
+		case PHY_TYPE_KSZ9031:
+			switch(mmd_device)
+			{
+				case 0x00:
+					switch(mmd_reg_addr)
+					{
+						case 3:
+							info = "AN FLP Timer Lo: ";
+							if(mmd_value == 0x1a80)
+								info += "16 ms";
+							else if(mmd_value == 0x4000)
+								info += "8 ms";
+							else
+								info += "Reserved";
+							break;
+
+						case 4:
+							info = "AN FLP Timer Hi: ";
+							if(mmd_value == 0x3)
+								info += "8 ms";
+							else if(mmd_value == 0x6)
+								info += "16 ms";
+							else
+								info += "Reserved";
+							break;
+					}
+					break;
+
+				case 0x1:
+					break;
+
+				case 0x2:
+					break;
+
+				case 0x1c:
+					if(mmd_reg_addr == 0x23)
+					{
+						//EDPD Control
+						info = "EDPD Control: ";
+						if(mmd_value & 1)
+							info += "Enable";
+						else
+							info += "Disable";
+					}
+					break;
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	ret->m_headers["Info"] = info;
 
 	return ret;
 }

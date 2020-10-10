@@ -86,6 +86,12 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	enum PhyTypes
+	{
+		PHY_TYPE_GENERIC,	//IEEE registers only
+		PHY_TYPE_KSZ9031
+	};
+
 	virtual std::vector<std::string> GetHeaders();
 
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
@@ -96,6 +102,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(MDIODecoder)
 
 protected:
+	std::string m_typename;
 };
 
 #endif
