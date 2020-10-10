@@ -3133,6 +3133,11 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 	snprintf(tmp, sizeof(tmp), "MSIZ %ld", depth);
 	m_transport->SendCommand(tmp);
 	m_memoryDepth = depth;
+
+	//We need to reconfigure the trigger in order to keep the offset left-aligned when changing depth
+	size_t off = GetTriggerOffset();
+	m_triggerOffsetValid = false;
+	SetTriggerOffset(off);
 }
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
