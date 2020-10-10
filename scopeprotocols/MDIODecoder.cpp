@@ -114,6 +114,10 @@ void MDIODecoder::Refresh()
 	cap->m_startTimestamp = mdc->m_startTimestamp;
 	cap->m_startPicoseconds = mdc->m_startPicoseconds;
 
+	//Maintain MMD state across transactions
+	int mmd_dev = 0;
+	bool mmd_is_reg = false;
+
 	//Sample the data stream at each clock edge
 	DigitalWaveform dmdio;
 	SampleOnRisingEdges(mdio, mdc, dmdio);
@@ -201,9 +205,15 @@ void MDIODecoder::Refresh()
 				op |= 1;
 
 			if(op == 1)
+			{
 				pack->m_headers["Op"] = "Write";
+				pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+			}
 			else if(op == 2)
+			{
 				pack->m_headers["Op"] = "Read";
+				pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+			}
 			else
 				pack->m_headers["Op"] = "ERROR";
 
@@ -273,7 +283,13 @@ void MDIODecoder::Refresh()
 			start = dmdio.m_offsets[i];
 			for(size_t j=0; j<16; j++)
 			{
-				len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
+				//Use previous clock cycle's duration for last sample
+				//rather than stretching until next clock edge
+				if(j == 15)
+					len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j-1];
+				else
+					len = (dmdio.m_offsets[i+j] - start) + dmdio.m_durations[i+j];
+
 				value <<= 1;
 				if(dmdio.m_samples[i+j])
 					value |= 1;
@@ -420,11 +436,14 @@ void MDIODecoder::Refresh()
 				//MMD stuff
 				case 0xd:
 					info = "MMD Access: ";
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+					mmd_is_reg = false;
 
 					switch(value >> 14)
 					{
 						case 0:
 							info += "Register";
+							mmd_is_reg = true;
 							break;
 
 						case 1:
@@ -439,14 +458,32 @@ void MDIODecoder::Refresh()
 							info += "Data W increment";
 							break;
 					}
+
+					mmd_dev = (value & 0x1f);
+					snprintf(tmp, sizeof(tmp), "%02x", mmd_dev);
+					info += string(", MMD device = ") + tmp;
 					break;
 
 				case 0xe:
-					info = "MMD Addr/Data";
+					if(mmd_is_reg)
+					{
+						info = "MMD Address";
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+					}
+					else
+						info = "MMD Data";
 					break;
 
 				case 0xf:
-					info = "Extended Status";
+					info = "Extended Status: ";
+					if(value & 0x8000)
+						info += "1000base-X/full ";
+					if(value & 0x4000)
+						info += "1000base-X/half ";
+					if(value & 0x2000)
+						info += "1000base-T/full ";
+					if(value & 0x1000)
+						info += "1000base-T/half ";
 					break;
 
 				//TODO: support for PHY vendor specific registers if we know the PHY ID (or are told)
@@ -569,4 +606,83 @@ string MDIODecoder::GetText(int i)
 	}
 
 	return "";
+}
+
+bool MDIODecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+{
+	//If different PHYs, obviously can't merge
+	if(first->m_headers["PHY"] != next->m_headers["PHY"])
+		return false;
+
+	//Start merging when we get an access to the MMD address register
+	if( (first->m_headers["Reg"] == "0d") && (first->m_headers["Info"].find("Register") != string::npos) )
+	{
+		//Only merge accesses to 0e or 0d-with-data
+		if(next->m_headers["Reg"] == "0e")
+			return true;
+
+		if( (next->m_headers["Reg"] == "0d") && (next->m_headers["Info"].find("Data") != string::npos) )
+			return true;
+	}
+
+	return false;
+}
+
+Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
+{
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;
+
+	//Default to copying everything from the first packet
+	ret->m_headers["Clause"] = pack->m_headers["Clause"];
+	ret->m_headers["Op"] = pack->m_headers["Op"];
+	ret->m_headers["PHY"] = pack->m_headers["PHY"];
+	ret->m_headers["Reg"] = pack->m_headers["Reg"];
+	ret->m_headers["Value"] = pack->m_headers["Value"];
+	ret->m_headers["Info"] = pack->m_headers["Info"];
+	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+
+	//Search forward until we find the actual MMD data access, then update our color/type based on that
+	unsigned int mmd_reg_addr = 0;
+	unsigned int mmd_device = 0;
+	unsigned int mmd_value = 0;
+	bool mmd_is_addr = false;
+	for(size_t j=i; j<m_packets.size(); j++)
+	{
+		//Check type field
+		auto p = m_packets[j];
+		unsigned int pvalue = strtol(p->m_headers["Value"].c_str(), NULL, 16);
+
+		//Decode address info
+		if(p->m_headers["Reg"] == "0d")
+		{
+			if(p->m_headers["Info"].find("Register") != string::npos)
+				mmd_is_addr = true;
+			else
+				mmd_is_addr = false;
+
+			mmd_device = pvalue & 0x1f;
+		}
+
+		if(p->m_headers["Reg"] == "0e")
+		{
+			if(mmd_is_addr)
+				mmd_reg_addr = pvalue;
+
+			//Figure out top level op type on the final data transaction
+			else
+			{
+				ret->m_headers["Op"] = p->m_headers["Op"];
+				ret->m_displayBackgroundColor = p->m_displayBackgroundColor;
+
+				mmd_value = pvalue;
+				break;
+			}
+		}
+	}
+
+	LogDebug("MMD %x reg %x = %x\n", mmd_device, mmd_reg_addr, mmd_value);
+
+	return ret;
 }

@@ -88,6 +88,9 @@ public:
 
 	virtual std::vector<std::string> GetHeaders();
 
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
+
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(MDIODecoder)
