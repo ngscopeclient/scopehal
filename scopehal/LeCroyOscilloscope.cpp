@@ -2734,7 +2734,10 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
-	ret.push_back(2 * m);
+	if(m_modelid == MODEL_HDO_9K)		//... with one exception
+		ret.push_back(2500 * k);
+	else
+		ret.push_back(2 * m);
 	ret.push_back(5 * m);
 	ret.push_back(10 * m);
 	ret.push_back(20 * m);
