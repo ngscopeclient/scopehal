@@ -89,6 +89,7 @@ public:
 	virtual void SetChannelOffset(size_t i, double offset);
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -143,7 +144,7 @@ public:
 	virtual void SetFunctionChannelFallTime(int chan, float sec);
 
 	//Scope models.
-	//We only distinguish down to the series of scope, exact SKU is irrelevant.
+	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
 	{
 		MODEL_DDA_5K,
@@ -275,6 +276,9 @@ protected:
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
+
+	///Maximum bandwidth we support, in MHz
+	unsigned int m_maxBandwidth;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

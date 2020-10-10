@@ -57,6 +57,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
+	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
@@ -137,32 +138,59 @@ void LeCroyOscilloscope::IdentifyHardware()
 
 	//Look up model info
 	m_modelid = MODEL_UNKNOWN;
+	m_maxBandwidth = 0;
 
 	if(m_model.find("DDA5") == 0)
+	{
 		m_modelid = MODEL_DDA_5K;
+		m_maxBandwidth = 5000;
+	}
 	else if( (m_model.find("HDO4") == 0) && (m_model.find("A") != string::npos) )
+	{
 		m_modelid = MODEL_HDO_4KA;
+		m_maxBandwidth = stoi(m_model.substr(4, 2)) * 100;
+	}
 	else if( (m_model.find("HDO6") == 0) && (m_model.find("A") != string::npos) )
+	{
 		m_modelid = MODEL_HDO_6KA;
+		m_maxBandwidth = stoi(m_model.substr(4, 2)) * 100;
+	}
 	else if(m_model.find("HDO9") == 0)
+	{
 		m_modelid = MODEL_HDO_9K;
+		m_maxBandwidth = stoi(m_model.substr(4, 1)) * 1000;
+	}
 	else if(m_model == "MCM-ZI-A")
+	{
 		m_modelid = MODEL_LABMASTER_ZI_A;
+
+		//For now assume 100 GHz bandwidth.
+		//TODO: ID acquisition modules
+		m_maxBandwidth = 100000;
+	}
 	else if(m_model.find("MDA8") == 0)
 	{
 		m_modelid = MODEL_MDA_800;
 		m_highDefinition = true;	//Doesn't have "HD" in the name but is still 12 bit resolution
+		m_maxBandwidth = stoi(m_model.substr(4, 2)) * 100;
 	}
 	else if(m_model.find("SDA3") == 0)
+	{
 		m_modelid = MODEL_SDA_3K;
-	else if(m_model.find("WM") == 0)
+		m_maxBandwidth = 3000;
+	}
+	else if(m_model.find("WM8") == 0)
 	{
 		if(m_model.find("ZI-B") != string::npos)
 			m_modelid = MODEL_WAVEMASTER_8ZI_B;
+
+		m_maxBandwidth = stoi(m_model.substr(3, 2)) * 1000;
 	}
 	else if(m_model.find("WAVERUNNER8") == 0)
 	{
 		m_modelid = MODEL_WAVERUNNER_8K;
+
+		m_maxBandwidth = stoi(m_model.substr(11, 2)) * 100;
 
 		if(m_model.find("HD") != string::npos)
 			m_modelid = MODEL_WAVERUNNER_8K_HD;
@@ -173,16 +201,24 @@ void LeCroyOscilloscope::IdentifyHardware()
 			m_modelid = MODEL_WAVEPRO_HD;
 	}
 	else if(m_model.find("WAVERUNNER9") == 0)
+	{
 		m_modelid = MODEL_WAVERUNNER_9K;
+		m_maxBandwidth = stoi(m_model.substr(11, 2)) * 100;
+	}
 	else if(m_model.find("WS3") == 0)
+	{
 		m_modelid = MODEL_WAVESURFER_3K;
-
+		m_maxBandwidth = stoi(m_model.substr(3, 2)) * 100;
+	}
 	else if (m_vendor.compare("SIGLENT") == 0)
 	{
 		// TODO: if LeCroy and Siglent classes get split, then this should obviously
 		// move to the Siglent class.
 		if (m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 'X')
 			m_modelid = MODEL_SIGLENT_SDS2000X;
+
+		//FIXME
+		m_maxBandwidth = 200;
 	}
 
 	else
@@ -194,6 +230,11 @@ void LeCroyOscilloscope::IdentifyHardware()
 	//Enable HD mode by default if model name contains "HD" at any point
 	if(m_model.find("HD") != string::npos)
 		m_highDefinition = true;
+
+	//300 MHz bandwidth doesn't exist on any known scope.
+	//It's always 350, but is normally coded in the model ID as if it were 300.
+	if(m_maxBandwidth == 300)
+		m_maxBandwidth = 350;
 }
 
 void LeCroyOscilloscope::DetectOptions()
@@ -405,6 +446,8 @@ void LeCroyOscilloscope::DetectOptions()
 			//Currently unsupported trigger/decodes, to be added in the future
 			else if(o.find("CAN_FD") == 0)
 				desc = "CAN FD";
+			else if(o.find("FIBER_CH") == 0)
+				desc = "Fibre Channel";
 			else if(o.find("I2S") == 0)
 				desc = "I2S";
 			else if(o.find("I3C") == 0)
@@ -415,6 +458,12 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "SPMI";
 			else if(o.find("USB2") == 0)
 				desc = "USB2";
+			else if(o.find("USB3") == 0)
+				desc = "USB3";
+			else if(o.find("SATA") == 0)
+				desc = "Serial ATA";
+			else if(o.find("SAS") == 0)
+				desc = "Serial Attached SCSI";
 			else if(o == "HDTV")
 			{
 				type = "Trigger";		//FIXME: Is this just 1080p analog trigger support?
@@ -1165,6 +1214,114 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(cmd);
+}
+
+vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+{
+	vector<unsigned int> ret;
+
+	//"no limit"
+	ret.push_back(0);
+
+	//Supported by almost all known models
+	ret.push_back(20);
+	ret.push_back(200);
+
+	switch(m_modelid)
+	{
+		//Only one DDA5 model is known to exist, no need for bandwidth check
+		case MODEL_DDA_5K:
+			ret.push_back(1000);
+			ret.push_back(3000);
+			ret.push_back(4000);
+			break;
+
+		case MODEL_HDO_9K:
+			ret.push_back(500);
+			if(m_maxBandwidth >= 2000)
+				ret.push_back(1000);
+			if(m_maxBandwidth >= 3000)
+				ret.push_back(2000);
+			if(m_maxBandwidth >= 4000)
+				ret.push_back(3000);
+			break;
+
+		//TODO: this probably depends on which acquisition module is selected?
+		case MODEL_LABMASTER_ZI_A:
+			ret.clear();
+			ret.push_back(0);
+			ret.push_back(1000);
+			ret.push_back(3000);
+			ret.push_back(4000);
+			ret.push_back(6000);
+			ret.push_back(8000);
+			ret.push_back(13000);
+			ret.push_back(16000);
+			ret.push_back(20000);
+			ret.push_back(25000);
+			ret.push_back(30000);
+			ret.push_back(33000);
+			ret.push_back(36000);
+			break;
+
+		case MODEL_MDA_800:
+		case MODEL_WAVERUNNER_8K_HD:
+			if(m_maxBandwidth >= 500)
+				ret.push_back(350);
+			if(m_maxBandwidth >= 1000)
+				ret.push_back(500);
+			if(m_maxBandwidth >= 2000)
+				ret.push_back(1000);
+			break;
+
+		//Seems like the SDA 3010 is part of a family of different scopes with prefix indicating bandwidth.
+		//We should probably change this to SDA_FIRSTGEN or something?
+		case MODEL_SDA_3K:
+			ret.push_back(1000);
+			break;
+
+		case MODEL_WAVEMASTER_8ZI_B:
+			ret.push_back(1000);
+			if(m_maxBandwidth >= 6000)
+				ret.push_back(4000);
+			if(m_maxBandwidth >= 8000)
+				ret.push_back(6000);
+			if(m_maxBandwidth >= 13000)
+				ret.push_back(8000);
+			break;
+
+		case MODEL_WAVEPRO_HD:
+			ret.push_back(500);
+			ret.push_back(1000);
+			if(m_maxBandwidth >= 4000)
+				ret.push_back(2500);
+			if(m_maxBandwidth >= 6000)
+				ret.push_back(4000);
+			if(m_maxBandwidth >= 8000)
+				ret.push_back(6000);
+			break;
+
+		case MODEL_WAVERUNNER_8K:
+		case MODEL_WAVERUNNER_9K:
+			if(m_maxBandwidth >= 2500)
+				ret.push_back(1000);
+			break;
+
+		case MODEL_WAVESURFER_3K:
+			ret.clear();
+			if(m_maxBandwidth >= 350)
+				ret.push_back(200);
+			break;
+
+		//Only the default 20/200
+		case MODEL_HDO_4KA:
+		case MODEL_HDO_6KA:
+		case MODEL_SIGLENT_SDS2000X:
+		default:
+			break;
+	}
+
+	return ret;
 }
 
 int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)

@@ -201,6 +201,13 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten) =0;
 
 	/**
+		@brief Gets the set of available bandwidth limiters for an input channel.
+
+		@param i Zero-based index of channel
+	 */
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
+
+	/**
 		@brief Gets the bandwidth limit for an input channel.
 
 		@param i Zero-based index of channel

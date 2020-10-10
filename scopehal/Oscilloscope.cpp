@@ -412,6 +412,13 @@ string Oscilloscope::GetChannelDisplayName(size_t i)
 	return m_channelDisplayNames[m_channels[i]];
 }
 
+vector<unsigned int> Oscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
+{
+	vector<unsigned int> ret;
+	ret.push_back(0);
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic analyzer configuration (default no-op for scopes without MSO feature)
 
