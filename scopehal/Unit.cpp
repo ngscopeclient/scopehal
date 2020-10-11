@@ -70,6 +70,7 @@ string Unit::PrettyPrint(double value)
 		scale = "p";
 	}
 
+	bool space_after_number = true;
 	switch(m_type)
 	{
 		//Special handling needed since it's not a SI base unit
@@ -142,7 +143,8 @@ string Unit::PrettyPrint(double value)
 			unit = "bps";
 			break;
 		case UNIT_UI:
-			unit = "UI";
+			unit = " UI";	//move the space next to the number
+			space_after_number = false;
 			break;
 		case UNIT_RPM:
 			unit = "RPM";
@@ -199,18 +201,22 @@ string Unit::PrettyPrint(double value)
 
 		default:
 			{
+				const char* space = " ";
+				if(!space_after_number)
+					space = "";
+
 				//If not a round number, add more digits (up to 4)
 				//TODO: allow user to specify how many sigfigs they want
 				if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.0f %s%s", value_rescaled, scale, unit);
+					snprintf(tmp, sizeof(tmp), "%.0f%s%s%s", value_rescaled, space, scale, unit);
 				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.001)
-					snprintf(tmp, sizeof(tmp), "%.1f %s%s", value_rescaled, scale, unit);
+					snprintf(tmp, sizeof(tmp), "%.1f%s%s%s", value_rescaled, space, scale, unit);
 				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.2f %s%s", value_rescaled, scale, unit);
+					snprintf(tmp, sizeof(tmp), "%.2f%s%s%s", value_rescaled, space, scale, unit);
 				else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.3f %s%s", value_rescaled, scale, unit);
+					snprintf(tmp, sizeof(tmp), "%.3f%s%s%s", value_rescaled, space, scale, unit);
 				else
-					snprintf(tmp, sizeof(tmp), "%.4f %s%s", value_rescaled, scale, unit);
+					snprintf(tmp, sizeof(tmp), "%.4f%s%s%s", value_rescaled, space, scale, unit);
 			}
 			break;
 	}
