@@ -51,7 +51,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_digitalChannelBase(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
-	, m_bandwidth(1000)
+	, m_maxBandwidth(1000)
 {
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
@@ -85,7 +85,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_transport->SendCommand("VERB OFF");					//Disable verbose mode (send shorter commands)
 			m_transport->SendCommand("ACQ:STOPA SEQ");				//Stop after acquiring a single waveform
 			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
-			m_bandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
+			m_maxBandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
 			m_transport->SendCommand("HOR:MODE MAN");				//Enable manual sample rate and record length
 			m_transport->SendCommand("HOR:DEL:MOD ON");				//Horizontal position is in time units
 			m_transport->SendCommand("SV:RBWMODE MAN");				//Manual resolution bandwidth control
@@ -227,18 +227,29 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 	//See what options we have
 	vector<string> options;
-	/*
 	m_transport->SendCommand("*OPT?");
-	string reply = m_transport->ReadReply();
+	string reply = m_transport->ReadReply(false) + ',';
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-
+			{
+				//Seems like we have blocks divided by commas
+				//Each block contains three semicolon delimited fields: code, text description, license type
+				for (string::size_type prev_pos=0, pos=0;
+					 (pos = reply.find(',', pos)) != std::string::npos;
+					 prev_pos=++pos)
+				{
+					string optgroup = reply.substr(prev_pos, pos-prev_pos);
+					options.push_back(optgroup.substr(0, optgroup.find(";")));
+				}
+			}
 			break;
 
 		default:
 			{
+
+
 				for (std::string::size_type prev_pos=0, pos=0;
 					 (pos = reply.find(',', pos)) != std::string::npos;
 					 prev_pos=++pos)
@@ -254,7 +265,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			}
 			break;
 	}
-	*/
 
 	//Print out the option list and do processing for each
 	LogDebug("Installed options:\n");
@@ -262,7 +272,55 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		LogDebug("* None\n");
 	for(auto opt : options)
 	{
-		LogDebug("* %s (unknown)\n", opt.c_str());
+		if(opt == "BW6-1000")
+		{
+			LogDebug("* BW6-1000 (1 GHz bandwidth)\n");
+			//Don't touch m_maxBandwidth, we already got it from CONFIG:ANALO:BANDWIDTH
+		}
+
+		else if(opt == "LIC6-DDU")
+		{
+			LogDebug("* LIC6-DDU (6 series distribution demo)\n");
+			/*
+				This is a bundle code that unlocks lots of stuff:
+					* 8 GHZ bandwidth
+					* Function generator
+					* Multimeter
+					* I3C (decode only, no trigger)
+					* 100baseT1 (decode only, no trigger)
+					* SpaceWire (decode only, no trigger)
+
+				Trigger/decode types:
+					* Parallel bus
+					* I2C
+					* SPI
+					* RS232
+					* CAN
+					* LIN
+					* FlexRay
+					* SENT
+					* USB
+					* 10/100 Ethernet
+					* SPMI
+					* MIL-STD-1553
+					* ARINC 429
+					* I2S/LJ/RJ/TDM audio
+
+				This is in addition to the probably-standard trigger types:
+					* Edge
+					* Pulse width
+					* Timeout
+					* Runt
+					* Window
+					* Logic pattern
+					* Setup/hold
+					* Slew rate
+					* Sequence
+			 */
+		}
+
+		else
+			LogDebug("* %s (unknown)\n", opt.c_str());
 	}
 
 	//Figure out what probes we have connected
@@ -759,7 +817,7 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 			return m_channelBandwidthLimits[i];
 	}
 
-	int bwl = 0;
+	unsigned int bwl = 0;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -776,7 +834,7 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 						bwl = stof(reply) * 1e-6;
 
 					//If the returned bandwidth is the same as the instrument's upper bound, report "no limit"
-					if(bwl == m_bandwidth)
+					if(bwl == m_maxBandwidth)
 						bwl = 0;
 				}
 				break;
@@ -798,6 +856,57 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelBandwidthLimits[i] = bwl;
 	return bwl;
+}
+
+vector<unsigned int> TektronixOscilloscope::GetChannelBandwidthLimiters(size_t i)
+{
+	//Don't allow bandwidth limits >1 GHz for 1M ohm inputs
+	auto coupling = GetChannelCoupling(i);
+	bool is_1m = (coupling == OscilloscopeChannel::COUPLE_AC_1M) || (coupling == OscilloscopeChannel::COUPLE_DC_1M);
+
+	vector<unsigned int> ret;
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+
+			//Only show "unlimited" for 50 ohm channels
+			if(!is_1m)
+				ret.push_back(0);
+
+			ret.push_back(20);
+			ret.push_back(200);
+			ret.push_back(250);
+			ret.push_back(350);
+			if(!is_1m)
+			{
+				if(m_maxBandwidth > 1000)
+					ret.push_back(1000);
+				if(m_maxBandwidth > 2000)
+					ret.push_back(2000);
+				if(m_maxBandwidth > 2500)
+					ret.push_back(2500);
+				if(m_maxBandwidth > 3000)
+					ret.push_back(3000);
+				if(m_maxBandwidth >= 4000)
+					ret.push_back(4000);
+				if(m_maxBandwidth >= 5000)
+					ret.push_back(5000);
+				if(m_maxBandwidth >= 6000)
+					ret.push_back(6000);
+				if(m_maxBandwidth >= 7000)
+					ret.push_back(7000);
+			}
+			else if(m_maxBandwidth >= 1000)
+				ret.push_back(1000);
+			break;
+
+		default:
+			break;
+	}
+
+	return ret;
 }
 
 void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)

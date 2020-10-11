@@ -83,6 +83,7 @@ public:
 	virtual void SetChannelOffset(size_t i, double offset);
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -211,8 +212,8 @@ protected:
 		return true;
 	}
 
-	//available instrument bandwidth in MHz
-	int m_bandwidth;
+	///Maximum bandwidth we support, in MHz
+	unsigned int m_maxBandwidth;
 
 	enum Family
 	{
