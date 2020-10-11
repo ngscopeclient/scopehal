@@ -44,6 +44,10 @@ ThresholdFilter::ThresholdFilter(string color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
+
+	m_hysname = "Hysteresis";
+	m_parameters[m_hysname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_hysname].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,14 +100,38 @@ void ThresholdFilter::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	auto len = din->m_samples.size();
 
-	//Threshold all of our samples
+	//Setup
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
+	float hys = m_parameters[m_hysname].GetFloatVal();
 	DigitalWaveform* cap = new DigitalWaveform;
 	cap->Resize(len);
 	cap->CopyTimestamps(din);
-	#pragma omp parallel for
-	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] = din->m_samples[i] > midpoint;
+
+	//Threshold all of our samples
+	//Optimized inner loop if no hysteresis
+	if(hys == 0)
+	{
+		#pragma omp parallel for
+		for(size_t i=0; i<len; i++)
+			cap->m_samples[i] = din->m_samples[i] > midpoint;
+	}
+	else
+	{
+		bool cur = din->m_samples[0] > midpoint;
+		float thresh_rising = midpoint + hys/2;
+		float thresh_falling = midpoint - hys/2;
+
+		for(size_t i=0; i<len; i++)
+		{
+			float f = din->m_samples[i];
+			if(cur && (f < thresh_falling))
+				cur = false;
+			else if(!cur && (f > thresh_rising))
+				cur = true;
+			cap->m_samples[i] = cur;
+		}
+	}
+
 	SetData(cap, 0);
 
 	//Copy our time scales from the input
