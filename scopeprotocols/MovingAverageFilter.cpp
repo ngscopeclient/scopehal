@@ -43,6 +43,11 @@ MovingAverageFilter::MovingAverageFilter(string color)
 	m_depthname = "Depth";
 	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_depthname].SetFloatVal(0);
+
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,12 +69,12 @@ bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 double MovingAverageFilter::GetVoltageRange()
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_range;
 }
 
 double MovingAverageFilter::GetOffset()
 {
-	return m_inputs[0].m_channel->GetOffset();
+	return m_offset;
 }
 
 string MovingAverageFilter::GetProtocolName()
@@ -102,6 +107,14 @@ void MovingAverageFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void MovingAverageFilter::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
+}
+
 void MovingAverageFilter::Refresh()
 {
 	if(!VerifyAllInputsOKAndAnalog())
@@ -114,32 +127,44 @@ void MovingAverageFilter::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
 	size_t depth = m_parameters[m_depthname].GetIntVal();
+	if(len < depth)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
 
 	//Do the average
 	auto cap = new AnalogWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(din);
-	#pragma omp parallel for
-	for(size_t i=0; i<len; i++)
+	size_t nsamples = len - depth;
+	size_t off = depth/2;
+	cap->Resize(nsamples);
+	float vmin = FLT_MAX;
+	float vmax = -FLT_MAX;
+	//#pragma omp parallel for
+	for(size_t i=0; i<nsamples; i++)
 	{
 		float v = 0;
-		size_t navg = 0;
 		for(size_t j=0; j<depth; j++)
-		{
-			if(j > i)
-				break;
+			v += din->m_samples[i+j];
+		v /= depth;
 
-			v += din->m_samples[i-j];
-			navg ++;
-		}
-		v /= navg;
+		vmin = min(vmin, v);
+		vmax = max(vmax, v);
 
+		cap->m_offsets[i] = din->m_offsets[i+off];
+		cap->m_durations[i] = din->m_durations[i+off];
 		cap->m_samples[i] = v;
 	}
 	SetData(cap, 0);
+
+	//Calculate bounds
+	m_max = max(m_max, vmax);
+	m_min = min(m_min, vmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;
