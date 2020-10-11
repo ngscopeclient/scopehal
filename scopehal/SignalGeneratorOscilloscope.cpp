@@ -47,6 +47,8 @@ SignalGeneratorOscilloscope::SignalGeneratorOscilloscope(SCPITransport* transpor
 	, m_extTrigger(NULL)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_depth(100e3)
+	, m_rate(100e9)
 {
 	//Create a single channel named "waveform"
 	//TODO: more flexible config
@@ -59,6 +61,7 @@ SignalGeneratorOscilloscope::SignalGeneratorOscilloscope(SCPITransport* transpor
 		1,
 		0,
 		true));
+	SetChannelDisplayName(0, "waveform");
 
 	m_model = "IBIS Signal Generator";
 	m_vendor = "Antikernel Labs";
@@ -122,8 +125,8 @@ bool SignalGeneratorOscilloscope::AcquireData()
 	auto waveform = m_bufmodel->SimulatePRBS(
 		rand(),
 		CORNER_TYP,
-		10,			//100 Gsps
-		200000,
+		1e12 / m_rate,
+		m_depth,
 		80			//1.25 Gbps
 		);
 
@@ -246,16 +249,23 @@ void SignalGeneratorOscilloscope::SetChannelOffset(size_t i, double offset)
 
 vector<uint64_t> SignalGeneratorOscilloscope::GetSampleRatesNonInterleaved()
 {
-	//no-op
+	uint64_t k = 1000;
+	uint64_t m = k * k;
+	uint64_t g = k * m;
+
 	vector<uint64_t> ret;
+	ret.push_back(1 * g);
+	ret.push_back(5 * g);
+	ret.push_back(10 * g);
+	ret.push_back(25 * g);
+	ret.push_back(50 * g);
+	ret.push_back(100 * g);
 	return ret;
 }
 
 vector<uint64_t> SignalGeneratorOscilloscope::GetSampleRatesInterleaved()
 {
-	//no-op
-	vector<uint64_t> ret;
-	return ret;
+	return GetSampleRatesNonInterleaved();
 }
 
 set<Oscilloscope::InterleaveConflict> SignalGeneratorOscilloscope::GetInterleaveConflicts()
@@ -267,37 +277,40 @@ set<Oscilloscope::InterleaveConflict> SignalGeneratorOscilloscope::GetInterleave
 
 vector<uint64_t> SignalGeneratorOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	//no-op
+	uint64_t k = 1000;
+	uint64_t m = k * k;
+
 	vector<uint64_t> ret;
+	ret.push_back(10 * k);
+	ret.push_back(100 * k);
+	ret.push_back(1 * m);
+	ret.push_back(10 * m);
 	return ret;
 }
 
 vector<uint64_t> SignalGeneratorOscilloscope::GetSampleDepthsInterleaved()
 {
-	//no-op
-	vector<uint64_t> ret;
-	return ret;
+	return GetSampleDepthsNonInterleaved();
 }
 
 uint64_t SignalGeneratorOscilloscope::GetSampleRate()
 {
-	return 1;
+	return m_rate;
 }
 
 uint64_t SignalGeneratorOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	return m_depth;
 }
 
-void SignalGeneratorOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void SignalGeneratorOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//no-op
+	m_depth = depth;
 }
 
-void SignalGeneratorOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void SignalGeneratorOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//no-op
+	m_rate = rate;
 }
 
 void SignalGeneratorOscilloscope::SetTriggerOffset(int64_t /*offset*/)
