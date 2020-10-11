@@ -92,6 +92,10 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 {
 	if(i < m_signalNames.size())
 	{
+		//Calling SetInput with the current input is a legal no-op
+		if(stream == m_inputs[i])
+			return;
+
 		if(stream.m_channel == NULL)	//NULL is always legal
 		{
 			m_inputs[i] = StreamDescriptor(NULL, 0);
