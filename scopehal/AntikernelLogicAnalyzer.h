@@ -110,8 +110,6 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
-	std::recursive_mutex m_mutex;
-
 	std::vector<size_t> m_lowIndexes;
 	std::vector<size_t> m_highIndexes;
 
