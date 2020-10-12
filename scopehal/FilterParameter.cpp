@@ -89,7 +89,6 @@ void FilterParameter::ParseString(const string& str)
 
 				//Split out semicolon-delimited filenames
 				string tmp;
-				str += ';';
 				for(size_t i=0; i<str.length(); i++)
 				{
 					if(str[i] ==';')
@@ -105,6 +104,11 @@ void FilterParameter::ParseString(const string& str)
 					}
 
 					tmp += str[i];
+				}
+				if(tmp != "")
+				{
+					m_string = tmp;
+					m_filenames.push_back(tmp);
 				}
 			}
 			break;
