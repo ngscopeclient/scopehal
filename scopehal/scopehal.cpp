@@ -139,9 +139,9 @@ void DriverStaticInit()
 string GetDefaultChannelColor(int i)
 {
 	const int NUM_COLORS = 12;
-	static const char* colorTable[NUM_COLORS]=
+	static const char* colorTable[NUM_COLORS] =
 	{
-		"#a6cee3",
+		"#a6cee3",	//cppcheck suppress constStatement
 		"#1f78b4",
 		"#b2df8a",
 		"#33a02c",
@@ -181,7 +181,7 @@ void InitializePlugins()
 	search_dirs.push_back("/usr/local/lib/scopehal/plugins/");
 
 	//current binary dir
-	char selfPath[1024] = {0};
+	char selfPath[1024] = "";
 	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
 	if ( readlinkReturn > 0)
 		search_dirs.push_back(dirname(selfPath));
