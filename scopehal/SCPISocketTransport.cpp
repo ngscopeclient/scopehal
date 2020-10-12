@@ -40,7 +40,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPISocketTransport::SCPISocketTransport(string args)
+SCPISocketTransport::SCPISocketTransport(const string& args)
 	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 {
 	char hostname[128];
@@ -101,7 +101,7 @@ string SCPISocketTransport::GetConnectionString()
 	return string(tmp);
 }
 
-bool SCPISocketTransport::SendCommand(string cmd)
+bool SCPISocketTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";

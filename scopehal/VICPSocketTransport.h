@@ -46,13 +46,13 @@
 class VICPSocketTransport : public SCPITransport
 {
 public:
-	VICPSocketTransport(std::string args);
+	VICPSocketTransport(const std::string& args);
 	virtual ~VICPSocketTransport();
 
 	virtual std::string GetConnectionString();
 	static std::string GetTransportName();
 
-	virtual bool SendCommand(std::string cmd);
+	virtual bool SendCommand(const std::string& cmd);
 	virtual std::string ReadReply(bool endOnSemicolon = true);
 	virtual void ReadRawData(size_t len, unsigned char* buf);
 	virtual void SendRawData(size_t len, const unsigned char* buf);

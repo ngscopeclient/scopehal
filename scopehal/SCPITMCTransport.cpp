@@ -46,7 +46,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPITMCTransport::SCPITMCTransport(string args)
+SCPITMCTransport::SCPITMCTransport(const string& args)
 {
 	// TODO: add configuration options:
 	// - set the maximum request size of usbtmc read requests (currently 2032)
@@ -103,7 +103,7 @@ string SCPITMCTransport::GetConnectionString()
 	return m_devicePath;
 }
 
-bool SCPITMCTransport::SendCommand(string cmd)
+bool SCPITMCTransport::SendCommand(const string& cmd)
 {
 	if (!IsConnected())
 		return false;

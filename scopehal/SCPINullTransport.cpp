@@ -46,7 +46,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPINullTransport::SCPINullTransport(string args)
+SCPINullTransport::SCPINullTransport(const string& args)
 	: m_args(args)
 {
 }
@@ -74,7 +74,7 @@ string SCPINullTransport::GetConnectionString()
 	return m_args;
 }
 
-bool SCPINullTransport::SendCommand(string /*cmd*/)
+bool SCPINullTransport::SendCommand(const string& /*cmd*/)
 {
 	return true;
 }

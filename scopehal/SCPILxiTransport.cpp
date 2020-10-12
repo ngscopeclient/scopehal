@@ -49,7 +49,7 @@ using namespace std;
 
 bool SCPILxiTransport::m_lxi_initialized = false;
 
-SCPILxiTransport::SCPILxiTransport(string args)
+SCPILxiTransport::SCPILxiTransport(const string& args)
 {
 	if (!m_lxi_initialized)
 	{
@@ -132,7 +132,7 @@ string SCPILxiTransport::GetConnectionString()
 	return string(tmp);
 }
 
-bool SCPILxiTransport::SendCommand(string cmd)
+bool SCPILxiTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 

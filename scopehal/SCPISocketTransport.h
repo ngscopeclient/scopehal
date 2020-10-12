@@ -44,13 +44,13 @@
 class SCPISocketTransport : public SCPITransport
 {
 public:
-	SCPISocketTransport(std::string args);
+	SCPISocketTransport(const std::string& args);
 	virtual ~SCPISocketTransport();
 
 	virtual std::string GetConnectionString();
 	static std::string GetTransportName();
 
-	virtual bool SendCommand(std::string cmd);
+	virtual bool SendCommand(const std::string& cmd);
 	virtual std::string ReadReply(bool endOnSemicolon = true);
 	virtual void ReadRawData(size_t len, unsigned char* buf);
 	virtual void SendRawData(size_t len, const unsigned char* buf);
@@ -60,7 +60,7 @@ public:
 
 	TRANSPORT_INITPROC(SCPISocketTransport)
 
-	std::string GetHostname()
+	const std::string& GetHostname()
 	{ return m_hostname; }
 
 protected:

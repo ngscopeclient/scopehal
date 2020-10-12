@@ -61,7 +61,7 @@ void SCPITransport::EnumTransports(vector<string>& names)
 		names.push_back(it->first);
 }
 
-SCPITransport* SCPITransport::CreateTransport(string transport, string args)
+SCPITransport* SCPITransport::CreateTransport(const string& transport, const string& args)
 {
 	if(m_createprocs.find(transport) != m_createprocs.end())
 		return m_createprocs[transport](args);

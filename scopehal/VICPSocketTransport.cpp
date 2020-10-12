@@ -40,7 +40,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-VICPSocketTransport::VICPSocketTransport(string args)
+VICPSocketTransport::VICPSocketTransport(const string& args)
 	: m_nextSequence(1)
 	, m_lastSequence(1)
 	, m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
@@ -116,7 +116,7 @@ uint8_t VICPSocketTransport::GetNextSequenceNumber()
 	return m_lastSequence;
 }
 
-bool VICPSocketTransport::SendCommand(string cmd)
+bool VICPSocketTransport::SendCommand(const string& cmd)
 {
 	//Operation and flags header
 	string payload;

@@ -40,7 +40,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIUARTTransport::SCPIUARTTransport(string args)
+SCPIUARTTransport::SCPIUARTTransport(const string& args)
 {
 	char devfile[128];
 	unsigned int baudrate = 0;
@@ -90,7 +90,7 @@ string SCPIUARTTransport::GetConnectionString()
 	return string(tmp);
 }
 
-bool SCPIUARTTransport::SendCommand(string cmd)
+bool SCPIUARTTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 	string tempbuf = cmd + "\n";
