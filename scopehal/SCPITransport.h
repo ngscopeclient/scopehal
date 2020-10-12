@@ -57,7 +57,7 @@ public:
 	virtual bool IsConnected() =0;
 
 public:
-	typedef SCPITransport* (*CreateProcType)(std::string args);
+	typedef SCPITransport* (*CreateProcType)(const std::string& args);
 	static void DoAddTransportClass(std::string name, CreateProcType proc);
 
 	static void EnumTransports(std::vector<std::string>& names);
@@ -70,7 +70,7 @@ protected:
 };
 
 #define TRANSPORT_INITPROC(T) \
-	static SCPITransport* CreateInstance(std::string args) \
+	static SCPITransport* CreateInstance(const std::string& args) \
 	{ \
 		return new T(args); \
 	} \
