@@ -80,11 +80,11 @@ class WaveformBase
 {
 public:
 	WaveformBase()
-	{
-		m_triggerPhase = 0;
-		m_startTimestamp = 0;
-		m_startPicoseconds = 0;
-	}
+		: m_timescale(0)
+		, m_startTimestamp(0)
+		, m_startPicoseconds(0)
+		, m_triggerPhase(0)
+	{}
 
 	//empty virtual destructor in case any derived classes need one
 	virtual ~WaveformBase()

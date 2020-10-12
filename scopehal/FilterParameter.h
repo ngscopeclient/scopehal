@@ -50,11 +50,7 @@ public:
 		TYPE_STRING		//arbitrary string
 	};
 
-	FilterParameter()
-	: m_unit(Unit::UNIT_PS)
-	{}
-
-	FilterParameter(ParameterTypes type, Unit unit);
+	FilterParameter(ParameterTypes type = FilterParameter::TYPE_FLOAT, Unit unit  = Unit(Unit::UNIT_PS));
 
 	void ParseString(std::string str);
 	std::string ToString();

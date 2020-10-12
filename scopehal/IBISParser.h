@@ -121,9 +121,14 @@ public:
 class IBISModel
 {
 public:
-	IBISModel(std::string name)
+	IBISModel(const std::string& name)
 	: m_type(TYPE_IO)
 	, m_name(name)
+	, m_vil{0}
+	, m_vih{0}
+	, m_temps{0}
+	, m_voltages{0}
+	, m_dieCapacitance{0}
 	{}
 
 	//Model type
