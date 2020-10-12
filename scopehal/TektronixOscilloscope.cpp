@@ -373,9 +373,16 @@ void TektronixOscilloscope::DetectProbes()
 				if(reply == "DIG")
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
 
-				//Treat anything else as analog
+				//Treat anything else as analog. See what type
 				else
-					m_probeTypes[i] = PROBE_TYPE_ANALOG;
+				{
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBE:ID:TYP?");
+					string id = TrimQuotes(m_transport->ReadReply());
+					if(id == "TPP1000")
+						m_probeTypes[i] = PROBE_TYPE_ANALOG_250K;
+					else
+						m_probeTypes[i] = PROBE_TYPE_ANALOG;
+				}
 			}
 			break;
 
@@ -430,7 +437,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i] != PROBE_TYPE_ANALOG)
+		if(m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT)
 			return false;
 	}
 	else if(IsSpectrum(i))
@@ -438,7 +445,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i - m_spectrumChannelBase] != PROBE_TYPE_ANALOG)
+		if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
 			return false;
 	}
 
@@ -490,7 +497,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if( IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+		if( IsAnalog(i) && (m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT) )
 			return;
 
 		//If we're a digital channel with an analog probe connected, we're unusable
@@ -521,7 +528,17 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 				if(IsSpectrum(i))
 					m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE ON");
 				else
+				{
+					//Make sure the digital group is on
+					if(IsDigital(i))
+					{
+						size_t parent = m_flexChannelParents[m_channels[i]];
+						m_transport->SendCommand(
+							string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
+					}
+
 					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
+				}
 				break;
 
 			default:
@@ -538,13 +555,13 @@ bool TektronixOscilloscope::CanEnableChannel(size_t i)
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 	//If we're an analog channel with a digital probe connected, the analog channel is unusable
-	if(IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+	if(IsAnalog(i) && (m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT) )
 		return false;
 
 	//Can't use spectrum view if the parent channel has a digital channel connected
 	if(IsSpectrum(i))
 	{
-		if(m_probeTypes[i - m_spectrumChannelBase] != PROBE_TYPE_ANALOG)
+		if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
 			return false;
 	}
 
@@ -565,7 +582,7 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
 		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if( IsAnalog(i) && (m_probeTypes[i] != PROBE_TYPE_ANALOG) )
+		if( IsAnalog(i) && (m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT) )
 			return;
 	}
 
@@ -684,13 +701,18 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 1E+6");
+					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 250E3");
+					else
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 1E+6");
 					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 1E+6");
-					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 250E3");
+					else
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
 					break;
 
 				default:
@@ -965,7 +987,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 		return 1;
 
 	//If unusable, return a placeholder value
-	if(!CanEnableChannel(i))
+	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return 1;
 
 	//We want total range, not per division
@@ -1007,8 +1029,8 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	if(!IsAnalog(i) && !IsSpectrum(i))
 		return;
 
-	//If unusable, do nothing
-	if(!CanEnableChannel(i))
+	//If unusable or disabled do nothing
+	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -1153,7 +1175,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 		return 0;
 
 	//If unusable, return a placeholder value
-	if(!CanEnableChannel(i))
+	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return 0;
 
 	//Read offset
@@ -1204,7 +1226,7 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 		return;
 
 	//If unusable, do nothing
-	if(!CanEnableChannel(i))
+	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);

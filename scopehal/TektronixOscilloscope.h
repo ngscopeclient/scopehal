@@ -174,6 +174,7 @@ protected:
 	enum ProbeType
 	{
 		PROBE_TYPE_ANALOG,
+		PROBE_TYPE_ANALOG_250K,
 		PROBE_TYPE_DIGITAL_8BIT
 	};
 
