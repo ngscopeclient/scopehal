@@ -52,6 +52,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
 	, m_maxBandwidth(1000)
+	, m_hasDVM(false)
 {
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
@@ -280,7 +281,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 		else if(opt == "LIC6-DDU")
 		{
-			LogDebug("* LIC6-DDU (6 series distribution demo)\n");
 			/*
 				This is a bundle code that unlocks lots of stuff:
 					* 8 GHZ bandwidth
@@ -317,6 +317,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					* Slew rate
 					* Sequence
 			 */
+			 LogDebug("* LIC6-DDU (6 series distribution demo)\n");
+			 m_hasDVM = true;
 		}
 
 		else
@@ -341,7 +343,10 @@ string TektronixOscilloscope::GetDriverNameInternal()
 
 unsigned int TektronixOscilloscope::GetInstrumentTypes()
 {
-	return Instrument::INST_OSCILLOSCOPE;
+	unsigned int mask = Instrument::INST_OSCILLOSCOPE;
+	if(m_hasDVM)
+		mask |= Instrument::INST_MULTIMETER;
+	return mask;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2320,7 +2325,7 @@ void TektronixOscilloscope::SetDigitalThreshold(size_t channel, float level)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Spectrum analyzer configuration
+// Spectrum analyzer mode
 
 bool TektronixOscilloscope::HasFrequencyControls()
 {
@@ -2439,4 +2444,94 @@ int64_t TektronixOscilloscope::GetResolutionBandwidth()
 		default:
 			return 1;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Multimeter mode
+
+unsigned int TektronixOscilloscope::GetMeasurementTypes()
+{
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			if(m_hasDVM)
+				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE;
+			else
+				return 0;
+
+		default:
+			return 0;
+	}
+}
+
+int TektronixOscilloscope::GetMeterChannelCount()
+{
+	return m_analogChannelCount;
+}
+
+string TektronixOscilloscope::GetMeterChannelName(int chan)
+{
+	return GetChannel(chan)->GetDisplayName();
+}
+
+int TektronixOscilloscope::GetCurrentMeterChannel()
+{
+	return 0;
+}
+
+void TektronixOscilloscope::SetCurrentMeterChannel(int chan)
+{
+}
+
+MeasurementTypes TektronixOscilloscope::GetMeterMode()
+{
+	return DC_VOLTAGE;
+}
+
+void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
+{
+}
+
+void TektronixOscilloscope::SetMeterAutoRange(bool enable)
+{
+
+}
+
+bool TektronixOscilloscope::GetMeterAutoRange()
+{
+	return false;
+}
+
+void TektronixOscilloscope::StartMeter()
+{
+}
+
+void TektronixOscilloscope::StopMeter()
+{
+}
+
+double TektronixOscilloscope::GetVoltage()
+{
+	return 0;
+}
+
+double TektronixOscilloscope::GetPeakToPeak()
+{
+	return 0;
+}
+
+double TektronixOscilloscope::GetFrequency()
+{
+	return 0;
+}
+
+double TektronixOscilloscope::GetCurrent()
+{
+	return 0;
+}
+
+double TektronixOscilloscope::GetTemperature()
+{
+	return 0;
 }

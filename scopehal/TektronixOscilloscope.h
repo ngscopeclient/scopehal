@@ -125,6 +125,26 @@ public:
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Multimeter stuff
+
+	virtual unsigned int GetMeasurementTypes();
+	virtual int GetMeterChannelCount();
+	virtual std::string GetMeterChannelName(int chan);
+	virtual int GetCurrentMeterChannel();
+	virtual void SetCurrentMeterChannel(int chan);
+	virtual MeasurementTypes GetMeterMode();
+	virtual void SetMeterMode(MeasurementTypes type);
+	virtual void SetMeterAutoRange(bool enable);
+	virtual bool GetMeterAutoRange();
+	virtual void StartMeter();
+	virtual void StopMeter();
+	virtual double GetVoltage();
+	virtual double GetPeakToPeak();
+	virtual double GetFrequency();
+	virtual double GetCurrent();
+	virtual double GetTemperature();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration
 
 	virtual bool HasFrequencyControls();
@@ -221,6 +241,9 @@ protected:
 		FAMILY_MSO6,
 		FAMILY_UNKNOWN
 	} m_family;
+
+	//Installed software options
+	bool m_hasDVM;
 
 public:
 	static std::string GetDriverNameInternal();
