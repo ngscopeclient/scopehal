@@ -199,6 +199,10 @@ protected:
 	int64_t m_rbw;
 	bool m_dmmAutorangeValid;
 	bool m_dmmAutorange;
+	bool m_dmmChannelValid;
+	int m_dmmChannel;
+	bool m_dmmModeValid;
+	Multimeter::MeasurementTypes m_dmmMode;
 
 	///The analog channel for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelParents;

@@ -50,6 +50,10 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_rbw(0)
 	, m_dmmAutorangeValid(false)
 	, m_dmmAutorange(false)
+	, m_dmmChannelValid(false)
+	, m_dmmChannel(0)
+	, m_dmmModeValid(false)
+	, m_dmmMode(Multimeter::DC_VOLTAGE)
 	, m_digitalChannelBase(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -239,12 +243,13 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			{
 				//Seems like we have blocks divided by commas
 				//Each block contains three semicolon delimited fields: code, text description, license type
+				//Option code has is further divided into code:type, e.g. BW6-1000:License
 				for (string::size_type prev_pos=0, pos=0;
 					 (pos = reply.find(',', pos)) != std::string::npos;
 					 prev_pos=++pos)
 				{
 					string optgroup = reply.substr(prev_pos, pos-prev_pos);
-					options.push_back(optgroup.substr(0, optgroup.find(";")));
+					options.push_back(optgroup.substr(0, optgroup.find(":")));
 				}
 			}
 			break;
@@ -408,6 +413,8 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_triggerOffsetValid = false;
 	m_rbwValid = false;
 	m_dmmAutorangeValid = false;
+	m_dmmChannelValid = false;
+	m_dmmModeValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -2498,10 +2505,11 @@ unsigned int TektronixOscilloscope::GetMeasurementTypes()
 {
 	switch(m_family)
 	{
+		//TODO: frequency is a second function, not primary
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			if(m_hasDVM)
-				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE | FREQUENCY;
+				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE/* | FREQUENCY*/;
 			else
 				return 0;
 
@@ -2522,20 +2530,93 @@ string TektronixOscilloscope::GetMeterChannelName(int chan)
 
 int TektronixOscilloscope::GetCurrentMeterChannel()
 {
-	return 0;
+	if(!m_dmmChannelValid)
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				m_transport->SendCommand("DVM:SOU?");
+				m_dmmChannel = (int)GetChannelByHwName(Trim(m_transport->ReadReply()))->GetIndex();
+				break;
+
+			default:
+				break;
+		}
+
+		m_dmmChannelValid = true;
+	}
+
+	return m_dmmChannel;
 }
 
 void TektronixOscilloscope::SetCurrentMeterChannel(int chan)
 {
+	//Skip channels that aren't usable
+	if(!CanEnableChannel(chan))
+		return;
+
+	m_dmmChannel = chan;
+	m_dmmChannelValid = true;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand(string("DVM:SOU ") + m_channels[chan]->GetHwname());
+			break;
+
+		default:
+			break;
+	}
 }
 
 Multimeter::MeasurementTypes TektronixOscilloscope::GetMeterMode()
 {
+	if(m_dmmModeValid)
+		return m_dmmMode;
+
 	return DC_VOLTAGE;
 }
 
 void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
 {
+	m_dmmMode = type;
+	m_dmmModeValid = true;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			switch(type)
+			{
+				case Multimeter::DC_VOLTAGE:
+					m_transport->SendCommand("DVM:MOD DC");
+					break;
+
+				case Multimeter::DC_RMS_AMPLITUDE:
+					m_transport->SendCommand("DVM:MOD ACDCRMS");
+					break;
+
+				case Multimeter::AC_RMS_AMPLITUDE:
+					m_transport->SendCommand("DVM:MOD ACRMS");
+					break;
+
+				//no other modes supported
+				default:
+					break;
+			}
+			break;
+
+		default:
+			break;
+	}
 }
 
 void TektronixOscilloscope::SetMeterAutoRange(bool enable)
