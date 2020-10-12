@@ -98,7 +98,7 @@ public:
 	std::string GetInputName(size_t i);
 
 	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
-	void SetInput(std::string name, StreamDescriptor stream, bool force = false);
+	void SetInput(const std::string& name, StreamDescriptor stream, bool force = false);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
 
 	StreamDescriptor GetInput(size_t i);
@@ -145,7 +145,7 @@ protected:
 	/**
 		@brief Creates and names an input signal
 	 */
-	void CreateInput(std::string name)
+	void CreateInput(const std::string& name)
 	{
 		m_signalNames.push_back(name);
 		m_inputs.push_back(StreamDescriptor(NULL, 0));

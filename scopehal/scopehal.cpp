@@ -161,7 +161,7 @@ string GetDefaultChannelColor(int i)
 /**
 	@brief Converts a vector bus signal into a scalar (up to 64 bits wide)
  */
-uint64_t ConvertVectorSignalToScalar(vector<bool> bits)
+uint64_t ConvertVectorSignalToScalar(const vector<bool>& bits)
 {
 	uint64_t rval = 0;
 	for(auto b : bits)
@@ -323,7 +323,7 @@ void InitializePlugins()
 /**
 	@brief Removes whitespace from the start and end of a string
  */
-string Trim(string str)
+string Trim(const string& str)
 {
 	string ret;
 	string tmp;
@@ -355,7 +355,7 @@ string Trim(string str)
 /**
 	@brief Removes quotes from the start and end of a string
  */
-string TrimQuotes(string str)
+string TrimQuotes(const string& str)
 {
 	string ret;
 	string tmp;
@@ -384,7 +384,7 @@ string TrimQuotes(string str)
 	return ret;
 }
 
-string BaseName(string const & path)
+string BaseName(const string & path)
 {
 	return path.substr(path.find_last_of("/\\") + 1);
 }

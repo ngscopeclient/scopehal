@@ -135,7 +135,7 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 	@param force	Forcibly connect this stream without checking to make sure it's the right type.
 					Should only be set true by by Filter::LoadInputs() or in similar specialized situations.
  */
-void FlowGraphNode::SetInput(string name, StreamDescriptor stream, bool force)
+void FlowGraphNode::SetInput(const string& name, StreamDescriptor stream, bool force)
 {
 	//Find the channel
 	for(size_t i=0; i<m_signalNames.size(); i++)

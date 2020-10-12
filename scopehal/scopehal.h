@@ -85,13 +85,13 @@
 #include "TouchstoneParser.h"
 #include "IBISParser.h"
 
-uint64_t ConvertVectorSignalToScalar(std::vector<bool> bits);
+uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
 std::string GetDefaultChannelColor(int i);
 
-std::string Trim(std::string str);
-std::string TrimQuotes(std::string str);
-std::string BaseName(std::string const& path);
+std::string Trim(const std::string& str);
+std::string TrimQuotes(const std::string& str);
+std::string BaseName(const std::string& path);
 
 void TransportStaticInit();
 void DriverStaticInit();

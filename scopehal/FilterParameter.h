@@ -78,7 +78,7 @@ public:
 	std::string m_fileFilterName;
 
 	//Add an enumerated value
-	void AddEnumValue(std::string name, int value)
+	void AddEnumValue(const std::string& name, int value)
 	{
 		m_forwardEnumMap[name] = value;
 		m_reverseEnumMap[value] = name;
