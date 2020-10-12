@@ -48,6 +48,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerOffset(0)
 	, m_rbwValid(false)
 	, m_rbw(0)
+	, m_dmmAutorangeValid(false)
+	, m_dmmAutorange(false)
 	, m_digitalChannelBase(0)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -345,7 +347,7 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 {
 	unsigned int mask = Instrument::INST_OSCILLOSCOPE;
 	if(m_hasDVM)
-		mask |= Instrument::INST_MULTIMETER;
+		mask |= Instrument::INST_DMM;
 	return mask;
 }
 
@@ -398,6 +400,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_sampleDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_rbwValid = false;
+	m_dmmAutorangeValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -961,6 +964,10 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 	if(!IsAnalog(i) && !IsSpectrum(i))
 		return 1;
 
+	//If unusable, return a placeholder value
+	if(!CanEnableChannel(i))
+		return 1;
+
 	//We want total range, not per division
 	double range;
 	{
@@ -998,6 +1005,10 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 
 	//If not analog, skip it
 	if(!IsAnalog(i) && !IsSpectrum(i))
+		return;
+
+	//If unusable, do nothing
+	if(!CanEnableChannel(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -1048,13 +1059,17 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 			return m_channelDisplayNames[chan];
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Spectrum channels don't have separate names from the time domain ones.
 	//Store our own nicknames clientside for them.
 	string name;
-	if(!IsSpectrum(i))
+
+	//If we can't use the channel return the hwname as a placeholder
+	if(!CanEnableChannel(i))
+		name = chan->GetHwname();
+
+	else if(!IsSpectrum(i))
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(m_family)
 		{
 			//What a shocker!
@@ -1137,6 +1152,10 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	if(!IsAnalog(i) && !IsSpectrum(i))
 		return 0;
 
+	//If unusable, return a placeholder value
+	if(!CanEnableChannel(i))
+		return 0;
+
 	//Read offset
 	double offset = 0;
 	{
@@ -1182,6 +1201,10 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 
 	//If not analog, skip it
 	if(!IsAnalog(i) && !IsSpectrum(i))
+		return;
+
+	//If unusable, do nothing
+	if(!CanEnableChannel(i))
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -2456,7 +2479,7 @@ unsigned int TektronixOscilloscope::GetMeasurementTypes()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			if(m_hasDVM)
-				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE;
+				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE | FREQUENCY;
 			else
 				return 0;
 
@@ -2484,7 +2507,7 @@ void TektronixOscilloscope::SetCurrentMeterChannel(int chan)
 {
 }
 
-MeasurementTypes TektronixOscilloscope::GetMeterMode()
+Multimeter::MeasurementTypes TektronixOscilloscope::GetMeterMode()
 {
 	return DC_VOLTAGE;
 }
@@ -2495,20 +2518,79 @@ void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
 
 void TektronixOscilloscope::SetMeterAutoRange(bool enable)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 
+	m_dmmAutorange = enable;
+	m_dmmAutorangeValid = true;
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			if(enable)
+				m_transport->SendCommand("DVM:AUTOR ON");
+			else
+				m_transport->SendCommand("DVM:AUTOR OFF");
+			break;
+
+		default:
+			break;
+	}
 }
 
 bool TektronixOscilloscope::GetMeterAutoRange()
 {
-	return false;
+	if(m_dmmAutorangeValid)
+		return m_dmmAutorange;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("DVM:AUTOR?");
+			m_dmmAutorange = (stoi(m_transport->ReadReply()) == 1);
+			break;
+
+		default:
+			break;
+	}
+
+	m_dmmAutorangeValid = true;
+	return m_dmmAutorange;
 }
 
 void TektronixOscilloscope::StartMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("DVM:MOD DC");		//TODO: use saved operating mode
+			break;
+
+		default:
+			break;
+	}
 }
 
 void TektronixOscilloscope::StopMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("DVM:MOD OFF");
+			break;
+
+		default:
+			break;
+	}
 }
 
 double TektronixOscilloscope::GetVoltage()

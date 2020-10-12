@@ -52,7 +52,9 @@ class EdgeTrigger;
 	ALLEV?
 		Prints the error log in a somewhat confusing and not-human-readable format
  */
-class TektronixOscilloscope : public SCPIOscilloscope
+class TektronixOscilloscope
+	: public SCPIOscilloscope
+	, public Multimeter
 {
 public:
 	TektronixOscilloscope(SCPITransport* transport);
@@ -194,6 +196,8 @@ protected:
 	std::map<size_t, ProbeType> m_probeTypes;
 	bool m_rbwValid;
 	int64_t m_rbw;
+	bool m_dmmAutorangeValid;
+	bool m_dmmAutorange;
 
 	///The analog channel for each flex channel
 	std::map<OscilloscopeChannel*, size_t> m_flexChannelParents;
