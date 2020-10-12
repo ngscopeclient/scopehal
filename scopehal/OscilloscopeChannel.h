@@ -200,7 +200,7 @@ protected:
 	/**
 		@brief Adds a new data stream to the channel
 	 */
-	void AddStream(std::string name)
+	void AddStream(const std::string& name)
 	{
 		m_streamNames.push_back(name);
 		m_streamData.push_back(NULL);

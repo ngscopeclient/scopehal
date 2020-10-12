@@ -76,7 +76,7 @@ public:
 	{}
 
 	std::string PrettyPrint(double value);
-	double ParseString(std::string str);
+	double ParseString(const std::string& str);
 
 	UnitType GetType()
 	{ return m_type; }

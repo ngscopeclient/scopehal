@@ -226,7 +226,7 @@ string Unit::PrettyPrint(double value)
 /**
 	@brief Parses a string based on the supplied unit
  */
-double Unit::ParseString(string str)
+double Unit::ParseString(const string& str)
 {
 	//Find the first non-numeric character in the strnig
 	double scale = 1;

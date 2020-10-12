@@ -141,7 +141,8 @@ string GetDefaultChannelColor(int i)
 	const int NUM_COLORS = 12;
 	static const char* colorTable[NUM_COLORS] =
 	{
-		"#a6cee3",	//cppcheck suppress constStatement
+		// cppcheck-suppress constStatement
+		"#a6cee3",
 		"#1f78b4",
 		"#b2df8a",
 		"#33a02c",
