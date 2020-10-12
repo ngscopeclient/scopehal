@@ -52,7 +52,7 @@ public:
 
 	FilterParameter(ParameterTypes type = FilterParameter::TYPE_FLOAT, Unit unit  = Unit(Unit::UNIT_PS));
 
-	void ParseString(std::string str);
+	void ParseString(const std::string& str);
 	std::string ToString();
 
 	bool GetBoolVal()
@@ -67,8 +67,8 @@ public:
 	{ m_intval = b; }
 	void SetIntVal(int64_t i);
 	void SetFloatVal(float f);
-	void SetFileName(std::string f);
-	void SetFileNames(std::vector<std::string> names);
+	void SetFileName(const std::string& f);
+	void SetFileNames(const std::vector<std::string>& names);
 
 	ParameterTypes GetType()
 	{ return m_type; }

@@ -51,7 +51,7 @@ FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 
 }
 
-void FilterParameter::ParseString(string str)
+void FilterParameter::ParseString(const string& str)
 {
 	switch(m_type)
 	{
@@ -197,7 +197,7 @@ void FilterParameter::SetFloatVal(float f)
 	m_filenames.clear();
 }
 
-void FilterParameter::SetFileName(string f)
+void FilterParameter::SetFileName(const string& f)
 {
 	m_intval = 0;
 	m_floatval = 0;
@@ -206,7 +206,7 @@ void FilterParameter::SetFileName(string f)
 	m_filenames.push_back(f);
 }
 
-void FilterParameter::SetFileNames(vector<string> names)
+void FilterParameter::SetFileNames(const vector<string>& names)
 {
 	m_intval = 0;
 	m_floatval = 0;
