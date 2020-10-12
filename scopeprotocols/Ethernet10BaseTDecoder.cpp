@@ -39,7 +39,10 @@ using namespace std;
 Ethernet10BaseTDecoder::Ethernet10BaseTDecoder(string color)
 	: EthernetProtocolDecoder(color)
 {
+}
 
+Ethernet10BaseTDecoder::~Ethernet10BaseTDecoder()
+{
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,10 +101,10 @@ void Ethernet10BaseTDecoder::Refresh()
 		//Look for a falling edge with at least -500 mV differential (falling edge of the first preamble bit)
 		if(!FindFallingEdge(i, din))
 		{
-			LogDebug("Capture ended before finding another preamble\n");
+			LogTrace("Capture ended before finding another preamble\n");
 			break;
 		}
-		LogDebug("Start of frame\n");
+		LogTrace("Start of frame\n");
 
 		uint8_t current_byte = 0;
 		int bitcount = 0;
@@ -123,7 +126,7 @@ void Ethernet10BaseTDecoder::Refresh()
 			//LogDebug("Looking for %d -> %d edge\n", current_state, !current_state);
 			if(!FindEdge(i, din, !current_state))
 			{
-				LogDebug("Capture ended while looking for middle of this bit\n");
+				LogTrace("Capture ended while looking for middle of this bit\n");
 				done = true;
 				break;
 			}
@@ -140,13 +143,13 @@ void Ethernet10BaseTDecoder::Refresh()
 				delta * 1.0f / ui_width);*/
 			if(delta > 10 * ui_width)
 			{
-				LogDebug("Premature end of frame (middle of a bit)\n");
+				LogTrace("Premature end of frame (middle of a bit)\n");
 				i++;
 				break;
 			}
 			if( (delta < eye_start) || (delta > eye_end) )
 			{
-				LogDebug("Edge was in the wrong place, skipping it and attempting resync\n");
+				LogTrace("Edge was in the wrong place, skipping it and attempting resync\n");
 				i++;
 				ui_start = din->m_offsets[i] * cap->m_timescale;
 				current_state = !current_state;
@@ -178,7 +181,7 @@ void Ethernet10BaseTDecoder::Refresh()
 			//See if we have an edge at the end of this bit period
 			if(!FindEdge(i, din, current_state))
 			{
-				LogDebug("Capture ended while looking for end of this bit\n");
+				LogTrace("Capture ended while looking for end of this bit\n");
 				done = true;
 				break;
 			}
@@ -188,7 +191,7 @@ void Ethernet10BaseTDecoder::Refresh()
 			//If the next edge is more than ten UIs after this one, declare the frame over
 			if(delta > 10*ui_width)
 			{
-				LogDebug("Normal end of frame\n");
+				LogTrace("Normal end of frame\n");
 				i++;
 				break;
 			}
