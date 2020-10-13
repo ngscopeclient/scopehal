@@ -115,6 +115,7 @@ public:
 	virtual double GetMeterValue();
 	virtual Multimeter::MeasurementTypes GetMeterMode();
 	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
+	virtual int GetMeterDigits();
 
 	//Function generator
 	virtual int GetFunctionChannelCount();

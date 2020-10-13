@@ -2505,11 +2505,10 @@ unsigned int TektronixOscilloscope::GetMeasurementTypes()
 {
 	switch(m_family)
 	{
-		//TODO: frequency is a second function, not primary
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			if(m_hasDVM)
-				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE/* | FREQUENCY*/;
+				return DC_VOLTAGE | DC_RMS_AMPLITUDE | AC_RMS_AMPLITUDE;
 			else
 				return 0;
 
@@ -2698,5 +2697,23 @@ void TektronixOscilloscope::StopMeter()
 
 double TektronixOscilloscope::GetMeterValue()
 {
-	return 0;
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			m_transport->SendCommand("DVM:MEASU:VAL?");
+			break;
+
+		default:
+			return 0;
+	}
+
+	return stod(m_transport->ReadReply());
+}
+
+int TektronixOscilloscope::GetMeterDigits()
+{
+	return 4;
 }

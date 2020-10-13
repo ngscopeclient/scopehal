@@ -1479,6 +1479,11 @@ string LeCroyOscilloscope::GetPossiblyEmptyString(string property)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DMM mode
 
+int LeCroyOscilloscope::GetMeterDigits()
+{
+	return 5;
+}
+
 bool LeCroyOscilloscope::GetMeterAutoRange()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);

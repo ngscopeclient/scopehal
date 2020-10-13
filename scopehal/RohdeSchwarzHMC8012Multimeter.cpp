@@ -77,6 +77,11 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetMeasurementTypes()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DMM mode
 
+int RohdeSchwarzHMC8012Multimeter::GetMeterDigits()
+{
+	return 6;
+}
+
 bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 {
 	switch(m_mode)

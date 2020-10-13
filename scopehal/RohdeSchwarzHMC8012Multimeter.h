@@ -66,6 +66,8 @@ public:
 	virtual void StartMeter();
 	virtual void StopMeter();
 
+	virtual int GetMeterDigits();
+
 	//Get readings
 	virtual double GetMeterValue();
 

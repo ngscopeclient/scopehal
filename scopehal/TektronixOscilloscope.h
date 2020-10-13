@@ -141,6 +141,7 @@ public:
 	virtual void StartMeter();
 	virtual void StopMeter();
 	virtual double GetMeterValue();
+	virtual int GetMeterDigits();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration

@@ -82,6 +82,13 @@ public:
 		@brief Get the value of the primary measurement
 	 */
 	virtual double GetMeterValue() =0;
+
+	/**
+		@brief Returns the digit resolution of the meter
+
+		Values are rounded up for display, for example a 5 3/4 digit meter should return 6 here.
+	 */
+	virtual int GetMeterDigits() =0;
 };
 
 #endif
