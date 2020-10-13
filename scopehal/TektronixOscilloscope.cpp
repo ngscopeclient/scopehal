@@ -2696,27 +2696,7 @@ void TektronixOscilloscope::StopMeter()
 	}
 }
 
-double TektronixOscilloscope::GetVoltage()
-{
-	return 0;
-}
-
-double TektronixOscilloscope::GetPeakToPeak()
-{
-	return 0;
-}
-
-double TektronixOscilloscope::GetFrequency()
-{
-	return 0;
-}
-
-double TektronixOscilloscope::GetCurrent()
-{
-	return 0;
-}
-
-double TektronixOscilloscope::GetTemperature()
+double TektronixOscilloscope::GetMeterValue()
 {
 	return 0;
 }

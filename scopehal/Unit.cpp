@@ -150,9 +150,16 @@ string Unit::PrettyPrint(double value)
 			unit = "RPM";
 			break;
 
-		//Degrees do not use SI prefixes
+		//Angular degrees do not use SI prefixes
 		case UNIT_DEGREES:
 			unit = "°";
+			scale = "";
+			value_rescaled = value;
+			break;
+
+		//Neither do thermal degrees
+		case UNIT_CELSIUS:
+			unit = "°C";
 			scale = "";
 			value_rescaled = value;
 			break;

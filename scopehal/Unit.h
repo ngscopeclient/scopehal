@@ -65,6 +65,7 @@ public:
 		UNIT_UI,			//Unit interval (relative to signal bit rate)
 		UNIT_DEGREES,		//Angular degrees
 		UNIT_RPM,			//Revolutions per minute
+		UNIT_CELSIUS,		//Degrees Celsius
 
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 

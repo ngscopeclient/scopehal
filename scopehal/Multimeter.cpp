@@ -37,3 +37,25 @@ Multimeter::Multimeter()
 Multimeter::~Multimeter()
 {
 }
+
+Unit Multimeter::GetMeterUnit()
+{
+	switch(GetMeterMode())
+	{
+		case Multimeter::FREQUENCY:
+			return Unit(Unit::UNIT_HZ);
+
+		case Multimeter::TEMPERATURE:
+			return Unit(Unit::UNIT_CELSIUS);
+
+		case Multimeter::DC_CURRENT:
+		case Multimeter::AC_CURRENT:
+			return Unit(Unit::UNIT_AMPS);
+
+		case Multimeter::DC_VOLTAGE:
+		case Multimeter::DC_RMS_AMPLITUDE:
+		case Multimeter::AC_RMS_AMPLITUDE:
+		default:
+			return Unit(Unit::UNIT_VOLTS);
+	}
+}

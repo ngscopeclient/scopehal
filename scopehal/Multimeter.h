@@ -29,6 +29,13 @@
 #ifndef Multimeter_h
 #define Multimeter_h
 
+/**
+	@brief A multimeter
+
+	The distinction between multimeters and oscilloscopes can be blurry at times. For the moment, libscopehal considers
+	an instrument a meter if it outputs a scalar, and an oscilloscope if it outputs a vector, regardless of sample rate
+	or resolution.
+ */
 class Multimeter : public virtual Instrument
 {
 public:
@@ -66,12 +73,15 @@ public:
 	virtual void StartMeter() =0;
 	virtual void StopMeter() =0;
 
-	//Get readings
-	virtual double GetVoltage() =0;
-	virtual double GetPeakToPeak() =0;
-	virtual double GetFrequency() =0;
-	virtual double GetCurrent() =0;
-	virtual double GetTemperature() =0;
+	/**
+		@brief Get the current primary measurement unit
+	 */
+	virtual Unit GetMeterUnit();
+
+	/**
+		@brief Get the value of the primary measurement
+	 */
+	virtual double GetMeterValue() =0;
 };
 
 #endif

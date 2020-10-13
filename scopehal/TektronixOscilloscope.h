@@ -140,11 +140,7 @@ public:
 	virtual bool GetMeterAutoRange();
 	virtual void StartMeter();
 	virtual void StopMeter();
-	virtual double GetVoltage();
-	virtual double GetPeakToPeak();
-	virtual double GetFrequency();
-	virtual double GetCurrent();
-	virtual double GetTemperature();
+	virtual double GetMeterValue();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration

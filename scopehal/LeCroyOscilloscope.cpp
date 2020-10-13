@@ -68,6 +68,8 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_triggerOffset(0)
 	, m_interleaving(false)
 	, m_interleavingValid(false)
+	, m_meterMode(Multimeter::DC_VOLTAGE)
+	, m_meterModeValid(false)
 	, m_highDefinition(false)
 {
 	//standard initialization
@@ -894,6 +896,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_interleavingValid = false;
+	m_meterModeValid = false;
 }
 
 /**
@@ -1509,46 +1512,30 @@ void LeCroyOscilloscope::StopMeter()
 	m_transport->SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 0'");
 }
 
-double LeCroyOscilloscope::GetVoltage()
+double LeCroyOscilloscope::GetMeterValue()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
-	string str = m_transport->ReadReply();
-	double ret;
-	sscanf(str.c_str(), "%lf", &ret);
-	return ret;
-}
 
-double LeCroyOscilloscope::GetCurrent()
-{
-	//DMM does not support current
-	return 0;
-}
+	switch(GetMeterMode())
+	{
+		case Multimeter::DC_VOLTAGE:
+			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
+			break;
 
-double LeCroyOscilloscope::GetTemperature()
-{
-	//DMM does not support current
-	return 0;
-}
+		case Multimeter::DC_RMS_AMPLITUDE:
+		case Multimeter::AC_RMS_AMPLITUDE:
+			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
+			break;
 
-double LeCroyOscilloscope::GetPeakToPeak()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
-	string str = m_transport->ReadReply();
-	double ret;
-	sscanf(str.c_str(), "%lf", &ret);
-	return ret;
-}
+		case Multimeter::FREQUENCY:
+			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
+			break;
 
-double LeCroyOscilloscope::GetFrequency()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
-	string str = m_transport->ReadReply();
-	double ret;
-	sscanf(str.c_str(), "%lf", &ret);
-	return ret;
+		default:
+			return 0;
+	}
+
+	return stod(m_transport->ReadReply());
 }
 
 int LeCroyOscilloscope::GetMeterChannelCount()
@@ -1586,6 +1573,9 @@ void LeCroyOscilloscope::SetCurrentMeterChannel(int chan)
 
 Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 {
+	if(m_meterModeValid)
+		return m_meterMode;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.DvmMode'");
 	string str = m_transport->ReadReply();
@@ -1595,23 +1585,28 @@ Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 		str.resize(str.length() - 1);
 
 	if(str == "DC")
-		return Multimeter::DC_VOLTAGE;
+		m_meterMode = Multimeter::DC_VOLTAGE;
 	else if(str == "DC RMS")
-		return Multimeter::DC_RMS_AMPLITUDE;
+		m_meterMode = Multimeter::DC_RMS_AMPLITUDE;
 	else if(str == "ACRMS")
-		return Multimeter::AC_RMS_AMPLITUDE;
+		m_meterMode = Multimeter::AC_RMS_AMPLITUDE;
 	else if(str == "Frequency")
-		return Multimeter::FREQUENCY;
+		m_meterMode = Multimeter::FREQUENCY;
 	else
 	{
 		LogError("Invalid meter mode \"%s\"\n", str.c_str());
-		return Multimeter::DC_VOLTAGE;
+		m_meterMode = Multimeter::DC_VOLTAGE;
 	}
+
+	m_meterModeValid = true;
+	return m_meterMode;
 }
 
 void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	m_meterMode = type;
+	m_meterModeValid = true;
+
 	string stype;
 	switch(type)
 	{
@@ -1640,9 +1635,8 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 
 	}
 
-	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "VBS 'app.acquisition.DVM.DvmMode = \"%s\"'", stype.c_str());
-	m_transport->SendCommand(cmd);
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("VBS 'app.acquisition.DVM.DvmMode = \"") + stype + "\"");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -67,11 +67,7 @@ public:
 	virtual void StopMeter();
 
 	//Get readings
-	virtual double GetVoltage();
-	virtual double GetPeakToPeak();
-	virtual double GetFrequency();
-	virtual double GetCurrent();
-	virtual double GetTemperature();
+	virtual double GetMeterValue();
 
 protected:
 	MeasurementTypes m_mode;

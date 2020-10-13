@@ -121,54 +121,10 @@ void RohdeSchwarzHMC8012Multimeter::StopMeter()
 	//cannot be started or stopped
 }
 
-double RohdeSchwarzHMC8012Multimeter::GetVoltage()
+double RohdeSchwarzHMC8012Multimeter::GetMeterValue()
 {
-	//assume we're in the right mode for now
 	m_transport->SendCommand("READ?");
-	string str = m_transport->ReadReply();
-	double d;
-	sscanf(str.c_str(), "%lf", &d);
-	return d;
-}
-
-double RohdeSchwarzHMC8012Multimeter::GetPeakToPeak()
-{
-	//assume we're in the right mode for now
-	m_transport->SendCommand("READ?");
-	string str = m_transport->ReadReply();
-	double d;
-	sscanf(str.c_str(), "%lf", &d);
-	return d;
-}
-
-double RohdeSchwarzHMC8012Multimeter::GetFrequency()
-{
-	//assume we're in the right mode for now
-	m_transport->SendCommand("READ?");
-	string str = m_transport->ReadReply();
-	double d;
-	sscanf(str.c_str(), "%lf", &d);
-	return d;
-}
-
-double RohdeSchwarzHMC8012Multimeter::GetCurrent()
-{
-	//assume we're in the right mode for now
-	m_transport->SendCommand("READ?");
-	string str = m_transport->ReadReply();
-	double d;
-	sscanf(str.c_str(), "%lf", &d);
-	return d;
-}
-
-double RohdeSchwarzHMC8012Multimeter::GetTemperature()
-{
-	//assume we're in the right mode for now
-	m_transport->SendCommand("READ?");
-	string str = m_transport->ReadReply();
-	double d;
-	sscanf(str.c_str(), "%lf", &d);
-	return d;
+	return stod(m_transport->ReadReply());
 }
 
 int RohdeSchwarzHMC8012Multimeter::GetMeterChannelCount()

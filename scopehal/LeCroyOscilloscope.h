@@ -103,13 +103,6 @@ public:
 	virtual void EnableTriggerOutput();
 	virtual std::vector<std::string> GetTriggerTypes();
 
-	//DMM acquisition
-	virtual double GetVoltage();
-	virtual double GetPeakToPeak();
-	virtual double GetFrequency();
-	virtual double GetCurrent();
-	virtual double GetTemperature();
-
 	//DMM configuration
 	virtual int GetMeterChannelCount();
 	virtual std::string GetMeterChannelName(int chan);
@@ -119,7 +112,7 @@ public:
 	virtual void StopMeter();
 	virtual void SetMeterAutoRange(bool enable);
 	virtual bool GetMeterAutoRange();
-
+	virtual double GetMeterValue();
 	virtual Multimeter::MeasurementTypes GetMeterMode();
 	virtual void SetMeterMode(Multimeter::MeasurementTypes type);
 
@@ -296,6 +289,8 @@ protected:
 	std::map<size_t, int64_t> m_channelDeskew;
 	bool m_interleaving;
 	bool m_interleavingValid;
+	Multimeter::MeasurementTypes m_meterMode;
+	bool m_meterModeValid;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
