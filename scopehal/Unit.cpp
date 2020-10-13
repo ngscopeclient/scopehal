@@ -31,7 +31,13 @@
 
 using namespace std;
 
-string Unit::PrettyPrint(double value)
+/**
+	@brief Prints a value with SI scaling factors
+
+	@param value	The value
+	@param digits	Number of significant digits to display
+ */
+string Unit::PrettyPrint(double value, int sigfigs)
 {
 	const char* scale = "";
 	const char* unit = "";
@@ -212,18 +218,38 @@ string Unit::PrettyPrint(double value)
 				if(!space_after_number)
 					space = "";
 
+				if(sigfigs > 0)
+				{
+					int leftdigits = 0;
+					if(fabs(value_rescaled) > 1000)			//shouldn't have more than 4 digits w/ SI scaling
+						leftdigits = 4;
+					else if(fabs(value_rescaled) > 100)
+						leftdigits = 3;
+					else if(fabs(value_rescaled) > 10)
+						leftdigits = 2;
+					else if(fabs(value_rescaled) > 1)
+						leftdigits = 1;
+					int rightdigits = sigfigs - leftdigits;
+
+					char format[32];
+					snprintf(format, sizeof(format), "%%%d.%df%%s%%s%%s", leftdigits, rightdigits);
+					snprintf(tmp, sizeof(tmp), format, value_rescaled, space, scale, unit);
+				}
+
 				//If not a round number, add more digits (up to 4)
-				//TODO: allow user to specify how many sigfigs they want
-				if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.0f%s%s%s", value_rescaled, space, scale, unit);
-				else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.001)
-					snprintf(tmp, sizeof(tmp), "%.1f%s%s%s", value_rescaled, space, scale, unit);
-				else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.2f%s%s%s", value_rescaled, space, scale, unit);
-				else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
-					snprintf(tmp, sizeof(tmp), "%.3f%s%s%s", value_rescaled, space, scale, unit);
 				else
-					snprintf(tmp, sizeof(tmp), "%.4f%s%s%s", value_rescaled, space, scale, unit);
+				{
+					if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
+						snprintf(tmp, sizeof(tmp), "%.0f%s%s%s", value_rescaled, space, scale, unit);
+					else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.001)
+						snprintf(tmp, sizeof(tmp), "%.1f%s%s%s", value_rescaled, space, scale, unit);
+					else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.001 )
+						snprintf(tmp, sizeof(tmp), "%.2f%s%s%s", value_rescaled, space, scale, unit);
+					else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
+						snprintf(tmp, sizeof(tmp), "%.3f%s%s%s", value_rescaled, space, scale, unit);
+					else
+						snprintf(tmp, sizeof(tmp), "%.4f%s%s%s", value_rescaled, space, scale, unit);
+				}
 			}
 			break;
 	}

@@ -76,7 +76,7 @@ public:
 	: m_type(t)
 	{}
 
-	std::string PrettyPrint(double value);
+	std::string PrettyPrint(double value, int sigfigs = -1);
 	double ParseString(const std::string& str);
 
 	UnitType GetType()
