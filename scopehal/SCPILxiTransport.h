@@ -47,6 +47,10 @@ public:
 	SCPILxiTransport(const std::string& args);
 	virtual ~SCPILxiTransport();
 
+	//not copyable or assignable
+	SCPILxiTransport(const SCPILxiTransport&) =delete;
+	SCPILxiTransport& operator=(const SCPILxiTransport&) =delete;
+
 	virtual std::string GetConnectionString();
 	static std::string GetTransportName();
 

@@ -75,14 +75,8 @@ SCPILxiTransport::SCPILxiTransport(const string& args)
 
 	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
-	char *hostname_dup = new char[m_hostname.length()+1];
-	strcpy(hostname_dup, m_hostname.c_str());
-	char *instname_dup = new char[strlen("inst0")+1];
-	strcpy(instname_dup, "inst0");
-
-	m_device = lxi_connect(hostname_dup, m_port, instname_dup, m_timeout, VXI11);
-	delete[] hostname_dup;
-	delete[] instname_dup;
+	string instname = "inst0";
+	m_device = lxi_connect(&m_hostname[0], m_port, &instname[0], m_timeout, VXI11);
 
 	if (m_device == LXI_ERROR)
 	{
@@ -136,9 +130,9 @@ bool SCPILxiTransport::SendCommand(const string& cmd)
 {
 	LogTrace("Sending %s\n", cmd.c_str());
 
-	char *cmd_dup = new char[cmd.length()+1];
-	strcpy(cmd_dup, cmd.c_str());
-	int result = lxi_send(m_device, cmd_dup, cmd.length(), m_timeout);
+	//Need the cast when using liblxi versions prior to 63ea109 because they don't have "const" on the argument.
+	//It doesn't actually change the inputs, so safe to cast.
+	int result = lxi_send(m_device, const_cast<char*>(&cmd[0]), cmd.length(), m_timeout);
 
 	m_data_in_staging_buf = 0;
 	m_data_offset = 0;
@@ -174,9 +168,9 @@ void SCPILxiTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	// XXX: Should this reset m_data_depleted just like SendCommmand?
 
-	char *buf_dup = new char[len+1];
-	memcpy(buf_dup, buf, len);
-	lxi_send(m_device, buf_dup, len, m_timeout);
+	//Need the cast when using liblxi versions prior to 63ea109 because they don't have "const" on the argument.
+	//It doesn't actually change the inputs, so safe to cast.
+	lxi_send(m_device, const_cast<char*>(reinterpret_cast<const char*>(buf)), len, m_timeout);
 }
 
 void SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
