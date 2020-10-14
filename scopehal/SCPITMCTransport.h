@@ -45,6 +45,10 @@ public:
 	SCPITMCTransport(const std::string& args);
 	virtual ~SCPITMCTransport();
 
+	//not copyable or assignable
+	SCPITMCTransport(const SCPITMCTransport&) =delete;
+	SCPITMCTransport& operator=(const SCPITMCTransport&) =delete;
+
 	virtual std::string GetConnectionString();
 	static std::string GetTransportName();
 
