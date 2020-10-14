@@ -47,12 +47,12 @@ using namespace std;
 // Construction / destruction
 
 SCPITMCTransport::SCPITMCTransport(const string& args)
+	: m_devicePath(args)
 {
 	// TODO: add configuration options:
 	// - set the maximum request size of usbtmc read requests (currently 2032)
 	// - set timeout value (when using kernel that has usbtmc v2 version)
 	// - set size of staging buffer (or get rid of it entirely?)
-	m_devicePath = args;
 
 	// FIXME: currently not used
 	m_timeout = 1000;

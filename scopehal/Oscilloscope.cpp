@@ -120,7 +120,7 @@ OscilloscopeChannel* Oscilloscope::GetChannel(size_t i)
 		return NULL;
 }
 
-OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
+OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(const string& name)
 {
 	for(auto c : m_channels)
 	{
@@ -130,7 +130,7 @@ OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(string name)
 	return NULL;
 }
 
-OscilloscopeChannel* Oscilloscope::GetChannelByHwName(string name)
+OscilloscopeChannel* Oscilloscope::GetChannelByHwName(const string& name)
 {
 	for(auto c : m_channels)
 	{

@@ -99,12 +99,12 @@ public:
 	/**
 		@brief Gets a channel given the display name
 	 */
-	OscilloscopeChannel* GetChannelByDisplayName(std::string name);
+	OscilloscopeChannel* GetChannelByDisplayName(const std::string& name);
 
 	/**
 		@brief Gets a channel given the hardware name
 	 */
-	OscilloscopeChannel* GetChannelByHwName(std::string name);
+	OscilloscopeChannel* GetChannelByHwName(const std::string& name);
 
 	/**
 		@brief Checks if a channel is enabled in hardware.

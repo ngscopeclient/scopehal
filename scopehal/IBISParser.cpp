@@ -470,7 +470,7 @@ bool IBISParser::Load(string fname)
 		//Parse commands
 		if(line[0] == '[')
 		{
-			if(1 != sscanf(line, "[%[^]]]", command))
+			if(1 != sscanf(line, "[%127[^]]]", command))
 				continue;
 			string scmd(command);
 
@@ -487,12 +487,12 @@ bool IBISParser::Load(string fname)
 			//Metadata
 			if(scmd == "Component")
 			{
-				sscanf(line, "[Component] %s", tmp);
+				sscanf(line, "[Component] %127s", tmp);
 				m_component = tmp;
 			}
 			else if(scmd == "Manufacturer")
 			{
-				sscanf(line, "[Manufacturer] %s", tmp);
+				sscanf(line, "[Manufacturer] %127s", tmp);
 				m_manufacturer = tmp;
 			}
 			else if(scmd == "IBIS ver")
@@ -517,7 +517,7 @@ bool IBISParser::Load(string fname)
 			//Start a new model
 			else if(scmd == "Model")
 			{
-				sscanf(line, "[Model] %s", tmp);
+				sscanf(line, "[Model] %127s", tmp);
 				model = new IBISModel(tmp);
 				m_models[tmp] = model;
 				data_block = BLOCK_NONE;
@@ -600,7 +600,7 @@ bool IBISParser::Load(string fname)
 		//Alphanumeric? It's a keyword. Parse it out.
 		else if(isalpha(line[0]))
 		{
-			sscanf(line, "%[^ =]", tmp);
+			sscanf(line, "%127[^ =]", tmp);
 			string skeyword = tmp;
 
 			//If there's not an active model, skip it
@@ -732,6 +732,10 @@ bool IBISParser::Load(string fname)
 		{
 			//If not in a data block, do nothing
 			if(data_block == BLOCK_NONE)
+				continue;
+
+			//If there's not an active model, skip it
+			if(!model)
 				continue;
 
 			//Crack individual numbers

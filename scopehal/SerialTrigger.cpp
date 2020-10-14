@@ -37,22 +37,22 @@ using namespace std;
 
 SerialTrigger::SerialTrigger(Oscilloscope* scope)
 	: Trigger(scope)
+	, m_radixname("Radix")
+	, m_patternname("Pattern")
+	, m_pattern2name("Pattern 2")
+	, m_conditionname("Condition")
 {
 	//CreateInput("din");
 
-	m_radixname = "Radix";
 	m_parameters[m_radixname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_radixname].AddEnumValue("ASCII", RADIX_ASCII);
 	m_parameters[m_radixname].AddEnumValue("Binary", RADIX_BINARY);
 	m_parameters[m_radixname].AddEnumValue("Hex", RADIX_HEX);
 
-	m_patternname = "Pattern";
 	m_parameters[m_patternname] = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
 
-	m_pattern2name = "Pattern 2";
 	m_parameters[m_pattern2name] = FilterParameter(FilterParameter::TYPE_STRING, Unit(Unit::UNIT_COUNTS));
 
-	m_conditionname = "Condition";
 	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_conditionname].AddEnumValue("==", CONDITION_EQUAL);
 	m_parameters[m_conditionname].AddEnumValue("!=", CONDITION_NOT_EQUAL);
