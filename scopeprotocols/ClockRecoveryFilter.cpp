@@ -142,8 +142,6 @@ void ClockRecoveryFilter::Refresh()
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
 
-	double start = GetTime();
-
 	//Timestamps of the edges
 	vector<double> edges;
 	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
@@ -153,10 +151,6 @@ void ClockRecoveryFilter::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-
-	double dt = GetTime() - start;
-	start = GetTime();
-	//LogTrace("Zero crossing: %.3f ms\n", dt * 1000);
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
@@ -251,10 +245,6 @@ void ClockRecoveryFilter::Refresh()
 			cap->m_samples.push_back(value);
 		}
 	}
-
-	dt = GetTime() - start;
-	start = GetTime();
-	LogTrace("NCO: %.3f ms\n", dt * 1000);
 
 	total_error /= edges.size();
 	LogTrace("average phase error %.1f\n", total_error);
