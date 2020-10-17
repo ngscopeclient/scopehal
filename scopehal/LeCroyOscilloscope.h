@@ -220,7 +220,7 @@ protected:
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
-	void PushEdgeTrigger(EdgeTrigger* trig, std::string& tree);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& tree);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
