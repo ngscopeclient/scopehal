@@ -129,6 +129,15 @@ void ClockRecoveryFilter::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	auto gate = GetDigitalInputWaveform(1);
 
+	//Timestamps of the edges
+	vector<double> edges;
+	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
+	if(edges.empty())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Convert nominal baud period to ps
 	//Round nominal period to nearest ps, but use the floating point value for the CDR PLL
 	float period = 1.0e12f / m_parameters[m_baudname].GetFloatVal();
@@ -141,16 +150,6 @@ void ClockRecoveryFilter::Refresh()
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
-
-	//Timestamps of the edges
-	vector<double> edges;
-	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
-
-	if(edges.empty())
-	{
-		SetData(NULL, 0);
-		return;
-	}
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
