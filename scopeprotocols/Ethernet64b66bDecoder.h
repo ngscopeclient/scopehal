@@ -61,7 +61,7 @@ typedef Waveform<Ethernet64b66bSymbol> Ethernet64b66bWaveform;
 class Ethernet64b66bDecoder : public Filter
 {
 public:
-	Ethernet64b66bDecoder(std::string color);
+	Ethernet64b66bDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

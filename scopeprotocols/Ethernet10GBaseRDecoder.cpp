@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(string color)
+Ethernet10GBaseRDecoder::Ethernet10GBaseRDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 	//Digital inputs, so need to undo some stuff for the PHY layer decodes

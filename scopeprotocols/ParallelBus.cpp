@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ParallelBus::ParallelBus(string color)
+ParallelBus::ParallelBus(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_BUS)
 {
 	//Set up channels

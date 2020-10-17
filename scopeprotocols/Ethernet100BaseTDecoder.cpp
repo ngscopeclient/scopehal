@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(string color)
+Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 }

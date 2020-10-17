@@ -40,7 +40,7 @@
 class FFTFilter : public PeakDetectionFilter
 {
 public:
-	FFTFilter(std::string color);
+	FFTFilter(const std::string& color);
 	virtual ~FFTFilter();
 
 	virtual void Refresh();

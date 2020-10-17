@@ -74,7 +74,7 @@ const char* JtagSymbol::GetName(JtagSymbol::JtagState state)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-JtagDecoder::JtagDecoder(string color)
+JtagDecoder::JtagDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels

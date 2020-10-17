@@ -37,7 +37,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeHeightMeasurement::EyeHeightMeasurement(string color)
+EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_PS);

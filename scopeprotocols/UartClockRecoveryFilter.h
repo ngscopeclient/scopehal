@@ -38,7 +38,7 @@
 class UartClockRecoveryFilter : public Filter
 {
 public:
-	UartClockRecoveryFilter(std::string color);
+	UartClockRecoveryFilter(const std::string& color);
 
 	virtual void Refresh();
 

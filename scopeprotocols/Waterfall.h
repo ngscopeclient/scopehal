@@ -54,7 +54,7 @@ protected:
 class Waterfall : public Filter
 {
 public:
-	Waterfall(std::string color);
+	Waterfall(const std::string& color);
 
 	virtual void Refresh();
 

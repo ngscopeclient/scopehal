@@ -60,6 +60,10 @@ public:
 	TektronixOscilloscope(SCPITransport* transport);
 	virtual ~TektronixOscilloscope();
 
+	//not copyable or assignable
+	TektronixOscilloscope(const TektronixOscilloscope& rhs) =delete;
+	TektronixOscilloscope& operator=(const TektronixOscilloscope& rhs) =delete;
+
 public:
 
 	//Device information

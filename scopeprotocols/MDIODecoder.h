@@ -75,7 +75,7 @@ typedef Waveform<MDIOSymbol> MDIOWaveform;
 class MDIODecoder : public PacketDecoder
 {
 public:
-	MDIODecoder(std::string color);
+	MDIODecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

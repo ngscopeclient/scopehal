@@ -38,7 +38,7 @@
 class MultiplyFilter : public Filter
 {
 public:
-	MultiplyFilter(std::string color);
+	MultiplyFilter(const std::string& color);
 
 	virtual void Refresh();
 

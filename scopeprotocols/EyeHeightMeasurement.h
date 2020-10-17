@@ -38,7 +38,7 @@
 class EyeHeightMeasurement : public Filter
 {
 public:
-	EyeHeightMeasurement(std::string color);
+	EyeHeightMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

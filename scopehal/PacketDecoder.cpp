@@ -48,7 +48,9 @@ Gdk::Color PacketDecoder::m_backgroundColors[PROTO_STANDARD_COLOR_COUNT] =
 // Packet
 
 Packet::Packet()
-	: m_displayForegroundColor(Gdk::Color("#ffffff"))
+	: m_offset(0)
+	, m_len(0)
+	, m_displayForegroundColor(Gdk::Color("#ffffff"))
 	, m_displayBackgroundColor(PacketDecoder::m_backgroundColors[PacketDecoder::PROTO_COLOR_DEFAULT])
 {
 }
@@ -60,7 +62,7 @@ Packet::~Packet()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Category cat)
+PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat)
 	: Filter(type, color, cat)
 {
 }

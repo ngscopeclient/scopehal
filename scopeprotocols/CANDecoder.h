@@ -49,7 +49,7 @@ typedef Waveform<CANSymbol> CANWaveform;
 class CANDecoder : public Filter
 {
 public:
-	CANDecoder(std::string color);
+	CANDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

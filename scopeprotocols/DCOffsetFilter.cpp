@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DCOffsetFilter::DCOffsetFilter(string color)
+DCOffsetFilter::DCOffsetFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels

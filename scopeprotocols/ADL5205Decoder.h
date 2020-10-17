@@ -60,7 +60,7 @@ typedef Waveform<ADL5205Symbol> ADL5205Waveform;
 class ADL5205Decoder : public Filter
 {
 public:
-	ADL5205Decoder(std::string color);
+	ADL5205Decoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

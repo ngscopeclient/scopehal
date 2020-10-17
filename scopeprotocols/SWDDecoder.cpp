@@ -42,7 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SWDDecoder::SWDDecoder(string color)
+SWDDecoder::SWDDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	CreateInput("SWCLK");

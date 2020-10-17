@@ -41,7 +41,7 @@
 class QSPIDecoder : public SPIDecoder
 {
 public:
-	QSPIDecoder(std::string color);
+	QSPIDecoder(const std::string& color);
 
 	virtual void Refresh();
 

@@ -99,7 +99,7 @@ typedef Waveform<JtagSymbol> JtagWaveform;
 class JtagDecoder : public PacketDecoder
 {
 public:
-	JtagDecoder(std::string color);
+	JtagDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

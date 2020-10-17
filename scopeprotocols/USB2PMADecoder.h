@@ -68,7 +68,7 @@ typedef Waveform<USB2PMASymbol> USB2PMAWaveform;
 class USB2PMADecoder : public Filter
 {
 public:
-	USB2PMADecoder(std::string color);
+	USB2PMADecoder(const std::string& color);
 
 	virtual void Refresh();
 

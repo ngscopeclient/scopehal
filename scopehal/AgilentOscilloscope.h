@@ -38,6 +38,10 @@ public:
 	AgilentOscilloscope(SCPITransport* transport);
 	virtual ~AgilentOscilloscope();
 
+	//not copyable or assignable
+	AgilentOscilloscope(const AgilentOscilloscope& rhs) =delete;
+	AgilentOscilloscope& operator=(const AgilentOscilloscope& rhs) =delete;
+
 public:
 
 	//Device information

@@ -38,7 +38,7 @@
 class FallMeasurement : public Filter
 {
 public:
-	FallMeasurement(std::string color);
+	FallMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

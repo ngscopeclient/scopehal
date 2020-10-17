@@ -78,7 +78,7 @@ typedef Waveform<IPv4Symbol> IPv4Waveform;
 class IPv4Decoder : public Filter
 {
 public:
-	IPv4Decoder(std::string color);
+	IPv4Decoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

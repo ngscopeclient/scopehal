@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EthernetProtocolDecoder::EthernetProtocolDecoder(string color)
+EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels

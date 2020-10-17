@@ -38,7 +38,7 @@
 class PeakHoldFilter : public PeakDetectionFilter
 {
 public:
-	PeakHoldFilter(std::string color);
+	PeakHoldFilter(const std::string& color);
 
 	virtual void Refresh();
 

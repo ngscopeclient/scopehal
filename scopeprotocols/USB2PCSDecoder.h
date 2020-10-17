@@ -75,7 +75,7 @@ typedef Waveform<USB2PCSSymbol> USB2PCSWaveform;
 class USB2PCSDecoder : public Filter
 {
 public:
-	USB2PCSDecoder(std::string color);
+	USB2PCSDecoder(const std::string& color);
 
 	virtual void Refresh();
 

@@ -43,9 +43,9 @@ using namespace std;
 
 OscilloscopeChannel::OscilloscopeChannel(
 	Oscilloscope* scope,
-	string hwname,
+	const string& hwname,
 	OscilloscopeChannel::ChannelType type,
-	string color,
+	const string& color,
 	int width,
 	size_t index,
 	bool physical)
@@ -69,9 +69,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 
 OscilloscopeChannel::OscilloscopeChannel(
 	Oscilloscope* scope,
-	string hwname,
+	const string& hwname,
 	OscilloscopeChannel::ChannelType type,
-	string color,
+	const string& color,
 	Unit xunit,
 	Unit yunit,
 	int width,

@@ -38,7 +38,7 @@
 class CurrentShuntFilter : public Filter
 {
 public:
-	CurrentShuntFilter(std::string color);
+	CurrentShuntFilter(const std::string& color);
 
 	virtual void Refresh();
 

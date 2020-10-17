@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TachometerFilter::TachometerFilter(string color)
+TachometerFilter::TachometerFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_RPM);

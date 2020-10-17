@@ -38,7 +38,7 @@
 class PeriodMeasurement : public Filter
 {
 public:
-	PeriodMeasurement(std::string color);
+	PeriodMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

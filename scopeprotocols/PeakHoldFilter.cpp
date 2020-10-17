@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PeakHoldFilter::PeakHoldFilter(string color)
+PeakHoldFilter::PeakHoldFilter(const string& color)
 	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels

@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SPIFlashDecoder::SPIFlashDecoder(string color)
+SPIFlashDecoder::SPIFlashDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	CreateInput("spi_in");

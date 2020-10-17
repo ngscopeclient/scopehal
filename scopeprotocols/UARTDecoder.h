@@ -41,7 +41,7 @@
 class UARTDecoder : public PacketDecoder
 {
 public:
-	UARTDecoder(std::string color);
+	UARTDecoder(const std::string& color);
 	virtual ~UARTDecoder();
 
 	virtual Gdk::Color GetColor(int i);

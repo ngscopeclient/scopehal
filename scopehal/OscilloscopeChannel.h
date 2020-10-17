@@ -62,17 +62,17 @@ public:
 
 	OscilloscopeChannel(
 		Oscilloscope* scope,
-		std::string hwname,
+		const std::string& hwname,
 		OscilloscopeChannel::ChannelType type,
-		std::string color,
+		const std::string& color,
 		int width = 1,
 		size_t index = 0,
 		bool physical = false);
 	OscilloscopeChannel(
 		Oscilloscope* scope,
-		std::string hwname,
+		const std::string& hwname,
 		OscilloscopeChannel::ChannelType type,
-		std::string color,
+		const std::string& color,
 		Unit xunit,
 		Unit yunit,
 		int width = 1,

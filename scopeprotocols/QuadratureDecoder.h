@@ -41,7 +41,7 @@
 class QuadratureDecoder : public Filter
 {
 public:
-	QuadratureDecoder(std::string color);
+	QuadratureDecoder(const std::string& color);
 
 	virtual void Refresh();
 

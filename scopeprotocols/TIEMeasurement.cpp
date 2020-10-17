@@ -34,7 +34,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TIEMeasurement::TIEMeasurement(string color)
+TIEMeasurement::TIEMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_PS);

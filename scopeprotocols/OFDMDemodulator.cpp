@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-OFDMDemodulator::OFDMDemodulator(string color)
+OFDMDemodulator::OFDMDemodulator(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	//Set up channels

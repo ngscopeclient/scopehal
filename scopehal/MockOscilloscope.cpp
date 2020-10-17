@@ -42,7 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-MockOscilloscope::MockOscilloscope(string name, string vendor, string serial)
+MockOscilloscope::MockOscilloscope(const string& name, const string& vendor, const string& serial)
 	: m_name(name)
 	, m_vendor(vendor)
 	, m_serial(serial)

@@ -38,7 +38,7 @@
 class EyeWidthMeasurement : public Filter
 {
 public:
-	EyeWidthMeasurement(std::string color);
+	EyeWidthMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

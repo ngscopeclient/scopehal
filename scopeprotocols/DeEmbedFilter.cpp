@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DeEmbedFilter::DeEmbedFilter(string color)
+DeEmbedFilter::DeEmbedFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	//Set up channels

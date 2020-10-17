@@ -40,7 +40,7 @@
 class ChannelEmulationFilter : public DeEmbedFilter
 {
 public:
-	ChannelEmulationFilter(std::string color);
+	ChannelEmulationFilter(const std::string& color);
 
 	virtual void Refresh();
 

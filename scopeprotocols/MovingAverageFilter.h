@@ -38,7 +38,7 @@
 class MovingAverageFilter : public Filter
 {
 public:
-	MovingAverageFilter(std::string color);
+	MovingAverageFilter(const std::string& color);
 
 	virtual void Refresh();
 

@@ -37,7 +37,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyeWidthMeasurement::EyeWidthMeasurement(string color)
+EyeWidthMeasurement::EyeWidthMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);

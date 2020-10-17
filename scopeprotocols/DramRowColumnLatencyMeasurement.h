@@ -38,7 +38,7 @@
 class DramRowColumnLatencyMeasurement : public Filter
 {
 public:
-	DramRowColumnLatencyMeasurement(std::string color);
+	DramRowColumnLatencyMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

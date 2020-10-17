@@ -38,7 +38,7 @@
 class WindowedAutocorrelationFilter : public Filter
 {
 public:
-	WindowedAutocorrelationFilter(std::string color);
+	WindowedAutocorrelationFilter(const std::string& color);
 
 	virtual void Refresh();
 

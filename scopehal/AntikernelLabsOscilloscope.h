@@ -36,6 +36,10 @@ public:
 	AntikernelLabsOscilloscope(SCPITransport* transport);
 	virtual ~AntikernelLabsOscilloscope();
 
+	//not copyable or assignable
+	AntikernelLabsOscilloscope(const AntikernelLabsOscilloscope& rhs) =delete;
+	AntikernelLabsOscilloscope& operator=(const AntikernelLabsOscilloscope& rhs) =delete;
+
 public:
 	//Device information
 	virtual unsigned int GetInstrumentTypes();

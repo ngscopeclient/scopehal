@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-AutocorrelationFilter::AutocorrelationFilter(string color)
+AutocorrelationFilter::AutocorrelationFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up inputs

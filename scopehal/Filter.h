@@ -62,7 +62,7 @@ public:
 		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
 	};
 
-	Filter(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
+	Filter(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat);
 	virtual ~Filter();
 
 	virtual void Refresh() =0;
@@ -125,7 +125,7 @@ public:
 
 		Do not change ordering, add new items to the end only.
 	 */
-	enum
+	enum FilterColor
 	{
 		COLOR_DATA,			//protocol data
 		COLOR_CONTROL,		//generic control sequences
@@ -137,7 +137,7 @@ public:
 		COLOR_IDLE,			//downtime between frames
 
 		STANDARD_COLOR_COUNT
-	} standard_color;
+	};
 
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
@@ -208,11 +208,11 @@ protected:
 	void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
 
 public:
-	typedef Filter* (*CreateProcType)(std::string);
-	static void DoAddDecoderClass(std::string name, CreateProcType proc);
+	typedef Filter* (*CreateProcType)(const std::string&);
+	static void DoAddDecoderClass(const std::string& name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
-	static Filter* CreateFilter(std::string protocol, std::string color);
+	static Filter* CreateFilter(const std::string& protocol, const std::string& color);
 
 protected:
 	//Class enumeration
@@ -224,7 +224,7 @@ protected:
 };
 
 #define PROTOCOL_DECODER_INITPROC(T) \
-	static Filter* CreateInstance(std::string color) \
+	static Filter* CreateInstance(const std::string& color) \
 	{ \
 		return new T(color); \
 	} \

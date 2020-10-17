@@ -73,7 +73,7 @@ typedef Waveform<I2CEepromSymbol> I2CEepromWaveform;
 class I2CEepromDecoder : public PacketDecoder
 {
 public:
-	I2CEepromDecoder(std::string color);
+	I2CEepromDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

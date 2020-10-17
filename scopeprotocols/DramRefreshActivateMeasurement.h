@@ -38,7 +38,7 @@
 class DramRefreshActivateMeasurement : public Filter
 {
 public:
-	DramRefreshActivateMeasurement(std::string color);
+	DramRefreshActivateMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

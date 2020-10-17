@@ -38,7 +38,7 @@
 class ParallelBus : public Filter
 {
 public:
-	ParallelBus(std::string color);
+	ParallelBus(const std::string& color);
 
 	virtual void Refresh();
 

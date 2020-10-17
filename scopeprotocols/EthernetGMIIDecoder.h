@@ -38,7 +38,7 @@
 class EthernetGMIIDecoder : public EthernetProtocolDecoder
 {
 public:
-	EthernetGMIIDecoder(std::string color);
+	EthernetGMIIDecoder(const std::string& color);
 
 	virtual void Refresh();
 	static std::string GetProtocolName();

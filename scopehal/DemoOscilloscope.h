@@ -45,6 +45,10 @@ public:
 	DemoOscilloscope(SCPITransport* transport);
 	virtual ~DemoOscilloscope();
 
+	//not copyable or assignable
+	DemoOscilloscope(const DemoOscilloscope& rhs) =delete;
+	DemoOscilloscope& operator=(const DemoOscilloscope& rhs) =delete;
+
 	virtual std::string IDPing();
 
 	virtual std::string GetTransportConnectionString();

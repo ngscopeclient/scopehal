@@ -73,7 +73,7 @@ class PeakDetectionFilter
 	, public PeakDetector
 {
 public:
-	PeakDetectionFilter(OscilloscopeChannel::ChannelType type, std::string color, Category cat);
+	PeakDetectionFilter(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat);
 	virtual ~PeakDetectionFilter();
 
 protected:

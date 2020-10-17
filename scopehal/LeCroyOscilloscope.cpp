@@ -701,7 +701,7 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	char chn[32];
 	for(unsigned int i=0; i<count; i++)
 	{
-		snprintf(chn, sizeof(chn), "D%d", i);
+		snprintf(chn, sizeof(chn), "D%u", i);
 		auto chan = new OscilloscopeChannel(
 			this,
 			chn,
@@ -1464,7 +1464,7 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 /**
 	@brief Get an
  */
-string LeCroyOscilloscope::GetPossiblyEmptyString(string property)
+string LeCroyOscilloscope::GetPossiblyEmptyString(const string& property)
 {
 	//Get string length first since reading empty strings is problematic over SCPI
 	m_transport->SendCommand(string("VBS? 'return = Len(") + property + ")'");
@@ -1981,6 +1981,9 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 		TODO: during startup, query instrument for its current time zone
 		since the wavedesc reports instment local time
 	 */
+	//Yes, this cast is intentional.
+	//It assumes you're on a little endian system using IEEE754 64-bit float, but that applies to everything we support.
+	//cppcheck-suppress invalidPointerCast
 	double fseconds = *reinterpret_cast<const double*>(wavedesc + 296);
 	uint8_t seconds = floor(fseconds);
 	basetime = fseconds - seconds;
@@ -2029,10 +2032,19 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	auto pdesc = (unsigned char*)(&wavedesc[0]);
 	//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
 	//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+
+	//cppcheck-suppress invalidPointerCast
 	float v_gain = *reinterpret_cast<float*>(pdesc + 156);
+
+	//cppcheck-suppress invalidPointerCast
 	float v_off = *reinterpret_cast<float*>(pdesc + 160);
+
+	//cppcheck-suppress invalidPointerCast
 	float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+
+	//cppcheck-suppress invalidPointerCast
 	double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+
 	double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
 	if(h_off_frac < 0)
 		h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
@@ -3132,7 +3144,7 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "MSIZ %ld", depth);
+	snprintf(tmp, sizeof(tmp), "MSIZ %lu", depth);
 	m_transport->SendCommand(tmp);
 	m_memoryDepth = depth;
 

@@ -98,7 +98,7 @@ typedef Waveform<USB2PacketSymbol> USB2PacketWaveform;
 class USB2PacketDecoder : public PacketDecoder
 {
 public:
-	USB2PacketDecoder(std::string color);
+	USB2PacketDecoder(const std::string& color);
 
 	virtual void Refresh();
 

@@ -38,7 +38,7 @@
 class UpsampleFilter : public Filter
 {
 public:
-	UpsampleFilter(std::string color);
+	UpsampleFilter(const std::string& color);
 
 	virtual void Refresh();
 

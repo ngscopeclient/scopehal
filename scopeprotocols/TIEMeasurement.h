@@ -38,7 +38,7 @@
 class TIEMeasurement : public Filter
 {
 public:
-	TIEMeasurement(std::string color);
+	TIEMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

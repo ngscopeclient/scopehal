@@ -41,7 +41,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-UARTDecoder::UARTDecoder(string color)
+UARTDecoder::UARTDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels

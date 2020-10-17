@@ -41,7 +41,7 @@
 class DeEmbedFilter : public Filter
 {
 public:
-	DeEmbedFilter(std::string color);
+	DeEmbedFilter(const std::string& color);
 	virtual ~DeEmbedFilter();
 
 	virtual void Refresh();

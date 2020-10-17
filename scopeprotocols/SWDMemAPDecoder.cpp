@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SWDMemAPDecoder::SWDMemAPDecoder(string color)
+SWDMemAPDecoder::SWDMemAPDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	CreateInput("swd");

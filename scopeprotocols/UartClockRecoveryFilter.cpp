@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-UartClockRecoveryFilter::UartClockRecoveryFilter(string color)
+UartClockRecoveryFilter::UartClockRecoveryFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
 {
 	//Set up channels

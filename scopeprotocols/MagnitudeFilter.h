@@ -38,7 +38,7 @@
 class MagnitudeFilter : public Filter
 {
 public:
-	MagnitudeFilter(std::string color);
+	MagnitudeFilter(const std::string& color);
 
 	virtual void Refresh();
 

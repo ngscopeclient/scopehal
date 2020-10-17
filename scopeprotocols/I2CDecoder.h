@@ -73,7 +73,7 @@ typedef Waveform<I2CSymbol> I2CWaveform;
 class I2CDecoder : public Filter
 {
 public:
-	I2CDecoder(std::string color);
+	I2CDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

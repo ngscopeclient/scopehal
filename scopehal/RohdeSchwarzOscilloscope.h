@@ -38,6 +38,9 @@ public:
 	RohdeSchwarzOscilloscope(SCPITransport* transport);
 	virtual ~RohdeSchwarzOscilloscope();
 
+	//not copyable or assignable
+	RohdeSchwarzOscilloscope(const RohdeSchwarzOscilloscope& rhs) =delete;
+	RohdeSchwarzOscilloscope& operator=(const RohdeSchwarzOscilloscope& rhs) =delete;
 
 public:
 	//Device information

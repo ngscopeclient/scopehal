@@ -48,7 +48,7 @@ VideoScanlinePacket::~VideoScanlinePacket()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DVIDecoder::DVIDecoder(string color)
+DVIDecoder::DVIDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels

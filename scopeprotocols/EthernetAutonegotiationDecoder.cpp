@@ -41,7 +41,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(string color)
+EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels

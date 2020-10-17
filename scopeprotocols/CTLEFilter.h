@@ -40,7 +40,7 @@
 class CTLEFilter : public DeEmbedFilter
 {
 public:
-	CTLEFilter(std::string color);
+	CTLEFilter(const std::string& color);
 
 	virtual void Refresh();
 

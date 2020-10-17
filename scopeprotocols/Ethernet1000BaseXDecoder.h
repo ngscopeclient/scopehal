@@ -38,7 +38,7 @@
 class Ethernet1000BaseXDecoder : public EthernetProtocolDecoder
 {
 public:
-	Ethernet1000BaseXDecoder(std::string color);
+	Ethernet1000BaseXDecoder(const std::string& color);
 
 	virtual void Refresh();
 	static std::string GetProtocolName();

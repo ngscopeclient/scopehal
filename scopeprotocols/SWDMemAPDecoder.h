@@ -65,7 +65,7 @@ typedef Waveform<SWDMemAPSymbol> SWDMemAPWaveform;
 class SWDMemAPDecoder : public PacketDecoder
 {
 public:
-	SWDMemAPDecoder(std::string color);
+	SWDMemAPDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

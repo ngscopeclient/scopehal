@@ -68,7 +68,7 @@ public:
 class PacketDecoder : public Filter
 {
 public:
-	PacketDecoder(OscilloscopeChannel::ChannelType type, std::string color, Filter::Category cat);
+	PacketDecoder(OscilloscopeChannel::ChannelType type, const std::string& color, Filter::Category cat);
 	virtual ~PacketDecoder();
 
 	const std::vector<Packet*>& GetPackets()
@@ -87,7 +87,7 @@ public:
 
 		Do not change ordering, add new items to the end only.
 	 */
-	enum
+	enum PacketColor
 	{
 		PROTO_COLOR_DEFAULT,		//Default color if not otherwise specified
 		PROTO_COLOR_ERROR,			//Malformed packets, or packets indicating an error condition
@@ -98,7 +98,7 @@ public:
 		PROTO_COLOR_COMMAND,		//Executing commands of some sort
 
 		PROTO_STANDARD_COLOR_COUNT
-	} standard_color;
+	};
 
 	static Gdk::Color m_backgroundColors[PROTO_STANDARD_COLOR_COUNT];
 

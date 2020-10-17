@@ -614,7 +614,7 @@ bool IBISParser::Load(string fname)
 			//Type of buffer
 			if(skeyword == "Model_type")
 			{
-				if(1 != sscanf(line, "Model_type %s", tmp))
+				if(1 != sscanf(line, "Model_type %127s", tmp))
 					continue;
 
 				string type(tmp);

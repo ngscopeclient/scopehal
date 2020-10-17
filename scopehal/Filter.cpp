@@ -58,7 +58,7 @@ Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 
 Filter::Filter(
 	OscilloscopeChannel::ChannelType type,
-	string color,
+	const string& color,
 	Category cat)
 	: OscilloscopeChannel(NULL, "", type, color, 1)	//TODO: handle this better?
 	, m_category(cat)
@@ -132,7 +132,7 @@ void Filter::RefreshIfDirty()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void Filter::DoAddDecoderClass(string name, CreateProcType proc)
+void Filter::DoAddDecoderClass(const string& name, CreateProcType proc)
 {
 	m_createprocs[name] = proc;
 }
@@ -143,7 +143,7 @@ void Filter::EnumProtocols(vector<string>& names)
 		names.push_back(it->first);
 }
 
-Filter* Filter::CreateFilter(string protocol, string color)
+Filter* Filter::CreateFilter(const string& protocol, const string& color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
 		return m_createprocs[protocol](color);

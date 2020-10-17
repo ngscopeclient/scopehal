@@ -54,6 +54,10 @@ public:
 	LeCroyOscilloscope(SCPITransport* transport);
 	virtual ~LeCroyOscilloscope();
 
+	//not copyable or assignable
+	LeCroyOscilloscope(const LeCroyOscilloscope& rhs) =delete;
+	LeCroyOscilloscope& operator=(const LeCroyOscilloscope& rhs) =delete;
+
 protected:
 	void IdentifyHardware();
 	void SharedCtorInit();
@@ -228,7 +232,7 @@ protected:
 
 	void BulkCheckChannelEnableState();
 
-	std::string GetPossiblyEmptyString(std::string property);
+	std::string GetPossiblyEmptyString(const std::string& property);
 
 	bool ReadWaveformBlock(std::string& data);
 	bool ReadWavedescs(

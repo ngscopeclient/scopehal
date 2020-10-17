@@ -38,7 +38,7 @@
 class ClockRecoveryFilter : public Filter
 {
 public:
-	ClockRecoveryFilter(std::string color);
+	ClockRecoveryFilter(const std::string& color);
 	virtual ~ClockRecoveryFilter();
 
 	virtual void Refresh();

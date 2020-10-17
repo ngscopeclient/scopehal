@@ -44,6 +44,10 @@ public:
 	AntikernelLogicAnalyzer(SCPITransport* transport);
 	virtual ~AntikernelLogicAnalyzer();
 
+	//not copyable or assignable
+	AntikernelLogicAnalyzer(const AntikernelLogicAnalyzer& rhs) =delete;
+	AntikernelLogicAnalyzer& operator=(const AntikernelLogicAnalyzer& rhs) =delete;
+
 	virtual std::string IDPing();
 
 	virtual std::string GetTransportConnectionString();

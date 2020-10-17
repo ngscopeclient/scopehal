@@ -37,7 +37,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-FFTFilter::FFTFilter(string color)
+FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);

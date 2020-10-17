@@ -41,7 +41,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-IBM8b10bDecoder::IBM8b10bDecoder(string color)
+IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	//Set up channels

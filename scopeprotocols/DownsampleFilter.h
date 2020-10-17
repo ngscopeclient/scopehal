@@ -41,7 +41,7 @@
 class DownsampleFilter : public Filter
 {
 public:
-	DownsampleFilter(std::string color);
+	DownsampleFilter(const std::string& color);
 
 	virtual void Refresh();
 

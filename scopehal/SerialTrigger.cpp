@@ -38,9 +38,9 @@ using namespace std;
 SerialTrigger::SerialTrigger(Oscilloscope* scope)
 	: Trigger(scope)
 	, m_radixname("Radix")
+	, m_conditionname("Condition")
 	, m_patternname("Pattern")
 	, m_pattern2name("Pattern 2")
-	, m_conditionname("Condition")
 {
 	//CreateInput("din");
 

@@ -42,7 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DDR3Decoder::DDR3Decoder(string color)
+DDR3Decoder::DDR3Decoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
 	CreateInput("CLK");

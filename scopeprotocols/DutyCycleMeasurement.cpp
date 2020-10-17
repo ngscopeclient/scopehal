@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DutyCycleMeasurement::DutyCycleMeasurement(string color)
+DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_PERCENT);

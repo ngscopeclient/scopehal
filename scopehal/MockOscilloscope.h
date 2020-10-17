@@ -39,8 +39,12 @@
 class MockOscilloscope : public Oscilloscope
 {
 public:
-	MockOscilloscope(std::string name, std::string vendor, std::string serial);
+	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
 	virtual ~MockOscilloscope();
+
+	//not copyable or assignable
+	MockOscilloscope(const MockOscilloscope& rhs) =delete;
+	MockOscilloscope& operator=(const MockOscilloscope& rhs) =delete;
 
 	virtual std::string IDPing();
 

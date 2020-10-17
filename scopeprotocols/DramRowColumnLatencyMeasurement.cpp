@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(string color)
+DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	//Set up channels

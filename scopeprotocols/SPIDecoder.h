@@ -69,7 +69,7 @@ typedef Waveform<SPISymbol> SPIWaveform;
 class SPIDecoder : public Filter
 {
 public:
-	SPIDecoder(std::string color);
+	SPIDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

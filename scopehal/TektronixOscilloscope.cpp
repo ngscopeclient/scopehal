@@ -1561,12 +1561,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		int msglen = atoi(digits);
 
 		//Read the actual data
-		char* rxbuf = new char[msglen];
-		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
-
-		//convert bytes to samples
 		size_t nsamples = msglen/8;
-		double* samples = (double*)rxbuf;
+		double* samples = new double[nsamples];
+		m_transport->ReadRawData(msglen, (unsigned char*)samples);
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1592,7 +1589,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		pending_waveforms[nchan].push_back(cap);
 
 		//Done
-		delete[] rxbuf;
+		delete[] samples;
 
 		//Throw out garbage at the end of the message (why is this needed?)
 		m_transport->ReadReply();

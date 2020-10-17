@@ -38,9 +38,9 @@ using namespace std;
 
 PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	: EdgeTrigger(scope)
+	, m_conditionname("Condition")
 	, m_lowername("Lower Bound")
 	, m_uppername("Upper Bound")
-	, m_conditionname("Condition")
 {
 	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 

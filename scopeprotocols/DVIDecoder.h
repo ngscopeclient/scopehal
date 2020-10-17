@@ -83,7 +83,7 @@ typedef Waveform<DVISymbol> DVIWaveform;
 class DVIDecoder : public PacketDecoder
 {
 public:
-	DVIDecoder(std::string color);
+	DVIDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

@@ -38,7 +38,7 @@
 class SubtractFilter : public Filter
 {
 public:
-	SubtractFilter(std::string color);
+	SubtractFilter(const std::string& color);
 
 	virtual void Refresh();
 

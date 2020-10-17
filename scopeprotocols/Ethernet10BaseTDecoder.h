@@ -38,7 +38,7 @@
 class Ethernet10BaseTDecoder : public EthernetProtocolDecoder
 {
 public:
-	Ethernet10BaseTDecoder(std::string color);
+	Ethernet10BaseTDecoder(const std::string& color);
 	virtual ~Ethernet10BaseTDecoder();
 
 	virtual void Refresh();

@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-QuadratureDecoder::QuadratureDecoder(string color)
+QuadratureDecoder::QuadratureDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
 {
 	//Set up channels

@@ -40,9 +40,9 @@ class SpectrumChannel
 public:
 	SpectrumChannel(
 		Oscilloscope* scope,
-		std::string hwname,
+		const std::string& hwname,
 		OscilloscopeChannel::ChannelType type,
-		std::string color,
+		const std::string& color,
 		size_t index,
 		bool physical = false
 		);

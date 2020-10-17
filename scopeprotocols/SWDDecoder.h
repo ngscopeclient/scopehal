@@ -77,7 +77,7 @@ typedef Waveform<SWDSymbol> SWDWaveform;
 class SWDDecoder : public Filter
 {
 public:
-	SWDDecoder(std::string color);
+	SWDDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

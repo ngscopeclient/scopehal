@@ -38,6 +38,10 @@ public:
 	RigolOscilloscope(SCPITransport* transport);
 	virtual ~RigolOscilloscope();
 
+	//not copyable or assignable
+	RigolOscilloscope(const RigolOscilloscope& rhs) =delete;
+	RigolOscilloscope& operator=(const RigolOscilloscope& rhs) =delete;
+
 public:
 	//Device information
 	virtual unsigned int GetInstrumentTypes();

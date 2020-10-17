@@ -38,7 +38,7 @@
 class EyeBitRateMeasurement : public Filter
 {
 public:
-	EyeBitRateMeasurement(std::string color);
+	EyeBitRateMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

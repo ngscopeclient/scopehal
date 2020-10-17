@@ -78,7 +78,7 @@ typedef Waveform<EthernetFrameSegment> EthernetWaveform;
 class EthernetProtocolDecoder : public PacketDecoder
 {
 public:
-	EthernetProtocolDecoder(std::string color);
+	EthernetProtocolDecoder(const std::string& color);
 	virtual ~EthernetProtocolDecoder();
 
 	virtual std::string GetText(int i);

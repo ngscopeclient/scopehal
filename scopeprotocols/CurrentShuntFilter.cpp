@@ -35,7 +35,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-CurrentShuntFilter::CurrentShuntFilter(string color)
+CurrentShuntFilter::CurrentShuntFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_POWER)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_AMPS);

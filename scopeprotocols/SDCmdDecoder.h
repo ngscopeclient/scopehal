@@ -88,7 +88,7 @@ typedef Waveform<SDCmdSymbol> SDCmdWaveform;
 class SDCmdDecoder : public PacketDecoder
 {
 public:
-	SDCmdDecoder(std::string color);
+	SDCmdDecoder(const std::string& color);
 
 	virtual void Refresh();
 

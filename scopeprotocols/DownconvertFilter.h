@@ -41,7 +41,7 @@
 class DownconvertFilter : public Filter
 {
 public:
-	DownconvertFilter(std::string color);
+	DownconvertFilter(const std::string& color);
 
 	virtual void Refresh();
 

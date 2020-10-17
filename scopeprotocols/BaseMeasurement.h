@@ -38,7 +38,7 @@
 class BaseMeasurement : public Filter
 {
 public:
-	BaseMeasurement(std::string color);
+	BaseMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

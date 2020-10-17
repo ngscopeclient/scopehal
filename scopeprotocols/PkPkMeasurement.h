@@ -38,7 +38,7 @@
 class PkPkMeasurement : public Filter
 {
 public:
-	PkPkMeasurement(std::string color);
+	PkPkMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

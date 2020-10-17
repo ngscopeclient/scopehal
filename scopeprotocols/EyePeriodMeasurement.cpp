@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyePeriodMeasurement::EyePeriodMeasurement(string color)
+EyePeriodMeasurement::EyePeriodMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_PS);

@@ -36,9 +36,9 @@ using namespace std;
 
 SpectrumChannel::SpectrumChannel(
 	Oscilloscope* scope,
-	string hwname,
+	const string& hwname,
 	OscilloscopeChannel::ChannelType type,
-	string color,
+	const string& color,
 	size_t index,
 	bool physical
 	)

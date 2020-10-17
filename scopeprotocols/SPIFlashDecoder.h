@@ -108,7 +108,7 @@ typedef Waveform<SPIFlashSymbol> SPIFlashWaveform;
 class SPIFlashDecoder : public PacketDecoder
 {
 public:
-	SPIFlashDecoder(std::string color);
+	SPIFlashDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

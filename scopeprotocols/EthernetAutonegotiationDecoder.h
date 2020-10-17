@@ -41,7 +41,7 @@ typedef Waveform<uint16_t> EthernetAutonegotiationWaveform;
 class EthernetAutonegotiationDecoder : public Filter
 {
 public:
-	EthernetAutonegotiationDecoder(std::string color);
+	EthernetAutonegotiationDecoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

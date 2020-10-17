@@ -96,7 +96,7 @@ protected:
 class EyePattern : public Filter
 {
 public:
-	EyePattern(std::string color);
+	EyePattern(const std::string& color);
 
 	virtual void Refresh();
 

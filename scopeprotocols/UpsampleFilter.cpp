@@ -63,7 +63,7 @@ float blackman(float x, float width)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-UpsampleFilter::UpsampleFilter(string color)
+UpsampleFilter::UpsampleFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
 	//Set up channels

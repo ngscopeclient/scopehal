@@ -55,7 +55,7 @@ WaterfallWaveform::~WaterfallWaveform()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-Waterfall::Waterfall(string color)
+Waterfall::Waterfall(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 	, m_pixelsPerHz(0.001)
 	, m_offsetHz(0)

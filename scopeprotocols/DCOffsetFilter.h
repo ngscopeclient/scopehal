@@ -38,7 +38,7 @@
 class DCOffsetFilter : public Filter
 {
 public:
-	DCOffsetFilter(std::string color);
+	DCOffsetFilter(const std::string& color);
 
 	virtual void Refresh();
 

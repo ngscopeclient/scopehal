@@ -38,7 +38,7 @@
 class TopMeasurement : public Filter
 {
 public:
-	TopMeasurement(std::string color);
+	TopMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

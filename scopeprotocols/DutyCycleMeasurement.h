@@ -38,7 +38,7 @@
 class DutyCycleMeasurement : public Filter
 {
 public:
-	DutyCycleMeasurement(std::string color);
+	DutyCycleMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

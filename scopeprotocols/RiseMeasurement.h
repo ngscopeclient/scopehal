@@ -38,7 +38,7 @@
 class RiseMeasurement : public Filter
 {
 public:
-	RiseMeasurement(std::string color);
+	RiseMeasurement(const std::string& color);
 
 	virtual void Refresh();
 

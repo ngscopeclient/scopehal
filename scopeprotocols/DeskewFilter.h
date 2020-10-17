@@ -38,7 +38,7 @@
 class DeskewFilter : public Filter
 {
 public:
-	DeskewFilter(std::string color);
+	DeskewFilter(const std::string& color);
 
 	virtual void Refresh();
 

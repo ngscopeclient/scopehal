@@ -76,7 +76,7 @@ typedef Waveform<DDR3Symbol> DDR3Waveform;
 class DDR3Decoder : public Filter
 {
 public:
-	DDR3Decoder(std::string color);
+	DDR3Decoder(const std::string& color);
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

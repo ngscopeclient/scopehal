@@ -36,7 +36,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ChannelEmulationFilter::ChannelEmulationFilter(string color)
+ChannelEmulationFilter::ChannelEmulationFilter(const string& color)
 	: DeEmbedFilter(color)
 {
 }

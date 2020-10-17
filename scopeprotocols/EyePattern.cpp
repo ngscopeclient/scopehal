@@ -89,7 +89,7 @@ void EyeWaveform::Normalize()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EyePattern::EyePattern(string color)
+EyePattern::EyePattern(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_EYE, color, CAT_ANALYSIS)
 	, m_height(1)
 	, m_width(1)

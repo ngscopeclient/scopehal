@@ -38,7 +38,7 @@
 class AutocorrelationFilter : public Filter
 {
 public:
-	AutocorrelationFilter(std::string color);
+	AutocorrelationFilter(const std::string& color);
 
 	virtual void Refresh();
 
