@@ -176,7 +176,6 @@ void SWDDecoder::Refresh()
 
 				cap->m_offsets.push_back(tstart);
 				cap->m_durations.push_back(dur);
-				tstart += dur;
 				cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_R_NW, samples.m_samples[i]));
 
 				current_word = 0;

@@ -210,10 +210,7 @@ void ClockRecoveryFilter::Refresh()
 
 			//If the clock is currently gated, re-sync to the edge
 			if(was_gating && !gating)
-			{
 				edgepos = tnext + period;
-				delta = 0;
-			}
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 			//If we skipped some edges, apply a larger correction

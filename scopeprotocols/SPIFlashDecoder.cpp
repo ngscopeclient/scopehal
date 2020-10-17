@@ -534,6 +534,13 @@ void SPIFlashDecoder::Refresh()
 			//Read address in QSPI mode
 			case STATE_QUAD_ADDRESS:
 
+				if(!dquad)
+				{
+					LogWarning("Encountered a quad SPI command, but no quad data provided\n");
+					state = STATE_IDLE;
+					break;
+				}
+
 				//Discard quad samples until we're lined up with the start of the x1 sample
 				while(iquad < quadlen)
 				{
@@ -732,6 +739,13 @@ void SPIFlashDecoder::Refresh()
 
 			//Read or write data in quad mode
 			case STATE_QUAD_DATA:
+
+				if(!dquad)
+				{
+					LogWarning("Encountered a quad SPI command, but no quad data provided\n");
+					state = STATE_IDLE;
+					break;
+				}
 
 				//Discard quad samples until we're lined up with the start of the x1 sample
 				while(iquad < quadlen)

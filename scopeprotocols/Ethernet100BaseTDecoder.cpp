@@ -265,25 +265,25 @@ void Ethernet100BaseTDecoder::Refresh()
 		i += 10;
 
 		//4b5b decode table
-		static const int code_5to4[]=
+		static const unsigned int code_5to4[]=
 		{
-			-1, //0x00 unused
-			-1, //0x01 unused
-			-1, //0x02 unused
-			-1, //0x03 unused
-			-1, //0x04 = /H/, tx error
-			-1, //0x05 unused
-			-1, //0x06 unused
+			0, //0x00 unused
+			0, //0x01 unused
+			0, //0x02 unused
+			0, //0x03 unused
+			0, //0x04 = /H/, tx error
+			0, //0x05 unused
+			0, //0x06 unused
 			0, //0x07 = /R/, second half of ESD
-			-1, //0x08 unused
+			0, //0x08 unused
 			0x1,
 			0x4,
 			0x5,
-			-1, //0x0c unused
+			0, //0x0c unused
 			0, //0x0d = /T/, first half of ESD
 			0x6,
 			0x7,
-			-1, //0x10 unused
+			0, //0x10 unused
 			0, //0x11 = /K/, second half of SSD
 			0x8,
 			0x9,
@@ -292,7 +292,7 @@ void Ethernet100BaseTDecoder::Refresh()
 			0xa,
 			0xb,
 			0, //0x18 = /J/, first half of SSD
-			-1, //0x19 unused
+			0, //0x19 unused
 			0xc,
 			0xd,
 			0xe,
@@ -351,7 +351,7 @@ void Ethernet100BaseTDecoder::Refresh()
 				continue;
 
 			//Nope, normal nibble.
-			int decoded = code_5to4[code];
+			unsigned int decoded = code_5to4[code];
 			if(first)
 			{
 				current_start = descrambled_bits.m_offsets[i];

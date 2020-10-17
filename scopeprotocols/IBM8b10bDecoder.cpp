@@ -43,6 +43,7 @@ using namespace std;
 
 IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	, m_cachedDisplayFormat(FORMAT_DOTTED)
 {
 	//Set up channels
 	CreateInput("data");
@@ -394,9 +395,9 @@ string IBM8b10bDecoder::GetText(int i)
 			if(m_cachedDisplayFormat == FORMAT_DOTTED)
 			{
 				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K%d.%d", left, right);
+					snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
 				else
-					snprintf(tmp, sizeof(tmp), "D%d.%d", left, right);
+					snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
 			}
 
 			//Hex format

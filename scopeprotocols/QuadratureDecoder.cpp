@@ -172,8 +172,6 @@ void QuadratureDecoder::Refresh()
 	size_t alen = a->m_offsets.size();
 	size_t blen = b->m_offsets.size();
 
-	bool last_a = a->m_samples[0];
-	bool last_b = b->m_samples[0];
 	float phase = 0;
 
 	enum
@@ -184,7 +182,7 @@ void QuadratureDecoder::Refresh()
 		STATE_B_HIGH
 	} state = STATE_BOTH_LOW;
 
-	if(last_a && last_b)
+	if(a->m_samples[0] && b->m_samples[0])
 		state = STATE_BOTH_HIGH;
 
 	while(true)
@@ -317,10 +315,6 @@ void QuadratureDecoder::Refresh()
 		//Store phase limits
 		m_min = min(m_min, phase);
 		m_max = max(m_max, phase);
-
-		//Save current values for edge detection
-		last_a = ca;
-		last_b = cb;
 
 		//Get timestamps of next event on each channel.
 		//If we can't move forward, stop.

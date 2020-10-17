@@ -56,6 +56,10 @@ class Waterfall : public Filter
 public:
 	Waterfall(const std::string& color);
 
+	//not copyable or assignable
+	Waterfall(const Waterfall&) =delete;
+	Waterfall& operator=(const Waterfall&) =delete;
+
 	virtual void Refresh();
 
 	virtual bool NeedsConfig();

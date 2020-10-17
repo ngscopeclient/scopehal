@@ -67,9 +67,6 @@ public:
 protected:
 	std::string m_tq;
 	std::string m_bs1, m_bs2;
-
-	// Nominal Bit Time, in ns
-	unsigned int m_nbt;
 };
 
 #endif

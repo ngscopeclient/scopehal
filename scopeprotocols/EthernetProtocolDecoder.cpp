@@ -456,6 +456,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 					pack->m_len = ends[i] - pack->m_offset;
 					m_packets.push_back(pack);
+					pack = NULL;
 				}
 
 				break;
@@ -464,6 +465,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 				break;
 		}
 	}
+
+	if(pack)
+		delete pack;
 }
 
 Gdk::Color EthernetProtocolDecoder::GetColor(int i)

@@ -97,7 +97,8 @@ void CANDecoder::Refresh()
 	uint8_t stuff = 0;
 
 	// Sync_seg + bs1 + bs2
-	m_nbt = m_parameters[m_tq].GetIntVal() * ( 1 + m_parameters[m_bs1].GetIntVal() + m_parameters[m_bs2].GetIntVal() );
+	unsigned int nbt = m_parameters[m_tq].GetIntVal() *
+		( 1 + m_parameters[m_bs1].GetIntVal() + m_parameters[m_bs2].GetIntVal() );
 
 	size_t len = diff->m_samples.size();
 	int delta1 = ((2 * m_parameters[m_bs1].GetIntVal() + 1) * m_parameters[m_tq].GetIntVal() / 2);
@@ -111,7 +112,7 @@ void CANDecoder::Refresh()
 		}
 
 		else if (symbol_start != 0 && current_symbol != CANSymbol::TYPE_SOF &&
-		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < m_nbt)
+		    ((diff->m_offsets[i] - diff->m_offsets[bit_start] + 1) * diff->m_timescale) < nbt)
 		{
 			// We wait for the next bit
 			continue;

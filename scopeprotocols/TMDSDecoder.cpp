@@ -228,7 +228,7 @@ void TMDSDecoder::Refresh()
 				cap->m_offsets.push_back(sampdata.m_offsets[i]);
 				cap->m_durations.push_back(sampdata.m_offsets[i+10] - sampdata.m_offsets[i]);
 				cap->m_samples.push_back(TMDSSymbol(TMDSSymbol::TMDS_TYPE_GUARD, 0));
-				last_symbol_type = TYPE_GUARD;
+				//last_symbol_type = TYPE_GUARD;
 				break;
 			}
 		}

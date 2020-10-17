@@ -3969,7 +3969,7 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, string tree)
+void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 {
 	//Level
 	PushFloat(tree + ".Level", trig->GetLevel());
@@ -4143,7 +4143,7 @@ void LeCroyOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 /**
 	@brief Pushes settings for a trigger condition under a .Condition field
  */
-void LeCroyOscilloscope::PushCondition(string path, Trigger::Condition cond)
+void LeCroyOscilloscope::PushCondition(const string& path, Trigger::Condition cond)
 {
 	switch(cond)
 	{
@@ -4172,7 +4172,7 @@ void LeCroyOscilloscope::PushCondition(string path, Trigger::Condition cond)
 /**
 	@brief Pushes settings for a trigger condition under a .PatternOperator field
  */
-void LeCroyOscilloscope::PushPatternCondition(string path, Trigger::Condition cond)
+void LeCroyOscilloscope::PushPatternCondition(const string& path, Trigger::Condition cond)
 {
 	//Note that these enum strings are NOT THE SAME as used by PushCondition()!
 	//For example CONDITION_LESS is "Smaller" vs "LessThan"

@@ -44,6 +44,10 @@ public:
 	EyeWaveform(size_t width, size_t height, float center);
 	virtual ~EyeWaveform();
 
+	//not copyable or assignable
+	EyeWaveform(const EyeWaveform&) =delete;
+	EyeWaveform& operator=(const EyeWaveform&) =delete;
+
 	float* GetData()
 	{ return m_outdata; }
 
