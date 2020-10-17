@@ -133,7 +133,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 		}
 	}
 
-	Packet* pack = NULL;
+	Packet* pack = new Packet;
 
 	EthernetFrameSegment segment;
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
@@ -160,7 +160,6 @@ void EthernetProtocolDecoder::BytesToFrames(
 					segment.m_data.push_back(0x55);
 
 					//Start a new packet
-					pack = new Packet;
 					pack->m_offset = starts[i];
 				}
 				break;
@@ -456,7 +455,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 
 					pack->m_len = ends[i] - pack->m_offset;
 					m_packets.push_back(pack);
-					pack = NULL;
+					return;
 				}
 
 				break;
@@ -466,8 +465,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 		}
 	}
 
-	if(pack)
-		delete pack;
+	//If we get here it wasn't a valid frame
+	delete pack;
 }
 
 Gdk::Color EthernetProtocolDecoder::GetColor(int i)
