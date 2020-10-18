@@ -41,6 +41,10 @@ public:
 	WaterfallWaveform(size_t width, size_t height);
 	virtual ~WaterfallWaveform();
 
+	//not copyable or assignable
+	WaterfallWaveform(const WaterfallWaveform&) =delete;
+	WaterfallWaveform& operator=(const WaterfallWaveform&) =delete;
+
 	float* GetData()
 	{ return m_outdata; }
 

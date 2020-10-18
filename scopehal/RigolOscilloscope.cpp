@@ -662,7 +662,7 @@ bool RigolOscilloscope::AcquireData()
 			string reply = m_transport->ReadReply();
 			//LogDebug("Preamble = %s\n", reply.c_str());
 			sscanf(reply.c_str(),
-				"%d,%d,%lu,%d,%lf,%lf,%lf,%lf,%lf,%lf",
+				"%d,%d,%zu,%d,%lf,%lf,%lf,%lf,%lf,%lf",
 				&unused1,
 				&unused2,
 				&npoints,

@@ -481,7 +481,7 @@ bool AgilentOscilloscope::AcquireData()
 		m_transport->SendCommand(":WAV:SOUR " + m_channels[i]->GetHwname());
 		m_transport->SendCommand(":WAV:PRE?");
 		string reply = m_transport->ReadReply();
-		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
+		sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
 				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
 
 		//Figure out the sample rate
