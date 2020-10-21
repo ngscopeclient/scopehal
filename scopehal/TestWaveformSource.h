@@ -58,7 +58,8 @@ public:
 		float startphase,
 		int64_t period,
 		int64_t sampleperiod,
-		size_t depth);
+		size_t depth,
+		float noise_amplitude = 0.01);
 
 	WaveformBase* GenerateNoisySinewaveMix(
 		float amplitude,
@@ -67,7 +68,8 @@ public:
 		float period1,
 		float period2,
 		int64_t sampleperiod,
-		size_t depth);
+		size_t depth,
+		float noise_amplitude = 0.01);
 
 	WaveformBase* GeneratePRBS31(
 		float amplitude,

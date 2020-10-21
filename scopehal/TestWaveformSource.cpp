@@ -84,13 +84,12 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float startphase,
 	int64_t period,
 	int64_t sampleperiod,
-	size_t depth)
+	size_t depth,
+	float noise_amplitude)
 {
 	auto ret = new AnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
-
-	const float noise_amplitude = 0.010;	//gaussian noise w/ 10 mV stdev
 
 	random_device rd;
 	mt19937 rng(rd());
@@ -123,13 +122,12 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	float period1,
 	float period2,
 	int64_t sampleperiod,
-	size_t depth)
+	size_t depth,
+	float noise_amplitude)
 {
 	auto ret = new AnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
-
-	const float noise_amplitude = 0.010;	//gaussian noise w/ 10 mV stdev
 
 	random_device rd;
 	mt19937 rng(rd());
