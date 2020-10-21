@@ -38,6 +38,7 @@
 
 #include "../scopehal/AlignedAllocator.h"
 #include <ffts.h>
+#include <random>
 
 /**
 	@brief Helper class for generating test waveforms
@@ -47,7 +48,7 @@
 class TestWaveformSource
 {
 public:
-	TestWaveformSource();
+	TestWaveformSource(std::mt19937& rng);
 	virtual ~TestWaveformSource();
 
 	TestWaveformSource(const TestWaveformSource&) =delete;
@@ -86,6 +87,8 @@ public:
 	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth);
 
 protected:
+	std::mt19937& m_rng;
+
 	//FFT stuff
 	AlignedAllocator<float, 32> m_allocator;
 	ffts_plan_t* m_forwardPlan;

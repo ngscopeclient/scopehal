@@ -47,6 +47,8 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	, m_extTrigger(NULL)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
+	, m_rng(m_rd())
+	, m_source(m_rng)
 {
 	m_model = "Oscilloscope Simulator";
 	m_vendor = "Antikernel Labs";

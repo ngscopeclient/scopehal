@@ -75,6 +75,7 @@ set(SCOPEHAL_SOURCES
 	Statistic.cpp
 	SpectrumChannel.cpp
 
+	TestCase.cpp
 	TestWaveformSource.cpp
 	)
 

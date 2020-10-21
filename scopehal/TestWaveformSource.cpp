@@ -34,7 +34,6 @@
  */
 #include "scopehal.h"
 #include "TestWaveformSource.h"
-#include <random>
 #include <complex>
 
 using namespace std;
@@ -42,7 +41,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TestWaveformSource::TestWaveformSource()
+TestWaveformSource::TestWaveformSource(mt19937& rng)
+	: m_rng(rng)
 {
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
@@ -91,8 +91,6 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
-	random_device rd;
-	mt19937 rng(rd());
 	normal_distribution<> noise(0, noise_amplitude);
 
 	float samples_per_cycle = period * 1.0 / sampleperiod;
@@ -106,7 +104,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 		ret->m_offsets[i] = i;
 		ret->m_durations[i] = 1;
 
-		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(rng);
+		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
 	}
 
 	return ret;
@@ -129,8 +127,6 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
-	random_device rd;
-	mt19937 rng(rd());
 	normal_distribution<> noise(0, noise_amplitude);
 
 	float radians_per_sample1 = 2 * M_PI * sampleperiod / period1;
@@ -147,7 +143,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 
 		ret->m_samples[i] = scale *
 			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
-			+ noise(rng);
+			+ noise(m_rng);
 	}
 
 	return ret;
@@ -280,8 +276,6 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth)
 {
 	//RNGs
-	random_device rd;
-	mt19937 rng(rd());
 	normal_distribution<> noise(0, 0.01);
 
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
@@ -333,5 +327,5 @@ void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t samplepe
 	//Rescale the FFT output and copy to the output, then add noise
 	float fftscale = 1.0f / npoints;
 	for(size_t i=0; i<depth; i++)
-		cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(rng);
+		cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(m_rng);
 }
