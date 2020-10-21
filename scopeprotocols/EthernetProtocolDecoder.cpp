@@ -46,6 +46,7 @@ EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
 	m_parameters[m_outfile] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_outfile].m_fileFilterMask = "*.pcap";
 	m_parameters[m_outfile].m_fileFilterName = "PCAP files (*.pcap)";
+	m_parameters[m_outfile].m_fileIsOutput = true;
 
 	m_fpOut = NULL;
 }

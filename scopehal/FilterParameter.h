@@ -77,6 +77,9 @@ public:
 	std::string m_fileFilterMask;
 	std::string m_fileFilterName;
 
+	//Specifies TYPE_FILENAME is an output
+	bool m_fileIsOutput;
+
 	//Add an enumerated value
 	void AddEnumValue(const std::string& name, int value)
 	{

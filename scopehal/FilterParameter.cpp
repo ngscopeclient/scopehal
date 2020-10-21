@@ -42,7 +42,8 @@ using namespace std;
 // FilterParameter
 
 FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
-	: m_type(type)
+	: m_fileIsOutput(false)
+	, m_type(type)
 	, m_unit(unit)
 	, m_intval(0)
 	, m_floatval(0)
