@@ -46,6 +46,9 @@ public:
 	MockOscilloscope(const MockOscilloscope& rhs) =delete;
 	MockOscilloscope& operator=(const MockOscilloscope& rhs) =delete;
 
+	void AddChannel(OscilloscopeChannel* chan)
+	{ m_channels.push_back(chan); }
+
 	virtual std::string IDPing();
 
 	virtual std::string GetTransportConnectionString();

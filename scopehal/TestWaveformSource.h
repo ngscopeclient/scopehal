@@ -57,7 +57,7 @@ public:
 	WaveformBase* GenerateNoisySinewave(
 		float amplitude,
 		float startphase,
-		int64_t period,
+		float period,
 		int64_t sampleperiod,
 		size_t depth,
 		float noise_amplitude = 0.01);

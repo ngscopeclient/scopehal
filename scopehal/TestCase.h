@@ -37,15 +37,23 @@
 #define TestCase_h
 
 #include <random>
+#include "MockOscilloscope.h"
 
 class TestCase
 {
 public:
-	TestCase(int argc, char* argv[]);
+	TestCase(int argc, char* argv[], std::string filter);
 	virtual ~TestCase();
+
+	bool Run();
+	virtual bool Iteration(size_t i) =0;
 
 protected:
 	std::mt19937 m_rng;
+
+	Filter* m_filter;
+	MockOscilloscope m_scope;
 };
+
 
 #endif

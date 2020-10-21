@@ -41,10 +41,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TestCase::TestCase(int argc, char* argv[])
+TestCase::TestCase(int argc, char* argv[], string filter)
+	: m_scope("Test Scope", "Antikernel Labs", "12345")
 {
 	//Global settings
-	Severity console_verbosity = Severity::NOTICE;
+	//Default to debug since this is a test case
+	Severity console_verbosity = Severity::DEBUG;
 
 	//Parse command-line arguments
 	int64_t seed = 0;
@@ -56,7 +58,7 @@ TestCase::TestCase(int argc, char* argv[])
 		if(ParseLoggerArguments(i, argc, argv, console_verbosity))
 			continue;
 
-		//TODO: parse arguments for random seed
+		//TODO: parse arguments for random seed, number of iterations, etc
 	}
 
 	//Initialize the seed
@@ -64,9 +66,45 @@ TestCase::TestCase(int argc, char* argv[])
 
 	//Set up logging
 	g_log_sinks.emplace(g_log_sinks.begin(), new ColoredSTDLogSink(console_verbosity));
+
+	//Global scopehal initialization
+	TransportStaticInit();
+	DriverStaticInit();
+	InitializePlugins();
+
+	//Create the filter
+	m_filter = Filter::CreateFilter(filter, "#ffffff");
+	m_filter->AddRef();
+
+	LogNotice("Testing \"%s\" filter\n", filter.c_str());
 }
 
 TestCase::~TestCase()
 {
+	m_filter->Release();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Test execution
+
+/**
+	@brief Runs the test iteration in a loop
+
+	@return True if all test iterations are successful, false on failure
+ */
+bool TestCase::Run()
+{
+	//TODO: get this from an argument
+	const size_t niter = 25;
+
+	for(size_t i=0; i<niter; i++)
+	{
+		if(!Iteration(i))
+		{
+			LogError("Test case FAILED at iteration %zu\n", i);
+			return false;
+		}
+	}
+
+	return true;
+}
