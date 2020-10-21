@@ -30,98 +30,70 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DemoOscilloscope
+	@brief Declaration of TestWaveformSource
  */
 
-#ifndef DemoOscilloscope_h
-#define DemoOscilloscope_h
+#ifndef TestWaveformSource_h
+#define TestWaveformSource_h
 
-#include "TestWaveformSource.h"
+#include "../scopehal/AlignedAllocator.h"
+#include <ffts.h>
 
-class DemoOscilloscope : public SCPIOscilloscope
+/**
+	@brief Helper class for generating test waveforms
+
+	Used by DemoOscilloscope as well as various unit tests etc.
+ */
+class TestWaveformSource
 {
 public:
-	DemoOscilloscope(SCPITransport* transport);
-	virtual ~DemoOscilloscope();
+	TestWaveformSource();
+	virtual ~TestWaveformSource();
 
-	//not copyable or assignable
-	DemoOscilloscope(const DemoOscilloscope& rhs) =delete;
-	DemoOscilloscope& operator=(const DemoOscilloscope& rhs) =delete;
+	TestWaveformSource(const TestWaveformSource&) =delete;
+	TestWaveformSource& operator=(const TestWaveformSource&) =delete;
 
-	virtual std::string IDPing();
+	WaveformBase* GenerateNoisySinewave(
+		float amplitude,
+		float startphase,
+		int64_t period,
+		int64_t sampleperiod,
+		size_t depth);
 
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
+	WaveformBase* GenerateNoisySinewaveMix(
+		float amplitude,
+		float startphase1,
+		float startphase2,
+		float period1,
+		float period2,
+		int64_t sampleperiod,
+		size_t depth);
 
-	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	WaveformBase* GeneratePRBS31(
+		float amplitude,
+		float period,
+		int64_t sampleperiod,
+		size_t depth);
 
-	//Triggering
-	virtual Oscilloscope::TriggerMode PollTrigger();
-	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
+	WaveformBase* Generate8b10b(
+		float amplitude,
+		float period,
+		int64_t sampleperiod,
+		size_t depth);
 
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
-	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
-	virtual bool IsInterleaving();
-	virtual bool SetInterleaving(bool combine);
-
-	virtual unsigned int GetInstrumentTypes();
-	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
+	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth);
 
 protected:
+	//FFT stuff
+	AlignedAllocator<float, 32> m_allocator;
+	ffts_plan_t* m_forwardPlan;
+	ffts_plan_t* m_reversePlan;
+	size_t m_cachedNumPoints;
+	size_t m_cachedRawSize;
 
-	OscilloscopeChannel* m_extTrigger;
-
-	std::map<size_t, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCoupling;
-	std::map<size_t, double> m_channelAttenuation;
-	std::map<size_t, unsigned int> m_channelBandwidth;
-	std::map<size_t, double> m_channelVoltageRange;
-	std::map<size_t, double> m_channelOffset;
-
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-
-	float m_sweepFreq;
-
-	size_t m_depth;
-	size_t m_rate;
-
-	TestWaveformSource m_source;
-
-public:
-	static std::string GetDriverNameInternal();
-
-	OSCILLOSCOPE_INITPROC(DemoOscilloscope)
+	float* m_forwardInBuf;
+	float* m_forwardOutBuf;
+	float* m_reverseOutBuf;
 };
 
 #endif
-

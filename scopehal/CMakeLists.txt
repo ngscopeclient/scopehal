@@ -74,6 +74,8 @@ set(SCOPEHAL_SOURCES
 	PeakDetectionFilter.cpp
 	Statistic.cpp
 	SpectrumChannel.cpp
+
+	TestWaveformSource.cpp
 	)
 
 add_library(scopehal SHARED
