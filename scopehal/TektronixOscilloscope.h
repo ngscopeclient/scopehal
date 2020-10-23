@@ -33,6 +33,7 @@
 class EdgeTrigger;
 class PulseWidthTrigger;
 class DropoutTrigger;
+class RuntTrigger;
 
 /**
 	@brief Driver for Tektronix oscilloscopes
@@ -226,6 +227,8 @@ protected:
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PullDropoutTrigger();
 	void PushDropoutTrigger(DropoutTrigger* trig);
+	void PullRuntTrigger();
+	void PushRuntTrigger(RuntTrigger* trig);
 
 	//Helpers for figuring out type of a channel by the index
 	bool IsAnalog(size_t index)

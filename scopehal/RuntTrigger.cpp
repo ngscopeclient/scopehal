@@ -29,6 +29,8 @@
 
 #include "scopehal.h"
 #include "RuntTrigger.h"
+#include "LeCroyOscilloscope.h"
+#include "TektronixOscilloscope.h"
 
 using namespace std;
 
@@ -37,26 +39,46 @@ using namespace std;
 
 RuntTrigger::RuntTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
+	, m_conditionname("Condition")
+	, m_lowerintname("Lower Interval")
+	, m_upperintname("Upper Interval")
 {
 	CreateInput("din");
 
-	m_lowerintname = "Lower Interval";
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-
-	m_upperintname = "Upper Interval";
-	m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-
-	m_conditionname = "Condition";
+	//These conditions are supported by all known scopes with a runt trigger
 	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
 	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
-	m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 
+	//Standard edge slopes everyone supports
 	m_slopename = "Edge Slope";
 	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
 	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
+
+	//LeCroy scopes support both min and max limits, so we can specify range operators
+	if(dynamic_cast<LeCroyOscilloscope*>(scope))
+	{
+		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+
+		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+	}
+
+	//Tek scopes support equal with unspecified tolerance, either-edge pulses, and "ignore width",
+	//but only a single pulse width target.
+	if(dynamic_cast<TektronixOscilloscope*>(scope))
+	{
+		m_lowerintname = "Pulse Width";
+
+		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
+		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+		m_parameters[m_conditionname].AddEnumValue("Occurs", CONDITION_ANY);
+
+		m_parameters[m_slopename].AddEnumValue("Any", EDGE_ANY);
+	}
+
+	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 }
 
 RuntTrigger::~RuntTrigger()

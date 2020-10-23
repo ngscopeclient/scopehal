@@ -32,6 +32,7 @@
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "DropoutTrigger.h"
+#include "RuntTrigger.h"
 
 using namespace std;
 
@@ -2091,6 +2092,7 @@ vector<string> TektronixOscilloscope::GetTriggerTypes()
 	ret.push_back(DropoutTrigger::GetTriggerName());
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(RuntTrigger::GetTriggerName());
 	return ret;
 }
 
@@ -2112,6 +2114,8 @@ void TektronixOscilloscope::PullTrigger()
 					PullPulseWidthTrigger();
 				else if(reply == "TIMEO")
 					PullDropoutTrigger();
+				else if(reply == "RUN")
+					PullRuntTrigger();
 				else
 				{
 					LogWarning("Unknown trigger type %s\n", reply.c_str());
@@ -2368,15 +2372,92 @@ void TektronixOscilloscope::PullDropoutTrigger()
 	}
 }
 
+/**
+	@brief Reads settings for a runt trigger from the instrument
+ */
+void TektronixOscilloscope::PullRuntTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<RuntTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new RuntTrigger(this);
+	RuntTrigger* et = dynamic_cast<RuntTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Source channel
+				m_transport->SendCommand("TRIG:A:RUNT:SOU?");
+				auto reply = m_transport->ReadReply();
+				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+
+				//Trigger level
+				auto chname = reply;
+				m_transport->SendCommand(string("TRIG:A:LOW:") + chname + "?");
+				et->SetLowerBound(stof(m_transport->ReadReply()));
+				m_transport->SendCommand(string("TRIG:A:UPP:") + chname + "?");
+				et->SetUpperBound(stof(m_transport->ReadReply()));
+
+				//Match condition
+				m_transport->SendCommand("TRIG:A:RUNT:WHE?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "LESS")
+					et->SetCondition(Trigger::CONDITION_LESS);
+				else if(reply == "MORE")
+					et->SetCondition(Trigger::CONDITION_GREATER);
+				else if(reply == "EQ")
+					et->SetCondition(Trigger::CONDITION_EQUAL);
+				else if(reply == "UNEQ")
+					et->SetCondition(Trigger::CONDITION_NOT_EQUAL);
+				else if(reply == "OCCURS")
+					et->SetCondition(Trigger::CONDITION_ANY);
+
+				//Only lower interval supported, no upper
+				Unit ps(Unit::UNIT_PS);
+				m_transport->SendCommand("TRIG:A:RUNT:WID?");
+				et->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+
+				//TODO: TRIG:A:RUNT:LOGICQUAL?
+
+				//Edge slope
+				m_transport->SendCommand("TRIG:A:RUNT:POL?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "POS")
+					et->SetSlope(RuntTrigger::EDGE_RISING);
+				else if(reply == "NEG")
+					et->SetSlope(RuntTrigger::EDGE_FALLING);
+				else if(reply == "EIT")
+					et->SetSlope(RuntTrigger::EDGE_ANY);
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 void TektronixOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
+	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	if(pt)
 		PushPulseWidthTrigger(pt);
 	else if(dt)
 		PushDropoutTrigger(dt);
+	else if(rt)
+		PushRuntTrigger(rt);
 
 	//needs to be last, since pulse width and other more specialized types should be checked first
 	//but are also derived from EdgeTrigger
@@ -2542,6 +2623,80 @@ void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 			break;
 	}
 }
+
+/**
+	@brief Pushes settings for a runt trigger to the instrument
+ */
+void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand("TRIG:A:TYP RUN");
+
+				m_transport->SendCommand(string("TRIG:A:RUNT:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+
+				m_transport->SendCommand(
+					string("TRIG:A:LOW:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetLowerBound()));
+				m_transport->SendCommand(
+					string("TRIG:A:UPP:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetUpperBound()));
+
+				switch(trig->GetSlope())
+				{
+					case RuntTrigger::EDGE_RISING:
+						m_transport->SendCommand("TRIG:A:RUNT:POL POS");
+						break;
+
+					case RuntTrigger::EDGE_FALLING:
+						m_transport->SendCommand("TRIG:A:RUNT:POL NEG");
+						break;
+
+					case RuntTrigger::EDGE_ANY:
+						m_transport->SendCommand("TRIG:A:RUNT:POL EIT");
+						break;
+				}
+
+				switch(trig->GetCondition())
+				{
+					case Trigger::CONDITION_LESS:
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN LESS");
+						break;
+
+					case Trigger::CONDITION_GREATER:
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN MORE");
+						break;
+
+					case Trigger::CONDITION_EQUAL:
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN EQ");
+						break;
+
+					case Trigger::CONDITION_NOT_EQUAL:
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN UNEQ");
+						break;
+
+					case Trigger::CONDITION_ANY:
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN OCCURS");
+						break;
+
+					default:
+						break;
+				}
+
+				m_transport->SendCommand(string("TRIG:A:RUNT:WID ") + to_string_sci(trig->GetLowerInterval()*1e-12));
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 
 vector<Oscilloscope::DigitalBank> TektronixOscilloscope::GetDigitalBanks()
 {

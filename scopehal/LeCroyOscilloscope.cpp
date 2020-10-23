@@ -4209,6 +4209,10 @@ void LeCroyOscilloscope::PushPatternCondition(const string& path, Trigger::Condi
 		case Trigger::CONDITION_NOT_BETWEEN:
 			m_transport->SendCommand(string("VBS? '") + path + " = \"OutRange\"'");
 			break;
+
+		//CONDITION_ANY not supported by LeCroy scopes
+		default:
+			break;
 	}
 }
 
