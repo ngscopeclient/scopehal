@@ -348,7 +348,6 @@ void EyePattern::Refresh()
 	//Get the input data
 	auto waveform = GetAnalogInputWaveform(0);
 	auto clock = GetDigitalInputWaveform(1);
-	size_t cend = clock->m_samples.size();
 	double start = GetTime();
 
 	//If center of the eye was changed, reset existing eye data
@@ -376,24 +375,56 @@ void EyePattern::Refresh()
 	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
 
-	//Calculate average period of the clock
-	//TODO: All of this code assumes a fully RLE'd clock with one sample per toggle.
-	//We probably need a preprocessing filter to handle analog etc clock sources.
+	//Find all toggles in the clock
+	vector<int64_t> clock_edges;
+	switch(m_parameters[m_polarityName].GetIntVal())
+	{
+		case CLOCK_RISING:
+			FindRisingEdges(clock, clock_edges);
+			break;
+
+		case CLOCK_FALLING:
+			FindFallingEdges(clock, clock_edges);
+			break;
+
+		case CLOCK_BOTH:
+			FindZeroCrossings(clock, clock_edges);
+			break;
+	}
+
+	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
 	{
-		double tlastclk = clock->m_offsets[cend-1] + clock->m_durations[cend-1];
-		cap->m_uiWidth = tlastclk / cend;
+		//Find width of each UI
+		vector<int64_t> ui_widths;
+		for(size_t i=0; i<clock_edges.size()-1; i++)
+			ui_widths.push_back(clock_edges[i+1] - clock_edges[i]);
+
+		//Need to average at least ten UIs to get meaningful data
+		size_t nuis = ui_widths.size();
+		if(nuis > 10)
+		{
+			//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
+			sort(ui_widths.begin(), ui_widths.end());
+			size_t navg = 0;
+			int64_t total = 0;
+			for(size_t i = nuis/10; i <= nuis*9/10; i++)
+			{
+				total += ui_widths[i];
+				navg ++;
+			}
+
+			cap->m_uiWidth = (1.0 * total) / navg;
+		}
 	}
 
 	//Process the eye
+	size_t cend = clock_edges.size();
 	float yscale = m_height / m_inputs[0].m_channel->GetVoltageRange();
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
-	int clkpol = m_parameters[m_polarityName].GetIntVal();
 	size_t iclock = 0;
-	bool last_clock = clock->m_samples[0];
 	size_t wend = waveform->m_samples.size()-1;
-	size_t num_uis = 0;
 	for(size_t i=0; i<wend; i++)
 	{
 		//If scale isn't defined yet, early out
@@ -406,35 +437,21 @@ void EyePattern::Refresh()
 
 		//Find time of this sample.
 		//If it's past the end of the current UI, move to the next clock edge
-		int64_t twidth = clock->m_durations[iclock];
+		int64_t tnext = clock_edges[iclock + 1];
+		int64_t twidth = tnext - clock_edges[iclock];
 		int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - clock->m_offsets[iclock] * clock->m_timescale;
+		int64_t offset = tstart - clock_edges[iclock];
 		if(offset < -10)
 			continue;
-		if( (offset > twidth) || (iclock == 0) )
+		if(offset > twidth)
 		{
 			//Move to the next clock edge
-			while(iclock < cend)
-			{
-				bool b = clock->m_samples[iclock];
-				if(b != last_clock)
-				{
-					last_clock = b;
-					if(b && (clkpol & CLOCK_RISING))
-						break;
-					if(!b && (clkpol & CLOCK_FALLING))
-						break;
-				}
-
-				iclock ++;
-			}
-			num_uis ++;
-
+			iclock ++;
 			if(iclock + 1 >= cend)
 				break;
 
 			//Figure out the offset to the next edge
-			offset = tstart - clock->m_offsets[iclock+1] * clock->m_timescale;
+			offset = tstart - tnext;
 		}
 
 		//LogDebug("%zu, %zd\n", i, offset);
@@ -486,7 +503,7 @@ void EyePattern::Refresh()
 	fflush(stdout);
 
 	//Count total number of UIs we've integrated
-	cap->IntegrateUIs(num_uis);
+	cap->IntegrateUIs(clock_edges.size());
 	cap->Normalize();
 	SetData(cap, 0);
 
