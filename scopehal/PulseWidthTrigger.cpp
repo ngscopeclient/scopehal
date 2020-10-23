@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "PulseWidthTrigger.h"
 #include "LeCroyOscilloscope.h"
+#include "TektronixOscilloscope.h"
 
 using namespace std;
 
@@ -51,9 +52,15 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
 	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
 
-	//So far only LeCroy is known to support this
+	//Some modes are only supported by certain vendors
 	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
 		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
+	{
+		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
+		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+	}
 }
 
 PulseWidthTrigger::~PulseWidthTrigger()
