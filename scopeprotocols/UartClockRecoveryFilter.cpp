@@ -128,43 +128,12 @@ void UartClockRecoveryFilter::Refresh()
 	vector<int64_t> edges;
 
 	//Find times of the zero crossings
-	bool first = true;
-	bool last = false;
 	const float threshold = m_parameters[m_threshname].GetFloatVal();
-	size_t len = din->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		bool value = din->m_samples[i] > threshold;
-
-		//Start time of the sample, in picoseconds
-		int64_t t = din->m_triggerPhase + din->m_timescale * din->m_offsets[i];
-
-		//Move to the middle of the sample
-		t += din->m_timescale/2;
-
-		//Save the last value
-		if(first)
-		{
-			last = value;
-			first = false;
-			continue;
-		}
-
-		//Skip samples with no transition
-		if(last == value)
-			continue;
-
-		//Interpolate the time
-		t += din->m_timescale * InterpolateTime(din, i-1, threshold);
-		edges.push_back(t);
-		last = value;
-	}
+	FindZeroCrossings(din, threshold, edges);
 
 	//Actual DLL logic
-	//TODO: recover from glitches better?
 	size_t nedge = 0;
 	int64_t bcenter = 0;
-	bool value = false;
 	size_t elen = edges.size();
 	for(; nedge < elen;)
 	{
@@ -187,9 +156,12 @@ void UartClockRecoveryFilter::Refresh()
 
 			//Emit a sample for this data bit
 			cap->m_offsets.push_back(bcenter);
-			cap->m_durations.push_back(ps);
-			cap->m_samples.push_back(value);
-			value = !value;
+			cap->m_durations.push_back(ps/2);
+			cap->m_samples.push_back(1);
+
+			cap->m_offsets.push_back(bcenter + ps/2);
+			cap->m_durations.push_back(ps/2);
+			cap->m_samples.push_back(0);
 
 			//Next bit starts one baud period later
 			bcenter  += ps;
