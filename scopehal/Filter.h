@@ -205,6 +205,8 @@ protected:
 
 	//Find edges in a signal (discarding repeated samples)
 	void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
+	void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
+	void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
 	void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
 
 public:

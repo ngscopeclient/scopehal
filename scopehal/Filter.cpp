@@ -515,13 +515,13 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vecto
 }
 
 /**
-	@brief Find zero crossings in a waveform, interpolating as necessary
+	@brief Find edges in a waveform, discarding repeated samples
  */
 void Filter::FindZeroCrossings(DigitalWaveform* data, vector<int64_t>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
-	bool last = false;
+	bool last = data->m_samples[0];
 	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
 	size_t len = data->m_samples.size();
 	for(size_t i=1; i<len; i++)
@@ -546,7 +546,67 @@ void Filter::FindZeroCrossings(DigitalWaveform* data, vector<int64_t>& edges)
 }
 
 /**
-	@brief Find zero crossings in a waveform, interpolating as necessary
+	@brief Find rising edges in a waveform
+ */
+void Filter::FindRisingEdges(DigitalWaveform* data, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(value && !last)
+			edges.push_back(phoff + data->m_timescale * data->m_offsets[i]);
+
+		last = value;
+	}
+}
+
+/**
+	@brief Find falling edges in a waveform
+ */
+void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(!value && last)
+			edges.push_back(phoff + data->m_timescale * data->m_offsets[i]);
+
+		last = value;
+	}
+}
+
+/**
+	@brief Find edges in a waveform, discarding repeated samples
 
 	No extra resolution vs the int64 version, just for interface compatibility with the analog interpolating version.
  */
