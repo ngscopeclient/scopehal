@@ -31,6 +31,7 @@
 #define TektronixOscilloscope_h
 
 class EdgeTrigger;
+class PulseWidthTrigger;
 
 /**
 	@brief Driver for Tektronix oscilloscopes
@@ -100,6 +101,7 @@ public:
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
+	std::vector<std::string> GetTriggerTypes();
 
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
@@ -219,6 +221,8 @@ protected:
 
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
+	void PullPulseWidthTrigger();
+	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 
 	//Helpers for figuring out type of a channel by the index
 	bool IsAnalog(size_t index)

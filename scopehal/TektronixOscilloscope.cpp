@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "TektronixOscilloscope.h"
 #include "EdgeTrigger.h"
+#include "PulseWidthTrigger.h"
 
 using namespace std;
 
@@ -2083,6 +2084,14 @@ bool TektronixOscilloscope::SetInterleaving(bool /*combine*/)
 	return false;
 }
 
+vector<string> TektronixOscilloscope::GetTriggerTypes()
+{
+	vector<string> ret;
+	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	return ret;
+}
+
 void TektronixOscilloscope::PullTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -2097,6 +2106,8 @@ void TektronixOscilloscope::PullTrigger()
 
 				if(reply == "EDG")
 					PullEdgeTrigger();
+				else if(reply == "WID")
+					PullPulseWidthTrigger();
 				else
 				{
 					LogWarning("Unknown trigger type %s\n", reply.c_str());
@@ -2213,10 +2224,93 @@ void TektronixOscilloscope::PullEdgeTrigger()
 	}
 }
 
+/**
+	@brief Reads settings for a pulse width trigger from the instrument
+ */
+void TektronixOscilloscope::PullPulseWidthTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new PulseWidthTrigger(this);
+	PulseWidthTrigger* et = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Source channel
+				m_transport->SendCommand("TRIG:A:PULSEW:SOU?");
+				auto reply = m_transport->ReadReply();
+				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+
+				//TODO: TRIG:A:PULSEW:LOGICQUAL?
+
+				//Trigger level
+				m_transport->SendCommand("TRIG:A:LEV?");
+				et->SetLevel(stof(m_transport->ReadReply()));
+
+				//For some reason we get 3 more values after this. Discard them.
+				for(int i=0; i<3; i++)
+					m_transport->ReadReply();
+
+				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");//stof scientific notation
+				Unit ps(Unit::UNIT_PS);
+				et->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
+
+				m_transport->SendCommand("TRIG:A:PULSEW:LOWL?");
+				et->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+
+				//Edge slope
+				m_transport->SendCommand("TRIG:A:PULSEW:POL?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "POS")
+					et->SetType(EdgeTrigger::EDGE_RISING);
+				else if(reply == "NEG")
+					et->SetType(EdgeTrigger::EDGE_FALLING);
+
+				//Condition
+				m_transport->SendCommand("TRIG:A:PULSEW:WHE?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "LESS")
+					et->SetCondition(Trigger::CONDITION_LESS);
+				if(reply == "MORE")
+					et->SetCondition(Trigger::CONDITION_GREATER);
+				else if(reply == "EQ")
+					et->SetCondition(Trigger::CONDITION_EQUAL);
+				else if(reply == "UNEQ")
+					et->SetCondition(Trigger::CONDITION_NOT_EQUAL);
+				else if(reply == "WIT")
+					et->SetCondition(Trigger::CONDITION_BETWEEN);
+				else if(reply == "OUT")
+					et->SetCondition(Trigger::CONDITION_NOT_BETWEEN);
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 void TektronixOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(et)
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	if(pt)
+		PushPulseWidthTrigger(pt);
+
+	//needs to be last, since pulse width and other more specialized types should be checked first
+	//but are also derived from EdgeTrigger
+	else if(et)
 		PushEdgeTrigger(et);
 
 	else
@@ -2266,6 +2360,65 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 				snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
 				m_transport->SendCommand(tmp);
 			}
+			break;
+	}
+}
+
+void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand(string("TRIG:A:PULSEW:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
+					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetLevel()));
+
+				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") + to_string(trig->GetUpperBound()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") + to_string(trig->GetLowerBound()*1e-12));
+
+				if(trig->GetType() == EdgeTrigger::EDGE_RISING)
+					m_transport->SendCommand("TRIG:A:PULSEW:POL POS");
+				else
+					m_transport->SendCommand("TRIG:A:PULSEW:POL NEG");
+
+				switch(trig->GetCondition())
+				{
+					case Trigger::CONDITION_LESS:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE LESS");
+						break;
+
+					case Trigger::CONDITION_GREATER:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE MORE");
+						break;
+
+					case Trigger::CONDITION_EQUAL:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE EQ");
+						break;
+
+					case Trigger::CONDITION_NOT_EQUAL:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE UNEQ");
+						break;
+
+					case Trigger::CONDITION_BETWEEN:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE WIT");
+						break;
+
+					case Trigger::CONDITION_NOT_BETWEEN:
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE OUT");
+						break;
+
+					default:
+						break;
+				}
+			}
+			break;
+
+		default:
 			break;
 	}
 }
