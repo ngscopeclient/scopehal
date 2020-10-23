@@ -148,6 +148,13 @@ public:
 	const EyeMask& GetMask() const
 	{ return m_mask; }
 
+	enum ClockPolarity
+	{
+		CLOCK_RISING	= 1,
+		CLOCK_FALLING	= 2,
+		CLOCK_BOTH 		= 3	//CLOCK_RISING | CLOCK_FALLING
+	};
+
 	PROTOCOL_DECODER_INITPROC(EyePattern)
 
 protected:
@@ -162,6 +169,7 @@ protected:
 	std::string m_saturationName;
 	std::string m_centerName;
 	std::string m_maskName;
+	std::string m_polarityName;
 
 	EyeMask m_mask;
 };

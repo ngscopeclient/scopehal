@@ -95,24 +95,31 @@ EyePattern::EyePattern(const string& color)
 	, m_width(1)
 	, m_xoff(0)
 	, m_xscale(0)
+	, m_saturationName("Saturation Level")
+	, m_centerName("Center Voltage")
+	, m_maskName("Mask")
+	, m_polarityName("Clock Edge")
 {
 	//Set up channels
 	CreateInput("din");
 	CreateInput("clk");
 
-	m_saturationName = "Saturation Level";
 	m_parameters[m_saturationName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_saturationName].SetFloatVal(1);
 
-	m_centerName = "Center Voltage";
 	m_parameters[m_centerName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_centerName].SetFloatVal(0);
 
-	m_maskName = "Mask";
 	m_parameters[m_maskName] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_maskName].SetFileName("");
 	m_parameters[m_maskName].m_fileFilterMask = "*.yml";
 	m_parameters[m_maskName].m_fileFilterName = "YAML files (*.yml)";
+
+	m_parameters[m_polarityName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_polarityName].AddEnumValue("Rising", CLOCK_RISING);
+	m_parameters[m_polarityName].AddEnumValue("Falling", CLOCK_FALLING);
+	m_parameters[m_polarityName].AddEnumValue("Both", CLOCK_BOTH);
+	m_parameters[m_polarityName].SetIntVal(CLOCK_BOTH);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -379,11 +386,14 @@ void EyePattern::Refresh()
 	}
 
 	//Process the eye
-	size_t iclock = 0;
 	float yscale = m_height / m_inputs[0].m_channel->GetVoltageRange();
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
+	int clkpol = m_parameters[m_polarityName].GetIntVal();
+	size_t iclock = 0;
+	bool last_clock = clock->m_samples[0];
 	size_t wend = waveform->m_samples.size()-1;
+	size_t num_uis = 0;
 	for(size_t i=0; i<wend; i++)
 	{
 		//If scale isn't defined yet, early out
@@ -401,11 +411,29 @@ void EyePattern::Refresh()
 		int64_t offset = tstart - clock->m_offsets[iclock] * clock->m_timescale;
 		if(offset < -10)
 			continue;
-		if(offset > twidth)
+		if( (offset > twidth) || (iclock == 0) )
 		{
-			iclock ++;
+			//Move to the next clock edge
+			while(iclock < cend)
+			{
+				bool b = clock->m_samples[iclock];
+				if(b != last_clock)
+				{
+					last_clock = b;
+					if(b && (clkpol & CLOCK_RISING))
+						break;
+					if(!b && (clkpol & CLOCK_FALLING))
+						break;
+				}
+
+				iclock ++;
+			}
+			num_uis ++;
+
 			if(iclock + 1 >= cend)
 				break;
+
+			//Figure out the offset to the next edge
 			offset = tstart - clock->m_offsets[iclock+1] * clock->m_timescale;
 		}
 
@@ -458,7 +486,7 @@ void EyePattern::Refresh()
 	fflush(stdout);
 
 	//Count total number of UIs we've integrated
-	cap->IntegrateUIs(clock->m_samples.size());
+	cap->IntegrateUIs(num_uis);
 	cap->Normalize();
 	SetData(cap, 0);
 
