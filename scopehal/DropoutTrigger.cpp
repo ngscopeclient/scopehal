@@ -29,6 +29,8 @@
 
 #include "scopehal.h"
 #include "DropoutTrigger.h"
+#include "LeCroyOscilloscope.h"
+#include "TektronixOscilloscope.h"
 
 using namespace std;
 
@@ -44,14 +46,19 @@ DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
 	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_typename].AddEnumValue("Rising", EDGE_RISING);
 	m_parameters[m_typename].AddEnumValue("Falling", EDGE_FALLING);
+	if(dynamic_cast<TektronixOscilloscope*>(scope))
+		m_parameters[m_typename].AddEnumValue("Any", EDGE_ANY);
 
 	m_timename = "Dropout Time";
 	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 
 	m_resetname = "Reset Mode";
-	m_parameters[m_resetname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_resetname].AddEnumValue("Opposite Edge", RESET_OPPOSITE);
-	m_parameters[m_resetname].AddEnumValue("None", RESET_NONE);
+	if(dynamic_cast<LeCroyOscilloscope*>(scope))
+	{
+		m_parameters[m_resetname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_parameters[m_resetname].AddEnumValue("Opposite Edge", RESET_OPPOSITE);
+		m_parameters[m_resetname].AddEnumValue("None", RESET_NONE);
+	}
 }
 
 DropoutTrigger::~DropoutTrigger()

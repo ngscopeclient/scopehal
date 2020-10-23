@@ -31,6 +31,7 @@
 #include "TektronixOscilloscope.h"
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "DropoutTrigger.h"
 
 using namespace std;
 
@@ -2087,6 +2088,7 @@ bool TektronixOscilloscope::SetInterleaving(bool /*combine*/)
 vector<string> TektronixOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
+	ret.push_back(DropoutTrigger::GetTriggerName());
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	return ret;
@@ -2108,6 +2110,8 @@ void TektronixOscilloscope::PullTrigger()
 					PullEdgeTrigger();
 				else if(reply == "WID")
 					PullPulseWidthTrigger();
+				else if(reply == "TIMEO")
+					PullDropoutTrigger();
 				else
 				{
 					LogWarning("Unknown trigger type %s\n", reply.c_str());
@@ -2263,7 +2267,7 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 				for(int i=0; i<3; i++)
 					m_transport->ReadReply();
 
-				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");//stof scientific notation
+				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");
 				Unit ps(Unit::UNIT_PS);
 				et->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
 
@@ -2301,12 +2305,78 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 	}
 }
 
+
+/**
+	@brief Reads settings for a dropout trigger from the instrument
+
+	Note that Tek's UI calls it "timeout" not "dropout" but the functionality is the same.
+ */
+void TektronixOscilloscope::PullDropoutTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<DropoutTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new DropoutTrigger(this);
+	DropoutTrigger* et = dynamic_cast<DropoutTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Source channel
+				m_transport->SendCommand("TRIG:A:TIMEO:SOU?");
+				auto reply = m_transport->ReadReply();
+				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+
+				//Trigger level
+				m_transport->SendCommand("TRIG:A:LEV?");
+				et->SetLevel(stof(m_transport->ReadReply()));
+
+				//For some reason we get 3 more values after this. Discard them.
+				for(int i=0; i<3; i++)
+					m_transport->ReadReply();
+
+				m_transport->SendCommand("TRIG:A:TIMEO:TIM?");
+				Unit ps(Unit::UNIT_PS);
+				et->SetDropoutTime(ps.ParseString(m_transport->ReadReply()));
+
+				//TODO: TRIG:A:TIMEO:LOGICQUAL?
+
+				//Edge slope
+				m_transport->SendCommand("TRIG:A:TIMEO:POL?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "STAYSH")
+					et->SetType(DropoutTrigger::EDGE_RISING);
+				else if(reply == "STAYSL")
+					et->SetType(DropoutTrigger::EDGE_FALLING);
+				else if(reply == "EIT")
+					et->SetType(DropoutTrigger::EDGE_ANY);
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 void TektronixOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	if(pt)
 		PushPulseWidthTrigger(pt);
+	else if(dt)
+		PushDropoutTrigger(dt);
 
 	//needs to be last, since pulse width and other more specialized types should be checked first
 	//but are also derived from EdgeTrigger
@@ -2329,10 +2399,12 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
+				m_transport->SendCommand("TRIG:A:TYP EDGE");
+
 				m_transport->SendCommand(string("TRIG:A:EDGE:SOU ") + trig->GetInput(0).m_channel->GetHwname());
 				m_transport->SendCommand(
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
-					to_string(trig->GetLevel()));
+					to_string_sci(trig->GetLevel()));
 
 				switch(trig->GetType())
 				{
@@ -2373,13 +2445,15 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
+				m_transport->SendCommand("TRIG:A:TYP WID");
+
 				m_transport->SendCommand(string("TRIG:A:PULSEW:SOU ") + trig->GetInput(0).m_channel->GetHwname());
 				m_transport->SendCommand(
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLevel()));
 
-				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") + to_string(trig->GetUpperBound()*1e-12));
-				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") + to_string(trig->GetLowerBound()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") + to_string_sci(trig->GetUpperBound()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") + to_string_sci(trig->GetLowerBound()*1e-12));
 
 				if(trig->GetType() == EdgeTrigger::EDGE_RISING)
 					m_transport->SendCommand("TRIG:A:PULSEW:POL POS");
@@ -2415,6 +2489,52 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 					default:
 						break;
 				}
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
+/**
+	@brief Pushes settings for a dropout trigger to the instrument
+ */
+void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand("TRIG:A:TYP TIMEO");
+
+				m_transport->SendCommand(string("TRIG:A:TIMEO:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
+					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetLevel()));
+
+				switch(trig->GetType())
+				{
+					case DropoutTrigger::EDGE_RISING:
+						m_transport->SendCommand("TRIG:A:TIMEO:POL STAYSH");
+						break;
+
+					case DropoutTrigger::EDGE_FALLING:
+						m_transport->SendCommand("TRIG:A:TIMEO:POL STAYSL");
+						break;
+
+					case DropoutTrigger::EDGE_ANY:
+						m_transport->SendCommand("TRIG:A:TIMEO:POL EIT");
+						break;
+
+					default:
+						break;
+				}
+
+				m_transport->SendCommand(string("TRIG:A:TIMEO:TIM ") + to_string_sci(trig->GetDropoutTime()*1e-12));
 			}
 			break;
 
