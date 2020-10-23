@@ -1097,12 +1097,11 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 					return tmp;
 			}
 			break;
-
-		//Unknown vendor, print part number as hex
-		default:
-			snprintf(tmp, sizeof(tmp), "%x", s.m_data);
-			return tmp;
 	}
+
+	//Unknown vendor, print part number as hex
+	snprintf(tmp, sizeof(tmp), "%x", s.m_data);
+	return tmp;
 }
 
 bool SPIFlashDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
