@@ -397,3 +397,13 @@ float FreqToPhase(float hz)
 {
 	return 2 * M_PI * hz;
 }
+
+/**
+	@brief Like std::to_string, but output in scientific notation
+ */
+string to_string_sci(double d)
+{
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "%e", d);
+	return tmp;
+}

@@ -93,6 +93,8 @@ std::string Trim(const std::string& str);
 std::string TrimQuotes(const std::string& str);
 std::string BaseName(const std::string& path);
 
+std::string to_string_sci(double d);
+
 void TransportStaticInit();
 void DriverStaticInit();
 
