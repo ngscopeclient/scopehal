@@ -48,8 +48,50 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	enum Crossing
+	{
+		CROSS_UPPER,
+		CROSS_LOWER,
+		CROSS_EITHER,
+		CROSS_NONE,
+	};
+
+	enum WindowType
+	{
+		WINDOW_ENTER,			//Trigger immediately upon entry to the window
+		WINDOW_EXIT,			//Trigger immediately upon exit from the window
+		WINDOW_EXIT_TIMED,		//Trigger upon exit from the window, if we were in it for at least X time
+		WINDOW_ENTER_TIMED		//Trigger upon entry to the window, if we were outside it for at least X time
+	};
+
+	/// @brief Sets the crossing direction (only used for "stay inside" and "stay outside" window types)
+	void SetCrossingDirection(Crossing dir)
+	{ m_parameters[m_crossingName].SetIntVal(dir); }
+
+	Crossing GetCrossingDirection()
+	{ return (Crossing)m_parameters[m_crossingName].GetIntVal(); }
+
+	/// @brief Sets the type of window
+	void SetWindowType(WindowType type)
+	{ m_parameters[m_windowName].SetIntVal(type); }
+
+	WindowType GetWindowType()
+	{ return (WindowType)m_parameters[m_windowName].GetIntVal(); }
+
+	///	@brief Sets the time the signal needs to stay in/outside the window
+	void SetWidth(int64_t ps)
+	{ m_parameters[m_widthName].SetIntVal(ps); }
+
+	int64_t GetWidth()
+	{ return m_parameters[m_widthName].GetIntVal(); }
+
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(WindowTrigger);
+
+protected:
+	std::string m_widthName;
+	std::string m_crossingName;
+	std::string m_windowName;
 };
 
 #endif

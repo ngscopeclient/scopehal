@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "WindowTrigger.h"
+#include "TektronixOscilloscope.h"
 
 using namespace std;
 
@@ -37,8 +38,28 @@ using namespace std;
 
 WindowTrigger::WindowTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
+	, m_widthName("Time Limit")
+	, m_crossingName("Edge")
+	, m_windowName("Condition")
 {
 	CreateInput("din");
+
+	if(dynamic_cast<TektronixOscilloscope*>(scope))
+	{
+		m_parameters[m_widthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+
+		m_parameters[m_crossingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_parameters[m_crossingName].AddEnumValue("Upper", CROSS_UPPER);
+		m_parameters[m_crossingName].AddEnumValue("Lower", CROSS_LOWER);
+		m_parameters[m_crossingName].AddEnumValue("Either", CROSS_EITHER);
+		m_parameters[m_crossingName].AddEnumValue("None", CROSS_NONE);
+
+		m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_parameters[m_windowName].AddEnumValue("Enter", WINDOW_ENTER);
+		m_parameters[m_windowName].AddEnumValue("Exit", WINDOW_EXIT);
+		m_parameters[m_windowName].AddEnumValue("Exit (timed)", WINDOW_EXIT_TIMED);
+		m_parameters[m_windowName].AddEnumValue("Enter (timed)", WINDOW_ENTER_TIMED);
+	}
 }
 
 WindowTrigger::~WindowTrigger()

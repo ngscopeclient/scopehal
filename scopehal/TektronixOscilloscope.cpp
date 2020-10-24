@@ -33,6 +33,7 @@
 #include "PulseWidthTrigger.h"
 #include "DropoutTrigger.h"
 #include "RuntTrigger.h"
+#include "WindowTrigger.h"
 
 using namespace std;
 
@@ -2093,6 +2094,7 @@ vector<string> TektronixOscilloscope::GetTriggerTypes()
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	ret.push_back(RuntTrigger::GetTriggerName());
+	ret.push_back(WindowTrigger::GetTriggerName());
 	return ret;
 }
 
@@ -2116,6 +2118,8 @@ void TektronixOscilloscope::PullTrigger()
 					PullDropoutTrigger();
 				else if(reply == "RUN")
 					PullRuntTrigger();
+				else if(reply == "WIN")
+					PullWindowTrigger();
 				else
 				{
 					LogWarning("Unknown trigger type %s\n", reply.c_str());
@@ -2446,18 +2450,95 @@ void TektronixOscilloscope::PullRuntTrigger()
 	}
 }
 
+/**
+	@brief Reads settings for a window trigger from the instrument
+ */
+void TektronixOscilloscope::PullWindowTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<WindowTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new WindowTrigger(this);
+	WindowTrigger* et = dynamic_cast<WindowTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				//Source channel
+				m_transport->SendCommand("TRIG:A:WIN:SOU?");
+				auto reply = m_transport->ReadReply();
+				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+
+				//Trigger level
+				auto chname = reply;
+				m_transport->SendCommand(string("TRIG:A:LOW:") + chname + "?");
+				et->SetLowerBound(stof(m_transport->ReadReply()));
+				m_transport->SendCommand(string("TRIG:A:UPP:") + chname + "?");
+				et->SetUpperBound(stof(m_transport->ReadReply()));
+
+				//TODO: TRIG:A:WIN:LOGICQUAL?
+
+				//Crossing direction (only used for inside/outside greater)
+				m_transport->SendCommand("TRIG:A:WIN:CROSSI?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "UPP")
+					et->SetCrossingDirection(WindowTrigger::CROSS_UPPER);
+				else if(reply == "LOW")
+					et->SetCrossingDirection(WindowTrigger::CROSS_LOWER);
+				else if(reply == "EIT")
+					et->SetCrossingDirection(WindowTrigger::CROSS_EITHER);
+				else if(reply == "NON")
+					et->SetCrossingDirection(WindowTrigger::CROSS_NONE);
+
+				//Match condition
+				m_transport->SendCommand("TRIG:A:WIN:WHE?");
+				reply = Trim(m_transport->ReadReply());
+				if(reply == "ENTERSW")
+					et->SetWindowType(WindowTrigger::WINDOW_ENTER);
+				else if(reply == "EXITSW")
+					et->SetWindowType(WindowTrigger::WINDOW_EXIT);
+				else if(reply == "INSIDEG")
+					et->SetWindowType(WindowTrigger::WINDOW_EXIT_TIMED);
+				else if(reply == "OUTSIDEG")
+					et->SetWindowType(WindowTrigger::WINDOW_ENTER_TIMED);
+
+				//Only lower interval supported, no upper
+				Unit ps(Unit::UNIT_PS);
+				m_transport->SendCommand("TRIG:A:WIN:WID?");
+				et->SetWidth(ps.ParseString(m_transport->ReadReply()));
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
 void TektronixOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
+	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(pt)
 		PushPulseWidthTrigger(pt);
 	else if(dt)
 		PushDropoutTrigger(dt);
 	else if(rt)
 		PushRuntTrigger(rt);
+	else if(wt)
+		PushWindowTrigger(wt);
 
 	//needs to be last, since pulse width and other more specialized types should be checked first
 	//but are also derived from EdgeTrigger
@@ -2697,6 +2778,78 @@ void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	}
 }
 
+/**
+	@brief Pushes settings for a runt trigger to the instrument
+ */
+void TektronixOscilloscope::PushWindowTrigger(WindowTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			{
+				m_transport->SendCommand("TRIG:A:TYP WIN");
+
+				m_transport->SendCommand(string("TRIG:A:WIN:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+
+				m_transport->SendCommand(
+					string("TRIG:A:LOW:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetLowerBound()));
+				m_transport->SendCommand(
+					string("TRIG:A:UPP:") + trig->GetInput(0).m_channel->GetHwname() + " " +
+					to_string(trig->GetUpperBound()));
+
+				switch(trig->GetCrossingDirection())
+				{
+					case WindowTrigger::CROSS_UPPER:
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI UPP");
+						break;
+
+					case WindowTrigger::CROSS_LOWER:
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI LOW");
+						break;
+
+					case WindowTrigger::CROSS_EITHER:
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI EIT");
+						break;
+
+					case WindowTrigger::CROSS_NONE:
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI NON");
+						break;
+				}
+
+				switch(trig->GetWindowType())
+				{
+					case WindowTrigger::WINDOW_ENTER:
+						m_transport->SendCommand("TRIG:A:WIN:WHEN ENTERSW");
+						break;
+
+					case WindowTrigger::WINDOW_EXIT:
+						m_transport->SendCommand("TRIG:A:WIN:WHEN EXITSW");
+						break;
+
+					case WindowTrigger::WINDOW_ENTER_TIMED:
+						m_transport->SendCommand("TRIG:A:WIN:WHEN INSIDEG");
+						break;
+
+					case WindowTrigger::WINDOW_EXIT_TIMED:
+						m_transport->SendCommand("TRIG:A:WIN:WHEN OUTSIDEG");
+						break;
+
+					default:
+						break;
+				}
+
+				m_transport->SendCommand(string("TRIG:A:WIN:WID ") + to_string_sci(trig->GetWidth()*1e-12));
+			}
+			break;
+
+		default:
+			break;
+	}
+}
 
 vector<Oscilloscope::DigitalBank> TektronixOscilloscope::GetDigitalBanks()
 {
