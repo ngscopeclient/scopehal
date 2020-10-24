@@ -187,27 +187,27 @@ public:
 	static float GetAvgVoltage(AnalogWaveform* cap);
 	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
 
+	//Samples a digital channel on the edges of another channel.
+	//The two channels need not be the same sample rate.
+	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
+	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+	static void SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
+	static void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+
+	//Find interpolated zero crossings of a signal
+	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
+
+	//Find edges in a signal (discarding repeated samples)
+	static void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
+
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
-
-	//Samples a digital channel on the edges of another channel.
-	//The two channels need not be the same sample rate.
-	void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
-	void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
-	void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
-	void SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
-	void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
-
-	//Find interpolated zero crossings of a signal
-	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
-	void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
-
-	//Find edges in a signal (discarding repeated samples)
-	void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
-	void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
-	void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
-	void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
 
 public:
 	typedef Filter* (*CreateProcType)(const std::string&);
