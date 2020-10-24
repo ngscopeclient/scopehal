@@ -92,7 +92,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 
 			//Figure out units
 			string funit(freq_unit);
-			if(funit == "MHZ")
+			if( (funit == "MHZ") ||  (funit == "MHz") )
 				unit_scale = 1e6;
 			else if(funit == "GHZ")
 				unit_scale = 1e9;
