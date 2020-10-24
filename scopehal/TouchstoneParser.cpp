@@ -69,6 +69,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	//Read line by line.
 	char line[256];
 	double unit_scale = 1;
+	bool mag_is_db = false;
 	while(!feof(fp))
 	{
 		fgets(line, sizeof(line), fp);
@@ -105,9 +106,15 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 				LogError("Unrecognized S2P frequency unit (got %s)\n", freq_unit);
 				return false;
 			}
-			if(0 != strcmp(volt_unit, "MA"))
+			if(0 == strcmp(volt_unit, "MA"))
 			{
-				LogError("S2P formats other than mag-angle not yet supported (got %s)\n", volt_unit);
+				//magnitude, no action required
+			}
+			else if( (0 == strcmp(volt_unit, "DB")) || (0 == strcmp(volt_unit, "dB")) )
+				mag_is_db = true;
+			else
+			{
+				LogError("S2P units other than magnitude and dB not supported (got %s)\n", volt_unit);
 				return false;
 			}
 
@@ -120,6 +127,15 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 		{
 			LogError("Malformed S2P line \"%s\"", line);
 			return false;
+		}
+
+		//Convert magnitudes if needed
+		if(mag_is_db)
+		{
+			s11m = pow(10, s11m/20);
+			s12m = pow(10, s12m/20);
+			s21m = pow(10, s21m/20);
+			s22m = pow(10, s22m/20);
 		}
 
 		//Rescale frequency
