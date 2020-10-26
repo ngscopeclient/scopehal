@@ -145,7 +145,7 @@ void DPhySymbolDecoder::Refresh()
 		LP-00 or LP-01 (decode as LP-00)
 			Dp < 50 mV
 
-		LP-10 or LP-11 (decode as LP-10)
+		LP-10 or LP-11 (decode as LP-11)
 			Dp > 880 mV
 	*/
 	if(!dn)
@@ -156,7 +156,7 @@ void DPhySymbolDecoder::Refresh()
 			float v = dp->m_samples[i];
 
 			if(v > 0.88)
-				nextstate = DPhySymbol::STATE_LP10;
+				nextstate = DPhySymbol::STATE_LP11;
 			else if(v > 0.225)
 				nextstate = DPhySymbol::STATE_HS1;
 			else if(v < 0.005)
