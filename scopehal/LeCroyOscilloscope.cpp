@@ -2923,6 +2923,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(100 * k);
 	ret.push_back(200 * k);
 	ret.push_back(250 * k);
+	ret.push_back(400 * k);
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
@@ -3026,51 +3027,31 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 {
-	const int64_t k = 1000;
-	const int64_t m = k*k;
+	vector<uint64_t> base = GetSampleDepthsNonInterleaved();
 
-	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
+	//Default to doubling the non-interleaved depths
+	vector<uint64_t> ret;
+	for(auto rate : base)
+		ret.push_back(rate*2);
 
 	switch(m_modelid)
 	{
 		//DDA5 is weird, not a power of two
 		//TODO: XXL option gives 100M, with 48M on all channels
 		case MODEL_DDA_5K:
-			ret.push_back(48 * m);
-			break;
-
 		case MODEL_HDO_4KA:
-			ret.push_back(25 * m);
-			break;
-
-		//no deep-memory option here
 		case MODEL_HDO_9K:
-			ret.push_back(128 * m);
-			break;
+		case MODEL_WAVERUNNER_8K:
+		case MODEL_WAVERUNNER_9K:
+		case MODEL_WAVEPRO_HD:
+			return ret;
 
 		//memory is dedicated per channel, no interleaving possible
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
 		case MODEL_WAVEMASTER_8ZI_B:
-			break;
-
-		case MODEL_WAVEPRO_HD:
-			if(m_memoryDepthOption == 100)
-				ret.push_back(100 * m);
-			break;
-
-		//TODO: multiple levels of channel combining to deal with?
-		case MODEL_WAVERUNNER_8K_HD:
-			break;
-
-		case MODEL_WAVERUNNER_8K:
-		case MODEL_WAVERUNNER_9K:
-			if(m_memoryDepthOption == 128)
-				ret.push_back(128 * m);
-			else
-				ret.push_back(32 * m);
-			break;
+			return base;
 
 		//TODO: add more models here
 		default:
