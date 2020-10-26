@@ -88,10 +88,10 @@ void DPhySymbolDecoder::SetDefaultName()
 
 	char hwname[256];
 	if(din1.m_channel == NULL)
-		snprintf(hwname, sizeof(hwname), "DPHY(%s)", GetInputDisplayName(0).c_str());
+		snprintf(hwname, sizeof(hwname), "DPHYSymbol(%s)", GetInputDisplayName(0).c_str());
 	else
 	{
-		snprintf(hwname, sizeof(hwname), "DPHY(%s,%s)",
+		snprintf(hwname, sizeof(hwname), "DPHYSymbol(%s,%s)",
 			GetInputDisplayName(0).c_str(),
 			GetInputDisplayName(1).c_str());
 	}
@@ -124,7 +124,7 @@ void DPhySymbolDecoder::Refresh()
 		len = min(len, dn->m_samples.size());
 
 	//Create output waveform
-	DPhyWaveform* cap = new DPhyWaveform;
+	DPhySymbolWaveform* cap = new DPhySymbolWaveform;
 	cap->m_timescale = dp->m_timescale;
 	cap->m_startTimestamp = dp->m_startTimestamp;
 	cap->m_startPicoseconds = dp->m_startPicoseconds;
@@ -223,6 +223,27 @@ void DPhySymbolDecoder::Refresh()
 			//Nope, create a new sample
 			else
 			{
+				//Glitch filter LP states.
+				//If the previous sample was a LP state, but significantly less than Tlpx long, discard it.
+				//For now, set the cutoff at 40 ns (40,000 ps)
+				const int64_t tlpx_cutoff = 40000;
+				if(nsize && (state != DPhySymbol::STATE_HS0) && (state != DPhySymbol::STATE_HS1) )
+				{
+					if( (cap->m_durations[nlast] * cap->m_timescale) < tlpx_cutoff )
+					{
+						cap->m_durations.resize(nlast);
+						cap->m_offsets.resize(nlast);
+						cap->m_samples.resize(nlast);
+
+						//If there was a previous sample, extend it to the start of this one
+						if(nsize > 1)
+						{
+							nlast --;
+							cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
+						}
+					}
+				}
+
 				cap->m_offsets.push_back(dp->m_offsets[i]);
 				cap->m_durations.push_back(dp->m_durations[i]);
 				cap->m_samples.push_back(nextstate);
@@ -238,7 +259,7 @@ void DPhySymbolDecoder::Refresh()
 
 Gdk::Color DPhySymbolDecoder::GetColor(int i)
 {
-	auto capture = dynamic_cast<DPhyWaveform*>(GetData(0));
+	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const DPhySymbol& s = capture->m_samples[i];
@@ -262,7 +283,7 @@ Gdk::Color DPhySymbolDecoder::GetColor(int i)
 
 string DPhySymbolDecoder::GetText(int i)
 {
-	auto capture = dynamic_cast<DPhyWaveform*>(GetData(0));
+	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
 		const DPhySymbol& s = capture->m_samples[i];

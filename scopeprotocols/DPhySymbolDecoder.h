@@ -63,7 +63,7 @@ public:
 	}
 };
 
-typedef Waveform<DPhySymbol> DPhyWaveform;
+typedef Waveform<DPhySymbol> DPhySymbolWaveform;
 
 /**
 	@brief Decoder for MIPI D-PHY symbols.
