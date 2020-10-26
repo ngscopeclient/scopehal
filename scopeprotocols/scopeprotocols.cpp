@@ -55,6 +55,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DeskewFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
+	AddDecoderClass(DPhySymbolDecoder);
 	AddDecoderClass(DramRefreshActivateMeasurement);
 	AddDecoderClass(DramRowColumnLatencyMeasurement);
 	AddDecoderClass(DutyCycleMeasurement);
