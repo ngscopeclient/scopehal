@@ -149,7 +149,6 @@ void DPhyDataDecoder::Refresh()
 		size_t nlast = cap->m_samples.size()-1;
 		int64_t tend = data->m_offsets[idata] + data->m_durations[idata];
 		int64_t tclkstart = clk->m_offsets[iclk];
-		int64_t tclkend = tclkstart + clk->m_durations[iclk];
 
 		//Look for clock edges
 		bool clock_rising = false;
@@ -322,7 +321,42 @@ void DPhyDataDecoder::Refresh()
 
 					//End of packet
 					else if(cur_data.m_type == DPhySymbol::STATE_LP11)
+					{
+						//Trim garbage at end of packet
+						if(cap->m_offsets.size() >= 4)
+						{
+							//Discard last 3 bytes of data
+							for(size_t i=0; i<3; i++)
+							{
+								cap->m_offsets.pop_back();
+								cap->m_durations.pop_back();
+								cap->m_samples.pop_back();
+							}
+
+							//Discard all bytes with the same value
+							size_t endlen = cap->m_samples.size()-1;
+							uint8_t last = cap->m_samples[endlen].m_data;
+							while(cap->m_samples[endlen].m_data == last)
+							{
+								cap->m_offsets.pop_back();
+								cap->m_durations.pop_back();
+								cap->m_samples.pop_back();
+
+								endlen --;
+								if(endlen == 0)
+									break;
+							}
+
+							//Add a new "end" sample
+							endlen = cap->m_samples.size()-1;
+							tstart = cap->m_offsets[endlen] + cap->m_durations[endlen];
+							cap->m_offsets.push_back(tstart);
+							cap->m_durations.push_back(tclkstart - tstart);
+							cap->m_samples.push_back(DPhyDataSymbol(DPhyDataSymbol::TYPE_EOT));
+						}
+
 						state = STATE_IDLE;
+					}
 
 					//Something illegal
 					else
@@ -362,6 +396,9 @@ Gdk::Color DPhyDataDecoder::GetColor(int i)
 			case DPhyDataSymbol::TYPE_SOT:
 				return m_standardColors[COLOR_PREAMBLE];
 
+			case DPhyDataSymbol::TYPE_EOT:
+				return m_standardColors[COLOR_IDLE];
+
 			case DPhyDataSymbol::TYPE_HS_DATA:
 				return m_standardColors[COLOR_DATA];
 
@@ -387,6 +424,9 @@ string DPhyDataDecoder::GetText(int i)
 		{
 			case DPhyDataSymbol::TYPE_SOT:
 				return "SOT";
+
+			case DPhyDataSymbol::TYPE_EOT:
+				return "EOT";
 
 			case DPhyDataSymbol::TYPE_HS_DATA:
 				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
