@@ -30,97 +30,69 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of DSIPacketDecoder
  */
+#ifndef DSIPacketDecoder_h
+#define DSIPacketDecoder_h
 
-#include "scopeprotocols.h"
+class DSISymbol
+{
+public:
+
+	enum stype
+	{
+		TYPE_VC,
+		TYPE_IDENTIFIER,
+		TYPE_LEN,
+		TYPE_DATA,
+		TYPE_ECC_OK,
+		TYPE_ECC_BAD,
+		TYPE_CHECKSUM_OK,
+		TYPE_CHECKSUM_BAD,
+		TYPE_ERROR
+	} m_stype;
+
+	uint16_t m_data;
+
+	DSISymbol(stype t = TYPE_ERROR, uint16_t data = 0)
+	 : m_stype(t)
+	 , m_data(data)
+	{}
+
+	bool operator== (const DSISymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<DSISymbol> DSIWaveform;
 
 /**
-	@brief Static initialization for protocol list
+	@brief Decodes MIPI DSI from a D-PHY data stream
  */
-void ScopeProtocolStaticInit()
+class DSIPacketDecoder : public Filter
 {
-	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurement);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationFilter);
-	AddDecoderClass(ClockRecoveryFilter);
-	AddDecoderClass(CTLEFilter);
-	AddDecoderClass(CurrentShuntFilter);
-	AddDecoderClass(DCOffsetFilter);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedFilter);
-	AddDecoderClass(DeskewFilter);
-	AddDecoderClass(DownconvertFilter);
-	AddDecoderClass(DownsampleFilter);
-	AddDecoderClass(DPhyDataDecoder);
-	AddDecoderClass(DPhySymbolDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurement);
-	AddDecoderClass(DramRowColumnLatencyMeasurement);
-	AddDecoderClass(DSIPacketDecoder);
-	AddDecoderClass(DutyCycleMeasurement);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurement);
-	AddDecoderClass(EyePattern);
-	AddDecoderClass(EyeHeightMeasurement);
-	AddDecoderClass(EyeJitterMeasurement);
-	AddDecoderClass(EyePeriodMeasurement);
-	AddDecoderClass(EyeWidthMeasurement);
-	AddDecoderClass(FallMeasurement);
-	AddDecoderClass(FFTFilter);
-	AddDecoderClass(FrequencyMeasurement);
-	AddDecoderClass(HorizontalBathtub);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MagnitudeFilter);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
-	AddDecoderClass(OvershootMeasurement);
-	AddDecoderClass(ParallelBus);
-	AddDecoderClass(PeakHoldFilter);
-	AddDecoderClass(PeriodMeasurement);
-	AddDecoderClass(PkPkMeasurement);
-	AddDecoderClass(QSPIDecoder);
-	AddDecoderClass(QuadratureDecoder);
-	AddDecoderClass(RiseMeasurement);
-	AddDecoderClass(SDCmdDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(SPIFlashDecoder);
-	AddDecoderClass(SubtractFilter);
-	AddDecoderClass(SWDDecoder);
-	AddDecoderClass(SWDMemAPDecoder);
-	AddDecoderClass(TachometerFilter);
-	AddDecoderClass(ThresholdFilter);
-	AddDecoderClass(TIEMeasurement);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurement);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryFilter);
-	AddDecoderClass(UndershootMeasurement);
-	AddDecoderClass(UpsampleFilter);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(Waterfall);
-	AddDecoderClass(WindowedAutocorrelationFilter);
+public:
+	DSIPacketDecoder(const std::string& color);
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	uint16_t UpdateCRC(uint16_t crc, uint8_t data);
+	uint16_t BitReverse(uint16_t crc);
+
+	PROTOCOL_DECODER_INITPROC(DSIPacketDecoder)
+};
+
+#endif

@@ -59,6 +59,7 @@
 #include "DramRefreshActivateMeasurement.h"
 #include "DramRowColumnLatencyMeasurement.h"
 #include "DutyCycleMeasurement.h"
+#include "DSIPacketDecoder.h"
 #include "DVIDecoder.h"
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
