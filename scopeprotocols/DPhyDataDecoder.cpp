@@ -122,6 +122,10 @@ void DPhyDataDecoder::Refresh()
 		STATE_HS_DATA
 	} state = STATE_UNKNOWN;
 
+	//If our data is a single-ended decode, we have to infer some states we can't see.
+	auto data_decoder = dynamic_cast<DPhySymbolDecoder*>(GetInput(1).m_channel);
+	bool single_ended_data = data_decoder->GetInput(1).m_channel == NULL;
+
 	//Process the data
 	DPhyDataSymbol samp;
 	size_t clklen = clk->m_samples.size();
@@ -185,8 +189,10 @@ void DPhyDataDecoder::Refresh()
 			//Link is idle, wait for a start-of-transmission or escape sequence
 			case STATE_IDLE:
 
-				//LP-01 is a HS-REQUEST
-				if(cur_data.m_type == DPhySymbol::STATE_LP01)
+				//LP-01 is a HS-REQUEST.
+				//If doing a single-ended decode, we can't see the LP-01. We seem to jump straight to LP-00.
+				if( (cur_data.m_type == DPhySymbol::STATE_LP01) ||
+					(single_ended_data && (cur_data.m_type == DPhySymbol::STATE_LP00) ) )
 				{
 					state = STATE_HS_REQUEST;
 
