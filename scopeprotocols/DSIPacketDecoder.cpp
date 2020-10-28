@@ -422,7 +422,7 @@ void DSIPacketDecoder::Refresh()
 
 					//Verify checksum.
 					//0x0000 means "checksum not calculated" so always passes
-					if( (current_checksum == BitReverse(expected_checksum)) || (current_checksum == 0x0000) )
+					if( (current_checksum == expected_checksum) || (current_checksum == 0x0000) )
 						cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_CHECKSUM_OK, current_checksum));
 					else
 						cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_CHECKSUM_BAD, current_checksum));
@@ -646,32 +646,16 @@ string DSIPacketDecoder::GetText(int i)
 uint16_t DSIPacketDecoder::UpdateCRC(uint16_t crc, uint8_t data)
 {
 	//CRC16 with polynomial x^16 + x^12 + x^5 + x^0 (CRC-16-CCITT)
-	uint16_t poly = 0x1021;
+	uint16_t poly = 0x8408;
 	for(int i=0; i<8; i++)
 	{
-		bool b = (data >> (7-i)) & 1;
-		bool c = (crc & 0x8000);
-		crc <<= 1;
-		if(b ^ c)
-			crc ^= poly;
+		if( ((data >> i) ^ crc) & 1 )
+			crc = (crc >> 1) ^ poly;
+		else
+			crc >>= 1;
 	}
 
 	return crc;
-}
-
-/**
-	@brief MIPI seems to send the CRC bit-reversed from the normal order. Flip it
- */
-uint16_t DSIPacketDecoder::BitReverse(uint16_t crc)
-{
-	uint16_t crc_flipped = 0;
-	for(int i=0; i<16; i++)
-	{
-		if(crc & (1 << i))
-			crc_flipped |= (1 << (15-i));
-	}
-
-	return crc_flipped;
 }
 
 vector<string> DSIPacketDecoder::GetHeaders()

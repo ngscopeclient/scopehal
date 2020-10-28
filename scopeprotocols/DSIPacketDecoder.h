@@ -133,7 +133,6 @@ public:
 
 protected:
 	uint16_t UpdateCRC(uint16_t crc, uint8_t data);
-	uint16_t BitReverse(uint16_t crc);
 
 public:
 	PROTOCOL_DECODER_INITPROC(DSIPacketDecoder)

@@ -85,6 +85,7 @@ vector<string> DSIFrameDecoder::GetHeaders()
 {
 	vector<string> ret;
 	ret.push_back("Width");
+	ret.push_back("Checksum");
 	return ret;
 }
 
@@ -213,6 +214,7 @@ void DSIFrameDecoder::Refresh()
 				//Create packet
 				pack = new VideoScanlinePacket;
 				pack->m_offset = off * cap->m_timescale;
+				pack->m_headers["Checksum"] = "Not checked";
 
 			//fall through
 			case STATE_RGB888_RED:
@@ -222,6 +224,11 @@ void DSIFrameDecoder::Refresh()
 					red = s.m_data;
 					state = STATE_RGB888_GREEN;
 				}
+				else if(s.m_stype == DSISymbol::TYPE_CHECKSUM_OK)
+					pack->m_headers["Checksum"] = "OK";
+				else if(s.m_stype == DSISymbol::TYPE_CHECKSUM_BAD)
+					pack->m_headers["Checksum"] = "Error";
+
 				break;
 
 			case STATE_RGB888_GREEN:
