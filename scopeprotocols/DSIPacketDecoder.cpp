@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 DSIPacketDecoder::DSIPacketDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
 {
 	CreateInput("data");
 }
@@ -93,6 +93,8 @@ void DSIPacketDecoder::SetDefaultName()
 
 void DSIPacketDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -121,11 +123,14 @@ void DSIPacketDecoder::Refresh()
 		STATE_DROP
 	} state = STATE_IDLE;
 
-	//Loop over the DSI events and process stuff
+	//Create output waveform
 	auto cap = new DSIWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startPicoseconds = din->m_startPicoseconds;
+	SetData(cap, 0);
+
+	//Main decode loop
 	size_t current_len = 0;
 	size_t bytes_read = 0;
 	uint8_t current_type = 0;
@@ -133,6 +138,7 @@ void DSIPacketDecoder::Refresh()
 	uint16_t expected_checksum = 0;
 	uint16_t current_checksum = 0;
 	int64_t tstart = 0;
+	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
 	{
 		auto s = din->m_samples[i];
@@ -163,17 +169,17 @@ void DSIPacketDecoder::Refresh()
 					cap->m_durations.push_back(halfdur);
 					cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_VC, current_vc));
 
-					switch(s.m_data & 0x3f)
+					switch(current_type)
 					{
 						//Type codes for long packets
-						case 0x09:
-						case 0x19:
-						case 0x29:
-						case 0x39:
-						case 0x0e:
-						case 0x1e:
-						case 0x2e:
-						case 0x3e:
+						case TYPE_NULL:
+						case TYPE_BLANKING:
+						case TYPE_GENERIC_LONG_WRITE:
+						case TYPE_DCS_LONG_WRITE:
+						case TYPE_PACKED_PIXEL_RGB565:
+						case TYPE_PACKED_PIXEL_RGB666:
+						case TYPE_LOOSE_PIXEL_RGB666:
+						case TYPE_PACKED_PIXEL_RGB888:
 							state = STATE_LONG_LEN_LO;
 							cap->m_offsets.push_back(off + halfdur);
 							cap->m_durations.push_back(dur - halfdur);
@@ -181,25 +187,25 @@ void DSIPacketDecoder::Refresh()
 							break;
 
 						//Type codes for short packets
-						case 0x01:
-						case 0x11:
-						case 0x21:
-						case 0x31:
-						case 0x08:
-						case 0x02:
-						case 0x12:
-						case 0x22:
-						case 0x32:
-						case 0x03:
-						case 0x13:
-						case 0x23:
-						case 0x04:
-						case 0x14:
-						case 0x24:
-						case 0x05:
-						case 0x15:
-						case 0x06:
-						case 0x37:
+						case TYPE_VSYNC_START:
+						case TYPE_VSYNC_END:
+						case TYPE_HSYNC_START:
+						case TYPE_HSYNC_END:
+						case TYPE_EOTP:
+						case TYPE_CM_OFF:
+						case TYPE_CM_ON:
+						case TYPE_SHUT_DOWN:
+						case TYPE_TURN_ON:
+						case TYPE_GENERIC_SHORT_WRITE_0PARAM:
+						case TYPE_GENERIC_SHORT_WRITE_1PARAM:
+						case TYPE_GENERIC_SHORT_WRITE_2PARAM:
+						case TYPE_GENERIC_READ_0PARAM:
+						case TYPE_GENERIC_READ_1PARAM:
+						case TYPE_GENERIC_READ_2PARAM:
+						case TYPE_DCS_SHORT_WRITE_0PARAM:
+						case TYPE_DCS_SHORT_WRITE_1PARAM:
+						case TYPE_DCS_READ:
+						case TYPE_SET_MAX_RETURN_SIZE:
 							state = STATE_SHORT_DATA_0;
 							cap->m_offsets.push_back(off + halfdur);
 							cap->m_durations.push_back(dur - halfdur);
@@ -213,6 +219,66 @@ void DSIPacketDecoder::Refresh()
 							cap->m_durations.push_back(dur - halfdur);
 							cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_ERROR));
 							state = STATE_DROP;
+							break;
+					}
+
+					//Create the packet
+					pack = new Packet;
+					pack->m_offset = off * din->m_timescale;
+					pack->m_len = 0;
+					pack->m_headers["VC"] = to_string(current_vc);
+					pack->m_headers["Type"] = GetText(cap->m_offsets.size() - 1);
+					m_packets.push_back(pack);
+
+					//Set the color for the packet
+					switch(current_type)
+					{
+						//Framing/blanking/ignored
+						case TYPE_NULL:
+						case TYPE_BLANKING:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DEFAULT];
+							break;
+
+						//Sync and commands
+						case TYPE_EOTP:
+						case TYPE_VSYNC_START:
+						case TYPE_VSYNC_END:
+						case TYPE_HSYNC_START:
+						case TYPE_HSYNC_END:
+						case TYPE_CM_OFF:
+						case TYPE_CM_ON:
+						case TYPE_SHUT_DOWN:
+						case TYPE_TURN_ON:
+						case TYPE_SET_MAX_RETURN_SIZE:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+							break;
+
+						//Write data
+						case TYPE_GENERIC_LONG_WRITE:
+						case TYPE_DCS_LONG_WRITE:
+						case TYPE_PACKED_PIXEL_RGB565:
+						case TYPE_PACKED_PIXEL_RGB666:
+						case TYPE_LOOSE_PIXEL_RGB666:
+						case TYPE_PACKED_PIXEL_RGB888:
+						case TYPE_GENERIC_SHORT_WRITE_0PARAM:
+						case TYPE_GENERIC_SHORT_WRITE_1PARAM:
+						case TYPE_GENERIC_SHORT_WRITE_2PARAM:
+						case TYPE_DCS_SHORT_WRITE_0PARAM:
+						case TYPE_DCS_SHORT_WRITE_1PARAM:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							break;
+
+						//Read data
+						case TYPE_GENERIC_READ_0PARAM:
+						case TYPE_GENERIC_READ_1PARAM:
+						case TYPE_GENERIC_READ_2PARAM:
+						case TYPE_DCS_READ:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							break;
+
+						//Invalid/illegal
+						default:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							break;
 					}
 				}
@@ -314,6 +380,8 @@ void DSIPacketDecoder::Refresh()
 
 					expected_checksum = UpdateCRC(expected_checksum, s.m_data);
 
+					pack->m_data.push_back(s.m_data);
+
 					//At end of packet, read checksum
 					bytes_read ++;
 					if(bytes_read == current_len)
@@ -361,6 +429,8 @@ void DSIPacketDecoder::Refresh()
 
 					//Packet is over now
 					state = STATE_HEADER;
+					pack->m_headers["Len"] = to_string(pack->m_data.size());
+					pack->m_len = (end * din->m_timescale) - pack->m_offset;
 				}
 				else
 				{
@@ -381,6 +451,8 @@ void DSIPacketDecoder::Refresh()
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_DATA, s.m_data));
 
+					pack->m_data.push_back(s.m_data);
+
 					state = STATE_SHORT_DATA_1;
 				}
 				else
@@ -398,6 +470,8 @@ void DSIPacketDecoder::Refresh()
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(DSISymbol(DSISymbol::TYPE_DATA, s.m_data));
+
+					pack->m_data.push_back(s.m_data);
 
 					state = STATE_SHORT_ECC;
 				}
@@ -429,6 +503,8 @@ void DSIPacketDecoder::Refresh()
 
 					//Done
 					state = STATE_HEADER;
+					pack->m_len = (end * din->m_timescale) - pack->m_offset;
+					pack->m_headers["Len"] = to_string(pack->m_data.size());
 				}
 				else
 				{
@@ -449,8 +525,6 @@ void DSIPacketDecoder::Refresh()
 				break;	//end STATE_DROP
 		}
 	}
-
-	SetData(cap, 0);
 }
 
 Gdk::Color DSIPacketDecoder::GetColor(int i)
@@ -502,36 +576,40 @@ string DSIPacketDecoder::GetText(int i)
 			case DSISymbol::TYPE_IDENTIFIER:
 				switch(s.m_data & 0x3f)
 				{
-					case 0x01:	return "VSYNC Start";
-					case 0x11:	return "VSYNC End";
-					case 0x21:	return "HSYNC Start";
-					case 0x31:	return "HSYNC End";
-					case 0x08:	return "End of TX";
-					case 0x02:	return "CM Off";
-					case 0x12:	return "CM On";
-					case 0x22:	return "Shut Down";
-					case 0x32:	return "Turn On";
-					case 0x03:
-					case 0x13:
-					case 0x23:
-					case 0x29:
+					case TYPE_VSYNC_START:	return "VSYNC Start";
+					case TYPE_VSYNC_END:	return "VSYNC End";
+					case TYPE_HSYNC_START:	return "HSYNC Start";
+					case TYPE_HSYNC_END:	return "HSYNC End";
+					case TYPE_EOTP:			return "End of TX";
+					case TYPE_CM_OFF:		return "CM Off";
+					case TYPE_CM_ON:		return "CM On";
+					case TYPE_SHUT_DOWN:	return "Shut Down";
+					case TYPE_TURN_ON:		return "Turn On";
+
+					case TYPE_GENERIC_SHORT_WRITE_0PARAM:
+					case TYPE_GENERIC_SHORT_WRITE_1PARAM:
+					case TYPE_GENERIC_SHORT_WRITE_2PARAM:
+					case TYPE_GENERIC_LONG_WRITE:
 						return "Generic Write";
-					case 0x04:
-					case 0x14:
-					case 0x24:
+
+					case TYPE_GENERIC_READ_0PARAM:
+					case TYPE_GENERIC_READ_1PARAM:
+					case TYPE_GENERIC_READ_2PARAM:
 						return "Generic Read";
-					case 0x05:
-					case 0x15:
-					case 0x39:
+
+					case TYPE_DCS_SHORT_WRITE_0PARAM:
+					case TYPE_DCS_SHORT_WRITE_1PARAM:
+					case TYPE_DCS_LONG_WRITE:
 						return "DCS Write";
-					case 0x06:	return "DCS Read";
-					case 0x37:	return "Set Max Return Size";
-					case 0x09:	return "Null";
-					case 0x19:	return "Blank";
-					case 0x0e:	return "RGB565";
-					case 0x1e:	return "RGB666";
-					case 0x2e:	return "RGB666 Loose";
-					case 0x3e:	return "RGB888";
+
+					case TYPE_DCS_READ:				return "DCS Read";
+					case TYPE_SET_MAX_RETURN_SIZE:	return "Set Max Return Size";
+					case TYPE_NULL:					return "Null";
+					case TYPE_BLANKING:				return "Blank";
+					case TYPE_PACKED_PIXEL_RGB565:	return "RGB565";
+					case TYPE_PACKED_PIXEL_RGB666:	return "RGB666";
+					case TYPE_LOOSE_PIXEL_RGB666:	return "RGB666 Loose";
+					case TYPE_PACKED_PIXEL_RGB888:	return "RGB888";
 
 					default:
 						snprintf(tmp, sizeof(tmp), "RSVD %02x", s.m_data & 0x3f);
@@ -554,7 +632,7 @@ string DSIPacketDecoder::GetText(int i)
 
 			case DSISymbol::TYPE_CHECKSUM_OK:
 			case DSISymbol::TYPE_CHECKSUM_BAD:
-				snprintf(tmp, sizeof(tmp), "Check %02x", s.m_data);
+				snprintf(tmp, sizeof(tmp), "Check %04x", s.m_data);
 				return tmp;
 
 			case DSISymbol::TYPE_ERROR:
@@ -594,4 +672,99 @@ uint16_t DSIPacketDecoder::BitReverse(uint16_t crc)
 	}
 
 	return crc_flipped;
+}
+
+vector<string> DSIPacketDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("VC");
+	ret.push_back("Type");
+	ret.push_back("Length");
+	return ret;
+}
+
+bool DSIPacketDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+{
+	//If packets are from different VCs we can't merge them
+	if(first->m_headers["VC"] != next->m_headers["VC"])
+		return false;
+
+	//Merge consecutive null packets
+	if( (first->m_headers["Type"] == "Null") && (next->m_headers["Type"] == "Null") )
+		return true;
+
+	//Can merge EoTX or null after a video data packet
+	if( (first->m_headers["Type"] == "RGB888") ||
+		(first->m_headers["Type"] == "RGB666") ||
+		(first->m_headers["Type"] == "RGB666 Loose") ||
+		(first->m_headers["Type"] == "RGB565"))
+	{
+		if(	(next->m_headers["Type"] == "End of TX") ||
+			(next->m_headers["Type"] == "Null") )
+		{
+			return true;
+		}
+	}
+
+	//Merge H/VSYNC start and end.
+	//Also allow merging null/EoTX after them
+	if( (first->m_headers["Type"] == "HSYNC Start") )
+	{
+		if( (next->m_headers["Type"] == "HSYNC End") ||
+			(next->m_headers["Type"] == "End of TX") ||
+			(next->m_headers["Type"] == "Null") )
+		{
+			return true;
+		}
+	}
+	if( (first->m_headers["Type"] == "VSYNC Start") )
+	{
+		if( (next->m_headers["Type"] == "VSYNC End") ||
+			(next->m_headers["Type"] == "End of TX") ||
+			(next->m_headers["Type"] == "Null") )
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+Packet* DSIPacketDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
+{
+	//Default copy
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;
+	ret->m_headers["VC"] = pack->m_headers["VC"];
+
+	if( (pack->m_headers["Type"] == "RGB888") ||
+		(pack->m_headers["Type"] == "RGB666") ||
+		(pack->m_headers["Type"] == "RGB666 Loose") ||
+		(pack->m_headers["Type"] == "RGB565"))
+	{
+		ret->m_headers["Type"] = pack->m_headers["Type"];
+		ret->m_headers["Len"] = pack->m_headers["Len"];
+		ret->m_data = pack->m_data;
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+	}
+
+	if(pack->m_headers["Type"] == "VSYNC Start")
+	{
+		ret->m_headers["Type"] = "VSYNC";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+	}
+	if(pack->m_headers["Type"] == "HSYNC Start")
+	{
+		ret->m_headers["Type"] = "HSYNC";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+	}
+
+	else if(pack->m_headers["Type"] == "Null")
+	{
+		ret->m_headers["Type"] = "Padding";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DEFAULT];
+	}
+
+	return ret;
 }

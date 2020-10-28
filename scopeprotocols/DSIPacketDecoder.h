@@ -35,6 +35,8 @@
 #ifndef DSIPacketDecoder_h
 #define DSIPacketDecoder_h
 
+#include "PacketDecoder.h"
+
 class DSISymbol
 {
 public:
@@ -70,7 +72,7 @@ typedef Waveform<DSISymbol> DSIWaveform;
 /**
 	@brief Decodes MIPI DSI from a D-PHY data stream
  */
-class DSIPacketDecoder : public Filter
+class DSIPacketDecoder : public PacketDecoder
 {
 public:
 	DSIPacketDecoder(const std::string& color);
@@ -89,9 +91,51 @@ public:
 	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	std::vector<std::string> GetHeaders();
+
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+
+protected:
 	uint16_t UpdateCRC(uint16_t crc, uint8_t data);
 	uint16_t BitReverse(uint16_t crc);
 
+	//From table 16
+	enum
+	{
+		//Short
+		TYPE_VSYNC_START				= 0x01,
+		TYPE_VSYNC_END					= 0x11,
+		TYPE_HSYNC_START				= 0x21,
+		TYPE_HSYNC_END					= 0x31,
+		TYPE_EOTP						= 0x08,
+		TYPE_CM_OFF						= 0x02,
+		TYPE_CM_ON						= 0x12,
+		TYPE_SHUT_DOWN					= 0x22,
+		TYPE_TURN_ON					= 0x32,
+		TYPE_GENERIC_SHORT_WRITE_0PARAM	= 0x03,
+		TYPE_GENERIC_SHORT_WRITE_1PARAM	= 0x13,
+		TYPE_GENERIC_SHORT_WRITE_2PARAM	= 0x23,
+		TYPE_GENERIC_READ_0PARAM		= 0x04,
+		TYPE_GENERIC_READ_1PARAM		= 0x14,
+		TYPE_GENERIC_READ_2PARAM		= 0x24,
+		TYPE_DCS_SHORT_WRITE_0PARAM		= 0x05,
+		TYPE_DCS_SHORT_WRITE_1PARAM		= 0x15,
+		TYPE_DCS_READ					= 0x06,
+		TYPE_SET_MAX_RETURN_SIZE		= 0x37,
+
+		//Long
+		TYPE_NULL						= 0x09,
+		TYPE_BLANKING					= 0x19,
+		TYPE_GENERIC_LONG_WRITE			= 0x29,
+		TYPE_DCS_LONG_WRITE				= 0x39,
+		TYPE_PACKED_PIXEL_RGB565		= 0x0e,
+		TYPE_PACKED_PIXEL_RGB666		= 0x1e,
+		TYPE_LOOSE_PIXEL_RGB666			= 0x2e,
+		TYPE_PACKED_PIXEL_RGB888		= 0x3e
+	};
+
+public:
 	PROTOCOL_DECODER_INITPROC(DSIPacketDecoder)
 };
 
