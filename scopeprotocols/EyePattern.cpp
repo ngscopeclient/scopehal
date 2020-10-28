@@ -382,9 +382,8 @@ void EyePattern::Refresh()
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
 	if(cap == NULL)
-		cap = new EyeWaveform(m_width, m_height, center);
+		cap = ReallocateWaveform();
 	cap->m_saturationLevel = m_parameters[m_saturationName].GetFloatVal();
-	cap->m_timescale = 1;
 	int64_t* data = cap->GetAccumData();
 
 	//Find all toggles in the clock
@@ -406,29 +405,7 @@ void EyePattern::Refresh()
 
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
-	{
-		//Find width of each UI
-		vector<int64_t> ui_widths;
-		for(size_t i=0; i<clock_edges.size()-1; i++)
-			ui_widths.push_back(clock_edges[i+1] - clock_edges[i]);
-
-		//Need to average at least ten UIs to get meaningful data
-		size_t nuis = ui_widths.size();
-		if(nuis > 10)
-		{
-			//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
-			sort(ui_widths.begin(), ui_widths.end());
-			size_t navg = 0;
-			int64_t total = 0;
-			for(size_t i = nuis/10; i <= nuis*9/10; i++)
-			{
-				total += ui_widths[i];
-				navg ++;
-			}
-
-			cap->m_uiWidth = (1.0 * total) / navg;
-		}
-	}
+		RecalculateUIWidth();
 
 	//Process the eye
 	size_t cend = clock_edges.size();
@@ -517,7 +494,6 @@ void EyePattern::Refresh()
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock_edges.size());
 	cap->Normalize();
-	SetData(cap, 0);
 
 	//If we have an eye mask, prepare it for processing
 	if(m_mask.GetFileName() != "")
@@ -527,6 +503,64 @@ void EyePattern::Refresh()
 	total_frames ++;
 	total_time += dt;
 	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
+}
+
+EyeWaveform* EyePattern::ReallocateWaveform()
+{
+	auto cap = new EyeWaveform(m_width, m_height, m_parameters[m_centerName].GetFloatVal());
+	cap->m_timescale = 1;
+	SetData(cap, 0);
+	return cap;
+}
+
+void EyePattern::RecalculateUIWidth()
+{
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	if(!cap)
+		cap = ReallocateWaveform();
+
+	auto clock = GetDigitalInputWaveform(1);
+	if(!clock)
+		return;
+
+	//Find all toggles in the clock
+	vector<int64_t> clock_edges;
+	switch(m_parameters[m_polarityName].GetIntVal())
+	{
+		case CLOCK_RISING:
+			FindRisingEdges(clock, clock_edges);
+			break;
+
+		case CLOCK_FALLING:
+			FindFallingEdges(clock, clock_edges);
+			break;
+
+		case CLOCK_BOTH:
+			FindZeroCrossings(clock, clock_edges);
+			break;
+	}
+
+	//Find width of each UI
+	vector<int64_t> ui_widths;
+	for(size_t i=0; i<clock_edges.size()-1; i++)
+		ui_widths.push_back(clock_edges[i+1] - clock_edges[i]);
+
+	//Need to average at least ten UIs to get meaningful data
+	size_t nuis = ui_widths.size();
+	if(nuis > 10)
+	{
+		//Sort, discard the top and bottom 10%, and average the rest to calculate nominal width
+		sort(ui_widths.begin(), ui_widths.end());
+		size_t navg = 0;
+		int64_t total = 0;
+		for(size_t i = nuis/10; i <= nuis*9/10; i++)
+		{
+			total += ui_widths[i];
+			navg ++;
+		}
+
+		cap->m_uiWidth = (1.0 * total) / navg;
+	}
 }
 
 /**

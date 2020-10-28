@@ -117,6 +117,9 @@ public:
 
 	virtual void ClearSweeps();
 
+	void RecalculateUIWidth();
+	EyeWaveform* ReallocateWaveform();
+
 	void SetWidth(size_t width)
 	{
 		m_width = width;
