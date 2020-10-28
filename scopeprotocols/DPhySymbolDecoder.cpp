@@ -158,17 +158,23 @@ void DPhySymbolDecoder::Refresh()
 		{
 			//Can only go to a HS state from another HS state or LP00
 			if( (state == DPhySymbol::STATE_HS0) ||
-				(state == DPhySymbol::STATE_HS1) ||
-				(state == DPhySymbol::STATE_LP00) )
+				(state == DPhySymbol::STATE_HS1) )
 			{
 				if(v > 0.88)
 					nextstate = DPhySymbol::STATE_LP11;
-				else if(v > 0.225)
+				else if(v > 0.21)
 					nextstate = DPhySymbol::STATE_HS1;
+				else if(v < 0.16)
+					nextstate = DPhySymbol::STATE_HS0;
+			}
+
+			//LP00 can go to HS0 or stay in LP00
+			else if(state == DPhySymbol::STATE_LP00)
+			{
+				if(v > 0.125)
+					nextstate = DPhySymbol::STATE_HS0;
 				else if(v < 0.025)
 					nextstate = DPhySymbol::STATE_LP00;
-				else if(v < 0.175)
-					nextstate = DPhySymbol::STATE_HS0;
 			}
 
 			//Otherwise, only consider other LP states
@@ -195,9 +201,9 @@ void DPhySymbolDecoder::Refresh()
 					(state == DPhySymbol::STATE_HS1) ||
 					(state == DPhySymbol::STATE_LP00) )
 				{
-					if(vd < -0.07)
+					if(vd < -0.05)
 						nextstate = DPhySymbol::STATE_HS0;
-					else if(vd > 0.07)
+					else if(vd > 0.05)
 						nextstate = DPhySymbol::STATE_HS1;
 				}
 
