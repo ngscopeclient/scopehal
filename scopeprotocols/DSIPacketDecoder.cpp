@@ -429,7 +429,7 @@ void DSIPacketDecoder::Refresh()
 
 					//Packet is over now
 					state = STATE_HEADER;
-					pack->m_headers["Len"] = to_string(pack->m_data.size());
+					pack->m_headers["Length"] = to_string(pack->m_data.size());
 					pack->m_len = (end * din->m_timescale) - pack->m_offset;
 				}
 				else
@@ -504,7 +504,7 @@ void DSIPacketDecoder::Refresh()
 					//Done
 					state = STATE_HEADER;
 					pack->m_len = (end * din->m_timescale) - pack->m_offset;
-					pack->m_headers["Len"] = to_string(pack->m_data.size());
+					pack->m_headers["Length"] = to_string(pack->m_data.size());
 				}
 				else
 				{
@@ -744,7 +744,7 @@ Packet* DSIPacketDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
 		(pack->m_headers["Type"] == "RGB565"))
 	{
 		ret->m_headers["Type"] = pack->m_headers["Type"];
-		ret->m_headers["Len"] = pack->m_headers["Len"];
+		ret->m_headers["Length"] = pack->m_headers["Length"];
 		ret->m_data = pack->m_data;
 		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 	}

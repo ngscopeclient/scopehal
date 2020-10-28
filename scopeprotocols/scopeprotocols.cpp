@@ -59,6 +59,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DPhySymbolDecoder);
 	AddDecoderClass(DramRefreshActivateMeasurement);
 	AddDecoderClass(DramRowColumnLatencyMeasurement);
+	AddDecoderClass(DSIFrameDecoder);
 	AddDecoderClass(DSIPacketDecoder);
 	AddDecoderClass(DutyCycleMeasurement);
 	AddDecoderClass(DVIDecoder);

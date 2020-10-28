@@ -21,6 +21,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DPhySymbolDecoder.cpp
 	DramRefreshActivateMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
+	DSIFrameDecoder.cpp
 	DSIPacketDecoder.cpp
 	DutyCycleMeasurement.cpp
 	DVIDecoder.cpp

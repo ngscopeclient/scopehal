@@ -96,10 +96,6 @@ public:
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
 
-protected:
-	uint16_t UpdateCRC(uint16_t crc, uint8_t data);
-	uint16_t BitReverse(uint16_t crc);
-
 	//From table 16
 	enum
 	{
@@ -134,6 +130,10 @@ protected:
 		TYPE_LOOSE_PIXEL_RGB666			= 0x2e,
 		TYPE_PACKED_PIXEL_RGB888		= 0x3e
 	};
+
+protected:
+	uint16_t UpdateCRC(uint16_t crc, uint8_t data);
+	uint16_t BitReverse(uint16_t crc);
 
 public:
 	PROTOCOL_DECODER_INITPROC(DSIPacketDecoder)
