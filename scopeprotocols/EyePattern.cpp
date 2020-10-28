@@ -99,6 +99,8 @@ EyePattern::EyePattern(const string& color)
 	, m_centerName("Center Voltage")
 	, m_maskName("Mask")
 	, m_polarityName("Clock Edge")
+	, m_vmodeName("Vertical Scale Mode")
+	, m_rangeName("Vertical Range")
 {
 	//Set up channels
 	CreateInput("din");
@@ -120,6 +122,13 @@ EyePattern::EyePattern(const string& color)
 	m_parameters[m_polarityName].AddEnumValue("Falling", CLOCK_FALLING);
 	m_parameters[m_polarityName].AddEnumValue("Both", CLOCK_BOTH);
 	m_parameters[m_polarityName].SetIntVal(CLOCK_BOTH);
+
+	m_parameters[m_vmodeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_vmodeName].AddEnumValue("Auto", RANGE_AUTO);
+	m_parameters[m_vmodeName].AddEnumValue("Fixed", RANGE_FIXED);
+
+	m_parameters[m_rangeName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_rangeName].SetFloatVal(0.25);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +177,10 @@ bool EyePattern::NeedsConfig()
 
 double EyePattern::GetVoltageRange()
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	if(m_parameters[m_vmodeName].GetIntVal() == RANGE_AUTO)
+		return m_inputs[0].m_channel->GetVoltageRange();
+	else
+		return m_parameters[m_rangeName].GetFloatVal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -420,7 +432,7 @@ void EyePattern::Refresh()
 
 	//Process the eye
 	size_t cend = clock_edges.size();
-	float yscale = m_height / m_inputs[0].m_channel->GetVoltageRange();
+	float yscale = m_height / GetVoltageRange();
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	size_t iclock = 0;

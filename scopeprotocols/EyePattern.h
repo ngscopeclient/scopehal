@@ -155,6 +155,12 @@ public:
 		CLOCK_BOTH 		= 3	//CLOCK_RISING | CLOCK_FALLING
 	};
 
+	enum RangeMode
+	{
+		RANGE_AUTO		= 0,
+		RANGE_FIXED		= 1
+	};
+
 	PROTOCOL_DECODER_INITPROC(EyePattern)
 
 protected:
@@ -170,6 +176,8 @@ protected:
 	std::string m_centerName;
 	std::string m_maskName;
 	std::string m_polarityName;
+	std::string m_vmodeName;
+	std::string m_rangeName;
 
 	EyeMask m_mask;
 };

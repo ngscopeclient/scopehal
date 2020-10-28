@@ -159,17 +159,46 @@ void DPhyHSClockRecoveryFilter::Refresh()
 		//See if the data is in HS mode
 		bool hs_mode = (cur_data.m_type == DPhySymbol::STATE_HS0) || (cur_data.m_type == DPhySymbol::STATE_HS1);
 
-		//Emit a new sample for this clock pulse if we have a toggle in HS mode
 		int64_t toff = clk->m_offsets[iclk];
 		int64_t tend = toff + clk->m_durations[iclk];
-		if(clock_toggling && hs_mode)
+		if(clock_toggling)
 		{
-			cap->m_offsets.push_back(tstart);
-			cap->m_durations.push_back(tend - tstart);
-			cap->m_samples.push_back(cur_out);
+			//Emit a new sample for this clock pulse if we have a toggle in HS mode
+			if(hs_mode)
+			{
+				cap->m_offsets.push_back(tstart);
+				cap->m_durations.push_back(tend - tstart);
+				cap->m_samples.push_back(cur_out);
 
-			cur_out = !cur_out;
-			tstart = tend;
+				cur_out = !cur_out;
+				tstart = tend;
+			}
+
+			//If we've left HS mode, delete the last few toggles
+			else
+			{
+				for(size_t i=0; i<10; i++)
+				{
+					if(cap->m_offsets.empty())
+						break;
+
+					cap->m_offsets.pop_back();
+					cap->m_durations.pop_back();
+					cap->m_samples.pop_back();
+				}
+
+				if(cap->m_offsets.empty())
+				{
+					tstart = 0;
+					cur_out = false;
+				}
+				else
+				{
+					size_t n = cap->m_offsets.size() - 1;
+					tstart = cap->m_offsets[n];
+					cur_out = cap->m_samples[n];
+				}
+			}
 		}
 
 		//All good, move on
