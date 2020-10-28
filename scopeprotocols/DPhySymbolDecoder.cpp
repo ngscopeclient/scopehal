@@ -128,64 +128,61 @@ void DPhySymbolDecoder::Refresh()
 	cap->m_timescale = dp->m_timescale;
 	cap->m_startTimestamp = dp->m_startTimestamp;
 	cap->m_startPicoseconds = dp->m_startPicoseconds;
-	DPhySymbol::type state = DPhySymbol::STATE_LP00;
+	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
+	DPhySymbol::type state = DPhySymbol::STATE_HS0;
+	DPhySymbol::type nextstate = state;
 
-	/*
-	If we have Dp only, we can decode a restricted subset of line states by cheating a bit.
-	This isn't truly spec compliant but allows for protocol decoding with only one probe.
-
-		HS-1
-			Dp > 225 mV
-			Dp < 880 mV
-
-		HS-0
-			Dp > 50 mV
-			Dp < 175 mV
-
-		LP-00 or LP-01 (decode as LP-00)
-			Dp < 50 mV
-
-		LP-10 or LP-11 (decode as LP-11)
-			Dp > 880 mV
-	*/
-	if(!dn)
+	for(size_t i=0; i<len; i++)
 	{
-		DPhySymbol::type nextstate = state;
-		for(size_t i=0; i<len; i++)
+		float v = dp->m_samples[i];
+
+		/*
+			If we have Dp only, we can decode a restricted subset of line states by cheating a bit.
+			This isn't truly spec compliant but allows for protocol decoding with only one probe.
+
+				HS-1
+					Dp > 225 mV
+					Dp < 880 mV
+
+				HS-0
+					Dp > 50 mV
+					Dp < 175 mV
+
+				LP-00 or LP-01 (decode as LP-00)
+					Dp < 50 mV
+
+				LP-10 or LP-11 (decode as LP-11)
+					Dp > 880 mV
+		*/
+		if(!dn)
 		{
-			float v = dp->m_samples[i];
-
-			if(v > 0.88)
-				nextstate = DPhySymbol::STATE_LP11;
-			else if(v > 0.225)
-				nextstate = DPhySymbol::STATE_HS1;
-			else if(v < 0.005)
-				nextstate = DPhySymbol::STATE_LP00;
-			else if(v < 0.175)
-				nextstate = DPhySymbol::STATE_HS0;
-
-			//If same as existing state, extend it
-			size_t nsize = cap->m_samples.size();
-			size_t nlast = nsize-1;
-			if(nsize && cap->m_samples[nlast].m_type == nextstate)
-				cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
-
-			//Nope, create a new sample
-			else
+			//Can only go to a HS state from another HS state or LP00
+			if( (state == DPhySymbol::STATE_HS0) ||
+				(state == DPhySymbol::STATE_HS1) ||
+				(state == DPhySymbol::STATE_LP00) )
 			{
-				cap->m_offsets.push_back(dp->m_offsets[i]);
-				cap->m_durations.push_back(dp->m_durations[i]);
-				cap->m_samples.push_back(nextstate);
+				if(v > 0.88)
+					nextstate = DPhySymbol::STATE_LP11;
+				else if(v > 0.225)
+					nextstate = DPhySymbol::STATE_HS1;
+				else if(v < 0.025)
+					nextstate = DPhySymbol::STATE_LP00;
+				else if(v < 0.175)
+					nextstate = DPhySymbol::STATE_HS0;
 			}
 
-			state = nextstate;
+			//Otherwise, only consider other LP states
+			else
+			{
+				if(v > 0.88)
+					nextstate = DPhySymbol::STATE_LP11;
+				else if(v < 0.025)
+					nextstate = DPhySymbol::STATE_LP00;
+			}
 		}
-	}
 
-	else
-	{
-		DPhySymbol::type nextstate = state;
-		for(size_t i=0; i<len; i++)
+		//Full differential decode
+		else
 		{
 			float vp = dp->m_samples[i];
 			float vn = dn->m_samples[i];
@@ -213,44 +210,85 @@ void DPhySymbolDecoder::Refresh()
 				nextstate = DPhySymbol::STATE_LP10;
 			else if( (vp > 0.80) && (vn > 0.80) )
 				nextstate = DPhySymbol::STATE_LP11;
+		}
 
-			//If same as existing state, extend it
-			size_t nsize = cap->m_samples.size();
-			size_t nlast = nsize-1;
-			if(nsize && cap->m_samples[nlast].m_type == nextstate)
-				cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
+		//See if the state has changed
+		size_t nsize = cap->m_samples.size();
+		size_t nlast = nsize-1;
+		bool samestate = (nsize && cap->m_samples[nlast].m_type == nextstate);
 
-			//Nope, create a new sample
-			else
+		//Glitch filtering
+		if(!samestate && nsize)
+		{
+			bool last_was_glitch = false;
+
+			//If we are transitioning from LP-00 to HS-0, we need to hold in LP-00 state for Ths-prepare first.
+			//Discard any glitches to HS-0 during the transition period.
+			if( (state == DPhySymbol::STATE_LP00) && (nextstate == DPhySymbol::STATE_HS0) )
 			{
-				//Glitch filter LP states.
-				//If the previous sample was a LP state, but significantly less than Tlpx long, discard it.
-				//For now, set the cutoff at 40 ns (40,000 ps)
-				const int64_t tlpx_cutoff = 40000;
-				if(nsize && (state != DPhySymbol::STATE_HS0) && (state != DPhySymbol::STATE_HS1) )
+				//For now, set the cutoff at 30 ns. Per spec it should be 40 ns + 4 UI at the TX,
+				//but we're decoding combinatorially and don't know the UI yet.
+				const int64_t thsprepare_cutoff = 30000;
+				if( (cap->m_durations[nlast] * cap->m_timescale) < thsprepare_cutoff )
 				{
-					if( (cap->m_durations[nlast] * cap->m_timescale) < tlpx_cutoff )
-					{
-						cap->m_durations.resize(nlast);
-						cap->m_offsets.resize(nlast);
-						cap->m_samples.resize(nlast);
-
-						//If there was a previous sample, extend it to the start of this one
-						if(nsize > 1)
-						{
-							nlast --;
-							cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
-						}
-					}
+					nextstate  = DPhySymbol::STATE_LP00;
+					samestate = true;
 				}
-
-				cap->m_offsets.push_back(dp->m_offsets[i]);
-				cap->m_durations.push_back(dp->m_durations[i]);
-				cap->m_samples.push_back(nextstate);
 			}
 
+			//Transition from HS-0 to LP-00 isn't allowed.
+			//This probably means we were never in HS-0 in the first place.
+			else if( (state == DPhySymbol::STATE_HS0) && (nextstate == DPhySymbol::STATE_LP00) )
+				last_was_glitch = true;
+
+			//If the previous sample was a LP state, but significantly less than Tlpx long, discard it.
+			else if( (state != DPhySymbol::STATE_HS0) && (state != DPhySymbol::STATE_HS1) )
+			{
+				//For now, set the cutoff at 40 ns (40,000 ps).
+				//This provides some margin on the 50 ns Tlpx in the spec.
+				const int64_t tlpx_cutoff = 40000;
+				if( (cap->m_durations[nlast] * cap->m_timescale) < tlpx_cutoff )
+					last_was_glitch = true;
+			}
+
+			if(last_was_glitch)
+			{
+				//Delete the glitch sample
+				cap->m_durations.pop_back();
+				cap->m_offsets.pop_back();
+				cap->m_samples.pop_back();
+
+				//Update sizes
+				nsize = cap->m_samples.size();
+				if(nsize)
+				{
+					nlast = nsize-1;
+					last_state = cap->m_samples[nlast].m_type;
+					samestate = (nsize && last_state == nextstate);
+
+					//If changing, extend the pre-glitch sample to the start of this sample
+					if(!samestate)
+						cap->m_durations[nlast] = dp->m_offsets[i] - cap->m_offsets[nlast];
+				}
+				else
+					samestate = false;
+			}
+		}
+
+		//If same as existing state, extend last one
+		if(samestate)
+			cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
+
+		//Nope, create a new sample
+		else
+		{
+			cap->m_offsets.push_back(dp->m_offsets[i]);
+			cap->m_durations.push_back(dp->m_durations[i]);
+			cap->m_samples.push_back(nextstate);
 			state = nextstate;
 		}
+
+		last_state = state;
 	}
 
 	SetData(cap, 0);
