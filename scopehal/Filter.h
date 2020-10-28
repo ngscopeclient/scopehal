@@ -174,8 +174,9 @@ public:
 	virtual Gdk::Color GetColor(int i);
 	virtual std::string GetText(int i);
 
-	//Helpers for superresolution
+	//Helpers for sub-sample interoplation
 	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
+	static float InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, float voltage);
 	static float InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks);
 
 	//Helpers for more complex measurements

@@ -55,6 +55,7 @@
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
 #include "DPhyDataDecoder.h"
+#include "DPhyHSClockRecoveryFilter.h"
 #include "DPhySymbolDecoder.h"
 #include "DramRefreshActivateMeasurement.h"
 #include "DramRowColumnLatencyMeasurement.h"

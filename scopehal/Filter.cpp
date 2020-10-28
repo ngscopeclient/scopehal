@@ -788,6 +788,29 @@ float Filter::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
 }
 
 /**
+	@brief Interpolates the actual time of a differential threshold crossing between two samples
+
+	Simple linear interpolation for now (TODO sinc)
+
+	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
+ */
+float Filter::InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, float voltage)
+{
+	//If the voltage isn't between the two points, abort
+	float fa = p->m_samples[a] - n->m_samples[a];
+	float fb = p->m_samples[a+1] - n->m_samples[a+1];
+	bool ag = (fa > voltage);
+	bool bg = (fb > voltage);
+	if( (ag && bg) || (!ag && !bg) )
+		return 0;
+
+	//no need to divide by time, sample spacing is normalized to 1 timebase unit
+	float slope = (fb - fa);
+	float delta = voltage - fa;
+	return delta / slope;
+}
+
+/**
 	@brief Interpolates the actual value of a point between two samples
 
 	@param cap			Waveform to work with

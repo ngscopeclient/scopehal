@@ -125,7 +125,7 @@ void DPhySymbolDecoder::Refresh()
 
 	//Create output waveform
 	DPhySymbolWaveform* cap = new DPhySymbolWaveform;
-	cap->m_timescale = dp->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = dp->m_startTimestamp;
 	cap->m_startPicoseconds = dp->m_startPicoseconds;
 	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
@@ -135,6 +135,8 @@ void DPhySymbolDecoder::Refresh()
 	for(size_t i=0; i<len; i++)
 	{
 		float v = dp->m_samples[i];
+		int64_t start = dp->m_offsets[i] * dp->m_timescale;
+		int64_t dur = dp->m_durations[i] * dp->m_timescale;
 
 		/*
 			If we have Dp only, we can decode a restricted subset of line states by cheating a bit.
@@ -163,9 +165,17 @@ void DPhySymbolDecoder::Refresh()
 				if(v > 0.88)
 					nextstate = DPhySymbol::STATE_LP11;
 				else if(v > 0.21)
+				{
+					//Interpolate the toggle time to sub-sample precision
+					start += dp->m_timescale * InterpolateTime(dp, i-1, 0.21);
+
 					nextstate = DPhySymbol::STATE_HS1;
+				}
 				else if(v < 0.16)
+				{
+					start += dp->m_timescale * InterpolateTime(dp, i-1, 0.16);
 					nextstate = DPhySymbol::STATE_HS0;
+				}
 			}
 
 			//LP00 can go to HS0 or stay in LP00
@@ -202,9 +212,15 @@ void DPhySymbolDecoder::Refresh()
 					(state == DPhySymbol::STATE_LP00) )
 				{
 					if(vd < -0.05)
+					{
 						nextstate = DPhySymbol::STATE_HS0;
+						start += dp->m_timescale * InterpolateTime(dp, dn, i-1, -0.05);
+					}
 					else if(vd > 0.05)
+					{
 						nextstate = DPhySymbol::STATE_HS1;
+						start += dp->m_timescale * InterpolateTime(dp, dn, i-1, 0.05);
+					}
 				}
 
 				if( (fabs(vd) < 0.07) && (vp < 0.15) && (vn < 0.15) )
@@ -235,7 +251,7 @@ void DPhySymbolDecoder::Refresh()
 				//For now, set the cutoff at 30 ns. Per spec it should be 40 ns + 4 UI at the TX,
 				//but we're decoding combinatorially and don't know the UI yet.
 				const int64_t thsprepare_cutoff = 30000;
-				if( (cap->m_durations[nlast] * cap->m_timescale) < thsprepare_cutoff )
+				if( (cap->m_durations[nlast]) < thsprepare_cutoff )
 				{
 					nextstate  = DPhySymbol::STATE_LP00;
 					samestate = true;
@@ -253,7 +269,7 @@ void DPhySymbolDecoder::Refresh()
 				//For now, set the cutoff at 40 ns (40,000 ps).
 				//This provides some margin on the 50 ns Tlpx in the spec.
 				const int64_t tlpx_cutoff = 40000;
-				if( (cap->m_durations[nlast] * cap->m_timescale) < tlpx_cutoff )
+				if( (cap->m_durations[nlast]) < tlpx_cutoff )
 					last_was_glitch = true;
 			}
 
@@ -274,7 +290,7 @@ void DPhySymbolDecoder::Refresh()
 
 					//If changing, extend the pre-glitch sample to the start of this sample
 					if(!samestate)
-						cap->m_durations[nlast] = dp->m_offsets[i] - cap->m_offsets[nlast];
+						cap->m_durations[nlast] = (start) - cap->m_offsets[nlast];
 				}
 				else
 					samestate = false;
@@ -283,13 +299,19 @@ void DPhySymbolDecoder::Refresh()
 
 		//If same as existing state, extend last one
 		if(samestate)
-			cap->m_durations[nlast] = dp->m_offsets[i] + dp->m_durations[i] - cap->m_offsets[nlast];
+			cap->m_durations[nlast] = start + dp->m_durations[i]*dp->m_timescale - cap->m_offsets[nlast];
 
 		//Nope, create a new sample
 		else
 		{
-			cap->m_offsets.push_back(dp->m_offsets[i]);
-			cap->m_durations.push_back(dp->m_durations[i]);
+			//Extend last sample to start of this one, if needed
+			nsize = cap->m_samples.size();
+			nlast = nsize-1;
+			if(nsize)
+				cap->m_durations[nlast] = start - cap->m_offsets[nlast];
+
+			cap->m_offsets.push_back(start);
+			cap->m_durations.push_back(dur);
 			cap->m_samples.push_back(nextstate);
 			state = nextstate;
 		}

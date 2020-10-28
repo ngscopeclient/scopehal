@@ -18,6 +18,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp
+	DPhyHSClockRecoveryFilter.cpp
 	DPhySymbolDecoder.cpp
 	DramRefreshActivateMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
