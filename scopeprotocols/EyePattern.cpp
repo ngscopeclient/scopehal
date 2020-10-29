@@ -585,7 +585,7 @@ void EyePattern::DoMaskTest(EyeWaveform* cap)
 	cr->fill();
 
 	//Software rendering
-	float yscale = m_height / m_inputs[0].m_channel->GetVoltageRange();
+	float yscale = m_height / GetVoltageRange();
 	m_mask.RenderForAnalysis(
 		cr,
 		cap,
@@ -599,11 +599,12 @@ void EyePattern::DoMaskTest(EyeWaveform* cap)
 
 	//Test each pixel of the eye pattern against the mask
 	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
+	int stride = surface->get_stride() / sizeof(uint32_t);
 	size_t total = 0;
 	size_t hits = 0;
 	for(size_t y=0; y<m_height; y++)
 	{
-		auto row = data + (y*m_width);
+		auto row = data + (y*stride);
 		auto eyerow = accum + (y*m_width);
 		for(size_t x=0; x<m_width; x++)
 		{
