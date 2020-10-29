@@ -167,13 +167,15 @@ void DPhySymbolDecoder::Refresh()
 				else if(v > 0.21)
 				{
 					//Interpolate the toggle time to sub-sample precision
-					start += dp->m_timescale * InterpolateTime(dp, i-1, 0.21);
+					if(i != 0)
+						start += dp->m_timescale * InterpolateTime(dp, i-1, 0.21);
 
 					nextstate = DPhySymbol::STATE_HS1;
 				}
 				else if(v < 0.16)
 				{
-					start += dp->m_timescale * InterpolateTime(dp, i-1, 0.16);
+					if(i != 0)
+						start += dp->m_timescale * InterpolateTime(dp, i-1, 0.16);
 					nextstate = DPhySymbol::STATE_HS0;
 				}
 			}
@@ -214,12 +216,14 @@ void DPhySymbolDecoder::Refresh()
 					if(vd < -0.05)
 					{
 						nextstate = DPhySymbol::STATE_HS0;
-						start += dp->m_timescale * InterpolateTime(dp, dn, i-1, -0.05);
+						if(i != 0)
+							start += dp->m_timescale * InterpolateTime(dp, dn, i-1, -0.05);
 					}
 					else if(vd > 0.05)
 					{
 						nextstate = DPhySymbol::STATE_HS1;
-						start += dp->m_timescale * InterpolateTime(dp, dn, i-1, 0.05);
+						if(i != 0)
+							start += dp->m_timescale * InterpolateTime(dp, dn, i-1, 0.05);
 					}
 				}
 
