@@ -164,6 +164,12 @@ public:
 		RANGE_FIXED		= 1
 	};
 
+	enum ClockAlignment
+	{
+		ALIGN_CENTER,
+		ALIGN_EDGE
+	};
+
 	PROTOCOL_DECODER_INITPROC(EyePattern)
 
 protected:
@@ -174,6 +180,7 @@ protected:
 
 	int64_t m_xoff;
 	float m_xscale;
+	ClockAlignment m_lastClockAlign;
 
 	std::string m_saturationName;
 	std::string m_centerName;
@@ -181,6 +188,7 @@ protected:
 	std::string m_polarityName;
 	std::string m_vmodeName;
 	std::string m_rangeName;
+	std::string m_clockAlignName;
 
 	EyeMask m_mask;
 };

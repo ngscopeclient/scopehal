@@ -95,12 +95,14 @@ EyePattern::EyePattern(const string& color)
 	, m_width(1)
 	, m_xoff(0)
 	, m_xscale(0)
+	, m_lastClockAlign(ALIGN_CENTER)
 	, m_saturationName("Saturation Level")
 	, m_centerName("Center Voltage")
 	, m_maskName("Mask")
 	, m_polarityName("Clock Edge")
 	, m_vmodeName("Vertical Scale Mode")
 	, m_rangeName("Vertical Range")
+	, m_clockAlignName("Clock Alignment")
 {
 	//Set up channels
 	CreateInput("din");
@@ -129,6 +131,11 @@ EyePattern::EyePattern(const string& color)
 
 	m_parameters[m_rangeName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_rangeName].SetFloatVal(0.25);
+
+	m_parameters[m_clockAlignName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_clockAlignName].AddEnumValue("Center", ALIGN_CENTER);
+	m_parameters[m_clockAlignName].AddEnumValue("Edge", ALIGN_EDGE);
+	m_parameters[m_clockAlignName].SetIntVal(ALIGN_CENTER);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -369,9 +376,18 @@ void EyePattern::Refresh()
 	{
 		if(abs(cap->GetCenterVoltage() - center) > 0.001)
 		{
-			delete cap;
+			SetData(NULL, 0);
 			cap = NULL;
 		}
+	}
+
+	//If clock alignment was changed, reset existing eye data
+	ClockAlignment clock_align = static_cast<ClockAlignment>(m_parameters[m_clockAlignName].GetIntVal());
+	if(m_lastClockAlign != clock_align)
+	{
+		SetData(NULL, 0);
+		cap = NULL;
+		m_lastClockAlign = clock_align;
 	}
 
 	//Load the mask, if needed
@@ -406,6 +422,14 @@ void EyePattern::Refresh()
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
 		RecalculateUIWidth();
+
+	//Shift the clock by half a UI if it's edge aligned
+	//All of the eye creation logic assumes a center aligned clock.
+	if(clock_align == ALIGN_EDGE)
+	{
+		for(size_t i=0; i<clock_edges.size(); i++)
+			clock_edges[i] += cap->m_uiWidth / 2;
+	}
 
 	//Process the eye
 	size_t cend = clock_edges.size();
