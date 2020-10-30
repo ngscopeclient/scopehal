@@ -34,6 +34,7 @@
 
 class DropoutTrigger;
 class EdgeTrigger;
+class GlitchTrigger;
 class PulseWidthTrigger;
 class RuntTrigger;
 class SlewRateTrigger;
@@ -209,6 +210,7 @@ public:
 protected:
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();
+	void PullGlitchTrigger();
 	void PullPulseWidthTrigger();
 	void PullRuntTrigger();
 	void PullSlewRateTrigger();
@@ -221,6 +223,7 @@ protected:
 
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& tree);
+	void PushGlitchTrigger(GlitchTrigger* trig);
 	void PushCondition(const std::string& path, Trigger::Condition cond);
 	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);

@@ -49,6 +49,7 @@
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
+#include "GlitchTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
@@ -129,6 +130,7 @@ void DriverStaticInit()
 
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
+	AddTriggerClass(GlitchTrigger);
 	AddTriggerClass(PulseWidthTrigger);
 	AddTriggerClass(RuntTrigger);
 	AddTriggerClass(SlewRateTrigger);

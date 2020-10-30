@@ -39,6 +39,7 @@ set(SCOPEHAL_SOURCES
 	Trigger.cpp
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
+	GlitchTrigger.cpp
 	PulseWidthTrigger.cpp
 	RuntTrigger.cpp
 	SerialTrigger.cpp

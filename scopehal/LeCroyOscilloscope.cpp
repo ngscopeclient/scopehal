@@ -36,6 +36,7 @@
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
+#include "GlitchTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
@@ -3448,6 +3449,8 @@ void LeCroyOscilloscope::PullTrigger()
 		PullDropoutTrigger();
 	else if (reply == "Edge")
 		PullEdgeTrigger();
+	else if (reply == "Glitch")
+		PullGlitchTrigger();
 	else if (reply == "Runt")
 		PullRuntTrigger();
 	else if (reply == "SlewRate")
@@ -3553,6 +3556,45 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
 	GetTriggerSlope(et, Trim(m_transport->ReadReply()));
+}
+
+/**
+	@brief Reads settings for a glitch trigger from the instrument
+ */
+void LeCroyOscilloscope::PullGlitchTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<GlitchTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new GlitchTrigger(this);
+	GlitchTrigger* gt = dynamic_cast<GlitchTrigger*>(m_trigger);
+
+	//Level
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Level'");
+	gt->SetLevel(stof(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Slope'");
+	GetTriggerSlope(gt, Trim(m_transport->ReadReply()));
+
+	//Condition
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Condition'");
+	gt->SetCondition(GetCondition(m_transport->ReadReply()));
+
+	//Min range
+	Unit ps(Unit::UNIT_PS);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeLow'");
+	gt->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+
+	//Max range
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeHigh'");
+	gt->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
 }
 
 /**
@@ -3883,6 +3925,7 @@ void LeCroyOscilloscope::PushTrigger()
 	//The rest depends on the type
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
@@ -3893,15 +3936,15 @@ void LeCroyOscilloscope::PushTrigger()
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"");
 		PushDropoutTrigger(dt);
 	}
-	else if(pt)	//must be before edge trigger
+	else if(pt)
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
 		PushPulseWidthTrigger(pt);
 	}
-	else if(et)
+	else if(gt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
-		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Glitch\"");
+		PushGlitchTrigger(gt);
 	}
 	else if(rt)
 	{
@@ -3922,6 +3965,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Window\"");
 		PushWindowTrigger(wt);
+	}
+	else if(et)	//must be last
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
+		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
 	}
 
 	else
@@ -3985,6 +4033,17 @@ void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	PushCondition("app.Acquisition.Trigger.Width.Condition", trig->GetCondition());
 	PushFloat("app.Acquisition.Trigger.Width.TimeHigh", trig->GetUpperBound() * 1e-12f);
 	PushFloat("app.Acquisition.Trigger.Width.TimeLow", trig->GetLowerBound() * 1e-12f);
+}
+
+/**
+	@brief Pushes settings for a glitch trigger to the instrument
+ */
+void LeCroyOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
+{
+	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Glitch");
+	PushCondition("app.Acquisition.Trigger.Glitch.Condition", trig->GetCondition());
+	PushFloat("app.Acquisition.Trigger.Glitch.TimeHigh", trig->GetUpperBound() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Glitch.TimeLow", trig->GetLowerBound() * 1e-12f);
 }
 
 /**
@@ -4214,6 +4273,7 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(DropoutTrigger::GetTriggerName());
 	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(GlitchTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	ret.push_back(RuntTrigger::GetTriggerName());
 	ret.push_back(SlewRateTrigger::GetTriggerName());
