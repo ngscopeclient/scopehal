@@ -187,6 +187,7 @@ public:
 	void SetCenterFrequency(int64_t freq);
 
 protected:
+	void SharedCtorInit();
 
 	/**
 		@brief Clears out any existing streams

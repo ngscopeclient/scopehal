@@ -61,10 +61,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_xAxisUnit(Unit::UNIT_PS)
 	, m_yAxisUnit(Unit::UNIT_VOLTS)
 {
-	//Create a stream for our output.
-	//Normal channels only have one stream.
-	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
-	AddStream("data");
+	SharedCtorInit();
 }
 
 OscilloscopeChannel::OscilloscopeChannel(
@@ -89,10 +86,25 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_xAxisUnit(xunit)
 	, m_yAxisUnit(yunit)
 {
+	SharedCtorInit();
+}
+
+void OscilloscopeChannel::SharedCtorInit()
+{
 	//Create a stream for our output.
 	//Normal channels only have one stream.
 	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
 	AddStream("data");
+
+	//If we have a scope, m_displayname is ignored.
+	//Start out by pulling the name from hardware.
+	//If it's not set, use our hardware name as the default.
+	if(m_scope)
+	{
+		auto name = m_scope->GetChannelDisplayName(m_index);
+		if(name == "")
+			m_scope->SetChannelDisplayName(m_index, m_hwname);
+	}
 }
 
 OscilloscopeChannel::~OscilloscopeChannel()
