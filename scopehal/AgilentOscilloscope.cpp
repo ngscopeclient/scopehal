@@ -81,15 +81,16 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		}
 
 		//Create the channel
-		m_channels.push_back(
-			new OscilloscopeChannel(
+		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
 			1,
 			i,
-			true));
+			true);
+		m_channels.push_back(chan);
+		chan->SetDefaultDisplayName();
 
 		//Configure transport format to raw 8-bit int
 		m_transport->SendCommand(":WAV:SOUR " + chname);
@@ -110,6 +111,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		m_channels.size(),
 		true);
 	m_channels.push_back(m_extTrigChannel);
+	m_extTrigChannel->SetDefaultDisplayName();
 
 	//See what options we have
 	m_transport->SendCommand("*OPT?");

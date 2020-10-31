@@ -95,7 +95,10 @@ void OscilloscopeChannel::SharedCtorInit()
 	//Normal channels only have one stream.
 	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
 	AddStream("data");
+}
 
+void OscilloscopeChannel::SetDefaultDisplayName()
+{
 	//If we have a scope, m_displayname is ignored.
 	//Start out by pulling the name from hardware.
 	//If it's not set, use our hardware name as the default.

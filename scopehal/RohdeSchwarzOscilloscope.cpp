@@ -73,15 +73,16 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 		}
 
 		//Create the channel
-		m_channels.push_back(
-			new OscilloscopeChannel(
+		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
 			1,
 			i,
-			true));
+			true);
+		m_channels.push_back(chan);
+		chan->SetDefaultDisplayName();
 
 		//Request all points when we download
 		m_transport->SendCommand(chname + ":DATA:POIN MAX");
@@ -98,6 +99,7 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 		m_channels.size(),
 		true);
 	m_channels.push_back(m_extTrigChannel);
+	m_extTrigChannel->SetDefaultDisplayName();
 
 	//Configure transport format to raw IEEE754 float, little endian
 	//TODO: if instrument internal is big endian, skipping the bswap might improve download performance?

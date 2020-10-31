@@ -76,8 +76,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
-		string chname = string("CHAN1");
-		chname[4] += i;
+		string chname = string("CHAN") + to_string(i+1);
 
 		//Color the channels based on Rigol's standard color sequence (yellow-cyan-red-blue)
 		string color = "#ffffff";
@@ -101,8 +100,9 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 		}
 
 		//Create the channel
-		m_channels.push_back(
-			new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, 1, i, true));
+		auto chan = new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, 1, i, true);
+		m_channels.push_back(chan);
+		chan->SetDefaultDisplayName();
 	}
 	m_analogChannelCount = nchans;
 
@@ -110,6 +110,7 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 	m_extTrigChannel =
 		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
+	m_extTrigChannel->SetDefaultDisplayName();
 
 	//Configure acquisition modes
 	if(m_protocol == DS_OLD)

@@ -186,6 +186,7 @@ public:
 
 	void SetCenterFrequency(int64_t freq);
 
+	void SetDefaultDisplayName();
 protected:
 	void SharedCtorInit();
 
