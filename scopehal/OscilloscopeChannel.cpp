@@ -97,6 +97,11 @@ void OscilloscopeChannel::SharedCtorInit()
 	AddStream("data");
 }
 
+/**
+	@brief Gives a channel a default display name if there's not one already.
+
+	MUST NOT be called until the channel has been added to its parent scope.
+ */
 void OscilloscopeChannel::SetDefaultDisplayName()
 {
 	//If we have a scope, m_displayname is ignored.
