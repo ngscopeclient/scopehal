@@ -56,6 +56,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
 	OFDMDemodulator.cpp
+	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	ParallelBus.cpp
 	PeakHoldFilter.cpp

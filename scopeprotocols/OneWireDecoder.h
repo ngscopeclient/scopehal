@@ -30,100 +30,62 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of OneWireDecoder
  */
 
-#include "scopeprotocols.h"
+#ifndef OneWireDecoder_h
+#define OneWireDecoder_h
 
-/**
-	@brief Static initialization for protocol list
- */
-void ScopeProtocolStaticInit()
+class OneWireSymbol
 {
-	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurement);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationFilter);
-	AddDecoderClass(ClockRecoveryFilter);
-	AddDecoderClass(CTLEFilter);
-	AddDecoderClass(CurrentShuntFilter);
-	AddDecoderClass(DCOffsetFilter);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedFilter);
-	AddDecoderClass(DeskewFilter);
-	AddDecoderClass(DownconvertFilter);
-	AddDecoderClass(DownsampleFilter);
-	AddDecoderClass(DPhyDataDecoder);
-	AddDecoderClass(DPhyHSClockRecoveryFilter);
-	AddDecoderClass(DPhySymbolDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurement);
-	AddDecoderClass(DramRowColumnLatencyMeasurement);
-	AddDecoderClass(DSIFrameDecoder);
-	AddDecoderClass(DSIPacketDecoder);
-	AddDecoderClass(DutyCycleMeasurement);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurement);
-	AddDecoderClass(EyePattern);
-	AddDecoderClass(EyeHeightMeasurement);
-	AddDecoderClass(EyeJitterMeasurement);
-	AddDecoderClass(EyePeriodMeasurement);
-	AddDecoderClass(EyeWidthMeasurement);
-	AddDecoderClass(FallMeasurement);
-	AddDecoderClass(FFTFilter);
-	AddDecoderClass(FrequencyMeasurement);
-	AddDecoderClass(HorizontalBathtub);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MagnitudeFilter);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
-	AddDecoderClass(OneWireDecoder);
-	AddDecoderClass(OvershootMeasurement);
-	AddDecoderClass(ParallelBus);
-	AddDecoderClass(PeakHoldFilter);
-	AddDecoderClass(PeriodMeasurement);
-	AddDecoderClass(PkPkMeasurement);
-	AddDecoderClass(QSPIDecoder);
-	AddDecoderClass(QuadratureDecoder);
-	AddDecoderClass(RiseMeasurement);
-	AddDecoderClass(SDCmdDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(SPIFlashDecoder);
-	AddDecoderClass(SubtractFilter);
-	AddDecoderClass(SWDDecoder);
-	AddDecoderClass(SWDMemAPDecoder);
-	AddDecoderClass(TachometerFilter);
-	AddDecoderClass(ThresholdFilter);
-	AddDecoderClass(TIEMeasurement);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurement);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryFilter);
-	AddDecoderClass(UndershootMeasurement);
-	AddDecoderClass(UpsampleFilter);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(Waterfall);
-	AddDecoderClass(WindowedAutocorrelationFilter);
+public:
+	enum stype
+	{
+		TYPE_RESET,
+		TYPE_DATA,
+		TYPE_ERROR,
+		TYPE_PRESENCE
+	};
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	OneWireSymbol()
+	{}
+
+	OneWireSymbol(stype t,uint8_t d)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint8_t m_data;
+
+	bool operator== (const OneWireSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<OneWireSymbol> OneWireWaveform;
+
+class OneWireDecoder : public Filter
+{
+public:
+	OneWireDecoder(const std::string& color);
+	virtual ~OneWireDecoder();
+
+	virtual Gdk::Color GetColor(int i);
+	virtual std::string GetText(int i);
+
+	virtual void Refresh();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(OneWireDecoder)
+
+protected:
+};
+
+#endif

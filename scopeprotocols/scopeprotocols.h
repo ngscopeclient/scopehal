@@ -92,6 +92,7 @@
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
 #include "OFDMDemodulator.h"
+#include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
 #include "PeakHoldFilter.h"
