@@ -252,6 +252,16 @@ void OneWireDecoder::Refresh()
 				else if(pulselen > 60)
 					current_byte >>= 1;
 
+				//Invalid pulse length
+				else
+				{
+					cap->m_offsets.push_back(starts[i]);
+					cap->m_durations.push_back(lens[i]);
+					cap->m_samples.push_back(OneWireSymbol(OneWireSymbol::TYPE_ERROR, 0));
+
+					state = STATE_IDLE;
+				}
+
 				bitcount ++;
 
 				//Last bit? Finish the byte
