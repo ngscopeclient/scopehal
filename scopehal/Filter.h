@@ -65,6 +65,19 @@ public:
 	Filter(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat);
 	virtual ~Filter();
 
+	/**
+		@brief Specifies whether we're using an auto-generated name or not
+	 */
+	void UseDefaultName(bool use)
+	{
+		m_usingDefault = use;
+		if(use)
+			SetDefaultName();
+	}
+
+	bool IsUsingDefaultName()
+	{ return m_usingDefault; }
+
 	virtual void Refresh() =0;
 
 	virtual void AddRef();
@@ -148,6 +161,9 @@ protected:
 
 	///Indicates if our output is out-of-sync with our input
 	bool m_dirty;
+
+	///Indicates we're using an auto-generated name
+	bool m_usingDefault;
 
 	bool VerifyAllInputsOK(bool allowEmpty = false);
 	bool VerifyInputOK(size_t i, bool allowEmpty = false);

@@ -63,6 +63,7 @@ Filter::Filter(
 	: OscilloscopeChannel(NULL, "", type, color, 1)	//TODO: handle this better?
 	, m_category(cat)
 	, m_dirty(true)
+	, m_usingDefault(true)
 {
 	m_physical = false;
 	m_filters.emplace(this);
