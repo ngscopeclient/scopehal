@@ -88,12 +88,44 @@ bool SubtractFilter::NeedsConfig()
 	return true;
 }
 
-double SubtractFilter::GetVoltageRange()
+double SubtractFilter::GetOffset()
 {
-	//TODO: default, but allow overriding
 	double v1 = m_inputs[0].m_channel->GetVoltageRange();
 	double v2 = m_inputs[1].m_channel->GetVoltageRange();
-	return max(v1, v2) * 2;
+	double o1 = m_inputs[0].m_channel->GetOffset();
+	double o2 = m_inputs[1].m_channel->GetOffset();
+
+	double vmax_p = v1/2 - o1;
+	double vmin_p = -v1/2 - o1;
+
+	double vmax_n = v2/2 - o2;
+	double vmin_n = -v2/2 - o2;
+
+	//Possible output range
+	double vout_max = vmax_p - vmin_n;
+	double vout_min = vmin_p - vmax_p;
+
+	return -(vout_min + ((vout_max - vout_min) / 2));
+}
+
+double SubtractFilter::GetVoltageRange()
+{
+	double v1 = m_inputs[0].m_channel->GetVoltageRange();
+	double v2 = m_inputs[1].m_channel->GetVoltageRange();
+	double o1 = m_inputs[0].m_channel->GetOffset();
+	double o2 = m_inputs[1].m_channel->GetOffset();
+
+	double vmax_p = v1/2 - o1;
+	double vmin_p = -v1/2 - o1;
+
+	double vmax_n = v2/2 - o2;
+	double vmin_n = -v2/2 - o2;
+
+	//Possible output range
+	double vout_max = vmax_p - vmin_n;
+	double vout_min = vmin_p - vmax_p;
+
+	return (vout_max - vout_min);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

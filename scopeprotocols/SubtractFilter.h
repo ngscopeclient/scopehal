@@ -48,6 +48,7 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
+	virtual double GetOffset();
 	virtual double GetVoltageRange();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
