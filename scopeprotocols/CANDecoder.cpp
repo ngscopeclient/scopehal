@@ -90,8 +90,8 @@ void CANDecoder::Refresh()
 		STATE_EXT_ID,
 		STATE_RTR,
 		STATE_IDE,
+		STATE_FD,
 		STATE_R0,
-		STATE_R1,
 		STATE_DLC,
 		STATE_DATA,
 		STATE_CRC,
@@ -244,13 +244,7 @@ void CANDecoder::Refresh()
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, frame_is_rtr));
 
 					if(extended_id)
-					{
-						tblockstart = off;
-						nbit = 0;
-						current_field = 0;
-						state = STATE_R1;
-					}
-
+						state = STATE_FD;
 					else
 						state = STATE_IDE;
 
@@ -307,19 +301,13 @@ void CANDecoder::Refresh()
 					current_field = 0;
 					break;
 
-				//Reserved bits (should always be zero)
-				case STATE_R1:
-					if(nbit == 2)
-					{
-						cap->m_offsets.push_back(tbitstart);
-						cap->m_durations.push_back(end - tbitstart);
-						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_R0, sampled_value));
+				//FD mode (currently ignored)
+				case STATE_FD:
+					cap->m_offsets.push_back(tbitstart);
+					cap->m_durations.push_back(end - tbitstart);
+					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_FD, sampled_value));
 
-						state = STATE_DLC;
-						tblockstart = off;
-						nbit = 0;
-						current_field = 0;
-					}
+					state = STATE_R0;
 					break;
 
 				//Data length code (4 bits)
@@ -467,6 +455,7 @@ Gdk::Color CANDecoder::GetColor(int i)
 				return m_standardColors[COLOR_ADDRESS];
 
 			case CANSymbol::TYPE_RTR:
+			case CANSymbol::TYPE_FD:
 				return m_standardColors[COLOR_CONTROL];
 
 			case CANSymbol::TYPE_DLC:
@@ -521,6 +510,12 @@ string CANDecoder::GetText(int i)
 			case CANSymbol::TYPE_ID:
 				snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
 				break;
+
+			case CANSymbol::TYPE_FD:
+				if(s.m_data)
+					return "FD";
+				else
+					return "STD";
 
 			case CANSymbol::TYPE_RTR:
 				if(s.m_data)

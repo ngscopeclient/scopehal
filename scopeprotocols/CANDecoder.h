@@ -17,6 +17,7 @@ public:
 		TYPE_RTR,
 		TYPE_IDE,
 		TYPE_R0,
+		TYPE_FD,
 		TYPE_DLC,
 		TYPE_DATA,
 		TYPE_CRC_OK,
