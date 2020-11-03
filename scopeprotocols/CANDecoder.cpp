@@ -250,6 +250,7 @@ void CANDecoder::Refresh()
 						pack->m_headers["ID"] = tmp;
 						pack->m_headers["Format"] = "Base";
 						pack->m_headers["Mode"] = "CAN";
+						pack->m_headers["Type"] = "Data";
 					}
 
 					break;
@@ -261,6 +262,9 @@ void CANDecoder::Refresh()
 					cap->m_offsets.push_back(tbitstart);
 					cap->m_durations.push_back(end - tbitstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, frame_is_rtr));
+
+					if(frame_is_rtr)
+						pack->m_headers["Type"] = "RTR";
 
 					if(extended_id)
 						state = STATE_FD;
@@ -351,8 +355,8 @@ void CANDecoder::Refresh()
 
 						frame_bytes_left = current_field;
 
-						//Skip data if DLC=0
-						if(frame_bytes_left == 0)
+						//Skip data if DLC=0, or if this is a read request
+						if( (frame_bytes_left == 0) || frame_is_rtr)
 							state = STATE_CRC;
 						else
 							state = STATE_DATA;
@@ -446,7 +450,10 @@ void CANDecoder::Refresh()
 					//EOF is 7 bits long
 					if(nbit == 7)
 					{
-						snprintf(tmp, sizeof(tmp), "%d", (int)pack->m_data.size());
+						if(frame_is_rtr)
+							snprintf(tmp, sizeof(tmp), "%d", (int)frame_bytes_left);
+						else
+							snprintf(tmp, sizeof(tmp), "%d", (int)pack->m_data.size());
 						pack->m_headers["Len"] = tmp;
 
 						cap->m_offsets.push_back(tblockstart);
@@ -604,8 +611,9 @@ vector<string> CANDecoder::GetHeaders()
 {
 	vector<string> ret;
 	ret.push_back("ID");
-	ret.push_back("Format");
 	ret.push_back("Mode");
+	ret.push_back("Format");
+	ret.push_back("Type");
 	ret.push_back("Ack");
 	ret.push_back("Len");
 	return ret;
