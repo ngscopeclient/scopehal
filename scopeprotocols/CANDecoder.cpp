@@ -87,12 +87,15 @@ void CANDecoder::Refresh()
 		STATE_IDLE,
 		STATE_SOF,
 		STATE_ID,
+		STATE_EXT_ID,
 		STATE_RTR,
 		STATE_IDE,
 		STATE_R0,
+		STATE_R1,
 		STATE_DLC,
 		STATE_DATA,
 		STATE_CRC,
+
 		STATE_CRC_DELIM,
 		STATE_ACK,
 		STATE_ACK_DELIM,
@@ -115,6 +118,7 @@ void CANDecoder::Refresh()
 	bool frame_is_rtr = false;
 	bool extended_id = false;
 	int frame_bytes_left = 0;
+	int32_t frame_id = 0;
 	for(size_t i = 0; i < len; i++)
 	{
 		bool v = diff->m_samples[i];
@@ -166,6 +170,10 @@ void CANDecoder::Refresh()
 			if(sampled_value == last_sampled_value)
 				bits_since_toggle ++;
 
+			//Don't look for stuff bits at the end of the frame
+			else if(state >= STATE_ACK)
+			{}
+
 			//Discard stuff bits
 			else
 			{
@@ -202,6 +210,8 @@ void CANDecoder::Refresh()
 					cap->m_durations.push_back(off - tblockstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
 
+					extended_id = false;
+
 					tblockstart = off;
 					nbit = 0;
 					current_field = 0;
@@ -219,6 +229,8 @@ void CANDecoder::Refresh()
 						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, current_field));
 
 						state = STATE_RTR;
+
+						frame_id = current_field;
 					}
 
 					break;
@@ -231,7 +243,16 @@ void CANDecoder::Refresh()
 					cap->m_durations.push_back(end - tbitstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_RTR, frame_is_rtr));
 
-					state = STATE_IDE;
+					if(extended_id)
+					{
+						tblockstart = off;
+						nbit = 0;
+						current_field = 0;
+						state = STATE_R1;
+					}
+
+					else
+						state = STATE_IDE;
 
 					break;
 
@@ -239,11 +260,38 @@ void CANDecoder::Refresh()
 				case STATE_IDE:
 					extended_id = sampled_value;
 
+					if(extended_id)
+					{
+						//The last symbol was a SRR, not a RTR
+						cap->m_samples[cap->m_samples.size()-1].m_stype = CANSymbol::TYPE_SRR;
+
+						tblockstart = off;
+						nbit = 0;
+						current_field = 0;
+						state = STATE_EXT_ID;
+					}
+
+					else
+						state = STATE_R0;
+
 					cap->m_offsets.push_back(tbitstart);
 					cap->m_durations.push_back(end - tbitstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_IDE, extended_id));
 
-					state = STATE_R0;
+					break;
+
+				//Full ID
+				case STATE_EXT_ID:
+
+					//Read the other 18 bits of the ID
+					if(nbit == 18)
+					{
+						cap->m_offsets.push_back(tblockstart);
+						cap->m_durations.push_back(end - tblockstart);
+						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, (frame_id << 18) | current_field));
+
+						state = STATE_RTR;
+					}
 
 					break;
 
@@ -257,6 +305,21 @@ void CANDecoder::Refresh()
 					tblockstart = off;
 					nbit = 0;
 					current_field = 0;
+					break;
+
+				//Reserved bits (should always be zero)
+				case STATE_R1:
+					if(nbit == 2)
+					{
+						cap->m_offsets.push_back(tbitstart);
+						cap->m_durations.push_back(end - tbitstart);
+						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_R0, sampled_value));
+
+						state = STATE_DLC;
+						tblockstart = off;
+						nbit = 0;
+						current_field = 0;
+					}
 					break;
 
 				//Data length code (4 bits)
@@ -421,6 +484,7 @@ Gdk::Color CANDecoder::GetColor(int i)
 			case CANSymbol::TYPE_CRC_DELIM:
 			case CANSymbol::TYPE_ACK_DELIM:
 			case CANSymbol::TYPE_EOF:
+			case CANSymbol::TYPE_SRR:
 				if(s.m_data)
 					return m_standardColors[COLOR_PREAMBLE];
 				else
@@ -469,6 +533,9 @@ string CANDecoder::GetText(int i)
 					return "EXT";
 				else
 					return "BASE";
+
+			case CANSymbol::TYPE_SRR:
+				return "SRR";
 
 			case CANSymbol::TYPE_R0:
 				return "RSVD";

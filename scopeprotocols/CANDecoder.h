@@ -24,7 +24,8 @@ public:
 		TYPE_CRC_DELIM,
 		TYPE_ACK,
 		TYPE_ACK_DELIM,
-		TYPE_EOF
+		TYPE_EOF,
+		TYPE_SRR
 	};
 
 	CANSymbol()
