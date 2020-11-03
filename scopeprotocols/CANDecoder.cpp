@@ -13,7 +13,7 @@ using namespace std;
 // Construction / destruction
 
 CANDecoder::CANDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 	, m_baudrateName("Bit Rate")
 {
 	//Set up channels
@@ -60,6 +60,8 @@ void CANDecoder::SetDefaultName()
 
 void CANDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
@@ -105,6 +107,8 @@ void CANDecoder::Refresh()
 	//LogDebug("Starting CAN decode\n");
 	//LogIndenter li;
 
+	Packet* pack = NULL;
+
 	size_t len = diff->m_samples.size();
 	int64_t tbitstart = 0;
 	int64_t tblockstart = 0;
@@ -117,8 +121,10 @@ void CANDecoder::Refresh()
 	uint32_t current_field = 0;
 	bool frame_is_rtr = false;
 	bool extended_id = false;
+	bool fd_mode = false;
 	int frame_bytes_left = 0;
 	int32_t frame_id = 0;
+	char tmp[128];
 	for(size_t i = 0; i < len; i++)
 	{
 		bool v = diff->m_samples[i];
@@ -206,11 +212,19 @@ void CANDecoder::Refresh()
 
 				//SOF bit is over
 				case STATE_SOF:
+
+					//Start a new packet
+					pack = new Packet;
+					pack->m_offset = off * diff->m_timescale;
+					pack->m_len = 0;
+					m_packets.push_back(pack);
+
 					cap->m_offsets.push_back(tblockstart);
 					cap->m_durations.push_back(off - tblockstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_SOF, 0));
 
 					extended_id = false;
+					fd_mode = false;
 
 					tblockstart = off;
 					nbit = 0;
@@ -231,6 +245,11 @@ void CANDecoder::Refresh()
 						state = STATE_RTR;
 
 						frame_id = current_field;
+
+						snprintf(tmp, sizeof(tmp), "%03x", frame_id);
+						pack->m_headers["ID"] = tmp;
+						pack->m_headers["Format"] = "Base";
+						pack->m_headers["Mode"] = "CAN";
 					}
 
 					break;
@@ -256,10 +275,14 @@ void CANDecoder::Refresh()
 
 					if(extended_id)
 					{
-						//The last symbol was a SRR, not a RTR
-						cap->m_samples[cap->m_samples.size()-1].m_stype = CANSymbol::TYPE_SRR;
+						//Delete the old ID and SRR
+						for(int n=0; n<2; n++)
+						{
+							cap->m_offsets.pop_back();
+							cap->m_durations.pop_back();
+							cap->m_samples.pop_back();
+						}
 
-						tblockstart = off;
 						nbit = 0;
 						current_field = 0;
 						state = STATE_EXT_ID;
@@ -267,10 +290,6 @@ void CANDecoder::Refresh()
 
 					else
 						state = STATE_R0;
-
-					cap->m_offsets.push_back(tbitstart);
-					cap->m_durations.push_back(end - tbitstart);
-					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_IDE, extended_id));
 
 					break;
 
@@ -280,9 +299,15 @@ void CANDecoder::Refresh()
 					//Read the other 18 bits of the ID
 					if(nbit == 18)
 					{
+						frame_id = (frame_id << 18) | current_field;
+
 						cap->m_offsets.push_back(tblockstart);
 						cap->m_durations.push_back(end - tblockstart);
-						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, (frame_id << 18) | current_field));
+						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ID, frame_id));
+
+						snprintf(tmp, sizeof(tmp), "%08x", frame_id);
+						pack->m_headers["ID"] = tmp;
+						pack->m_headers["Format"] = "Ext";
 
 						state = STATE_RTR;
 					}
@@ -306,6 +331,10 @@ void CANDecoder::Refresh()
 					cap->m_offsets.push_back(tbitstart);
 					cap->m_durations.push_back(end - tbitstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_FD, sampled_value));
+
+					fd_mode = sampled_value;
+					if(fd_mode)
+						pack->m_headers["Mode"] = "CAN-FD";
 
 					state = STATE_R0;
 					break;
@@ -344,6 +373,8 @@ void CANDecoder::Refresh()
 						cap->m_offsets.push_back(tblockstart);
 						cap->m_durations.push_back(end - tblockstart);
 						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_DATA, current_field));
+
+						pack->m_data.push_back(current_field);
 
 						//Go to CRC after we've read all the data
 						frame_bytes_left --;
@@ -389,6 +420,11 @@ void CANDecoder::Refresh()
 					cap->m_durations.push_back(end - tbitstart);
 					cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_ACK, sampled_value));
 
+					if(sampled_value)
+						pack->m_headers["Ack"] = "NAK";
+					else
+						pack->m_headers["Ack"] = "ACK";
+
 					state = STATE_ACK_DELIM;
 					break;
 
@@ -410,6 +446,9 @@ void CANDecoder::Refresh()
 					//EOF is 7 bits long
 					if(nbit == 7)
 					{
+						snprintf(tmp, sizeof(tmp), "%d", (int)pack->m_data.size());
+						pack->m_headers["Len"] = tmp;
+
 						cap->m_offsets.push_back(tblockstart);
 						cap->m_durations.push_back(end - tblockstart);
 						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_EOF, current_field));
@@ -451,7 +490,6 @@ Gdk::Color CANDecoder::GetColor(int i)
 					return m_standardColors[COLOR_ERROR];
 
 			case CANSymbol::TYPE_ID:
-			case CANSymbol::TYPE_IDE:
 				return m_standardColors[COLOR_ADDRESS];
 
 			case CANSymbol::TYPE_RTR:
@@ -473,7 +511,6 @@ Gdk::Color CANDecoder::GetColor(int i)
 			case CANSymbol::TYPE_CRC_DELIM:
 			case CANSymbol::TYPE_ACK_DELIM:
 			case CANSymbol::TYPE_EOF:
-			case CANSymbol::TYPE_SRR:
 				if(s.m_data)
 					return m_standardColors[COLOR_PREAMBLE];
 				else
@@ -523,15 +560,6 @@ string CANDecoder::GetText(int i)
 				else
 					return "DATA";
 
-			case CANSymbol::TYPE_IDE:
-				if(s.m_data)
-					return "EXT";
-				else
-					return "BASE";
-
-			case CANSymbol::TYPE_SRR:
-				return "SRR";
-
 			case CANSymbol::TYPE_R0:
 				return "RSVD";
 
@@ -572,3 +600,13 @@ string CANDecoder::GetText(int i)
 	return "ERROR";
 }
 
+vector<string> CANDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("ID");
+	ret.push_back("Format");
+	ret.push_back("Mode");
+	ret.push_back("Ack");
+	ret.push_back("Len");
+	return ret;
+}

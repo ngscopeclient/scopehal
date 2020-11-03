@@ -7,6 +7,8 @@
 #ifndef CANDecoder_h
 #define CANDecoder_h
 
+#include "PacketDecoder.h"
+
 class CANSymbol
 {
 public:
@@ -15,7 +17,6 @@ public:
 		TYPE_SOF,
 		TYPE_ID,
 		TYPE_RTR,
-		TYPE_IDE,
 		TYPE_R0,
 		TYPE_FD,
 		TYPE_DLC,
@@ -25,8 +26,7 @@ public:
 		TYPE_CRC_DELIM,
 		TYPE_ACK,
 		TYPE_ACK_DELIM,
-		TYPE_EOF,
-		TYPE_SRR
+		TYPE_EOF
 	};
 
 	CANSymbol()
@@ -49,7 +49,7 @@ public:
 
 typedef Waveform<CANSymbol> CANWaveform;
 
-class CANDecoder : public Filter
+class CANDecoder : public PacketDecoder
 {
 public:
 	CANDecoder(const std::string& color);
@@ -62,6 +62,8 @@ public:
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
+
+	std::vector<std::string> GetHeaders();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
