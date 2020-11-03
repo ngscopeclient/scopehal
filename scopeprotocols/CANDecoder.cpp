@@ -86,6 +86,7 @@ void CANDecoder::Refresh()
 
 	enum
 	{
+		STATE_WAIT_FOR_IDLE,
 		STATE_IDLE,
 		STATE_SOF,
 		STATE_ID,
@@ -102,7 +103,7 @@ void CANDecoder::Refresh()
 		STATE_ACK,
 		STATE_ACK_DELIM,
 		STATE_EOF
-	} state = STATE_IDLE;
+	} state = STATE_WAIT_FOR_IDLE;
 
 	//LogDebug("Starting CAN decode\n");
 	//LogIndenter li;
@@ -135,6 +136,18 @@ void CANDecoder::Refresh()
 		auto end = diff->m_durations[i] + off;
 
 		auto current_bitlen = off - tbitstart;
+
+		//When starting up, wait until we have at least 7 UIs idle in a row
+		if(state == STATE_WAIT_FOR_IDLE)
+		{
+			if(v)
+				tblockstart = off;
+			else
+			{
+				if( (off - tblockstart) >= (7 * samples_per_ui) )
+					state = STATE_IDLE;
+			}
+		}
 
 		//If we're idle, begin the SOF as soon as we hit a dominant state
 		if(state == STATE_IDLE)
@@ -207,6 +220,10 @@ void CANDecoder::Refresh()
 
 			switch(state)
 			{
+				//Wait for at least 7 bit times low
+				case STATE_WAIT_FOR_IDLE:
+					break;
+
 				case STATE_IDLE:
 					break;
 
