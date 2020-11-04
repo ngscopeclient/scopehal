@@ -29,6 +29,8 @@
 
 #include "scopehal.h"
 #include "SlewRateTrigger.h"
+#include "LeCroyOscilloscope.h"
+#include "TektronixOscilloscope.h"
 
 using namespace std;
 
@@ -37,26 +39,43 @@ using namespace std;
 
 SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 	: TwoLevelTrigger(scope)
+	, m_conditionname("Condition")
+	, m_lowerintname("Lower Interval")
+	, m_upperintname("Upper Interval")
+	, m_slopename("Edge Slope")
 {
-	CreateInput("din");
+	CreateInput("in");
 
-	m_lowerintname = "Lower Interval";
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-
-	m_upperintname = "Upper Interval";
-	m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-
-	m_conditionname = "Condition";
 	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
 	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
-	m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 
-	m_slopename = "Edge Slope";
 	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
 	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
+
+	//Make/model specific options
+	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
+	{
+		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
+
+		//Upper interval only present on LeCroy
+		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	}
+
+	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
+	{
+		m_lowerintname = "Time Limit";
+
+		m_parameters[m_slopename].AddEnumValue("Any", EDGE_ANY);
+
+		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
+		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
+	}
+
+	//must come after model specific config since we change parameter names
+	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
 }
 
 SlewRateTrigger::~SlewRateTrigger()

@@ -76,7 +76,8 @@ public:
 	enum EdgeType
 	{
 		EDGE_RISING,
-		EDGE_FALLING
+		EDGE_FALLING,
+		EDGE_ANY
 	};
 
 	void SetSlope(EdgeType type)

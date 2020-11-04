@@ -34,6 +34,7 @@ class EdgeTrigger;
 class PulseWidthTrigger;
 class DropoutTrigger;
 class RuntTrigger;
+class SlewRateTrigger;
 class WindowTrigger;
 
 /**
@@ -230,6 +231,8 @@ protected:
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PullRuntTrigger();
 	void PushRuntTrigger(RuntTrigger* trig);
+	void PullSlewRateTrigger();
+	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PullWindowTrigger();
 	void PushWindowTrigger(WindowTrigger* trig);
 
