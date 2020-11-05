@@ -98,7 +98,7 @@ double SubtractFilter::GetOffset()
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;
 
-	double vmax_n = v2/2 - o2;
+	//double vmax_n = v2/2 - o2;
 	double vmin_n = -v2/2 - o2;
 
 	//Possible output range
@@ -118,7 +118,7 @@ double SubtractFilter::GetVoltageRange()
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;
 
-	double vmax_n = v2/2 - o2;
+	//double vmax_n = v2/2 - o2;
 	double vmin_n = -v2/2 - o2;
 
 	//Possible output range
