@@ -44,9 +44,15 @@ using namespace std;
 
 SDCmdDecoder::SDCmdDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	, m_cardtypename("Card Type")
 {
 	CreateInput("CMD");
 	CreateInput("CLK");
+
+	m_parameters[m_cardtypename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_cardtypename].AddEnumValue("SD", SD_GENERIC);
+	m_parameters[m_cardtypename].AddEnumValue("eMMC", SD_EMMC);
+	m_parameters[m_cardtypename].SetIntVal(SD_GENERIC);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,8 +249,15 @@ void SDCmdDecoder::Refresh()
 					{
 						switch(data)
 						{
-							//READ_SINGLE_BLOCK
+							//WRITE_BLOCK, WRITE_MULTIPLE_BLOCK
+							case 24:
+							case 25:
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+								break;
+
+							//READ_SINGLE_BLOCK, READ_MULTIPLE_BLOCK
 							case 17:
+							case 18:
 								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 								break;
 
@@ -419,6 +432,8 @@ string SDCmdDecoder::GetText(int i)
 {
 	char tmp[128];
 
+	CardType cardtype = static_cast<CardType>(m_parameters[m_cardtypename].GetIntVal());
+
 	auto capture = dynamic_cast<SDCmdWaveform*>(GetData(0));
 	if(capture != NULL)
 	{
@@ -449,23 +464,55 @@ string SDCmdDecoder::GetText(int i)
 						case 2:		return "ALL_SEND_CID";
 						case 3:		return "SEND_RELATIVE_ADDR";
 						case 4:		return "SET_DSR";
-						//CMD5 reserved for SDIO
-						case 6:		return "SET_BUS_WIDTH";
+
+						//CMD5 reserved for SDIO.
+						//eMMC uses it for SLEEP/AWAKE mode
+						case 5:
+							if(cardtype == SD_EMMC)
+								return "SLEEP_AWAKE";
+							break;
+
+						case 6:
+							if(cardtype == SD_EMMC)
+								return "SWITCH";
+							else
+								return "SET_BUS_WIDTH";
+
 						case 7:		return "SELECT_DESELECT_CARD";
-						case 8:		return "SEND_IF_COND";
+
+						case 8:
+							if(cardtype == SD_EMMC)
+								return "SEND_EXT_CSD";
+							else
+								return "SEND_IF_COND";
+
 						case 9:		return "SEND_CSD";
 						case 10:	return "SEND_CID";
 						case 11:	return "VOLTAGE_SWITCH";
 						case 12:	return "STOP_TRANSMISSION";
 						case 13:	return "SEND_STATUS";
+
 						//CMD14 reserved
+						//eMMC uses it for bus testing
+						case 14:
+							if(cardtype == SD_EMMC)
+								return "BUSTEST_R";
+							break;
+
 						case 15:	return "GO_INACTIVE_STATE";
 						case 16:	return "SET_BLOCKLEN";
 						case 17:	return "READ_SINGLE_BLOCK";
 						case 18:	return "READ_MULTIPLE_BLOCK";
 						case 19:	return "SEND_TUNING_BLOCK";
 						case 20:	return "SPEED_CLASS_CONTROL";
+
 						//CMD21 reserved
+						//eMMC uses it for link training in HS200 mode
+						case 21:
+							if(cardtype == SD_EMMC)
+								return "SEND_TUNING_BLOCK";
+							break;
+
 						case 22:	return "ADDRESS_EXTENSION";
 						case 23:	return "SET_BLOCK_COUNT";
 						case 24:	return "WRITE_BLOCK";
@@ -553,14 +600,30 @@ string SDCmdDecoder::GetText(int i)
 						case 2:
 							return "";
 
+						//CMD5 SLEEP/AWAKE
+						case 5:
+							if(cardtype == SD_EMMC)
+							{
+								if(s.m_data & 0x8000)
+									snprintf(tmp, sizeof(tmp), "RCA=%04x SLEEP", s.m_data >> 16);
+								else
+									snprintf(tmp, sizeof(tmp), "RCA=%04x WAKE", s.m_data >> 16);
+								ret = tmp;
+							}
+							break;
+
 						//CMD7 Select/Deselect Card
 						case 7:
 							snprintf(tmp, sizeof(tmp), "RCA=%04x", s.m_data >> 16);
 							ret = tmp;
 							break;
 
-						//CMD8 Send Interface Condition (4.3.13)
+						//For eMMC: SEND_EXT_CSD (no arguments)
+						//For SD: CMD8 Send Interface Condition (4.3.13)
 						case 8:
+							if(cardtype == SD_EMMC)
+								ret = "";
+							else
 							{
 								snprintf(tmp, sizeof(tmp), "%02x", s.m_data & 0xff);
 								ret = string("Check ") + tmp;
@@ -796,6 +859,9 @@ string SDCmdDecoder::GetText(int i)
 
 						//R7 Card Interface Condition (4.9.6)
 						case 8:
+							if(cardtype == SD_EMMC)
+								ret = "";
+							else
 							{
 								snprintf(tmp, sizeof(tmp), "%02x", s.m_data & 0xff);
 								ret = string("Check ") + tmp;

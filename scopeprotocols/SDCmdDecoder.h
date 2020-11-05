@@ -109,9 +109,16 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	enum CardType
+	{
+		SD_GENERIC,
+		SD_EMMC
+	};
+
 	PROTOCOL_DECODER_INITPROC(SDCmdDecoder)
 
 protected:
+	std::string m_cardtypename;
 };
 
 #endif
