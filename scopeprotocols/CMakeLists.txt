@@ -66,6 +66,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
 	SDCmdDecoder.cpp
+	SDDataDecoder.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
 	SubtractFilter.cpp

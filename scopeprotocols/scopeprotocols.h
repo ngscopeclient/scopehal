@@ -102,6 +102,7 @@
 #include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"
 #include "SDCmdDecoder.h"
+#include "SDDataDecoder.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"
 #include "SubtractFilter.h"
