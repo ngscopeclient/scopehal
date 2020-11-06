@@ -431,6 +431,8 @@ void EyePattern::Refresh()
 			clock_edges[i] += cap->m_uiWidth / 2;
 	}
 
+	uint32_t prng = 0xdeadbeef;
+
 	//Process the eye
 	size_t cend = clock_edges.size();
 	float yscale = m_height / GetVoltageRange();
@@ -438,82 +440,81 @@ void EyePattern::Refresh()
 	float yoff = -center*yscale + ymid;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
-	for(size_t i=0; i<wend; i++)
+	if(m_xscale > FLT_EPSILON)
 	{
-		//If scale isn't defined yet, early out
-		if(m_xscale < FLT_EPSILON)
-			break;
-
-		//Stop when we get to the end of the clock
-		if(iclock + 1 >= cend)
-			break;
-
-		//Find time of this sample.
-		//If it's past the end of the current UI, move to the next clock edge
-		int64_t tnext = clock_edges[iclock + 1];
-		int64_t twidth = tnext - clock_edges[iclock];
-		int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
-		int64_t offset = tstart - clock_edges[iclock];
-		if(offset < -10)
-			continue;
-		if(offset > twidth)
+		for(size_t i=0; i<wend; i++)
 		{
-			//Move to the next clock edge
-			iclock ++;
+			//Stop when we get to the end of the clock
 			if(iclock + 1 >= cend)
 				break;
 
-			//Figure out the offset to the next edge
-			offset = tstart - tnext;
-		}
-
-		//LogDebug("%zu, %zd\n", i, offset);
-
-		//Interpolate voltage
-		int64_t dt = (waveform->m_offsets[i+1] - waveform->m_offsets[i]) * waveform->m_timescale;
-		float pixel_x_f = (offset - m_xoff) * m_xscale;
-		float pixel_x_fround = floor(pixel_x_f);
-		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
-		float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * m_xscale );
-		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
-
-		//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
-		pixel_x_f -= m_xscale * 0.5;
-		pixel_x_f += (rand() & 0xff) * m_xscale / 255.0f;
-
-		//LogDebug("%zu, %zd, %f\n", i, offset, pixel_x_f);
-
-		//Find (and sanity check) the Y coordinate
-		float nominal_pixel_y = nominal_voltage*yscale + yoff;
-		size_t y1 = static_cast<size_t>(nominal_pixel_y);
-		if(y1 >= (m_height-1))
-			continue;
-
-		//Calculate how much of the pixel's intensity to put in each row
-		float yfrac = nominal_pixel_y - y1;
-		int bin2 = yfrac * 64;
-		int bin1 = 64 - bin2;
-		int64_t* row1 = data + y1*m_width;
-		int64_t* row2 = row1 + m_width;
-
-		//Plot each point 3 times for center/left/right portions of the eye
-		int64_t pixel_x_round = round(pixel_x_f);
-		int64_t pixel_x_round2 = round(pixel_x_f + m_xscale*cap->m_uiWidth);
-		int64_t pixel_x_round3 = round(pixel_x_f - m_xscale*cap->m_uiWidth);
-		int64_t xpos[] = { pixel_x_round, pixel_x_round2, pixel_x_round3 };
-		int64_t w = m_width;
-		for(auto x : xpos)
-		{
-			if( (x+1 < w) && (x >= 0) )
+			//Find time of this sample.
+			//If it's past the end of the current UI, move to the next clock edge
+			int64_t tnext = clock_edges[iclock + 1];
+			int64_t twidth = tnext - clock_edges[iclock];
+			int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
+			int64_t offset = tstart - clock_edges[iclock];
+			if(offset < -10)
+				continue;
+			if(offset > twidth)
 			{
-				row1[x+0] += bin1 * dx_frac;
-				row1[x+1] += bin1 * (1-dx_frac);
-				row2[x+0] += bin2 * dx_frac;
-				row2[x+1] += bin2 * (1-dx_frac);
+				//Move to the next clock edge
+				iclock ++;
+				if(iclock + 1 >= cend)
+					break;
+
+				//Figure out the offset to the next edge
+				offset = tstart - tnext;
+			}
+
+			//LogDebug("%zu, %zd\n", i, offset);
+
+			//Interpolate voltage
+			int64_t dt = (waveform->m_offsets[i+1] - waveform->m_offsets[i]) * waveform->m_timescale;
+			float pixel_x_f = (offset - m_xoff) * m_xscale;
+			float pixel_x_fround = floor(pixel_x_f);
+			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * m_xscale );
+			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+
+			//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
+			pixel_x_f -= m_xscale * 0.5;
+			pixel_x_f += (prng & 0xff) * m_xscale / 255.0f;
+			prng = 0x343fd * prng + 0x269ec3;
+
+			//LogDebug("%zu, %zd, %f\n", i, offset, pixel_x_f);
+
+			//Find (and sanity check) the Y coordinate
+			float nominal_pixel_y = nominal_voltage*yscale + yoff;
+			size_t y1 = static_cast<size_t>(nominal_pixel_y);
+			if(y1 >= (m_height-1))
+				continue;
+
+			//Calculate how much of the pixel's intensity to put in each row
+			float yfrac = nominal_pixel_y - y1;
+			int bin2 = yfrac * 64;
+			int bin1 = 64 - bin2;
+			int64_t* row1 = data + y1*m_width;
+			int64_t* row2 = row1 + m_width;
+
+			//Plot each point 3 times for center/left/right portions of the eye
+			int64_t pixel_x_round = round(pixel_x_f);
+			int64_t pixel_x_round2 = round(pixel_x_f + m_xscale*cap->m_uiWidth);
+			int64_t pixel_x_round3 = round(pixel_x_f - m_xscale*cap->m_uiWidth);
+			int64_t xpos[] = { pixel_x_round, pixel_x_round2, pixel_x_round3 };
+			int64_t w = m_width;
+			for(auto x : xpos)
+			{
+				if( (x+1 < w) && (x >= 0) )
+				{
+					row1[x+0] += bin1 * dx_frac;
+					row1[x+1] += bin1 * (1-dx_frac);
+					row2[x+0] += bin2 * dx_frac;
+					row2[x+1] += bin2 * (1-dx_frac);
+				}
 			}
 		}
 	}
-	fflush(stdout);
 
 	//Count total number of UIs we've integrated
 	cap->IntegrateUIs(clock_edges.size());
