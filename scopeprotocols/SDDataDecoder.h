@@ -36,6 +36,9 @@
 #ifndef SDDataDecoder_h
 #define SDDataDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+#include "SDCmdDecoder.h"
+
 class SDDataSymbol
 {
 public:
@@ -68,12 +71,14 @@ public:
 
 typedef Waveform<SDDataSymbol> SDDataWaveform;
 
-class SDDataDecoder : public Filter
+class SDDataDecoder : public PacketDecoder
 {
 public:
 	SDDataDecoder(const std::string& color);
 
 	virtual void Refresh();
+
+	std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
@@ -87,6 +92,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SDDataDecoder)
 
 protected:
+	Packet* FindCommandBusPacket(SDCmdDecoder* decode, int64_t timestamp);
 };
 
 #endif

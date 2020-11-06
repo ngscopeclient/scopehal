@@ -43,17 +43,14 @@ using namespace std;
 // Construction / destruction
 
 SDDataDecoder::SDDataDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
-	//Remove the x1 SPI inputs
-	m_inputs.clear();
-	m_signalNames.clear();
-
 	CreateInput("clk");
 	CreateInput("dat3");
 	CreateInput("dat2");
 	CreateInput("dat1");
 	CreateInput("dat0");
+	CreateInput("cmdbus");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +80,9 @@ bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 		return true;
 	}
 
+	if( (i == 5) && (dynamic_cast<SDCmdDecoder*>(stream.m_channel) != NULL) )
+		return true;
+
 	return false;
 }
 
@@ -104,6 +104,8 @@ void SDDataDecoder::SetDefaultName()
 
 void SDDataDecoder::Refresh()
 {
+	ClearPackets();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
@@ -117,6 +119,7 @@ void SDDataDecoder::Refresh()
 	auto data2 = GetDigitalInputWaveform(2);
 	auto data1 = GetDigitalInputWaveform(3);
 	auto data0 = GetDigitalInputWaveform(4);
+	auto cmdbus = dynamic_cast<SDCmdDecoder*>(GetInput(5).m_channel);
 
 	//Sample the data
 	DigitalWaveform d0;
@@ -136,6 +139,9 @@ void SDDataDecoder::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startPicoseconds = clk->m_startPicoseconds;
+
+	Packet* pack = NULL;
+	Packet* last_cmdbus_packet = NULL;
 
 	//Loop over the data and look for transactions
 	enum
@@ -171,6 +177,27 @@ void SDDataDecoder::Refresh()
 					cap->m_samples.push_back(SDDataSymbol(SDDataSymbol::TYPE_START, 0));
 					bytes_left = 512;
 					state = STATE_DATA_HIGH;
+
+					//Find the command bus packet that triggered this data bus transaction
+					auto cmd_packet = FindCommandBusPacket(cmdbus, d0.m_offsets[i]);
+
+					//If it's the same as our last packet, or doesn't exist, don't make a new packet
+					if( (cmd_packet == last_cmdbus_packet) || (cmd_packet == NULL) )
+						pack = NULL;
+
+					//New packet, process stuff
+					else
+					{
+						pack = new Packet;
+						pack->m_offset = d0.m_offsets[i];
+						pack->m_len = 0;
+						pack->m_headers = cmd_packet->m_headers;
+						pack->m_displayForegroundColor = cmd_packet->m_displayForegroundColor;
+						pack->m_displayBackgroundColor = cmd_packet->m_displayBackgroundColor;
+						m_packets.push_back(pack);
+
+						last_cmdbus_packet = cmd_packet;
+					}
 				}
 
 				//Idle
@@ -293,4 +320,35 @@ string SDDataDecoder::GetText(int i)
 		}
 	}
 	return "";
+}
+
+vector<string> SDDataDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Code");
+	ret.push_back("Command");
+	ret.push_back("Info");
+	return ret;
+}
+
+Packet* SDDataDecoder::FindCommandBusPacket(SDCmdDecoder* decode, int64_t timestamp)
+{
+	//TODO: more efficient than linear search
+	Packet* ret = NULL;
+	auto packets = decode->GetPackets();
+	for(auto p : packets)
+	{
+		//If it's not a command, ignore it
+		if(p->m_headers["Type"] != "Command")
+			continue;
+
+		//If it's after the timestamp, we're done
+		if(p->m_offset > timestamp)
+			break;
+
+		ret = p;
+
+	}
+	return ret;
 }

@@ -376,6 +376,7 @@ void SDCmdDecoder::Refresh()
 					cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_ERROR, b));
 				}
 
+				pack->m_len = end - pack->m_offset;
 				m_packets.push_back(pack);
 				pack = NULL;
 
