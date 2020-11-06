@@ -453,17 +453,19 @@ void EyePattern::Refresh()
 	float yoff = -center*yscale + ymid;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
+	float xtimescale = waveform->m_timescale * m_xscale;
 	if(m_xscale > FLT_EPSILON)
 	{
 		for(size_t i=0; i<wend; i++)
 		{
 			//Stop when we get to the end of the clock
-			if(iclock + 1 >= cend)
+			size_t nextclk = iclock + 1;
+			if(nextclk >= cend)
 				break;
 
 			//Find time of this sample.
 			//If it's past the end of the current UI, move to the next clock edge
-			int64_t tnext = clock_edges[iclock + 1];
+			int64_t tnext = clock_edges[nextclk];
 			int64_t twidth = tnext - clock_edges[iclock];
 			int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
 			int64_t offset = tstart - clock_edges[iclock];
@@ -482,22 +484,25 @@ void EyePattern::Refresh()
 
 			//LogDebug("%zu, %zd\n", i, offset);
 
-			//Interpolate voltage
-			int64_t dt = (waveform->m_offsets[i+1] - waveform->m_offsets[i]) * waveform->m_timescale;
+			//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
+			int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
 			float pixel_x_f = (offset - m_xoff) * m_xscale;
 			float pixel_x_fround = floor(pixel_x_f);
-			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
-			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * m_xscale );
-			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
-
-			//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
+			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * xtimescale );
 			pixel_x_f -= m_xscale * 0.5;
 			pixel_x_f += (prng & 0xff) * m_xscale / 255.0f;
 			prng = 0x343fd * prng + 0x269ec3;
 
+			//Early out if off the end of the plot
+			int64_t pixel_x_round = round(pixel_x_f);
+			if(pixel_x_round+1 >= (int64_t) m_width)
+				continue;
+
 			//LogDebug("%zu, %zd, %f\n", i, offset, pixel_x_f);
 
-			//Find (and sanity check) the Y coordinate
+			//Interpolate voltage, early out if clipping
+			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 			float nominal_pixel_y = nominal_voltage*yscale + yoff;
 			size_t y1 = static_cast<size_t>(nominal_pixel_y);
 			if(y1 >= (m_height-1))
@@ -511,14 +516,10 @@ void EyePattern::Refresh()
 			int64_t* row2 = row1 + m_width;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			int64_t pixel_x_round = round(pixel_x_f);
-			if(pixel_x_round+1 < (int64_t)m_width)
-			{
-				row1[pixel_x_round+0] += bin1 * dx_frac;
-				row1[pixel_x_round+1] += bin1 * (1-dx_frac);
-				row2[pixel_x_round+0] += bin2 * dx_frac;
-				row2[pixel_x_round+1] += bin2 * (1-dx_frac);
-			}
+			row1[pixel_x_round  ] += bin1 * dx_frac;
+			row1[pixel_x_round+1] += bin1 * (1-dx_frac);
+			row2[pixel_x_round  ] += bin2 * dx_frac;
+			row2[pixel_x_round+1] += bin2 * (1-dx_frac);
 		}
 	}
 
