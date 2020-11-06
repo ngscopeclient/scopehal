@@ -507,12 +507,11 @@ void EyePattern::Refresh()
 
 			//Calculate how much of the pixel's intensity to put in each row
 			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
-			float bin2 = yfrac * 64;
-			float bin1 = 64 - bin2;
+			int64_t bin2 = yfrac * 64;
 			int64_t* pix = data + y1*m_width + pixel_x_round;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			pix[0] += bin1;
+			pix[0] 		 += 64 - bin2;
 			pix[m_width] += bin2;
 		}
 	}
