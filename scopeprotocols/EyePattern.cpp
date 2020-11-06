@@ -458,6 +458,8 @@ void EyePattern::Refresh()
 	size_t cend = clock_edges.size() - 1;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
+	size_t ymax = m_height - 1;
+	int64_t xmax = m_width - 1;
 	if(m_xscale > FLT_EPSILON)
 	{
 		for(size_t i=0; i<wend && iclock < cend; i++)
@@ -492,7 +494,7 @@ void EyePattern::Refresh()
 
 			//Early out if off the end of the plot
 			int64_t pixel_x_round = round(pixel_x_f);
-			if(pixel_x_round+1 >= (int64_t) m_width)
+			if(pixel_x_round >= xmax)
 				continue;
 
 			//Interpolate voltage, early out if clipping
@@ -500,7 +502,7 @@ void EyePattern::Refresh()
 			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 			float nominal_pixel_y = nominal_voltage*yscale + yoff;
 			size_t y1 = static_cast<size_t>(nominal_pixel_y);
-			if(y1 >= (m_height-1))
+			if(y1 >= ymax)
 				continue;
 
 			//Calculate how much of the pixel's intensity to put in each row
