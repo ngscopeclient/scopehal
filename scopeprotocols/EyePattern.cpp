@@ -458,7 +458,7 @@ void EyePattern::Refresh()
 	size_t cend = clock_edges.size() - 1;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
-	size_t ymax = m_height - 1;
+	int64_t ymax = m_height - 1;
 	int64_t xmax = m_width;
 	if(m_xscale > FLT_EPSILON)
 	{
@@ -501,8 +501,8 @@ void EyePattern::Refresh()
 			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
 			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 			float nominal_pixel_y = nominal_voltage*yscale + yoff;
-			size_t y1 = static_cast<size_t>(nominal_pixel_y);
-			if(y1 >= ymax)
+			int64_t y1 = static_cast<size_t>(nominal_pixel_y);
+			if( (y1 >= ymax) || (y1 < 0) )
 				continue;
 
 			//Calculate how much of the pixel's intensity to put in each row
