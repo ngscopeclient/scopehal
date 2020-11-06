@@ -65,13 +65,25 @@ EyeWaveform::~EyeWaveform()
 
 void EyeWaveform::Normalize()
 {
-	//Normalize it
-	size_t len = m_width * m_height;
-
-	//Find the peak amplitude
+	//Preprocessing
 	int64_t nmax = 0;
-	for(size_t i=0; i<len; i++)
-		nmax = max(m_accumdata[i], nmax);
+	int64_t halfwidth = m_width/2;
+	size_t blocksize = halfwidth * sizeof(int64_t);
+	for(size_t y=0; y<m_height; y++)
+	{
+		int64_t* row = m_accumdata + y*m_width;
+
+		//Find peak amplitude
+		for(size_t x=halfwidth; x<m_width; x++)
+			nmax = max(row[x], nmax);
+
+		//Copy right half to left half
+		memcpy(row, row+halfwidth, blocksize);
+
+		//Fix singularity at midpoint (TODO: better option)
+		row[halfwidth+1] = row[halfwidth+2];
+		row[halfwidth] = row[halfwidth-1];
+	}
 	if(nmax == 0)
 		nmax = 1;
 	float norm = 2.0f / nmax;
@@ -82,6 +94,7 @@ void EyeWaveform::Normalize()
 		2.0 means mapping values to [0, 2] and saturating anything above 1.
 	 */
 	norm *= m_saturationLevel;
+	size_t len = m_width * m_height;
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = min(1.0f, m_accumdata[i] * norm);
 }
@@ -497,20 +510,14 @@ void EyePattern::Refresh()
 			int64_t* row1 = data + y1*m_width;
 			int64_t* row2 = row1 + m_width;
 
-			//Plot each point 2 times for left/right portions of the eye
-			int64_t pixel_x_round_right = round(pixel_x_f);
-			int64_t pixel_x_round_left = round(pixel_x_f - m_xscale*cap->m_uiWidth);
-			int64_t xpos[] = { pixel_x_round_right, pixel_x_round_left };
-			int64_t w = m_width;
-			for(auto x : xpos)
+			//Plot each point (this only draws the right half of the eye, we copy to the left later)
+			int64_t pixel_x_round = round(pixel_x_f);
+			if( (pixel_x_round+1 < (int64_t)m_width) && (pixel_x_round >= 0) )
 			{
-				if( (x+1 < w) && (x >= 0) )
-				{
-					row1[x+0] += bin1 * dx_frac;
-					row1[x+1] += bin1 * (1-dx_frac);
-					row2[x+0] += bin2 * dx_frac;
-					row2[x+1] += bin2 * (1-dx_frac);
-				}
+				row1[pixel_x_round+0] += bin1 * dx_frac;
+				row1[pixel_x_round+1] += bin1 * (1-dx_frac);
+				row2[pixel_x_round+0] += bin2 * dx_frac;
+				row2[pixel_x_round+1] += bin2 * (1-dx_frac);
 			}
 		}
 	}
