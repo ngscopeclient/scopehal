@@ -509,14 +509,14 @@ void EyePattern::Refresh()
 			float yfrac = nominal_pixel_y - y1;
 			float bin2 = yfrac * 64;
 			float bin1 = 64 - bin2;
-			int64_t* row1 = data + y1*m_width;
-			int64_t* row2 = row1 + m_width;
+			int64_t* pix1 = data + y1*m_width + pixel_x_round;
+			int64_t* pix2 = pix1 + m_width;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			row1[pixel_x_round  ] += bin1 * dx_frac;
-			row1[pixel_x_round+1] += bin1 * (1-dx_frac);
-			row2[pixel_x_round  ] += bin2 * dx_frac;
-			row2[pixel_x_round+1] += bin2 * (1-dx_frac);
+			pix1[0] += bin1 * dx_frac;
+			pix1[1] += bin1 * (1-dx_frac);
+			pix2[0] += bin2 * dx_frac;
+			pix2[1] += bin2 * (1-dx_frac);
 		}
 	}
 
