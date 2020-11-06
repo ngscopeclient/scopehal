@@ -497,11 +497,10 @@ void EyePattern::Refresh()
 			int64_t* row1 = data + y1*m_width;
 			int64_t* row2 = row1 + m_width;
 
-			//Plot each point 3 times for center/left/right portions of the eye
-			int64_t pixel_x_round = round(pixel_x_f);
-			int64_t pixel_x_round2 = round(pixel_x_f + m_xscale*cap->m_uiWidth);
-			int64_t pixel_x_round3 = round(pixel_x_f - m_xscale*cap->m_uiWidth);
-			int64_t xpos[] = { pixel_x_round, pixel_x_round2, pixel_x_round3 };
+			//Plot each point 2 times for left/right portions of the eye
+			int64_t pixel_x_round_right = round(pixel_x_f);
+			int64_t pixel_x_round_left = round(pixel_x_f - m_xscale*cap->m_uiWidth);
+			int64_t xpos[] = { pixel_x_round_right, pixel_x_round_left };
 			int64_t w = m_width;
 			for(auto x : xpos)
 			{
