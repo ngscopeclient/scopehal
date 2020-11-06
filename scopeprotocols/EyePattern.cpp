@@ -459,7 +459,7 @@ void EyePattern::Refresh()
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
 	size_t ymax = m_height - 1;
-	int64_t xmax = m_width - 1;
+	int64_t xmax = m_width;
 	if(m_xscale > FLT_EPSILON)
 	{
 		for(size_t i=0; i<wend && iclock < cend; i++)
@@ -506,17 +506,14 @@ void EyePattern::Refresh()
 				continue;
 
 			//Calculate how much of the pixel's intensity to put in each row
-			float yfrac = nominal_pixel_y - y1;
+			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
 			float bin2 = yfrac * 64;
 			float bin1 = 64 - bin2;
-			int64_t* pix1 = data + y1*m_width + pixel_x_round;
-			int64_t* pix2 = pix1 + m_width;
+			int64_t* pix = data + y1*m_width + pixel_x_round;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			pix1[0] += bin1 * dx_frac;
-			pix1[1] += bin1 * (1-dx_frac);
-			pix2[0] += bin2 * dx_frac;
-			pix2[1] += bin2 * (1-dx_frac);
+			pix[0] += bin1;
+			pix[m_width] += bin2;
 		}
 	}
 
