@@ -446,14 +446,18 @@ void EyePattern::Refresh()
 
 	uint32_t prng = 0xdeadbeef;
 
-	//Process the eye
-	size_t cend = clock_edges.size();
+	//Precompute some scaling factors
 	float yscale = m_height / GetVoltageRange();
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
+	float xtimescale = waveform->m_timescale * m_xscale;
+	float xscale_div255 = m_xscale / 255.0f;
+	float xscale_div2 = m_xscale / 2;
+
+	//Process the eye
+	size_t cend = clock_edges.size();
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
-	float xtimescale = waveform->m_timescale * m_xscale;
 	if(m_xscale > FLT_EPSILON)
 	{
 		for(size_t i=0; i<wend; i++)
@@ -482,23 +486,18 @@ void EyePattern::Refresh()
 				offset = tstart - tnext;
 			}
 
-			//LogDebug("%zu, %zd\n", i, offset);
-
 			//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
 			int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
 			float pixel_x_f = (offset - m_xoff) * m_xscale;
 			float pixel_x_fround = floor(pixel_x_f);
 			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * xtimescale );
-			pixel_x_f -= m_xscale * 0.5;
-			pixel_x_f += (prng & 0xff) * m_xscale / 255.0f;
+			pixel_x_f += (prng & 0xff) * xscale_div255 - xscale_div2;
 			prng = 0x343fd * prng + 0x269ec3;
 
 			//Early out if off the end of the plot
 			int64_t pixel_x_round = round(pixel_x_f);
 			if(pixel_x_round+1 >= (int64_t) m_width)
 				continue;
-
-			//LogDebug("%zu, %zd, %f\n", i, offset, pixel_x_f);
 
 			//Interpolate voltage, early out if clipping
 			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
