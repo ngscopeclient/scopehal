@@ -455,31 +455,27 @@ void EyePattern::Refresh()
 	float xscale_div2 = m_xscale / 2;
 
 	//Process the eye
-	size_t cend = clock_edges.size();
+	size_t cend = clock_edges.size() - 1;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
 	if(m_xscale > FLT_EPSILON)
 	{
-		for(size_t i=0; i<wend; i++)
+		for(size_t i=0; i<wend && iclock < cend; i++)
 		{
-			//Stop when we get to the end of the clock
-			size_t nextclk = iclock + 1;
-			if(nextclk >= cend)
-				break;
-
 			//Find time of this sample.
 			//If it's past the end of the current UI, move to the next clock edge
-			int64_t tnext = clock_edges[nextclk];
-			int64_t twidth = tnext - clock_edges[iclock];
 			int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
 			int64_t offset = tstart - clock_edges[iclock];
 			if(offset < -10)
 				continue;
+			size_t nextclk = iclock + 1;
+			int64_t tnext = clock_edges[nextclk];
+			int64_t twidth = tnext - clock_edges[iclock];
 			if(offset > twidth)
 			{
 				//Move to the next clock edge
 				iclock ++;
-				if(iclock + 1 >= cend)
+				if(iclock >= cend)
 					break;
 
 				//Figure out the offset to the next edge
