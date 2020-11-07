@@ -79,10 +79,6 @@ void EyeWaveform::Normalize()
 
 		//Copy right half to left half
 		memcpy(row, row+halfwidth, blocksize);
-
-		//Fix singularity at midpoint (TODO: better option)
-		row[halfwidth+1] = row[halfwidth+2];
-		row[halfwidth] = row[halfwidth-1];
 	}
 	if(nmax == 0)
 		nmax = 1;
@@ -458,8 +454,8 @@ void EyePattern::Refresh()
 	size_t cend = clock_edges.size() - 1;
 	size_t iclock = 0;
 	size_t wend = waveform->m_samples.size()-1;
-	int64_t ymax = m_height - 1;
-	int64_t xmax = m_width;
+	size_t ymax = m_height - 1;
+	size_t xmax = m_width - 1;
 	if(m_xscale > FLT_EPSILON)
 	{
 		for(size_t i=0; i<wend && iclock < cend; i++)
@@ -468,12 +464,11 @@ void EyePattern::Refresh()
 			//If it's past the end of the current UI, move to the next clock edge
 			int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
 			int64_t offset = tstart - clock_edges[iclock];
-			if(offset < -10)
+			if(offset < 0)
 				continue;
 			size_t nextclk = iclock + 1;
 			int64_t tnext = clock_edges[nextclk];
-			int64_t twidth = tnext - clock_edges[iclock];
-			if(offset > twidth)
+			if(tstart >= tnext)
 			{
 				//Move to the next clock edge
 				iclock ++;
@@ -492,17 +487,17 @@ void EyePattern::Refresh()
 			pixel_x_f += (prng & 0xff) * xscale_div255 - xscale_div2;
 			prng = 0x343fd * prng + 0x269ec3;
 
-			//Early out if off the end of the plot
-			int64_t pixel_x_round = round(pixel_x_f);
-			if(pixel_x_round >= xmax)
+			//Early out if off end of plot
+			size_t pixel_x_round = floor(pixel_x_f);
+			if(pixel_x_round > xmax)
 				continue;
 
 			//Interpolate voltage, early out if clipping
 			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
 			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 			float nominal_pixel_y = nominal_voltage*yscale + yoff;
-			int64_t y1 = static_cast<size_t>(nominal_pixel_y);
-			if( (y1 >= ymax) || (y1 < 0) )
+			size_t y1 = static_cast<size_t>(nominal_pixel_y);
+			if(y1 >= ymax)
 				continue;
 
 			//Calculate how much of the pixel's intensity to put in each row
@@ -514,6 +509,18 @@ void EyePattern::Refresh()
 			pix[0] 		 += 64 - bin2;
 			pix[m_width] += bin2;
 		}
+	}
+
+	//Rightmost picosecond of the eye has some rounding artifacts.
+	//For now, just replace it with the value from 1ps to its left.
+	size_t delta = ceil(m_xscale);
+	size_t xstart = xmax - delta;
+	size_t xend = xmax;
+	for(size_t y=0; y<m_height; y++)
+	{
+		int64_t* row = data + y*m_width;
+		for(size_t x=xstart; x<=xend; x++)
+			row[x] = row[x-delta];
 	}
 
 	//Count total number of UIs we've integrated
