@@ -402,6 +402,9 @@ void I2CEepromDecoder::Refresh()
 					cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_DATA, s.m_data));
 					tstart = end;
 
+					//Save the data byte
+					pack->m_data.push_back(s.m_data);
+
 					//Expect an ACK right after.
 					state = 9;
 
