@@ -103,8 +103,8 @@ void LeCroyOscilloscope::SharedCtorInit()
 	else
 		m_transport->SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
 
-	//Always use "max memory" config for setting sample depth
-	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"SetMaximumMemory\"'");
+	//Always use "fixed sample rate" config for setting timebase
+	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"FixedSampleRate\"'");
 
 	//If interleaving, disable the extra channels
 	if(IsInterleaving())
@@ -2060,10 +2060,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	int16_t* wdata = (int16_t*)&data[0];
 	int8_t* bdata = (int8_t*)&data[0];
 
-	//Update cache with settings from this trigger
-	m_memoryDepth = num_per_segment;
-	m_memoryDepthValid = true;
-
 	for(size_t j=0; j<num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
@@ -3109,13 +3105,18 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 {
 	if(!m_memoryDepthValid)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("MSIZ?");
-		string reply = m_transport->ReadReply();
-		float size;
-		sscanf(reply.c_str(), "%f", &size);
+		//MSIZ? can sometimes return incorrect values! It returns the *cap* on memory depth,
+		//not the *actual* memory depth.
+		//This is the same as app.Acquisition.Horizontal.MaxSamples, which is also wrong.
 
-		m_memoryDepth = size;
+		//What you see below is the only observed method that seems to reliably get the *actual* memory depth.
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.AcquisitionDuration'");
+		string reply = m_transport->ReadReply();
+		int64_t capture_len_ps = Unit(Unit::UNIT_PS).ParseString(reply);
+		int64_t ps_per_sample = 1000000000000L / GetSampleRate();
+
+		m_memoryDepth = capture_len_ps / ps_per_sample;
 		m_memoryDepthValid = true;
 	}
 
@@ -3125,29 +3126,29 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "MSIZ %lu", depth);
-	m_transport->SendCommand(tmp);
-	m_memoryDepth = depth;
 
-	//We need to reconfigure the trigger in order to keep the offset left-aligned when changing depth
-	size_t off = GetTriggerOffset();
-	m_triggerOffsetValid = false;
-	SetTriggerOffset(off);
+	//Calculate the record length we need for this memory depth
+	int64_t ps_per_sample = 1000000000000L / GetSampleRate();
+	int64_t ps_per_acquisition = depth * ps_per_sample;
+	float sec_per_acquisition = ps_per_acquisition * 1e-12;
+	float sec_per_div = sec_per_acquisition / 10;
+
+	m_transport->SendCommand(
+		string("VBS? 'app.Acquisition.Horizontal.HorScale = ") +
+		to_string_sci(sec_per_div) + "'");
+
+	//Sometimes the scope won't set the exact depth we ask for.
+	//Flush the cache to force a read so we know the actual depth we got.
+	m_memoryDepthValid = false;
 }
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 {
-	uint64_t ps_per_sample = 1000000000000L / rate;
-	double time_per_sample = ps_per_sample * 1.0e-12;
-	double time_per_plot = time_per_sample * GetSampleDepth();
-	double time_per_div = time_per_plot / 10;
-	m_sampleRate = rate;
-
 	lock_guard<recursive_mutex> lock(m_mutex);
-	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "TDIV %.0e", time_per_div);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommand(string("VBS? 'app.Acquisition.Horizontal.SampleRate = ") + to_string(rate) + "'");
+
+	m_sampleRate = rate;
+	m_sampleRateValid = true;
 }
 
 void LeCroyOscilloscope::EnableTriggerOutput()
