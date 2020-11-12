@@ -182,8 +182,11 @@ void SDDataDecoder::Refresh()
 					auto cmd_packet = FindCommandBusPacket(cmdbus, d0.m_offsets[i]);
 
 					//If it's the same as our last packet, or doesn't exist, don't make a new packet
-					if( (cmd_packet == last_cmdbus_packet) || (cmd_packet == NULL) )
+					if(cmd_packet == NULL)
 						pack = NULL;
+
+					else if(cmd_packet == last_cmdbus_packet)
+					{}
 
 					//New packet, process stuff
 					else
@@ -215,19 +218,26 @@ void SDDataDecoder::Refresh()
 				break;
 
 			case STATE_DATA_LOW:
-				cap->m_offsets.push_back(data_start);
-				cap->m_durations.push_back(d0.m_offsets[i] + d0.m_durations[i] - data_start);
-				cap->m_samples.push_back(SDDataSymbol(SDDataSymbol::TYPE_DATA, high_val | cur_data));
-
-				bytes_left --;
-
-				if(bytes_left > 0)
-					state = STATE_DATA_HIGH;
-				else
 				{
-					data_start = d0.m_offsets[i] + d0.m_durations[i];
-					state = STATE_CRC;
-					bytes_left = 16;
+					uint8_t data = high_val | cur_data;
+
+					cap->m_offsets.push_back(data_start);
+					cap->m_durations.push_back(d0.m_offsets[i] + d0.m_durations[i] - data_start);
+					cap->m_samples.push_back(SDDataSymbol(SDDataSymbol::TYPE_DATA, data));
+
+					if(pack)
+						pack->m_data.push_back(data);
+
+					bytes_left --;
+
+					if(bytes_left > 0)
+						state = STATE_DATA_HIGH;
+					else
+					{
+						data_start = d0.m_offsets[i] + d0.m_durations[i];
+						state = STATE_CRC;
+						bytes_left = 16;
+					}
 				}
 				break;
 
@@ -252,6 +262,10 @@ void SDDataDecoder::Refresh()
 				cap->m_durations.push_back(d0.m_durations[i]);
 				cap->m_samples.push_back(SDDataSymbol(SDDataSymbol::TYPE_END, 0));
 				state = STATE_IDLE;
+
+				if(pack)
+					pack->m_len = d0.m_offsets[i] + d0.m_durations[i] - pack->m_offset;
+
 				break;
 
 			default:
