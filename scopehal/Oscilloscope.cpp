@@ -462,6 +462,50 @@ void Oscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Analog channel configuration
+
+vector<Oscilloscope::AnalogBank> Oscilloscope::GetAnalogBanks()
+{
+	vector<AnalogBank> ret;
+	ret.push_back(GetAnalogBank(0));
+	return ret;
+}
+
+Oscilloscope::AnalogBank Oscilloscope::GetAnalogBank(size_t /*channel*/)
+{
+	AnalogBank ret;
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto chan = m_channels[i];
+		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+			ret.push_back(chan);
+	}
+	return ret;
+}
+
+bool Oscilloscope::IsADCModeConfigurable()
+{
+	return false;
+}
+
+vector<string> Oscilloscope::GetADCModeNames(size_t /*channel*/)
+{
+	vector<string> ret;
+	ret.push_back("Default");
+	return ret;
+}
+
+size_t Oscilloscope::GetADCMode(size_t /*channel*/)
+{
+	return 0;
+}
+
+void Oscilloscope::SetADCMode(size_t /*channel*/, size_t /*mode*/)
+{
+	//no-op
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Trigger configuration
 
 vector<string> Oscilloscope::GetTriggerTypes()

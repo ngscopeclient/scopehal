@@ -524,6 +524,48 @@ public:
 	// Sequenced triggering
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// ADC bit depth configuration
+
+	typedef std::vector<OscilloscopeChannel*> AnalogBank;
+
+	/**
+		@brief Gets the analog banks for this instrument.
+
+		A bank is a set of one or more channels all sharing a common ADC configuration.
+	 */
+	virtual std::vector<AnalogBank> GetAnalogBanks();
+
+	/**
+		@brief Gets the bank containing a given channel.
+	 */
+	virtual AnalogBank GetAnalogBank(size_t channel);
+
+	/**
+		@brief Returns true if the ADC is configurable, false if it can only run in one mode.
+	 */
+	virtual bool IsADCModeConfigurable();
+
+	/**
+		@brief Gets the names of the ADC modes for the bank a given channel is located in.
+
+		ADC mode names are usually descriptive, like "12 bit, 640 Msps max" or "8 bit, 1 Gsps max"; but some instruments
+		may use more generic
+
+		@param channel	Index of the channel to query modes for
+	 */
+	virtual std::vector<std::string> GetADCModeNames(size_t channel);
+
+	/**
+		@brief Gets the ADC mode for a channel
+	 */
+	virtual size_t GetADCMode(size_t channel);
+
+	/**
+		@brief Sets the ADC mode for a channel
+	 */
+	virtual void SetADCMode(size_t channel, size_t mode);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
 	typedef std::vector<OscilloscopeChannel*> DigitalBank;
@@ -536,7 +578,7 @@ public:
 	virtual std::vector<DigitalBank> GetDigitalBanks();
 
 	/**
-		@brief Gets the bank containing a given channel
+		@brief Gets the bank containing a given channel.
 	 */
 	virtual DigitalBank GetDigitalBank(size_t channel);
 
