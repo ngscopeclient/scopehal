@@ -207,6 +207,17 @@ public:
 	virtual void SetDigitalHysteresis(size_t channel, float level);
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// ADC bit depth configuration
+
+	//All currently supported LeCroy scopes have only one analog bank (same ADC config for all channels)
+	//so no need to override those
+
+	virtual bool IsADCModeConfigurable();
+	virtual std::vector<std::string> GetADCModeNames(size_t channel);
+	virtual size_t GetADCMode(size_t channel);
+	virtual void SetADCMode(size_t channel, size_t mode);
+
 protected:
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();

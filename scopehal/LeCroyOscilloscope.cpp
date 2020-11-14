@@ -3337,6 +3337,60 @@ bool LeCroyOscilloscope::SetInterleaving(bool combine)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Analog bank configuration
+
+bool LeCroyOscilloscope::IsADCModeConfigurable()
+{
+	//HDO9000 is the only known LeCroy model with programmable ADC resolution
+	return (m_modelid == MODEL_HDO_9K);
+}
+
+vector<string> LeCroyOscilloscope::GetADCModeNames(size_t /*channel*/)
+{
+	vector<string> ret;
+	ret.push_back("HD Off");
+	ret.push_back("HD On");
+	return ret;
+}
+
+size_t LeCroyOscilloscope::GetADCMode(size_t /*channel*/)
+{
+	if(m_modelid != MODEL_HDO_9K)
+		return 0;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.HiResolutionModeActive'");
+	string reply = Trim(m_transport->ReadReply().c_str());
+
+	if(reply == "HDOn")
+		return 1;
+	else
+		return 0;
+}
+
+void LeCroyOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
+{
+	if(m_modelid != MODEL_HDO_9K)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(mode == 1)
+		m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOn\"'");
+	else
+	{
+		m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOff\"'");
+
+		//Disable all interpolation
+		for(size_t i=0; i<m_analogChannelCount; i++)
+		{
+			m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() +
+				".Interpolation = \"NONE\"'");
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Logic analyzer configuration
 
 vector<Oscilloscope::DigitalBank> LeCroyOscilloscope::GetDigitalBanks()
