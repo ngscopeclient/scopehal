@@ -36,6 +36,8 @@
 #ifndef scopehal_h
 #define scopehal_h
 
+#define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
+
 #include <vector>
 #include <string>
 #include <map>
