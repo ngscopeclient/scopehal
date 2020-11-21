@@ -121,7 +121,7 @@ void IBM8b10bDecoder::Refresh()
 	//TODO: allow single rate clocks too?
 	DigitalWaveform data;
 	SampleOnAnyEdges(din, clkin, data);
-q
+
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
 	size_t max_commas = 0;
