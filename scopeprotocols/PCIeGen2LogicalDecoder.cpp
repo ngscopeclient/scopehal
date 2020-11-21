@@ -109,7 +109,8 @@ void PCIeGen2LogicalDecoder::Refresh()
 	size_t len = data->m_samples.size();
 	bool synced = false;
 	uint16_t scrambler = 0;
-	bool in_packet = false;
+	bool in_packet = true;			//Assume we're in a partial packet at time zero
+									//(safer than assuming link is idle)
 	for(size_t i=0; i<len; i++)
 	{
 		auto sym = data->m_samples[i];
@@ -135,20 +136,7 @@ void PCIeGen2LogicalDecoder::Refresh()
 		if(sym.m_control && (sym.m_data == 0x1c) )
 		{}
 		else
-		{
-			for(int j=0; j<8; j++)
-			{
-				bool b = (scrambler & 0x8000) ? true : false;
-				scrambler_out >>= 1;
-
-				if(b)
-				{
-					scrambler_out |= 0x80;
-					scrambler ^= 0x1c;
-				}
-				scrambler = (scrambler << 1) | b;
-			}
-		}
+			scrambler_out = RunScrambler(scrambler);
 
 		//Control characters
 		if(sym.m_control)
@@ -254,6 +242,60 @@ void PCIeGen2LogicalDecoder::Refresh()
 			if(last_was_no_scramble)
 				cap->m_durations[ilast] = end - cap->m_offsets[ilast];
 
+			//Not in a packet? It's an idle
+			else if(!in_packet)
+			{
+				//See if we have a symbol after this
+				if( (i+1 < len) && !data->m_samples[i+1].m_control)
+				{
+					//At sample i, we know the data is 0x00 00.
+					//Therefore, the LFSR output and the scrambled data should be equal.
+					//We want to recover the LFSR *state* at time i.
+
+					//Bits 15:8 of state at time i.
+					//Great, this is unmodified state! Use it as is
+					uint8_t lfsr_hi = data->m_samples[i].m_data;
+					bool b[16] = {0};
+					b[15] = (lfsr_hi >> 0) & 1;
+					b[14] = (lfsr_hi >> 1) & 1;
+					b[13] = (lfsr_hi >> 2) & 1;
+					b[12] = (lfsr_hi >> 3) & 1;
+					b[11] = (lfsr_hi >> 4) & 1;
+					b[10] = (lfsr_hi >> 5) & 1;
+					b[9]  = (lfsr_hi >> 6) & 1;
+					b[8]  = (lfsr_hi >> 7) & 1;
+
+					//Bits 15:8 of the state at time i+1
+					uint8_t next = data->m_samples[i+1].m_data;
+
+					//We need to unroll the LFSR to calculate what the state of bits 7:0 were at time i.
+					//The first 3 bits are easy, since they're before any XORs.
+					b[7] =   (next >> 0) & 1;
+					b[6] =   (next >> 1) & 1;
+					b[5] =   (next >> 2) & 1;
+
+					//Then we have to start backing out stuff.
+					b[4] = ( (next >> 3) & 1 ) ^ b[15];
+					b[3] = ( (next >> 4) & 1 ) ^ b[15] ^ b[14];
+					b[2] = ( (next >> 5) & 1 ) ^ b[15] ^ b[14] ^ b[13];
+					b[1] = ( (next >> 6) & 1 ) ^ b[14] ^ b[13] ^ b[12];
+					b[0] = ( (next >> 7) & 1 ) ^ b[13] ^ b[12] ^ b[11];
+
+					//Patch it all back up
+					scrambler = 0;
+					for(int j=0; j<16; j++)
+					{
+						if(b[j])
+							scrambler |= (1 << j);
+					}
+					synced = true;
+
+					//Back up one cycle and re-process this as a logical idle
+					i--;
+					continue;
+				}
+			}
+
 			else
 			{
 				cap->m_offsets.push_back(off);
@@ -264,6 +306,26 @@ void PCIeGen2LogicalDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+}
+
+uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)
+{
+	uint8_t ret = 0;
+
+	for(int j=0; j<8; j++)
+	{
+		bool b = (state & 0x8000) ? true : false;
+		ret >>= 1;
+
+		if(b)
+		{
+			ret |= 0x80;
+			state ^= 0x1c;
+		}
+		state = (state << 1) | b;
+	}
+
+	return ret;
 }
 
 Gdk::Color PCIeGen2LogicalDecoder::GetColor(int i)

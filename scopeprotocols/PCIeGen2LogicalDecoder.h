@@ -93,6 +93,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(PCIeGen2LogicalDecoder)
+
+protected:
+	uint8_t RunScrambler(uint16_t& state);
 };
 
 #endif
