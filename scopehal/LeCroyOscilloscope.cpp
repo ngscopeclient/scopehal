@@ -1232,6 +1232,13 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	if(i >= m_analogChannelCount)
 		return;
 
+	//Don't allow changing attenuation on active probes
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeIsActive[i])
+			return;
+	}
+
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:ATTENUATION %f", m_channels[i]->GetHwname().c_str(), atten);
 
