@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "AgilentOscilloscope.h"
 #include "EdgeTrigger.h"
+#include "PulseWidthTrigger.h"
 
 using namespace std;
 
@@ -680,6 +681,8 @@ void AgilentOscilloscope::PullTrigger()
 	string reply = m_transport->ReadReply();
 	if (reply == "EDGE")
 		PullEdgeTrigger();
+	else if (reply == "GLIT")
+		PullPulseWidthTrigger();
 
 	//Unrecognized trigger type
 	else
@@ -705,7 +708,7 @@ void AgilentOscilloscope::PullEdgeTrigger()
 	//Create a new trigger if necessary
 	if(m_trigger == NULL)
 		m_trigger = new EdgeTrigger(this);
-	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -724,21 +727,120 @@ void AgilentOscilloscope::PullEdgeTrigger()
 
 	//Edge slope
 	m_transport->SendCommand("TRIG:SLOPE?");
-	reply = m_transport->ReadReply();
+	GetTriggerSlope(et, m_transport->ReadReply());
+}
+
+void AgilentOscilloscope::PullPulseWidthTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<PulseWidthTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new PulseWidthTrigger(this);
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	m_transport->SendCommand("TRIG:GLIT:SOUR?");
+	string reply = m_transport->ReadReply();
+	auto chan = GetChannelByHwName(reply);
+	pt->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand("TRIG:GLIT:LEV?");
+	pt->SetLevel(stof(m_transport->ReadReply()));
+
+	//Condition
+	m_transport->SendCommand("TRIG:GLIT:QUAL?");
+	pt->SetCondition(GetCondition(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("TRIG:GLIT:POL?");
+	GetTriggerSlope(pt, m_transport->ReadReply());
+
+	// Bounds
+	//
+	// In the BETWEEN condition the bounds are stored in a different variable
+	// on the scope so check & set the correct one.
+	if(pt->GetCondition() == Trigger::CONDITION_BETWEEN)
+	{
+		m_transport->SendCommand("TRIG:GLIT:RANG?");
+		reply = m_transport->ReadReply();
+		stringstream ss(reply);
+		string upper_bound, lower_bound;
+
+		if (!getline(ss, upper_bound, ',') || !getline(ss, lower_bound, ','))
+			LogWarning("Malformed TRIG:GLIT:RANG response: %s\n", reply.c_str());
+		else
+		{
+			pt->SetLowerBound(stof(lower_bound) * 1e12);
+			pt->SetUpperBound(stof(upper_bound) * 1e12);
+		}
+
+	}
+	else
+	{
+		//Lower bound
+		m_transport->SendCommand("TRIG:GLIT:GRE?");
+		pt->SetLowerBound(stof(m_transport->ReadReply()) * 1e12);
+
+		//Upper bound
+		m_transport->SendCommand("TRIG:GLIT:LESS?");
+		pt->SetUpperBound(stof(m_transport->ReadReply()) * 1e12);
+	}
+}
+
+/**
+	@brief Processes the slope for an edge or edge-derived trigger
+ */
+void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
+{
 	if (reply == "POS")
-		et->SetType(EdgeTrigger::EDGE_RISING);
+		trig->SetType(EdgeTrigger::EDGE_RISING);
 	else if (reply == "NEG")
-		et->SetType(EdgeTrigger::EDGE_FALLING);
+		trig->SetType(EdgeTrigger::EDGE_FALLING);
 	else if (reply == "EITH")
-		et->SetType(EdgeTrigger::EDGE_ANY);
+		trig->SetType(EdgeTrigger::EDGE_ANY);
 	else if (reply == "ALT")
-		et->SetType(EdgeTrigger::EDGE_ALTERNATING);
+		trig->SetType(EdgeTrigger::EDGE_ALTERNATING);
+	else
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+}
+
+/**
+	@brief Parses a trigger condition
+ */
+Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
+{
+	reply = Trim(reply);
+
+	if(reply == "LESS")
+		return Trigger::CONDITION_LESS;
+	else if(reply == "GRE")
+		return Trigger::CONDITION_GREATER;
+	else if(reply == "RANG")
+		return Trigger::CONDITION_BETWEEN;
+
+	//unknown
+	return Trigger::CONDITION_LESS;
 }
 
 void AgilentOscilloscope::PushTrigger()
 {
+	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(et)
+	if(pt)
+		PushPulseWidthTrigger(pt);
+	// Must go last
+	else if(et)
 		PushEdgeTrigger(et);
 
 	else
@@ -752,39 +854,99 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
+	//Mode
+	m_transport->SendCommand("TRIG:MODE EDGE");
+
 	//Source
 	m_transport->SendCommand(string("TRIG:SOURCE ") + trig->GetInput(0).m_channel->GetHwname());
 
 	//Level
-	char tmp[32];
-	snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
-	m_transport->SendCommand(tmp);
+	PushFloat("TRIG:LEV", trig->GetLevel());
 
 	//Slope
-	switch((int)trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("TRIG:SLOPE POS");
-			break;
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("TRIG:SLOPE NEG");
-			break;
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("TRIG:SLOPE EITH");
-			break;
-		case EdgeTrigger::EDGE_ALTERNATING:
-			m_transport->SendCommand("TRIG:SLOPE ALT");
-			break;
+	PushSlope("TRIG:SLOPE", trig->GetType());
+}
 
+/**
+	@brief Pushes settings for a pulse width trigger to the instrument
+ */
+void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("TRIG:MODE GLIT");
+	m_transport->SendCommand("TRIG:GLIT:SOURCE " +
+		trig->GetInput(0).m_channel->GetHwname());
+	PushSlope("TRIG:GLIT:POL", trig->GetType());
+	PushCondition("TRIG:GLIT:QUAL", trig->GetCondition());
+	PushFloat("TRIG:GLIT:LEV", trig->GetLevel());
+	if(trig->GetCondition() == Trigger::CONDITION_BETWEEN)
+	{
+		m_transport->SendCommand("TRIG:GLIT:RANG " +
+			to_string_sci(trig->GetUpperBound() * 1e-12f) +
+			"," +
+			to_string_sci(trig->GetLowerBound() * 1e-12f));
+	}
+	else
+	{
+		PushFloat("TRIG:GLIT:LESS", trig->GetUpperBound() * 1e-12f);
+		PushFloat("TRIG:GLIT:GRE",  trig->GetLowerBound() * 1e-12f);
+	}
+}
+
+void AgilentOscilloscope::PushCondition(string path, Trigger::Condition cond)
+{
+	string cond_str;
+	switch(cond)
+	{
+		case Trigger::CONDITION_LESS:
+			cond_str = "LESS";
+			break;
+		case Trigger::CONDITION_GREATER:
+			cond_str = "GRE";
+			break;
+		case Trigger::CONDITION_BETWEEN:
+			cond_str = "RANG";
+			break;
 		default:
 			return;
 	}
+	m_transport->SendCommand(path + " " + cond_str);
+}
+
+void AgilentOscilloscope::PushFloat(string path, float f)
+{
+	m_transport->SendCommand(path + " " + to_string_sci(f));
+}
+
+void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
+{
+	string slope_str;
+	switch(slope)
+	{
+		case EdgeTrigger::EDGE_RISING:
+			slope_str = "POS";
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			slope_str = "NEG";
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			slope_str = "EITH";
+			break;
+		case EdgeTrigger::EDGE_ALTERNATING:
+			slope_str = "ALT";
+			break;
+		default:
+			return;
+	}
+	m_transport->SendCommand(path + " " + slope_str);
 }
 
 vector<string> AgilentOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
+	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	return ret;
 }
 
