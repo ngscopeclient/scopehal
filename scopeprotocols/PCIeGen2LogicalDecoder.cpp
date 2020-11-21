@@ -122,10 +122,12 @@ void PCIeGen2LogicalDecoder::Refresh()
 		size_t ilast = outlen - 1;
 		bool last_was_skip = false;
 		bool last_was_idle = false;
+		bool last_was_no_scramble = false;
 		if(outlen)
 		{
 			last_was_skip = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_SKIP);
 			last_was_idle = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_LOGICAL_IDLE);
+			last_was_no_scramble = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_NO_SCRAMBLER);
 		}
 
 		//Update the scrambler UNLESS we have a SKP character K28.0 (k.1c)
@@ -225,7 +227,7 @@ void PCIeGen2LogicalDecoder::Refresh()
 			{
 				//Prefer to extend an existing symbol
 				if(last_was_idle)
-					cap->m_durations[outlen-1] = end - cap->m_offsets[outlen-1];
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
 
 				//Nope, need to make a new symbol
 				else
@@ -248,14 +250,16 @@ void PCIeGen2LogicalDecoder::Refresh()
 		//If we get a Dx.x character and aren't synced, create a "no scrambler" symbol on the output
 		else
 		{
-			if(cap->m_samples.empty())
+			//Prefer to extend an existing symbol
+			if(last_was_no_scramble)
+				cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+
+			else
 			{
-				cap->m_offsets.push_back(0);
-				cap->m_durations.push_back(end);
+				cap->m_offsets.push_back(off);
+				cap->m_durations.push_back(end - off);
 				cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_NO_SCRAMBLER));
 			}
-			else
-				cap->m_durations[0] = end;
 		}
 	}
 
