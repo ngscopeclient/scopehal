@@ -310,7 +310,7 @@ void IBM8b10bDecoder::Refresh()
 		int err3 = false;
 		if(ctl5)
 		{
-			if(disp5)
+			if(disp5 >= 0)
 				code3 = code3_pos_ctl_table[code4];
 			else
 				code3 = code3_neg_ctl_table[code4];
