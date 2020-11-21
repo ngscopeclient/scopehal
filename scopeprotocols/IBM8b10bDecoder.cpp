@@ -121,7 +121,7 @@ void IBM8b10bDecoder::Refresh()
 	//TODO: allow single rate clocks too?
 	DigitalWaveform data;
 	SampleOnAnyEdges(din, clkin, data);
-
+q
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
 	size_t max_commas = 0;
@@ -132,6 +132,7 @@ void IBM8b10bDecoder::Refresh()
 		size_t dlen = data.m_samples.size() - 20;
 		for(size_t i=0; i<dlen; i += 10)
 		{
+			/*
 			//Check if we have a comma (five identical bits) anywhere in the data stream
 			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
 			bool comma = true;
@@ -143,6 +144,37 @@ void IBM8b10bDecoder::Refresh()
 					break;
 				}
 			}
+			*/
+
+			//Look for K28.5 symbols only.
+			bool comma = false;
+			if(	!data.m_samples[i+offset+0] &&
+				!data.m_samples[i+offset+1] &&
+				data.m_samples[i+offset+2] &&
+				data.m_samples[i+offset+3] &&
+				data.m_samples[i+offset+4] &&
+				data.m_samples[i+offset+5] &&
+				data.m_samples[i+offset+6] &&
+				!data.m_samples[i+offset+7] &&
+				data.m_samples[i+offset+8] &&
+				!data.m_samples[i+offset+9])
+			{
+				comma = true;
+			}
+			if(	data.m_samples[i+offset+0] &&
+				data.m_samples[i+offset+1] &&
+				!data.m_samples[i+offset+2] &&
+				!data.m_samples[i+offset+3] &&
+				!data.m_samples[i+offset+4] &&
+				!data.m_samples[i+offset+5] &&
+				!data.m_samples[i+offset+6] &&
+				data.m_samples[i+offset+7] &&
+				!data.m_samples[i+offset+8] &&
+				data.m_samples[i+offset+9])
+			{
+				comma = true;
+			}
+
 			if(comma)
 				num_commas ++;
 		}
@@ -151,7 +183,7 @@ void IBM8b10bDecoder::Refresh()
 			max_commas = num_commas;
 			max_offset = offset;
 		}
-		//LogDebug("Found %zu commas at offset %zu\n", num_commas, offset);
+		//LogTrace("Found %zu commas at offset %zu\n", num_commas, offset);
 	}
 
 	//Decode the actual data
