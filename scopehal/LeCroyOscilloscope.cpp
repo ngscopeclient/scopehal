@@ -893,6 +893,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
 	m_channelDisplayNames.clear();
+	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
@@ -1142,10 +1143,15 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	if(i >= m_analogChannelCount)
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
+	string reply;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
+		reply = Trim(m_transport->ReadReply().substr(0,3));
+	}
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
-	string reply = m_transport->ReadReply().substr(0,3);	//trim off trailing newline, all coupling codes are 3 chars
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_probeIsActive[i] = false;
 
 	if(reply == "A1M")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -1155,6 +1161,11 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 		return OscilloscopeChannel::COUPLE_DC_50;
 	else if(reply == "GND")
 		return OscilloscopeChannel::COUPLE_GND;
+	else if(reply == "DC")
+	{
+		m_probeIsActive[i] = true;
+		return OscilloscopeChannel::COUPLE_DC_50;
+	}
 
 	//invalid
 	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
@@ -1164,6 +1175,14 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
 	if(i >= m_analogChannelCount)
+		return;
+
+	//Get the old coupling value first.
+	//This ensures that m_probeIsActive[i] is valid
+	GetChannelCoupling(i);
+
+	//If we have an active probe, don't touch the hardware config
+	if(m_probeIsActive[i])
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
