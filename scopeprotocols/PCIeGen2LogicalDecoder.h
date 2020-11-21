@@ -30,102 +30,69 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope protocol initialization
+	@brief Declaration of PCIe2Gen2LogicalDecoder
  */
 
-#include "scopeprotocols.h"
+#ifndef PCIe2Gen2LogicalDecoder_h
+#define PCIe2Gen2LogicalDecoder_h
+
+class PCIeLogicalSymbol
+{
+public:
+
+	enum SymbolType
+	{
+		TYPE_NO_SCRAMBLER,		//unknown data before the scrambler seed is figured out
+		TYPE_LOGICAL_IDLE,		//nothing happening
+		TYPE_SKIP,				//rate matching character
+		TYPE_START_TLP,			//Begin an upper layer packet
+		TYPE_START_DLLP,
+		TYPE_END,				//End a TLP or DLLP
+		TYPE_END_BAD,			//End a packet, but mark it as to be ignored
+		TYPE_PAYLOAD_DATA,		//A byte of TLP or DLLP data
+		TYPE_ERROR
+	} m_type;
+
+	uint8_t m_data;
+
+	PCIeLogicalSymbol()
+	{}
+
+	PCIeLogicalSymbol(SymbolType type, uint8_t data = 0)
+		: m_type(type)
+		, m_data(data)
+	{}
+
+
+	bool operator==(const PCIeLogicalSymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<PCIeLogicalSymbol> PCIeLogicalWaveform;
 
 /**
-	@brief Static initialization for protocol list
+	@brief Decoder for PCIe gen 1/2 logical sub-block
  */
-void ScopeProtocolStaticInit()
+class PCIeGen2LogicalDecoder : public Filter
 {
-	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
-	AddDecoderClass(ADL5205Decoder);
-	AddDecoderClass(BaseMeasurement);
-	AddDecoderClass(CANDecoder);
-	AddDecoderClass(ChannelEmulationFilter);
-	AddDecoderClass(ClockRecoveryFilter);
-	AddDecoderClass(CTLEFilter);
-	AddDecoderClass(CurrentShuntFilter);
-	AddDecoderClass(DCOffsetFilter);
-	AddDecoderClass(DDR3Decoder);
-	AddDecoderClass(DeEmbedFilter);
-	AddDecoderClass(DeskewFilter);
-	AddDecoderClass(DownconvertFilter);
-	AddDecoderClass(DownsampleFilter);
-	AddDecoderClass(DPhyDataDecoder);
-	AddDecoderClass(DPhyHSClockRecoveryFilter);
-	AddDecoderClass(DPhySymbolDecoder);
-	AddDecoderClass(DramRefreshActivateMeasurement);
-	AddDecoderClass(DramRowColumnLatencyMeasurement);
-	AddDecoderClass(DSIFrameDecoder);
-	AddDecoderClass(DSIPacketDecoder);
-	AddDecoderClass(DutyCycleMeasurement);
-	AddDecoderClass(DVIDecoder);
-	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
-	AddDecoderClass(Ethernet1000BaseXDecoder);
-	AddDecoderClass(Ethernet10GBaseRDecoder);
-	AddDecoderClass(Ethernet64b66bDecoder);
-	AddDecoderClass(EthernetGMIIDecoder);
-	AddDecoderClass(EthernetRGMIIDecoder);
-	AddDecoderClass(EthernetAutonegotiationDecoder);
-	AddDecoderClass(EyeBitRateMeasurement);
-	AddDecoderClass(EyePattern);
-	AddDecoderClass(EyeHeightMeasurement);
-	AddDecoderClass(EyeJitterMeasurement);
-	AddDecoderClass(EyePeriodMeasurement);
-	AddDecoderClass(EyeWidthMeasurement);
-	AddDecoderClass(FallMeasurement);
-	AddDecoderClass(FFTFilter);
-	AddDecoderClass(FrequencyMeasurement);
-	AddDecoderClass(HorizontalBathtub);
-	AddDecoderClass(I2CDecoder);
-	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
-	AddDecoderClass(IPv4Decoder);
-	AddDecoderClass(JtagDecoder);
-	AddDecoderClass(MagnitudeFilter);
-	AddDecoderClass(MDIODecoder);
-	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
-	AddDecoderClass(OneWireDecoder);
-	AddDecoderClass(OvershootMeasurement);
-	AddDecoderClass(ParallelBus);
-	AddDecoderClass(PCIeGen2LogicalDecoder);
-	AddDecoderClass(PeakHoldFilter);
-	AddDecoderClass(PeriodMeasurement);
-	AddDecoderClass(PkPkMeasurement);
-	AddDecoderClass(QSPIDecoder);
-	AddDecoderClass(QuadratureDecoder);
-	AddDecoderClass(RiseMeasurement);
-	AddDecoderClass(SDCmdDecoder);
-	AddDecoderClass(SDDataDecoder);
-	AddDecoderClass(SPIDecoder);
-	AddDecoderClass(SPIFlashDecoder);
-	AddDecoderClass(SubtractFilter);
-	AddDecoderClass(SWDDecoder);
-	AddDecoderClass(SWDMemAPDecoder);
-	AddDecoderClass(TachometerFilter);
-	AddDecoderClass(ThresholdFilter);
-	AddDecoderClass(TIEMeasurement);
-	AddDecoderClass(TMDSDecoder);
-	AddDecoderClass(TopMeasurement);
-	AddDecoderClass(UARTDecoder);
-	AddDecoderClass(UartClockRecoveryFilter);
-	AddDecoderClass(UndershootMeasurement);
-	AddDecoderClass(UpsampleFilter);
-	AddDecoderClass(USB2ActivityDecoder);
-	AddDecoderClass(USB2PacketDecoder);
-	AddDecoderClass(USB2PCSDecoder);
-	AddDecoderClass(USB2PMADecoder);
-	AddDecoderClass(Waterfall);
-	AddDecoderClass(WindowedAutocorrelationFilter);
+public:
+	PCIeGen2LogicalDecoder(const std::string& color);
+	virtual ~PCIeGen2LogicalDecoder();
 
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
-}
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+	virtual bool NeedsConfig();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(PCIeGen2LogicalDecoder)
+};
+
+#endif
