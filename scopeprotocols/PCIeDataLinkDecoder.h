@@ -47,15 +47,18 @@ public:
 	{
 		TYPE_DLLP_TYPE,
 		TYPE_DLLP_VC,
-		TYPE_DLLP_DATA1,
-		TYPE_DLLP_DATA2,
-		TYPE_DLLP_DATA3,
+		TYPE_DLLP_DATA,
 		TYPE_DLLP_CRC_OK,
 		TYPE_DLLP_CRC_BAD,
 
 		TYPE_DLLP_SEQUENCE,
 		TYPE_DLLP_HEADER_CREDITS,
 		TYPE_DLLP_DATA_CREDITS,
+
+		TYPE_TLP_SEQUENCE,
+		TYPE_TLP_CRC_OK,
+		TYPE_TLP_CRC_BAD,
+		TYPE_TLP_DATA,
 
 		TYPE_ERROR
 	} m_type;
@@ -82,12 +85,12 @@ public:
 		DLLP_TYPE_UPDATEFC_CPL					= 0xa0
 	};
 
-	uint16_t m_data;
+	uint32_t m_data;
 
 	PCIeDataLinkSymbol()
 	{}
 
-	PCIeDataLinkSymbol(SymbolType type, uint8_t data = 0)
+	PCIeDataLinkSymbol(SymbolType type, uint32_t data = 0)
 		: m_type(type)
 		, m_data(data)
 	{}
@@ -127,6 +130,7 @@ public:
 
 protected:
 	uint16_t CalculateDllpCRC(uint8_t type, uint8_t* data);
+	uint32_t CalculateTlpCRC(Packet* pack);
 };
 
 #endif

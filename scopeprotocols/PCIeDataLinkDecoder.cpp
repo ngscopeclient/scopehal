@@ -117,6 +117,11 @@ void PCIeDataLinkDecoder::Refresh()
 		STATE_DLLP_DATA3,
 		STATE_DLLP_CRC1,
 		STATE_DLLP_CRC2,
+
+		STATE_TLP_SEQUENCE_HI,
+		STATE_TLP_SEQUENCE_LO,
+		STATE_TLP_DATA,
+
 		STATE_END
 
 	} state = STATE_IDLE;
@@ -148,6 +153,8 @@ void PCIeDataLinkDecoder::Refresh()
 				//Ignore everything but start of a packet;
 				if(sym.m_type == PCIeLogicalSymbol::TYPE_START_DLLP)
 					state = STATE_DLLP_TYPE;
+				else if(sym.m_type == PCIeLogicalSymbol::TYPE_START_TLP)
+					state = STATE_TLP_SEQUENCE_HI;
 
 				break;	//end STATE_IDLE
 
@@ -265,7 +272,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_offsets.push_back(off);
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(
-								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_DATA1, sym.m_data));
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_DATA, sym.m_data));
 							break;
 					}
 
@@ -311,7 +318,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_offsets.push_back(off);
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(PCIeDataLinkSymbol(
-								PCIeDataLinkSymbol::TYPE_DLLP_DATA2, sym.m_data));
+								PCIeDataLinkSymbol::TYPE_DLLP_DATA, sym.m_data));
 							break;
 					}
 
@@ -358,7 +365,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_offsets.push_back(off);
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(PCIeDataLinkSymbol(
-								PCIeDataLinkSymbol::TYPE_DLLP_DATA3, sym.m_data));
+								PCIeDataLinkSymbol::TYPE_DLLP_DATA, sym.m_data));
 							break;
 
 						//Assume anything else is a flow control DLLP
@@ -440,6 +447,133 @@ void PCIeDataLinkDecoder::Refresh()
 
 				break;	//end STATE_DLLP_CRC2
 
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// TLP path
+
+			case STATE_TLP_SEQUENCE_HI:
+
+				if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				{
+					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+					state = STATE_IDLE;
+				}
+
+				else
+				{
+					//Initial packet creation
+					pack = new Packet;
+					m_packets.push_back(pack);
+					pack->m_offset = off * cap->m_timescale;
+					pack->m_len = 0;
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+					pack->m_headers["Type"] = "TLP";
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeDataLinkSymbol(
+						PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE, sym.m_data));
+
+					//Sequence number is covered by the LCRC so it's considered part of the TLP data
+					pack->m_data.push_back(sym.m_data);
+
+					state = STATE_TLP_SEQUENCE_LO;
+				}
+
+				break;	//end STATE_TLP_SEQUENCE_HI
+
+			case STATE_TLP_SEQUENCE_LO:
+
+				if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				{
+					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+					state = STATE_IDLE;
+				}
+				else
+				{
+					//Extend the sequence number
+					cap->m_samples[ilast].m_data = (cap->m_samples[ilast].m_data << 8) | sym.m_data;
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+
+					pack->m_headers["Seq"] = to_string(cap->m_samples[ilast].m_data);
+
+					pack->m_data.push_back(sym.m_data);
+
+					state = STATE_TLP_DATA;
+				}
+				break;
+
+			case STATE_TLP_DATA:
+
+				//Stop when we get an END sequence
+				if(sym.m_type == PCIeLogicalSymbol::TYPE_END)
+				{
+					//If the TLP has less than 4 bytes of payload, abort
+					if(pack->m_data.size() < 4)
+						cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+
+					//Nope. We at least have enough data for the link layer to process it.
+					else
+					{
+						//The last four bytes of the packet are the CRC.
+						//Delete the last 3, then extend the first.
+						for(int j=0; j<3; j++)
+						{
+							cap->m_offsets.pop_back();
+							cap->m_durations.pop_back();
+							cap->m_samples.pop_back();
+						}
+						ilast = cap->m_samples.size()-1;
+						cap->m_durations[ilast] = off - cap->m_offsets[ilast];
+
+						//Extract the CRC value from the packet data
+						size_t base = pack->m_data.size() - 4;
+						uint32_t crc_expected = 0;
+						for(size_t j=0; j<4; j++)
+							crc_expected = (crc_expected << 8) | pack->m_data[base + j];
+						pack->m_data.resize(base);
+						cap->m_samples[ilast].m_data = crc_expected;
+
+						//Validate the CRC
+						uint32_t crc_calculated = CalculateTlpCRC(pack);
+						if(crc_expected == crc_calculated)
+							cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_TLP_CRC_OK;
+						else
+						{
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+							cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD;
+						}
+
+						//Calculate the new packet length
+						pack->m_headers["Length"] = to_string(pack->m_data.size());
+						pack->m_len = end * cap->m_timescale - pack->m_offset;
+					}
+
+					state = STATE_IDLE;
+				}
+
+				//Abort if we have garbage
+				else if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				{
+					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+					state = STATE_IDLE;
+				}
+
+				//Payload
+				else
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeDataLinkSymbol(
+						PCIeDataLinkSymbol::TYPE_TLP_DATA, sym.m_data));
+
+					pack->m_data.push_back(sym.m_data);
+				}
+
+				break;
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// Wait for done symbol
+
 			case STATE_END:
 				if(sym.m_type != PCIeLogicalSymbol::TYPE_END)
 					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
@@ -479,6 +613,35 @@ uint16_t PCIeDataLinkDecoder::CalculateDllpCRC(uint8_t type, uint8_t* data)
 	return ~( (crc << 8) | ( (crc >> 8) & 0xff) );
 }
 
+/**
+	@brief PCIe TLP CRC32
+
+	Uses the standard CRC-32 polynomial used by Ethernet etc.
+ */
+uint32_t PCIeDataLinkDecoder::CalculateTlpCRC(Packet* pack)
+{
+	uint32_t poly = 0xedb88320;
+
+	size_t len = pack->m_data.size();
+	uint32_t crc = 0xffffffff;
+	for(size_t n=0; n<len; n++)
+	{
+		uint8_t d = pack->m_data[n];
+		for(int i=0; i<8; i++)
+		{
+			bool b = ( crc ^ (d >> i) ) & 1;
+			crc >>= 1;
+			if(b)
+				crc ^= poly;
+		}
+	}
+
+	return ~(	((crc & 0x000000ff) << 24) |
+				((crc & 0x0000ff00) << 8) |
+				((crc & 0x00ff0000) >> 8) |
+				 (crc >> 24) );
+}
+
 Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 {
 	auto capture = dynamic_cast<PCIeDataLinkWaveform*>(GetData(0));
@@ -492,20 +655,22 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
 				return m_standardColors[COLOR_ADDRESS];
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA1:
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA2:
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA3:
-			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
+			case PCIeDataLinkSymbol::TYPE_TLP_DATA:
 				return m_standardColors[COLOR_DATA];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
+			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
 				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
+			case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
 				return m_standardColors[COLOR_CHECKSUM_OK];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
+			case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
 				return m_standardColors[COLOR_CHECKSUM_BAD];
 
 			case PCIeDataLinkSymbol::TYPE_ERROR:
@@ -558,12 +723,12 @@ string PCIeDataLinkDecoder::GetText(int i)
 				return string("VC ") + to_string(s.m_data);
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
 				snprintf(tmp, sizeof(tmp), "Seq: 0x%03x", s.m_data);
 				return tmp;
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA1:
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA2:
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA3:
+			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
+			case PCIeDataLinkSymbol::TYPE_TLP_DATA:
 				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 				return tmp;
 
@@ -576,6 +741,11 @@ string PCIeDataLinkDecoder::GetText(int i)
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
 				snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
+				return tmp;
+
+			case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
+			case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
+				snprintf(tmp, sizeof(tmp), "CRC: %08x", s.m_data);
 				return tmp;
 
 			case PCIeDataLinkSymbol::TYPE_ERROR:
