@@ -33,10 +33,8 @@
 	@brief Implementation of PCIeDataLinkDecoder
  */
 #include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
 #include "PCIeGen2LogicalDecoder.h"
 #include "PCIeDataLinkDecoder.h"
-
 
 using namespace std;
 
@@ -44,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 PCIeDataLinkDecoder::PCIeDataLinkDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	//Set up channels
 	CreateInput("logical");
@@ -93,6 +91,8 @@ void PCIeDataLinkDecoder::SetDefaultName()
 
 void PCIeDataLinkDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -105,6 +105,7 @@ void PCIeDataLinkDecoder::Refresh()
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startPicoseconds = data->m_startPicoseconds;
+	SetData(cap, 0);
 
 	enum
 	{
@@ -125,11 +126,14 @@ void PCIeDataLinkDecoder::Refresh()
 	uint8_t dllp_type = 0;
 	uint8_t dllp_data[3] = {0};
 
+	Packet* pack = NULL;
+
 	for(size_t i=0; i<len; i++)
 	{
 		auto sym = data->m_samples[i];
 		int64_t off = data->m_offsets[i];
 		int64_t dur = data->m_durations[i];
+		int64_t halfdur = dur/2;
 		int64_t end = off + dur;
 
 		size_t ilast = cap->m_samples.size() - 1;
@@ -157,11 +161,72 @@ void PCIeDataLinkDecoder::Refresh()
 					state = STATE_IDLE;
 				else
 				{
-					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, sym.m_data));
+					//Initial packet creation
+					pack = new Packet;
+					m_packets.push_back(pack);
+					pack->m_offset = off * cap->m_timescale;
+					pack->m_len = 0;
 
 					dllp_type = sym.m_data;
+
+					//Packet color
+					switch(dllp_type)
+					{
+						case PCIeDataLinkSymbol::DLLP_TYPE_ACK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_NAK:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+							break;
+
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+							break;
+
+						default:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+							break;
+					}
+
+					switch(dllp_type)
+					{
+						//All types other than flow control don't need any more processing
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_ACK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_NAK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:
+							cap->m_offsets.push_back(off);
+							cap->m_durations.push_back(dur);
+							cap->m_samples.push_back(
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, sym.m_data));
+							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1);
+							break;
+
+						//Split flow control into two symbols: type and VC
+						default:
+							dllp_type = sym.m_data & 0xf0;
+
+							cap->m_offsets.push_back(off);
+							cap->m_durations.push_back(halfdur);
+							cap->m_samples.push_back(
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, dllp_type));
+							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1);
+
+							cap->m_offsets.push_back(off + halfdur);
+							cap->m_durations.push_back(dur - halfdur);
+							cap->m_samples.push_back(
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_VC, sym.m_data & 0xf));
+
+							pack->m_headers["VC"] = to_string(sym.m_data & 0xf);
+							break;
+					}
+
+					pack->m_data.push_back(sym.m_data);
 					state = STATE_DLLP_DATA1;
 				}
 				break;	//end STATE_DLLP_TYPE
@@ -204,6 +269,7 @@ void PCIeDataLinkDecoder::Refresh()
 							break;
 					}
 
+					pack->m_data.push_back(sym.m_data);
 					state = STATE_DLLP_DATA2;
 				}
 
@@ -249,6 +315,7 @@ void PCIeDataLinkDecoder::Refresh()
 							break;
 					}
 
+					pack->m_data.push_back(sym.m_data);
 					state = STATE_DLLP_DATA3;
 				}
 
@@ -265,7 +332,6 @@ void PCIeDataLinkDecoder::Refresh()
 				else
 				{
 					dllp_data[2] = sym.m_data;
-					state = STATE_DLLP_CRC1;
 
 					switch(dllp_type)
 					{
@@ -283,6 +349,8 @@ void PCIeDataLinkDecoder::Refresh()
 						case PCIeDataLinkSymbol::DLLP_TYPE_NAK:
 							cap->m_samples[ilast].m_data = (cap->m_samples[ilast].m_data << 8) | sym.m_data;
 							cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+
+							pack->m_headers["Seq"] = to_string(cap->m_samples[ilast].m_data);
 							break;
 
 						//Make a new symbol if vendor specific
@@ -302,15 +370,22 @@ void PCIeDataLinkDecoder::Refresh()
 									((cap->m_samples[ilast].m_data & 0xc0) >> 6);
 								cap->m_samples[ilast-1].m_type = PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS;
 
+								pack->m_headers["HdrFC"] = to_string(cap->m_samples[ilast-1].m_data);
+
 								//Extract the data credit count and put in the second data word
 								//then extend the second word to span both bytes
 								cap->m_samples[ilast].m_data =
 									( (cap->m_samples[ilast].m_data & 0xf) << 8) | sym.m_data;
 								cap->m_durations[ilast] = end - cap->m_offsets[ilast];
 								cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS;
+
+								pack->m_headers["DataFC"] = to_string(cap->m_samples[ilast].m_data);
 							}
 							break;
 					}
+
+					pack->m_data.push_back(sym.m_data);
+					state = STATE_DLLP_CRC1;
 				}
 
 				break;	//end STATE_DLLP_DATA3
@@ -357,6 +432,10 @@ void PCIeDataLinkDecoder::Refresh()
 						cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD;
 
 					state = STATE_END;
+
+					//Finalize the packet
+					pack->m_headers["Length"] = "4";
+					pack->m_len = (end * cap->m_timescale) - pack->m_offset;
 				}
 
 				break;	//end STATE_DLLP_CRC2
@@ -368,8 +447,6 @@ void PCIeDataLinkDecoder::Refresh()
 				break;	//end STATE_END
 		}
 	}
-
-	SetData(cap, 0);
 }
 
 /**
@@ -412,6 +489,7 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 		switch(s.m_type)
 		{
 			case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
+			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
 				return m_standardColors[COLOR_ADDRESS];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA1:
@@ -461,34 +539,23 @@ string PCIeDataLinkDecoder::GetText(int i)
 					case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:				return "PM_Request_Ack";
 					case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:				return "Vendor Specific";
 
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_P:					return "InitFC1-P";
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_NP:					return "InitFC1-NP";
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_CPL:					return "InitFC1-CPL";
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_P:					return "InitFC2-P";
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_NP:					return "InitFC2-NP";
+					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_CPL:					return "InitFC2-CPL";
+					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_P:					return "UpdateFC-P";
+					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_NP:					return "UpdateFC-NP";
+					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_CPL:				return "UpdateFC-CPL";
+
 					default:
-						break;
+						snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+						return string("Reserved ") + tmp;
 				}
 
-				switch(s.m_data & 0xf8)
-				{
-					case 0x40:
-						return string("InitFC1-P VC") + to_string(s.m_data & 7);
-					case 0x50:
-						return string("InitFC1-NP VC") + to_string(s.m_data & 7);
-					case 0x60:
-						return string("InitFC1-Cpl VC") + to_string(s.m_data & 7);
-					case 0xc0:
-						return string("InitFC2-P VC") + to_string(s.m_data & 7);
-					case 0xd0:
-						return string("InitFC2-NP VC") + to_string(s.m_data & 7);
-					case 0xe0:
-						return string("InitFC2-Cpl VC") + to_string(s.m_data & 7);
-					case 0x80:
-						return string("UpdateFC-P VC") + to_string(s.m_data & 7);
-					case 0x90:
-						return string("UpdateFC-NP VC") + to_string(s.m_data & 7);
-					case 0xa0:
-						return string("UpdateFC-Cpl VC") + to_string(s.m_data & 7);
-				}
-
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string("Reserved ") + tmp;
+			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
+				return string("VC ") + to_string(s.m_data);
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
 				snprintf(tmp, sizeof(tmp), "Seq: 0x%03x", s.m_data);
@@ -517,4 +584,16 @@ string PCIeDataLinkDecoder::GetText(int i)
 		}
 	}
 	return "";
+}
+
+vector<string> PCIeDataLinkDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("VC");
+	ret.push_back("Seq");
+	ret.push_back("HdrFC");
+	ret.push_back("DataFC");
+	ret.push_back("Length");
+	return ret;
 }

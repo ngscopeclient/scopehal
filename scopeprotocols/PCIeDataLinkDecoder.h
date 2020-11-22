@@ -36,6 +36,8 @@
 #ifndef PCIeDataLinkDecoder_h
 #define PCIeDataLinkDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+
 class PCIeDataLinkSymbol
 {
 public:
@@ -44,6 +46,7 @@ public:
 	enum SymbolType
 	{
 		TYPE_DLLP_TYPE,
+		TYPE_DLLP_VC,
 		TYPE_DLLP_DATA1,
 		TYPE_DLLP_DATA2,
 		TYPE_DLLP_DATA3,
@@ -66,7 +69,17 @@ public:
 		DLLP_TYPE_PM_ENTER_L23					= 0x21,
 		DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1	= 0x23,
 		DLLP_TYPE_PM_REQUEST_ACK				= 0x24,
-		DLLP_TYPE_VENDOR_SPECIFIC				= 0x30
+		DLLP_TYPE_VENDOR_SPECIFIC				= 0x30,
+
+		DLLP_TYPE_INITFC1_P						= 0x40,
+		DLLP_TYPE_INITFC1_NP					= 0x50,
+		DLLP_TYPE_INITFC1_CPL					= 0x60,
+		DLLP_TYPE_INITFC2_P						= 0xc0,
+		DLLP_TYPE_INITFC2_NP					= 0xd0,
+		DLLP_TYPE_INITFC2_CPL					= 0xe0,
+		DLLP_TYPE_UPDATEFC_P					= 0x80,
+		DLLP_TYPE_UPDATEFC_NP					= 0x90,
+		DLLP_TYPE_UPDATEFC_CPL					= 0xa0
 	};
 
 	uint16_t m_data;
@@ -91,7 +104,7 @@ typedef Waveform<PCIeDataLinkSymbol> PCIeDataLinkWaveform;
 /**
 	@brief Decoder for PCIe data link layer
  */
-class PCIeDataLinkDecoder : public Filter
+class PCIeDataLinkDecoder : public PacketDecoder
 {
 public:
 	PCIeDataLinkDecoder(const std::string& color);
@@ -107,6 +120,8 @@ public:
 	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	virtual std::vector<std::string> GetHeaders();
 
 	PROTOCOL_DECODER_INITPROC(PCIeDataLinkDecoder)
 
