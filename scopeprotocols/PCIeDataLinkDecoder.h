@@ -40,6 +40,7 @@ class PCIeDataLinkSymbol
 {
 public:
 
+	//Data link symbols
 	enum SymbolType
 	{
 		TYPE_DLLP_TYPE,
@@ -49,9 +50,14 @@ public:
 		TYPE_DLLP_CRC_OK,
 		TYPE_DLLP_CRC_BAD,
 
+		TYPE_DLLP_SEQUENCE,
+		TYPE_DLLP_HEADER_CREDITS,
+		TYPE_DLLP_DATA_CREDITS,
+
 		TYPE_ERROR
 	} m_type;
 
+	//DLLP byte 0 type fields (PCIe 2.0 Base Spec table 3-1)
 	enum DLLPType
 	{
 		DLLP_TYPE_ACK 							= 0x00,

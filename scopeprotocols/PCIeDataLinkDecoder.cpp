@@ -173,12 +173,36 @@ void PCIeDataLinkDecoder::Refresh()
 
 				else
 				{
-					//First byte of data goes in the first DLLP data
-					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_DATA1, sym.m_data));
-
 					dllp_data[0] = sym.m_data;
+
+					switch(dllp_type)
+					{
+						//Power management DLLPs have no content
+						//Extend the type
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:
+							cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+							break;
+
+						//Sequence numbe for ACK/NAK
+						case PCIeDataLinkSymbol::DLLP_TYPE_ACK:
+						case PCIeDataLinkSymbol::DLLP_TYPE_NAK:
+							cap->m_offsets.push_back(off);
+							cap->m_durations.push_back(dur);
+							cap->m_samples.push_back(
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE, sym.m_data));
+							break;
+
+						default:
+							//First byte of data goes in the first DLLP data
+							cap->m_offsets.push_back(off);
+							cap->m_durations.push_back(dur);
+							cap->m_samples.push_back(
+								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_DATA1, sym.m_data));
+							break;
+					}
 
 					state = STATE_DLLP_DATA2;
 				}
@@ -199,6 +223,15 @@ void PCIeDataLinkDecoder::Refresh()
 
 					switch(dllp_type)
 					{
+						//Power management DLLPs have no content
+						//Extend the type
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:
+							cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+							break;
+
 						//If this is an ACK/NAK DLLP, save the sequence number.
 						//Throw away the first byte of data (reserved/ignored)
 						case PCIeDataLinkSymbol::DLLP_TYPE_ACK:
@@ -232,9 +265,19 @@ void PCIeDataLinkDecoder::Refresh()
 				else
 				{
 					dllp_data[2] = sym.m_data;
+					state = STATE_DLLP_CRC1;
 
 					switch(dllp_type)
 					{
+						//Power management DLLPs have no content
+						//Extend the type
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:
+						case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:
+							cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+							break;
+
 						//If this is an ACK/NAK DLLP, extend the existing sequence number.
 						case PCIeDataLinkSymbol::DLLP_TYPE_ACK:
 						case PCIeDataLinkSymbol::DLLP_TYPE_NAK:
@@ -242,16 +285,32 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_durations[ilast] = end - cap->m_offsets[ilast];
 							break;
 
-						//Default to making a new symbol
-						default:
+						//Make a new symbol if vendor specific
+						case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:
 							cap->m_offsets.push_back(off);
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(PCIeDataLinkSymbol(
-								PCIeDataLinkSymbol::TYPE_DLLP_DATA2, sym.m_data));
+								PCIeDataLinkSymbol::TYPE_DLLP_DATA3, sym.m_data));
+							break;
+
+						//Assume anything else is a flow control DLLP
+						default:
+							{
+								//Extract the header credit count and put it in the first data word
+								cap->m_samples[ilast-1].m_data =
+									((cap->m_samples[ilast-1].m_data & 0x3f) << 2) |
+									((cap->m_samples[ilast].m_data & 0xc0) >> 6);
+								cap->m_samples[ilast-1].m_type = PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS;
+
+								//Extract the data credit count and put in the second data word
+								//then extend the second word to span both bytes
+								cap->m_samples[ilast].m_data =
+									( (cap->m_samples[ilast].m_data & 0xf) << 8) | sym.m_data;
+								cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+								cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS;
+							}
 							break;
 					}
-
-					state = STATE_DLLP_CRC1;
 				}
 
 				break;	//end STATE_DLLP_DATA3
@@ -294,7 +353,6 @@ void PCIeDataLinkDecoder::Refresh()
 
 					//Verify it
 					uint16_t actual_crc = CalculateDllpCRC(dllp_type, dllp_data);
-					LogDebug("DLLP: expected %04x, calculated %04x\n", expected_crc, actual_crc);
 					if(expected_crc != actual_crc)
 						cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD;
 
@@ -317,13 +375,16 @@ void PCIeDataLinkDecoder::Refresh()
 /**
 	@brief PCIe DLLP CRC
 
-	See PCIe Base Spec v2.0, figure 3-11
+	Based on the reference LFSR design in the PCIe Base Spec v2.0, figure 3-11, but optimized for software calculation.
+
+	Since swapping bits in a byte is expensive, we reverse the direction of the LFSR which does a free bitwise reversal
+	of the entire 16-bit CRC. Then all we have to do is swap bytes on the output.
  */
 uint16_t PCIeDataLinkDecoder::CalculateDllpCRC(uint8_t type, uint8_t* data)
 {
 	uint8_t crc_in[4] = { type, data[0], data[1], data[2] };
 
-	uint16_t poly = 0x100b;
+	uint16_t poly = 0xd008;
 	uint16_t crc = 0xffff;
 
 	for(int n=0; n<4; n++)
@@ -331,26 +392,14 @@ uint16_t PCIeDataLinkDecoder::CalculateDllpCRC(uint8_t type, uint8_t* data)
 		uint8_t d = crc_in[n];
 		for(int i=0; i<8; i++)
 		{
-			bool b = ( (crc >> 15) ^ (d >> i) ) & 1;
-
-			crc <<= 1;
-
+			bool b = ( crc ^ (d >> i) ) & 1;
+			crc >>= 1;
 			if(b)
 				crc ^= poly;
 		}
 	}
 
-	//Bitswap CRC
-	uint16_t crc_bitswap = 0;
-	for(int i=0; i<8; i++)
-	{
-		if( (crc >> i) & 1)
-			crc_bitswap |= 1 << (7-i);
-		if( (crc >> (i+8)) & 1)
-			crc_bitswap |= 1 << (15-i);
-	}
-
-	return ~crc_bitswap;
+	return ~( (crc << 8) | ( (crc >> 8) & 0xff) );
 }
 
 Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
@@ -367,7 +416,13 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA1:
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA2:
+			case PCIeDataLinkSymbol::TYPE_DLLP_DATA3:
+			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
 				return m_standardColors[COLOR_DATA];
+
+			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
+			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
+				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
 				return m_standardColors[COLOR_CHECKSUM_OK];
@@ -386,7 +441,7 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 
 string PCIeDataLinkDecoder::GetText(int i)
 {
-	char tmp[32];
+	char tmp[64];
 
 	auto capture = dynamic_cast<PCIeDataLinkWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -435,29 +490,21 @@ string PCIeDataLinkDecoder::GetText(int i)
 				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 				return string("Reserved ") + tmp;
 
+			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+				snprintf(tmp, sizeof(tmp), "Seq: 0x%03x", s.m_data);
+				return tmp;
+
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA1:
-
-				//TODO
-				snprintf(tmp, sizeof(tmp), "D1 %02x", s.m_data);
-				return tmp;
-
-				break;
-
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA2:
-
-				//TODO
-				snprintf(tmp, sizeof(tmp), "D2 %02x", s.m_data);
-				return tmp;
-
-				break;
-
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA3:
-
-				//TODO
-				snprintf(tmp, sizeof(tmp), "D3 %02x", s.m_data);
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 				return tmp;
 
-				break;
+			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
+				return to_string(s.m_data) + " headers";
+
+			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
+				return to_string(16*s.m_data) + " data bytes";
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
