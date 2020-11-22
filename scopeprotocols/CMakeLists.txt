@@ -59,6 +59,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	ParallelBus.cpp
+	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp

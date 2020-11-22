@@ -95,6 +95,7 @@
 #include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"
 #include "ParallelBus.h"
+#include "PCIeDataLinkDecoder.h"
 #include "PCIeGen2LogicalDecoder.h"
 #include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
