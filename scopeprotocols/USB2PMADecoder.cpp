@@ -123,29 +123,30 @@ void USB2PMADecoder::Refresh()
 	{
 		bool bp = (din_p->m_samples[i] > 0.4);
 		bool bn = (din_n->m_samples[i] > 0.4);
+		float vdiff = din_p->m_samples[i] - din_n->m_samples[i];
 
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
-		if(bp && bn)
-			type = USB2PMASymbol::TYPE_SE1;
-		else if(!bp && !bn)
-			type = USB2PMASymbol::TYPE_SE0;
-		else
+		if(fabs(vdiff) > 0.4)
 		{
 			if(speed == 1)
 			{
-				if(bp && !bn)
+				if(vdiff > 0)
 					type = USB2PMASymbol::TYPE_J;
 				else
 					type = USB2PMASymbol::TYPE_K;
 			}
 			else
 			{
-				if(bp && !bn)
+				if(vdiff > 0)
 					type = USB2PMASymbol::TYPE_K;
 				else
 					type = USB2PMASymbol::TYPE_J;
 			}
 		}
+		else if(bp && bn)
+			type = USB2PMASymbol::TYPE_SE1;
+		else
+			type = USB2PMASymbol::TYPE_SE0;
 
 		//First sample goes as-is
 		if(cap->m_samples.empty())

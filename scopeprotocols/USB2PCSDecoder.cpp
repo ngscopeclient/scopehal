@@ -374,7 +374,7 @@ void USB2PCSDecoder::RefreshIterationData(
 	{
 		//If we're not two UIs long, we have a problem
 		//TODO: handle reset
-		if(round(sample_width_ui) != 2)
+		if(sample_width_ui < 1.2)
 		{
 			cap->m_offsets.push_back(din->m_offsets[nin]);
 			cap->m_durations.push_back(din->m_durations[nin]);
