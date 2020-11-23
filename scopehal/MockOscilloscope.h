@@ -42,6 +42,8 @@ public:
 	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
 	virtual ~MockOscilloscope();
 
+	bool LoadCSV(const std::string& path);
+
 	//not copyable or assignable
 	MockOscilloscope(const MockOscilloscope& rhs) =delete;
 	MockOscilloscope& operator=(const MockOscilloscope& rhs) =delete;
