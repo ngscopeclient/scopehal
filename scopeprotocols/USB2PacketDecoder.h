@@ -50,8 +50,10 @@ public:
 		TYPE_PID,
 		TYPE_ADDR,
 		TYPE_ENDP,
-		TYPE_CRC5,
-		TYPE_CRC16,
+		TYPE_CRC5_GOOD,
+		TYPE_CRC5_BAD,
+		TYPE_CRC16_GOOD,
+		TYPE_CRC16_BAD,
 		TYPE_NFRAME,
 		TYPE_DATA,
 		TYPE_ERROR
@@ -125,6 +127,9 @@ protected:
 	void DecodeSof(USB2PacketWaveform* cap, size_t istart, size_t& i);
 	void DecodeSetup(USB2PacketWaveform* cap, size_t istart, size_t& i);
 	void DecodeData(USB2PacketWaveform* cap, size_t istart, size_t& i);
+
+	bool VerifyCRC5(uint8_t* data);
+	uint16_t CalculateCRC16(const std::vector<uint8_t>& data);
 };
 
 #endif
