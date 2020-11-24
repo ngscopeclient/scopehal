@@ -90,6 +90,13 @@ public:
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
 
+	//Set all currently existing filters to the dirty state
+	static void SetAllFiltersDirty()
+	{
+		for(auto f : m_filters)
+			f->SetDirty();
+	}
+
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
 
