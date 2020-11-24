@@ -671,7 +671,10 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		return;
 	}
 	if(scrc.m_type != USB2PacketSymbol::TYPE_CRC5_GOOD)
+	{
+		LogDebug("bad CRC\n");
 		return;
+	}
 
 	//Expect minimum DATA, 0 or more data bytes, ACK
 	if(i >= cap->m_samples.size())
@@ -713,6 +716,9 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		pack->m_headers["Endpoint"] = tmp;
 		pack->m_headers["Details"] = "NAK";
 		m_packets.push_back(pack);
+
+		pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
+
 		return;
 	}
 	else	//normal data
@@ -749,10 +755,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 
 		//Keep adding data
 		if(s.m_type == USB2PacketSymbol::TYPE_DATA)
-		{
 			pack->m_data.push_back(s.m_data);
-			pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
-		}
 
 		//Next should be a CRC16
 		else if(s.m_type == USB2PacketSymbol::TYPE_CRC16_GOOD)
@@ -785,6 +788,8 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		LogDebug("DecodeData got type %x instead of ACK/NAK\n", sack.m_type);
 		ack = "Not a PID";
 	}
+
+	pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
 
 	//Format the data
 	string details = "";
