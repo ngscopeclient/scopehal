@@ -168,6 +168,8 @@ void PCIeGen2LogicalDecoder::Refresh()
 							cap->m_durations.push_back(end - start);
 							cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_SKIP));
 						}
+
+						in_packet = false;
 					}
 					break;
 

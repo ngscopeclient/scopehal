@@ -163,9 +163,19 @@ void PCIeDataLinkDecoder::Refresh()
 
 			case STATE_DLLP_TYPE:
 
-				//If it's not data, we probably don't have scrambler sync yet. Abort.
-				if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				//Scrambler not synced? Quietly abort
+				if(sym.m_type == PCIeLogicalSymbol::TYPE_NO_SCRAMBLER)
 					state = STATE_IDLE;
+
+				//Anything else is a problem
+				else if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_ERROR));
+
+					state = STATE_IDLE;
+				}
 				else
 				{
 					//Initial packet creation
@@ -452,7 +462,11 @@ void PCIeDataLinkDecoder::Refresh()
 
 			case STATE_TLP_SEQUENCE_HI:
 
-				if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
+				//Scrambler not synced? Quietly abort
+				if(sym.m_type == PCIeLogicalSymbol::TYPE_NO_SCRAMBLER)
+					state = STATE_IDLE;
+
+				else if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
 				{
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
