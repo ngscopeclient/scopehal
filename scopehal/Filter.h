@@ -231,7 +231,7 @@ public:
 	static void DoAddDecoderClass(const std::string& name, CreateProcType proc);
 
 	static void EnumProtocols(std::vector<std::string>& names);
-	static Filter* CreateFilter(const std::string& protocol, const std::string& color);
+	static Filter* CreateFilter(const std::string& protocol, const std::string& color = "#ffffff");
 
 protected:
 	//Class enumeration
