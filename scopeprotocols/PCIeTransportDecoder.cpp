@@ -111,7 +111,8 @@ void PCIeTransportDecoder::Refresh()
 	{
 		STATE_IDLE,
 		STATE_HEADER_0,
-		STATE_HEADER_1
+		STATE_HEADER_1,
+		STATE_HEADER_2,
 	} state = STATE_IDLE;
 
 	size_t len = data->m_samples.size();
@@ -128,6 +129,7 @@ void PCIeTransportDecoder::Refresh()
 
 	bool format_4word = false;
 	bool has_data = false;
+	int traffic_class;
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -174,12 +176,13 @@ void PCIeTransportDecoder::Refresh()
 
 				else
 				{
-					//Extract format
+					//Extract format (PCIe 2.0 base spec table 2-2)
 					tlp_format = static_cast<TLPFormat>(sym.m_data >> 5);
 					format_4word = (tlp_format == TLP_FORMAT_4W_NODATA) || (tlp_format == TLP_FORMAT_4W_DATA);
 					has_data = (tlp_format == TLP_FORMAT_3W_DATA) || (tlp_format == TLP_FORMAT_4W_DATA);
 
 					//Type is a bit complicated, because it depends on both type and format fields
+					//PCIe 2.0 base spec table 2-3
 					PCIeTransportSymbol::TlpType type = PCIeTransportSymbol::TYPE_INVALID;
 					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					switch(sym.m_data & 0x1f)
@@ -288,6 +291,23 @@ void PCIeTransportDecoder::Refresh()
 				}
 
 				break;	//end STATE_HEADER_0
+
+			//This one is easy. Traffic class plus a bunch of reserved fields
+			case STATE_HEADER_1:
+
+				traffic_class = (sym.m_data >> 4) & 7;
+
+				cap->m_offsets.push_back(off);
+				cap->m_durations.push_back(dur);
+				cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TRAFFIC_CLASS, traffic_class));
+
+				pack->m_headers["TC"] = to_string(traffic_class);
+
+				state = STATE_HEADER_2;
+				break;	//end STATE_HEADER_1
+
+			case STATE_HEADER_2:
+				break;	//end STATE_HEADER_2
 		}
 	}
 }
@@ -302,6 +322,7 @@ Gdk::Color PCIeTransportDecoder::GetColor(int i)
 		switch(s.m_type)
 		{
 			case PCIeTransportSymbol::TYPE_TLP_TYPE:
+			case PCIeTransportSymbol::TYPE_TRAFFIC_CLASS:
 				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeTransportSymbol::TYPE_ERROR:
@@ -354,6 +375,9 @@ string PCIeTransportDecoder::GetText(int i)
 						return "ERROR";
 				}
 
+			case PCIeTransportSymbol::TYPE_TRAFFIC_CLASS:
+				return string("TC: ") + to_string(s.m_data);
+
 			case PCIeTransportSymbol::TYPE_ERROR:
 			default:
 				return "ERROR";
@@ -367,6 +391,7 @@ vector<string> PCIeTransportDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Seq");
 	ret.push_back("Type");
+	ret.push_back("TC");
 
 	/*
 	ret.push_back("Seq");

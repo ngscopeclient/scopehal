@@ -46,6 +46,7 @@ public:
 	enum SymbolType
 	{
 		TYPE_TLP_TYPE,
+		TYPE_TRAFFIC_CLASS,
 
 		TYPE_ERROR
 	} m_type;
