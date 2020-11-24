@@ -454,7 +454,10 @@ void PCIeDataLinkDecoder::Refresh()
 
 				if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
 				{
-					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_ERROR));
+
 					state = STATE_IDLE;
 				}
 
@@ -724,7 +727,7 @@ string PCIeDataLinkDecoder::GetText(int i)
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
 			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
-				snprintf(tmp, sizeof(tmp), "Seq: 0x%03x", s.m_data);
+				snprintf(tmp, sizeof(tmp), "Seq: %d", s.m_data);
 				return tmp;
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
