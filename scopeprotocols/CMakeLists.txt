@@ -61,6 +61,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ParallelBus.cpp
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
+	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
 	PkPkMeasurement.cpp
