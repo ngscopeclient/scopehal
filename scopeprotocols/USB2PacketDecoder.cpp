@@ -51,7 +51,7 @@ bool USB2PacketDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<USB2PCSWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<USB2PCSDecoder*>(stream.m_channel) != NULL) )
 		return true;
 
 	return false;
@@ -338,10 +338,8 @@ void USB2PacketDecoder::Refresh()
 					packet_data.pop_back();
 					packet_data.pop_back();
 
-					//Calculate the CRC
+					//Verify the CRC
 					uint16_t crc16_calculated = CalculateCRC16(packet_data);
-					LogDebug("Calculated CRC16: %04x, got: %04x\n", crc16_calculated, crc16);
-
 					cap->m_durations[firstoff] += cap->m_durations[secondoff];
 					if(crc16 == crc16_calculated)
 						cap->m_samples[firstoff] = USB2PacketSymbol(USB2PacketSymbol::TYPE_CRC16_GOOD, crc16);

@@ -50,7 +50,7 @@ bool USB2PCSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<USB2PMAWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<USB2PMADecoder*>(stream.m_channel) != NULL) )
 		return true;
 
 	return false;
