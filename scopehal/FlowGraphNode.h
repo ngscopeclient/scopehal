@@ -51,7 +51,7 @@ public:
 	, m_stream(0)
 	{}
 
-	StreamDescriptor(OscilloscopeChannel* channel, size_t stream)
+	StreamDescriptor(OscilloscopeChannel* channel, size_t stream = 0)
 		: m_channel(channel)
 		, m_stream(stream)
 	{}
