@@ -356,7 +356,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 		return false;
 	}
 
-	map<int, AnalogWaveform*> waveforms;
+	vector<AnalogWaveform*> waveforms;
 
 	char line[1024];
 	size_t nrow = 0;
@@ -461,15 +461,22 @@ bool MockOscilloscope::LoadCSV(const string& path)
 					true);
 				AddChannel(chan);
 				chan->SetDefaultDisplayName();
+			}
+		}
 
+		//Create waveforms if needed
+		if(waveforms.empty())
+		{
+			for(size_t i=0; i<ncols; i++)
+			{
 				//Create the waveform for the channel
 				auto wfm = new AnalogWaveform;
 				wfm->m_timescale = 1;
 				wfm->m_startTimestamp = 0;
 				wfm->m_startPicoseconds = 0;
 				wfm->m_triggerPhase = 0;
-				waveforms[i] = wfm;
-				chan->SetData(wfm, 0);
+				waveforms.push_back(wfm);
+				GetChannel(i)->SetData(wfm, 0);
 			}
 		}
 
