@@ -113,6 +113,17 @@ void PCIeTransportDecoder::Refresh()
 		STATE_HEADER_0,
 		STATE_HEADER_1,
 		STATE_HEADER_2,
+		STATE_HEADER_3,
+
+		STATE_REQUESTER_ID_0,
+		STATE_REQUESTER_ID_1,
+		STATE_TAG,
+		STATE_BYTE_ENABLES,
+		STATE_ADDRESS_0,
+		STATE_ADDRESS_1,
+
+		STATE_DATA,
+
 	} state = STATE_IDLE;
 
 	size_t len = data->m_samples.size();
@@ -125,11 +136,33 @@ void PCIeTransportDecoder::Refresh()
 		TLP_FORMAT_4W_NODATA	= 1,
 		TLP_FORMAT_3W_DATA		= 2,
 		TLP_FORMAT_4W_DATA 		= 3
-	} tlp_format;
+	} tlp_format = TLP_FORMAT_3W_NODATA;
 
-	bool format_4word = false;
-	bool has_data = false;
-	int traffic_class;
+	bool format_4word 		= false;
+	bool has_data 			= false;
+	int traffic_class		= 0;
+	bool digest_present		= false;
+	bool poisoned 			= false;
+	bool relaxed_ordering	= false;
+	bool no_snoop			= false;
+	size_t packet_len		= 0;
+	uint16_t requester_id	= 0;
+	uint8_t tag				= 0;
+	uint64_t mem_addr		= 0;
+	size_t nbyte			= 0;
+	char tmp[32];
+
+	PCIeTransportSymbol::TlpType type = PCIeTransportSymbol::TYPE_INVALID;
+
+	//Address types (PCIe 2.0 base spec table 2-5)
+	/*
+	enum AddressType
+	{
+		ADDRESS_TYPE_DEFAULT				= 0,
+		ADDRESS_TYPE_TRANSLATION_REQUEST	= 1,
+		ADDRESS_TYPE_TRANSLATED				= 2
+	} address_type;
+	*/
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -138,6 +171,7 @@ void PCIeTransportDecoder::Refresh()
 		int64_t dur = data->m_durations[i];
 		int64_t halfdur = dur/2;
 		int64_t end = off + dur;
+		size_t ilast = cap->m_samples.size() - 1;
 
 		switch(state)
 		{
@@ -162,7 +196,7 @@ void PCIeTransportDecoder::Refresh()
 				break;	//end STATE_IDLE
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TLP headers
+			// Common TLP headers (PCIe 2.0 base spec figure 2-4, section 2.2.1)
 
 			case STATE_HEADER_0:
 
@@ -171,6 +205,7 @@ void PCIeTransportDecoder::Refresh()
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					state = STATE_IDLE;
 				}
 
@@ -183,7 +218,7 @@ void PCIeTransportDecoder::Refresh()
 
 					//Type is a bit complicated, because it depends on both type and format fields
 					//PCIe 2.0 base spec table 2-3
-					PCIeTransportSymbol::TlpType type = PCIeTransportSymbol::TYPE_INVALID;
+					type = PCIeTransportSymbol::TYPE_INVALID;
 					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					switch(sym.m_data & 0x1f)
 					{
@@ -295,19 +330,350 @@ void PCIeTransportDecoder::Refresh()
 			//This one is easy. Traffic class plus a bunch of reserved fields
 			case STATE_HEADER_1:
 
-				traffic_class = (sym.m_data >> 4) & 7;
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
 
-				cap->m_offsets.push_back(off);
-				cap->m_durations.push_back(dur);
-				cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TRAFFIC_CLASS, traffic_class));
+				else
+				{
+					traffic_class = (sym.m_data >> 4) & 7;
 
-				pack->m_headers["TC"] = to_string(traffic_class);
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TRAFFIC_CLASS, traffic_class));
 
-				state = STATE_HEADER_2;
+					pack->m_headers["TC"] = to_string(traffic_class);
+
+					state = STATE_HEADER_2;
+				}
 				break;	//end STATE_HEADER_1
 
+			//7 TLP digest present
+			//6	poisoned (corrupted, discard)
+			//5:4 attributes
+			//3:2 = address type
+			//1:0 = high 2 bits of length
 			case STATE_HEADER_2:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+
+				else
+				{
+					digest_present = (sym.m_data & PCIeTransportSymbol::FLAG_DIGEST_PRESENT) != 0;
+					poisoned = (sym.m_data & PCIeTransportSymbol::FLAG_POISONED) != 0;
+					relaxed_ordering = (sym.m_data & PCIeTransportSymbol::FLAG_RELAXED_ORDERING) != 0;
+					no_snoop = (sym.m_data & PCIeTransportSymbol::FLAG_NO_SNOOP) != 0;
+					//address_type = static_cast<AddressType>( (sym.m_data >> 2) & 3);
+					packet_len = (sym.m_data & 3) << 8;
+
+					if(poisoned)
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_FLAGS, sym.m_data));
+
+					string flags;
+					if(digest_present)
+						flags += "TD ";
+					if(poisoned)
+						flags += "EP ";
+					if(relaxed_ordering)
+						flags += "RLX ";
+					if(no_snoop)
+						flags += "NS";
+					pack->m_headers["Flags"] = flags;
+
+					state = STATE_HEADER_3;
+				}
+
 				break;	//end STATE_HEADER_2
+
+			//Low byte of length
+			case STATE_HEADER_3:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+
+				else
+				{
+					//Length is 32-bit words, plus special case 0 is 1024 words (see PCIe 2.0 base spec table 2-4)
+					packet_len |= sym.m_data;
+					if(packet_len == 0)
+						packet_len = 1024;
+
+					//If the message has no payload, force length to zero for payload size counting
+					//(according to spec, actual value is reserved)
+					if(!has_data)
+						packet_len = 0;
+					else
+						pack->m_headers["Length"] = to_string(packet_len * 4);
+
+					//Add the length symbol
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_LENGTH, packet_len));
+
+					//What happens next depends on the TLP format
+
+					switch(type)
+					{
+						//Memory, IO, or config access?
+						case PCIeTransportSymbol::TYPE_MEM_RD:
+						case PCIeTransportSymbol::TYPE_MEM_RD_LK:
+						case PCIeTransportSymbol::TYPE_MEM_WR:
+						case PCIeTransportSymbol::TYPE_IO_RD:
+						case PCIeTransportSymbol::TYPE_IO_WR:
+						case PCIeTransportSymbol::TYPE_CFG_RD_0:
+						case PCIeTransportSymbol::TYPE_CFG_WR_0:
+						case PCIeTransportSymbol::TYPE_CFG_RD_1:
+						case PCIeTransportSymbol::TYPE_CFG_WR_1:
+							state = STATE_REQUESTER_ID_0;
+							break;
+
+						//Give up on anything else
+						default:
+							state = STATE_IDLE;
+					}
+				}
+				break;	//end STATE_HEADER_3
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// Memory, I/O, and Configuration requests (PCIe 2.0 base spec section 2.2.7)
+
+			case STATE_REQUESTER_ID_0:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					requester_id = (sym.m_data << 8);
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_REQUESTER_ID, requester_id));
+
+					state = STATE_REQUESTER_ID_1;
+				}
+				break; //end STATE_REQUESTER_ID_0
+
+			case STATE_REQUESTER_ID_1:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					requester_id |= sym.m_data;
+
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+					cap->m_samples[ilast].m_data = requester_id;
+
+					snprintf(tmp, sizeof(tmp), "%04x", requester_id);
+					pack->m_headers["Requester"] = tmp;
+
+					state = STATE_TAG;
+				}
+				break;	//end STATE_REQUESTER_ID_1
+
+			case STATE_TAG:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					tag = sym.m_data;
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TAG, tag));
+
+					state = STATE_BYTE_ENABLES;
+				}
+				break;	//end STATE_TAG
+
+			case STATE_BYTE_ENABLES:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(halfdur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE,
+						sym.m_data >> 4));
+
+					cap->m_offsets.push_back(off + halfdur);
+					cap->m_durations.push_back(dur - halfdur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_FIRST_BYTE_ENABLE,
+						sym.m_data & 0xf));
+
+					string first = "";
+					string last = "";
+					for(int j=3; j>=0; j--)
+					{
+						if(sym.m_data & (1 << j) )
+							first += to_string(j);
+						if(sym.m_data & (0x10 << j) )
+							last += to_string(j);
+					}
+
+					pack->m_headers["First"] = first;
+					pack->m_headers["Last"] = first;
+
+					state = STATE_ADDRESS_0;
+					nbyte = 0;
+					mem_addr = 0;
+				}
+
+				break;	//end STATE_BYTE_ENABLES
+
+			//32-bit address, or high half of a 64 bit
+			case STATE_ADDRESS_0:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					mem_addr = (mem_addr << 8) | sym.m_data;
+
+					//Create the initial symbol
+					if(nbyte == 0)
+					{
+						cap->m_offsets.push_back(off);
+						cap->m_durations.push_back(dur);
+						cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ADDRESS_X32, 0));
+					}
+
+					nbyte ++;
+
+					if(nbyte == 4)
+					{
+						cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+						cap->m_samples[ilast].m_data = mem_addr;
+
+						if(format_4word)
+							state = STATE_ADDRESS_1;
+						else
+						{
+							snprintf(tmp, sizeof(tmp), "%08lx", mem_addr);
+							pack->m_headers["Addr"] = tmp;
+
+							nbyte = 0;
+							state = STATE_DATA;
+						}
+					}
+				}
+
+				break;	//end STATE_ADDRESS_0
+
+			//Low half of a 64-bit address
+			case STATE_ADDRESS_1:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					mem_addr = (mem_addr << 8) | sym.m_data;
+					nbyte ++;
+
+					if(nbyte == 8)
+					{
+						cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+						cap->m_samples[ilast].m_data = mem_addr;
+						cap->m_samples[ilast].m_type = PCIeTransportSymbol::TYPE_ADDRESS_X64;
+
+						snprintf(tmp, sizeof(tmp), "%016lx", mem_addr);
+						pack->m_headers["Addr"] = tmp;
+
+						nbyte = 0;
+						state = STATE_DATA;
+					}
+				}
+				break;
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// TLP data
+
+			case STATE_DATA:
+
+				if(sym.m_type == PCIeDataLinkSymbol::TYPE_TLP_CRC_OK)
+				{
+					//TODO: verify length wasn't truncated
+					//TODO: verify TLP end to end CRC if present
+					state = STATE_IDLE;
+				}
+
+				else if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+
+				//TODO: complain if we have more data than we should have
+				else
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_DATA, sym.m_data));
+
+					pack->m_data.push_back(sym.m_data);
+				}
+
+				break;
 		}
 	}
 }
@@ -323,7 +689,25 @@ Gdk::Color PCIeTransportDecoder::GetColor(int i)
 		{
 			case PCIeTransportSymbol::TYPE_TLP_TYPE:
 			case PCIeTransportSymbol::TYPE_TRAFFIC_CLASS:
+			case PCIeTransportSymbol::TYPE_LENGTH:
+			case PCIeTransportSymbol::TYPE_TAG:
+			case PCIeTransportSymbol::TYPE_FIRST_BYTE_ENABLE:
+			case PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE:
 				return m_standardColors[COLOR_CONTROL];
+
+			case PCIeTransportSymbol::TYPE_FLAGS:
+				if(s.m_data & PCIeTransportSymbol::FLAG_POISONED)
+					return m_standardColors[COLOR_ERROR];
+				else
+					return m_standardColors[COLOR_CONTROL];
+
+			case PCIeTransportSymbol::TYPE_REQUESTER_ID:
+			case PCIeTransportSymbol::TYPE_ADDRESS_X32:
+			case PCIeTransportSymbol::TYPE_ADDRESS_X64:
+				return m_standardColors[COLOR_ADDRESS];
+
+			case PCIeTransportSymbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
 
 			case PCIeTransportSymbol::TYPE_ERROR:
 			default:
@@ -378,6 +762,70 @@ string PCIeTransportDecoder::GetText(int i)
 			case PCIeTransportSymbol::TYPE_TRAFFIC_CLASS:
 				return string("TC: ") + to_string(s.m_data);
 
+			case PCIeTransportSymbol::TYPE_REQUESTER_ID:
+				snprintf(tmp, sizeof(tmp), "Requester: %04lx", s.m_data);
+				return tmp;
+
+			case PCIeTransportSymbol::TYPE_ADDRESS_X32:
+				snprintf(tmp, sizeof(tmp), "Address: %08lx", s.m_data);
+				return tmp;
+
+			case PCIeTransportSymbol::TYPE_ADDRESS_X64:
+				snprintf(tmp, sizeof(tmp), "Address: %016lx", s.m_data);
+				return tmp;
+
+			case PCIeTransportSymbol::TYPE_TAG:
+				snprintf(tmp, sizeof(tmp), "Tag: %02lx", s.m_data);
+				return tmp;
+
+			case PCIeTransportSymbol::TYPE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+				return tmp;
+
+			case PCIeTransportSymbol::TYPE_FLAGS:
+				{
+					string ret;
+					if(s.m_data & PCIeTransportSymbol::FLAG_DIGEST_PRESENT)
+						ret += "DP ";
+					if(s.m_data & PCIeTransportSymbol::FLAG_POISONED)
+						ret += "Poison ";
+					if(s.m_data & PCIeTransportSymbol::FLAG_RELAXED_ORDERING)
+						ret += "Relaxed ";
+					if(s.m_data & PCIeTransportSymbol::FLAG_NO_SNOOP)
+						ret += "No snoop ";
+					if(ret == "")
+						ret = "No flags";
+					return ret;
+				}
+
+			case PCIeTransportSymbol::TYPE_LENGTH:
+				return string("Len: ") + to_string(s.m_data * 4);
+
+			case PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE:
+				{
+					if(s.m_data == 0)
+						return "Last: none";
+
+					string ret = "Last: bytes ";
+					for(int j=3; j>=0; j--)
+					{
+						if(s.m_data & (1 << j) )
+							ret += to_string(j);
+					}
+					return ret;
+				};
+
+			case PCIeTransportSymbol::TYPE_FIRST_BYTE_ENABLE:
+				{
+					string ret = "First: bytes ";
+					for(int j=3; j>=0; j--)
+					{
+						if(s.m_data & (1 << j) )
+							ret += to_string(j);
+					}
+					return ret;
+				};
+
 			case PCIeTransportSymbol::TYPE_ERROR:
 			default:
 				return "ERROR";
@@ -392,12 +840,12 @@ vector<string> PCIeTransportDecoder::GetHeaders()
 	ret.push_back("Seq");
 	ret.push_back("Type");
 	ret.push_back("TC");
+	ret.push_back("Flags");
+	ret.push_back("Requester");
+	ret.push_back("First");
+	ret.push_back("Last");
+	ret.push_back("Addr");
 
-	/*
-	ret.push_back("Seq");
-	ret.push_back("HdrFC");
-	ret.push_back("DataFC");
-	*/
 	ret.push_back("Length");
 	return ret;
 }

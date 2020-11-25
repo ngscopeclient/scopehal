@@ -47,7 +47,15 @@ public:
 	{
 		TYPE_TLP_TYPE,
 		TYPE_TRAFFIC_CLASS,
-
+		TYPE_FLAGS,
+		TYPE_LENGTH,
+		TYPE_REQUESTER_ID,
+		TYPE_TAG,
+		TYPE_LAST_BYTE_ENABLE,
+		TYPE_FIRST_BYTE_ENABLE,
+		TYPE_ADDRESS_X32,
+		TYPE_ADDRESS_X64,
+		TYPE_DATA,
 		TYPE_ERROR
 	} m_type;
 
@@ -73,12 +81,21 @@ public:
 		TYPE_INVALID
 	};
 
-	uint32_t m_data;
+	//TLP flags
+	enum TlpFlags
+	{
+		FLAG_DIGEST_PRESENT		= 0x80,
+		FLAG_POISONED 			= 0x40,
+		FLAG_RELAXED_ORDERING	= 0x20,
+		FLAG_NO_SNOOP			= 0x10
+	};
+
+	uint64_t m_data;
 
 	PCIeTransportSymbol()
 	{}
 
-	PCIeTransportSymbol(SymbolType type, uint32_t data = 0)
+	PCIeTransportSymbol(SymbolType type, uint64_t data = 0)
 		: m_type(type)
 		, m_data(data)
 	{}
