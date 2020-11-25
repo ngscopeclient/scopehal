@@ -115,12 +115,21 @@ void PCIeTransportDecoder::Refresh()
 		STATE_HEADER_2,
 		STATE_HEADER_3,
 
-		STATE_REQUESTER_ID_0,
-		STATE_REQUESTER_ID_1,
-		STATE_TAG,
+		STATE_MEMORY_0,
+		STATE_MEMORY_1,
+		STATE_MEMORY_3,
 		STATE_BYTE_ENABLES,
 		STATE_ADDRESS_0,
 		STATE_ADDRESS_1,
+
+		STATE_COMPLETION_0,
+		STATE_COMPLETION_1,
+		STATE_COMPLETION_2,
+		STATE_COMPLETION_3,
+		STATE_COMPLETION_4,
+		STATE_COMPLETION_5,
+		STATE_COMPLETION_6,
+		STATE_COMPLETION_7,
 
 		STATE_DATA,
 
@@ -138,18 +147,22 @@ void PCIeTransportDecoder::Refresh()
 		TLP_FORMAT_4W_DATA 		= 3
 	} tlp_format = TLP_FORMAT_3W_NODATA;
 
-	bool format_4word 		= false;
-	bool has_data 			= false;
-	int traffic_class		= 0;
-	bool digest_present		= false;
-	bool poisoned 			= false;
-	bool relaxed_ordering	= false;
-	bool no_snoop			= false;
-	size_t packet_len		= 0;
-	uint16_t requester_id	= 0;
-	uint8_t tag				= 0;
-	uint64_t mem_addr		= 0;
-	size_t nbyte			= 0;
+	bool format_4word 			= false;
+	bool has_data 				= false;
+	int traffic_class			= 0;
+	bool digest_present			= false;
+	bool poisoned 				= false;
+	bool relaxed_ordering		= false;
+	bool no_snoop				= false;
+	size_t packet_len			= 0;
+	uint16_t requester_id		= 0;
+	uint16_t completer_id		= 0;
+	uint8_t tag					= 0;
+	uint64_t mem_addr			= 0;
+	size_t nbyte				= 0;
+	uint8_t completion_status	= 0;
+	uint16_t byte_count			= 0;
+
 	char tmp[32];
 
 	PCIeTransportSymbol::TlpType type = PCIeTransportSymbol::TYPE_INVALID;
@@ -446,7 +459,14 @@ void PCIeTransportDecoder::Refresh()
 						case PCIeTransportSymbol::TYPE_CFG_WR_0:
 						case PCIeTransportSymbol::TYPE_CFG_RD_1:
 						case PCIeTransportSymbol::TYPE_CFG_WR_1:
-							state = STATE_REQUESTER_ID_0;
+							state = STATE_MEMORY_0;
+							break;
+
+						case PCIeTransportSymbol::TYPE_COMPLETION:
+						case PCIeTransportSymbol::TYPE_COMPLETION_DATA:
+						case PCIeTransportSymbol::TYPE_COMPLETION_LOCKED_ERROR:
+						case PCIeTransportSymbol::TYPE_COMPLETION_LOCKED_DATA:
+							state = STATE_COMPLETION_0;
 							break;
 
 						//Give up on anything else
@@ -459,7 +479,7 @@ void PCIeTransportDecoder::Refresh()
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Memory, I/O, and Configuration requests (PCIe 2.0 base spec section 2.2.7)
 
-			case STATE_REQUESTER_ID_0:
+			case STATE_MEMORY_0:
 
 				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
 				{
@@ -477,11 +497,11 @@ void PCIeTransportDecoder::Refresh()
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_REQUESTER_ID, requester_id));
 
-					state = STATE_REQUESTER_ID_1;
+					state = STATE_MEMORY_1;
 				}
-				break; //end STATE_REQUESTER_ID_0
+				break; //end STATE_MEMORY_0
 
-			case STATE_REQUESTER_ID_1:
+			case STATE_MEMORY_1:
 				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
 				{
 					cap->m_offsets.push_back(off);
@@ -497,14 +517,13 @@ void PCIeTransportDecoder::Refresh()
 					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
 					cap->m_samples[ilast].m_data = requester_id;
 
-					snprintf(tmp, sizeof(tmp), "%04x", requester_id);
-					pack->m_headers["Requester"] = tmp;
+					pack->m_headers["Requester"] = FormatID(requester_id);
 
-					state = STATE_TAG;
+					state = STATE_MEMORY_3;
 				}
-				break;	//end STATE_REQUESTER_ID_1
+				break;	//end STATE_MEMORY_1
 
-			case STATE_TAG:
+			case STATE_MEMORY_3:
 				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
 				{
 					cap->m_offsets.push_back(off);
@@ -521,9 +540,11 @@ void PCIeTransportDecoder::Refresh()
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TAG, tag));
 
+					pack->m_headers["Tag"] = to_string(tag);
+
 					state = STATE_BYTE_ENABLES;
 				}
-				break;	//end STATE_TAG
+				break;	//end STATE_MEMORY_3
 
 			case STATE_BYTE_ENABLES:
 
@@ -643,9 +664,231 @@ void PCIeTransportDecoder::Refresh()
 				break;
 
 			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TLP data
+			// Completion packets
+
+			//Completer ID
+			case STATE_COMPLETION_0:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					completer_id = sym.m_data << 8;
+
+					//Create the initial symbol
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_COMPLETER_ID, 0));
+
+					state = STATE_COMPLETION_1;
+				}
+
+				break; //end STATE_COMPLETION_0
+
+			case STATE_COMPLETION_1:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					completer_id |= sym.m_data;
+
+					//Save the final ID
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+					cap->m_samples[ilast].m_data = completer_id;
+
+					pack->m_headers["Completer"] = FormatID(completer_id);
+
+					state = STATE_COMPLETION_2;
+				}
+
+				break; //end STATE_COMPLETION_1
+
+			//Status and high half of byte count
+			case STATE_COMPLETION_2:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					completion_status = (sym.m_data >> 5);
+
+					//Create the initial symbol
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_COMPLETION_STATUS,
+						completion_status));
+
+					switch(completion_status)
+					{
+						case 0:
+							pack->m_headers["Status"] = "SC";
+							break;
+
+						case 1:
+							pack->m_headers["Status"] = "UR";
+							break;
+
+						case 2:
+							pack->m_headers["Status"] = "CRS";
+							break;
+
+						case 4:
+							pack->m_headers["Status"] = "CA";
+							break;
+
+						default:
+							pack->m_headers["Status"] = "Invalid";
+							break;
+					}
+
+					byte_count = (sym.m_data & 0xf) << 8;
+
+					state = STATE_COMPLETION_3;
+				}
+
+				break;	//end STATE_COMPLETION_2
+
+			case STATE_COMPLETION_3:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					byte_count |= sym.m_data;
+
+					//Save the final ID
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_BYTE_COUNT, byte_count));
+
+					pack->m_headers["Count"] = to_string(byte_count);
+
+					state = STATE_COMPLETION_4;
+				}
+				break;	//end STATE_COMPLETION_3
+
+			case STATE_COMPLETION_4:
+
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					requester_id = (sym.m_data << 8);
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_REQUESTER_ID, requester_id));
+
+					state = STATE_COMPLETION_5;
+				}
+
+				break; //end STATE_COMPLETION_4
+
+			case STATE_COMPLETION_5:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					requester_id |= sym.m_data;
+
+					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+					cap->m_samples[ilast].m_data = requester_id;
+
+					pack->m_headers["Requester"] = FormatID(requester_id);
+
+					state = STATE_COMPLETION_6;
+				}
+				break;	//end STATE_COMPLETION_5
+
+			case STATE_COMPLETION_6:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					tag = sym.m_data;
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TAG, tag));
+
+					pack->m_headers["Tag"] = to_string(tag);
+
+					state = STATE_COMPLETION_7;
+				}
+				break;	//end STATE_COMPLETION_6
+
+			case STATE_COMPLETION_7:
+				if(sym.m_type != PCIeDataLinkSymbol::TYPE_TLP_DATA)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ERROR));
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					state = STATE_IDLE;
+				}
+				else
+				{
+					state = STATE_DATA;
+
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_ADDRESS_X32,
+						sym.m_data & 0x7f));
+
+					snprintf(tmp, sizeof(tmp), "   ...%02x", sym.m_data & 0x7f);
+					pack->m_headers["Addr"] = tmp;
+				}
+				break;	//end STATE_COMPLETION_7
+
+			////////////////////////////////////////////////////////////////////////////////////////////////////////////
+			// TLP payload data
 
 			case STATE_DATA:
+
+				//Update packet length
+				pack->m_len = (end * cap->m_timescale) - pack->m_offset;
 
 				if(sym.m_type == PCIeDataLinkSymbol::TYPE_TLP_CRC_OK)
 				{
@@ -690,9 +933,11 @@ Gdk::Color PCIeTransportDecoder::GetColor(int i)
 			case PCIeTransportSymbol::TYPE_TLP_TYPE:
 			case PCIeTransportSymbol::TYPE_TRAFFIC_CLASS:
 			case PCIeTransportSymbol::TYPE_LENGTH:
+			case PCIeTransportSymbol::TYPE_BYTE_COUNT:
 			case PCIeTransportSymbol::TYPE_TAG:
 			case PCIeTransportSymbol::TYPE_FIRST_BYTE_ENABLE:
 			case PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE:
+			case PCIeTransportSymbol::TYPE_COMPLETION_STATUS:
 				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeTransportSymbol::TYPE_FLAGS:
@@ -702,6 +947,7 @@ Gdk::Color PCIeTransportDecoder::GetColor(int i)
 					return m_standardColors[COLOR_CONTROL];
 
 			case PCIeTransportSymbol::TYPE_REQUESTER_ID:
+			case PCIeTransportSymbol::TYPE_COMPLETER_ID:
 			case PCIeTransportSymbol::TYPE_ADDRESS_X32:
 			case PCIeTransportSymbol::TYPE_ADDRESS_X64:
 				return m_standardColors[COLOR_ADDRESS];
@@ -763,8 +1009,10 @@ string PCIeTransportDecoder::GetText(int i)
 				return string("TC: ") + to_string(s.m_data);
 
 			case PCIeTransportSymbol::TYPE_REQUESTER_ID:
-				snprintf(tmp, sizeof(tmp), "Requester: %04lx", s.m_data);
-				return tmp;
+				return string("Requester: ") + FormatID(s.m_data);
+
+			case PCIeTransportSymbol::TYPE_COMPLETER_ID:
+				return string("Completer: ") + FormatID(s.m_data);
 
 			case PCIeTransportSymbol::TYPE_ADDRESS_X32:
 				snprintf(tmp, sizeof(tmp), "Address: %08lx", s.m_data);
@@ -801,6 +1049,9 @@ string PCIeTransportDecoder::GetText(int i)
 			case PCIeTransportSymbol::TYPE_LENGTH:
 				return string("Len: ") + to_string(s.m_data * 4);
 
+			case PCIeTransportSymbol::TYPE_BYTE_COUNT:
+				return string("Bytes: ") + to_string(s.m_data);
+
 			case PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE:
 				{
 					if(s.m_data == 0)
@@ -826,6 +1077,22 @@ string PCIeTransportDecoder::GetText(int i)
 					return ret;
 				};
 
+			case PCIeTransportSymbol::TYPE_COMPLETION_STATUS:
+				switch(s.m_data)
+				{
+					case 0:
+						return "Status: SC";
+					case 1:
+						return "Status: UR";
+					case 2:
+						return "Status: CRS";
+					case 4:
+						return "Status: CA";
+					default:
+						return "Status: Invalid";
+				}
+				break;
+
 			case PCIeTransportSymbol::TYPE_ERROR:
 			default:
 				return "ERROR";
@@ -838,14 +1105,28 @@ vector<string> PCIeTransportDecoder::GetHeaders()
 {
 	vector<string> ret;
 	ret.push_back("Seq");
-	ret.push_back("Type");
 	ret.push_back("TC");
+	ret.push_back("Type");
+	ret.push_back("Addr");
 	ret.push_back("Flags");
 	ret.push_back("Requester");
+	ret.push_back("Completer");
+	ret.push_back("Tag");
 	ret.push_back("First");
 	ret.push_back("Last");
-	ret.push_back("Addr");
+	ret.push_back("Status");
+	ret.push_back("Count");
 
 	ret.push_back("Length");
 	return ret;
+}
+
+string PCIeTransportDecoder::FormatID(uint16_t id)
+{
+	char tmp[16];
+	snprintf(tmp, sizeof(tmp), "%02x:%x.%d",
+		id >> 8,
+		(id >> 3) & 0x1f,
+		id & 0x7);
+	return tmp;
 }

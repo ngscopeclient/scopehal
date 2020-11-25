@@ -56,6 +56,9 @@ public:
 		TYPE_ADDRESS_X32,
 		TYPE_ADDRESS_X64,
 		TYPE_DATA,
+		TYPE_COMPLETER_ID,
+		TYPE_COMPLETION_STATUS,
+		TYPE_BYTE_COUNT,
 		TYPE_ERROR
 	} m_type;
 
@@ -132,6 +135,9 @@ public:
 	virtual std::vector<std::string> GetHeaders();
 
 	PROTOCOL_DECODER_INITPROC(PCIeTransportDecoder)
+
+protected:
+	std::string FormatID(uint16_t id);
 };
 
 #endif
