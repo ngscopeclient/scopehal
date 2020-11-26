@@ -109,7 +109,7 @@ double HorizontalBathtub::GetOffset()
 
 void HorizontalBathtub::Refresh()
 {
-	if(!VerifyAllInputsOK())
+	if(!VerifyAllInputsOK(true))
 	{
 		SetData(NULL, 0);
 		return;
