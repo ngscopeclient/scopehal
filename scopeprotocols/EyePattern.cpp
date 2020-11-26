@@ -442,6 +442,11 @@ void EyePattern::Refresh()
 
 	uint32_t prng = 0xdeadbeef;
 
+	//Recompute scales
+	float eye_width_ps = 2 * cap->m_uiWidth;
+	m_xscale = m_width * 1.0 / eye_width_ps;
+	m_xoff = -round(cap->m_uiWidth);
+
 	//Precompute some scaling factors
 	float yscale = m_height / GetVoltageRange();
 	float ymid = m_height / 2;

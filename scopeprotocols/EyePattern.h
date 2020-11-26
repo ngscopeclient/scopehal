@@ -132,15 +132,11 @@ public:
 		SetData(NULL, 0);
 	}
 
-	void SetXOffset(int64_t xoff)
-	{
-		m_xoff = xoff;
-	}
+	int64_t GetXOffset()
+	{ return m_xoff; }
 
-	void SetXScale(float xscale)
-	{
-		m_xscale = xscale;
-	}
+	float GetXScale()
+	{ return m_xscale; }
 
 	size_t GetWidth() const
 	{ return m_width; }
