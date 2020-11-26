@@ -81,6 +81,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FallMeasurement);
 	AddDecoderClass(FFTFilter);
 	AddDecoderClass(FrequencyMeasurement);
+	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(I2CEepromDecoder);

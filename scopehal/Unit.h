@@ -58,6 +58,7 @@ public:
 		UNIT_DB,			//Dimensionless ratio
 		UNIT_DBM,			//dB mW (more common than dBW)
 		UNIT_COUNTS,		//Dimensionless ratio (histogram)
+		UNIT_COUNTS_SCI,	//Dimensionless ratio (histogram, but scientific notation)
 		UNIT_LOG_BER,		//Dimensionless ratio (log scale)
 		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
 		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)

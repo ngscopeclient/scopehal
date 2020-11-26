@@ -184,6 +184,10 @@ string Unit::PrettyPrint(double value, int sigfigs)
 			value_rescaled = value * 100;
 			break;
 
+		case UNIT_COUNTS_SCI:
+			unit = "#";
+			break;
+
 		//Dimensionless unit, no scaling applied
 		case UNIT_DB:
 			unit = "dB";

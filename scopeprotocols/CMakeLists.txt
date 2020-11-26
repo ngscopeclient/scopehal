@@ -45,6 +45,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FallMeasurement.cpp
 	FFTFilter.cpp
 	FrequencyMeasurement.cpp
+	HistogramFilter.cpp
 	HorizontalBathtub.cpp
 	I2CDecoder.cpp
 	I2CEepromDecoder.cpp
