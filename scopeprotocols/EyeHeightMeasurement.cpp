@@ -82,7 +82,7 @@ bool EyeHeightMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 void EyeHeightMeasurement::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeHeight(%s, %s, %s)",
+	snprintf(hwname, sizeof(hwname), "EyeHeightSlice(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
 		m_parameters[m_startname].ToString().c_str(),
 		m_parameters[m_endname].ToString().c_str());
@@ -92,7 +92,7 @@ void EyeHeightMeasurement::SetDefaultName()
 
 string EyeHeightMeasurement::GetProtocolName()
 {
-	return "Eye Height";
+	return "Eye Height Slice";
 }
 
 bool EyeHeightMeasurement::IsOverlay()
@@ -122,7 +122,7 @@ double EyeHeightMeasurement::GetOffset()
 
 void EyeHeightMeasurement::Refresh()
 {
-	if(!VerifyAllInputsOK())
+	if(!VerifyAllInputsOK(true))
 	{
 		SetData(NULL, 0);
 		return;
@@ -134,9 +134,9 @@ void EyeHeightMeasurement::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	//Make sure times are in the right order, and convert from seconds to picoseconds
-	float tstart = m_parameters[m_startname].GetFloatVal() * 1e12;
-	float tend = m_parameters[m_endname].GetFloatVal() * 1e12;
+	//Make sure times are in the right order
+	float tstart = m_parameters[m_startname].GetFloatVal();
+	float tend = m_parameters[m_endname].GetFloatVal();
 	if(tstart > tend)
 	{
 		float tmp = tstart;

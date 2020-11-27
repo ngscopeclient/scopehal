@@ -83,6 +83,12 @@ bool EyeBitRateMeasurement::IsOverlay()
 	return false;
 }
 
+bool EyeBitRateMeasurement::IsScalarOutput()
+{
+	//single sample output
+	return true;
+}
+
 bool EyeBitRateMeasurement::NeedsConfig()
 {
 	//automatic configuration

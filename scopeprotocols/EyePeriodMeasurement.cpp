@@ -83,6 +83,12 @@ bool EyePeriodMeasurement::IsOverlay()
 	return false;
 }
 
+bool EyePeriodMeasurement::IsScalarOutput()
+{
+	//single point
+	return true;
+}
+
 bool EyePeriodMeasurement::NeedsConfig()
 {
 	//automatic configuration
@@ -104,7 +110,7 @@ double EyePeriodMeasurement::GetOffset()
 
 void EyePeriodMeasurement::Refresh()
 {
-	if(!VerifyAllInputsOK())
+	if(!VerifyAllInputsOK(true))
 	{
 		SetData(NULL, 0);
 		return;

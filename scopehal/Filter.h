@@ -78,6 +78,8 @@ public:
 	bool IsUsingDefaultName()
 	{ return m_usingDefault; }
 
+	virtual bool IsScalarOutput();
+
 	virtual void Refresh() =0;
 
 	virtual void AddRef();

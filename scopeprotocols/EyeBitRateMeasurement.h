@@ -44,6 +44,7 @@ public:
 
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
+	virtual bool IsScalarOutput();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();

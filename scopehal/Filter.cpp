@@ -105,6 +105,16 @@ bool Filter::IsOverlay()
 	return true;
 }
 
+/**
+	@brief Returns true if this filter outputs a waveform consisting of a single sample.
+
+	If scalar, the output is displayed with statistics rather than a waveform view.
+ */
+bool Filter::IsScalarOutput()
+{
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Refreshing
 
