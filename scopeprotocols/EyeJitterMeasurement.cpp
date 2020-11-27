@@ -78,7 +78,7 @@ bool EyeJitterMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 void EyeJitterMeasurement::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeJitterSlice(%s, %s, %s)",
+	snprintf(hwname, sizeof(hwname), "EyePPJitter(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
 		m_parameters[m_startname].ToString().c_str(),
 		m_parameters[m_endname].ToString().c_str());
@@ -88,7 +88,7 @@ void EyeJitterMeasurement::SetDefaultName()
 
 string EyeJitterMeasurement::GetProtocolName()
 {
-	return "Eye Jitter Slice";
+	return "Eye P-P Jitter";
 }
 
 bool EyeJitterMeasurement::IsOverlay()

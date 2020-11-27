@@ -78,7 +78,7 @@ bool EyeWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 void EyeWidthMeasurement::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeWidthSlice(%s, %s, %s)",
+	snprintf(hwname, sizeof(hwname), "EyeWidth(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
 		m_parameters[m_startname].ToString().c_str(),
 		m_parameters[m_endname].ToString().c_str());
@@ -88,7 +88,7 @@ void EyeWidthMeasurement::SetDefaultName()
 
 string EyeWidthMeasurement::GetProtocolName()
 {
-	return "Eye Width Slice";
+	return "Eye Width";
 }
 
 bool EyeWidthMeasurement::IsOverlay()
