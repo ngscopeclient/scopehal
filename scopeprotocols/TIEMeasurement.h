@@ -56,6 +56,7 @@ public:
 
 protected:
 	double m_maxTie;
+	std::string m_threshname;
 };
 
 #endif

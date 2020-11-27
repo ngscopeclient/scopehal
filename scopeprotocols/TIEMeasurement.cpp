@@ -36,6 +36,7 @@ using namespace std;
 
 TIEMeasurement::TIEMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
+	, m_threshname("Threshold")
 {
 	m_yAxisUnit = Unit(Unit::UNIT_PS);
 
@@ -44,6 +45,9 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	CreateInput("Golden");
 
 	m_maxTie = 1;
+
+	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_threshname].SetFloatVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +122,7 @@ void TIEMeasurement::Refresh()
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	FindZeroCrossings(clk, 0, edges);
+	FindZeroCrossings(clk, m_parameters[m_threshname].GetFloatVal(), edges);
 
 	m_maxTie = 1;
 
