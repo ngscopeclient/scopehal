@@ -89,6 +89,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
+	VerticalBathtub.cpp
 	Waterfall.cpp
 	WindowedAutocorrelationFilter.cpp
 
