@@ -163,18 +163,15 @@ void JitterSpectrumFilter::Refresh()
 	size_t ui_width = EstimateUIWidth(din);
 
 	//Loop over the input and copy samples.
+	//If we have runs of identical bits, extend the same jitter value.
+	//TODO: interpolate?
 	vector<float, AlignedAllocator<float, 64>> extended_samples;
 	extended_samples.reserve(inlen);
 	for(size_t i=0; i<inlen; i++)
 	{
-		//Add the base sample
-		extended_samples.push_back(din->m_samples[i]);
-
-		//If we have gaps between UIs, fill them with zeroes (no jitter).
-		//TODO: interpolate?
 		int64_t nui = round(1.0 * din->m_durations[i] / ui_width);
-		for(int64_t j=1; j<nui; j++)
-			extended_samples.push_back(0);
+		for(int64_t j=0; j<nui; j++)
+			extended_samples.push_back(din->m_samples[i]);
 	}
 
 	//Refine our estimate of the final UI width.
@@ -204,5 +201,5 @@ void JitterSpectrumFilter::Refresh()
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
 	//and do the actual FFT processing
-	DoRefresh(din, ui_width_final, nouts, npoints);
+	DoRefresh(din, ui_width_final, npoints, nouts);
 }
