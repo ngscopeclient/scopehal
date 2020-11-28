@@ -43,6 +43,9 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	m_yAxisUnit = Unit(Unit::UNIT_PS);
 	m_category = CAT_ANALYSIS;
+
+	m_range = 1;
+	m_offset = -0.5;
 }
 
 JitterSpectrumFilter::~JitterSpectrumFilter()
@@ -201,5 +204,5 @@ void JitterSpectrumFilter::Refresh()
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
 	//and do the actual FFT processing
-	DoRefresh(din, ui_width_final, npoints, nouts);
+	DoRefresh(din, ui_width_final, npoints, nouts, false);
 }

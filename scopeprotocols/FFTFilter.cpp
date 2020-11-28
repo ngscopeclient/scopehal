@@ -195,10 +195,10 @@ void FFTFilter::Refresh()
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
 	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	DoRefresh(din, ps, npoints, nouts);
+	DoRefresh(din, ps, npoints, nouts, true);
 }
 
-void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoints, size_t nouts)
+void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoints, size_t nouts, bool log_output)
 {
 	//Calculate the FFT
 	ffts_execute(m_plan, m_rdin, m_rdout);
@@ -216,10 +216,20 @@ void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoi
 
 	//Normalize magnitudes
 	cap->Resize(nouts);
-	if(g_hasAvx2)
-		NormalizeOutputAVX2(cap, nouts, npoints);
+	if(log_output)
+	{
+		if(g_hasAvx2)
+			NormalizeOutputLogAVX2(cap, nouts, npoints);
+		else
+			NormalizeOutputLog(cap, nouts, npoints);
+	}
 	else
-		NormalizeOutput(cap, nouts, npoints);
+	{
+		if(g_hasAvx2)
+			NormalizeOutputLinearAVX2(cap, nouts, npoints);
+		else
+			NormalizeOutputLinear(cap, nouts, npoints);
+	}
 
 	//Peak search
 	FindPeaks(cap);
@@ -232,13 +242,13 @@ void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoi
 // Normalization
 
 /**
-	@brief Normalize FFT output (unoptimized C++ implementation)
+	@brief Normalize FFT output and convert to dBm (unoptimized C++ implementation)
  */
-void FFTFilter::NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoints)
+void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, size_t npoints)
 {
 	//assume constant 50 ohms for now
 	const float impedance = 50;
-
+	float scale = 2.0 / npoints;
 	for(size_t i=0; i<nouts; i++)
 	{
 		cap->m_offsets[i] = i;
@@ -247,7 +257,7 @@ void FFTFilter::NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoint
 		float real = m_rdout[i*2];
 		float imag = m_rdout[i*2 + 1];
 
-		float voltage = sqrtf(real*real + imag*imag) / npoints;
+		float voltage = sqrtf(real*real + imag*imag) * scale;
 
 		//Convert to dBm
 		cap->m_samples[i] = (10 * log10(voltage*voltage / impedance) + 30);
@@ -255,10 +265,28 @@ void FFTFilter::NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoint
 }
 
 /**
-	@brief Normalize FFT output (optimized AVX2 implementation)
+	@brief Normalize FFT output and output in native Y-axis units (unoptimized C++ implementation)
+ */
+void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, size_t npoints)
+{
+	float scale = 2.0 / npoints;
+	for(size_t i=0; i<nouts; i++)
+	{
+		cap->m_offsets[i] = i;
+		cap->m_durations[i] = 1;
+
+		float real = m_rdout[i*2];
+		float imag = m_rdout[i*2 + 1];
+
+		cap->m_samples[i] = sqrtf(real*real + imag*imag) * scale;
+	}
+}
+
+/**
+	@brief Normalize FFT output and convert to dBm (optimized AVX2 implementation)
  */
 __attribute__((target("avx2")))
-void FFTFilter::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints)
+void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints)
 {
 	int64_t* offs = (int64_t*)&cap->m_offsets[0];
 	int64_t* durs = (int64_t*)&cap->m_durations[0];
@@ -358,6 +386,84 @@ void FFTFilter::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t np
 
 		//Convert to dBm
 		pout[k] = (10 * log10(voltage*voltage / impedance) + 30);
+	}
+}
+
+/**
+	@brief Normalize FFT output and keep in native units (optimized AVX2 implementation)
+ */
+__attribute__((target("avx2")))
+void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints)
+{
+	int64_t* offs = (int64_t*)&cap->m_offsets[0];
+	int64_t* durs = (int64_t*)&cap->m_durations[0];
+
+	size_t end = nouts - (nouts % 8);
+
+	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
+	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
+	int64_t __attribute__ ((aligned(32))) count_x4[] = {0, 1, 2, 3};
+
+	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
+	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
+	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	//double since we only look at positive half
+	float norm = 2.0f / npoints;
+	__m256 norm_f = { norm, norm, norm, norm, norm, norm, norm, norm };
+
+	float* pout = (float*)&cap->m_samples[0];
+
+	//Vectorized processing (8 samples per iteration)
+	for(size_t k=0; k<end; k += 8)
+	{
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+
+		//Read interleaved real/imaginary FFT output (riririri riririri)
+		__m256 din0 = _mm256_load_ps(m_rdout + k*2);
+		__m256 din1 = _mm256_load_ps(m_rdout + k*2 + 8);
+
+		//Step 1: Shuffle 32-bit values within 128-bit lanes to get rriirrii rriirrii.
+		din0 = _mm256_permute_ps(din0, 0xd8);
+		din1 = _mm256_permute_ps(din1, 0xd8);
+
+		//Step 2: Shuffle 64-bit values to get rrrriiii rrrriiii.
+		__m256i block0 = _mm256_permute4x64_epi64(_mm256_castps_si256(din0), 0xd8);
+		__m256i block1 = _mm256_permute4x64_epi64(_mm256_castps_si256(din1), 0xd8);
+
+		//Step 3: Shuffle 128-bit values to get rrrrrrrr iiiiiiii.
+		__m256 real = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x20));
+		__m256 imag = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x31));
+
+		//Actual vector normalization
+		real = _mm256_mul_ps(real, real);
+		imag = _mm256_mul_ps(imag, imag);
+		__m256 sum = _mm256_add_ps(real, imag);
+		__m256 mag = _mm256_sqrt_ps(sum);
+		mag = _mm256_mul_ps(mag, norm_f);
+
+		//and store the result
+		_mm256_store_ps(pout + k, mag);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<nouts; k++)
+	{
+		cap->m_offsets[k] = k;
+		cap->m_durations[k] = 1;
+
+		float real = m_rdout[k*2];
+		float imag = m_rdout[k*2 + 1];
+
+		pout[k] = sqrtf(real*real + imag*imag) / npoints;
 	}
 }
 
