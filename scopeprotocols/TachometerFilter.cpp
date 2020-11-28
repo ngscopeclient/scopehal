@@ -143,7 +143,7 @@ void TachometerFilter::Refresh()
 		double end = edges[i+2];
 
 		double delta = end - start;
-		double freq = 1.0e12 / delta;
+		double freq = FS_PER_SECOND / delta;
 		double rpm = freq * pulses_to_rpm;
 
 		cap->m_offsets.push_back(start);
@@ -163,8 +163,8 @@ void TachometerFilter::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

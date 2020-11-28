@@ -123,13 +123,13 @@ void EyeBitRateMeasurement::Refresh()
 	auto cap = new AnalogWaveform;
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(2 * din->m_uiWidth);
-	m_value = 1.0e12f / din->m_uiWidth;
+	m_value = FS_PER_SECOND / din->m_uiWidth;
 	cap->m_samples.push_back(m_value);
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

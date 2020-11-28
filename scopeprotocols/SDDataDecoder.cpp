@@ -138,7 +138,7 @@ void SDDataDecoder::Refresh()
 	auto cap = new SDDataWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startPicoseconds = clk->m_startPicoseconds;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	Packet* pack = NULL;
 	Packet* last_cmdbus_packet = NULL;

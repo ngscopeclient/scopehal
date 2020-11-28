@@ -38,7 +38,7 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 	, m_threshname("Threshold")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
+	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
 	//Set up channels
 	CreateInput("Clock");
@@ -197,5 +197,5 @@ void TIEMeasurement::Refresh()
 	//Copy start time etc from the input
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startPicoseconds = 0;
+	cap->m_startFemtoseconds = 0;
 }

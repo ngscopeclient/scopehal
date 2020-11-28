@@ -118,8 +118,7 @@ void UARTDecoder::Refresh()
 	auto din = GetDigitalInputWaveform(0);
 
 	//Get the bit period
-	float bit_period = 1.0f / m_parameters[m_baudname].GetFloatVal();
-	bit_period *= 1E12;
+	float bit_period = FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal();
 	int64_t ibitper = bit_period;
 	int64_t scaledbitper = ibitper / din->m_timescale;
 
@@ -127,7 +126,7 @@ void UARTDecoder::Refresh()
 	auto cap = new AsciiWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	//Time-domain processing to reflect potentially variable sampling rate for RLE captures
 	int64_t next_value = 0;

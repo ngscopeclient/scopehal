@@ -42,10 +42,10 @@ public:
 	Packet();
 	virtual ~Packet();
 
-	///Offset of the packet from the start of the capture (picoseconds)
+	///Offset of the packet from the start of the capture (femtoseconds)
 	int64_t m_offset;
 
-	///Duration time of the packet (picoseconds)
+	///Duration time of the packet (femtoseconds)
 	int64_t m_len;
 
 	//Arbitrary header properties (human readable)

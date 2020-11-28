@@ -107,7 +107,7 @@ void SWDDecoder::Refresh()
 	auto cap = new SWDWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startPicoseconds = clk->m_startPicoseconds;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//Sample SWDIO on SWCLK edges
 	DigitalWaveform samples;
@@ -137,7 +137,6 @@ void SWDDecoder::Refresh()
 	bool		writing			= 0;
 
 	size_t len = samples.m_samples.size();
-	Unit ps(Unit::UNIT_PS);
 	int64_t last_dur = 0;
 	for(size_t i=0; i<len; i++)
 	{

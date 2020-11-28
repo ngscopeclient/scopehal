@@ -140,7 +140,7 @@ void MagnitudeFilter::Refresh()
 	//Copy our time scales from the input
 	cap->m_timescale 		= a->m_timescale;
 	cap->m_startTimestamp 	= a->m_startTimestamp;
-	cap->m_startPicoseconds = a->m_startPicoseconds;
+	cap->m_startFemtoseconds = a->m_startFemtoseconds;
 
 	SetData(cap, 0);
 }

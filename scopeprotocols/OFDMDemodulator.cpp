@@ -52,12 +52,12 @@ OFDMDemodulator::OFDMDemodulator(const string& color)
 	//TODO: create outputs
 
 	m_symbolTimeName = "Symbol Time";
-	m_parameters[m_symbolTimeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-	m_parameters[m_symbolTimeName].SetIntVal(3.2e6);
+	m_parameters[m_symbolTimeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_symbolTimeName].SetIntVal(3.2e9);
 
 	m_guardIntervalName = "Guard Interval";
-	m_parameters[m_guardIntervalName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-	m_parameters[m_guardIntervalName].SetIntVal(400e3);
+	m_parameters[m_guardIntervalName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_guardIntervalName].SetIntVal(400e6);
 
 	m_fftSizeName = "FFT Size";
 	m_parameters[m_fftSizeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
@@ -168,10 +168,10 @@ void OFDMDemodulator::Refresh()
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
 
 	//Convert rates to number of samples
-	int symbol_time_ps = m_parameters[m_symbolTimeName].GetIntVal();
+	int symbol_time_fs = m_parameters[m_symbolTimeName].GetIntVal();
 	size_t symbol_time_samples = symbol_time_ps / din_i->m_timescale;
-	int guard_interval_ps = m_parameters[m_guardIntervalName].GetIntVal();
-	size_t guard_interval_samples = guard_interval_ps / din_i->m_timescale;
+	int guard_interval_fs = m_parameters[m_guardIntervalName].GetIntVal();
+	size_t guard_interval_samples = guard_interval_fs / din_i->m_timescale;
 
 	//We need meaningful data, bail if it's too short
 	auto len = min(din_i->m_samples.size(), din_q->m_samples.size());

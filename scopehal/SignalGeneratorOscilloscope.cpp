@@ -125,7 +125,7 @@ bool SignalGeneratorOscilloscope::AcquireData()
 	auto waveform = m_bufmodel->SimulatePRBS(
 		rand(),
 		CORNER_TYP,
-		1e12 / m_rate,
+		FS_PER_SECOND / m_rate,
 		m_depth,
 		80			//1.25 Gbps
 		);

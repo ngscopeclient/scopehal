@@ -128,5 +128,5 @@ void DCOffsetFilter::Refresh()
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

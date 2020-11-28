@@ -41,7 +41,7 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
+	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -159,8 +159,8 @@ void EyeJitterMeasurement::Refresh()
 	int64_t w = din->GetWidth();
 	int64_t xcenter = w / 2;
 	float ber_max = FLT_EPSILON;
-	double width_ps = 2 * din->m_uiWidth;
-	double ps_per_pixel = width_ps / w;
+	double width_fs = 2 * din->m_uiWidth;
+	double fs_per_pixel = width_fs / w;
 	for(size_t i=start_bin; i <= end_bin; i++)
 	{
 		float* row = data + i*w;
@@ -193,7 +193,7 @@ void EyeJitterMeasurement::Refresh()
 		int64_t jitter_left = cleft - left;
 		int64_t jitter_right = cright - right;
 
-		float value = ps_per_pixel * max(jitter_left, jitter_right);
+		float value = fs_per_pixel * max(jitter_left, jitter_right);
 
 		//Output waveform generation
 		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
@@ -209,8 +209,8 @@ void EyeJitterMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

@@ -105,7 +105,7 @@ void Ethernet64b66bDecoder::Refresh()
 	auto cap = new Ethernet64b66bWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	//Record the value of the data stream at each clock edge
 	DigitalWaveform data;

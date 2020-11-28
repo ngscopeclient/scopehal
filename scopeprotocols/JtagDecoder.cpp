@@ -161,7 +161,7 @@ void JtagDecoder::Refresh()
 	auto cap = new JtagWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = tck->m_startTimestamp;
-	cap->m_startPicoseconds = tck->m_startPicoseconds;
+	cap->m_startFemtoseconds = tck->m_startFemtoseconds;
 
 	//Table for state transitions
 	JtagSymbol::JtagState state_if_tms_high[] =

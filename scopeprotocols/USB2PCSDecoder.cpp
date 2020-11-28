@@ -107,7 +107,7 @@ void USB2PCSDecoder::Refresh()
 	auto cap = new USB2PCSWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	//Initialize the current sample to idle at the start of the capture
 	int64_t offset = 0;
@@ -161,11 +161,11 @@ void USB2PCSDecoder::RefreshIterationIdle(
 	int64_t& offset
 	)
 {
-	const size_t ui_width_480 = 2083;
-	const size_t ui_width_12 = 83333;
-	const size_t ui_width_1 = 666666;
+	const size_t ui_width_480 = 2083000;
+	const size_t ui_width_12 = 83333000;
+	const size_t ui_width_1 = 666666000;
 
-	size_t sample_ps = din->m_durations[nin] * din->m_timescale;
+	size_t sample_fs = din->m_durations[nin] * din->m_timescale;
 	auto sin = din->m_samples[nin];
 
 	switch(sin.m_type)
@@ -181,12 +181,12 @@ void USB2PCSDecoder::RefreshIterationIdle(
 			offset = din->m_offsets[nin];
 
 			//The length of the K indicates our clock speed
-			if(sample_ps < (2 * ui_width_480) )
+			if(sample_fs < (2 * ui_width_480) )
 			{
 				speed = SPEED_480M;
 				ui_width = ui_width_480;
 			}
-			else if(sample_ps < (2 * ui_width_12) )
+			else if(sample_fs < (2 * ui_width_12) )
 			{
 				speed = SPEED_12M;
 				ui_width = ui_width_12;
@@ -226,8 +226,8 @@ void USB2PCSDecoder::RefreshIterationSync(
 	int64_t& offset,
 	uint8_t& data)
 {
-	size_t sample_ps = din->m_durations[nin] * din->m_timescale;
-	float sample_width_ui = sample_ps * 1.0f / ui_width;
+	size_t sample_fs = din->m_durations[nin] * din->m_timescale;
+	float sample_width_ui = sample_fs * 1.0f / ui_width;
 
 	//Keep track of our position in the sync sequence
 	count ++;
@@ -363,10 +363,10 @@ void USB2PCSDecoder::RefreshIterationData(
 	int64_t& offset,
 	uint8_t& data)
 {
-	size_t sample_ps = din->m_durations[nin] * din->m_timescale;
-	size_t last_sample_ps = din->m_durations[nlast] * din->m_timescale;
-	float sample_width_ui = sample_ps * 1.0f / ui_width;
-	float last_sample_width_ui = last_sample_ps * 1.0f / ui_width;
+	size_t sample_fs = din->m_durations[nin] * din->m_timescale;
+	size_t last_sample_fs = din->m_durations[nlast] * din->m_timescale;
+	float sample_width_ui = sample_fs * 1.0f / ui_width;
+	float last_sample_width_ui = last_sample_fs * 1.0f / ui_width;
 
 	//If this is a SE0, we're done
 	auto sin = din->m_samples[nin];

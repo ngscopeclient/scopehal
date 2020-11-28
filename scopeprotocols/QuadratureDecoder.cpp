@@ -58,7 +58,7 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	m_parameters[m_revname].AddEnumValue("Multi", MODE_MULTI_REV);
 
 	m_debouncename = "Debounce Cooldown";
-	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_debouncename].ParseString("1 ms");
 
 	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
@@ -151,14 +151,14 @@ void QuadratureDecoder::Refresh()
 
 	InterpolationMode mode = (InterpolationMode)m_parameters[m_interpname].GetIntVal();
 	RevMode rmode = (RevMode)m_parameters[m_revname].GetIntVal();
-	int64_t debounce_ps = m_parameters[m_debouncename].GetIntVal();
-	int64_t debounce_samples = debounce_ps / a->m_timescale;
+	int64_t debounce_fs = m_parameters[m_debouncename].GetIntVal();
+	int64_t debounce_samples = debounce_fs / a->m_timescale;
 
 	//Create the output waveform
 	auto cap = new AnalogWaveform;
 	cap->m_timescale = a->m_timescale;
 	cap->m_startTimestamp = a->m_startTimestamp;
-	cap->m_startPicoseconds = a->m_startPicoseconds;
+	cap->m_startFemtoseconds = a->m_startFemtoseconds;
 
 	//Seed with initial point at time zero
 	int64_t last_edge = 0;

@@ -148,7 +148,7 @@ void ParallelBus::Refresh()
 	//Copy our time scales from the input
 	cap->m_timescale = inputs[0]->m_timescale;
 	cap->m_startTimestamp = inputs[0]->m_startTimestamp;
-	cap->m_startPicoseconds = inputs[0]->m_startPicoseconds;
+	cap->m_startFemtoseconds = inputs[0]->m_startFemtoseconds;
 
 	//Set all unused channels to NULL
 	for(size_t i=m_width; i < 16; i++)

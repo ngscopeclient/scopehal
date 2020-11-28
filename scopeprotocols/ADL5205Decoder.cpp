@@ -111,7 +111,7 @@ void ADL5205Decoder::Refresh()
 	auto cap = new ADL5205Waveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	ADL5205Symbol samp;
 	int phase = 0;
 	int64_t offset = 0;

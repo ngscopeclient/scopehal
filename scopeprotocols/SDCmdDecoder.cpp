@@ -119,7 +119,7 @@ void SDCmdDecoder::Refresh()
 	auto cap = new SDCmdWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startPicoseconds = clk->m_startPicoseconds;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	SetData(cap, 0);
 
 	enum
@@ -132,9 +132,7 @@ void SDCmdDecoder::Refresh()
 		STATE_STOP,
 
 		STATE_RESPONSE_HEADER,
-		STATE_RESPONSE_BODY,
-
-		STATE_HANG
+		STATE_RESPONSE_BODY
 	} state = STATE_IDLE;
 
 	int64_t tstart = 0;
@@ -151,7 +149,7 @@ void SDCmdDecoder::Refresh()
 	{
 		bool b = dcmd.m_samples[i];
 		int64_t off = dcmd.m_offsets[i];		//no need to multiply by timescale
-		int64_t dur = dcmd.m_durations[i];		//because SampleOnRisingEdges() always uses 1ps timesteps
+		int64_t dur = dcmd.m_durations[i];		//because SampleOnRisingEdges() always uses 1fs timesteps
 		int64_t end = off + dur;
 
 		switch(state)

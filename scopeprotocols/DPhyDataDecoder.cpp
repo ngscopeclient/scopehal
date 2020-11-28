@@ -107,7 +107,7 @@ void DPhyDataDecoder::Refresh()
 	auto cap = new DPhyDataWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startPicoseconds = data->m_startPicoseconds;
+	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 
 	enum
 	{

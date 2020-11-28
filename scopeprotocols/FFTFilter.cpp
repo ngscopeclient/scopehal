@@ -194,11 +194,11 @@ void FFTFilter::Refresh()
 		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
-	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	DoRefresh(din, ps, npoints, nouts, true);
+	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	DoRefresh(din, fs, npoints, nouts, true);
 }
 
-void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoints, size_t nouts, bool log_output)
+void FFTFilter::DoRefresh(AnalogWaveform* din, double fs_per_sample, size_t npoints, size_t nouts, bool log_output)
 {
 	//Calculate the FFT
 	ffts_execute(m_plan, m_rdin, m_rdout);
@@ -206,10 +206,10 @@ void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoi
 	//Set up output and copy timestamps
 	auto cap = new AnalogWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	//Calculate size of each bin
-	double sample_ghz = 1000 / ps_per_sample;
+	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	cap->m_timescale = bin_hz;
 	LogTrace("bin_hz: %f\n", bin_hz);

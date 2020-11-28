@@ -38,7 +38,7 @@ using namespace std;
 PeriodMeasurement::PeriodMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
+	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
 	//Set up channels
 	CreateInput("din");
@@ -154,8 +154,8 @@ void PeriodMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

@@ -271,8 +271,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
 	//Calculate size of each bin
-	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	double sample_ghz = 1000 / ps;
+	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
 	//Resample S21 to our FFT bin size if needed.
@@ -300,7 +300,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//Set up output and copy timestamps
 	auto cap = new AnalogWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_timescale = din->m_timescale;
 
 	//Calculate bounds for the *meaningful* output data.
@@ -343,7 +343,7 @@ int64_t DeEmbedFilter::GetGroupDelay()
 	float max_delay = 0;
 	for(size_t i=0; i<s21.size()-1 && i<50; i++)
 		max_delay = max(max_delay, s21.GetGroupDelay(i));
-	return max_delay * 1e12;
+	return max_delay * FS_PER_SECOND;
 }
 
 /**

@@ -234,7 +234,7 @@ bool Filter::VerifyAllInputsOKAndAnalog()
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
 
-	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
 
 	@param data		The data signal to sample
 	@param clock	The clock signal to use
@@ -280,7 +280,7 @@ void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, 
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
 
-	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
 
 	@param data		The data signal to sample
 	@param clock	The clock signal to use
@@ -326,7 +326,7 @@ void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* cloc
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
 
-	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
 
 	@param data		The data signal to sample
 	@param clock	The clock signal to use
@@ -372,7 +372,7 @@ void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock,
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
 
-	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
 
 	@param data		The data signal to sample
 	@param clock	The clock signal to use
@@ -418,7 +418,7 @@ void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, Dig
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
 
-	The sampled waveform has a time scale in picoseconds regardless of the incoming waveform's time scale.
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
 
 	@param data		The data signal to sample
 	@param clock	The clock signal to use

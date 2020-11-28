@@ -49,7 +49,7 @@ RiseMeasurement::RiseMeasurement(const string& color)
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
 	m_parameters[m_endname].SetFloatVal(0.8);
 
-	m_yAxisUnit = Unit(Unit::UNIT_PS);
+	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
 	m_midpoint = 0;
 	m_range = 1;
@@ -197,8 +197,8 @@ void RiseMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

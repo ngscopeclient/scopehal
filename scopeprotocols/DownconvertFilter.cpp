@@ -117,7 +117,7 @@ void DownconvertFilter::Refresh()
 
 	//Calculate phase velocity
 	double lo_freq = m_parameters[m_freqname].GetFloatVal();
-	double sample_freq = 1e12f / din->m_timescale;
+	double sample_freq = FS_PER_SECOND / din->m_timescale;
 	double lo_cycles_per_sample = lo_freq / sample_freq;
 	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
 
@@ -150,6 +150,6 @@ void DownconvertFilter::Refresh()
 	cap_q->m_timescale 			= din->m_timescale;
 	cap_i->m_startTimestamp 	= din->m_startTimestamp;
 	cap_q->m_startTimestamp 	= din->m_startTimestamp;
-	cap_i->m_startPicoseconds	= din->m_startPicoseconds;
-	cap_q->m_startPicoseconds	= din->m_startPicoseconds;
+	cap_i->m_startFemtoseconds	= din->m_startFemtoseconds;
+	cap_q->m_startFemtoseconds	= din->m_startFemtoseconds;
 }

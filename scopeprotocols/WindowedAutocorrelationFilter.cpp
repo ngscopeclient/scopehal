@@ -50,12 +50,12 @@ WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(const string& color
 	m_max = -FLT_MAX;
 
 	m_windowName = "Window";
-	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-	m_parameters[m_windowName].SetFloatVal(400000);
+	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_windowName].SetFloatVal(400e6);
 
 	m_periodName = "Period";
-	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
-	m_parameters[m_periodName].SetFloatVal(3600000);
+	m_parameters[m_periodName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_periodName].SetFloatVal(3.6e9);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +104,6 @@ bool WindowedAutocorrelationFilter::NeedsConfig()
 void WindowedAutocorrelationFilter::SetDefaultName()
 {
 	char hwname[256];
-	Unit ps(Unit::UNIT_PS);
 	snprintf(hwname, sizeof(hwname), "WindowedAutocorrelation(%s, %s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
 		GetInputDisplayName(1).c_str(),
@@ -195,7 +194,7 @@ void WindowedAutocorrelationFilter::Refresh()
 	//Copy our time scales from the input
 	cap->m_timescale 		= din_i->m_timescale;
 	cap->m_startTimestamp 	= din_i->m_startTimestamp;
-	cap->m_startPicoseconds = din_i->m_startPicoseconds;
+	cap->m_startFemtoseconds = din_i->m_startFemtoseconds;
 
 	SetData(cap, 0);
 }

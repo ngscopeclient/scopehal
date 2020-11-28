@@ -45,7 +45,7 @@ VerticalBathtub::VerticalBathtub(const string& color)
 	CreateInput("din");
 
 	m_timeName = "Time";
-	m_parameters[m_timeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_timeName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_timeName].SetFloatVal(0);
 }
 
@@ -139,7 +139,7 @@ void VerticalBathtub::Refresh()
 	auto cap = new AnalogWaveform;
 	cap->m_timescale = eye->m_timescale;
 	cap->m_startTimestamp = eye->m_startTimestamp;
-	cap->m_startPicoseconds = eye->m_startPicoseconds;
+	cap->m_startFemtoseconds = eye->m_startFemtoseconds;
 
 	//Eye height config
 	double mv_per_pixel = 1000 * ein->GetVoltageRange() / eye->GetHeight();

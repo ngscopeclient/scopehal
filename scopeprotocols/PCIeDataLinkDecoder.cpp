@@ -104,7 +104,7 @@ void PCIeDataLinkDecoder::Refresh()
 	auto cap = new PCIeDataLinkWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startPicoseconds = data->m_startPicoseconds;
+	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 	SetData(cap, 0);
 
 	enum

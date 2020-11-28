@@ -127,7 +127,7 @@ void DPhySymbolDecoder::Refresh()
 	DPhySymbolWaveform* cap = new DPhySymbolWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = dp->m_startTimestamp;
-	cap->m_startPicoseconds = dp->m_startPicoseconds;
+	cap->m_startFemtoseconds = dp->m_startFemtoseconds;
 	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type nextstate = state;
@@ -258,7 +258,7 @@ void DPhySymbolDecoder::Refresh()
 			{
 				//For now, set the cutoff at 30 ns. Per spec it should be 40 ns + 4 UI at the TX,
 				//but we're decoding combinatorially and don't know the UI yet.
-				const int64_t thsprepare_cutoff = 30000;
+				const int64_t thsprepare_cutoff = 30000000;
 				if( (cap->m_durations[nlast]) < thsprepare_cutoff )
 				{
 					nextstate  = DPhySymbol::STATE_LP00;
@@ -274,9 +274,9 @@ void DPhySymbolDecoder::Refresh()
 			//If the previous sample was a LP state, but significantly less than Tlpx long, discard it.
 			else if( (state != DPhySymbol::STATE_HS0) && (state != DPhySymbol::STATE_HS1) )
 			{
-				//For now, set the cutoff at 40 ns (40,000 ps).
+				//For now, set the cutoff at 40 ns.
 				//This provides some margin on the 50 ns Tlpx in the spec.
-				const int64_t tlpx_cutoff = 40000;
+				const int64_t tlpx_cutoff = 40000000;
 				if( (cap->m_durations[nlast]) < tlpx_cutoff )
 					last_was_glitch = true;
 			}

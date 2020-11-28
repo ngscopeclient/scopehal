@@ -167,10 +167,10 @@ void USB2PMADecoder::Refresh()
 		}
 
 		//Ignore SE0/SE1 states during transitions.
-		int64_t last_ps = cap->m_durations[iold] * din_p->m_timescale;
+		int64_t last_fs = cap->m_durations[iold] * din_p->m_timescale;
 		if(
 			( (oldtype == USB2PMASymbol::TYPE_SE0) || (oldtype == USB2PMASymbol::TYPE_SE1) ) &&
-			(last_ps < 100000))
+			(last_fs < 100000000))
 		{
 			cap->m_samples[iold].m_type = type;
 			cap->m_durations[iold] += din_p->m_durations[i];
@@ -189,7 +189,7 @@ void USB2PMADecoder::Refresh()
 	//Use the first trace's timestamp as our start time if they differ
 	cap->m_timescale = din_p->m_timescale;
 	cap->m_startTimestamp = din_p->m_startTimestamp;
-	cap->m_startPicoseconds = din_p->m_startPicoseconds;
+	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
 }
 
 Gdk::Color USB2PMADecoder::GetColor(int i)

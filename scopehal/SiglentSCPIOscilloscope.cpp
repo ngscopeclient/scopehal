@@ -319,8 +319,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					//double trigoff = ptrigtime[1];	//offset to point 0 from trigger time
 				}
 
-				int64_t trigtime_samples = trigtime * 1e12f / interval;
-				//int64_t trigoff_samples = trigoff * 1e12f / interval;
+				int64_t trigtime_samples = trigtime * FS_PER_SECOND / interval;
+				//int64_t trigoff_samples = trigoff * FS_PER_SECOND / interval;
 				//LogDebug("	Trigger time: %.3f sec (%lu samples)\n", trigtime, trigtime_samples);
 				//LogDebug("	Trigger offset: %.3f sec (%lu samples)\n", trigoff, trigoff_samples);
 

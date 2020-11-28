@@ -193,17 +193,16 @@ void EthernetProtocolDecoder::BytesToFrames(
 					{
 						//Calculate the start time of the packet
 						time_t tstart = cap->m_startTimestamp;
-						int64_t ps = cap->m_startPicoseconds + start;
-						const int64_t ps_per_second = 1e12;
-						if(ps >= ps_per_second)
+						int64_t fs = cap->m_startFemtoseconds + start;
+						if(fs >= FS_PER_SECOND)
 						{
-							tstart += (ps / ps_per_second);
-							ps %= ps_per_second;
+							tstart += (fs / FS_PER_SECOND);
+							fs %= (int64_t)FS_PER_SECOND;
 						}
 
 						//Convert timestamp to PCAP format: 32-bit sec + us
 						uint32_t sec = tstart;
-						uint32_t us = ps / 1000000;
+						uint32_t us = fs / 1000000000;
 						fwrite(&sec, sizeof(sec), 1, m_fpOut);
 						fwrite(&us, sizeof(us), 1, m_fpOut);
 

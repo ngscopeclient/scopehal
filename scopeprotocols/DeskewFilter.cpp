@@ -42,7 +42,7 @@ DeskewFilter::DeskewFilter(const string& color)
 	CreateInput("din");
 
 	m_skewname = "Skew";
-	m_parameters[m_skewname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
+	m_parameters[m_skewname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
 	m_parameters[m_skewname].SetFloatVal(0);
 }
 
@@ -154,5 +154,5 @@ void DeskewFilter::Refresh()
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

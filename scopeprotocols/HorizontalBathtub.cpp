@@ -130,8 +130,8 @@ void HorizontalBathtub::Refresh()
 		return;
 
 	//Horizontal scale: one eye is two UIs wide
-	double ps_per_width = 2*din->m_uiWidth;
-	double ps_per_pixel = ps_per_width / din->GetWidth();
+	double fs_per_width = 2*din->m_uiWidth;
+	double fs_per_pixel = fs_per_width / din->GetWidth();
 
 	//Create the output
 	auto cap = new AnalogWaveform;
@@ -143,8 +143,8 @@ void HorizontalBathtub::Refresh()
 	cap->Resize(len);
 	for(size_t i=0; i<len; i++)
 	{
-		cap->m_offsets[i] = i*ps_per_pixel - din->m_uiWidth;
-		cap->m_durations[i] = ps_per_pixel;
+		cap->m_offsets[i] = i*fs_per_pixel - din->m_uiWidth;
+		cap->m_durations[i] = fs_per_pixel;
 		cap->m_samples[i] = row[i];
 	}
 
@@ -184,8 +184,8 @@ void HorizontalBathtub::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

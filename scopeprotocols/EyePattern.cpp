@@ -443,8 +443,8 @@ void EyePattern::Refresh()
 	uint32_t prng = 0xdeadbeef;
 
 	//Recompute scales
-	float eye_width_ps = 2 * cap->m_uiWidth;
-	m_xscale = m_width * 1.0 / eye_width_ps;
+	float eye_width_fs = 2 * cap->m_uiWidth;
+	m_xscale = m_width * 1.0 / eye_width_fs;
 	m_xoff = -round(cap->m_uiWidth);
 
 	//Precompute some scaling factors
@@ -453,6 +453,7 @@ void EyePattern::Refresh()
 	float yoff = -center*yscale + ymid;
 	float xtimescale = waveform->m_timescale * m_xscale;
 	float xscale_div255 = m_xscale / 255.0f;
+	float xscale_div255_x100 = xscale_div255 * 100;
 	float xscale_div2 = m_xscale / 2;
 
 	//Process the eye
@@ -484,12 +485,12 @@ void EyePattern::Refresh()
 				offset = tstart - tnext;
 			}
 
-			//Antialiasing: jitter the fractional X position by up to 1ps to fill in blank spots
+			//Antialiasing: jitter the fractional X position by up to 100fs to fill in blank spots
 			int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
 			float pixel_x_f = (offset - m_xoff) * m_xscale;
 			float pixel_x_fround = floor(pixel_x_f);
 			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * xtimescale );
-			pixel_x_f += (prng & 0xff) * xscale_div255 - xscale_div2;
+			pixel_x_f += (prng & 0xff) * xscale_div255_x100 - xscale_div2;
 			prng = 0x343fd * prng + 0x269ec3;
 
 			//Early out if off end of plot
@@ -516,8 +517,8 @@ void EyePattern::Refresh()
 		}
 	}
 
-	//Rightmost picosecond of the eye has some rounding artifacts.
-	//For now, just replace it with the value from 1ps to its left.
+	//Rightmost column of the eye has some rounding artifacts.
+	//For now, just replace it with the value from 1 column to its left.
 	size_t delta = ceil(m_xscale);
 	size_t xstart = xmax - delta;
 	size_t xend = xmax;

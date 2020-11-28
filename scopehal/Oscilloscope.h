@@ -490,7 +490,7 @@ public:
 	/**
 		@brief Sets the trigger offset
 
-		@param offset		Picoseconds from the start of the capture to the trigger point.
+		@param offset		Femtoseconds from the start of the capture to the trigger point.
 							Positive values mean the trigger is within the waveform.
 							Negative values mean there is a delay from the trigger point to the start of the waveform.
 	 */
@@ -505,7 +505,7 @@ public:
 		@brief Sets the deskew setting for a channel
 
 		@param channel		The channel to deskew
-		@param skew			Skew value, in picoseconds.
+		@param skew			Skew value, in femtoseconds.
 							Negative values move the channel earlier relative to the zero point.
 							Positive values move the channel later.
 

@@ -91,7 +91,7 @@ public:
 	{}
 
 	/**
-		@brief The time scale, in picoseconds per timestep, used by this channel.
+		@brief The time scale, in femtoseconds per timestep, used by this channel.
 
 		This is used as a scaling factor for individual sample time values as well as to compute the maximum zoom value
 		for the time axis.

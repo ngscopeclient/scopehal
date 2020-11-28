@@ -128,7 +128,7 @@ void EthernetRGMIIDecoder::Refresh()
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startPicoseconds = data->m_startPicoseconds;
+	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 
 	//skip first 2 samples so we can get a full clock cycle before starting
 	for(size_t i=2; i < len; i++)

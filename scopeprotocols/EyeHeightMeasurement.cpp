@@ -40,18 +40,18 @@ using namespace std;
 EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_xAxisUnit = Unit(Unit::UNIT_PS);
+	m_xAxisUnit = Unit(Unit::UNIT_FS);
 	m_yAxisUnit = Unit(Unit::UNIT_VOLTS);
 
 	//Set up channels
 	CreateInput("Eye");
 
 	m_startname = "Begin Time";
-	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
+	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
 	m_parameters[m_startname].SetFloatVal(0);
 
 	m_endname = "End Time";
-	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PS));
+	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
 	m_parameters[m_endname].SetFloatVal(0);
 
 	m_posname = "Midpoint Voltage";
@@ -146,12 +146,12 @@ void EyeHeightMeasurement::Refresh()
 
 	//Convert times to bins
 	size_t width_bins = din->GetWidth();
-	float width_ps = din->m_uiWidth * 2;
-	float ps_per_bin = width_ps / width_bins;
+	float width_fs = din->m_uiWidth * 2;
+	float fs_per_bin = width_fs / width_bins;
 
 	//Find start/end time bins
-	size_t start_bin = round((tstart + din->m_uiWidth) / ps_per_bin);
-	size_t end_bin = round((tend + din->m_uiWidth) / ps_per_bin);
+	size_t start_bin = round((tstart + din->m_uiWidth) / fs_per_bin);
+	size_t end_bin = round((tend + din->m_uiWidth) / fs_per_bin);
 	start_bin = min(start_bin, din->GetWidth());
 	end_bin = min(end_bin, din->GetWidth());
 
@@ -192,8 +192,8 @@ void EyeHeightMeasurement::Refresh()
 		float height_volts = volts_per_row * height_bins;
 
 		//Output waveform generation
-		cap->m_offsets.push_back(round( (x*ps_per_bin) - din->m_uiWidth ));
-		cap->m_durations.push_back(round(ps_per_bin));
+		cap->m_offsets.push_back(round( (x*fs_per_bin) - din->m_uiWidth ));
+		cap->m_durations.push_back(round(fs_per_bin));
 		cap->m_samples.push_back(height_volts);
 		m_min = min(height_volts, m_min);
 		m_max = max(height_volts, m_max);
@@ -205,8 +205,8 @@ void EyeHeightMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in picoseconds.
+	//Copy start time etc from the input. Timestamps are in femtoseconds.
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

@@ -123,7 +123,7 @@ void EthernetGMIIDecoder::Refresh()
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startPicoseconds = data->m_startPicoseconds;
+	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 
 	size_t len = den.m_samples.size();
 	len = min(len, der.m_samples.size());

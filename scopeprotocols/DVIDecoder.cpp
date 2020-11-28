@@ -129,7 +129,7 @@ void DVIDecoder::Refresh()
 	DVIWaveform* cap = new DVIWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = dblue->m_startTimestamp;
-	cap->m_startPicoseconds = dblue->m_startPicoseconds;
+	cap->m_startFemtoseconds = dblue->m_startFemtoseconds;
 
 	size_t iblue = 0;
 	size_t igreen = 0;

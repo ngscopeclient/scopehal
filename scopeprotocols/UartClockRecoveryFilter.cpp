@@ -115,14 +115,14 @@ void UartClockRecoveryFilter::Refresh()
 
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
-	int64_t ps = static_cast<int64_t>(1.0e12f / baud);
+	int64_t fs = static_cast<int64_t>(FS_PER_SECOND / baud);
 
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
-	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
+	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
@@ -138,7 +138,7 @@ void UartClockRecoveryFilter::Refresh()
 	for(; nedge < elen;)
 	{
 		//The current bit starts half a baud period after the start bit edge
-		bcenter = edges[nedge] + ps/2;
+		bcenter = edges[nedge] + fs/2;
 		nedge ++;
 
 		//We have ten start/ data/stop bits after this
@@ -148,23 +148,23 @@ void UartClockRecoveryFilter::Refresh()
 				break;
 
 			//If the next edge is around the time of this bit, re-sync to it
-			if(edges[nedge] < bcenter + ps/4)
+			if(edges[nedge] < bcenter + fs/4)
 			{
-				//bcenter = edges[nedge] + ps/2;
+				//bcenter = edges[nedge] + fs/2;
 				nedge ++;
 			}
 
 			//Emit a sample for this data bit
 			cap->m_offsets.push_back(bcenter);
-			cap->m_durations.push_back(ps/2);
+			cap->m_durations.push_back(fs/2);
 			cap->m_samples.push_back(1);
 
-			cap->m_offsets.push_back(bcenter + ps/2);
-			cap->m_durations.push_back(ps/2);
+			cap->m_offsets.push_back(bcenter + fs/2);
+			cap->m_durations.push_back(fs/2);
 			cap->m_samples.push_back(0);
 
 			//Next bit starts one baud period later
-			bcenter  += ps;
+			bcenter  += fs;
 		}
 	}
 

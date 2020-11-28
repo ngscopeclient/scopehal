@@ -124,7 +124,7 @@ void DDR3Decoder::Refresh()
 	auto cap = new DDR3Waveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
-	cap->m_startPicoseconds = 0;
+	cap->m_startFemtoseconds = 0;
 
 	//Loop over the data and look for events on clock edges
 	size_t len = we.m_samples.size();

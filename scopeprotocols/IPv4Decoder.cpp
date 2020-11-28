@@ -108,7 +108,7 @@ void IPv4Decoder::Refresh()
 	auto cap = new IPv4Waveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	int state = 0;
 	int header_len = 0;

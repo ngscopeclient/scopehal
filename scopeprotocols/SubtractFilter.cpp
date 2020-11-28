@@ -176,7 +176,7 @@ void SubtractFilter::Refresh()
 	//Use the first trace's timestamp as our start time if they differ
 	cap->m_timescale 		= din_p->m_timescale;
 	cap->m_startTimestamp 	= din_p->m_startTimestamp;
-	cap->m_startPicoseconds = din_p->m_startPicoseconds;
+	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization

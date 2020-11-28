@@ -109,7 +109,7 @@ void I2CDecoder::Refresh()
 	auto cap = new I2CWaveform;
 	cap->m_timescale = sda->m_timescale;
 	cap->m_startTimestamp = sda->m_startTimestamp;
-	cap->m_startPicoseconds = sda->m_startPicoseconds;
+	cap->m_startFemtoseconds = sda->m_startFemtoseconds;
 
 	//Loop over the data and look for transactions
 	//For now, assume equal sample rate

@@ -76,13 +76,13 @@ void CANDecoder::Refresh()
 	auto cap = new CANWaveform;
 	cap->m_timescale = diff->m_timescale;
 	cap->m_startTimestamp = diff->m_startTimestamp;
-	cap->m_startPicoseconds = diff->m_startPicoseconds;
+	cap->m_startFemtoseconds = diff->m_startFemtoseconds;
 
 	//Calculate some time scale values
 	//Sample point is 3/4 of the way through the UI
 	auto bitrate = m_parameters[m_baudrateName].GetIntVal();
-	int64_t ps_per_ui = 1e12 / bitrate;
-	int64_t samples_per_ui = ps_per_ui / diff->m_timescale;
+	int64_t fs_per_ui = FS_PER_SECOND / bitrate;
+	int64_t samples_per_ui = fs_per_ui / diff->m_timescale;
 
 	enum
 	{
@@ -182,7 +182,7 @@ void CANDecoder::Refresh()
 		{
 			/*
 			LogDebug("Bit ended at %s (bits_since_toggle = %d, sampled_value = %d, last_sampled_value = %d)\n",
-				Unit(Unit::UNIT_PS).PrettyPrint(off * diff->m_timescale).c_str(), bits_since_toggle,
+				Unit(Unit::UNIT_FS).PrettyPrint(off * diff->m_timescale).c_str(), bits_since_toggle,
 				sampled_value, last_sampled_value);
 			*/
 
@@ -199,7 +199,7 @@ void CANDecoder::Refresh()
 				if(bits_since_toggle == 5)
 				{
 					//LogDebug("Discarding stuff bit at %s (bits_since_toggle = %d)\n",
-					//	Unit(Unit::UNIT_PS).PrettyPrint(off * diff->m_timescale).c_str(), bits_since_toggle);
+					//	Unit(Unit::UNIT_FS).PrettyPrint(off * diff->m_timescale).c_str(), bits_since_toggle);
 
 					tbitstart = off;
 					sampled = false;

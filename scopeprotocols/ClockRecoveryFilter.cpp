@@ -138,18 +138,18 @@ void ClockRecoveryFilter::Refresh()
 		return;
 	}
 
-	//Convert nominal baud period to ps
-	//Round nominal period to nearest ps, but use the floating point value for the CDR PLL
-	float period = 1.0e12f / m_parameters[m_baudname].GetFloatVal();
-	int64_t ps = round(period);
-	m_nominalPeriod = ps;
+	//Convert nominal baud period to fs
+	//Round nominal period to nearest fs, but use the floating point value for the CDR PLL
+	float period = FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal();
+	int64_t fs = round(period);
+	m_nominalPeriod = fs;
 
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
-	cap->m_timescale = 1;		//recovered clock time scale is single picoseconds
+	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.

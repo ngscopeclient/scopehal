@@ -109,7 +109,7 @@ void SPIDecoder::Refresh()
 	auto cap = new SPIWaveform;
 	cap->m_timescale = clk->m_timescale;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startPicoseconds = clk->m_startPicoseconds;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//TODO: different cpha/cpol modes
 

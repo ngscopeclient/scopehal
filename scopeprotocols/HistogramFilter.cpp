@@ -170,7 +170,7 @@ void HistogramFilter::Refresh()
 		cap = new AnalogWaveform;
 		cap->m_timescale = 1;
 		cap->m_startTimestamp = din->m_startTimestamp;
-		cap->m_startPicoseconds = din->m_startPicoseconds;
+		cap->m_startFemtoseconds = din->m_startFemtoseconds;
 		SetData(cap, 0);
 
 		//Set up timestamps and initial values

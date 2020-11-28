@@ -77,7 +77,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	EthernetWaveform* cap = new EthernetWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startPicoseconds = din->m_startPicoseconds;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
 	const int64_t ui_width 			= 8000;
 	const int64_t ui_width_samples	= ui_width / din->m_timescale;

@@ -265,7 +265,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	SendCommand(CMD_GET_MAX_WIDTH);
 	m_maxWidth = Read1ByteReply();
 
-	//Round sampling period down to be an even number of picoseconds
+	//Round sampling period down to be an even number of femtoseconds
 	//(this is needed so the clock can be double-rate and not lose sync)
 	if(m_samplePeriod & 1)
 		m_samplePeriod --;
