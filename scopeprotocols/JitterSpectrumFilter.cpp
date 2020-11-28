@@ -84,7 +84,8 @@ size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
 	int64_t maxdur = 0;
 	for(size_t i=0; i<inlen; i++)
 	{
-		int64_t dur = din->m_durations[i];
+		int64_t dur = din->m_durations[i] / 1000;	//convert to ps, we dont need stupidly high resolution here
+													//and this makes the histogram much smaller
 		maxdur = max(dur, maxdur);
 		if(dur > 0)
 			durations[dur] ++;
@@ -130,6 +131,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
 			break;
 		}
 	}
+
 	LogTrace("Initial UI width estimate: %zu\n", ui_width);
 
 	//Take a weighted average to smooth out the peak location somewhat.
@@ -148,6 +150,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
 	ui_width /= ui_width_samples;
 	LogTrace("Averaged UI width estimate: %zu\n", ui_width);
 
+	ui_width *= 1000;	//convert back to fs
 	return ui_width;
 }
 
