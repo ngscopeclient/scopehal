@@ -128,6 +128,7 @@ void TIEMeasurement::Refresh()
 
 	//For each input clock edge, find the closest recovered clock edge
 	size_t iedge = 0;
+	size_t tlast = 0;
 	for(auto atime : edges)
 	{
 		if(iedge >= len)
@@ -179,10 +180,16 @@ void TIEMeasurement::Refresh()
 		golden_center += 1.5*clk->m_timescale;			//TODO: why is this needed?
 		int64_t tie = atime - golden_center;
 
+		//Update the last sample
+		size_t end = cap->m_durations.size();
+		if(end)
+			cap->m_durations[end-1] = atime - tlast;
+
 		m_maxTie = max(m_maxTie, fabs(tie));
 		cap->m_offsets.push_back(atime);
-		cap->m_durations.push_back(golden_period);
+		cap->m_durations.push_back(1);
 		cap->m_samples.push_back(tie);
+		tlast = atime;
 	}
 
 	SetData(cap, 0);
