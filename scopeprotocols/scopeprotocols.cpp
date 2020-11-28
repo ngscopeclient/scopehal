@@ -87,6 +87,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(I2CEepromDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IPv4Decoder);
+	AddDecoderClass(JitterSpectrumFilter);
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MagnitudeFilter);
 	AddDecoderClass(MDIODecoder);

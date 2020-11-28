@@ -187,7 +187,7 @@ void TIEMeasurement::Refresh()
 
 		m_maxTie = max(m_maxTie, fabs(tie));
 		cap->m_offsets.push_back(atime);
-		cap->m_durations.push_back(1);
+		cap->m_durations.push_back(0);
 		cap->m_samples.push_back(tie);
 		tlast = atime;
 	}

@@ -49,6 +49,7 @@ FFTFilter::FFTFilter(const string& color)
 	CreateInput("din");
 
 	m_cachedNumPoints = 0;
+	m_cachedNumPointsFFT = 0;
 	m_rdin = NULL;
 	m_rdout = NULL;
 	m_plan = NULL;
@@ -144,16 +145,23 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 {
 	m_cachedNumPoints = npoints_raw;
 
+	if(m_cachedNumPointsFFT != npoints)
+	{
+		m_cachedNumPointsFFT = npoints;
+
+		if(m_plan)
+			ffts_free(m_plan);
+
+		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+	}
+
 	if(m_rdin)
 		g_floatVectorAllocator.deallocate(m_rdin);
 	if(m_rdout)
 		g_floatVectorAllocator.deallocate(m_rdout);
-	if(m_plan)
-		ffts_free(m_plan);
 
 	m_rdin = g_floatVectorAllocator.allocate(npoints);
 	m_rdout = g_floatVectorAllocator.allocate(2*nouts);
-	m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 }
 
 void FFTFilter::Refresh()
@@ -186,6 +194,12 @@ void FFTFilter::Refresh()
 		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
+	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	DoRefresh(din, ps, npoints, nouts);
+}
+
+void FFTFilter::DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoints, size_t nouts)
+{
 	//Calculate the FFT
 	ffts_execute(m_plan, m_rdin, m_rdout);
 
@@ -195,8 +209,7 @@ void FFTFilter::Refresh()
 	cap->m_startPicoseconds = din->m_startPicoseconds;
 
 	//Calculate size of each bin
-	double ps = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	double sample_ghz = 1000 / ps;
+	double sample_ghz = 1000 / ps_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	cap->m_timescale = bin_hz;
 	LogTrace("bin_hz: %f\n", bin_hz);

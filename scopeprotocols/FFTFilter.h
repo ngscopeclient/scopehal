@@ -83,7 +83,10 @@ protected:
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
+	void DoRefresh(AnalogWaveform* din, double ps_per_sample, size_t npoints, size_t nouts);
+
 	size_t m_cachedNumPoints;
+	size_t m_cachedNumPointsFFT;
 	float* m_rdin;
 	float* m_rdout;
 	ffts_plan_t* m_plan;
