@@ -52,34 +52,60 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 	{
 		//Get peak search width in bins
 		int64_t search_bins = ceil(search_hz / cap->m_timescale);
-		search_bins = min(search_bins, (int64_t)512);	//TODO: reasonable limit
 		int64_t search_rad = search_bins/2;
 
 		//Find peaks (TODO: can we vectorize/multithread this?)
 		//Start at index 1 so we don't waste a marker on the DC peak
 		vector<Peak> peaks;
-		for(ssize_t i=1; i<(ssize_t)nouts; i++)
+		ssize_t nend = nouts-1;
+		size_t minpeak = 10;		//Skip this many bins at left to avoid false positives on the DC peak
+		for(ssize_t i=minpeak; i<(ssize_t)nouts; i++)
 		{
-			ssize_t max_delta = 0;
-			float max_value = -FLT_MAX;
-
-			for(ssize_t delta = -search_rad; delta <= search_rad; delta ++)
+			//Locate the peak
+			ssize_t left = max((ssize_t)minpeak, i - search_rad);
+			ssize_t right = min(i + search_rad, (ssize_t)nend);
+			float target = cap->m_samples[i];
+			bool is_peak = true;
+			for(ssize_t j=left; j<=right; j++)
 			{
-				ssize_t index = i+delta ;
-				if( (index < 0) || (index >= (ssize_t)nouts) )
+				if(i == j)
 					continue;
-
-				float amp = cap->m_samples[index];
-				if(amp > max_value)
+				if(cap->m_samples[j] >= target)
 				{
-					max_value = amp;
-					max_delta = delta;
+					//Something higher is to our right.
+					//It's higher than anything from left to j. This makes it a candidate peak.
+					//Restart our search from there.
+					if(j > i)
+						i = j-1;
+
+					is_peak = false;
+					break;
 				}
 			}
+			if(!is_peak)
+				continue;
 
-			//If the highest point in the search window is at our location, we're a peak
-			if(max_delta == 0)
-				peaks.push_back(Peak(cap->m_offsets[i], max_value));
+			//Do a weighted average of our immediate neighbors to fine tune our position
+			ssize_t fine_rad = 10;
+			left = max((ssize_t)1, i - fine_rad);
+			right = min(i + fine_rad, (ssize_t)nouts);
+			//LogDebug("peak range: %zu, %zu\n", left, right);
+			double total = 0;
+			double count = 0;
+			for(ssize_t j=left; j<=right; j++)
+			{
+				total += cap->m_samples[j] * cap->m_offsets[j];
+				count += cap->m_samples[j];
+			}
+			ssize_t peak_location = total / count;
+			//LogDebug("Moved peak from %zu to %zd\n", (size_t)cap->m_offsets[i], peak_location);
+			//LogDebug("Final position: %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(peak_location * cap->m_timescale).c_str());
+
+			peaks.push_back(Peak(peak_location, target));
+
+			//We know we're the highest point until at least i+search_rad.
+			//Don't bother searching those points.
+			i += (search_rad-1);
 		}
 
 		//Sort the peak table and pluck out the requested count
