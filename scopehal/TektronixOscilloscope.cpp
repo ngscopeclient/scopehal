@@ -1331,19 +1331,19 @@ bool TektronixOscilloscope::AcquireData()
 			length = 500;
 
 			//Figure out the sample rate
-			int64_t ps_per_sample = round(xincrement * 1e12f);
-			//LogDebug("%ld ps/sample\n", ps_per_sample);
+			int64_t fs_per_sample = round(xincrement * FS_PER_SECOND);
+			//LogDebug("%ld fs/sample\n", fs_per_sample);
 
 			//LogDebug("length = %d\n", length);
 
 			//Set up the capture we're going to store our data into
 			//(no TDC data available on Tektronix scopes?)
 			AnalogWaveform* cap = new AnalogWaveform;
-			cap->m_timescale = ps_per_sample;
+			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
 			double t = GetTime();
-			cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECONDf;
 
 			//Ask for the data
 			m_transport->SendCommand("CURV?");
@@ -1470,7 +1470,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
 			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
 
-		timebase = xincrement * 1e12;	//scope gives sec, not ps
+		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
 		m_channelOffsets[i] = -yoff;
 
 		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
@@ -1503,7 +1503,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(nsamples);
 
 		//Convert to volts
@@ -1577,7 +1577,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(nsamples);
 
 		//We get dBm from the instrument, so just have to convert double to single precision
@@ -1644,7 +1644,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
 			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
 			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-		timebase = xincrement * 1e12;	//scope gives sec, not ps
+		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
 
 		m_transport->SendCommand("CURV?");
 
@@ -1671,7 +1671,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
 			double t = GetTime();
-			cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 			cap->Resize(msglen);
 
 			//Extract sample data
@@ -1965,7 +1965,7 @@ void TektronixOscilloscope::SetTriggerOffset(int64_t offset)
 			//Instrument reports position of trigger from the midpoint of the display
 			//but we want to know position from the start of the capture
 			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
-			double offset_sec = offset * 1e-12f;
+			double offset_sec = offset * SECONDS_PER_FS;
 			double center_offset_sec = capture_len_sec/2 - offset_sec;
 
 			m_transport->SendCommand(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
@@ -2000,8 +2000,8 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
 			double offset_sec = capture_len_sec/2 - center_offset_sec;
 
-			//All good, convert to ps and we're done
-			m_triggerOffset = round(offset_sec * 1e12);
+			//All good, convert to fs and we're done
+			m_triggerOffset = round(offset_sec * FS_PER_SECOND);
 			m_triggerOffsetValid = true;
 			return m_triggerOffset;
 		}
@@ -2033,7 +2033,7 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
-			m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-12");
+			m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
 			break;
 
 		default:
@@ -2063,7 +2063,7 @@ int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 			case FAMILY_MSO6:
 				//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
 				m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK?");
-				deskew = -round(1e12 * stof(m_transport->ReadReply()));
+				deskew = -round(FS_PER_SECOND * stof(m_transport->ReadReply()));
 				break;
 
 			default:
@@ -2280,11 +2280,11 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 					m_transport->ReadReply();
 
 				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");
-				Unit ps(Unit::UNIT_PS);
-				et->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
+				Unit fs(Unit::UNIT_FS);
+				et->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
 
 				m_transport->SendCommand("TRIG:A:PULSEW:LOWL?");
-				et->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+				et->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
 
 				//Edge slope
 				m_transport->SendCommand("TRIG:A:PULSEW:POL?");
@@ -2358,8 +2358,8 @@ void TektronixOscilloscope::PullDropoutTrigger()
 					m_transport->ReadReply();
 
 				m_transport->SendCommand("TRIG:A:TIMEO:TIM?");
-				Unit ps(Unit::UNIT_PS);
-				et->SetDropoutTime(ps.ParseString(m_transport->ReadReply()));
+				Unit fs(Unit::UNIT_FS);
+				et->SetDropoutTime(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:TIMEO:LOGICQUAL?
 
@@ -2431,9 +2431,9 @@ void TektronixOscilloscope::PullRuntTrigger()
 					et->SetCondition(Trigger::CONDITION_ANY);
 
 				//Only lower interval supported, no upper
-				Unit ps(Unit::UNIT_PS);
+				Unit fs(Unit::UNIT_FS);
 				m_transport->SendCommand("TRIG:A:RUNT:WID?");
-				et->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+				et->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:RUNT:LOGICQUAL?
 
@@ -2503,9 +2503,9 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 					et->SetCondition(Trigger::CONDITION_NOT_EQUAL);
 
 				//Only lower interval supported, no upper
-				Unit ps(Unit::UNIT_PS);
+				Unit fs(Unit::UNIT_FS);
 				m_transport->SendCommand("TRIG:A:TRAN:DELT?");
-				et->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+				et->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:TRAN:LOGICQUAL?
 
@@ -2589,9 +2589,9 @@ void TektronixOscilloscope::PullWindowTrigger()
 					et->SetWindowType(WindowTrigger::WINDOW_ENTER_TIMED);
 
 				//Only lower interval supported, no upper
-				Unit ps(Unit::UNIT_PS);
+				Unit fs(Unit::UNIT_FS);
 				m_transport->SendCommand("TRIG:A:WIN:WID?");
-				et->SetWidth(ps.ParseString(m_transport->ReadReply()));
+				et->SetWidth(fs.ParseString(m_transport->ReadReply()));
 			}
 			break;
 
@@ -2693,8 +2693,10 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLevel()));
 
-				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") + to_string_sci(trig->GetUpperBound()*1e-12));
-				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") + to_string_sci(trig->GetLowerBound()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") +
+					to_string_sci(trig->GetUpperBound() * SECONDS_PER_FS));
+				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") +
+					to_string_sci(trig->GetLowerBound() * SECONDS_PER_FS));
 
 				if(trig->GetType() == EdgeTrigger::EDGE_RISING)
 					m_transport->SendCommand("TRIG:A:PULSEW:POL POS");
@@ -2775,7 +2777,8 @@ void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 						break;
 				}
 
-				m_transport->SendCommand(string("TRIG:A:TIMEO:TIM ") + to_string_sci(trig->GetDropoutTime()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:TIMEO:TIM ") +
+					to_string_sci(trig->GetDropoutTime() * SECONDS_PER_FS));
 			}
 			break;
 
@@ -2848,7 +2851,8 @@ void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 						break;
 				}
 
-				m_transport->SendCommand(string("TRIG:A:RUNT:WID ") + to_string_sci(trig->GetLowerInterval()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:RUNT:WID ") +
+					to_string_sci(trig->GetLowerInterval() * SECONDS_PER_FS));
 			}
 			break;
 
@@ -2917,7 +2921,8 @@ void TektronixOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 						break;
 				}
 
-				m_transport->SendCommand(string("TRIG:A:TRAN:DELT ") + to_string_sci(trig->GetLowerInterval()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:TRAN:DELT ") +
+					to_string_sci(trig->GetLowerInterval() * SECONDS_PER_FS));
 			}
 			break;
 
@@ -2990,7 +2995,8 @@ void TektronixOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 						break;
 				}
 
-				m_transport->SendCommand(string("TRIG:A:WIN:WID ") + to_string_sci(trig->GetWidth()*1e-12));
+				m_transport->SendCommand(string("TRIG:A:WIN:WID ") +
+					to_string_sci(trig->GetWidth() * SECONDS_PER_FS));
 			}
 			break;
 

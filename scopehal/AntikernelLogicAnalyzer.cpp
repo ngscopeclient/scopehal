@@ -249,8 +249,8 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	uint8_t rawperiod[3];
 	SendCommand(CMD_GET_SAMPLE_PERIOD);
 	m_transport->ReadRawData(3, (unsigned char*)rawperiod);
-	m_samplePeriod = (rawperiod[0] << 16) | (rawperiod[1] << 8) | rawperiod[2];
-	//LogDebug("Sample period is %u ps\n", m_samplePeriod);
+	m_samplePeriod = ( (rawperiod[0] << 16) | (rawperiod[1] << 8) | rawperiod[2] ) * 1000;
+	//LogDebug("Sample period is %u fs\n", m_samplePeriod);
 
 	//Get memory aspect ratio info
 	uint8_t rawlen[3];
@@ -320,13 +320,13 @@ bool AntikernelLogicAnalyzer::AcquireData()
 
 	//Synthesize the clock
 	double time = GetTime();
-	double ps = (time - floor(time)) * 1e12f;
+	double fs = (time - floor(time)) * FS_PER_SECOND;
 	{
 		DigitalWaveform* cap = new DigitalWaveform;
 		cap->m_timescale = m_samplePeriod / 2;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time;
-		cap->m_startPicoseconds = ps;
+		cap->m_startFemtoseconds = fs;
 		cap->m_samples.resize(m_memoryDepth * 2);
 
 		auto chan = m_channels[0];
@@ -364,7 +364,7 @@ bool AntikernelLogicAnalyzer::AcquireData()
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_startPicoseconds = ps;
+			cap->m_startFemtoseconds = fs;
 			cap->m_samples.resize(m_memoryDepth);
 
 			//Pull the data
@@ -388,7 +388,7 @@ bool AntikernelLogicAnalyzer::AcquireData()
 			cap->m_timescale = m_samplePeriod;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time;
-			cap->m_startPicoseconds = ps;
+			cap->m_startFemtoseconds = fs;
 			cap->m_samples.resize(m_memoryDepth);
 
 			for(size_t j=0; j<m_memoryDepth; j++)

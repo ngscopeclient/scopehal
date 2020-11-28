@@ -47,8 +47,9 @@ public:
 
 	enum UnitType
 	{
-		UNIT_PS,			//Time. Note that this is not a SI base unit.
-							//Using picoseconds allows integer math for most timebases, which keeps things nice and simple.
+		UNIT_FS,			//Time. Note that this is not a SI base unit.
+							//Using femtoseconds allows integer math for all known scope timebases,
+							//which keeps things nice and simple.
 		UNIT_HZ,			//Frequency
 		UNIT_VOLTS,			//Voltage
 		UNIT_AMPS,			//Current

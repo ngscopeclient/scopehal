@@ -488,7 +488,7 @@ bool AgilentOscilloscope::AcquireData()
 				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
 
 		//Figure out the sample rate
-		int64_t ps_per_sample = round(xincrement * 1e12f);
+		int64_t fs_per_sample = round(xincrement * FS_PER_SECOND);
 		//LogDebug("%ld ps/sample\n", ps_per_sample);
 
 		//LogDebug("length = %d\n", length);
@@ -496,11 +496,11 @@ bool AgilentOscilloscope::AcquireData()
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = ps_per_sample;
+		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
 		//Ask for the data
 		m_transport->SendCommand(":WAV:DATA?");
@@ -781,8 +781,8 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 			LogWarning("Malformed TRIG:GLIT:RANG response: %s\n", reply.c_str());
 		else
 		{
-			pt->SetLowerBound(stof(lower_bound) * 1e12);
-			pt->SetUpperBound(stof(upper_bound) * 1e12);
+			pt->SetLowerBound(stof(lower_bound) * FS_PER_SECOND);
+			pt->SetUpperBound(stof(upper_bound) * FS_PER_SECOND);
 		}
 
 	}
@@ -790,11 +790,11 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	{
 		//Lower bound
 		m_transport->SendCommand("TRIG:GLIT:GRE?");
-		pt->SetLowerBound(stof(m_transport->ReadReply()) * 1e12);
+		pt->SetLowerBound(stof(m_transport->ReadReply()) * FS_PER_SECOND);
 
 		//Upper bound
 		m_transport->SendCommand("TRIG:GLIT:LESS?");
-		pt->SetUpperBound(stof(m_transport->ReadReply()) * 1e12);
+		pt->SetUpperBound(stof(m_transport->ReadReply()) * FS_PER_SECOND);
 	}
 }
 
@@ -883,14 +883,14 @@ void AgilentOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 	if(trig->GetCondition() == Trigger::CONDITION_BETWEEN)
 	{
 		m_transport->SendCommand("TRIG:GLIT:RANG " +
-			to_string_sci(trig->GetUpperBound() * 1e-12f) +
+			to_string_sci(trig->GetUpperBound() * SECONDS_PER_FS) +
 			"," +
-			to_string_sci(trig->GetLowerBound() * 1e-12f));
+			to_string_sci(trig->GetLowerBound() * SECONDS_PER_FS));
 	}
 	else
 	{
-		PushFloat("TRIG:GLIT:LESS", trig->GetUpperBound() * 1e-12f);
-		PushFloat("TRIG:GLIT:GRE",  trig->GetLowerBound() * 1e-12f);
+		PushFloat("TRIG:GLIT:LESS", trig->GetUpperBound() * SECONDS_PER_FS);
+		PushFloat("TRIG:GLIT:GRE",  trig->GetLowerBound() * SECONDS_PER_FS);
 	}
 }
 

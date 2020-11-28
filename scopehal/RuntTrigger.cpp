@@ -59,7 +59,7 @@ RuntTrigger::RuntTrigger(Oscilloscope* scope)
 	//LeCroy scopes support both min and max limits, so we can specify range operators
 	if(dynamic_cast<LeCroyOscilloscope*>(scope))
 	{
-		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
 		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
@@ -78,7 +78,7 @@ RuntTrigger::RuntTrigger(Oscilloscope* scope)
 		m_parameters[m_slopename].AddEnumValue("Any", EDGE_ANY);
 	}
 
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 }
 
 RuntTrigger::~RuntTrigger()

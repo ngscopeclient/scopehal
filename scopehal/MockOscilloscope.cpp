@@ -473,14 +473,14 @@ bool MockOscilloscope::LoadCSV(const string& path)
 				auto wfm = new AnalogWaveform;
 				wfm->m_timescale = 1;
 				wfm->m_startTimestamp = 0;
-				wfm->m_startPicoseconds = 0;
+				wfm->m_startFemtoseconds = 0;
 				wfm->m_triggerPhase = 0;
 				waveforms.push_back(wfm);
 				GetChannel(i)->SetData(wfm, 0);
 			}
 		}
 
-		int64_t timestamp = row[0] * 1e12;
+		int64_t timestamp = row[0] * FS_PER_SECOND;
 		for(size_t i=0; i<ncols; i++)
 		{
 			if(i+1 >= row.size())

@@ -82,7 +82,7 @@ public:
 	WaveformBase()
 		: m_timescale(0)
 		, m_startTimestamp(0)
-		, m_startPicoseconds(0)
+		, m_startFemtoseconds(0)
 		, m_triggerPhase(0)
 	{}
 
@@ -104,14 +104,14 @@ public:
 	time_t	m_startTimestamp;
 
 	/**
-		@brief Fractional start time of the acquisition (picoseconds since m_startTimestamp)
+		@brief Fractional start time of the acquisition (femtoseconds since m_startTimestamp)
 	 */
-	int64_t m_startPicoseconds;
+	int64_t m_startFemtoseconds;
 
 	/**
-		@brief Phase offset, in picoseconds, from the trigger to the sampling clock.
+		@brief Phase offset, in femtoseconds, from the trigger to the sampling clock.
 	 */
-	double m_triggerPhase;
+	int64_t m_triggerPhase;
 
 	///@brief Start timestamps of each sample
 	std::vector<

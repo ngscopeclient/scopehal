@@ -46,7 +46,7 @@ WindowTrigger::WindowTrigger(Oscilloscope* scope)
 
 	if(dynamic_cast<TektronixOscilloscope*>(scope))
 	{
-		m_parameters[m_widthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+		m_parameters[m_widthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 		m_parameters[m_crossingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 		m_parameters[m_crossingName].AddEnumValue("Upper", CROSS_UPPER);

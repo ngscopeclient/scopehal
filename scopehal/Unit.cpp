@@ -85,37 +85,37 @@ string Unit::PrettyPrint(double value, int sigfigs)
 	switch(m_type)
 	{
 		//Special handling needed since it's not a SI base unit
-		case UNIT_PS:
+		case UNIT_FS:
 			unit = "s";
 
-			if(fabs(value) >= 1e12)
+			if(fabs(value) >= 1e15)
+			{
+				value_rescaled = value / 1e15;
+				scale = "";
+			}
+			else if(fabs(value) >= 1e12)
 			{
 				value_rescaled = value / 1e12;
-				scale = "";
+				scale = "m";
 			}
 			else if(fabs(value) >= 1e9)
 			{
 				value_rescaled = value / 1e9;
-				scale = "m";
+				scale = "μ";
 			}
 			else if(fabs(value) >= 1e6)
 			{
 				value_rescaled = value / 1e6;
-				scale = "μ";
+				scale = "n";
 			}
 			else if(fabs(value) >= 1e3)
 			{
 				value_rescaled = value / 1e3;
-				scale = "n";
-			}
-			else if(fabs(value) >= 1)
-			{
-				value_rescaled = value;
 				scale = "p";
 			}
 			else
 			{
-				value_rescaled = value * 1e3;
+				value_rescaled = value;
 				scale = "f";
 			}
 			break;
@@ -311,8 +311,8 @@ double Unit::ParseString(const string& str)
 	//Apply a unit-specific scaling factor
 	switch(m_type)
 	{
-		case Unit::UNIT_PS:
-			ret *= 1e12;
+		case Unit::UNIT_FS:
+			ret *= 1e15;
 			break;
 
 		case Unit::UNIT_PERCENT:

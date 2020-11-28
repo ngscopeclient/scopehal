@@ -50,7 +50,7 @@ DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
 		m_parameters[m_typename].AddEnumValue("Any", EDGE_ANY);
 
 	m_timename = "Dropout Time";
-	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 	m_resetname = "Reset Mode";
 	if(dynamic_cast<LeCroyOscilloscope*>(scope))

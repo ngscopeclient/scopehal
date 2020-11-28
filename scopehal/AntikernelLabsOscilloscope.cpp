@@ -373,7 +373,7 @@ bool AntikernelLabsOscilloscope::AcquireData()
 	cap->m_triggerPhase = 0;
 	double t = GetTime();
 	cap->m_startTimestamp = floor(t);
-	cap->m_startPicoseconds = (t - cap->m_startTimestamp) * 1e12f;
+	cap->m_startFemtoseconds = (t - cap->m_startTimestamp) * FS_PER_SECOND;
 
 	//Process the samples
 	float fullscale = GetChannelVoltageRange(0);

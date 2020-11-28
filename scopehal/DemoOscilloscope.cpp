@@ -388,28 +388,28 @@ bool DemoOscilloscope::AcquireData()
 	m_sweepFreq += 1e6;
 	if(m_sweepFreq > 1.5e9)
 		m_sweepFreq = 1.1e9;
-	float sweepPeriod = 1e12 / m_sweepFreq;
+	float sweepPeriod = SECONDS_PER_FS / m_sweepFreq;
 
 	//Generate waveforms
 	SequenceSet s;
 	auto depth = GetSampleDepth();
-	int64_t sampleperiod = 1e12 / m_rate;
-	s[m_channels[0]] = m_source.GenerateNoisySinewave(0.9, 0.0, 1000, sampleperiod, depth);
-	s[m_channels[1]] = m_source.GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1000, sweepPeriod, sampleperiod, depth);
-	s[m_channels[2]] = m_source.GeneratePRBS31(0.9, 96.9696, sampleperiod, depth);
-	s[m_channels[3]] = m_source.Generate8b10b(0.9, 800, sampleperiod, depth);
+	int64_t sampleperiod = FS_PER_SECOND / m_rate;
+	s[m_channels[0]] = m_source.GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth);
+	s[m_channels[1]] = m_source.GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth);
+	s[m_channels[2]] = m_source.GeneratePRBS31(0.9, 96969.6, sampleperiod, depth);
+	s[m_channels[3]] = m_source.Generate8b10b(0.9, 800e3, sampleperiod, depth);
 
 	//Timestamp the waveform(s)
 	float now = GetTime();
 	float tfrac = fmodf(now, 1);
 	time_t start = round(now - tfrac);
-	int64_t ps = round(tfrac * 1e12);
+	int64_t fs = round(tfrac * SECONDS_PER_FS);
 	for(auto it : s)
 	{
 		auto wfm = it.second;
 
 		wfm->m_startTimestamp = start;
-		wfm->m_startPicoseconds = ps;
+		wfm->m_startFemtoseconds = fs;
 		wfm->m_triggerPhase = 0;
 	}
 

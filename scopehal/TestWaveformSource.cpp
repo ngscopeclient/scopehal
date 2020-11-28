@@ -307,7 +307,7 @@ void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t samplepe
 	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
 	//Simple channel response model
-	double sample_ghz = 1000.0 / sampleperiod;
+	double sample_ghz = 1e6 / sampleperiod;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	complex<float> pole(0, -FreqToPhase(5e9));
 	float prescale = abs(pole);

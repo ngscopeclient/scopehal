@@ -61,7 +61,7 @@ SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 
 		//Upper interval only present on LeCroy
-		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	}
 
 	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
@@ -75,7 +75,7 @@ SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 	}
 
 	//must come after model specific config since we change parameter names
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 }
 
 SlewRateTrigger::~SlewRateTrigger()

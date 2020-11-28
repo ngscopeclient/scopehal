@@ -634,7 +634,7 @@ bool RigolOscilloscope::AcquireData()
 
 		//LogDebug("Channel %zu\n", i);
 
-		int64_t ps_per_sample = 0;
+		int64_t fs_per_sample = 0;
 
 		if (m_protocol == DS_OLD)
 		{
@@ -652,7 +652,7 @@ bool RigolOscilloscope::AcquireData()
 			m_transport->SendCommand(":TIM:SCAL?");
 			reply = m_transport->ReadReply();
 			sscanf(reply.c_str(), "%lf", &sec_per_sample);
-			ps_per_sample = (sec_per_sample * 12 * 1e12f) / npoints;
+			fs_per_sample = (sec_per_sample * 12 * FS_PER_SECOND) / npoints;
 		}
 		else
 		{
@@ -674,18 +674,18 @@ bool RigolOscilloscope::AcquireData()
 				&yincrement,
 				&yorigin,
 				&yreference);
-			ps_per_sample = round(sec_per_sample * 1e12f);
-			//LogDebug("X: %d points, %f origin, ref %f ps/sample %ld\n", npoints, xorigin, xreference, ps_per_sample);
+			fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
+			//LogDebug("X: %d points, %f origin, ref %f fs/sample %ld\n", npoints, xorigin, xreference, fs_per_sample);
 			//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 		}
 
 		//Set up the capture we're going to store our data into
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = ps_per_sample;
+		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
 		for(size_t npoint = 0; npoint < npoints; )
@@ -1011,7 +1011,7 @@ void RigolOscilloscope::SetTriggerOffset(int64_t offset)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	double offsetval = (double)offset / 1E12;
+	double offsetval = (double)offset / FS_PER_SECOND;
 	char buf[128];
 	snprintf(buf, sizeof(buf), ":TIM:MAIN:OFFS %f", offsetval);
 	m_transport->SendCommand(buf);
@@ -1029,7 +1029,7 @@ int64_t RigolOscilloscope::GetTriggerOffset()
 
 	double offsetval;
 	sscanf(ret.c_str(), "%lf", &offsetval);
-	m_triggerOffset = (uint64_t)(offsetval * 1E12);
+	m_triggerOffset = (uint64_t)(offsetval * FS_PER_SECOND);
 	m_triggerOffsetValid = true;
 	return m_triggerOffset;
 }

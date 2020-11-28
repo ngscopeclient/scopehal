@@ -2067,12 +2067,12 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	float v_off = *reinterpret_cast<float*>(pdesc + 160);
 
 	//cppcheck-suppress invalidPointerCast
-	float interval = *reinterpret_cast<float*>(pdesc + 176) * 1e12f;
+	float interval = *reinterpret_cast<float*>(pdesc + 176) * FS_PER_SECOND;
 
 	//cppcheck-suppress invalidPointerCast
-	double h_off = *reinterpret_cast<double*>(pdesc + 180) * 1e12f;	//ps from start of waveform to trigger
+	double h_off = *reinterpret_cast<double*>(pdesc + 180) * FS_PER_SECOND;	//fs from start of waveform to trigger
 
-	double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+	double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in fs
 	if(h_off_frac < 0)
 		h_off_frac = interval + h_off_frac;		//double h_unit = *reinterpret_cast<double*>(pdesc + 244);
 
@@ -2097,9 +2097,9 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 
 		//Parse the time
 		if(num_sequences > 1)
-			cap->m_startPicoseconds = static_cast<int64_t>( (basetime + wavetime[j*2]) * 1e12f );
+			cap->m_startFemtoseconds = static_cast<int64_t>( (basetime + wavetime[j*2]) * FS_PER_SECOND );
 		else
-			cap->m_startPicoseconds = static_cast<int64_t>(basetime * 1e12f);
+			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
 
 		cap->Resize(num_per_segment);
 
@@ -2326,8 +2326,8 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	//so no sense bringing in a full parser.
 	tmp = data.substr(data.find("<HorPerStep>") + 12);
 	tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
-	float interval = atof(tmp.c_str()) * 1e12f;
-	//LogDebug("Sample interval: %.2f ps\n", interval);
+	float interval = atof(tmp.c_str()) * FS_PER_SECOND;
+	//LogDebug("Sample interval: %.2f fs\n", interval);
 
 	tmp = data.substr(data.find("<NumSamples>") + 12);
 	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
@@ -2363,10 +2363,10 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	epoch.tm_isdst = now.tm_isdst;
 	time_t epoch_stamp = mktime(&epoch);
 
-	//Pull out nanoseconds from the timestamp and convert to picoseconds since that's the scopehal fine time unit
+	//Pull out nanoseconds from the timestamp and convert to femtoseconds since that's the scopehal fine time unit
 	const int64_t ns_per_sec = 1000000000;
 	int64_t start_ns = timestamp % ns_per_sec;
-	int64_t start_ps = 1000 * start_ns;
+	int64_t start_fs = 1000000 * start_ns;
 	int64_t start_sec = (timestamp - start_ns) / ns_per_sec;
 	time_t start_time = epoch_stamp + start_sec;
 
@@ -2392,7 +2392,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
-			cap->m_startPicoseconds = start_ps;
+			cap->m_startFemtoseconds = start_fs;
 
 			//Preallocate memory assuming no deduplication possible
 			cap->Resize(num_samples);
@@ -3139,10 +3139,10 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 		lock_guard<recursive_mutex> lock(m_mutex);
 		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.AcquisitionDuration'");
 		string reply = m_transport->ReadReply();
-		int64_t capture_len_ps = Unit(Unit::UNIT_PS).ParseString(reply);
-		int64_t ps_per_sample = 1000000000000L / GetSampleRate();
+		int64_t capture_len_fs = Unit(Unit::UNIT_FS).ParseString(reply);
+		int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate();
 
-		m_memoryDepth = capture_len_ps / ps_per_sample;
+		m_memoryDepth = capture_len_fs / fs_per_sample;
 		m_memoryDepthValid = true;
 	}
 
@@ -3154,9 +3154,9 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//Calculate the record length we need for this memory depth
-	int64_t ps_per_sample = 1000000000000L / GetSampleRate();
-	int64_t ps_per_acquisition = depth * ps_per_sample;
-	float sec_per_acquisition = ps_per_acquisition * 1e-12;
+	int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate();
+	int64_t fs_per_acquisition = depth * fs_per_sample;
+	float sec_per_acquisition = fs_per_acquisition * SECONDS_PER_FS;
 	float sec_per_div = sec_per_acquisition / 10;
 
 	m_transport->SendCommand(
@@ -3201,10 +3201,10 @@ void LeCroyOscilloscope::SetTriggerOffset(int64_t offset)
 	//Scopehal has offset from the start.
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
-	int64_t halfwidth = static_cast<int64_t>(round(1e12f * halfdepth / rate));
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "TRDL %e", (offset - halfwidth) * 1e-12);
+	snprintf(tmp, sizeof(tmp), "TRDL %e", (offset - halfwidth) * SECONDS_PER_FS);
 	m_transport->SendCommand(tmp);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
@@ -3234,12 +3234,12 @@ int64_t LeCroyOscilloscope::GetTriggerOffset()
 	//Result comes back in scientific notation
 	double sec;
 	sscanf(reply.c_str(), "%le", &sec);
-	m_triggerOffset = static_cast<int64_t>(round(sec * 1e12));
+	m_triggerOffset = static_cast<int64_t>(round(sec * FS_PER_SECOND));
 
 	//Convert from midpoint to start point
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
-	int64_t halfwidth = static_cast<int64_t>(round(1e12f * halfdepth / rate));
+	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 	m_triggerOffset += halfwidth;
 
 	m_triggerOffsetValid = true;
@@ -3258,7 +3258,7 @@ void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS? 'app.Acquisition.%s.Deskew=%e'",
 		m_channels[channel]->GetHwname().c_str(),
-		skew * 1e-12
+		skew * SECONDS_PER_FS
 		);
 	m_transport->SendCommand(tmp);
 
@@ -3290,7 +3290,7 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 	//Value comes back as floating point ps
 	float skew;
 	sscanf(reply.c_str(), "%f", &skew);
-	int64_t skew_ps = round(skew * 1e12f);
+	int64_t skew_ps = round(skew * FS_PER_SECOND);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelDeskew[channel] = skew_ps;
@@ -3592,9 +3592,9 @@ void LeCroyOscilloscope::PullDropoutTrigger()
 	dt->SetLevel(stof(m_transport->ReadReply()));
 
 	//Dropout time
-	Unit ps(Unit::UNIT_PS);
+	Unit fs(Unit::UNIT_FS);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
-	dt->SetDropoutTime(ps.ParseString(m_transport->ReadReply()));
+	dt->SetDropoutTime(fs.ParseString(m_transport->ReadReply()));
 
 	//Edge type
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
@@ -3669,13 +3669,13 @@ void LeCroyOscilloscope::PullGlitchTrigger()
 	gt->SetCondition(GetCondition(m_transport->ReadReply()));
 
 	//Min range
-	Unit ps(Unit::UNIT_PS);
+	Unit fs(Unit::UNIT_FS);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeLow'");
-	gt->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+	gt->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
 
 	//Max range
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeHigh'");
-	gt->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
+	gt->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
 }
 
 /**
@@ -3704,13 +3704,13 @@ void LeCroyOscilloscope::PullPulseWidthTrigger()
 	pt->SetCondition(GetCondition(m_transport->ReadReply()));
 
 	//Min range
-	Unit ps(Unit::UNIT_PS);
+	Unit fs(Unit::UNIT_FS);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeLow'");
-	pt->SetLowerBound(ps.ParseString(m_transport->ReadReply()));
+	pt->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
 
 	//Max range
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeHigh'");
-	pt->SetUpperBound(ps.ParseString(m_transport->ReadReply()));
+	pt->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
@@ -3744,13 +3744,13 @@ void LeCroyOscilloscope::PullRuntTrigger()
 	rt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
 
 	//Lower interval
-	Unit ps(Unit::UNIT_PS);
+	Unit fs(Unit::UNIT_FS);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeLow'");
-	rt->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+	rt->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 	//Upper interval
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeHigh'");
-	rt->SetUpperInterval(ps.ParseString(m_transport->ReadReply()));
+	rt->SetUpperInterval(fs.ParseString(m_transport->ReadReply()));
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.Slope'");
@@ -3792,13 +3792,13 @@ void LeCroyOscilloscope::PullSlewRateTrigger()
 	st->SetUpperBound(v.ParseString(m_transport->ReadReply()));
 
 	//Lower interval
-	Unit ps(Unit::UNIT_PS);
+	Unit fs(Unit::UNIT_FS);
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeLow'");
-	st->SetLowerInterval(ps.ParseString(m_transport->ReadReply()));
+	st->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 	//Upper interval
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeHigh'");
-	st->SetUpperInterval(ps.ParseString(m_transport->ReadReply()));
+	st->SetUpperInterval(fs.ParseString(m_transport->ReadReply()));
 
 	//Slope
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.Slope'");
@@ -4063,7 +4063,7 @@ void LeCroyOscilloscope::PushTrigger()
 void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
 	PushFloat("app.Acquisition.Trigger.Dropout.Level", trig->GetLevel());
-	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
 
 	if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
@@ -4112,8 +4112,8 @@ void LeCroyOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
 	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Width");
 	PushCondition("app.Acquisition.Trigger.Width.Condition", trig->GetCondition());
-	PushFloat("app.Acquisition.Trigger.Width.TimeHigh", trig->GetUpperBound() * 1e-12f);
-	PushFloat("app.Acquisition.Trigger.Width.TimeLow", trig->GetLowerBound() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Width.TimeHigh", trig->GetUpperBound() * SECONDS_PER_FS);
+	PushFloat("app.Acquisition.Trigger.Width.TimeLow", trig->GetLowerBound() * SECONDS_PER_FS);
 }
 
 /**
@@ -4123,8 +4123,8 @@ void LeCroyOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
 {
 	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Glitch");
 	PushCondition("app.Acquisition.Trigger.Glitch.Condition", trig->GetCondition());
-	PushFloat("app.Acquisition.Trigger.Glitch.TimeHigh", trig->GetUpperBound() * 1e-12f);
-	PushFloat("app.Acquisition.Trigger.Glitch.TimeLow", trig->GetLowerBound() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Glitch.TimeHigh", trig->GetUpperBound() * SECONDS_PER_FS);
+	PushFloat("app.Acquisition.Trigger.Glitch.TimeLow", trig->GetLowerBound() * SECONDS_PER_FS);
 }
 
 /**
@@ -4133,8 +4133,8 @@ void LeCroyOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
 void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
 	PushCondition("app.Acquisition.Trigger.Runt.Condition", trig->GetCondition());
-	PushFloat("app.Acquisition.Trigger.Runt.TimeHigh", trig->GetUpperInterval() * 1e-12f);
-	PushFloat("app.Acquisition.Trigger.Runt.TimeLow", trig->GetLowerInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.Runt.TimeHigh", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat("app.Acquisition.Trigger.Runt.TimeLow", trig->GetLowerInterval() * SECONDS_PER_FS);
 	PushFloat("app.Acquisition.Trigger.Runt.UpperLevel", trig->GetUpperBound());
 	PushFloat("app.Acquisition.Trigger.Runt.LowerLevel", trig->GetLowerBound());
 
@@ -4150,8 +4150,8 @@ void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 {
 	PushCondition("app.Acquisition.Trigger.SlewRate.Condition", trig->GetCondition());
-	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperInterval() * 1e-12f);
-	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerInterval() * 1e-12f);
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeHigh", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat("app.Acquisition.Trigger.SlewRate.TimeLow", trig->GetLowerInterval() * SECONDS_PER_FS);
 	PushFloat("app.Acquisition.Trigger.SlewRate.UpperLevel", trig->GetUpperBound());
 	PushFloat("app.Acquisition.Trigger.SlewRate.LowerLevel", trig->GetLowerBound());
 

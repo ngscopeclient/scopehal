@@ -258,9 +258,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				num_sequences = wavedesc->TriggerTimeArrayLen;
 			float v_gain = wavedesc->VerticalGain;
 			float v_off = wavedesc->VerticalOffset;
-			float interval = wavedesc->HorizontalInterval * 1e12f;
-			double h_off = wavedesc->HorizontalOffset * 1e12f;	//ps from start of waveform to trigger
-			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in ps
+			float interval = wavedesc->HorizontalInterval * FS_PER_SECOND;
+			double h_off = wavedesc->HorizontalOffset * FS_PER_SECOND;		//fs from start of waveform to trigger
+			double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in fs
 			if(h_off_frac < 0)
 				h_off_frac = interval + h_off_frac;
 			cap->m_triggerPhase = h_off_frac;	//TODO: handle this properly in segmented mode?
@@ -270,7 +270,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Timestamp is a somewhat complex format that needs some shuffling around.
 			double fseconds = wavedesc->Timestamp.Seconds;
 			uint8_t seconds = floor(wavedesc->Timestamp.Seconds);
-			cap->m_startPicoseconds = static_cast<int64_t>( (fseconds - seconds) * 1e12f );
+			cap->m_startFemtoseconds = static_cast<int64_t>( (fseconds - seconds) * FS_PER_SECOND );
 			time_t tnow = time(NULL);
 			struct tm* now = localtime(&tnow);
 			struct tm tstruc;

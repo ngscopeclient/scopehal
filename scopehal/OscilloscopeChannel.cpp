@@ -58,7 +58,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_index(index)
 	, m_physical(physical)
 	, m_refcount(0)
-	, m_xAxisUnit(Unit::UNIT_PS)
+	, m_xAxisUnit(Unit::UNIT_FS)
 	, m_yAxisUnit(Unit::UNIT_VOLTS)
 {
 	SharedCtorInit();

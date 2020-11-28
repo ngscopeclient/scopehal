@@ -43,9 +43,9 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	, m_lowername("Lower Bound")
 	, m_uppername("Upper Bound")
 {
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_PS));
+	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);

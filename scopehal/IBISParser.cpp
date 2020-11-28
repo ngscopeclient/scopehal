@@ -301,7 +301,7 @@ vector<float> IBISModel::CalculateTurnonCurve(
 	For now, hard coded to PRBS-31 waveform
 
 	@param corner		Process corner to simulate (TODO others)
-	@param timescale	Picoseconds per simulation time step
+	@param timescale	Femtoseconds per simulation time step
 	@param length		Number of time steps to simulate
 	@param ui			Unit interval for the PRBS
  */
@@ -318,7 +318,7 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 	VTCurves* rising = GetHighestRisingWaveform();
 	VTCurves* falling = GetHighestFallingWaveform();
 
-	const float dt = timescale * 1e-12;
+	const float dt = timescale * SECONDS_PER_FS;
 
 	//PRBS-31 generator
 	uint32_t prbs = seed;
@@ -329,7 +329,7 @@ AnalogWaveform* IBISModel::SimulatePRBS(
 	float now = GetTime();
 	float tfrac = fmodf(now, 1);
 	ret->m_startTimestamp = round(now - tfrac);
-	ret->m_startPicoseconds = tfrac * 1e12;
+	ret->m_startFemtoseconds = tfrac * FS_PER_SECOND;
 	ret->m_triggerPhase = 0;
 	ret->Resize(length);
 

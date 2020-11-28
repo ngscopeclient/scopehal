@@ -419,18 +419,18 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Figure out the sample rate
 		double capture_len_sec = xstop - xstart;
 		double sec_per_sample = capture_len_sec / length;
-		int64_t ps_per_sample = round(sec_per_sample * 1e12f);
-		//LogDebug("%ld ps/sample\n", ps_per_sample);
+		int64_t fs_per_sample = round(sec_per_sample * FS_PER_SECOND);
+		//LogDebug("%ld fs/sample\n", fs_per_sample);
 
 		float* temp_buf = new float[length];
 
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
 		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = ps_per_sample;
+		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
-		cap->m_startPicoseconds = (t - floor(t)) * 1e12f;
+		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
 		//Ask for the data
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DATA?");
