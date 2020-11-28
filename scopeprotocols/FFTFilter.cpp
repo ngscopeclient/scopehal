@@ -31,6 +31,7 @@
 #include "../scopehal/AlignedAllocator.h"
 #include "FFTFilter.h"
 #include <immintrin.h>
+#include "../scopehal/avx_mathfun.h"
 
 using namespace std;
 
@@ -139,6 +140,22 @@ void FFTFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts)
+{
+	m_cachedNumPoints = npoints_raw;
+
+	if(m_rdin)
+		g_floatVectorAllocator.deallocate(m_rdin);
+	if(m_rdout)
+		g_floatVectorAllocator.deallocate(m_rdout);
+	if(m_plan)
+		ffts_free(m_plan);
+
+	m_rdin = g_floatVectorAllocator.allocate(npoints);
+	m_rdout = g_floatVectorAllocator.allocate(2*nouts);
+	m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+}
+
 void FFTFilter::Refresh()
 {
 	//Make sure we've got valid inputs
@@ -158,20 +175,7 @@ void FFTFilter::Refresh()
 	//Reallocate buffers if size has changed
 	const size_t nouts = npoints/2 + 1;
 	if(m_cachedNumPoints != npoints_raw)
-	{
-		m_cachedNumPoints = npoints_raw;
-
-		if(m_rdin)
-			g_floatVectorAllocator.deallocate(m_rdin);
-		if(m_rdout)
-			g_floatVectorAllocator.deallocate(m_rdout);
-		if(m_plan)
-			ffts_free(m_plan);
-
-		m_rdin = g_floatVectorAllocator.allocate(npoints);
-		m_rdout = g_floatVectorAllocator.allocate(2*nouts);
-		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-	}
+		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
 	//Copy the input with windowing, then zero pad to the desired input length
@@ -352,7 +356,10 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 	switch(func)
 	{
 		case WINDOW_BLACKMAN_HARRIS:
-			return BlackmanHarrisWindow(data, len, out);
+			if(g_hasAvx2)
+				return BlackmanHarrisWindowAVX2(data, len, out);
+			else
+				return BlackmanHarrisWindow(data, len, out);
 
 		case WINDOW_HANN:
 			return HannWindow(data, len, out);
@@ -370,39 +377,146 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
 {
 	float alpha1 = 1 - alpha0;
+	float scale = 2.0f * (float)M_PI / len;
+
+	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
+	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
 	for(size_t i=0; i<len; i++)
 	{
-		float w = alpha0 - alpha1*cos(2*M_PI*i / len);
+		float w = alpha0 - alpha1*cosf(i*scale);
+		aligned_out[i] = w * aligned_data[i];
+	}
+}
+
+__attribute__((target("avx2")))
+void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0)
+{
+	float alpha1 = 1 - alpha0;
+	float scale = 2.0f * (float)M_PI / len;
+
+	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
+	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
+
+	__m256 count_x8		= { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f };
+	__m256 eights_x8	= { 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f };
+	__m256 scale_x8		= { scale, scale, scale, scale, scale, scale, scale, scale };
+	__m256 alpha0_x8	= { alpha0, alpha0, alpha0, alpha0, alpha0, alpha0, alpha0, alpha0 };
+	__m256 alpha1_x8	= { alpha1, alpha1, alpha1, alpha1, alpha1, alpha1, alpha1, alpha1 };
+
+	size_t i;
+	size_t len_rounded = len - (len % 8);
+	for(i=0; i<len_rounded; i += 8)
+	{
+		__m256 vscale	= _mm256_mul_ps(count_x8, scale_x8);
+		__m256 vcos		= _mm256_cos_ps(vscale);
+		__m256 rhs 		= _mm256_mul_ps(vcos, alpha1_x8);
+		__m256 w		= _mm256_sub_ps(alpha0_x8, rhs);
+
+		__m256 din		= _mm256_load_ps(aligned_data + i);
+		__m256 dout		= _mm256_mul_ps(din, w);
+		_mm256_store_ps(aligned_out + i, dout);
+
+		count_x8 = _mm256_add_ps(count_x8, eights_x8);
+	}
+
+	//Last few iterations
+	for(; i<len; i++)
+	{
+		float w = alpha0 - alpha1*cosf(i*scale);
 		out[i] = w * data[i];
 	}
 }
 
-//TODO: vectorization
 void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 {
 	float alpha0 = 0.35875;
 	float alpha1 = 0.48829;
 	float alpha2 = 0.14128;
 	float alpha3 = 0.01168;
+	float scale = 2 *(float)M_PI / len;
 
 	for(size_t i=0; i<len; i++)
 	{
-		float num = 2*M_PI*i / len;
+		float num = i * scale;
 		float w =
 			alpha0 -
-			alpha1 * cos(num) +
-			alpha2 * cos(2*num) -
-			alpha3 * cos(6*num);
+			alpha1 * cosf(num) +
+			alpha2 * cosf(2*num) -
+			alpha3 * cosf(6*num);
+		out[i] = w * data[i];
+	}
+}
+
+__attribute__((target("avx2")))
+void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out)
+{
+	float alpha0 = 0.35875;
+	float alpha1 = 0.48829;
+	float alpha2 = 0.14128;
+	float alpha3 = 0.01168;
+	float scale = 2 *(float)M_PI / len;
+
+	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
+	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
+
+	__m256 count_x8		= { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f };
+	__m256 eights_x8	= { 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f };
+	__m256 scale_x8		= { scale, scale, scale, scale, scale, scale, scale, scale };
+	__m256 alpha0_x8	= { alpha0, alpha0, alpha0, alpha0, alpha0, alpha0, alpha0, alpha0 };
+	__m256 alpha1_x8	= { alpha1, alpha1, alpha1, alpha1, alpha1, alpha1, alpha1, alpha1 };
+	__m256 alpha2_x8	= { alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2 };
+	__m256 alpha3_x8	= { alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3 };
+	__m256 two_x8		= { 2, 2, 2, 2, 2, 2, 2, 2 };
+
+	size_t i;
+	size_t len_rounded = len - (len % 8);
+	for(i=0; i<len_rounded; i += 8)
+	{
+		__m256 vscale		= _mm256_mul_ps(count_x8, scale_x8);
+		__m256 vscale_x2	= _mm256_mul_ps(vscale, two_x8);
+		__m256 vscale_x3	= _mm256_add_ps(vscale, vscale_x2);
+
+		__m256 term1		= _mm256_cos_ps(vscale);
+		__m256 term2		= _mm256_cos_ps(vscale_x2);
+		__m256 term3		= _mm256_cos_ps(vscale_x3);
+		term1 				= _mm256_mul_ps(term1, alpha1_x8);
+		term2 				= _mm256_mul_ps(term2, alpha2_x8);
+		term3 				= _mm256_mul_ps(term3, alpha3_x8);
+		__m256 w			= _mm256_sub_ps(alpha0_x8, term1);
+		w					= _mm256_add_ps(w, term2);
+		w					= _mm256_add_ps(w, term3);
+
+		__m256 din			= _mm256_load_ps(aligned_data + i);
+		__m256 dout			= _mm256_mul_ps(din, w);
+		_mm256_store_ps(aligned_out + i, dout);
+
+		count_x8 = _mm256_add_ps(count_x8, eights_x8);
+	}
+
+	for(; i<len; i++)
+	{
+		float num = i * scale;
+		float w =
+			alpha0 -
+			alpha1 * cosf(num) +
+			alpha2 * cosf(2*num) -
+			alpha3 * cosf(3*num);
 		out[i] = w * data[i];
 	}
 }
 
 void FFTFilter::HannWindow(const float* data, size_t len, float* out)
 {
-	CosineSumWindow(data, len, out, 0.5);
+	if(g_hasAvx2)
+		CosineSumWindowAVX2(data, len, out, 0.5);
+	else
+		CosineSumWindow(data, len, out, 0.5);
 }
 
 void FFTFilter::HammingWindow(const float* data, size_t len, float* out)
 {
-	CosineSumWindow(data, len, out, 25.0f / 46);
+	if(g_hasAvx2)
+		CosineSumWindowAVX2(data, len, out, 25.0f / 46);
+	else
+		CosineSumWindow(data, len, out, 25.0f / 46);
 }

@@ -71,13 +71,17 @@ public:
 	static void HannWindow(const float* data, size_t len, float* out);
 	static void HammingWindow(const float* data, size_t len, float* out);
 	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
+	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
 	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
+	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
 
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
 	void NormalizeOutput(AnalogWaveform* cap, size_t nouts, size_t npoints);
 	void NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints);
+
+	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
 	size_t m_cachedNumPoints;
 	float* m_rdin;
