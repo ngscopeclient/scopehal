@@ -73,6 +73,11 @@ string Unit::PrettyPrint(double value, int sigfigs)
 	else if(fabs(value) < 1e-9)
 	{
 		value_rescaled *= 1e9;
+		scale = "n";
+	}
+	else if(fabs(value) < 1e-12)
+	{
+		value_rescaled *= 1e12;
 		scale = "p";
 	}
 
@@ -103,10 +108,15 @@ string Unit::PrettyPrint(double value, int sigfigs)
 				value_rescaled = value / 1e3;
 				scale = "n";
 			}
-			else
+			else if(fabs(value) >= 1)
 			{
 				value_rescaled = value;
 				scale = "p";
+			}
+			else
+			{
+				value_rescaled = value * 1e3;
+				scale = "f";
 			}
 			break;
 
@@ -287,6 +297,8 @@ double Unit::ParseString(const string& str)
 			scale = 1e-9;
 		else if(c == 'p')
 			scale = 1e-12;
+		else if(c == 'f')
+			scale = 1e-15;
 
 		break;
 	}
