@@ -156,7 +156,8 @@ void HistogramFilter::Refresh()
 	}
 
 	//Calculate histogram for our incoming data
-	size_t bins = ceil(range);
+	//For now, 100fs per bin target
+	size_t bins = ceil(range) / 100;
 	auto data = MakeHistogram(din, m_min, m_max, bins);
 
 	//Calculate bin configuration.

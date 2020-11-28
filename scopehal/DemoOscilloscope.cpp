@@ -388,7 +388,7 @@ bool DemoOscilloscope::AcquireData()
 	m_sweepFreq += 1e6;
 	if(m_sweepFreq > 1.5e9)
 		m_sweepFreq = 1.1e9;
-	float sweepPeriod = SECONDS_PER_FS / m_sweepFreq;
+	float sweepPeriod = FS_PER_SECOND / m_sweepFreq;
 
 	//Generate waveforms
 	SequenceSet s;
@@ -403,7 +403,7 @@ bool DemoOscilloscope::AcquireData()
 	float now = GetTime();
 	float tfrac = fmodf(now, 1);
 	time_t start = round(now - tfrac);
-	int64_t fs = round(tfrac * SECONDS_PER_FS);
+	int64_t fs = round(tfrac * FS_PER_SECOND);
 	for(auto it : s)
 	{
 		auto wfm = it.second;

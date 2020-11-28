@@ -122,9 +122,9 @@ void VerticalBathtub::Refresh()
 	int64_t timestamp = m_parameters[m_timeName].GetIntVal();
 
 	//Find the eye bin for this column
-	double ps_per_width = 2*eye->m_uiWidth;
-	double ps_per_pixel = ps_per_width / eye->GetWidth();
-	size_t xbin = round( (timestamp + eye->m_uiWidth) / ps_per_pixel );
+	double fs_per_width = 2*eye->m_uiWidth;
+	double fs_per_pixel = fs_per_width / eye->GetWidth();
+	size_t xbin = round( (timestamp + eye->m_uiWidth) / fs_per_pixel );
 
 	/*
 	float ymid = din->GetHeight()/2;
