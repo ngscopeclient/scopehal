@@ -39,6 +39,7 @@ using namespace std;
 
 FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	, m_windowName("Window")
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	m_yAxisUnit = Unit(Unit::UNIT_DBM);
@@ -54,6 +55,13 @@ FFTFilter::FFTFilter(const string& color)
 	//Default config
 	m_range = 70;
 	m_offset = 35;
+
+	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", WINDOW_BLACKMAN_HARRIS);
+	m_parameters[m_windowName].AddEnumValue("Hamming", WINDOW_HAMMING);
+	m_parameters[m_windowName].AddEnumValue("Hann", WINDOW_HANN);
+	m_parameters[m_windowName].AddEnumValue("Rectangular", WINDOW_RECTANGULAR);
+	m_parameters[m_windowName].SetIntVal(WINDOW_HAMMING);
 }
 
 FFTFilter::~FFTFilter()
@@ -164,9 +172,14 @@ void FFTFilter::Refresh()
 		m_rdout = g_floatVectorAllocator.allocate(2*nouts);
 		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 	}
+	LogTrace("Output: %zu\n", nouts);
 
-	//Copy the input, then zero pad the rest
-	memcpy(m_rdin, &din->m_samples[0], npoints_raw * sizeof(float));
+	//Copy the input with windowing, then zero pad to the desired input length
+	ApplyWindow(
+		(float*)&din->m_samples[0],
+		npoints_raw,
+		m_rdin,
+		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
 	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
 
 	//Calculate the FFT
@@ -182,6 +195,7 @@ void FFTFilter::Refresh()
 	double sample_ghz = 1000 / ps;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	cap->m_timescale = bin_hz;
+	LogTrace("bin_hz: %f\n", bin_hz);
 
 	//Normalize magnitudes
 	cap->Resize(nouts);
@@ -196,6 +210,9 @@ void FFTFilter::Refresh()
 	//Done
 	SetData(cap, 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Normalization
 
 /**
 	@brief Normalize FFT output (unoptimized C++ implementation)
@@ -325,4 +342,67 @@ void FFTFilter::NormalizeOutputAVX2(AnalogWaveform* cap, size_t nouts, size_t np
 		//Convert to dBm
 		pout[k] = (10 * log10(voltage*voltage / impedance) + 30);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Window functions
+
+void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFunction func)
+{
+	switch(func)
+	{
+		case WINDOW_BLACKMAN_HARRIS:
+			return BlackmanHarrisWindow(data, len, out);
+
+		case WINDOW_HANN:
+			return HannWindow(data, len, out);
+
+		case WINDOW_HAMMING:
+			return HammingWindow(data, len, out);
+
+		case WINDOW_RECTANGULAR:
+		default:
+			memcpy(out, data, len * sizeof(float));
+	}
+}
+
+//TODO: vectorization
+void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
+{
+	float alpha1 = 1 - alpha0;
+	for(size_t i=0; i<len; i++)
+	{
+		float w = alpha0 - alpha1*cos(2*M_PI*i / len);
+		out[i] = w * data[i];
+	}
+}
+
+//TODO: vectorization
+void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
+{
+	float alpha0 = 0.35875;
+	float alpha1 = 0.48829;
+	float alpha2 = 0.14128;
+	float alpha3 = 0.01168;
+
+	for(size_t i=0; i<len; i++)
+	{
+		float num = 2*M_PI*i / len;
+		float w =
+			alpha0 -
+			alpha1 * cos(num) +
+			alpha2 * cos(2*num) -
+			alpha3 * cos(6*num);
+		out[i] = w * data[i];
+	}
+}
+
+void FFTFilter::HannWindow(const float* data, size_t len, float* out)
+{
+	CosineSumWindow(data, len, out, 0.5);
+}
+
+void FFTFilter::HammingWindow(const float* data, size_t len, float* out)
+{
+	CosineSumWindow(data, len, out, 25.0f / 46);
 }

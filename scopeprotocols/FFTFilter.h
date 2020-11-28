@@ -58,6 +58,21 @@ public:
 	virtual void SetVoltageRange(double range);
 	virtual void SetOffset(double offset);
 
+	enum WindowFunction
+	{
+		WINDOW_RECTANGULAR,
+		WINDOW_HANN,
+		WINDOW_HAMMING,
+		WINDOW_BLACKMAN_HARRIS
+	};
+
+	//Window function helpers
+	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
+	static void HannWindow(const float* data, size_t len, float* out);
+	static void HammingWindow(const float* data, size_t len, float* out);
+	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
+	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
+
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
@@ -71,6 +86,8 @@ protected:
 
 	float m_range;
 	float m_offset;
+
+	std::string m_windowName;
 };
 
 #endif
