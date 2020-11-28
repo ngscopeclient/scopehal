@@ -55,9 +55,6 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(ClockRecoveryFilter)
 
-	//Debug
-	int64_t m_nominalPeriod;
-
 protected:
 	std::string m_baudname;
 	std::string m_threshname;

@@ -49,8 +49,6 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
-
-	m_nominalPeriod = 0;
 }
 
 ClockRecoveryFilter::~ClockRecoveryFilter()
@@ -130,7 +128,7 @@ void ClockRecoveryFilter::Refresh()
 	auto gate = GetDigitalInputWaveform(1);
 
 	//Timestamps of the edges
-	vector<double> edges;
+	vector<int64_t> edges;
 	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
 	if(edges.empty())
 	{
@@ -138,11 +136,8 @@ void ClockRecoveryFilter::Refresh()
 		return;
 	}
 
-	//Convert nominal baud period to fs
-	//Round nominal period to nearest fs, but use the floating point value for the CDR PLL
-	float period = FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal();
-	int64_t fs = round(period);
-	m_nominalPeriod = fs;
+	//Get nominal period used for the first cycle of the NCO
+	int64_t period = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
 
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
@@ -156,9 +151,9 @@ void ClockRecoveryFilter::Refresh()
 	int64_t tend = din->m_offsets[din->m_offsets.size() - 1] * din->m_timescale;
 	size_t nedge = 1;
 	//LogDebug("n, delta, period, freq_ghz\n");
-	double edgepos = edges[0];
+	int64_t edgepos = edges[0];
 	bool value = false;
-	double total_error = 0;
+	int64_t total_error = 0;
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 	bool gating = false;
@@ -166,7 +161,7 @@ void ClockRecoveryFilter::Refresh()
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
-		double edgepos_orig = edgepos;
+		int64_t edgepos_orig = edgepos;
 
 		//See if the current edge position is within a gating region
 		bool was_gating = gating;
@@ -200,12 +195,12 @@ void ClockRecoveryFilter::Refresh()
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
-		double tnext = edges[nedge];
+		int64_t tnext = edges[nedge];
 		cycles_open_loop ++;
 		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
 			//Find phase error
-			double delta = (edgepos - tnext) - period;
+			int64_t delta = (edgepos - tnext) - period;
 			total_error += fabs(delta);
 
 			//If the clock is currently gated, re-sync to the edge
@@ -214,15 +209,19 @@ void ClockRecoveryFilter::Refresh()
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 			//If we skipped some edges, apply a larger correction
-			else if(delta > 0)
-			{
-				period  -= 0.000025 * period * cycles_open_loop;
-				edgepos -= 0.0025 * period * cycles_open_loop;
-			}
 			else
 			{
-				period  += 0.000025 * period * cycles_open_loop;
-				edgepos += 0.0025 * period * cycles_open_loop;
+				int64_t cperiod = period * cycles_open_loop;
+				if(delta > 0)
+				{
+					period  -= cperiod / 40000;
+					edgepos -= cperiod / 400;
+				}
+				else
+				{
+					period  += cperiod / 40000;
+					edgepos += cperiod / 400;
+				}
 			}
 
 			cycles_open_loop = 0;
@@ -236,14 +235,14 @@ void ClockRecoveryFilter::Refresh()
 		{
 			value = !value;
 
-			cap->m_offsets.push_back(static_cast<int64_t>(round(edgepos_orig + period/2 - din->m_timescale*1.5)));
+			cap->m_offsets.push_back(edgepos_orig + period/2 - din->m_timescale*1.5);
 			cap->m_durations.push_back(period);
 			cap->m_samples.push_back(value);
 		}
 	}
 
 	total_error /= edges.size();
-	LogTrace("average phase error %.1f\n", total_error);
+	LogTrace("average phase error %zu\n", total_error);
 
 	SetData(cap, 0);
 }
