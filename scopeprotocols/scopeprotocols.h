@@ -114,6 +114,7 @@
 #include "SWDDecoder.h"
 #include "SWDMemAPDecoder.h"
 #include "TachometerFilter.h"
+#include "TappedDelayLineFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"
 #include "TMDSDecoder.h"

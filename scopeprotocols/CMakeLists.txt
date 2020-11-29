@@ -78,6 +78,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SWDDecoder.cpp
 	SWDMemAPDecoder.cpp
 	TachometerFilter.cpp
+	TappedDelayLineFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	TMDSDecoder.cpp
