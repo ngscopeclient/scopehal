@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
+#include "EmphasisRemovalFilter.h"
 #include "TappedDelayLineFilter.h"
 
 using namespace std;
@@ -35,18 +36,11 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
-	, m_tapDelayName("Tap Delay")
-	, m_tapCountName("Tap Count")
-	, m_tap0Name("Tap Value 0")
-	, m_tap1Name("Tap Value 1")
-	, m_tap2Name("Tap Value 2")
-	, m_tap3Name("Tap Value 3")
-	, m_tap4Name("Tap Value 4")
-	, m_tap5Name("Tap Value 5")
-	, m_tap6Name("Tap Value 6")
-	, m_tap7Name("Tap Value 7")
+EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+	, m_dataRateName("Data Rate")
+	, m_emphasisTypeName("Emphasis Type")
+	, m_emphasisAmountName("Emphasis Amount")
 {
 	CreateInput("in");
 
@@ -55,41 +49,21 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
 
-	m_parameters[m_tapDelayName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_tapDelayName].SetIntVal(200000);
+	m_parameters[m_dataRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_parameters[m_dataRateName].SetIntVal(5e9);
 
-	m_parameters[m_tapCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tapCountName].SetIntVal(1);
+	m_parameters[m_emphasisTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_emphasisTypeName].AddEnumValue("De-emphasis", DE_EMPHASIS);
+	m_parameters[m_emphasisTypeName].SetIntVal(DE_EMPHASIS);
 
-	m_parameters[m_tap0Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap0Name].SetFloatVal(1);
-
-	m_parameters[m_tap1Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap1Name].SetFloatVal(0);
-
-	m_parameters[m_tap2Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap2Name].SetFloatVal(0);
-
-	m_parameters[m_tap3Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap3Name].SetFloatVal(0);
-
-	m_parameters[m_tap4Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap4Name].SetFloatVal(0);
-
-	m_parameters[m_tap5Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap5Name].SetFloatVal(0);
-
-	m_parameters[m_tap6Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap6Name].SetFloatVal(0);
-
-	m_parameters[m_tap7Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tap7Name].SetFloatVal(0);
+	m_parameters[m_emphasisAmountName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_parameters[m_emphasisAmountName].SetFloatVal(6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool EmphasisRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -103,7 +77,7 @@ bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void TappedDelayLineFilter::ClearSweeps()
+void EmphasisRemovalFilter::ClearSweeps()
 {
 	m_range = 1;
 	m_offset = 0;
@@ -111,36 +85,38 @@ void TappedDelayLineFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-void TappedDelayLineFilter::SetDefaultName()
+void EmphasisRemovalFilter::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "TappedDelayLine(%s)", GetInputDisplayName(0).c_str());
+	snprintf(hwname, sizeof(hwname), "EmphasisRemoval(%s, %s)",
+		GetInputDisplayName(0).c_str(),
+		m_parameters[m_emphasisAmountName].ToString().c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string TappedDelayLineFilter::GetProtocolName()
+string EmphasisRemovalFilter::GetProtocolName()
 {
-	return "Tapped Delay Line";
+	return "Emphasis Removal";
 }
 
-bool TappedDelayLineFilter::IsOverlay()
+bool EmphasisRemovalFilter::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool TappedDelayLineFilter::NeedsConfig()
+bool EmphasisRemovalFilter::NeedsConfig()
 {
 	return true;
 }
 
-double TappedDelayLineFilter::GetVoltageRange()
+double EmphasisRemovalFilter::GetVoltageRange()
 {
 	return m_range;
 }
 
-double TappedDelayLineFilter::GetOffset()
+double EmphasisRemovalFilter::GetOffset()
 {
 	return m_offset;
 }
@@ -148,9 +124,16 @@ double TappedDelayLineFilter::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TappedDelayLineFilter::Refresh()
+void EmphasisRemovalFilter::Refresh()
 {
 	if(!VerifyAllInputsOKAndAnalog())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Only de-emphasis is implemented for now
+	if(m_parameters[m_emphasisTypeName].GetIntVal() != DE_EMPHASIS)
 	{
 		SetData(NULL, 0);
 		return;
@@ -174,70 +157,31 @@ void TappedDelayLineFilter::Refresh()
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
 
-	//Get the tap config
-	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();
-	int64_t tap_count = m_parameters[m_tapCountName].GetIntVal();
-	tap_count = min(tap_count, (int64_t)8);
+	//Convert data rate to tap delay
+	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
 
-	//Extract tap values
-	float taps[8] =
-	{
-		m_parameters[m_tap0Name].GetFloatVal(),
-		m_parameters[m_tap1Name].GetFloatVal(),
-		m_parameters[m_tap2Name].GetFloatVal(),
-		m_parameters[m_tap3Name].GetFloatVal(),
-		m_parameters[m_tap4Name].GetFloatVal(),
-		m_parameters[m_tap5Name].GetFloatVal(),
-		m_parameters[m_tap6Name].GetFloatVal(),
-		m_parameters[m_tap7Name].GetFloatVal()
-	};
+	//Calculate the tap values
+	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
+	const int64_t tap_count = 8;
+	float db = m_parameters[m_emphasisAmountName].GetFloatVal();
+	float coeff = 0.5 * pow(10, -db/20);
+	float c = coeff + 0.5;
+	float p = coeff - 0.5;
+	float p_over_c = p / c;
+	float taps[tap_count] = {0};
+
+	taps[0] = 1/c;
+	for(int64_t i=1; i<tap_count; i++)
+		taps[i] = -p_over_c * taps[i-1];
 
 	//Run the actual filter
 	float vmin;
 	float vmax;
-	DoFilterKernel(tap_count, tap_delay, taps, din, cap, vmin, vmax);
+	TappedDelayLineFilter::DoFilterKernel(tap_count, tap_delay, taps, din, cap, vmin, vmax);
 
 	//Calculate bounds
 	m_max = max(m_max, vmax);
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = -( (m_max - m_min)/2 + m_min );
-}
-
-void TappedDelayLineFilter::DoFilterKernel(
-	int64_t tap_count,
-	int64_t tap_delay,
-	float* taps,
-	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
-{
-	//For now, no resampling. Assume tap delay is an integer number of samples.
-	int64_t samples_per_tap = tap_delay / cap->m_timescale;
-
-	//Setup
-	vmin = FLT_MAX;
-	vmax = -FLT_MAX;
-	size_t len = din->m_samples.size();
-	size_t filterlen = 8*samples_per_tap;
-	size_t end = len - filterlen;
-	cap->Resize(end);
-	int64_t jstart = 8 - tap_count;
-
-	//Do the filter
-	//#pragma omp parallel for
-	for(size_t i=0; i<end; i++)
-	{
-		float v = 0;
-		for(int64_t j=jstart; j<tap_count; j++)
-			v += din->m_samples[i + j*samples_per_tap] * taps[7 - j];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
-
-		cap->m_offsets[i]	= din->m_offsets[i+filterlen];
-		cap->m_durations[i] = din->m_durations[i+filterlen];
-		cap->m_samples[i]	= v;
-	}
 }

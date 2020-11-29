@@ -64,6 +64,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DSIPacketDecoder);
 	AddDecoderClass(DutyCycleMeasurement);
 	AddDecoderClass(DVIDecoder);
+	AddDecoderClass(EmphasisRemovalFilter);
 	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
 	AddDecoderClass(Ethernet1000BaseXDecoder);
