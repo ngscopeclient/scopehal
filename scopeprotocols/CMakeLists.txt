@@ -50,6 +50,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	HorizontalBathtub.cpp
 	I2CDecoder.cpp
 	I2CEepromDecoder.cpp
+	I2SDecoder.cpp
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	JitterSpectrumFilter.cpp
