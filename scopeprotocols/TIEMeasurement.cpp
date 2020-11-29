@@ -37,6 +37,7 @@ using namespace std;
 TIEMeasurement::TIEMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 	, m_threshname("Threshold")
+	, m_skipname("Skip Start")
 {
 	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
@@ -44,10 +45,13 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	CreateInput("Clock");
 	CreateInput("Golden");
 
-	m_maxTie = 1;
+	ClearSweeps();
 
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
+
+	m_parameters[m_skipname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_skipname].SetIntVal(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,11 +102,24 @@ bool TIEMeasurement::NeedsConfig()
 
 double TIEMeasurement::GetVoltageRange()
 {
-	return m_maxTie * 2;
+	return m_range;
+}
+
+double TIEMeasurement::GetOffset()
+{
+	return m_offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+void TIEMeasurement::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
+}
 
 void TIEMeasurement::Refresh()
 {
@@ -124,7 +141,11 @@ void TIEMeasurement::Refresh()
 	vector<int64_t> edges;
 	FindZeroCrossings(clk, m_parameters[m_threshname].GetFloatVal(), edges);
 
-	m_maxTie = 1;
+	//Ignore edges before things have stabilized
+	int64_t skip_time = m_parameters[m_skipname].GetIntVal();
+
+	int64_t vmin = FS_PER_SECOND;
+	int64_t vmax = -FS_PER_SECOND;
 
 	//For each input clock edge, find the closest recovered clock edge
 	size_t iedge = 0;
@@ -180,15 +201,25 @@ void TIEMeasurement::Refresh()
 		golden_center += 1.5*clk->m_timescale;			//TODO: why is this needed?
 		int64_t tie = atime - golden_center;
 
-		//Update the last sample
-		size_t end = cap->m_durations.size();
-		if(end)
-			cap->m_durations[end-1] = atime - tlast;
+		//Ignore edges before things have stabilized
+		if(prev_edge < skip_time)
+		{}
 
-		m_maxTie = max(m_maxTie, fabs(tie));
-		cap->m_offsets.push_back(atime);
-		cap->m_durations.push_back(0);
-		cap->m_samples.push_back(tie);
+		else
+		{
+			//Update the last sample
+			size_t end = cap->m_durations.size();
+			if(end)
+				cap->m_durations[end-1] = atime - tlast;
+
+			vmax = max(vmax, tie);
+			vmin = min(vmin, tie);
+
+			cap->m_offsets.push_back(atime);
+			cap->m_durations.push_back(0);
+			cap->m_samples.push_back(tie);
+		}
+
 		tlast = atime;
 	}
 
@@ -198,4 +229,10 @@ void TIEMeasurement::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = 0;
+
+	//Calculate bounds
+	m_max = max(m_max, (float)vmax);
+	m_min = min(m_min, (float)vmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
 }
