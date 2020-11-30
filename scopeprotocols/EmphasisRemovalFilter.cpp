@@ -54,6 +54,7 @@ EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 
 	m_parameters[m_emphasisTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_emphasisTypeName].AddEnumValue("De-emphasis", DE_EMPHASIS);
+	m_parameters[m_emphasisTypeName].AddEnumValue("Pre-emphasis", PRE_EMPHASIS);
 	m_parameters[m_emphasisTypeName].SetIntVal(DE_EMPHASIS);
 
 	m_parameters[m_emphasisAmountName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
@@ -132,13 +133,6 @@ void EmphasisRemovalFilter::Refresh()
 		return;
 	}
 
-	//Only de-emphasis is implemented for now
-	if(m_parameters[m_emphasisTypeName].GetIntVal() != DE_EMPHASIS)
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
 	//Get the input data
 	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
@@ -164,7 +158,8 @@ void EmphasisRemovalFilter::Refresh()
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
 	const int64_t tap_count = 8;
 	float db = m_parameters[m_emphasisAmountName].GetFloatVal();
-	float coeff = 0.5 * pow(10, -db/20);
+	float emphasisLevel = pow(10, -db/20);
+	float coeff = 0.5 * emphasisLevel;
 	float c = coeff + 0.5;
 	float p = coeff - 0.5;
 	float p_over_c = p / c;
@@ -173,6 +168,14 @@ void EmphasisRemovalFilter::Refresh()
 	taps[0] = 1/c;
 	for(int64_t i=1; i<tap_count; i++)
 		taps[i] = -p_over_c * taps[i-1];
+
+	//If we're doing pre-emphasis rather than de-emphasis, we need to scale everything accordingly.
+	auto type = static_cast<EmphasisType>(m_parameters[m_emphasisTypeName].GetIntVal());
+	if(type == PRE_EMPHASIS)
+	{
+		for(int64_t i=0; i<tap_count; i++)
+			taps[i] *= emphasisLevel;
+	}
 
 	//Run the actual filter
 	float vmin;
