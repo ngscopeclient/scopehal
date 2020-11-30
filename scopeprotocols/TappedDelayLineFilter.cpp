@@ -29,6 +29,7 @@
 
 #include "scopeprotocols.h"
 #include "TappedDelayLineFilter.h"
+#include <immintrin.h>
 
 using namespace std;
 
@@ -249,6 +250,7 @@ void TappedDelayLineFilter::DoFilterKernelGeneric(
 	}
 }
 
+__attribute__((target("avx2")))
 void TappedDelayLineFilter::DoFilterKernelAVX2(
 	int64_t tap_delay,
 	float* taps,
@@ -272,12 +274,99 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 	memcpy(&cap->m_offsets[0], &din->m_offsets[filterlen], end*sizeof(int64_t));
 	memcpy(&cap->m_durations[0], &din->m_durations[filterlen], end*sizeof(int64_t));
 
-	//Do the filter
-	for(size_t i=0; i<end; i++)
+	//Reverse the taps
+	float taps_reversed[8] =
+	{ taps[7], taps[6], taps[5], taps[4], taps[3], taps[2], taps[1], taps[0] };
+
+	//I/O pointers
+	float* pin = (float*)&din->m_samples[0];
+	float* pout = (float*)&cap->m_samples[0];
+	size_t end_rounded = end - (end % 8);
+	size_t i=0;
+
+	__m256 vmin_x8 = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+	__m256 vmax_x8 = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+	//Vector loop.
+	//The filter is hard to vectorize because of striding.
+	//So rather than vectorizing the inner loop, we unroll it and vectorize 8 output samples at a time.
+	for(; i<end_rounded; i += 8)
 	{
-		float v = 0;
-		for(int64_t j=0; j<8; j++)
-			v += din->m_samples[i + j*samples_per_tap] * taps[7 - j];
+		//Load the first half of the inputs and coefficients
+		//The first sample is guaranteed to be aligned. Subsequent ones may not be.
+		//7 clock latency for all loads/broadcasts on Skylake,
+		//and 2 IPC throughput.
+		float* base = pin + i;
+		__m256 vin0 = _mm256_load_ps(base);
+		__m256 tap0 = _mm256_broadcast_ss(&taps_reversed[0]);
+		__m256 vin1 = _mm256_loadu_ps(base + samples_per_tap);
+		__m256 tap1 = _mm256_broadcast_ss(&taps_reversed[1]);
+		__m256 vin2 = _mm256_loadu_ps(base + 2*samples_per_tap);
+		__m256 tap2 = _mm256_broadcast_ss(&taps_reversed[2]);
+		__m256 vin3 = _mm256_loadu_ps(base + 3*samples_per_tap);
+		__m256 tap3 = _mm256_broadcast_ss(&taps_reversed[3]);
+
+		//Calculate the results for the first half
+		__m256 prod0 = _mm256_mul_ps(vin0, tap0);
+		__m256 prod1 = _mm256_mul_ps(vin1, tap1);
+		__m256 prod2 = _mm256_mul_ps(vin2, tap2);
+		__m256 prod3 = _mm256_mul_ps(vin3, tap3);
+		__m256 v01 = _mm256_add_ps(prod0, prod1);
+		__m256 v23 = _mm256_add_ps(prod2, prod3);
+
+		//Now we can load the second half and repeat the process
+		__m256 vin4 = _mm256_loadu_ps(base + 4*samples_per_tap);
+		__m256 tap4 = _mm256_broadcast_ss(&taps_reversed[4]);
+		__m256 vin5 = _mm256_loadu_ps(base + 5*samples_per_tap);
+		__m256 tap5 = _mm256_broadcast_ss(&taps_reversed[5]);
+		__m256 vin6 = _mm256_loadu_ps(base + 6*samples_per_tap);
+		__m256 tap6 = _mm256_broadcast_ss(&taps_reversed[6]);
+		__m256 vin7 = _mm256_loadu_ps(base + 7*samples_per_tap);
+		__m256 tap7 = _mm256_broadcast_ss(&taps_reversed[7]);
+
+		//Calculate the results for the first half
+		__m256 prod4 = _mm256_mul_ps(vin4, tap4);
+		__m256 prod5 = _mm256_mul_ps(vin5, tap5);
+		__m256 prod6 = _mm256_mul_ps(vin6, tap6);
+		__m256 prod7 = _mm256_mul_ps(vin7, tap7);
+		__m256 v45 = _mm256_add_ps(prod4, prod5);
+		__m256 v67 = _mm256_add_ps(prod6, prod7);
+
+		//Final summations
+		__m256 v03 = _mm256_add_ps(v01, v23);
+		__m256 v47 = _mm256_add_ps(v45, v67);
+		__m256 sum = _mm256_add_ps(v03, v47);
+
+		//Store the output
+		_mm256_store_ps(pout + i, sum);
+
+		//Calculate min/max
+		vmin_x8 = _mm256_min_ps(vmin_x8, sum);
+		vmax_x8 = _mm256_max_ps(vmax_x8, sum);
+	}
+
+	//Horizontal reduction of vector min/max
+	float tmp_min[8] __attribute__((aligned(32)));
+	float tmp_max[8] __attribute__((aligned(32)));
+	_mm256_store_ps(tmp_min, vmin_x8);
+	_mm256_store_ps(tmp_max, vmax_x8);
+	for(int j=0; j<8; j++)
+	{
+		vmin = min(vmin, tmp_min[j]);
+		vmax = max(vmax, tmp_max[j]);
+	}
+
+	//Catch stragglers at the end
+	for(; i<end; i++)
+	{
+		float v = pin[i] * taps_reversed[0];
+		v += pin[i + 1*samples_per_tap] * taps_reversed[1];
+		v += pin[i + 2*samples_per_tap] * taps_reversed[2];
+		v += pin[i + 3*samples_per_tap] * taps_reversed[3];
+		v += pin[i + 4*samples_per_tap] * taps_reversed[4];
+		v += pin[i + 5*samples_per_tap] * taps_reversed[5];
+		v += pin[i + 6*samples_per_tap] * taps_reversed[6];
+		v += pin[i + 7*samples_per_tap] * taps_reversed[7];
 
 		vmin = min(vmin, v);
 		vmax = max(vmax, v);
