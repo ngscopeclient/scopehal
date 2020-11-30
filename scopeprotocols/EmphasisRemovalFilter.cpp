@@ -180,7 +180,7 @@ void EmphasisRemovalFilter::Refresh()
 	//Run the actual filter
 	float vmin;
 	float vmax;
-	TappedDelayLineFilter::DoFilterKernel(tap_count, tap_delay, taps, din, cap, vmin, vmax);
+	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap, vmin, vmax);
 
 	//Calculate bounds
 	m_max = max(m_max, vmax);

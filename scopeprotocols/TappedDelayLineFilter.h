@@ -35,6 +35,9 @@
 #ifndef TappedDelayLineFilter_h
 #define TappedDelayLineFilter_h
 
+/**
+	@brief Performs an 8-tap FIR filter. The delay must be an integer multiple of the sampling period.
+ */
 class TappedDelayLineFilter : public Filter
 {
 public:
@@ -58,7 +61,6 @@ public:
 	PROTOCOL_DECODER_INITPROC(TappedDelayLineFilter)
 
 	static void DoFilterKernel(
-		int64_t tap_count,
 		int64_t tap_delay,
 		float* taps,
 		AnalogWaveform* din,
@@ -68,13 +70,28 @@ public:
 
 protected:
 
+	static void DoFilterKernelGeneric(
+		int64_t tap_delay,
+		float* taps,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
+
+	static void DoFilterKernelAVX2(
+		int64_t tap_delay,
+		float* taps,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
+
 	float m_min;
 	float m_max;
 	float m_range;
 	float m_offset;
 
 	std::string m_tapDelayName;
-	std::string m_tapCountName;
 	std::string m_tap0Name;
 	std::string m_tap1Name;
 	std::string m_tap2Name;

@@ -38,7 +38,6 @@ using namespace std;
 TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 	, m_tapDelayName("Tap Delay")
-	, m_tapCountName("Tap Count")
 	, m_tap0Name("Tap Value 0")
 	, m_tap1Name("Tap Value 1")
 	, m_tap2Name("Tap Value 2")
@@ -57,9 +56,6 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 
 	m_parameters[m_tapDelayName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_tapDelayName].SetIntVal(200000);
-
-	m_parameters[m_tapCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_tapCountName].SetIntVal(1);
 
 	m_parameters[m_tap0Name] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_tap0Name].SetFloatVal(1);
@@ -176,8 +172,6 @@ void TappedDelayLineFilter::Refresh()
 
 	//Get the tap config
 	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();
-	int64_t tap_count = m_parameters[m_tapCountName].GetIntVal();
-	tap_count = min(tap_count, (int64_t)8);
 
 	//Extract tap values
 	float taps[8] =
@@ -195,7 +189,7 @@ void TappedDelayLineFilter::Refresh()
 	//Run the actual filter
 	float vmin;
 	float vmax;
-	DoFilterKernel(tap_count, tap_delay, taps, din, cap, vmin, vmax);
+	DoFilterKernel(tap_delay, taps, din, cap, vmin, vmax);
 
 	//Calculate bounds
 	m_max = max(m_max, vmax);
@@ -205,7 +199,20 @@ void TappedDelayLineFilter::Refresh()
 }
 
 void TappedDelayLineFilter::DoFilterKernel(
-	int64_t tap_count,
+	int64_t tap_delay,
+	float* taps,
+	AnalogWaveform* din,
+	AnalogWaveform* cap,
+	float& vmin,
+	float& vmax)
+{
+	if(g_hasAvx2)
+		DoFilterKernelAVX2(tap_delay, taps, din, cap, vmin, vmax);
+	else
+		DoFilterKernelGeneric(tap_delay, taps, din, cap, vmin, vmax);
+}
+
+void TappedDelayLineFilter::DoFilterKernelGeneric(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,
@@ -223,21 +230,58 @@ void TappedDelayLineFilter::DoFilterKernel(
 	size_t filterlen = 8*samples_per_tap;
 	size_t end = len - filterlen;
 	cap->Resize(end);
-	int64_t jstart = 8 - tap_count;
+
+	//Copy the timestamps
+	memcpy(&cap->m_offsets[0], &din->m_offsets[filterlen], end*sizeof(int64_t));
+	memcpy(&cap->m_durations[0], &din->m_durations[filterlen], end*sizeof(int64_t));
 
 	//Do the filter
-	//#pragma omp parallel for
 	for(size_t i=0; i<end; i++)
 	{
 		float v = 0;
-		for(int64_t j=jstart; j<tap_count; j++)
+		for(int64_t j=0; j<8; j++)
 			v += din->m_samples[i + j*samples_per_tap] * taps[7 - j];
 
 		vmin = min(vmin, v);
 		vmax = max(vmax, v);
 
-		cap->m_offsets[i]	= din->m_offsets[i+filterlen];
-		cap->m_durations[i] = din->m_durations[i+filterlen];
+		cap->m_samples[i]	= v;
+	}
+}
+
+void TappedDelayLineFilter::DoFilterKernelAVX2(
+	int64_t tap_delay,
+	float* taps,
+	AnalogWaveform* din,
+	AnalogWaveform* cap,
+	float& vmin,
+	float& vmax)
+{
+	//For now, no resampling. Assume tap delay is an integer number of samples.
+	int64_t samples_per_tap = tap_delay / cap->m_timescale;
+
+	//Setup
+	vmin = FLT_MAX;
+	vmax = -FLT_MAX;
+	size_t len = din->m_samples.size();
+	size_t filterlen = 8*samples_per_tap;
+	size_t end = len - filterlen;
+	cap->Resize(end);
+
+	//Copy the timestamps
+	memcpy(&cap->m_offsets[0], &din->m_offsets[filterlen], end*sizeof(int64_t));
+	memcpy(&cap->m_durations[0], &din->m_durations[filterlen], end*sizeof(int64_t));
+
+	//Do the filter
+	for(size_t i=0; i<end; i++)
+	{
+		float v = 0;
+		for(int64_t j=0; j<8; j++)
+			v += din->m_samples[i + j*samples_per_tap] * taps[7 - j];
+
+		vmin = min(vmin, v);
+		vmax = max(vmax, v);
+
 		cap->m_samples[i]	= v;
 	}
 }
