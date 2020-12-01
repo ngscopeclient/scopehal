@@ -518,15 +518,21 @@ void EyePattern::DensePackedInnerLoopAVX2(
 
 	size_t wend_rounded = wend - (wend % 8);
 
-	//X offset
+	//Splat some constants into vector regs
 	__m256i vxoff 		= _mm256_set1_epi32((int)m_xoff);
 	__m256 vxscale 		= _mm256_set1_ps(m_xscale);
 	__m256 vxtimescale	= _mm256_set1_ps(xtimescale);
+	__m256 vyoff 		= _mm256_set1_ps(yoff);
+	__m256 vyscale 		= _mm256_set1_ps(yscale);
 
+	float* samples = (float*)&waveform->m_samples[0];
+
+	//Main unrolled loop, 8 samples per iteration
 	size_t i = 0;
 	for(; i<wend_rounded && iclock < cend; i+= 8)
 	{
-		//Figure out timestamp of this sample within the UI
+		//Figure out timestamp of this sample within the UI.
+		//This doesn't vectorize well, but it's pretty fast.
 		int32_t offset[8] __attribute__((aligned(32))) = {0};
 		for(size_t j=0; j<8; j++)
 		{
@@ -564,15 +570,21 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		__m256i vxfloori	= _mm256_cvtps_epi32(vxfloor);
 
 		//Load waveform data
-		//__mm256 v
+		__m256 vcur			= _mm256_loadu_ps(samples + i);
+		__m256 vnext		= _mm256_loadu_ps(samples + i + 1);
+
+		//Interpolate voltage
+		__m256 vdv			= _mm256_sub_ps(vnext, vcur);
+		__m256 ynom			= _mm256_mul_ps(vdv, fdx);
+		ynom				= _mm256_add_ps(vcur, ynom);
+		ynom				= _mm256_mul_ps(ynom, vyscale);
+		ynom				= _mm256_add_ps(ynom, vyoff);
 
 		//Save stuff for non-vectorized code
-		float pixel_x_fround[8] 	__attribute__((aligned(32)));
-		float dx_frac[8] 			__attribute__((aligned(32)));
 		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
-		_mm256_store_ps(pixel_x_fround, fround);
-		_mm256_store_ps(dx_frac, fdx);
+		float nominal_pixel_y[8] 	__attribute__((aligned(32)));
 		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
+		_mm256_store_ps(nominal_pixel_y, ynom);
 
 		for(size_t j=0; j<8; j++)
 		{
@@ -580,18 +592,13 @@ void EyePattern::DensePackedInnerLoopAVX2(
 			if(pixel_x_round[j] > xmax)
 				continue;
 
-			size_t k = i+j;
-
 			//Interpolate voltage, early out if clipping
-			float dv = waveform->m_samples[k+1] - waveform->m_samples[k];
-			float nominal_voltage = waveform->m_samples[k] + dv*dx_frac[j];
-			float nominal_pixel_y = nominal_voltage*yscale + yoff;
-			int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
+			int32_t y1 = static_cast<int32_t>(nominal_pixel_y[j]);
 			if(y1 >= ymax)
 				continue;
 
 			//Calculate how much of the pixel's intensity to put in each row
-			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+			float yfrac = nominal_pixel_y[j] - floor(nominal_pixel_y[j]);
 			int32_t bin2 = yfrac * 64;
 			int64_t* pix = data + y1*m_width + pixel_x_round[j];
 
