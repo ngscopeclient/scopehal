@@ -120,7 +120,7 @@ void FrequencyMeasurement::Refresh()
 	auto din = GetInputWaveform(0);
 	auto din_analog = GetAnalogInputWaveform(0);
 	auto din_digital = GetDigitalInputWaveform(0);
-	vector<double> edges;
+	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at 50% of full scale range
 	if(din_analog)
@@ -146,10 +146,10 @@ void FrequencyMeasurement::Refresh()
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		double start = edges[i];
-		double end = edges[i+2];
+		int64_t start = edges[i];
+		int64_t end = edges[i+2];
 
-		double delta = end - start;
+		int64_t delta = end - start;
 		double freq = FS_PER_SECOND / delta;
 
 		cap->m_offsets.push_back(start);

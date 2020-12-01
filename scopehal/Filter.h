@@ -223,13 +223,11 @@ public:
 
 	//Find interpolated zero crossings of a signal
 	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
-	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges);
 
 	//Find edges in a signal (discarding repeated samples)
 	static void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
-	static void FindZeroCrossings(DigitalWaveform* data, std::vector<double>& edges);
 
 protected:
 	//Common text formatting

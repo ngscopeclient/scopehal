@@ -119,7 +119,7 @@ void TachometerFilter::Refresh()
 	float midpoint = GetAvgVoltage(din);
 
 	//Timestamps of the edges
-	vector<double> edges;
+	vector<int64_t> edges;
 	FindZeroCrossings(din, midpoint, edges);
 	if(edges.size() < 2)
 	{
@@ -139,15 +139,15 @@ void TachometerFilter::Refresh()
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
-		double start = edges[i];
-		double end = edges[i+2];
+		int64_t start = edges[i];
+		int64_t end = edges[i+2];
 
-		double delta = end - start;
+		int64_t delta = end - start;
 		double freq = FS_PER_SECOND / delta;
 		double rpm = freq * pulses_to_rpm;
 
 		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(round(delta));
+		cap->m_durations.push_back(delta);
 		cap->m_samples.push_back(rpm);
 
 		rmin = min(rmin, rpm);

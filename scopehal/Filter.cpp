@@ -493,39 +493,6 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vecto
 }
 
 /**
-	@brief Find zero crossings in a waveform, interpolating as necessary
- */
-void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<double>& edges)
-{
-	//Find times of the zero crossings
-	bool first = true;
-	bool last = false;
-	double phoff = data->m_timescale/2 + data->m_triggerPhase;
-	size_t len = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		bool value = data->m_samples[i] > threshold;
-
-		//Save the last value
-		if(first)
-		{
-			last = value;
-			first = false;
-			continue;
-		}
-
-		//Skip samples with no transition
-		if(last == value)
-			continue;
-
-		//Midpoint of the sample, plus the zero crossing
-		double t = phoff + data->m_timescale * (data->m_offsets[i] + InterpolateTime(data, i-1, threshold));
-		edges.push_back(t);
-		last = value;
-	}
-}
-
-/**
 	@brief Find edges in a waveform, discarding repeated samples
  */
 void Filter::FindZeroCrossings(DigitalWaveform* data, vector<int64_t>& edges)
@@ -614,19 +581,6 @@ void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 
 		last = value;
 	}
-}
-
-/**
-	@brief Find edges in a waveform, discarding repeated samples
-
-	No extra resolution vs the int64 version, just for interface compatibility with the analog interpolating version.
- */
-void Filter::FindZeroCrossings(DigitalWaveform* data, vector<double>& edges)
-{
-	vector<int64_t> tmp;
-	FindZeroCrossings(data, tmp);
-	for(auto e : tmp)
-		edges.push_back(e);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
