@@ -165,14 +165,10 @@ void TappedDelayLineFilter::Refresh()
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
 
 	//Set up output
-	auto cap = new AnalogWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	SetData(cap, 0);
-
-	//Get the tap config
 	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();
+	const int64_t tap_count = 8;
+	int64_t samples_per_tap = tap_delay / din->m_timescale;
+	auto cap = SetupOutputWaveform(din, 0, tap_count * samples_per_tap, 0);
 
 	//Extract tap values
 	float taps[8] =
@@ -230,11 +226,6 @@ void TappedDelayLineFilter::DoFilterKernelGeneric(
 	size_t len = din->m_samples.size();
 	size_t filterlen = 8*samples_per_tap;
 	size_t end = len - filterlen;
-	cap->Resize(end);
-
-	//Copy the timestamps
-	memcpy(&cap->m_offsets[0], &din->m_offsets[filterlen], end*sizeof(int64_t));
-	memcpy(&cap->m_durations[0], &din->m_durations[filterlen], end*sizeof(int64_t));
 
 	//Do the filter
 	for(size_t i=0; i<end; i++)
@@ -268,11 +259,6 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 	size_t len = din->m_samples.size();
 	size_t filterlen = 8*samples_per_tap;
 	size_t end = len - filterlen;
-	cap->Resize(end);
-
-	//Copy the timestamps
-	memcpy(&cap->m_offsets[0], &din->m_offsets[filterlen], end*sizeof(int64_t));
-	memcpy(&cap->m_durations[0], &din->m_durations[filterlen], end*sizeof(int64_t));
 
 	//Reverse the taps
 	float taps_reversed[8] =

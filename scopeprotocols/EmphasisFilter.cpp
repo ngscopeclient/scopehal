@@ -145,18 +145,13 @@ void EmphasisFilter::Refresh()
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
 
 	//Set up output
-	auto cap = new AnalogWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	SetData(cap, 0);
-
-	//Convert data rate to tap delay
+	const int64_t tap_count = 8;
 	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
+	int64_t samples_per_tap = tap_delay / din->m_timescale;
+	auto cap = SetupOutputWaveform(din, 0, tap_count * samples_per_tap, 0);
 
 	//Calculate the tap values
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008
-	const int64_t tap_count = 8;
 	float db = m_parameters[m_emphasisAmountName].GetFloatVal();
 	float emphasisLevel = pow(10, -db/20);
 	float coeff = 0.5 * emphasisLevel;

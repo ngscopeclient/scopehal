@@ -1499,6 +1499,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
 		AnalogWaveform* cap = new AnalogWaveform;
+		cap->m_densePacked = true;
 		cap->m_timescale = timebase;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -1576,6 +1577,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->m_timescale = hzbase;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
+		cap->m_densePacked = true;
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(nsamples);
@@ -1670,6 +1672,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			cap->m_timescale = timebase;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
+			cap->m_densePacked = true;
 			double t = GetTime();
 			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 			cap->Resize(msglen);

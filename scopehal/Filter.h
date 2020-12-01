@@ -194,6 +194,8 @@ protected:
 			i ++;
 	}
 
+	AnalogWaveform* SetupOutputWaveform(AnalogWaveform* din, size_t stream, size_t skipstart, size_t skipend);
+
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
 	virtual Gdk::Color GetColor(int i);

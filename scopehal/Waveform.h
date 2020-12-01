@@ -84,6 +84,7 @@ public:
 		, m_startTimestamp(0)
 		, m_startFemtoseconds(0)
 		, m_triggerPhase(0)
+		, m_densePacked(false)
 	{}
 
 	//empty virtual destructor in case any derived classes need one
@@ -98,20 +99,25 @@ public:
 	 */
 	int64_t m_timescale;
 
-	/**
-		@brief Start time of the acquisition, rounded to nearest second
-	 */
+	///@brief Start time of the acquisition, rounded to nearest second
 	time_t	m_startTimestamp;
 
-	/**
-		@brief Fractional start time of the acquisition (femtoseconds since m_startTimestamp)
-	 */
+	///@brief Fractional start time of the acquisition (femtoseconds since m_startTimestamp)
 	int64_t m_startFemtoseconds;
 
-	/**
-		@brief Phase offset, in femtoseconds, from the trigger to the sampling clock.
-	 */
+	///@brief Phase offset, in femtoseconds, from the trigger to the sampling clock.
 	int64_t m_triggerPhase;
+
+	/**
+		@brief True if the waveform is "dense packed".
+
+		This means that m_durations is always 1, and m_offsets ranges from 0 to m_offsets.size()-1.
+
+		If dense packed, we can often perform various optimizations to avoid excessive copying of waveform data.
+
+		Most oscilloscopes output dense packed waveforms natively.
+	 */
+	bool m_densePacked;
 
 	///@brief Start timestamps of each sample
 	std::vector<

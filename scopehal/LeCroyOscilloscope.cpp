@@ -2094,6 +2094,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
+		cap->m_densePacked = true;
 
 		//Parse the time
 		if(num_sequences > 1)
@@ -2386,6 +2387,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 		{
 			DigitalWaveform* cap = new DigitalWaveform;
 			cap->m_timescale = interval;
+			cap->m_densePacked = true;
 
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
