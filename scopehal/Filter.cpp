@@ -979,6 +979,7 @@ AnalogWaveform* Filter::SetupOutputWaveform(AnalogWaveform* din, size_t stream, 
 	cap->m_timescale 			= din->m_timescale;
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+	cap->m_triggerPhase			= din->m_triggerPhase;
 
 	size_t len = din->m_offsets.size() - (skipstart + skipend);
 	size_t curlen = cap->m_offsets.size();

@@ -295,37 +295,42 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
-	int64_t groupdelay_samples =ceil( GetGroupDelay() / din->m_timescale );
-
-	//Set up output and copy timestamps
-	auto cap = new AnalogWaveform;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_timescale = din->m_timescale;
+	int64_t groupdelay_fs = GetGroupDelay();
+	int64_t groupdelay_samples =ceil( groupdelay_fs / din->m_timescale );
 
 	//Calculate bounds for the *meaningful* output data.
 	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
 	size_t istart = 0;
 	size_t iend = npoints_raw;
+	AnalogWaveform* cap = NULL;
 	if(invert)
+	{
 		iend -= groupdelay_samples;
+		cap = SetupOutputWaveform(din, 0, 0, groupdelay_samples);
+	}
 	else
+	{
 		istart += groupdelay_samples;
+		cap = SetupOutputWaveform(din, 0, groupdelay_samples, 0);
+	}
+
+	//Apply phase shift for the group delay so we draw the waveform in the right place even if dense packed
+	if(invert)
+		cap->m_triggerPhase = -groupdelay_fs;
+	else
+		cap->m_triggerPhase = groupdelay_fs;
 
 	//Copy waveform data after rescaling
 	float scale = 1.0f / npoints;
 	float vmin = FLT_MAX;
 	float vmax = -FLT_MAX;
 	size_t outlen = iend - istart;
-	cap->Resize(outlen);
-	memcpy(&cap->m_offsets[0], &din->m_offsets[istart], outlen * sizeof(int64_t));
-	memcpy(&cap->m_durations[0], &din->m_durations[istart], outlen * sizeof(int64_t));
-	for(size_t i=istart; i<iend; i++)
+	for(size_t i=0; i<outlen; i++)
 	{
-		float v = m_reverseOutBuf[i] * scale;
+		float v = m_reverseOutBuf[i+istart] * scale;
 		vmin = min(v, vmin);
 		vmax = max(v, vmax);
-		cap->m_samples[i-istart] = v;
+		cap->m_samples[i] = v;
 	}
 
 	//Calculate bounds
@@ -333,8 +338,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = -( (m_max - m_min)/2 + m_min );
-
-	SetData(cap, 0);
 }
 
 int64_t DeEmbedFilter::GetGroupDelay()
