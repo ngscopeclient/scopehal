@@ -459,54 +459,112 @@ void EyePattern::Refresh()
 	size_t xmax = m_width - 1;
 	if(m_xscale > FLT_EPSILON)
 	{
-		for(size_t i=0; i<wend && iclock < cend; i++)
+		//Optimized inner loop for dense packed waveforms
+		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
+		if(waveform->m_densePacked)
 		{
-			//Find time of this sample.
-			//If it's past the end of the current UI, move to the next clock edge
-			int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
-			int64_t offset = tstart - clock_edges[iclock];
-			if(offset < 0)
-				continue;
-			size_t nextclk = iclock + 1;
-			int64_t tnext = clock_edges[nextclk];
-			if(tstart >= tnext)
+			for(size_t i=0; i<wend && iclock < cend; i++)
 			{
-				//Move to the next clock edge
-				iclock ++;
-				if(iclock >= cend)
-					break;
+				//Find time of this sample.
+				//If it's past the end of the current UI, move to the next clock edge
+				int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
+				int64_t offset = tstart - clock_edges[iclock];
+				if(offset < 0)
+					continue;
+				size_t nextclk = iclock + 1;
+				int64_t tnext = clock_edges[nextclk];
+				if(tstart >= tnext)
+				{
+					//Move to the next clock edge
+					iclock ++;
+					if(iclock >= cend)
+						break;
 
-				//Figure out the offset to the next edge
-				offset = tstart - tnext;
+					//Figure out the offset to the next edge
+					offset = tstart - tnext;
+				}
+
+				//Interpolate position
+				float pixel_x_f = (offset - m_xoff) * m_xscale;
+				float pixel_x_fround = floor(pixel_x_f);
+				float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+				//Early out if off end of plot
+				size_t pixel_x_round = floor(pixel_x_f);
+				if(pixel_x_round > xmax)
+					continue;
+
+				//Interpolate voltage, early out if clipping
+				float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+				float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+				float nominal_pixel_y = nominal_voltage*yscale + yoff;
+				size_t y1 = static_cast<size_t>(nominal_pixel_y);
+				if(y1 >= ymax)
+					continue;
+
+				//Calculate how much of the pixel's intensity to put in each row
+				float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+				int64_t bin2 = yfrac * 64;
+				int64_t* pix = data + y1*m_width + pixel_x_round;
+
+				//Plot each point (this only draws the right half of the eye, we copy to the left later)
+				pix[0] 		 += 64 - bin2;
+				pix[m_width] += bin2;
 			}
+		}
 
-			//Interpolate position
-			int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
-			float pixel_x_f = (offset - m_xoff) * m_xscale;
-			float pixel_x_fround = floor(pixel_x_f);
-			float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * xtimescale );
+		//Normal main loop
+		else
+		{
+			for(size_t i=0; i<wend && iclock < cend; i++)
+			{
+				//Find time of this sample.
+				//If it's past the end of the current UI, move to the next clock edge
+				int64_t tstart = waveform->m_offsets[i] * waveform->m_timescale + waveform->m_triggerPhase;
+				int64_t offset = tstart - clock_edges[iclock];
+				if(offset < 0)
+					continue;
+				size_t nextclk = iclock + 1;
+				int64_t tnext = clock_edges[nextclk];
+				if(tstart >= tnext)
+				{
+					//Move to the next clock edge
+					iclock ++;
+					if(iclock >= cend)
+						break;
 
-			//Early out if off end of plot
-			size_t pixel_x_round = floor(pixel_x_f);
-			if(pixel_x_round > xmax)
-				continue;
+					//Figure out the offset to the next edge
+					offset = tstart - tnext;
+				}
 
-			//Interpolate voltage, early out if clipping
-			float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
-			float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
-			float nominal_pixel_y = nominal_voltage*yscale + yoff;
-			size_t y1 = static_cast<size_t>(nominal_pixel_y);
-			if(y1 >= ymax)
-				continue;
+				//Interpolate position
+				int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
+				float pixel_x_f = (offset - m_xoff) * m_xscale;
+				float pixel_x_fround = floor(pixel_x_f);
+				float dx_frac = (pixel_x_f - pixel_x_fround ) / (dt * xtimescale );
 
-			//Calculate how much of the pixel's intensity to put in each row
-			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
-			int64_t bin2 = yfrac * 64;
-			int64_t* pix = data + y1*m_width + pixel_x_round;
+				//Early out if off end of plot
+				size_t pixel_x_round = floor(pixel_x_f);
+				if(pixel_x_round > xmax)
+					continue;
 
-			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			pix[0] 		 += 64 - bin2;
-			pix[m_width] += bin2;
+				//Interpolate voltage, early out if clipping
+				float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+				float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+				float nominal_pixel_y = nominal_voltage*yscale + yoff;
+				size_t y1 = static_cast<size_t>(nominal_pixel_y);
+				if(y1 >= ymax)
+					continue;
+
+				//Calculate how much of the pixel's intensity to put in each row
+				float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+				int64_t bin2 = yfrac * 64;
+				int64_t* pix = data + y1*m_width + pixel_x_round;
+
+				//Plot each point (this only draws the right half of the eye, we copy to the left later)
+				pix[0] 		 += 64 - bin2;
+				pix[m_width] += bin2;
+			}
 		}
 	}
 
