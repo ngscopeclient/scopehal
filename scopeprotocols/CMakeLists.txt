@@ -26,6 +26,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DSIPacketDecoder.cpp
 	DutyCycleMeasurement.cpp
 	DVIDecoder.cpp
+	EmphasisFilter.cpp
 	EmphasisRemovalFilter.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
