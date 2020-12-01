@@ -171,6 +171,32 @@ public:
 protected:
 	void DoMaskTest(EyeWaveform* cap);
 
+	void SparsePackedInnerLoop(
+		AnalogWaveform* waveform,
+		std::vector<int64_t>& clock_edges,
+		int64_t* data,
+		size_t wend,
+		size_t cend,
+		int32_t xmax,
+		int32_t ymax,
+		float xtimescale,
+		float yscale,
+		float yoff
+		);
+
+	void DensePackedInnerLoop(
+		AnalogWaveform* waveform,
+		std::vector<int64_t>& clock_edges,
+		int64_t* data,
+		size_t wend,
+		size_t cend,
+		int32_t xmax,
+		int32_t ymax,
+		float xtimescale,
+		float yscale,
+		float yoff
+		);
+
 	size_t m_height;
 	size_t m_width;
 
