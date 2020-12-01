@@ -524,6 +524,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	__m256 vxtimescale	= _mm256_set1_ps(xtimescale);
 	__m256 vyoff 		= _mm256_set1_ps(yoff);
 	__m256 vyscale 		= _mm256_set1_ps(yscale);
+	__m256 v64			= _mm256_set1_ps(64);
 
 	float* samples = (float*)&waveform->m_samples[0];
 
@@ -579,32 +580,35 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		ynom				= _mm256_add_ps(vcur, ynom);
 		ynom				= _mm256_mul_ps(ynom, vyscale);
 		ynom				= _mm256_add_ps(ynom, vyoff);
+		__m256 vyfloor		= _mm256_floor_ps(ynom);
+		__m256 vyfrac		= _mm256_sub_ps(ynom, vyfloor);
+		__m256i vyfloori	= _mm256_cvtps_epi32(vyfloor);
+
+		//Calculate how much of the pixel's intensity to put in each row
+		__m256 vbin2f		= _mm256_mul_ps(vyfrac, v64);
+		__m256i vbin2i		= _mm256_cvtps_epi32(vbin2f);
 
 		//Save stuff for non-vectorized code
 		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
 		float nominal_pixel_y[8] 	__attribute__((aligned(32)));
+		int32_t bin2[8]				__attribute__((aligned(32)));
+		int32_t y1[8]				__attribute__((aligned(32)));
 		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
 		_mm256_store_ps(nominal_pixel_y, ynom);
+		_mm256_store_si256((__m256i*)bin2, vbin2i);
+		_mm256_store_si256((__m256i*)y1, vyfloori);
 
+		//Final output loop. Doesn't vectorize well
 		for(size_t j=0; j<8; j++)
 		{
-			//Early out if off end of plot
-			if(pixel_x_round[j] > xmax)
+			//Abort if this pixel is out of bounds
+			if( (pixel_x_round[j] > xmax) || (y1[j] >= ymax) )
 				continue;
-
-			//Interpolate voltage, early out if clipping
-			int32_t y1 = static_cast<int32_t>(nominal_pixel_y[j]);
-			if(y1 >= ymax)
-				continue;
-
-			//Calculate how much of the pixel's intensity to put in each row
-			float yfrac = nominal_pixel_y[j] - floor(nominal_pixel_y[j]);
-			int32_t bin2 = yfrac * 64;
-			int64_t* pix = data + y1*m_width + pixel_x_round[j];
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			pix[0] 		 += 64 - bin2;
-			pix[m_width] += bin2;
+			int64_t* pix = data + y1[j]*m_width + pixel_x_round[j];
+			pix[0] 		 += 64 - bin2[j];
+			pix[m_width] += bin2[j];
 		}
 	}
 
