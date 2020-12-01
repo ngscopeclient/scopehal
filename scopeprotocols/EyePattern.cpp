@@ -462,7 +462,10 @@ void EyePattern::Refresh()
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
 		if(waveform->m_densePacked)
 		{
-			DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			if(g_hasAvx2)
+				DensePackedInnerLoopAVX2(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			else
+				DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 		}
 
 		//Normal main loop
@@ -494,6 +497,142 @@ void EyePattern::Refresh()
 	total_frames ++;
 	total_time += dt;
 	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
+}
+
+__attribute__((target("avx2")))
+void EyePattern::DensePackedInnerLoopAVX2(
+	AnalogWaveform* waveform,
+	vector<int64_t>& clock_edges,
+	int64_t* data,
+	size_t wend,
+	size_t cend,
+	int32_t xmax,
+	int32_t ymax,
+	float xtimescale,
+	float yscale,
+	float yoff
+	)
+{
+	size_t iclock = 0;
+
+	size_t wend_rounded = wend - (wend % 8);
+
+	//X offset
+
+	size_t i = 0;
+	for(; i<wend_rounded && iclock < cend; i+= 8)
+	{
+		//Figure out timestamp of this sample within the UI
+		int32_t offset[8] __attribute__((aligned(32))) = {0};
+		for(size_t j=0; j<8; j++)
+		{
+			size_t k = i+j;
+
+			//Find time of this sample.
+			//If it's past the end of the current UI, move to the next clock edge
+			int64_t tstart = k * waveform->m_timescale + waveform->m_triggerPhase;
+			offset[j] = tstart - clock_edges[iclock];
+			if(offset[j] < 0)
+				continue;
+			size_t nextclk = iclock + 1;
+			int64_t tnext = clock_edges[nextclk];
+			if(tstart >= tnext)
+			{
+				//Move to the next clock edge
+				iclock ++;
+				if(iclock >= cend)
+					break;
+
+				//Figure out the offset to the next edge
+				offset[j] = tstart - tnext;
+			}
+		}
+
+		//Load the initial offsets
+		//__m256i voffset = _mm256_load_si256((__m256i*)offset);
+
+		for(size_t j=0; j<8; j++)
+		{
+			size_t k = i+j;
+
+			//Interpolate position
+			float pixel_x_f = (offset[j] - m_xoff) * m_xscale;
+			float pixel_x_fround = floor(pixel_x_f);
+			float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+			//Early out if off end of plot
+			int32_t pixel_x_round = floor(pixel_x_f);
+			if(pixel_x_round > xmax)
+				continue;
+
+			//Interpolate voltage, early out if clipping
+			float dv = waveform->m_samples[k+1] - waveform->m_samples[i];
+			float nominal_voltage = waveform->m_samples[k] + dv*dx_frac;
+			float nominal_pixel_y = nominal_voltage*yscale + yoff;
+			int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
+			if(y1 >= ymax)
+				continue;
+
+			//Calculate how much of the pixel's intensity to put in each row
+			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+			int32_t bin2 = yfrac * 64;
+			int64_t* pix = data + y1*m_width + pixel_x_round;
+
+			//Plot each point (this only draws the right half of the eye, we copy to the left later)
+			pix[0] 		 += 64 - bin2;
+			pix[m_width] += bin2;
+		}
+	}
+
+	//Catch any stragglers
+	for(; i<wend && iclock < cend; i++)
+	{
+		//Find time of this sample.
+		//If it's past the end of the current UI, move to the next clock edge
+		int64_t tstart = i * waveform->m_timescale + waveform->m_triggerPhase;
+		int64_t offset = tstart - clock_edges[iclock];
+		if(offset < 0)
+			continue;
+		size_t nextclk = iclock + 1;
+		int64_t tnext = clock_edges[nextclk];
+		if(tstart >= tnext)
+		{
+			//Move to the next clock edge
+			iclock ++;
+			if(iclock >= cend)
+				break;
+
+			//Figure out the offset to the next edge
+			offset = tstart - tnext;
+		}
+
+		//Interpolate position
+		float pixel_x_f = (offset - m_xoff) * m_xscale;
+		float pixel_x_fround = floor(pixel_x_f);
+		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Early out if off end of plot
+		int32_t pixel_x_round = floor(pixel_x_f);
+		if(pixel_x_round > xmax)
+			continue;
+
+		//Interpolate voltage, early out if clipping
+		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
+		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
+		float nominal_pixel_y = nominal_voltage*yscale + yoff;
+		int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
+		if(y1 >= ymax)
+			continue;
+
+		//Calculate how much of the pixel's intensity to put in each row
+		float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
+		int32_t bin2 = yfrac * 64;
+		int64_t* pix = data + y1*m_width + pixel_x_round;
+
+		//Plot each point (this only draws the right half of the eye, we copy to the left later)
+		pix[0] 		 += 64 - bin2;
+		pix[m_width] += bin2;
+	}
 }
 
 void EyePattern::DensePackedInnerLoop(
