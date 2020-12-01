@@ -229,6 +229,8 @@ public:
 	static void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
 
+	static void ClearAnalysisCache();
+
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
@@ -247,6 +249,10 @@ protected:
 
 	//Object enumeration
 	static std::set<Filter*> m_filters;
+
+	//Caching
+	static std::mutex m_cacheMutex;
+	static std::map<std::pair<WaveformBase*, float>, std::vector<int64_t> > m_zeroCrossingCache;
 };
 
 #define PROTOCOL_DECODER_INITPROC(T) \

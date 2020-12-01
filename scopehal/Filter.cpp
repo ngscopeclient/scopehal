@@ -36,10 +36,13 @@
 #include "scopehal.h"
 #include "Filter.h"
 
-Filter::CreateMapType Filter::m_createprocs;
-std::set<Filter*> Filter::m_filters;
-
 using namespace std;
+
+Filter::CreateMapType Filter::m_createprocs;
+set<Filter*> Filter::m_filters;
+
+mutex Filter::m_cacheMutex;
+map<pair<WaveformBase*, float>, vector<int64_t> > Filter::m_zeroCrossingCache;
 
 Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 {
@@ -462,8 +465,21 @@ void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, 
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int64_t>& edges)
 {
+	pair<WaveformBase*, float> cachekey(data, threshold);
+
+	//Check cache
+	{
+		lock_guard<mutex> lock(m_cacheMutex);
+		auto it = m_zeroCrossingCache.find(cachekey);
+		if(it != m_zeroCrossingCache.end())
+		{
+			edges = it->second;
+			return;
+		}
+	}
+
 	//Find times of the zero crossings
 	bool first = true;
 	bool last = false;
@@ -490,6 +506,10 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, std::vecto
 		edges.push_back(t);
 		last = value;
 	}
+
+	//Add to cache
+	lock_guard<mutex> lock(m_cacheMutex);
+	m_zeroCrossingCache[cachekey] = edges;
 }
 
 /**
@@ -921,4 +941,10 @@ float Filter::GetTopVoltage(AnalogWaveform* cap)
 
 	float fbin = (idx + 0.5f)/nbins;
 	return fbin*delta + vmin;
+}
+
+void Filter::ClearAnalysisCache()
+{
+	lock_guard<mutex> lock(m_cacheMutex);
+	m_zeroCrossingCache.clear();
 }
