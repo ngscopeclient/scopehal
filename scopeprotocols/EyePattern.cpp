@@ -30,6 +30,7 @@
 #include "../scopehal/scopehal.h"
 #include "EyePattern.h"
 #include <algorithm>
+#include <immintrin.h>
 
 using namespace std;
 
@@ -518,6 +519,9 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	size_t wend_rounded = wend - (wend % 8);
 
 	//X offset
+	__m256i vxoff 		= _mm256_set1_epi32((int)m_xoff);
+	__m256 vxscale 		= _mm256_set1_ps(m_xscale);
+	__m256 vxtimescale	= _mm256_set1_ps(xtimescale);
 
 	size_t i = 0;
 	for(; i<wend_rounded && iclock < cend; i+= 8)
@@ -548,26 +552,39 @@ void EyePattern::DensePackedInnerLoopAVX2(
 			}
 		}
 
-		//Load the initial offsets
-		//__m256i voffset = _mm256_load_si256((__m256i*)offset);
+		//Interpolate X position
+		__m256i voffset		= _mm256_load_si256((__m256i*)offset);
+		voffset 			= _mm256_sub_epi32(voffset, vxoff);
+		__m256 foffset		= _mm256_cvtepi32_ps(voffset);
+		foffset				= _mm256_mul_ps(foffset, vxscale);
+		__m256 fround		= _mm256_round_ps(foffset, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+		__m256 fdx			= _mm256_sub_ps(foffset, fround);
+		fdx					= _mm256_div_ps(fdx, vxtimescale);
+		__m256 vxfloor		= _mm256_floor_ps(foffset);
+		__m256i vxfloori	= _mm256_cvtps_epi32(vxfloor);
+
+		//Load waveform data
+		//__mm256 v
+
+		//Save stuff for non-vectorized code
+		float pixel_x_fround[8] 	__attribute__((aligned(32)));
+		float dx_frac[8] 			__attribute__((aligned(32)));
+		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
+		_mm256_store_ps(pixel_x_fround, fround);
+		_mm256_store_ps(dx_frac, fdx);
+		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
 
 		for(size_t j=0; j<8; j++)
 		{
-			size_t k = i+j;
-
-			//Interpolate position
-			float pixel_x_f = (offset[j] - m_xoff) * m_xscale;
-			float pixel_x_fround = floor(pixel_x_f);
-			float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
-
 			//Early out if off end of plot
-			int32_t pixel_x_round = floor(pixel_x_f);
-			if(pixel_x_round > xmax)
+			if(pixel_x_round[j] > xmax)
 				continue;
 
+			size_t k = i+j;
+
 			//Interpolate voltage, early out if clipping
-			float dv = waveform->m_samples[k+1] - waveform->m_samples[i];
-			float nominal_voltage = waveform->m_samples[k] + dv*dx_frac;
+			float dv = waveform->m_samples[k+1] - waveform->m_samples[k];
+			float nominal_voltage = waveform->m_samples[k] + dv*dx_frac[j];
 			float nominal_pixel_y = nominal_voltage*yscale + yoff;
 			int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
 			if(y1 >= ymax)
@@ -576,7 +593,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 			//Calculate how much of the pixel's intensity to put in each row
 			float yfrac = nominal_pixel_y - floor(nominal_pixel_y);
 			int32_t bin2 = yfrac * 64;
-			int64_t* pix = data + y1*m_width + pixel_x_round;
+			int64_t* pix = data + y1*m_width + pixel_x_round[j];
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
 			pix[0] 		 += 64 - bin2;
