@@ -525,11 +525,13 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	__m256 vyoff 		= _mm256_set1_ps(yoff);
 	__m256 vyscale 		= _mm256_set1_ps(yscale);
 	__m256 v64			= _mm256_set1_ps(64);
+	__m256i vwidth		= _mm256_set1_epi32(m_width);
 
 	float* samples = (float*)&waveform->m_samples[0];
 
 	//Main unrolled loop, 8 samples per iteration
 	size_t i = 0;
+	int32_t bufmax = m_width * (m_height - 1);
 	for(; i<wend_rounded && iclock < cend; i+= 8)
 	{
 		//Figure out timestamp of this sample within the UI.
@@ -588,27 +590,28 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		__m256 vbin2f		= _mm256_mul_ps(vyfrac, v64);
 		__m256i vbin2i		= _mm256_cvtps_epi32(vbin2f);
 
-		//Save stuff for non-vectorized code
+		//Final address calculation
+		__m256i voff		= _mm256_mullo_epi32(vyfloori, vwidth);
+		voff				= _mm256_add_epi32(voff, vxfloori);
+
+		//Save stuff for output loop
 		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
-		float nominal_pixel_y[8] 	__attribute__((aligned(32)));
 		int32_t bin2[8]				__attribute__((aligned(32)));
-		int32_t y1[8]				__attribute__((aligned(32)));
+		int32_t off[8]				__attribute__((aligned(32)));
 		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
-		_mm256_store_ps(nominal_pixel_y, ynom);
 		_mm256_store_si256((__m256i*)bin2, vbin2i);
-		_mm256_store_si256((__m256i*)y1, vyfloori);
+		_mm256_store_si256((__m256i*)off, voff);
 
 		//Final output loop. Doesn't vectorize well
 		for(size_t j=0; j<8; j++)
 		{
 			//Abort if this pixel is out of bounds
-			if( (pixel_x_round[j] > xmax) || (y1[j] >= ymax) )
+			if( (pixel_x_round[j] > xmax) || (off[j] >= bufmax) )
 				continue;
 
 			//Plot each point (this only draws the right half of the eye, we copy to the left later)
-			int64_t* pix = data + y1[j]*m_width + pixel_x_round[j];
-			pix[0] 		 += 64 - bin2[j];
-			pix[m_width] += bin2[j];
+			data[off[j]]	 		+= 64 - bin2[j];
+			data[off[j] + m_width]	+= bin2[j];
 		}
 	}
 
