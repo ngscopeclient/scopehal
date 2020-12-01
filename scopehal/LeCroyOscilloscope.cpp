@@ -2227,11 +2227,8 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 
 	for(unsigned int k=0; k<end; k += 32)
 	{
-		//This is likely a lot faster, but assumes we have 64 byte alignment on pin which is not guaranteed.
-		//TODO: fix alignment
-		//__m256i raw_samples = _mm256_load_si256(reinterpret_cast<__m256i*>(pin + k));
-
 		//Load all 32 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
 		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
 
 		//Fill duration
