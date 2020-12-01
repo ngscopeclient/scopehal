@@ -121,9 +121,7 @@ void MultiplyFilter::Refresh()
 	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() * m_inputs[1].m_channel->GetYAxisUnits();
 
 	//Set up the output waveform
-	auto cap = new AnalogWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(a);
+	auto cap = SetupOutputWaveform(a, 0, 0, 0);
 
 	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
@@ -136,11 +134,4 @@ void MultiplyFilter::Refresh()
 	float n = GetMinVoltage(cap);
 	m_range = x - n;
 	m_offset = (x+n)/2;
-
-	//Copy our time scales from the input
-	cap->m_timescale 		= a->m_timescale;
-	cap->m_startTimestamp 	= a->m_startTimestamp;
-	cap->m_startFemtoseconds = a->m_startFemtoseconds;
-
-	SetData(cap, 0);
 }

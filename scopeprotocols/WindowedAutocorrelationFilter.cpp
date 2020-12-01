@@ -157,7 +157,7 @@ void WindowedAutocorrelationFilter::Refresh()
 	}
 
 	//Set up the output waveform
-	auto cap = new AnalogWaveform;
+	auto cap = SetupOutputWaveform(din_i, 0, 0, 2*period_samples);
 
 	size_t end = len - 2*period_samples;
 	float vmax = -FLT_MAX;
@@ -180,9 +180,7 @@ void WindowedAutocorrelationFilter::Refresh()
 		vmax = max(vmax, v);
 		vmin = min(vmin, v);
 
-		cap->m_samples.push_back(v);
-		cap->m_offsets.push_back(din_i->m_offsets[i]);
-		cap->m_durations.push_back(din_i->m_durations[i]);
+		cap->m_samples[i] = v;
 	}
 
 	//Calculate bounds
@@ -190,11 +188,4 @@ void WindowedAutocorrelationFilter::Refresh()
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = ( (m_max - m_min)/2 + m_min );
-
-	//Copy our time scales from the input
-	cap->m_timescale 		= din_i->m_timescale;
-	cap->m_startTimestamp 	= din_i->m_startTimestamp;
-	cap->m_startFemtoseconds = din_i->m_startFemtoseconds;
-
-	SetData(cap, 0);
 }

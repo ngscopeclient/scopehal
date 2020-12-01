@@ -121,9 +121,7 @@ void CurrentShuntFilter::Refresh()
 	auto len = din->m_samples.size() ;
 
 	//Set up the output waveform
-	auto cap = new AnalogWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(din);
+	auto cap = SetupOutputWaveform(din, 0, 0, 0);
 
 	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
 
@@ -132,11 +130,4 @@ void CurrentShuntFilter::Refresh()
 	float ishunt = 1.0f / rshunt;
 	for(size_t i=0; i<len; i++)
 		fdst[i] = fsrc[i] * ishunt;
-
-	//Copy our time scales from the input
-	cap->m_timescale 		= din->m_timescale;
-	cap->m_startTimestamp 	= din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-
-	SetData(cap, 0);
 }

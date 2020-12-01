@@ -157,9 +157,7 @@ void SubtractFilter::Refresh()
 	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
 
 	//Create the output and copy timestamps
-	AnalogWaveform* cap = new AnalogWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(din_p);
+	auto cap = SetupOutputWaveform(din_p, 0, 0, 0);
 	float* out = (float*)&cap->m_samples[0];
 	float* a = (float*)&din_p->m_samples[0];
 	float* b = (float*)&din_n->m_samples[0];
@@ -169,14 +167,6 @@ void SubtractFilter::Refresh()
 		InnerLoopAVX2(out, a, b, len);
 	else
 		InnerLoop(out, a, b, len);
-
-	SetData(cap, 0);
-
-	//Copy our time scales from the input
-	//Use the first trace's timestamp as our start time if they differ
-	cap->m_timescale 		= din_p->m_timescale;
-	cap->m_startTimestamp 	= din_p->m_startTimestamp;
-	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
