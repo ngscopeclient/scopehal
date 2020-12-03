@@ -684,6 +684,7 @@ bool RigolOscilloscope::AcquireData()
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
+		cap->m_densePacked = true;
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
