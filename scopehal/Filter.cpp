@@ -485,26 +485,57 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 	bool last = false;
 	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
 	size_t len = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
+	float fscale = data->m_timescale;
+
+	if(data->m_densePacked)
 	{
-		bool value = data->m_samples[i] > threshold;
-
-		//Save the last value
-		if(first)
+		for(size_t i=1; i<len; i++)
 		{
+			bool value = data->m_samples[i] > threshold;
+
+			//Save the last value
+			if(first)
+			{
+				last = value;
+				first = false;
+				continue;
+			}
+
+			//Skip samples with no transition
+			if(last == value)
+				continue;
+
+			//Midpoint of the sample, plus the zero crossing
+			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+			int64_t t = phoff + data->m_timescale*i + tfrac;
+			edges.push_back(t);
 			last = value;
-			first = false;
-			continue;
 		}
+	}
+	else
+	{
+		for(size_t i=1; i<len; i++)
+		{
+			bool value = data->m_samples[i] > threshold;
 
-		//Skip samples with no transition
-		if(last == value)
-			continue;
+			//Save the last value
+			if(first)
+			{
+				last = value;
+				first = false;
+				continue;
+			}
 
-		//Midpoint of the sample, plus the zero crossing
-		int64_t t = phoff + data->m_timescale * (data->m_offsets[i] + InterpolateTime(data, i-1, threshold));
-		edges.push_back(t);
-		last = value;
+			//Skip samples with no transition
+			if(last == value)
+				continue;
+
+			//Midpoint of the sample, plus the zero crossing
+			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+			int64_t t = phoff + data->m_timescale * data->m_offsets[i] + tfrac;
+			edges.push_back(t);
+			last = value;
+		}
 	}
 
 	//Add to cache
