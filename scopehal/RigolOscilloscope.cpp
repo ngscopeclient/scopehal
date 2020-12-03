@@ -691,7 +691,12 @@ bool RigolOscilloscope::AcquireData()
 		//Downloading the waveform is a pain in the butt, because we can only pull 250K points at a time!
 		for(size_t npoint = 0; npoint < npoints; )
 		{
-			if (m_protocol == DS_OLD)
+			if(m_protocol == MSO5)
+			{
+				//Ask for the data block
+				m_transport->SendCommand("WAV:DATA?");
+			}
+			else if (m_protocol == DS_OLD)
 			{
 				m_transport->SendCommand(string(":WAV:DATA? ") + m_channels[i]->GetHwname());
 			}
