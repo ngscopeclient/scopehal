@@ -78,8 +78,10 @@ void JitterSpectrumFilter::SetDefaultName()
 
 size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
 {
-	//Make a histogram of sample durations
+	//Make a histogram of sample durations.
+	//Sample no more than 5K UIs since this is just a rough estimate.
 	size_t inlen = din->m_samples.size();
+	inlen = min(inlen, (size_t)5000);
 	map<int64_t, size_t> durations;
 	int64_t maxdur = 0;
 	for(size_t i=0; i<inlen; i++)
@@ -185,7 +187,7 @@ void JitterSpectrumFilter::Refresh()
 	size_t capture_duration = din->m_offsets[inlen-1] + din->m_durations[inlen-1];
 	size_t num_uis = extended_samples.size();
 	double ui_width_final = static_cast<double>(capture_duration) / num_uis;
-	LogTrace("Capture is %zu UIs, %s\n", num_uis, Unit(Unit::UNIT_FS).PrettyPrint(capture_duration).c_str());
+	//LogTrace("Capture is %zu UIs, %s\n", num_uis, Unit(Unit::UNIT_FS).PrettyPrint(capture_duration).c_str());
 	LogTrace("Final UI width estimate: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_width_final).c_str());
 
 	//Round size up to next power of two
