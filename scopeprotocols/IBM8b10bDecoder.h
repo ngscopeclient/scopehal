@@ -42,19 +42,24 @@ public:
 	IBM8b10bSymbol()
 	{}
 
-	IBM8b10bSymbol(bool b, bool e,uint8_t d)
+	IBM8b10bSymbol(bool b, bool e, uint8_t d, int disp)
 	 : m_control(b)
 	 , m_error(e)
 	 , m_data(d)
+	 , m_disparity(disp)
 	{}
 
 	bool m_control;
 	bool m_error;
 	uint8_t m_data;
+	int m_disparity;
 
 	bool operator== (const IBM8b10bSymbol& s) const
 	{
-		return (m_control == s.m_control) && (m_error == s.m_error) && (m_data == s.m_data);
+		return (m_control == s.m_control) &&
+			(m_error == s.m_error) &&
+			(m_data == s.m_data) &&
+			(m_disparity == s.m_disparity);
 	}
 };
 

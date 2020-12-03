@@ -363,7 +363,7 @@ void IBM8b10bDecoder::Refresh()
 		cap->m_offsets.push_back(data.m_offsets[i] - data.m_durations[i]/2);
 
 		cap->m_durations.push_back(data.m_offsets[i+10] - data.m_offsets[i]);
-		cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5));
+		cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5, last_disp));
 
 		if(err5 || err3 || disperr)
 		{
@@ -420,7 +420,7 @@ string IBM8b10bDecoder::GetText(int i)
 
 		char tmp[32];
 		if(s.m_error)
-			snprintf(tmp, sizeof(tmp), "ERROR");
+			return "ERROR";
 		else
 		{
 			//Dotted format
@@ -430,6 +430,11 @@ string IBM8b10bDecoder::GetText(int i)
 					snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
 				else
 					snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
+
+				if(s.m_disparity < 0)
+					return string(tmp) + "-";
+				else
+					return string(tmp) + "+";
 			}
 
 			//Hex format
@@ -439,9 +444,9 @@ string IBM8b10bDecoder::GetText(int i)
 					snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
 				else
 					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				return string(tmp);
 			}
 		}
-		return string(tmp);
 	}
 	return "";
 }
