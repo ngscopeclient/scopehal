@@ -789,7 +789,10 @@ bool RigolOscilloscope::AcquireData()
 			m_transport->SendCommand(":RUN");
 		}
 		else
+		{
 			m_transport->SendCommand(":SING");
+			m_transport->SendCommand("*WAI");
+		}
 		m_triggerArmed = true;
 	}
 
@@ -808,7 +811,10 @@ void RigolOscilloscope::Start()
 		m_transport->SendCommand(":RUN");
 	}
 	else
+	{
 		m_transport->SendCommand(":SING");
+		m_transport->SendCommand("*WAI");
+	}
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -822,7 +828,10 @@ void RigolOscilloscope::StartSingleTrigger()
 		m_transport->SendCommand(":RUN");
 	}
 	else
+	{
 		m_transport->SendCommand(":SING");
+		m_transport->SendCommand("*WAI");
+	}
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
