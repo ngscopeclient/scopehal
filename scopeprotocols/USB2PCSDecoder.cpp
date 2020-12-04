@@ -119,6 +119,7 @@ void USB2PCSDecoder::Refresh()
 	//Decode stuff
 	size_t count = 0;
 	uint8_t data = 0;
+	bool first = true;
 	for(size_t i=0; i<len; i++)
 	{
 		switch(state)
@@ -128,7 +129,7 @@ void USB2PCSDecoder::Refresh()
 				break;
 
 			case STATE_SYNC:
-				RefreshIterationSync(i, state, ui_width, cap, din, count, offset, data);
+				RefreshIterationSync(i, state, ui_width, cap, din, count, offset, data, first);
 				break;
 
 			case STATE_DATA:
@@ -224,7 +225,8 @@ void USB2PCSDecoder::RefreshIterationSync(
 	USB2PMAWaveform* din,
 	size_t& count,
 	int64_t& offset,
-	uint8_t& data)
+	uint8_t& data,
+	bool& first)
 {
 	size_t sample_fs = din->m_durations[nin] * din->m_timescale;
 	float sample_width_ui = sample_fs * 1.0f / ui_width;
@@ -240,15 +242,26 @@ void USB2PCSDecoder::RefreshIterationSync(
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
 			(sin.m_type != USB2PMASymbol::TYPE_J))
 		{
-			//Sync until the error happened
-			cap->m_offsets.push_back(offset);
-			cap->m_durations.push_back(din->m_offsets[nin] - offset);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
+			//First packet? Don't print an error. We're probably just halfway into a previous packet.
+			//Clear out any half-baked garbage.
+			if(first)
+			{
+				cap->m_offsets.clear();
+				cap->m_durations.clear();
+				cap->m_samples.clear();
+			}
+			else
+			{
+				//Sync until the error happened
+				cap->m_offsets.push_back(offset);
+				cap->m_durations.push_back(din->m_offsets[nin] - offset);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
 
-			//Then error symbol for this K
-			cap->m_offsets.push_back(din->m_offsets[nin]);
-			cap->m_durations.push_back(din->m_durations[nin]);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+				//Then error symbol for this K
+				cap->m_offsets.push_back(din->m_offsets[nin]);
+				cap->m_durations.push_back(din->m_durations[nin]);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+			}
 
 			//Go back
 			state = STATE_IDLE;
@@ -263,15 +276,26 @@ void USB2PCSDecoder::RefreshIterationSync(
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
 			(sin.m_type != USB2PMASymbol::TYPE_K) )
 		{
-			//Sync until the error happened
-			cap->m_offsets.push_back(offset);
-			cap->m_durations.push_back(din->m_offsets[nin] - offset);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
+			//First packet? Don't print an error. We're probably just halfway into a previous packet.
+			//Clear out any half-baked garbage.
+			if(first)
+			{
+				cap->m_offsets.clear();
+				cap->m_durations.clear();
+				cap->m_samples.clear();
+			}
+			else
+			{
+				//Sync until the error happened
+				cap->m_offsets.push_back(offset);
+				cap->m_durations.push_back(din->m_offsets[nin] - offset);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
 
-			//Then error symbol for this J
-			cap->m_offsets.push_back(din->m_offsets[nin]);
-			cap->m_durations.push_back(din->m_durations[nin]);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+				//Then error symbol for this J
+				cap->m_offsets.push_back(din->m_offsets[nin]);
+				cap->m_durations.push_back(din->m_durations[nin]);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+			}
 
 			//Go back
 			state = STATE_IDLE;
@@ -285,15 +309,26 @@ void USB2PCSDecoder::RefreshIterationSync(
 		//Should be a K and at least two UIs long
 		if( (sample_width_ui < 1.5) || (sin.m_type != USB2PMASymbol::TYPE_K) )
 		{
-			//Sync until the error happened
-			cap->m_offsets.push_back(offset);
-			cap->m_durations.push_back(din->m_offsets[nin] - offset);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
+			//First packet? Don't print an error. We're probably just halfway into a previous packet.
+			//Clear out any half-baked garbage.
+			if(first)
+			{
+				cap->m_offsets.clear();
+				cap->m_durations.clear();
+				cap->m_samples.clear();
+			}
+			else
+			{
+				//Sync until the error happened
+				cap->m_offsets.push_back(offset);
+				cap->m_durations.push_back(din->m_offsets[nin] - offset);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_SYNC, 0));
 
-			//Then error symbol for this J
-			cap->m_offsets.push_back(din->m_offsets[nin]);
-			cap->m_durations.push_back(din->m_durations[nin]);
-			cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+				//Then error symbol for this J
+				cap->m_offsets.push_back(din->m_offsets[nin]);
+				cap->m_durations.push_back(din->m_durations[nin]);
+				cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_ERROR, 0));
+			}
 
 			state = STATE_IDLE;
 			return;
@@ -303,6 +338,9 @@ void USB2PCSDecoder::RefreshIterationSync(
 		//We end right at the boundary.
 		if(round(sample_width_ui) == 2)
 		{
+			//Got a valid sync. Not the first packet anymore
+			first = false;
+
 			//Save the sync symbol
 			cap->m_offsets.push_back(offset);
 			cap->m_durations.push_back(din->m_offsets[nin] + din->m_durations[nin] - offset);
@@ -339,6 +377,9 @@ void USB2PCSDecoder::RefreshIterationSync(
 			}
 			else
 			{
+				//Got a valid sync. Not the first packet anymore
+				first = false;
+
 				data = 0;
 
 				//Add the ones, LSB to MSB

@@ -128,7 +128,9 @@ protected:
 		USB2PMAWaveform* din,
 		size_t& count,
 		int64_t& offset,
-		uint8_t& data);
+		uint8_t& data,
+		bool& first
+		);
 
 	void RefreshIterationData(
 		size_t nin,
