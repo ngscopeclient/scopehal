@@ -577,6 +577,7 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketWaveform* cap, size_t istart, size
 	Packet* pack = new Packet;
 	pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 	pack->m_headers["Type"] = "SETUP";
+	pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
 	char tmp[256];
 	snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 	pack->m_headers["Device"] = tmp;
@@ -707,9 +708,15 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		Packet* pack = new Packet;
 		pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 		if( (cap->m_samples[istart].m_data & 0xf) == USB2PacketSymbol::PID_IN)
+		{
 			pack->m_headers["Type"] = "IN";
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+		}
 		else
+		{
 			pack->m_headers["Type"] = "OUT";
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+		}
 		snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 		pack->m_headers["Device"] = tmp;
 		snprintf(tmp, sizeof(tmp), "%d", sendp.m_data);
@@ -732,6 +739,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		Packet* pack = new Packet;
 		pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 		pack->m_headers["Details"] = "ERROR";
+		pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 		m_packets.push_back(pack);
 		return;
 	}
@@ -740,9 +748,15 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	Packet* pack = new Packet;
 	pack->m_offset = cap->m_offsets[istart] * cap->m_timescale;
 	if( (cap->m_samples[istart].m_data & 0xf) == USB2PacketSymbol::PID_IN)
+	{
 		pack->m_headers["Type"] = "IN";
+		pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+	}
 	else
+	{
 		pack->m_headers["Type"] = "OUT";
+		pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+	}
 	snprintf(tmp, sizeof(tmp), "%d", saddr.m_data);
 	pack->m_headers["Device"] = tmp;
 	snprintf(tmp, sizeof(tmp), "%d", sendp.m_data);
