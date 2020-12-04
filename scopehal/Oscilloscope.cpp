@@ -505,6 +505,20 @@ void Oscilloscope::SetADCMode(size_t /*channel*/, size_t /*mode*/)
 	//no-op
 }
 
+bool Oscilloscope::CanInvert(size_t /*i*/)
+{
+	return false;
+}
+
+void Oscilloscope::Invert(size_t /*i*/, bool /*invert*/)
+{
+}
+
+bool Oscilloscope::IsInverted(size_t /*i*/)
+{
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Trigger configuration
 

@@ -1232,6 +1232,10 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	if(i >= m_analogChannelCount)
 		return;
 
+	//Get the old coupling value first.
+	//This ensures that m_probeIsActive[i] is valid
+	GetChannelCoupling(i);
+
 	//Don't allow changing attenuation on active probes
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1413,6 +1417,35 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
 	m_transport->SendCommand(cmd);
+}
+
+bool LeCroyOscilloscope::CanInvert(size_t i)
+{
+	//All analog channels, and only analog channels, can be inverted
+	return (i < m_analogChannelCount);
+}
+
+void LeCroyOscilloscope::Invert(size_t i, bool invert)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(invert)
+		m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = true'");
+	else
+		m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = false'");
+}
+
+bool LeCroyOscilloscope::IsInverted(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return false;
+
+	m_transport->SendCommand(string("VBS? 'return = app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert'");
+	auto reply = Trim(m_transport->ReadReply());
+	return (reply == "-1");
 }
 
 void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)

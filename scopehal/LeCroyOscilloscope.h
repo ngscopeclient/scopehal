@@ -95,6 +95,9 @@ public:
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
 	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
+	virtual bool CanInvert(size_t i);
+	virtual void Invert(size_t i, bool invert);
+	virtual bool IsInverted(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();

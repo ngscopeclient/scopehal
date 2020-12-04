@@ -277,6 +277,28 @@ string OscilloscopeChannel::GetDisplayName()
 		return m_displayname;
 }
 
+bool OscilloscopeChannel::CanInvert()
+{
+	if(m_scope)
+		return m_scope->CanInvert(m_index);
+	else
+		return false;
+}
+
+void OscilloscopeChannel::Invert(bool invert)
+{
+	if(m_scope)
+		m_scope->Invert(m_index, invert);
+}
+
+bool OscilloscopeChannel::IsInverted()
+{
+	if(m_scope)
+		return m_scope->IsInverted(m_index);
+	else
+		return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

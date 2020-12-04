@@ -274,6 +274,28 @@ public:
 	 */
 	virtual void SetChannelOffset(size_t i, double offset) =0;
 
+	/**
+		@brief Checks if a channel is capable of hardware polarity inversion
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool CanInvert(size_t i);
+
+	/**
+		@brief Enables hardware polarity inversion for a channel, if supported
+
+		@param i			Zero-based index of channel
+		@param invert		True to invert, false for normal operation
+	 */
+	virtual void Invert(size_t i, bool invert);
+
+	/**
+		@brief Checks if hardware polarity inversion is enabled for a channel
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool IsInverted(size_t i);
+
 	//Triggering
 	enum TriggerMode
 	{

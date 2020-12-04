@@ -186,6 +186,10 @@ public:
 
 	void SetCenterFrequency(int64_t freq);
 
+	virtual bool CanInvert();
+	virtual void Invert(bool invert);
+	virtual bool IsInverted();
+
 	void SetDefaultDisplayName();
 protected:
 	void SharedCtorInit();
