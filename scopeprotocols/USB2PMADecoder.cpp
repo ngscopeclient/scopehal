@@ -44,10 +44,13 @@ USB2PMADecoder::USB2PMADecoder(const string& color)
 	CreateInput("D+");
 	CreateInput("D-");
 
-	//TODO: make this an enum/bool
-	m_speedname = "Full Speed";
-	m_parameters[m_speedname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_speedname].SetIntVal(1);
+	m_speedname = "Speed";
+
+	m_parameters[m_speedname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_speedname].AddEnumValue("Low (1.5 Mbps)", SPEED_LOW);
+	m_parameters[m_speedname].AddEnumValue("Full (12 Mbps)", SPEED_FULL);
+	m_parameters[m_speedname].AddEnumValue("High (480 Mbps)", SPEED_HIGH);
+	m_parameters[m_speedname].SetIntVal(SPEED_FULL);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +118,7 @@ void USB2PMADecoder::Refresh()
 	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
 
 	//Figure out our speed so we know what's going on
-	int speed = m_parameters[m_speedname].GetIntVal();
+	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
 
 	//Figure out the line state for each input (no clock recovery yet)
 	auto cap = new USB2PMAWaveform;
@@ -128,7 +131,7 @@ void USB2PMADecoder::Refresh()
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
 		if(fabs(vdiff) > 0.4)
 		{
-			if(speed == 1)
+			if( (speed == SPEED_FULL) || (speed == SPEED_HIGH) )
 			{
 				if(vdiff > 0)
 					type = USB2PMASymbol::TYPE_J;

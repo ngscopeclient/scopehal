@@ -85,6 +85,13 @@ public:
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 
+	enum Speed
+	{
+		SPEED_LOW,
+		SPEED_FULL,
+		SPEED_HIGH
+	};
+
 	PROTOCOL_DECODER_INITPROC(USB2PMADecoder)
 
 protected:
