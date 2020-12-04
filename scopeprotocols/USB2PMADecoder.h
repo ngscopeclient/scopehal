@@ -92,6 +92,9 @@ public:
 		SPEED_HIGH
 	};
 
+	void SetSpeed(Speed s)
+	{ m_parameters[m_speedname].SetIntVal(s); }
+
 	PROTOCOL_DECODER_INITPROC(USB2PMADecoder)
 
 protected:
