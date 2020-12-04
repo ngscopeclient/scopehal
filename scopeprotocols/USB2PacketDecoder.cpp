@@ -794,7 +794,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 		return;
 	}
 	string ack = "";
-	auto sack = cap->m_samples[i++];
+	auto sack = cap->m_samples[i];
 	if(sack.m_type == USB2PacketSymbol::TYPE_PID)
 	{
 		if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
@@ -813,6 +813,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	}
 
 	pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
+	i++;
 
 	//Format the data
 	string details = "";
