@@ -773,7 +773,16 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 
 		//Next should be a CRC16
 		else if(s.m_type == USB2PacketSymbol::TYPE_CRC16_GOOD)
+		{
+			i++;
 			break;
+		}
+		else if(s.m_type == USB2PacketSymbol::TYPE_CRC16_BAD)
+		{
+			i++;
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+			break;
+		}
 
 		i++;
 	}
