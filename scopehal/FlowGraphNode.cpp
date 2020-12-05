@@ -75,7 +75,7 @@ string FlowGraphNode::GetInputName(size_t i)
 		return m_signalNames[i];
 	else
 	{
-		LogError("Invalid channel index\n");
+		LogError("Invalid channel index %zu in FlowGraphNode::GetInputName()\n", i);
 		return "";
 	}
 }
@@ -123,7 +123,7 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 	}
 	else
 	{
-		LogError("Invalid channel index\n");
+		LogError("Invalid channel index %zu in FlowGraphNode::SetInput()\n", i);
 	}
 }
 
@@ -160,7 +160,7 @@ StreamDescriptor FlowGraphNode::GetInput(size_t i)
 		return m_inputs[i];
 	else
 	{
-		LogError("Invalid channel index\n");
+		LogError("Invalid channel index %zu in FlowGraphNode::GetInput()\n", i);
 		return StreamDescriptor(NULL, 0);
 	}
 }
