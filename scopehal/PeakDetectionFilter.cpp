@@ -88,7 +88,7 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 			//Do a weighted average of our immediate neighbors to fine tune our position
 			ssize_t fine_rad = 10;
 			left = max((ssize_t)1, i - fine_rad);
-			right = min(i + fine_rad, (ssize_t)nouts);
+			right = min(i + fine_rad, (ssize_t)nouts-1);
 			//LogDebug("peak range: %zu, %zu\n", left, right);
 			double total = 0;
 			double count = 0;
