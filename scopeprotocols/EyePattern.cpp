@@ -597,7 +597,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		//Save stuff for output loop
 		int32_t pixel_x_round[8]	__attribute__((aligned(32)));
 		int32_t bin2[8]				__attribute__((aligned(32)));
-		int32_t off[8]				__attribute__((aligned(32)));
+		uint32_t off[8]				__attribute__((aligned(32)));
 		_mm256_store_si256((__m256i*)pixel_x_round, vxfloori);
 		_mm256_store_si256((__m256i*)bin2, vbin2i);
 		_mm256_store_si256((__m256i*)off, voff);
