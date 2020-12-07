@@ -531,7 +531,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 
 	//Main unrolled loop, 8 samples per iteration
 	size_t i = 0;
-	int32_t bufmax = m_width * (m_height - 1);
+	uint32_t bufmax = m_width * (m_height - 1);
 	for(; i<wend_rounded && iclock < cend; i+= 8)
 	{
 		//Figure out timestamp of this sample within the UI.
