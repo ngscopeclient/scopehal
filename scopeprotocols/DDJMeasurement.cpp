@@ -151,8 +151,6 @@ void DDJMeasurement::Refresh()
 	int64_t tfirst = tie->m_offsets[0] * tie->m_timescale + tie->m_triggerPhase;
 	for(size_t idata=0; idata < samplen; idata ++)
 	{
-		uint8_t last_window = window;
-
 		//Sample the next bit in the thresholded waveform
 		window = (window >> 1);
 		if(samples.m_samples[idata])
@@ -180,9 +178,15 @@ void DDJMeasurement::Refresh()
 		if(itie >= tielen)
 			break;
 
+		//If the TIE sample is after this bit, don't do anything.
+		//We need edges within this UI.
+		int64_t tend = tstart + samples.m_durations[idata];
+		if(target > tend)
+			continue;
+
 		//Save the info in the DDJ table
-		num_table[last_window] ++;
-		sum_table[last_window] += tie->m_samples[itie];
+		num_table[window] ++;
+		sum_table[window] += tie->m_samples[itie];
 	}
 
 	//Calculate DDJ
