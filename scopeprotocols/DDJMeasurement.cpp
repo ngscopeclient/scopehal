@@ -159,8 +159,8 @@ void DDJMeasurement::Refresh()
 			window |= 0x80;
 		nbits ++;
 
-		//need 10 in last_window, plus one more for the current bit
-		if(nbits < 11)
+		//need 8 in last_window, plus one more for the current bit
+		if(nbits < 9)
 			continue;
 
 		//If we're still before the first TIE sample, nothing to do
