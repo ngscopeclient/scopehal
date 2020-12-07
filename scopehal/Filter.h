@@ -194,7 +194,8 @@ protected:
 			i ++;
 	}
 
-	AnalogWaveform* SetupOutputWaveform(AnalogWaveform* din, size_t stream, size_t skipstart, size_t skipend);
+	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
+	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes

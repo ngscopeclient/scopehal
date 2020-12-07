@@ -103,9 +103,7 @@ void ThresholdFilter::Refresh()
 	//Setup
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
 	float hys = m_parameters[m_hysname].GetFloatVal();
-	DigitalWaveform* cap = new DigitalWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(din);
+	auto cap = SetupDigitalOutputWaveform(din, 0, 0, 0);
 
 	//Threshold all of our samples
 	//Optimized inner loop if no hysteresis
@@ -131,11 +129,4 @@ void ThresholdFilter::Refresh()
 			cap->m_samples[i] = cur;
 		}
 	}
-
-	SetData(cap, 0);
-
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

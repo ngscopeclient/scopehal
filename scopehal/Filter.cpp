@@ -996,13 +996,83 @@ void Filter::ClearAnalysisCache()
 
 	@return	The ready-to-use output waveform
  */
-AnalogWaveform* Filter::SetupOutputWaveform(AnalogWaveform* din, size_t stream, size_t skipstart, size_t skipend)
+AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
 {
 	//Create the waveform, but only if necessary
 	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(stream));
 	if(cap == NULL)
 	{
 		cap = new AnalogWaveform;
+		SetData(cap, stream);
+	}
+
+	//Copy configuration
+	cap->m_timescale 			= din->m_timescale;
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+	cap->m_triggerPhase			= din->m_triggerPhase;
+
+	size_t len = din->m_offsets.size() - (skipstart + skipend);
+	size_t curlen = cap->m_offsets.size();
+
+	cap->Resize(len);
+
+	//If the input waveform is NOT dense packed, no optimizations possible.
+	if(!din->m_densePacked)
+	{
+		memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
+		memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
+		cap->m_densePacked = false;
+	}
+
+	//Input waveform is dense packed, but output is not.
+	//Need to clear some old stuff but we can produce a dense packed output.
+	//Note that we copy from zero regardless of skipstart to produce a dense packed output.
+	//TODO: AVX2 optimizations here so we don't need to read data we already know the value of
+	else if(!cap->m_densePacked)
+	{
+		memcpy(&cap->m_offsets[0], &din->m_offsets[0], len*sizeof(int64_t));
+		memcpy(&cap->m_durations[0], &din->m_durations[0], len*sizeof(int64_t));
+		cap->m_densePacked = true;
+	}
+
+	//Both waveforms are dense packed, but new size is bigger. Need to copy the additional data.
+	else if(len > curlen)
+	{
+		size_t increase = len - curlen;
+		memcpy(&cap->m_offsets[curlen], &din->m_offsets[curlen], increase*sizeof(int64_t));
+		memcpy(&cap->m_durations[curlen], &din->m_durations[curlen], increase*sizeof(int64_t));
+	}
+
+	//Both waveforms are dense packed, new size is smaller or the same.
+	//This is what we want: no work needed at all!
+	else
+	{
+	}
+
+	return cap;
+}
+
+/**
+	@brief Sets up a digital output waveform and copies timebase configuration from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+	Timestamps are copied from the input to the output.
+
+	@param din			Input waveform
+	@param stream		Stream index
+	@param skipstart	Number of input samples to discard from the beginning of the waveform
+	@param skipend		Number of input samples to discard from the end of the waveform
+
+	@return	The ready-to-use output waveform
+ */
+DigitalWaveform* Filter::SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
+{
+	//Create the waveform, but only if necessary
+	DigitalWaveform* cap = dynamic_cast<DigitalWaveform*>(GetData(stream));
+	if(cap == NULL)
+	{
+		cap = new DigitalWaveform;
 		SetData(cap, stream);
 	}
 
