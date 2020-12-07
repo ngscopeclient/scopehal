@@ -279,7 +279,7 @@ void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t samplepe
 	normal_distribution<> noise(0, 0.01);
 
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
-	const size_t npoints = pow(2, ceil(log2(depth)));
+	const size_t npoints = next_pow2(depth);
 	size_t nouts = npoints/2 + 1;
 	if(m_cachedNumPoints != npoints)
 	{
