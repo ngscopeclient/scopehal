@@ -105,6 +105,8 @@ void DetectCPUFeatures();
 
 float FreqToPhase(float hz);
 
+uint64_t next_pow2(uint64_t v);
+
 extern bool g_hasAvx512F;
 extern bool g_hasAvx512VL;
 extern bool g_hasAvx512DQ;
