@@ -198,7 +198,6 @@ void TIEMeasurement::Refresh()
 		//edge for TIE measurements.
 		int64_t golden_period = next_edge - prev_edge;
 		int64_t golden_center = prev_edge + golden_period/2;
-		golden_center += 1.5*clk->m_timescale;			//TODO: why is this needed?
 		int64_t tie = atime - golden_center;
 
 		//Ignore edges before things have stabilized
@@ -215,12 +214,12 @@ void TIEMeasurement::Refresh()
 			vmax = max(vmax, tie);
 			vmin = min(vmin, tie);
 
-			cap->m_offsets.push_back(atime);
+			cap->m_offsets.push_back(golden_center);
 			cap->m_durations.push_back(0);
 			cap->m_samples.push_back(tie);
 		}
 
-		tlast = atime;
+		tlast = golden_center;
 	}
 
 	SetData(cap, 0);
@@ -228,7 +227,8 @@ void TIEMeasurement::Refresh()
 	//Copy start time etc from the input
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = 0;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 
 	//Calculate bounds
 	m_max = max(m_max, (float)vmax);
