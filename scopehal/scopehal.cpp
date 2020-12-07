@@ -409,3 +409,18 @@ string to_string_sci(double d)
 	snprintf(tmp, sizeof(tmp), "%e", d);
 	return tmp;
 }
+
+/**
+	@brief compute the next highest power of 2 of 64-bit value
+ */
+uint64_t next_pow2(uint64_t v) 
+{
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
+}
