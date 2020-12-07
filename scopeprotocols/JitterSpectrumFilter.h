@@ -45,6 +45,8 @@ public:
 
 	virtual void Refresh();
 
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
