@@ -235,7 +235,7 @@ void ClockRecoveryFilter::Refresh()
 		{
 			value = !value;
 
-			cap->m_offsets.push_back(edgepos_orig + period/2 - din->m_timescale*1.5);
+			cap->m_offsets.push_back(edgepos + period/2);
 			cap->m_durations.push_back(period);
 			cap->m_samples.push_back(value);
 		}
