@@ -176,7 +176,7 @@ void FFTFilter::Refresh()
 
 	//Round size up to next power of two
 	const size_t npoints_raw = din->m_samples.size();
-	const size_t npoints = pow(2, ceil(log2(npoints_raw)));
+	const size_t npoints = next_pow2(npoints_raw);
 	LogTrace("FFTFilter: processing %zu raw points\n", npoints_raw);
 	LogTrace("Rounded to %zu\n", npoints);
 
