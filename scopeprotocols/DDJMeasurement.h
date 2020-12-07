@@ -55,6 +55,12 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(DDJMeasurement)
+
+	float* GetDDJTable()
+	{ return m_table; }
+
+protected:
+	float m_table[256];
 };
 
 #endif

@@ -34,8 +34,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DDJMeasurement::DDJMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+RjBUjFilter::RjBUjFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
@@ -43,15 +43,15 @@ DDJMeasurement::DDJMeasurement(const string& color)
 	CreateInput("TIE");
 	CreateInput("Threshold");
 	CreateInput("Clock");
+	CreateInput("DDJ");
 
-	for(int i=0; i<256; i++)
-		m_table[i] = 0;
+	ClearSweeps();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+bool RjBUjFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -60,6 +60,8 @@ bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 		return true;
 	if( (i <= 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
+	if( (i == 3) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != NULL) )
+		return true;
 
 	return false;
 }
@@ -67,52 +69,55 @@ bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DDJMeasurement::SetDefaultName()
+void RjBUjFilter::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DDJ(%s, %s)",
+	snprintf(hwname, sizeof(hwname), "RjBUj(%s, %s)",
 		GetInputDisplayName(0).c_str(),
 		GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string DDJMeasurement::GetProtocolName()
+string RjBUjFilter::GetProtocolName()
 {
-	return "DDJ";
+	return "Rj + BUj";
 }
 
-bool DDJMeasurement::IsOverlay()
+bool RjBUjFilter::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool DDJMeasurement::IsScalarOutput()
-{
-	return true;
-}
-
-bool DDJMeasurement::NeedsConfig()
+bool RjBUjFilter::NeedsConfig()
 {
 	//we have more than one input
 	return true;
 }
 
-double DDJMeasurement::GetVoltageRange()
+double RjBUjFilter::GetVoltageRange()
 {
-	return 0;
+	return m_range;
 }
 
-double DDJMeasurement::GetOffset()
+double RjBUjFilter::GetOffset()
 {
-	return 0;
+	return m_offset;
+}
+
+void RjBUjFilter::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DDJMeasurement::Refresh()
+void RjBUjFilter::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
@@ -124,32 +129,28 @@ void DDJMeasurement::Refresh()
 	auto tie = GetAnalogInputWaveform(0);
 	auto thresh = GetDigitalInputWaveform(1);
 	auto clk = GetDigitalInputWaveform(2);
+	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(3).m_channel);
+	float* table = ddj->GetDDJTable();
 
 	//Sample the input data
 	DigitalWaveform samples;
 	SampleOnAnyEdges(thresh, clk, samples);
 
+	//Set up output waveform
+	auto cap = SetupOutputWaveform(tie, 0, 0, 0);
+
 	//DDJ history (8 UIs)
 	uint8_t window = 0;
-
-	//Table of jitter indexed by history
-	vector<size_t> num_table;
-	vector<float> sum_table;
-	size_t num_bins = 256;
-	num_table.resize(num_bins);
-	sum_table.resize(num_bins);
-	for(size_t i=0; i<num_bins; i++)
-	{
-		num_table[i] = 0;
-		sum_table[i] = 0;
-	}
 
 	size_t tielen = tie->m_samples.size();
 	size_t samplen = samples.m_samples.size();
 
 	size_t itie = 0;
 
-	//Loop over the TIE and threshold waveform and assign jitter to bins
+	float vmax = -FLT_MAX;
+	float vmin = FLT_MAX;
+
+	//Main processing loop
 	size_t nbits = 0;
 	int64_t tfirst = tie->m_offsets[0] * tie->m_timescale + tie->m_triggerPhase;
 	for(size_t idata=0; idata < samplen; idata ++)
@@ -187,33 +188,17 @@ void DDJMeasurement::Refresh()
 		if(target > tend)
 			continue;
 
-		//Save the info in the DDJ table
-		num_table[window] ++;
-		sum_table[window] += tie->m_samples[itie];
+		//We've got a good sample. Subtract the averaged DDJ from TIE to get the uncorrelated jitter (Rj + BUj).
+		float uj = tie->m_samples[itie] - table[window];
+		cap->m_samples[itie] = uj;
+
+		vmax = max(vmax, uj);
+		vmin = min(vmin, uj);
 	}
 
-	//Calculate DDJ
-	float ddjmin =  FLT_MAX;
-	float ddjmax = 0;
-	for(size_t i=0; i<num_bins; i++)
-	{
-		if(num_table[i] != 0)
-		{
-			float jitter = sum_table[i] * 1.0 / num_table[i];
-			m_table[i] = jitter;
-			ddjmin = min(ddjmin, jitter);
-			ddjmax = max(ddjmax, jitter);
-		}
-		else
-			m_table[i] = 0;
-	}
-
-	auto cap = new AnalogWaveform;
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(1);
-	cap->m_samples.push_back(ddjmax - ddjmin);
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = tie->m_startTimestamp;
-	cap->m_startFemtoseconds = tie->m_startFemtoseconds;
-	SetData(cap, 0);
+	//Calculate bounds
+	m_max = max(m_max, (float)vmax);
+	m_min = min(m_min, (float)vmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
 }
