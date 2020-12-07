@@ -483,7 +483,7 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 	//Find times of the zero crossings
 	bool first = true;
 	bool last = false;
-	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	int64_t phoff = data->m_triggerPhase;
 	size_t len = data->m_samples.size();
 	float fscale = data->m_timescale;
 
@@ -507,7 +507,7 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 
 			//Midpoint of the sample, plus the zero crossing
 			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale*i + tfrac;
+			int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
 			edges.push_back(t);
 			last = value;
 		}
@@ -532,7 +532,7 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 
 			//Midpoint of the sample, plus the zero crossing
 			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale * data->m_offsets[i] + tfrac;
+			int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
 			edges.push_back(t);
 			last = value;
 		}
