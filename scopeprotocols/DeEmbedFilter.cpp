@@ -227,7 +227,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	const size_t npoints_raw = din->m_samples.size();
 
 	//Zero pad to next power of two up
-	const size_t npoints = pow(2, ceil(log2(npoints_raw)));
+	const size_t npoints = next_pow2(npoints_raw);
 	//LogTrace("DeEmbedFilter: processing %zu raw points\n", npoints_raw);
 	//LogTrace("Rounded to %zu\n", npoints);
 
