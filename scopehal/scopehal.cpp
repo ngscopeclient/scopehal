@@ -411,16 +411,24 @@ string to_string_sci(double d)
 }
 
 /**
-	@brief compute the next highest power of 2 of 64-bit value
+	@brief Rounds a 64-bit integer up to the next power of 2
  */
-uint64_t next_pow2(uint64_t v) 
+uint64_t next_pow2(uint64_t v)
 {
+#ifdef __GNUC__
+	if(v == 1)
+		return 1;
+	else
+		return 1 << (64 - __builtin_clzl(v-1));
+#else
 	v--;
 	v |= v >> 1;
 	v |= v >> 2;
 	v |= v >> 4;
 	v |= v >> 8;
 	v |= v >> 16;
+	v |= v >> 32;
 	v++;
 	return v;
+#endif
 }
