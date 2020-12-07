@@ -12,6 +12,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
 	DCOffsetFilter.cpp
+	DDJMeasurement.cpp
 	DDR3Decoder.cpp
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp

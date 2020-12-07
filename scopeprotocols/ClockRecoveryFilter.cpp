@@ -161,7 +161,6 @@ void ClockRecoveryFilter::Refresh()
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
-		int64_t edgepos_orig = edgepos;
 
 		//See if the current edge position is within a gating region
 		bool was_gating = gating;

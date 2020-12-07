@@ -50,6 +50,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
 	AddDecoderClass(DCOffsetFilter);
+	AddDecoderClass(DDJMeasurement);
 	AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DeEmbedFilter);
 	AddDecoderClass(DeskewFilter);
