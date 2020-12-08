@@ -27,120 +27,130 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopeprotocols.h"
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+using namespace std;
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCDMeasurement.h"
-#include "DCOffsetFilter.h"
-#include "DDJMeasurement.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DPhyDataDecoder.h"
-#include "DPhyHSClockRecoveryFilter.h"
-#include "DPhySymbolDecoder.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DSIFrameDecoder.h"
-#include "DSIPacketDecoder.h"
-#include "DutyCycleMeasurement.h"
-#include "DVIDecoder.h"
-#include "EmphasisFilter.h"
-#include "EmphasisRemovalFilter.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HistogramFilter.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "I2CEepromDecoder.h"
-#include "IPv4Decoder.h"
-#include "ISIMeasurement.h"
-#include "JitterSpectrumFilter.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OneWireDecoder.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PCIeDataLinkDecoder.h"
-#include "PCIeGen2LogicalDecoder.h"
-#include "PCIeTransportDecoder.h"
-#include "PeakHoldFilter.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "RjBUjFilter.h"
-#include "QSPIDecoder.h"
-#include "QuadratureDecoder.h"
-#include "RiseMeasurement.h"
-#include "SDCmdDecoder.h"
-#include "SDDataDecoder.h"
-#include "SPIDecoder.h"
-#include "SPIFlashDecoder.h"
-#include "SubtractFilter.h"
-#include "SWDDecoder.h"
-#include "SWDMemAPDecoder.h"
-#include "TachometerFilter.h"
-#include "TappedDelayLineFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "VerticalBathtub.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
+ISIMeasurement::ISIMeasurement(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+{
+	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+	//Set up channels
+	CreateInput("DDJ");
+}
 
-void ScopeProtocolStaticInit();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-#endif
+bool ISIMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != NULL) )
+		return true;
+
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+void ISIMeasurement::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "ISI(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+string ISIMeasurement::GetProtocolName()
+{
+	return "ISI";
+}
+
+bool ISIMeasurement::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool ISIMeasurement::IsScalarOutput()
+{
+	return true;
+}
+
+bool ISIMeasurement::NeedsConfig()
+{
+	return false;
+}
+
+double ISIMeasurement::GetVoltageRange()
+{
+	return 1;
+}
+
+double ISIMeasurement::GetOffset()
+{
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void ISIMeasurement::Refresh()
+{
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Get the input data
+	auto din = GetAnalogInputWaveform(0);
+	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
+	float* table = ddj->GetDDJTable();
+
+	//Check all of the bins and find total jitter for rising and falling edges.
+	//Note that the table has LSB most recent, so 10...... is a rising edge and 01...... is a falling edge.
+	//We check for zero in case the table is incomplete (this should not drag the mean down).
+	float rising_min = FLT_MAX;
+	float rising_max = -FLT_MAX;
+	for(int i = 0x80; i < 0xc0; i++)
+	{
+		if(table[i] != 0)
+		{
+			rising_min = min(rising_min, table[i]);
+			rising_max = max(rising_max, table[i]);
+		}
+	}
+
+	float falling_min = FLT_MAX;
+	float falling_max = -FLT_MAX;
+	for(int i = 0x40; i < 0x80; i++)
+	{
+		if(table[i] != 0)
+		{
+			falling_min = min(falling_min, table[i]);
+			falling_max = max(falling_max, table[i]);
+		}
+	}
+
+	float rising_pp = rising_max - falling_min;
+	float falling_pp = falling_max - falling_min;
+
+	float isi = max(rising_pp, falling_pp);
+
+	auto cap = new AnalogWaveform;
+	cap->m_offsets.push_back(0);
+	cap->m_durations.push_back(1);
+	cap->m_samples.push_back(isi);
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	SetData(cap, 0);
+}

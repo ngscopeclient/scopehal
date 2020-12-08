@@ -55,6 +55,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	I2CEepromDecoder.cpp
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
+	ISIMeasurement.cpp
 	JitterSpectrumFilter.cpp
 	JtagDecoder.cpp
 	MagnitudeFilter.cpp
