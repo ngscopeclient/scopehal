@@ -11,6 +11,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClockRecoveryFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
+	DCDMeasurement.cpp
 	DCOffsetFilter.cpp
 	DDJMeasurement.cpp
 	DDR3Decoder.cpp

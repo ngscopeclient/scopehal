@@ -34,31 +34,24 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DDJMeasurement::DDJMeasurement(const string& color)
+DCDMeasurement::DCDMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_yAxisUnit = Unit(Unit::UNIT_FS);
 
 	//Set up channels
-	CreateInput("TIE");
-	CreateInput("Threshold");
-	CreateInput("Clock");
-
-	for(int i=0; i<256; i++)
-		m_table[i] = 0;
+	CreateInput("DDJ");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+bool DCDMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-	if( (i <= 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 0) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != NULL) )
 		return true;
 
 	return false;
@@ -67,44 +60,41 @@ bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DDJMeasurement::SetDefaultName()
+void DCDMeasurement::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DDJpp(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
+	snprintf(hwname, sizeof(hwname), "DCD(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string DDJMeasurement::GetProtocolName()
+string DCDMeasurement::GetProtocolName()
 {
-	return "DDJ";
+	return "DCD";
 }
 
-bool DDJMeasurement::IsOverlay()
+bool DCDMeasurement::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool DDJMeasurement::IsScalarOutput()
+bool DCDMeasurement::IsScalarOutput()
 {
 	return true;
 }
 
-bool DDJMeasurement::NeedsConfig()
+bool DCDMeasurement::NeedsConfig()
 {
-	//we have more than one input
-	return true;
+	return false;
 }
 
-double DDJMeasurement::GetVoltageRange()
+double DCDMeasurement::GetVoltageRange()
 {
-	return 0;
+	return 1;
 }
 
-double DDJMeasurement::GetOffset()
+double DCDMeasurement::GetOffset()
 {
 	return 0;
 }
@@ -112,7 +102,7 @@ double DDJMeasurement::GetOffset()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DDJMeasurement::Refresh()
+void DCDMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
@@ -121,99 +111,45 @@ void DDJMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto tie = GetAnalogInputWaveform(0);
-	auto thresh = GetDigitalInputWaveform(1);
-	auto clk = GetDigitalInputWaveform(2);
+	auto din = GetAnalogInputWaveform(0);
+	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
+	float* table = ddj->GetDDJTable();
 
-	//Sample the input data
-	DigitalWaveform samples;
-	SampleOnAnyEdges(thresh, clk, samples);
-
-	//DDJ history (8 UIs)
-	uint8_t window = 0;
-
-	//Table of jitter indexed by history
-	vector<size_t> num_table;
-	vector<float> sum_table;
-	size_t num_bins = 256;
-	num_table.resize(num_bins);
-	sum_table.resize(num_bins);
-	for(size_t i=0; i<num_bins; i++)
+	//Check all of the bins and find total jitter for rising and falling edges.
+	//Note that the table has LSB most recent, so 10...... is a rising edge and 01...... is a falling edge.
+	//We check for zero in case the table is incomplete (this should not drag the mean down).
+	int rising_count = 0;
+	float rising_sum = 0;
+	for(int i = 0x80; i < 0xc0; i++)
 	{
-		num_table[i] = 0;
-		sum_table[i] = 0;
-	}
-
-	size_t tielen = tie->m_samples.size();
-	size_t samplen = samples.m_samples.size();
-
-	size_t itie = 0;
-
-	//Loop over the TIE and threshold waveform and assign jitter to bins
-	size_t nbits = 0;
-	int64_t tfirst = tie->m_offsets[0] * tie->m_timescale + tie->m_triggerPhase;
-	for(size_t idata=0; idata < samplen; idata ++)
-	{
-		//Sample the next bit in the thresholded waveform
-		window = (window >> 1);
-		if(samples.m_samples[idata])
-			window |= 0x80;
-		nbits ++;
-
-		//need 8 in last_window, plus one more for the current bit
-		if(nbits < 9)
-			continue;
-
-		//If we're still before the first TIE sample, nothing to do
-		int64_t tstart = samples.m_offsets[idata];
-		if(tstart < tfirst)
-			continue;
-
-		//Advance TIE samples if needed
-		int64_t target = 0;
-		while( (target < tfirst) && (itie < tielen) )
+		if(table[i] != 0)
 		{
-			target = tie->m_offsets[itie] * tie->m_timescale + tie->m_triggerPhase;
-
-			if(target < tstart)
-				itie ++;
+			rising_count ++;
+			rising_sum += table[i];
 		}
-		if(itie >= tielen)
-			break;
-
-		//If the TIE sample is after this bit, don't do anything.
-		//We need edges within this UI.
-		int64_t tend = tstart + samples.m_durations[idata];
-		if(target > tend)
-			continue;
-
-		//Save the info in the DDJ table
-		num_table[window] ++;
-		sum_table[window] += tie->m_samples[itie];
 	}
 
-	//Calculate DDJ
-	float ddjmin =  FLT_MAX;
-	float ddjmax = 0;
-	for(size_t i=0; i<num_bins; i++)
+	int falling_count = 0;
+	float falling_sum = 0;
+	for(int i = 0x40; i < 0x80; i++)
 	{
-		if(num_table[i] != 0)
+		if(table[i] != 0)
 		{
-			float jitter = sum_table[i] * 1.0 / num_table[i];
-			m_table[i] = jitter;
-			ddjmin = min(ddjmin, jitter);
-			ddjmax = max(ddjmax, jitter);
+			falling_count ++;
+			falling_sum += table[i];
 		}
-		else
-			m_table[i] = 0;
 	}
+
+	float rising_avg = rising_sum / rising_count;
+	float falling_avg = falling_sum / falling_count;
+	float dcd = fabs(rising_avg - falling_avg);
 
 	auto cap = new AnalogWaveform;
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(1);
-	cap->m_samples.push_back(ddjmax - ddjmin);
+	cap->m_samples.push_back(dcd);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = tie->m_startTimestamp;
-	cap->m_startFemtoseconds = tie->m_startFemtoseconds;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
 }

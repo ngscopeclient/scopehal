@@ -49,6 +49,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
+	AddDecoderClass(DCDMeasurement);
 	AddDecoderClass(DCOffsetFilter);
 	AddDecoderClass(DDJMeasurement);
 	AddDecoderClass(DDR3Decoder);
