@@ -120,20 +120,19 @@ void DCDMeasurement::Refresh()
 	//We check for zero in case the table is incomplete (this should not drag the mean down).
 	int rising_count = 0;
 	float rising_sum = 0;
-	for(int i = 0x80; i < 0xc0; i++)
+	int falling_count = 0;
+	float falling_sum = 0;
+	for(int i=0; i<256; i++)
 	{
-		if(table[i] != 0)
+		if(table[i] == 0)
+			continue;
+
+		if(i & 0x80)
 		{
 			rising_count ++;
 			rising_sum += table[i];
 		}
-	}
-
-	int falling_count = 0;
-	float falling_sum = 0;
-	for(int i = 0x40; i < 0x80; i++)
-	{
-		if(table[i] != 0)
+		else
 		{
 			falling_count ++;
 			falling_sum += table[i];

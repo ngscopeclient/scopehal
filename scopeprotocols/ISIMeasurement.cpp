@@ -120,20 +120,19 @@ void ISIMeasurement::Refresh()
 	//We check for zero in case the table is incomplete (this should not drag the mean down).
 	float rising_min = FLT_MAX;
 	float rising_max = -FLT_MAX;
-	for(int i = 0x80; i < 0xc0; i++)
+	float falling_min = FLT_MAX;
+	float falling_max = -FLT_MAX;
+	for(int i=0; i<256; i++)
 	{
-		if(table[i] != 0)
+		if(table[i] == 0)
+			continue;
+
+		if(i & 0x80)
 		{
 			rising_min = min(rising_min, table[i]);
 			rising_max = max(rising_max, table[i]);
 		}
-	}
-
-	float falling_min = FLT_MAX;
-	float falling_max = -FLT_MAX;
-	for(int i = 0x40; i < 0x80; i++)
-	{
-		if(table[i] != 0)
+		else
 		{
 			falling_min = min(falling_min, table[i]);
 			falling_max = max(falling_max, table[i]);
