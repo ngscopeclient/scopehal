@@ -56,8 +56,13 @@ bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.m_channel->GetYAxisUnits() == Unit::UNIT_FS)
+		)
+	{
 		return true;
+	}
 	if( (i <= 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
 
