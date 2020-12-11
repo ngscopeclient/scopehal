@@ -202,7 +202,7 @@ void JitterSpectrumFilter::Refresh()
 	size_t capture_duration = din->m_offsets[inlen-1] + din->m_durations[inlen-1];
 	size_t num_uis = extended_samples.size();
 	double ui_width_final = static_cast<double>(capture_duration) / num_uis;
-	//LogTrace("Capture is %zu UIs, %s\n", num_uis, Unit(Unit::UNIT_FS).PrettyPrint(capture_duration).c_str());
+	LogTrace("Capture is %zu UIs, %s\n", num_uis, Unit(Unit::UNIT_FS).PrettyPrint(capture_duration).c_str());
 	LogTrace("Final UI width estimate: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_width_final).c_str());
 
 	//Round size up to next power of two

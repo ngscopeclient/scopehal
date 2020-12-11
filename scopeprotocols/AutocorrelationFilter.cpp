@@ -45,7 +45,7 @@ AutocorrelationFilter::AutocorrelationFilter(const string& color)
 	m_offset = 0;
 
 	m_maxDeltaName = "Max offset";
-	m_parameters[m_maxDeltaName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_maxDeltaName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_maxDeltaName].SetIntVal(1000);
 }
 
