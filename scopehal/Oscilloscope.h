@@ -389,8 +389,8 @@ public:
 	/**
 		@brief Starts the instrument in continuous trigger mode.
 
-		This is normally not used for data-download applications, because of the risk of race conditions where the
-		instrument triggers during AcquireData() leading to some channels having stale and some having new data.
+		Most drivers will implement this as repeated calls to the "single trigger" function to avoid race conditions
+		when the instrument triggers halfway through downloading captured waveforms.
 	 */
 	virtual void Start() =0;
 
