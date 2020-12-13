@@ -112,14 +112,14 @@ void BaseMeasurement::Refresh()
 	size_t len = din->m_samples.size();
 
 	//Make a histogram of the waveform
-	float min = GetMinVoltage(din);
-	float max = GetMaxVoltage(din);
+	float vmin = GetMinVoltage(din);
+	float vmax = GetMaxVoltage(din);
 	size_t nbins = 64;
-	vector<size_t> hist = MakeHistogram(din, min, max, nbins);
+	vector<size_t> hist = MakeHistogram(din, vmin, vmax, nbins);
 
 	//Set temporary midpoint and range
-	m_range = (max - min);
-	m_midpoint = m_range/2 + min;
+	m_range = (vmax - vmin);
+	m_midpoint = m_range/2 + vmin;
 
 	//Find the highest peak in the first quarter of the histogram
 	//This is the base for the entire waveform
@@ -134,51 +134,79 @@ void BaseMeasurement::Refresh()
 		}
 	}
 	float fbin = (idx + 0.5f)/nbins;
-	float global_base = fbin*m_range + min;
+	float global_base = fbin*m_range + vmin;
 
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	float last = min;
-	int64_t tedge = 0;
-	float sum = 0;
-	int64_t count = 0;
+	float last = vmin;
+	int64_t tfall = 0;
 	float delta = m_range * 0.1;
 
-	float fmax = -99999;
-	float fmin =  99999;
+	float fmax = -FLT_MAX;
+	float fmin =  FLT_MAX;
+
+	bool first = true;
+
+	vector<float> samples;
 
 	for(size_t i=0; i < len; i++)
 	{
-		//Wait for a falling edge
+		//Wait for a rising edge (end of the low period)
 		float cur = din->m_samples[i];
 		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
+		//Find falling edge
 		if( (cur < m_midpoint) && (last >= m_midpoint) )
+			tfall = tnow;
+
+		//Find rising edge
+		if( (cur > m_midpoint) && (last <= m_midpoint) )
 		{
 			//Done, add the sample
-			if(count != 0)
+			if(!samples.empty())
 			{
-				float vavg = sum/count;
-				if(vavg > fmax)
-					fmax = vavg;
-				if(vavg < fmin)
-					fmin = vavg;
+				if(first)
+					first = false;
 
-				cap->m_offsets.push_back(tedge);
-				cap->m_durations.push_back(tnow - tedge);
-				cap->m_samples.push_back(vavg);
+				else
+				{
+					//Average the middle 50% of the samples.
+					//Discard beginning and end as they include parts of the edge
+					float sum = 0;
+					int64_t count = 0;
+					size_t start = samples.size()/4;
+					size_t end = samples.size() - start;
+					for(size_t j=start; j<=end; j++)
+					{
+						sum += samples[j];
+						count ++;
+					}
+
+					float vavg = sum / count;
+
+					fmax = max(fmax, vavg);
+					fmin = min(fmin, vavg);
+
+					int64_t tmid = (tnow + tfall) / 2;
+
+					//Update duration for last sample
+					size_t n = cap->m_samples.size();
+					if(n)
+						cap->m_durations[n-1] = tmid - cap->m_offsets[n-1];
+
+					cap->m_offsets.push_back(tmid);
+					cap->m_durations.push_back(1);
+					cap->m_samples.push_back(vavg);
+				}
+
+				samples.clear();
 			}
-			tedge = tnow;
 		}
 
 		//If the value is fairly close to the calculated base, average it
-		//TODO: discard samples on the rising/falling edges as this will skew the results
 		if(fabs(cur - global_base) < delta)
-		{
-			count ++;
-			sum += cur;
-		}
+			samples.push_back(cur);
 
 		last = cur;
 	}
