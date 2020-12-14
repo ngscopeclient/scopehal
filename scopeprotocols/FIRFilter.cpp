@@ -59,7 +59,7 @@ FIRFilter::FIRFilter(const string& color)
 	m_parameters[m_filterTypeName].SetIntVal(FILTER_TYPE_LOWPASS);
 
 	m_parameters[m_filterLengthName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_filterLengthName].SetIntVal(19);
+	m_parameters[m_filterLengthName].SetIntVal(0);
 
 	m_parameters[m_stopbandAttenName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_parameters[m_stopbandAttenName].SetFloatVal(60);
@@ -200,15 +200,21 @@ void FIRFilter::Refresh()
 	flo = max(flo, 0.0f);
 	fhi = min(fhi, nyquist);
 
+	//Calculate filter order
+	size_t filterlen = m_parameters[m_filterLengthName].GetIntVal();
+	float atten = m_parameters[m_stopbandAttenName].GetFloatVal();
+	if(filterlen == 0)
+		filterlen = (atten / 22) * (sample_hz / (fhi - flo) );
+	filterlen |= 1;	//force length to be odd
+
 	//Create the filter coefficients (TODO: cache this)
-	size_t filterlen = m_parameters[m_filterLengthName].GetIntVal() | 1;	//force length to be odd
 	vector<float> coeffs;
 	coeffs.resize(filterlen);
 	CalculateFilterCoefficients(
 		coeffs,
 		flo / nyquist,
 		fhi / nyquist,
-		m_parameters[m_stopbandAttenName].GetFloatVal(),
+		atten,
 		type
 		);
 
@@ -223,7 +229,7 @@ void FIRFilter::Refresh()
 	float vmax;
 	DoFilterKernel(coeffs, din, cap, vmin, vmax);
 
-	//Correct for phase shift
+	//Shift output to compensate for filter group delay
 	cap->m_triggerPhase = (radius * fs_per_sample) + din->m_triggerPhase;
 
 	//Calculate bounds
