@@ -93,6 +93,13 @@ protected:
 		float& vmin,
 		float& vmax);
 
+	static void DoFilterKernelAVX2(
+		std::vector<float>& coefficients,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
+
 	float m_min;
 	float m_max;
 	float m_range;

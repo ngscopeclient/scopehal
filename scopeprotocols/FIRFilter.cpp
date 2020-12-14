@@ -240,9 +240,9 @@ void FIRFilter::DoFilterKernel(
 	float& vmin,
 	float& vmax)
 {
-	/*if(g_hasAvx2)
+	if(g_hasAvx2)
 		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
-	else*/
+	else
 		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
 }
 
@@ -265,6 +265,83 @@ void FIRFilter::DoFilterKernelGeneric(
 
 	//Do the filter
 	for(size_t i=0; i<end; i++)
+	{
+		float v = 0;
+		for(size_t j=0; j<filterlen; j++)
+			v += din->m_samples[i + j] * coefficients[j];
+
+		vmin = min(vmin, v);
+		vmax = max(vmax, v);
+
+		cap->m_samples[i]	= v;
+	}
+}
+
+/**
+	@brief Optimized FIR implementation
+
+	Uses AVX2, but not AVX512 or FMA.
+ */
+__attribute__((target("avx2")))
+void FIRFilter::DoFilterKernelAVX2(
+	vector<float>& coefficients,
+	AnalogWaveform* din,
+	AnalogWaveform* cap,
+	float& vmin,
+	float& vmax)
+{
+	__m256 vmin_x8 = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+	__m256 vmax_x8 = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
+
+	//Save some pointers and sizes
+	size_t len = din->m_samples.size();
+	size_t filterlen = coefficients.size();
+	size_t end = len - filterlen;
+	size_t end_rounded = end - (end % 8);
+	float* pin = (float*)&din->m_samples[0];
+	float* pout = (float*)&cap->m_samples[0];
+
+	//Vectorized outer loop
+	size_t i=0;
+	for(; i<end_rounded; i += 8)
+	{
+		float* base = pin + i;
+
+		//First tap
+		__m256 coeff	= _mm256_set1_ps(coefficients[0]);
+		__m256 vin		= _mm256_loadu_ps(base);
+		__m256 v		= _mm256_mul_ps(coeff, vin);
+
+		//Subsequent taps
+		for(size_t j=1; j<filterlen; j++)
+		{
+			coeff		= _mm256_set1_ps(coefficients[j]);
+			vin			= _mm256_loadu_ps(base + j);
+			__m256 prod	= _mm256_mul_ps(coeff, vin);
+			v			= _mm256_add_ps(prod, v);
+		}
+
+		//Store the output
+		_mm256_store_ps(pout + i, v);
+
+		//Calculate min/max
+		vmin_x8 = _mm256_min_ps(vmin_x8, v);
+		vmax_x8 = _mm256_max_ps(vmax_x8, v);
+	}
+
+	//Horizontal reduction of vector min/max
+	float tmp_min[8] __attribute__((aligned(32)));
+	float tmp_max[8] __attribute__((aligned(32)));
+	_mm256_store_ps(tmp_min, vmin_x8);
+	_mm256_store_ps(tmp_max, vmax_x8);
+	for(int j=0; j<8; j++)
+	{
+		vmin = min(vmin, tmp_min[j]);
+		vmax = max(vmax, tmp_max[j]);
+	}
+
+	//Catch any stragglers
+	for(; i<end_rounded; i++)
 	{
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
