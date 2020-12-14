@@ -36,7 +36,9 @@
 #define TappedDelayLineFilter_h
 
 /**
-	@brief Performs an 8-tap FIR filter. The delay must be an integer multiple of the sampling period.
+	@brief Performs an 8-tap FIR filter with a multi-sample delay between taps.
+
+	The delay must be an integer multiple of the sampling period.
  */
 class TappedDelayLineFilter : public Filter
 {

@@ -48,6 +48,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EyeWidthMeasurement.cpp
 	FallMeasurement.cpp
 	FFTFilter.cpp
+	FIRFilter.cpp
 	FrequencyMeasurement.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp

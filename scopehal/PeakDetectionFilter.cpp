@@ -48,7 +48,9 @@ PeakDetector::~PeakDetector()
 void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float search_hz)
 {
 	size_t nouts = cap->m_samples.size();
-	if(max_peaks > 0)
+	if(max_peaks == 0)
+		m_peaks.clear();
+	else
 	{
 		//Get peak search width in bins
 		int64_t search_bins = ceil(search_hz / cap->m_timescale);
@@ -114,6 +116,7 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 		for(size_t i=0; i<(size_t)max_peaks && i<peaks.size(); i++)
 			m_peaks.push_back(peaks[i]);
 	}
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -84,6 +84,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EyeWidthMeasurement);
 	AddDecoderClass(FallMeasurement);
 	AddDecoderClass(FFTFilter);
+	AddDecoderClass(FIRFilter);
 	AddDecoderClass(FrequencyMeasurement);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
