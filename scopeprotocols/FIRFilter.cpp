@@ -297,36 +297,50 @@ void FIRFilter::DoFilterKernelAVX2(
 	size_t len = din->m_samples.size();
 	size_t filterlen = coefficients.size();
 	size_t end = len - filterlen;
-	size_t end_rounded = end - (end % 8);
+	size_t end_rounded = end - (end % 16);
 	float* pin = (float*)&din->m_samples[0];
 	float* pout = (float*)&cap->m_samples[0];
 
 	//Vectorized outer loop
 	size_t i=0;
-	for(; i<end_rounded; i += 8)
+	for(; i<end_rounded; i += 16)
 	{
 		float* base = pin + i;
 
 		//First tap
-		__m256 coeff	= _mm256_set1_ps(coefficients[0]);
-		__m256 vin		= _mm256_loadu_ps(base);
-		__m256 v		= _mm256_mul_ps(coeff, vin);
+		__m256 coeff		= _mm256_set1_ps(coefficients[0]);
+
+		__m256 vin_a		= _mm256_loadu_ps(base + 0);
+		__m256 vin_b		= _mm256_loadu_ps(base + 8);
+
+		__m256 v_a			= _mm256_mul_ps(coeff, vin_a);
+		__m256 v_b			= _mm256_mul_ps(coeff, vin_b);
 
 		//Subsequent taps
 		for(size_t j=1; j<filterlen; j++)
 		{
-			coeff		= _mm256_set1_ps(coefficients[j]);
-			vin			= _mm256_loadu_ps(base + j);
-			__m256 prod	= _mm256_mul_ps(coeff, vin);
-			v			= _mm256_add_ps(prod, v);
+			coeff			= _mm256_set1_ps(coefficients[j]);
+
+			vin_a			= _mm256_loadu_ps(base + j + 0);
+			vin_b			= _mm256_loadu_ps(base + j + 8);
+
+			__m256 prod_a	= _mm256_mul_ps(coeff, vin_a);
+			__m256 prod_b	= _mm256_mul_ps(coeff, vin_b);
+
+			v_a				= _mm256_add_ps(prod_a, v_a);
+			v_b				= _mm256_add_ps(prod_b, v_b);
 		}
 
 		//Store the output
-		_mm256_store_ps(pout + i, v);
+		_mm256_store_ps(pout + i + 0, v_a);
+		_mm256_store_ps(pout + i + 8, v_b);
 
 		//Calculate min/max
-		vmin_x8 = _mm256_min_ps(vmin_x8, v);
-		vmax_x8 = _mm256_max_ps(vmax_x8, v);
+		vmin_x8 = _mm256_min_ps(vmin_x8, v_a);
+		vmax_x8 = _mm256_max_ps(vmax_x8, v_a);
+
+		vmin_x8 = _mm256_min_ps(vmin_x8, v_b);
+		vmax_x8 = _mm256_max_ps(vmax_x8, v_b);
 	}
 
 	//Horizontal reduction of vector min/max
