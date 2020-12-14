@@ -475,15 +475,10 @@ void FIRFilter::DoFilterKernelAVX512F(
 			vin_c			= _mm512_loadu_ps(base + j + 32);
 			vin_d			= _mm512_loadu_ps(base + j + 48);
 
-			__m512 prod_a	= _mm512_mul_ps(coeff, vin_a);
-			__m512 prod_b	= _mm512_mul_ps(coeff, vin_b);
-			__m512 prod_c	= _mm512_mul_ps(coeff, vin_c);
-			__m512 prod_d	= _mm512_mul_ps(coeff, vin_d);
-
-			v_a				= _mm512_add_ps(prod_a, v_a);
-			v_b				= _mm512_add_ps(prod_b, v_b);
-			v_c				= _mm512_add_ps(prod_c, v_c);
-			v_d				= _mm512_add_ps(prod_d, v_d);
+			v_a				= _mm512_fmadd_ps(coeff, vin_a, v_a);
+			v_b				= _mm512_fmadd_ps(coeff, vin_b, v_b);
+			v_c				= _mm512_fmadd_ps(coeff, vin_c, v_c);
+			v_d				= _mm512_fmadd_ps(coeff, vin_d, v_d);
 		}
 
 		//Store the output
