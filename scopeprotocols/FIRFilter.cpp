@@ -240,7 +240,9 @@ void FIRFilter::DoFilterKernel(
 	float& vmin,
 	float& vmax)
 {
-	if(g_hasAvx2)
+	if(g_hasAvx512F)
+		DoFilterKernelAVX512F(coefficients, din, cap, vmin, vmax);
+	else if(g_hasAvx2)
 		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
 	else
 		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
@@ -403,6 +405,115 @@ void FIRFilter::DoFilterKernelAVX2(
 	_mm256_store_ps(tmp_min, vmin_x8);
 	_mm256_store_ps(tmp_max, vmax_x8);
 	for(int j=0; j<8; j++)
+	{
+		vmin = min(vmin, tmp_min[j]);
+		vmax = max(vmax, tmp_max[j]);
+	}
+
+	//Catch any stragglers
+	for(; i<end_rounded; i++)
+	{
+		float v = 0;
+		for(size_t j=0; j<filterlen; j++)
+			v += din->m_samples[i + j] * coefficients[j];
+
+		vmin = min(vmin, v);
+		vmax = max(vmax, v);
+
+		cap->m_samples[i]	= v;
+	}
+}
+
+/**
+	@brief Optimized AVX512F implementation
+ */
+__attribute__((target("avx512f")))
+void FIRFilter::DoFilterKernelAVX512F(
+	vector<float>& coefficients,
+	AnalogWaveform* din,
+	AnalogWaveform* cap,
+	float& vmin,
+	float& vmax)
+{
+	__m512 vmin_x16 = _mm512_set1_ps(FLT_MAX);
+	__m512 vmax_x16 = _mm512_set1_ps(-FLT_MAX);
+
+	//Save some pointers and sizes
+	size_t len = din->m_samples.size();
+	size_t filterlen = coefficients.size();
+	size_t end = len - filterlen;
+	size_t end_rounded = end - (end % 64);
+	float* pin = (float*)&din->m_samples[0];
+	float* pout = (float*)&cap->m_samples[0];
+
+	//Vectorized and unrolled outer loop
+	size_t i=0;
+	for(; i<end_rounded; i += 64)
+	{
+		float* base = pin + i;
+
+		//First tap
+		__m512 coeff		= _mm512_set1_ps(coefficients[0]);
+
+		__m512 vin_a		= _mm512_loadu_ps(base + 0);
+		__m512 vin_b		= _mm512_loadu_ps(base + 16);
+		__m512 vin_c		= _mm512_loadu_ps(base + 32);
+		__m512 vin_d		= _mm512_loadu_ps(base + 48);
+
+		__m512 v_a			= _mm512_mul_ps(coeff, vin_a);
+		__m512 v_b			= _mm512_mul_ps(coeff, vin_b);
+		__m512 v_c			= _mm512_mul_ps(coeff, vin_c);
+		__m512 v_d			= _mm512_mul_ps(coeff, vin_d);
+
+		//Subsequent taps
+		for(size_t j=1; j<filterlen; j++)
+		{
+			coeff			= _mm512_set1_ps(coefficients[j]);
+
+			vin_a			= _mm512_loadu_ps(base + j + 0);
+			vin_b			= _mm512_loadu_ps(base + j + 16);
+			vin_c			= _mm512_loadu_ps(base + j + 32);
+			vin_d			= _mm512_loadu_ps(base + j + 48);
+
+			__m512 prod_a	= _mm512_mul_ps(coeff, vin_a);
+			__m512 prod_b	= _mm512_mul_ps(coeff, vin_b);
+			__m512 prod_c	= _mm512_mul_ps(coeff, vin_c);
+			__m512 prod_d	= _mm512_mul_ps(coeff, vin_d);
+
+			v_a				= _mm512_add_ps(prod_a, v_a);
+			v_b				= _mm512_add_ps(prod_b, v_b);
+			v_c				= _mm512_add_ps(prod_c, v_c);
+			v_d				= _mm512_add_ps(prod_d, v_d);
+		}
+
+		//Store the output
+		_mm512_store_ps(pout + i + 0,  v_a);
+		_mm512_store_ps(pout + i + 16,  v_b);
+		_mm512_store_ps(pout + i + 32, v_c);
+		_mm512_store_ps(pout + i + 48, v_d);
+
+		//Calculate min/max: First level
+		__m512 min_ab	= _mm512_min_ps(v_a, v_b);
+		__m512 min_cd	= _mm512_min_ps(v_c, v_d);
+
+		__m512 max_ab	= _mm512_max_ps(v_a, v_b);
+		__m512 max_cd	= _mm512_max_ps(v_c, v_d);
+
+		//Min/max: second level
+		__m512 min_abcd	= _mm512_min_ps(min_ab, min_cd);
+		__m512 max_abcd	= _mm512_max_ps(max_ab, max_cd);
+
+		//Min/max: final reduction
+		vmin_x16 = _mm512_min_ps(vmin_x16, min_abcd);
+		vmax_x16 = _mm512_max_ps(vmax_x16, max_abcd);
+	}
+
+	//Horizontal reduction of vector min/max
+	float tmp_min[16] __attribute__((aligned(64)));
+	float tmp_max[16] __attribute__((aligned(64)));
+	_mm512_store_ps(tmp_min, vmin_x16);
+	_mm512_store_ps(tmp_max, vmax_x16);
+	for(int j=0; j<16; j++)
 	{
 		vmin = min(vmin, tmp_min[j]);
 		vmax = max(vmax, tmp_max[j]);
