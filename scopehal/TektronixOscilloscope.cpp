@@ -1570,6 +1570,122 @@ void TektronixOscilloscope::Convert16BitSamplesAVX2(
 	}
 }
 
+/**
+	@brief Converts 8-bit ADC samples to floating point
+ */
+void TektronixOscilloscope::Convert8BitSamples(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count)
+{
+	for(unsigned int k=0; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
+		pout[k] = pin[k] * ymult + yoff;
+	}
+}
+
+/**
+	@brief Optimized version of Convert8BitSamples()
+ */
+__attribute__((target("avx2")))
+void TektronixOscilloscope::Convert8BitSamplesAVX2(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count)
+{
+	unsigned int end = count - (count % 32);
+
+	int64_t __attribute__ ((aligned(32))) count_x4[] = { 0, 1, 2, 3 };
+
+	__m256i all_ones	= _mm256_set1_epi64x(1);
+	__m256i all_fours	= _mm256_set1_epi64x(4);
+	__m256i counts		= _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	__m256 gains = { ymult, ymult, ymult, ymult, ymult, ymult, ymult, ymult };
+	__m256 offsets = { yoff, yoff, yoff, yoff, yoff, yoff, yoff, yoff };
+
+	for(unsigned int k=0; k<end; k += 32)
+	{
+		//Load all 32 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
+
+		//Extract the low and high 16 samples from the block
+		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
+		__m128i block23_x8 = _mm256_extracti128_si256(raw_samples, 1);
+
+		//Swap the low and high halves of these vectors
+		//Ugly casting needed because all permute instrinsics expect float/double datatypes
+		__m128i block10_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block01_x8), 1));
+		__m128i block32_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block23_x8), 1));
+
+		//Divide into blocks of 8 samples and sign extend to 32 bit
+		__m256i block0_int = _mm256_cvtepi8_epi32(block01_x8);
+		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
+		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
+		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+
+		//Convert the 32-bit int blocks to float.
+		//Apparently there's no direct epi8 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_int);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_int);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_int);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_int);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
+
+		block0_float = _mm256_add_ps(block0_float, offsets);
+		block1_float = _mm256_add_ps(block1_float, offsets);
+		block2_float = _mm256_add_ps(block2_float, offsets);
+		block3_float = _mm256_add_ps(block3_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(unsigned int k=end; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
+		pout[k] = pin[k] * ymult + yoff;
+	}
+}
+
+
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Make sure record length is valid
@@ -1600,7 +1716,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	double span;
 
 	//Ask for the analog data
-	m_transport->SendCommand("DAT:WID 2");					//16-bit data
+	m_transport->SendCommand("DAT:WID 1");					//8-bit data in NORMAL mode
 	m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
@@ -1645,8 +1761,8 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
 
 		//convert bytes to samples
-		size_t nsamples = msglen/2;
-		int16_t* samples = (int16_t*)rxbuf;
+		size_t nsamples = msglen;
+		int8_t* samples = (int8_t*)rxbuf;
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1661,7 +1777,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		if(g_hasAvx2)
 		{
-			Convert16BitSamplesAVX2(
+			Convert8BitSamplesAVX2(
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
@@ -1672,7 +1788,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		}
 		else
 		{
-			Convert16BitSamples(
+			Convert8BitSamples(
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],

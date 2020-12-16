@@ -75,6 +75,12 @@ SCPISocketTransport::SCPISocketTransport(const string& args)
 		LogError("Couldn't disable Nagle\n");
 		return;
 	}
+	if(!m_socket.DisableDelayedACK())
+	{
+		m_socket.Close();
+		LogError("Couldn't disable delayed ACK\n");
+		return;
+	}
 }
 
 SCPISocketTransport::~SCPISocketTransport()
