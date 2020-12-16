@@ -35,6 +35,7 @@
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
+#include <immintrin.h>
 
 using namespace std;
 
@@ -1484,6 +1485,91 @@ bool TektronixOscilloscope::AcquireData()
 	return true;
 }
 
+/**
+	@brief Converts raw ADC samples to floating point
+ */
+void TektronixOscilloscope::Convert16BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float ymult, float yoff, size_t count)
+{
+	for(size_t j=0; j<count; j++)
+	{
+		offs[j] = j;
+		durs[j] = 1;
+		pout[j] = ymult*pin[j] + yoff;
+	}
+}
+
+__attribute__((target("avx2")))
+void TektronixOscilloscope::Convert16BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float ymult, float yoff, size_t count)
+{
+	size_t end = count - (count % 32);
+
+	int64_t __attribute__ ((aligned(32))) count_x4[] = { 0, 1, 2, 3 };
+
+	__m256i all_ones	= _mm256_set1_epi64x(1);
+	__m256i all_fours	= _mm256_set1_epi64x(4);
+	__m256i counts		= _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	__m256 gains = { ymult, ymult, ymult, ymult, ymult, ymult, ymult, ymult };
+	__m256 offsets = { yoff, yoff, yoff, yoff, yoff, yoff, yoff, yoff };
+
+	for(size_t k=0; k<end; k += 16)
+	{
+		//Load all 16 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+
+		//Extract the low and high halves (8 samples each) from the input block
+		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples, 0);
+		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples, 1);
+
+		//Convert both blocks from 16 to 32 bit, giving us a pair of 8x int32 vectors
+		__m256i block0_i32 = _mm256_cvtepi16_epi32(block0_i16);
+		__m256i block1_i32 = _mm256_cvtepi16_epi32(block1_i16);
+
+		//Convert the 32-bit int blocks to fp32
+		//Sadly there's no direct epi32 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+
+		block0_float = _mm256_add_ps(block0_float, offsets);
+		block1_float = _mm256_add_ps(block1_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<count; k++)
+	{
+		offs[k] = k;
+		durs[k] = 1;
+		pout[k] = pin[k] * ymult + yoff;
+	}
+}
+
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Make sure record length is valid
@@ -1573,12 +1659,27 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(nsamples);
 
-		//Convert to volts
-		for(size_t j=0; j<nsamples; j++)
+		if(g_hasAvx2)
 		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = ymult*samples[j] + yoff;
+			Convert16BitSamplesAVX2(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				samples,
+				ymult,
+				yoff,
+				nsamples);
+		}
+		else
+		{
+			Convert16BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				samples,
+				ymult,
+				yoff,
+				nsamples);
 		}
 
 		//Done, update the data
