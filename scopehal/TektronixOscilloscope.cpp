@@ -1486,13 +1486,8 @@ bool TektronixOscilloscope::AcquireData()
 
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
-	//Get record length
-	m_transport->SendCommand("HOR:RECO?");
-	size_t length = stos(m_transport->ReadReply());
-	m_sampleDepth = length;
-	m_sampleDepthValid = true;
-	m_transport->SendCommand("DAT:START 0");
-	m_transport->SendCommand(string("DAT:STOP ") + to_string(length));
+	//Make sure record length is valid
+	GetSampleDepth();
 
 	//Preamble fields (not all are used)
 	int byte_num;
@@ -1597,13 +1592,20 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	}
 
 	//Get the spectrum stuff
-	m_transport->SendCommand("DAT:WID 8");					//double precision floating point data
-	m_transport->SendCommand("DAT:ENC SFPB");				//IEEE754 float
+	bool firstSpectrum = true;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		auto nchan = m_spectrumChannelBase + i;
 		if(!IsChannelEnabled(nchan))
 			continue;
+
+		//Select mode
+		if(firstSpectrum)
+		{
+			m_transport->SendCommand("DAT:WID 8");					//double precision floating point data
+			m_transport->SendCommand("DAT:ENC SFPB");				//IEEE754 float
+			firstSpectrum = false;
+		}
 
 		// Set source & get preamble+data
 		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
@@ -1678,8 +1680,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	}
 
 	//Get the digital stuff
-	m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
-	m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
+	bool firstDigital = true;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		//Skip anything without a digital probe connected
@@ -1703,6 +1704,15 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		}
 		if(!enabled)
 			continue;
+
+
+		//Configuration
+		if(firstDigital)
+		{
+			m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
+			m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
+			firstDigital = false;
+		}
 
 		//Ask for all of the data
 		m_transport->SendCommand(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
@@ -1975,6 +1985,10 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 			return 1;
 	}
 
+	//Update data read bounds
+	m_transport->SendCommand("DAT:START 0");
+	m_transport->SendCommand(string("DAT:STOP ") + to_string(m_sampleDepth));
+
 	m_sampleDepthValid = true;
 	return m_sampleDepth;
 }
@@ -2001,6 +2015,10 @@ void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 		default:
 			break;
 	}
+
+	//Update data read bounds
+	m_transport->SendCommand("DAT:START 0");
+	m_transport->SendCommand(string("DAT:STOP ") + to_string(depth));
 }
 
 void TektronixOscilloscope::SetSampleRate(uint64_t rate)
