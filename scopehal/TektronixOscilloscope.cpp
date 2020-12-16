@@ -246,15 +246,75 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				//Seems like we have blocks divided by commas
-				//Each block contains three semicolon delimited fields: code, text description, license type
-				//Option code has is further divided into code:type, e.g. BW6-1000:License
-				for (string::size_type prev_pos=0, pos=0;
-					 (pos = reply.find(',', pos)) != std::string::npos;
-					 prev_pos=++pos)
+				/*
+					Seems like we have blocks divided by commas
+					Each block contains three semicolon delimited fields: code, text description, license type
+					Option code has is further divided into code:type, e.g. BW6-1000:License
+					For extra fun, there can be commas inside the internal fields!
+
+					So ultimately what we expect is:
+						Option code
+						Colon
+						Option type
+						Semicolon
+						Description
+						Semicolon
+						License type
+						Comma
+				*/
+
+				size_t pos = 0;
+				while(pos < reply.length())
 				{
-					string optgroup = reply.substr(prev_pos, pos-prev_pos);
-					options.push_back(optgroup.substr(0, optgroup.find(":")));
+
+					//Read option code (the only part we care about)
+					string optcode;
+					for( ; pos < reply.length(); pos++)
+					{
+						if(reply[pos] == ':')
+							break;
+						optcode += reply[pos];
+					}
+					options.push_back(optcode);
+
+					//Skip the colon
+					pos++;
+
+					//Read and discard option type
+					string opttype;
+					for( ; pos < reply.length(); pos++)
+					{
+						if(reply[pos] == ';')
+							break;
+						opttype += reply[pos];
+					}
+
+					//Skip the semicolon
+					pos++;
+
+					//Read and discard option description (commas are legal here... thanks Tek)
+					string optdesc;
+					for( ; pos < reply.length(); pos++)
+					{
+						if(reply[pos] == ';')
+							break;
+						optdesc += reply[pos];
+					}
+
+					//Skip the semicolon
+					pos ++;
+
+					//Read and discard license type
+					string lictype;
+					for( ; pos < reply.length(); pos++)
+					{
+						if(reply[pos] == ',')
+							break;
+						lictype += reply[pos];
+					}
+
+					//Skip the comma
+					pos ++;
 				}
 			}
 			break;
@@ -290,7 +350,19 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			LogDebug("* BW6-1000 (1 GHz bandwidth)\n");
 			//Don't touch m_maxBandwidth, we already got it from CONFIG:ANALO:BANDWIDTH
 		}
-
+		else if(opt == "SUP6-DVM")
+		{
+			LogDebug("* SUP6-DVM (Digital voltmeter)\n");
+			m_hasDVM = true;
+		}
+		else if(opt == "SUP6-DEMO")
+		{
+			LogDebug("* SUP6-DEMO (Arbitrary function generator)\n");
+		}
+		else if(opt == "LIC6-SREMBD")
+		{
+			LogDebug("* LIC6-SREMBD (I2C/SPI trigger/decode)\n");
+		}
 		else if(opt == "LIC6-DDU")
 		{
 			/*
@@ -1020,7 +1092,6 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 			default:
 				break;
 		}
-
 		range = stof(m_transport->ReadReply()) * 10;
 	}
 
@@ -2143,6 +2214,20 @@ void TektronixOscilloscope::PullTrigger()
 }
 
 /**
+	@brief Parses a trigger level message
+ */
+float TektronixOscilloscope::ReadTriggerLevelMSO56()
+{
+	string reply = m_transport->ReadReply(false);
+
+	size_t off = reply.find(";");
+	if(off != string::npos)
+		reply = reply.substr(0, off);
+
+	return stof(reply);
+}
+
+/**
 	@brief Reads settings for an edge trigger from the instrument
  */
 void TektronixOscilloscope::PullEdgeTrigger()
@@ -2172,12 +2257,9 @@ void TektronixOscilloscope::PullEdgeTrigger()
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
+				//This is borked, we only care about the first thing
 				m_transport->SendCommand("TRIG:A:LEV?");
-				et->SetLevel(stof(m_transport->ReadReply()));
-
-				//For some reason we get 3 more values after this. Discard them.
-				for(int i=0; i<3; i++)
-					m_transport->ReadReply();
+				et->SetLevel(ReadTriggerLevelMSO56());
 
 				//Edge slope
 				m_transport->SendCommand("TRIG:A:EDGE:SLO?");
@@ -2276,11 +2358,7 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 
 				//Trigger level
 				m_transport->SendCommand("TRIG:A:LEV?");
-				et->SetLevel(stof(m_transport->ReadReply()));
-
-				//For some reason we get 3 more values after this. Discard them.
-				for(int i=0; i<3; i++)
-					m_transport->ReadReply();
+				et->SetLevel(ReadTriggerLevelMSO56());
 
 				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");
 				Unit fs(Unit::UNIT_FS);
@@ -2354,11 +2432,7 @@ void TektronixOscilloscope::PullDropoutTrigger()
 
 				//Trigger level
 				m_transport->SendCommand("TRIG:A:LEV?");
-				et->SetLevel(stof(m_transport->ReadReply()));
-
-				//For some reason we get 3 more values after this. Discard them.
-				for(int i=0; i<3; i++)
-					m_transport->ReadReply();
+				et->SetLevel(ReadTriggerLevelMSO56());
 
 				m_transport->SendCommand("TRIG:A:TIMEO:TIM?");
 				Unit fs(Unit::UNIT_FS);

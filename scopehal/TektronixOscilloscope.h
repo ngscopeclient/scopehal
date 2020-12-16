@@ -236,6 +236,8 @@ protected:
 	void PullWindowTrigger();
 	void PushWindowTrigger(WindowTrigger* trig);
 
+	float ReadTriggerLevelMSO56();
+
 	//Helpers for figuring out type of a channel by the index
 	bool IsAnalog(size_t index)
 	{ return index < m_analogChannelCount; }
