@@ -48,6 +48,9 @@ public:
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
+
+	SCPITransport* GetTransport()
+	{ return m_transport; }
 };
 
 #endif

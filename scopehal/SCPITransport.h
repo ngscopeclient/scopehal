@@ -48,6 +48,16 @@ public:
 	virtual std::string GetConnectionString() =0;
 	virtual std::string GetName() =0;
 
+	//Queued command API
+	void SendCommandQueued(const std::string& cmd);
+	std::string SendCommandWithReply(std::string cmd, bool endOnSemicolon = true);
+	bool FlushCommandQueue();
+
+	//Manual mutex locking for ReadRawData() etc
+	std::mutex& GetMutex()
+	{ return m_netMutex; }
+
+	//Immediate command API
 	virtual bool SendCommand(const std::string& cmd) =0;
 	virtual std::string ReadReply(bool endOnSemicolon = true) =0;
 	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
@@ -64,9 +74,15 @@ public:
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
 protected:
+
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
 	static CreateMapType m_createprocs;
+
+	//Queued commands waiting to be sent
+	std::mutex m_queueMutex;
+	std::mutex m_netMutex;
+	std::list<std::string> m_txQueue;
 };
 
 #define TRANSPORT_INITPROC(T) \

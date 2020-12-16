@@ -69,3 +69,61 @@ SCPITransport* SCPITransport::CreateTransport(const string& transport, const str
 	LogError("Invalid transport name \"%s\"\n", transport.c_str());
 	return NULL;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Command batching
+
+/**
+	@brief Pushes a command into the transmit FIFO then returns immediately.
+
+	This command will actually be sent the next time FlushCommandQueue() is called.
+ */
+void SCPITransport::SendCommandQueued(const string& cmd)
+{
+	lock_guard<mutex> lock(m_queueMutex);
+	m_txQueue.push_back(cmd);
+}
+
+/**
+	@brief Pushes all pending commands from SendCommandQueued() calls and blocks until they are all sent.
+ */
+bool SCPITransport::FlushCommandQueue()
+{
+	//Grab the queue, then immediately release the mutex so we can do more queued sends
+	list<string> tmp;
+	{
+		lock_guard<mutex> lock(m_queueMutex);
+		tmp = move(m_txQueue);
+		m_txQueue.clear();
+	}
+
+	lock_guard<mutex> lock(m_netMutex);
+	for(auto str : tmp)
+		SendCommand(str);
+
+	return true;
+}
+
+/**
+	@brief Sends a command (flushing any pending/queued commands first), then returns the response.
+
+	This is an atomic operation requiring no mutexing at the caller side.
+ */
+string SCPITransport::SendCommandWithReply(string cmd, bool endOnSemicolon)
+{
+	//Grab the queue, then immediately release the mutex so we can do more queued sends
+	list<string> tmp;
+	{
+		lock_guard<mutex> lock(m_queueMutex);
+		tmp = move(m_txQueue);
+		m_txQueue.clear();
+	}
+
+	lock_guard<mutex> lock(m_netMutex);
+
+	tmp.push_back(cmd);
+	for(auto str : tmp)
+		SendCommand(str);
+
+	return ReadReply(endOnSemicolon);
+}
