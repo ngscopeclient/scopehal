@@ -169,10 +169,6 @@ protected:
 
 	//acquisition
 	bool AcquireDataMSO56(std::map<int, std::vector<WaveformBase*> >& pending_waveforms);
-	void Convert8BitSamples(
-		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count);
-	void Convert8BitSamplesAVX2(
-		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count);
 	void Convert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float ymult, float yoff, size_t count);
 	void Convert16BitSamplesAVX2(

@@ -87,34 +87,31 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	int nchans = stoi(model_number) % 10;
 
 	// No header in the reply of queries
-	m_transport->SendCommandQueued("HEAD 0");
-
-	string reply;
+	m_transport->SendCommand("HEAD 0");
 
 	//Device specific initialization
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued("ACQ:MOD SAM");				//actual sampled data, no averaging etc
-			m_transport->SendCommandQueued("VERB OFF");					//Disable verbose mode (send shorter commands)
-			m_transport->SendCommandQueued("ACQ:STOPA SEQ");			//Stop after acquiring a single waveform
-			m_transport->SendCommandQueued("HOR:MODE MAN");				//Enable manual sample rate and record length
-			m_transport->SendCommandQueued("HOR:DEL:MOD ON");			//Horizontal position is in time units
-			m_transport->SendCommandQueued("SV:RBWMODE MAN");			//Manual resolution bandwidth control
-			m_transport->SendCommandQueued("SV:LOCKCENTER 0");			//Allow separate center freq per channel
-
-			reply = m_transport->SendCommandWithReply("CONFIG:ANALO:BANDW?");	//Figure out what bandwidth we have
-			m_maxBandwidth = stof(reply) * 1e-6;									//(so we know what probe bandwidth is)
+			m_transport->SendCommand("ACQ:MOD SAM");				//actual sampled data, no averaging etc
+			m_transport->SendCommand("VERB OFF");					//Disable verbose mode (send shorter commands)
+			m_transport->SendCommand("ACQ:STOPA SEQ");				//Stop after acquiring a single waveform
+			m_transport->SendCommand("CONFIG:ANALO:BANDW?");		//Figure out what bandwidth we have
+			m_maxBandwidth = stof(m_transport->ReadReply()) * 1e-6;	//(so we know what probe bandwidth is)
+			m_transport->SendCommand("HOR:MODE MAN");				//Enable manual sample rate and record length
+			m_transport->SendCommand("HOR:DEL:MOD ON");				//Horizontal position is in time units
+			m_transport->SendCommand("SV:RBWMODE MAN");				//Manual resolution bandwidth control
+			m_transport->SendCommand("SV:LOCKCENTER 0");			//Allow separate center freq per channel
 			break;
 
 		default:
 			// 8-bit signed data
-			m_transport->SendCommandQueued("DATA:ENC RIB;WID 1");
-			m_transport->SendCommandQueued("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
+			m_transport->SendCommand("DATA:ENC RIB;WID 1");
+			m_transport->SendCommand("DATA:SOURCE CH1, CH2, CH3, CH4;START 0; STOP 100000");
 
 			// FIXME: where to put this?
-			m_transport->SendCommandQueued("ACQ:STOPA SEQ;REPE 1");
+			m_transport->SendCommand("ACQ:STOPA SEQ;REPE 1");
 			break;
 	}
 
@@ -243,7 +240,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 	//See what options we have
 	vector<string> options;
-	reply = m_transport->SendCommandWithReply("*OPT?", false) + ",";
+	m_transport->SendCommand("*OPT?");
+	string reply = m_transport->ReadReply(false) + ',';
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -452,7 +450,8 @@ void TektronixOscilloscope::DetectProbes()
 			//If a digital probe (TLP058), disable this channel and mark as not usable
 			for(size_t i=0; i<m_analogChannelCount; i++)
 			{
-				string reply = m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":PROBETYPE?");
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBETYPE?");
+				string reply = m_transport->ReadReply();
 
 				if(reply == "DIG")
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
@@ -460,8 +459,8 @@ void TektronixOscilloscope::DetectProbes()
 				//Treat anything else as analog. See what type
 				else
 				{
-					string id = TrimQuotes(
-						m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":PROBE:ID:TYP?"));
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBE:ID:TYP?");
+					string id = TrimQuotes(m_transport->ReadReply());
 					if(id == "TPP1000")
 						m_probeTypes[i] = PROBE_TYPE_ANALOG_250K;
 					else
@@ -542,7 +541,8 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			return m_channelsEnabled[i];
 	}
 
-	string reply;
+	lock_guard<recursive_mutex> lock2(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -550,14 +550,16 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 			//Undocumented command to toggle spectrum view state
 			if(IsSpectrum(i))
-				reply = m_transport->SendCommandWithReply(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE?");
+				m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE?");
 			else
-				reply = m_transport->SendCommandWithReply(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
+				m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 			break;
 
 		default:
 			break;
 	}
+
+	string reply = m_transport->ReadReply();
 
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -576,9 +578,6 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 void TektronixOscilloscope::EnableChannel(size_t i)
 {
-	if(i == m_extTrigChannel->GetIndex())
-		return;
-
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -606,23 +605,24 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 	}
 
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
-					m_transport->SendCommandQueued(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE ON");
+					m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE ON");
 				else
 				{
 					//Make sure the digital group is on
 					if(IsDigital(i))
 					{
 						size_t parent = m_flexChannelParents[m_channels[i]];
-						m_transport->SendCommandQueued(
+						m_transport->SendCommand(
 							string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
 					}
 
-					m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
+					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
 				}
 				break;
 
@@ -638,9 +638,6 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 bool TektronixOscilloscope::CanEnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
-
-	if(i == m_extTrigChannel->GetIndex())
-		return false;
 
 	//If we're an analog channel with a digital probe connected, the analog channel is unusable
 	if(IsAnalog(i) && (m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT) )
@@ -674,22 +671,17 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
-	//Mark the channel as disabled first, before sending commands to the scope.
-	//This ensures that nobody else tries to use the disabled channel.
 	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelsEnabled[i] = false;
-	}
+		lock_guard<recursive_mutex> lock(m_mutex);
 
-	{
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
-					m_transport->SendCommandQueued(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE OFF");
+					m_transport->SendCommand(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE OFF");
 				else
-					m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
+					m_transport->SendCommand(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
 				break;
 
 			default:
@@ -697,6 +689,9 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 		}
 
 	}
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelsEnabled[i] = false;
 }
 
 OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size_t i)
@@ -714,13 +709,17 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 
 	OscilloscopeChannel::CouplingType coupling = OscilloscopeChannel::COUPLE_DC_1M;
 	{
+		lock_guard<recursive_mutex> lock2(m_mutex);
+
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				{
-					string coup = m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":COUP?");
-					float nterm = stof(m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":TER?"));
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+					string coup = m_transport->ReadReply();
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TER?");
+					float nterm = stof(m_transport->ReadReply());
 
 					//TODO: Tek's 1 GHz passive probes are 250K ohm impedance at the scope side.
 					//We report anything other than 50 ohm as 1M because scopehal doesn't have API support for that.
@@ -737,6 +736,29 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 
 				// FIXME
 				coupling = OscilloscopeChannel::COUPLE_DC_1M;
+			/*
+			#if 0
+
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+				string coup_reply = m_transport->ReadReply();
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP?");
+				string imp_reply = m_transport->ReadReply();
+
+				OscilloscopeChannel::CouplingType coupling;
+				if(coup_reply == "AC")
+					coupling = OscilloscopeChannel::COUPLE_AC_1M;
+				else if(coup_reply == "DC")
+				{
+					if(imp_reply == "ONEM")
+						coupling = OscilloscopeChannel::COUPLE_DC_1M;
+					else if(imp_reply == "FIFT")
+						coupling = OscilloscopeChannel::COUPLE_DC_50;
+				}
+				lock_guard<recursive_mutex> lock(m_cacheMutex);
+				m_channelCouplings[i] = coupling;
+				return coupling;
+			#endif
+			*/
 		}
 	}
 
@@ -750,6 +772,8 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 	if(!IsAnalog(i))
 		return;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -757,23 +781,23 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_DC_50:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 50");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 50");
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
 					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 250E3");
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 250E3");
 					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 1E+6");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP AC");
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 1E+6");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
 					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 250E3");
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":TERM 250E3");
 					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
+						m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
 					break;
 
 				default:
@@ -785,18 +809,18 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_DC_50:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP FIFT");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP FIFT");
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP ONEM");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP AC");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP ONEM");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP ONEM");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP ONEM");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
 					break;
 
 				default:
@@ -821,13 +845,17 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 	if(!IsAnalog(i))
 		return 1;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				float probegain = stof(m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
-				float extatten = stof(m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":PROBEF:EXTA?"));
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:GAIN?");
+				float probegain = stof(m_transport->ReadReply());
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBEF:EXTA?");
+				float extatten = stof(m_transport->ReadReply());
 
 				//Calculate the overall system attenuation.
 				//Note that probes report *gain* while the external is *attenuation*.
@@ -839,6 +867,21 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 
 		default:
 			// FIXME
+
+			/*
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+
+			string reply = m_transport->ReadReply();
+			double atten;
+			sscanf(reply.c_str(), "%lf", &atten);
+
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			m_channelAttenuations[i] = atten;
+			return atten;
+			*/
+
 			return 1.0;
 	}
 }
@@ -853,6 +896,8 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 		m_channelAttenuations[i] = atten;
 	}
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -861,10 +906,11 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 				//This function takes the overall system attenuation as an argument.
 				//We need to scale this by the probe gain to figure out the necessary external attenuation.
 				//At the moment, this isn't cached, but we probably should do this in the future.
-				float probegain = stof(m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PRO:GAIN?");
+				float probegain = stof(m_transport->ReadReply());
 
 				float extatten = atten * probegain;
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PROBEF:EXTA " + to_string(extatten));
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBEF:EXTA " + to_string(extatten));
 			}
 			break;
 
@@ -888,12 +934,15 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	unsigned int bwl = 0;
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				{
-					string reply = m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":BAN?");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN?");
+					string reply = m_transport->ReadReply();
 					if(reply == "FUL")		//no limit
 						bwl = 0;
 					else
@@ -906,6 +955,15 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 				break;
 
 			default:
+				/*
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
+				string reply = m_transport->ReadReply();
+				int bwl;
+				if(reply == "1")
+					bwl = 25;
+				else
+					bwl = 0;
+				*/
 				break;
 		}
 	}
@@ -977,6 +1035,8 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 		m_channelBandwidthLimits[i] = limit_mhz;
 	}
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -987,9 +1047,9 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 				limit_hz *= 1000 * 1000;
 
 				if(limit_mhz == 0)
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BAN FUL");
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN FUL");
 				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BAN " + to_string(limit_hz));
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAN " + to_string(limit_hz));
 			}
 			break;
 
@@ -1016,24 +1076,25 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 		return 1;
 
 	//We want total range, not per division
-	string reply;
-	switch(m_family)
+	double range;
 	{
-		case FAMILY_MSO5:
-		case FAMILY_MSO6:
-			if(IsSpectrum(i))
-			{
-				reply = m_transport->SendCommandWithReply(
-					string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:SCA?");
-			}
-			else
-				reply = m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":SCA?");
-			break;
+		lock_guard<recursive_mutex> lock2(m_mutex);
 
-		default:
-			break;
+		switch(m_family)
+		{
+			case FAMILY_MSO5:
+			case FAMILY_MSO6:
+				if(IsSpectrum(i))
+					m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:SCA?");
+				else
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA?");
+				break;
+
+			default:
+				break;
+		}
+		range = stof(m_transport->ReadReply()) * 10;
 	}
-	double range = stof(reply) * 10;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
@@ -1056,6 +1117,8 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -1065,15 +1128,15 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 				double divsize = range/10;
 				double offset_div = (GetChannelOffset(i) / divsize) - 5;
 
-				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:SCA " + to_string(divsize));
 
 				//This seems to also mess up vertical position, so update that too to keep us centered
-				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:POS " + to_string(offset_div));
 			}
 			else
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
 			break;
 
 		default:
@@ -1112,13 +1175,15 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 
 	else if(!IsSpectrum(i))
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(m_family)
 		{
 			//What a shocker!
 			//Completely orthogonal design for analog and digital, and it even handles empty strings well!
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				name = TrimQuotes(m_transport->SendCommandWithReply(chan->GetHwname() + ":LAB:NAM?"));
+				m_transport->SendCommand(chan->GetHwname() + ":LAB:NAM?");
+				name = TrimQuotes(m_transport->ReadReply());
 				break;
 
 			default:
@@ -1153,6 +1218,7 @@ void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
 
 	//Update in hardware
 	//(spectrum channels only have clientside naming)
+	lock_guard<recursive_mutex> lock(m_mutex);
 	if(!IsSpectrum(i))
 	{
 		//Hide the name if we type the channel name, no reason to have two labels
@@ -1170,7 +1236,7 @@ void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
 			//Completely orthogonal design for analog and digital, and it even handles empty strings well!
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				m_transport->SendCommandQueued(chan->GetHwname() + ":LAB:NAM \"" + name + "\"");
+				m_transport->SendCommand(chan->GetHwname() + ":LAB:NAM \"" + name + "\"");
 				break;
 
 			default:
@@ -1199,6 +1265,8 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	//Read offset
 	double offset = 0;
 	{
+		lock_guard<recursive_mutex> lock2(m_mutex);
+
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
@@ -1207,13 +1275,15 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 				{
 					//Position is reported in divisions, not dBm.
 					//It also seems to be negative, and reported from the top of the display rather than the middle.
-					string reply = m_transport->SendCommandWithReply(
-						string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?");
-					offset = (stof(reply) + 5) * (GetChannelVoltageRange(i)/10);
+					m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?");
+					float pos = stof(m_transport->ReadReply());
+					offset = (pos+5) * (GetChannelVoltageRange(i)/10);
 				}
 				else
-					offset = -stof(m_transport->SendCommandWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
-
+				{
+					m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+					offset = -stof(m_transport->ReadReply());
+				}
 				break;
 
 			default:
@@ -1243,6 +1313,8 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 	if(!CanEnableChannel(i) || !IsChannelEnabled(i))
 		return;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -1252,11 +1324,11 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 				double divsize = GetChannelVoltageRange(i) / 10;
 				double offset_div = (offset / divsize) - 5;
 
-				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
+				m_transport->SendCommand(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:POS " + to_string(offset_div));
 			}
 			else
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
 			break;
 
 		default:
@@ -1266,12 +1338,15 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 
 Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	if (!m_triggerArmed)
 		return TRIGGER_MODE_STOP;
 
 	// Based on example from 6000 Series Programmer's Guide
 	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
-	string ter = m_transport->SendCommandWithReply("TRIG:STATE?");
+	m_transport->SendCommand("TRIG:STATE?");
+	string ter = m_transport->ReadReply();
 
 	if(ter == "SAV")
 	{
@@ -1295,6 +1370,7 @@ bool TektronixOscilloscope::AcquireData()
 
 	map<int, vector<WaveformBase*> > pending_waveforms;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
 	switch(m_family)
@@ -1401,8 +1477,7 @@ bool TektronixOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		m_transport->SendCommandQueued("ACQ:STATE ON");
-		m_transport->FlushCommandQueue();
+		m_transport->SendCommand("ACQ:STATE ON");
 		m_triggerArmed = true;
 	}
 
@@ -1495,121 +1570,6 @@ void TektronixOscilloscope::Convert16BitSamplesAVX2(
 	}
 }
 
-/**
-	@brief Converts 8-bit ADC samples to floating point
- */
-void TektronixOscilloscope::Convert8BitSamples(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count)
-{
-	for(unsigned int k=0; k<count; k++)
-	{
-		offs[k] = k;
-		durs[k] = 1;
-		pout[k] = pin[k] * ymult + yoff;
-	}
-}
-
-/**
-	@brief Optimized version of Convert8BitSamples()
- */
-__attribute__((target("avx2")))
-void TektronixOscilloscope::Convert8BitSamplesAVX2(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float ymult, float yoff, size_t count)
-{
-	unsigned int end = count - (count % 32);
-
-	int64_t __attribute__ ((aligned(32))) count_x4[] = { 0, 1, 2, 3 };
-
-	__m256i all_ones	= _mm256_set1_epi64x(1);
-	__m256i all_fours	= _mm256_set1_epi64x(4);
-	__m256i counts		= _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
-
-	__m256 gains = { ymult, ymult, ymult, ymult, ymult, ymult, ymult, ymult };
-	__m256 offsets = { yoff, yoff, yoff, yoff, yoff, yoff, yoff, yoff };
-
-	for(unsigned int k=0; k<end; k += 32)
-	{
-		//Load all 32 raw ADC samples, without assuming alignment
-		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
-
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
-
-		//Extract the low and high 16 samples from the block
-		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
-		__m128i block23_x8 = _mm256_extracti128_si256(raw_samples, 1);
-
-		//Swap the low and high halves of these vectors
-		//Ugly casting needed because all permute instrinsics expect float/double datatypes
-		__m128i block10_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block01_x8), 1));
-		__m128i block32_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block23_x8), 1));
-
-		//Divide into blocks of 8 samples and sign extend to 32 bit
-		__m256i block0_int = _mm256_cvtepi8_epi32(block01_x8);
-		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
-		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
-		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-
-		//Convert the 32-bit int blocks to float.
-		//Apparently there's no direct epi8 to ps conversion instruction.
-		__m256 block0_float = _mm256_cvtepi32_ps(block0_int);
-		__m256 block1_float = _mm256_cvtepi32_ps(block1_int);
-		__m256 block2_float = _mm256_cvtepi32_ps(block2_int);
-		__m256 block3_float = _mm256_cvtepi32_ps(block3_int);
-
-		//Woo! We've finally got floating point data. Now we can do the fun part.
-		block0_float = _mm256_mul_ps(block0_float, gains);
-		block1_float = _mm256_mul_ps(block1_float, gains);
-		block2_float = _mm256_mul_ps(block2_float, gains);
-		block3_float = _mm256_mul_ps(block3_float, gains);
-
-		block0_float = _mm256_add_ps(block0_float, offsets);
-		block1_float = _mm256_add_ps(block1_float, offsets);
-		block2_float = _mm256_add_ps(block2_float, offsets);
-		block3_float = _mm256_add_ps(block3_float, offsets);
-
-		//All done, store back to the output buffer
-		_mm256_store_ps(pout + k, 		block0_float);
-		_mm256_store_ps(pout + k + 8,	block1_float);
-		_mm256_store_ps(pout + k + 16,	block2_float);
-		_mm256_store_ps(pout + k + 24,	block3_float);
-	}
-
-	//Get any extras we didn't get in the SIMD loop
-	for(unsigned int k=end; k<count; k++)
-	{
-		offs[k] = k;
-		durs[k] = 1;
-		pout[k] = pin[k] * ymult + yoff;
-	}
-}
-
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Make sure record length is valid
@@ -1640,56 +1600,53 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	double span;
 
 	//Ask for the analog data
-	m_transport->SendCommandQueued("DAT:WID 1");				//8-bit data
-	m_transport->SendCommandQueued("DAT:ENC SRI");				//signed, little endian binary
+	m_transport->SendCommand("DAT:WID 2");					//16-bit data
+	m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
 			continue;
 
-		//Set source for the waveform
-		m_transport->SendCommandQueued(string("DAT:SOU ") + m_channels[i]->GetHwname());
-		m_transport->FlushCommandQueue();
+		// Set source & get preamble+data
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname());
+
+		//Ask for the waveform preamble
+		m_transport->SendCommand("WFMO?");
+
+		//Process it (grab the whole block, semicolons and all)
+		string preamble = m_transport->ReadReply(false);
+		sscanf(preamble.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
+			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
+
+		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
+		m_channelOffsets[i] = -yoff;
+
+		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+		LogIndenter li2;
 
 		//Read the data blocks
-		char* rxbuf = NULL;
-		size_t nsamples;
-		{
-			lock_guard<mutex> lock(m_transport->GetMutex());
+		m_transport->SendCommand("CURV?");
 
-			//Crunch the waveform preamble
-			m_transport->SendCommand("WFMO?");
-			string preamble = m_transport->ReadReply(false);
-			sscanf(preamble.c_str(),
-				"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-				"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-				&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-				xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-			m_transport->SendCommand("CURV?");
+		//Read length of the actual data
+		char tmplen[3] = {0};
+		m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+		int ndigits = atoi(tmplen+1);
 
-			timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
-			m_channelOffsets[i] = -yoff;
+		char digits[10] = {0};
+		m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+		int msglen = atoi(digits);
 
-			//Read length of the actual data
-			char tmplen[3] = {0};
-			m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
-			int ndigits = atoi(tmplen+1);
+		//Read the actual data
+		char* rxbuf = new char[msglen];
+		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
 
-			char digits[10] = {0};
-			m_transport->ReadRawData(ndigits, (unsigned char*)digits);
-			int msglen = atoi(digits);
-
-			//Read the actual data
-			rxbuf = new char[msglen];
-			m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
-			nsamples = msglen;
-
-			//Throw out garbage at the end of the message (why is this needed?)
-			m_transport->ReadReply();
-		}
-
-		int8_t* samples = (int8_t*)rxbuf;
+		//convert bytes to samples
+		size_t nsamples = msglen/2;
+		int16_t* samples = (int16_t*)rxbuf;
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1704,7 +1661,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		if(g_hasAvx2)
 		{
-			Convert8BitSamplesAVX2(
+			Convert16BitSamplesAVX2(
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
@@ -1715,7 +1672,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		}
 		else
 		{
-			Convert8BitSamples(
+			Convert16BitSamples(
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
@@ -1730,6 +1687,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Done
 		delete[] rxbuf;
+
+		//Throw out garbage at the end of the message (why is this needed?)
+		m_transport->ReadReply();
 	}
 
 	//Get the spectrum stuff
@@ -1743,20 +1703,24 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Select mode
 		if(firstSpectrum)
 		{
-			m_transport->SendCommandQueued("DAT:WID 8");					//double precision floating point data
-			m_transport->SendCommandQueued("DAT:ENC SFPB");				//IEEE754 float
+			m_transport->SendCommand("DAT:WID 8");					//double precision floating point data
+			m_transport->SendCommand("DAT:ENC SFPB");				//IEEE754 float
 			firstSpectrum = false;
 		}
 
 		// Set source & get preamble+data
-		m_transport->SendCommandQueued(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
+		m_transport->SendCommand(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
 
 		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandWithReply("WFMO?", false);
+		m_transport->SendCommand("WFMO?");
+
+		//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
+		//LogIndenter li2;
 
 		//Process it
 		double hzbase = 0;
 		double hzoff = 0;
+		string preamble = m_transport->ReadReply(false);
 		sscanf(preamble.c_str(),
 			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
 			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
@@ -1764,35 +1728,22 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			xunit, &hzbase, &hzoff,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
 		m_channelOffsets[i] = -yoff;
 
-		size_t nsamples = 0;
-		double* samples = NULL;
-		{
-			lock_guard<mutex> lock(m_transport->GetMutex());
+		//Read the data block
+		m_transport->SendCommand("CURV?");
 
-			//Final check that channel is still active
-			if(!IsChannelEnabled(i))
-				continue;
+		//Read length of the actual data
+		char tmplen[3] = {0};
+		m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+		int ndigits = atoi(tmplen+1);
 
-			//Read the data block
-			m_transport->SendCommand("CURV?");
+		char digits[10] = {0};
+		m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+		int msglen = atoi(digits);
 
-			//Read length of the actual data
-			char tmplen[3] = {0};
-			m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
-			int ndigits = atoi(tmplen+1);
-
-			char digits[10] = {0};
-			m_transport->ReadRawData(ndigits, (unsigned char*)digits);
-			int msglen = atoi(digits);
-
-			//Read the actual data
-			nsamples = msglen/8;
-			samples = new double[nsamples];
-			m_transport->ReadRawData(msglen, (unsigned char*)samples);
-
-			//Throw out garbage at the end of the message (why is this needed?)
-			m_transport->ReadReply();
-		}
+		//Read the actual data
+		size_t nsamples = msglen/8;
+		double* samples = new double[nsamples];
+		m_transport->ReadRawData(msglen, (unsigned char*)samples);
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1820,6 +1771,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Done
 		delete[] samples;
+
+		//Throw out garbage at the end of the message (why is this needed?)
+		m_transport->ReadReply();
 
 		//Look for peaks
 		//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
@@ -1856,16 +1810,19 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Configuration
 		if(firstDigital)
 		{
-			m_transport->SendCommandQueued("DAT:WID 1");				//8 data bits per channel
-			m_transport->SendCommandQueued("DAT:ENC SRI");				//signed, little endian binary
+			m_transport->SendCommand("DAT:WID 1");					//8 data bits per channel
+			m_transport->SendCommand("DAT:ENC SRI");				//signed, little endian binary
 			firstDigital = false;
 		}
 
 		//Ask for all of the data
-		m_transport->SendCommandQueued(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
+		m_transport->SendCommand(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
 
 		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandWithReply("WFMO?", false);
+		m_transport->SendCommand("WFMO?");
+
+		//Process it
+		string preamble = m_transport->ReadReply(false);
 		sscanf(preamble.c_str(),
 			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
 			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
@@ -1873,33 +1830,20 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
 		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
 
-		size_t msglen = 0;
-		char* rxbuf = NULL;
-		{
-			lock_guard<mutex> lock(m_transport->GetMutex());
+		m_transport->SendCommand("CURV?");
 
-			//Final check that channel is still active
-			if(!IsChannelEnabled(i))
-				continue;
+		//Read length of the actual data
+		char tmplen[3] = {0};
+		m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
+		int ndigits = atoi(tmplen+1);
 
-			m_transport->SendCommand("CURV?");
+		char digits[10] = {0};
+		m_transport->ReadRawData(ndigits, (unsigned char*)digits);
+		int msglen = atoi(digits);
 
-			//Read length of the actual data
-			char tmplen[3] = {0};
-			m_transport->ReadRawData(2, (unsigned char*)tmplen);	//expect #n
-			int ndigits = atoi(tmplen+1);
-
-			char digits[10] = {0};
-			m_transport->ReadRawData(ndigits, (unsigned char*)digits);
-			msglen = atoi(digits);
-
-			//Read the actual data
-			rxbuf = new char[msglen];
-			m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
-
-			//Throw out garbage at the end of the message (why is this needed?)
-			m_transport->ReadReply();
-		}
+		//Read the actual data
+		char* rxbuf = new char[msglen];
+		m_transport->ReadRawData(msglen, (unsigned char*)rxbuf);
 
 		//Process the data for each channel
 		for(int j=0; j<8; j++)
@@ -1917,7 +1861,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 			//Extract sample data
 			int mask = (1 << j);
-			for(size_t k=0; k<msglen; k++)
+			for(int k=0; k<msglen; k++)
 			{
 				cap->m_offsets[k] = k;
 				cap->m_durations[k] = 1;
@@ -1930,6 +1874,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 		//Done
 		delete[] rxbuf;
+
+		//Throw out garbage at the end of the message (why is this needed?)
+		m_transport->ReadReply();
 	}
 
 	return true;
@@ -1937,21 +1884,24 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 void TektronixOscilloscope::Start()
 {
-	m_transport->SendCommandQueued("ACQ:STATE ON");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ACQ:STATE ON");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
 
 void TektronixOscilloscope::StartSingleTrigger()
 {
-	m_transport->SendCommandQueued("ACQ:STATE ON");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ACQ:STATE ON");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
 
 void TektronixOscilloscope::Stop()
 {
-	m_transport->SendCommandQueued("ACQ:STATE STOP");
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ACQ:STATE STOP");
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
@@ -2099,14 +2049,14 @@ uint64_t TektronixOscilloscope::GetSampleRate()
 	if(m_sampleRateValid)
 		return m_sampleRate;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-
-			//stoull seems to not handle scientific notation
-			m_sampleRate = stod(m_transport->SendCommandWithReply("HOR:MODE:SAMPLER?"));
-
+			m_transport->SendCommand("HOR:MODE:SAMPLER?");
+			m_sampleRate = stod(m_transport->ReadReply());	//stoull seems to not handle scientific notation
 			break;
 
 		default:
@@ -2122,11 +2072,14 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 	if(m_sampleDepthValid)
 		return m_sampleDepth;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_sampleDepth = stos(m_transport->SendCommandWithReply("HOR:MODE:RECO?"));
+			m_transport->SendCommand("HOR:MODE:RECO?");
+			m_sampleDepth = stos(m_transport->ReadReply());
 			break;
 
 		default:
@@ -2134,8 +2087,8 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 	}
 
 	//Update data read bounds
-	m_transport->SendCommandQueued("DAT:START 0");
-	m_transport->SendCommandQueued(string("DAT:STOP ") + to_string(m_sampleDepth));
+	m_transport->SendCommand("DAT:START 0");
+	m_transport->SendCommand(string("DAT:STOP ") + to_string(m_sampleDepth));
 
 	m_sampleDepthValid = true;
 	return m_sampleDepth;
@@ -2150,11 +2103,14 @@ void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 		m_sampleDepthValid = true;
 	}
 
+	//Send it
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(string("HOR:MODE:RECO ") + to_string(depth));
+			m_transport->SendCommand(string("HOR:MODE:RECO ") + to_string(depth));
 			break;
 
 		default:
@@ -2162,8 +2118,8 @@ void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 	}
 
 	//Update data read bounds
-	m_transport->SendCommandQueued("DAT:START 0");
-	m_transport->SendCommandQueued(string("DAT:STOP ") + to_string(depth));
+	m_transport->SendCommand("DAT:START 0");
+	m_transport->SendCommand(string("DAT:STOP ") + to_string(depth));
 }
 
 void TektronixOscilloscope::SetSampleRate(uint64_t rate)
@@ -2175,11 +2131,14 @@ void TektronixOscilloscope::SetSampleRate(uint64_t rate)
 		m_sampleRateValid = true;
 	}
 
+	//Send it
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(string("HOR:MODE:SAMPLER ") + to_string(rate));
+			m_transport->SendCommand(string("HOR:MODE:SAMPLER ") + to_string(rate));
 			break;
 
 		default:
@@ -2189,6 +2148,8 @@ void TektronixOscilloscope::SetSampleRate(uint64_t rate)
 
 void TektronixOscilloscope::SetTriggerOffset(int64_t offset)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -2200,7 +2161,7 @@ void TektronixOscilloscope::SetTriggerOffset(int64_t offset)
 			double offset_sec = offset * SECONDS_PER_FS;
 			double center_offset_sec = capture_len_sec/2 - offset_sec;
 
-			m_transport->SendCommandQueued(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
+			m_transport->SendCommand(string("HOR:DELAY:TIME ") + to_string(center_offset_sec));
 
 			//Don't update the cache because the scope is likely to round the offset we ask for.
 			//If we query the instrument later, the cache will be updated then.
@@ -2217,13 +2178,16 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 	if(m_triggerOffsetValid)
 		return m_triggerOffset;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 		{
 			//Instrument reports position of trigger from the midpoint of the display
-			double center_offset_sec = stod(m_transport->SendCommandWithReply("HOR:DELAY:TIME?"));
+			m_transport->SendCommand("HOR:DELAY:TIME?");
+			double center_offset_sec = stod(m_transport->ReadReply());
 
 			//but we want to know position from the start of the capture
 			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
@@ -2255,12 +2219,14 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	if(channel >= m_analogChannelCount)
 		return;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
-			m_transport->SendCommandQueued(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
+			m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
 			break;
 
 		default:
@@ -2282,15 +2248,15 @@ int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 	}
 
 	int64_t deskew = 0;
-	string reply;
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
-				reply = m_transport->SendCommandWithReply(m_channels[channel]->GetHwname() + ":DESK?");
-				deskew = -round(FS_PER_SECOND * stof(reply));
+				m_transport->SendCommand(m_channels[channel]->GetHwname() + ":DESK?");
+				deskew = -round(FS_PER_SECOND * stof(m_transport->ReadReply()));
 				break;
 
 			default:
@@ -2336,7 +2302,8 @@ void TektronixOscilloscope::PullTrigger()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				string reply = m_transport->SendCommandWithReply("TRIG:A:TYP?");
+				m_transport->SendCommand("TRIG:A:TYP?");
+				string reply = m_transport->ReadReply();
 
 				if(reply == "EDG")
 					PullEdgeTrigger();
@@ -2370,7 +2337,7 @@ void TektronixOscilloscope::PullTrigger()
  */
 float TektronixOscilloscope::ReadTriggerLevelMSO56()
 {
-	string reply = m_transport->SendCommandWithReply("TRIG:A:LEV?", false);
+	string reply = m_transport->ReadReply(false);
 
 	size_t off = reply.find(";");
 	if(off != string::npos)
@@ -2396,20 +2363,26 @@ void TektronixOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:EDGE:SOU?");
+				m_transport->SendCommand("TRIG:A:EDGE:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
+				//This is borked, we only care about the first thing
+				m_transport->SendCommand("TRIG:A:LEV?");
 				et->SetLevel(ReadTriggerLevelMSO56());
 
 				//Edge slope
-				reply = m_transport->SendCommandWithReply("TRIG:A:EDGE:SLO?");
+				m_transport->SendCommand("TRIG:A:EDGE:SLO?");
+				reply = m_transport->ReadReply();
 				if(reply == "RIS")
 					et->SetType(EdgeTrigger::EDGE_RISING);
 				else if(reply == "FALL")
@@ -2420,6 +2393,53 @@ void TektronixOscilloscope::PullEdgeTrigger()
 			break;
 
 		default:
+			/*
+			//Check cache
+			//No locking, worst case we return a result a few seconds old
+			if(m_triggerChannelValid)
+				return m_triggerChannel;
+
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			//Look it up
+			m_transport->SendCommand("TRIG:SOUR?");
+			string ret = m_transport->ReadReply();
+
+			if(ret.find("CHAN") == 0)
+			{
+				m_triggerChannelValid = true;
+				m_triggerChannel = atoi(ret.c_str()+4) - 1;
+				return m_triggerChannel;
+			}
+			else if(ret == "EXT")
+			{
+				m_triggerChannelValid = true;
+				m_triggerChannel = m_extTrigChannel->GetIndex();
+				return m_triggerChannel;
+			}
+			else
+			{
+				m_triggerChannelValid = false;
+				LogWarning("Unknown trigger source %s\n", ret.c_str());
+				return 0;
+			}
+
+			//Check cache.
+			//No locking, worst case we return a just-invalidated (but still fresh-ish) result.
+			if(m_triggerLevelValid)
+				return m_triggerLevel;
+
+			lock_guard<recursive_mutex> lock(m_mutex);
+
+			m_transport->SendCommand("TRIG:LEV?");
+			string ret = m_transport->ReadReply();
+
+			double level;
+			sscanf(ret.c_str(), "%lf", &level);
+			m_triggerLevel = level;
+			m_triggerLevelValid = true;
+			return level;
+			*/
 			break;
 	}
 }
@@ -2441,33 +2461,42 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 		m_trigger = new PulseWidthTrigger(this);
 	PulseWidthTrigger* et = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:PULSEW:SOU?");
+				m_transport->SendCommand("TRIG:A:PULSEW:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//TODO: TRIG:A:PULSEW:LOGICQUAL?
 
 				//Trigger level
+				m_transport->SendCommand("TRIG:A:LEV?");
 				et->SetLevel(ReadTriggerLevelMSO56());
 
+				m_transport->SendCommand("TRIG:A:PULSEW:HIGHL?");
 				Unit fs(Unit::UNIT_FS);
-				et->SetUpperBound(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:PULSEW:HIGHL?")));
-				et->SetLowerBound(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:PULSEW:LOWL?")));
+				et->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
+
+				m_transport->SendCommand("TRIG:A:PULSEW:LOWL?");
+				et->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:PULSEW:POL?"));
+				m_transport->SendCommand("TRIG:A:PULSEW:POL?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "POS")
 					et->SetType(EdgeTrigger::EDGE_RISING);
 				else if(reply == "NEG")
 					et->SetType(EdgeTrigger::EDGE_FALLING);
 
 				//Condition
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:PULSEW:WHE?"));
+				m_transport->SendCommand("TRIG:A:PULSEW:WHE?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "LESS")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				if(reply == "MORE")
@@ -2488,6 +2517,7 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 	}
 }
 
+
 /**
 	@brief Reads settings for a dropout trigger from the instrument
 
@@ -2507,25 +2537,31 @@ void TektronixOscilloscope::PullDropoutTrigger()
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* et = dynamic_cast<DropoutTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:TIMEO:SOU?");
+				m_transport->SendCommand("TRIG:A:TIMEO:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
+				m_transport->SendCommand("TRIG:A:LEV?");
 				et->SetLevel(ReadTriggerLevelMSO56());
 
+				m_transport->SendCommand("TRIG:A:TIMEO:TIM?");
 				Unit fs(Unit::UNIT_FS);
-				et->SetDropoutTime(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:TIMEO:TIM?")));
+				et->SetDropoutTime(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:TIMEO:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:TIMEO:POL?"));
+				m_transport->SendCommand("TRIG:A:TIMEO:POL?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "STAYSH")
 					et->SetType(DropoutTrigger::EDGE_RISING);
 				else if(reply == "STAYSL")
@@ -2557,22 +2593,28 @@ void TektronixOscilloscope::PullRuntTrigger()
 		m_trigger = new RuntTrigger(this);
 	RuntTrigger* et = dynamic_cast<RuntTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:RUNT:SOU?");
+				m_transport->SendCommand("TRIG:A:RUNT:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:UPP:") + chname + "?")));
+				m_transport->SendCommand(string("TRIG:A:LOW:") + chname + "?");
+				et->SetLowerBound(stof(m_transport->ReadReply()));
+				m_transport->SendCommand(string("TRIG:A:UPP:") + chname + "?");
+				et->SetUpperBound(stof(m_transport->ReadReply()));
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:RUNT:WHE?"));
+				m_transport->SendCommand("TRIG:A:RUNT:WHE?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "LESS")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				else if(reply == "MORE")
@@ -2586,12 +2628,14 @@ void TektronixOscilloscope::PullRuntTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:RUNT:WID?")));
+				m_transport->SendCommand("TRIG:A:RUNT:WID?");
+				et->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:RUNT:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:RUNT:POL?"));
+				m_transport->SendCommand("TRIG:A:RUNT:POL?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "POS")
 					et->SetSlope(RuntTrigger::EDGE_RISING);
 				else if(reply == "NEG")
@@ -2623,22 +2667,28 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 		m_trigger = new SlewRateTrigger(this);
 	SlewRateTrigger* et = dynamic_cast<SlewRateTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:TRAN:SOU?");
+				m_transport->SendCommand("TRIG:A:TRAN:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:UPP:") + chname + "?")));
+				m_transport->SendCommand(string("TRIG:A:LOW:") + chname + "?");
+				et->SetLowerBound(stof(m_transport->ReadReply()));
+				m_transport->SendCommand(string("TRIG:A:UPP:") + chname + "?");
+				et->SetUpperBound(stof(m_transport->ReadReply()));
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:TRAN:WHE?"));
+				m_transport->SendCommand("TRIG:A:TRAN:WHE?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "FAST")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				else if(reply == "SLOW")
@@ -2650,12 +2700,14 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:TRAN:DELT?")));
+				m_transport->SendCommand("TRIG:A:TRAN:DELT?");
+				et->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:TRAN:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:TRAN:POL?"));
+				m_transport->SendCommand("TRIG:A:TRAN:POL?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "POS")
 					et->SetSlope(SlewRateTrigger::EDGE_RISING);
 				else if(reply == "NEG")
@@ -2687,24 +2739,30 @@ void TektronixOscilloscope::PullWindowTrigger()
 		m_trigger = new WindowTrigger(this);
 	WindowTrigger* et = dynamic_cast<WindowTrigger*>(m_trigger);
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandWithReply("TRIG:A:WIN:SOU?");
+				m_transport->SendCommand("TRIG:A:WIN:SOU?");
+				auto reply = m_transport->ReadReply();
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandWithReply(string("TRIG:A:UPP:") + chname + "?")));
+				m_transport->SendCommand(string("TRIG:A:LOW:") + chname + "?");
+				et->SetLowerBound(stof(m_transport->ReadReply()));
+				m_transport->SendCommand(string("TRIG:A:UPP:") + chname + "?");
+				et->SetUpperBound(stof(m_transport->ReadReply()));
 
 				//TODO: TRIG:A:WIN:LOGICQUAL?
 
 				//Crossing direction (only used for inside/outside greater)
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:WIN:CROSSI?"));
+				m_transport->SendCommand("TRIG:A:WIN:CROSSI?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "UPP")
 					et->SetCrossingDirection(WindowTrigger::CROSS_UPPER);
 				else if(reply == "LOW")
@@ -2715,7 +2773,8 @@ void TektronixOscilloscope::PullWindowTrigger()
 					et->SetCrossingDirection(WindowTrigger::CROSS_NONE);
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandWithReply("TRIG:A:WIN:WHE?"));
+				m_transport->SendCommand("TRIG:A:WIN:WHE?");
+				reply = Trim(m_transport->ReadReply());
 				if(reply == "ENTERSW")
 					et->SetWindowType(WindowTrigger::WINDOW_ENTER);
 				else if(reply == "EXITSW")
@@ -2727,7 +2786,8 @@ void TektronixOscilloscope::PullWindowTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetWidth(fs.ParseString(m_transport->SendCommandWithReply("TRIG:A:WIN:WID?")));
+				m_transport->SendCommand("TRIG:A:WIN:WID?");
+				et->SetWidth(fs.ParseString(m_transport->ReadReply()));
 			}
 			break;
 
@@ -2769,30 +2829,32 @@ void TektronixOscilloscope::PushTrigger()
  */
 void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP EDGE");
+				m_transport->SendCommand("TRIG:A:TYP EDGE");
 
-				m_transport->SendCommandQueued(string("TRIG:A:EDGE:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(string("TRIG:A:EDGE:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string_sci(trig->GetLevel()));
 
 				switch(trig->GetType())
 				{
 					case EdgeTrigger::EDGE_RISING:
-						m_transport->SendCommandQueued("TRIG:A:EDGE:SLO RIS");
+						m_transport->SendCommand("TRIG:A:EDGE:SLO RIS");
 						break;
 
 					case EdgeTrigger::EDGE_FALLING:
-						m_transport->SendCommandQueued("TRIG:A:EDGE:SLO FALL");
+						m_transport->SendCommand("TRIG:A:EDGE:SLO FALL");
 						break;
 
 					case EdgeTrigger::EDGE_ANY:
-						m_transport->SendCommandQueued("TRIG:A:EDGE:SLO ANY");
+						m_transport->SendCommand("TRIG:A:EDGE:SLO ANY");
 						break;
 
 					default:
@@ -2805,7 +2867,7 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			{
 				char tmp[32];
 				snprintf(tmp, sizeof(tmp), "TRIG:LEV %.3f", trig->GetLevel());
-				m_transport->SendCommandQueued(tmp);
+				m_transport->SendCommand(tmp);
 			}
 			break;
 	}
@@ -2813,52 +2875,54 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 
 void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP WID");
+				m_transport->SendCommand("TRIG:A:TYP WID");
 
-				m_transport->SendCommandQueued(string("TRIG:A:PULSEW:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(string("TRIG:A:PULSEW:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLevel()));
 
-				m_transport->SendCommandQueued(string("TRIG:A:PULSEW:HIGHL ") +
+				m_transport->SendCommand(string("TRIG:A:PULSEW:HIGHL ") +
 					to_string_sci(trig->GetUpperBound() * SECONDS_PER_FS));
-				m_transport->SendCommandQueued(string("TRIG:A:PULSEW:LOWL ") +
+				m_transport->SendCommand(string("TRIG:A:PULSEW:LOWL ") +
 					to_string_sci(trig->GetLowerBound() * SECONDS_PER_FS));
 
 				if(trig->GetType() == EdgeTrigger::EDGE_RISING)
-					m_transport->SendCommandQueued("TRIG:A:PULSEW:POL POS");
+					m_transport->SendCommand("TRIG:A:PULSEW:POL POS");
 				else
-					m_transport->SendCommandQueued("TRIG:A:PULSEW:POL NEG");
+					m_transport->SendCommand("TRIG:A:PULSEW:POL NEG");
 
 				switch(trig->GetCondition())
 				{
 					case Trigger::CONDITION_LESS:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE LESS");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE LESS");
 						break;
 
 					case Trigger::CONDITION_GREATER:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE MORE");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE MORE");
 						break;
 
 					case Trigger::CONDITION_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE EQ");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE EQ");
 						break;
 
 					case Trigger::CONDITION_NOT_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE UNEQ");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE UNEQ");
 						break;
 
 					case Trigger::CONDITION_BETWEEN:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE WIT");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE WIT");
 						break;
 
 					case Trigger::CONDITION_NOT_BETWEEN:
-						m_transport->SendCommandQueued("TRIG:A:PULSEW:WHE OUT");
+						m_transport->SendCommand("TRIG:A:PULSEW:WHE OUT");
 						break;
 
 					default:
@@ -2877,37 +2941,39 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
  */
 void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP TIMEO");
+				m_transport->SendCommand("TRIG:A:TYP TIMEO");
 
-				m_transport->SendCommandQueued(string("TRIG:A:TIMEO:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(string("TRIG:A:TIMEO:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(
 					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLevel()));
 
 				switch(trig->GetType())
 				{
 					case DropoutTrigger::EDGE_RISING:
-						m_transport->SendCommandQueued("TRIG:A:TIMEO:POL STAYSH");
+						m_transport->SendCommand("TRIG:A:TIMEO:POL STAYSH");
 						break;
 
 					case DropoutTrigger::EDGE_FALLING:
-						m_transport->SendCommandQueued("TRIG:A:TIMEO:POL STAYSL");
+						m_transport->SendCommand("TRIG:A:TIMEO:POL STAYSL");
 						break;
 
 					case DropoutTrigger::EDGE_ANY:
-						m_transport->SendCommandQueued("TRIG:A:TIMEO:POL EIT");
+						m_transport->SendCommand("TRIG:A:TIMEO:POL EIT");
 						break;
 
 					default:
 						break;
 				}
 
-				m_transport->SendCommandQueued(string("TRIG:A:TIMEO:TIM ") +
+				m_transport->SendCommand(string("TRIG:A:TIMEO:TIM ") +
 					to_string_sci(trig->GetDropoutTime() * SECONDS_PER_FS));
 			}
 			break;
@@ -2922,64 +2988,66 @@ void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
  */
 void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP RUN");
+				m_transport->SendCommand("TRIG:A:TYP RUN");
 
-				m_transport->SendCommandQueued(string("TRIG:A:RUNT:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(string("TRIG:A:RUNT:SOU ") + trig->GetInput(0).m_channel->GetHwname());
 
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:LOW:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLowerBound()));
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:UPP:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetUpperBound()));
 
 				switch(trig->GetSlope())
 				{
 					case RuntTrigger::EDGE_RISING:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:POL POS");
+						m_transport->SendCommand("TRIG:A:RUNT:POL POS");
 						break;
 
 					case RuntTrigger::EDGE_FALLING:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:POL NEG");
+						m_transport->SendCommand("TRIG:A:RUNT:POL NEG");
 						break;
 
 					case RuntTrigger::EDGE_ANY:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:POL EIT");
+						m_transport->SendCommand("TRIG:A:RUNT:POL EIT");
 						break;
 				}
 
 				switch(trig->GetCondition())
 				{
 					case Trigger::CONDITION_LESS:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:WHEN LESS");
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN LESS");
 						break;
 
 					case Trigger::CONDITION_GREATER:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:WHEN MORE");
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN MORE");
 						break;
 
 					case Trigger::CONDITION_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:WHEN EQ");
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN EQ");
 						break;
 
 					case Trigger::CONDITION_NOT_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:WHEN UNEQ");
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN UNEQ");
 						break;
 
 					case Trigger::CONDITION_ANY:
-						m_transport->SendCommandQueued("TRIG:A:RUNT:WHEN OCCURS");
+						m_transport->SendCommand("TRIG:A:RUNT:WHEN OCCURS");
 						break;
 
 					default:
 						break;
 				}
 
-				m_transport->SendCommandQueued(string("TRIG:A:RUNT:WID ") +
+				m_transport->SendCommand(string("TRIG:A:RUNT:WID ") +
 					to_string_sci(trig->GetLowerInterval() * SECONDS_PER_FS));
 			}
 			break;
@@ -2994,60 +3062,62 @@ void TektronixOscilloscope::PushRuntTrigger(RuntTrigger* trig)
  */
 void TektronixOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP TRAN");
+				m_transport->SendCommand("TRIG:A:TYP TRAN");
 
-				m_transport->SendCommandQueued(string("TRIG:A:TRAN:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(string("TRIG:A:TRAN:SOU ") + trig->GetInput(0).m_channel->GetHwname());
 
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:LOW:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLowerBound()));
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:UPP:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetUpperBound()));
 
 				switch(trig->GetSlope())
 				{
 					case SlewRateTrigger::EDGE_RISING:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:POL POS");
+						m_transport->SendCommand("TRIG:A:TRAN:POL POS");
 						break;
 
 					case SlewRateTrigger::EDGE_FALLING:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:POL NEG");
+						m_transport->SendCommand("TRIG:A:TRAN:POL NEG");
 						break;
 
 					case SlewRateTrigger::EDGE_ANY:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:POL EIT");
+						m_transport->SendCommand("TRIG:A:TRAN:POL EIT");
 						break;
 				}
 
 				switch(trig->GetCondition())
 				{
 					case Trigger::CONDITION_LESS:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:WHEN FAST");
+						m_transport->SendCommand("TRIG:A:TRAN:WHEN FAST");
 						break;
 
 					case Trigger::CONDITION_GREATER:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:WHEN SLOW");
+						m_transport->SendCommand("TRIG:A:TRAN:WHEN SLOW");
 						break;
 
 					case Trigger::CONDITION_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:WHEN EQ");
+						m_transport->SendCommand("TRIG:A:TRAN:WHEN EQ");
 						break;
 
 					case Trigger::CONDITION_NOT_EQUAL:
-						m_transport->SendCommandQueued("TRIG:A:TRAN:WHEN UNEQ");
+						m_transport->SendCommand("TRIG:A:TRAN:WHEN UNEQ");
 						break;
 
 					default:
 						break;
 				}
 
-				m_transport->SendCommandQueued(string("TRIG:A:TRAN:DELT ") +
+				m_transport->SendCommand(string("TRIG:A:TRAN:DELT ") +
 					to_string_sci(trig->GetLowerInterval() * SECONDS_PER_FS));
 			}
 			break;
@@ -3062,64 +3132,66 @@ void TektronixOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
  */
 void TektronixOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				m_transport->SendCommandQueued("TRIG:A:TYP WIN");
+				m_transport->SendCommand("TRIG:A:TYP WIN");
 
-				m_transport->SendCommandQueued(string("TRIG:A:WIN:SOU ") + trig->GetInput(0).m_channel->GetHwname());
+				m_transport->SendCommand(string("TRIG:A:WIN:SOU ") + trig->GetInput(0).m_channel->GetHwname());
 
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:LOW:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetLowerBound()));
-				m_transport->SendCommandQueued(
+				m_transport->SendCommand(
 					string("TRIG:A:UPP:") + trig->GetInput(0).m_channel->GetHwname() + " " +
 					to_string(trig->GetUpperBound()));
 
 				switch(trig->GetCrossingDirection())
 				{
 					case WindowTrigger::CROSS_UPPER:
-						m_transport->SendCommandQueued("TRIG:A:WIN:CROSSI UPP");
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI UPP");
 						break;
 
 					case WindowTrigger::CROSS_LOWER:
-						m_transport->SendCommandQueued("TRIG:A:WIN:CROSSI LOW");
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI LOW");
 						break;
 
 					case WindowTrigger::CROSS_EITHER:
-						m_transport->SendCommandQueued("TRIG:A:WIN:CROSSI EIT");
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI EIT");
 						break;
 
 					case WindowTrigger::CROSS_NONE:
-						m_transport->SendCommandQueued("TRIG:A:WIN:CROSSI NON");
+						m_transport->SendCommand("TRIG:A:WIN:CROSSI NON");
 						break;
 				}
 
 				switch(trig->GetWindowType())
 				{
 					case WindowTrigger::WINDOW_ENTER:
-						m_transport->SendCommandQueued("TRIG:A:WIN:WHEN ENTERSW");
+						m_transport->SendCommand("TRIG:A:WIN:WHEN ENTERSW");
 						break;
 
 					case WindowTrigger::WINDOW_EXIT:
-						m_transport->SendCommandQueued("TRIG:A:WIN:WHEN EXITSW");
+						m_transport->SendCommand("TRIG:A:WIN:WHEN EXITSW");
 						break;
 
 					case WindowTrigger::WINDOW_ENTER_TIMED:
-						m_transport->SendCommandQueued("TRIG:A:WIN:WHEN INSIDEG");
+						m_transport->SendCommand("TRIG:A:WIN:WHEN INSIDEG");
 						break;
 
 					case WindowTrigger::WINDOW_EXIT_TIMED:
-						m_transport->SendCommandQueued("TRIG:A:WIN:WHEN OUTSIDEG");
+						m_transport->SendCommand("TRIG:A:WIN:WHEN OUTSIDEG");
 						break;
 
 					default:
 						break;
 				}
 
-				m_transport->SendCommandQueued(string("TRIG:A:WIN:WID ") +
+				m_transport->SendCommand(string("TRIG:A:WIN:WID ") +
 					to_string_sci(trig->GetWidth() * SECONDS_PER_FS));
 			}
 			break;
@@ -3189,17 +3261,18 @@ float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
 {
 	//TODO: caching?
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	auto chan = m_channels[channel];
 
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-
 			//note, group IDs are one based but lane IDs are zero based!
-			return stof(m_transport->SendCommandWithReply(
-				string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
-				":D" + to_string(m_flexChannelLanes[chan]) + ":THR?"));
+			m_transport->SendCommand(string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
+				":D" + to_string(m_flexChannelLanes[chan]) + ":THR?");
+			return stof(m_transport->ReadReply());
 
 		default:
 			break;
@@ -3214,16 +3287,16 @@ void TektronixOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*lev
 
 void TektronixOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
 	auto chan = m_channels[channel];
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-
 			//note, group IDs are one based but lane IDs are zero based!
-			m_transport->SendCommandQueued(string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
+			m_transport->SendCommand(string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
 				":D" + to_string(m_flexChannelLanes[chan]) + ":THR " + to_string(level));
-
 			break;
 
 		default:
@@ -3249,11 +3322,13 @@ bool TektronixOscilloscope::HasFrequencyControls()
 
 void TektronixOscilloscope::SetSpan(int64_t span)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(string("SV:SPAN ") + to_string(span));
+			m_transport->SendCommand(string("SV:SPAN ") + to_string(span));
 			break;
 
 		default:
@@ -3263,11 +3338,14 @@ void TektronixOscilloscope::SetSpan(int64_t span)
 
 int64_t TektronixOscilloscope::GetSpan()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return round(stod(m_transport->SendCommandWithReply("SV:SPAN?")));
+			m_transport->SendCommand("SV:SPAN?");
+			return round(stod(m_transport->ReadReply()));
 
 		default:
 			return 1;
@@ -3276,11 +3354,13 @@ int64_t TektronixOscilloscope::GetSpan()
 
 void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(
+			m_transport->SendCommand(
 				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY " + to_string(freq));
 			break;
 
@@ -3291,12 +3371,15 @@ void TektronixOscilloscope::SetCenterFrequency(size_t channel, int64_t freq)
 
 int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return round(stof(m_transport->SendCommandWithReply(
-				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?")));
+			m_transport->SendCommand(
+				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?");
+			return round(stof(m_transport->ReadReply()));
 
 		default:
 			return 0;
@@ -3308,11 +3391,13 @@ void TektronixOscilloscope::SetResolutionBandwidth(int64_t rbw)
 	m_rbw = rbw;
 	m_rbwValid = true;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(string("SV:RBW ") + to_string(rbw));
+			m_transport->SendCommand(string("SV:RBW ") + to_string(rbw));
 			break;
 
 		default:
@@ -3325,11 +3410,14 @@ int64_t TektronixOscilloscope::GetResolutionBandwidth()
 	if(m_rbwValid)
 		return m_rbw;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_rbw = round(stod(m_transport->SendCommandWithReply("SV:RBW?")));
+			m_transport->SendCommand("SV:RBW?");
+			m_rbw = round(stod(m_transport->ReadReply()));
 			m_rbwValid = true;
 			return m_rbw;
 
@@ -3371,14 +3459,14 @@ int TektronixOscilloscope::GetCurrentMeterChannel()
 {
 	if(!m_dmmChannelValid)
 	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				{
-					auto name = Trim(m_transport->SendCommandWithReply("DVM:SOU?"));
-					m_dmmChannel = (int)GetChannelByHwName(name)->GetIndex();
-				}
+				m_transport->SendCommand("DVM:SOU?");
+				m_dmmChannel = (int)GetChannelByHwName(Trim(m_transport->ReadReply()))->GetIndex();
 				break;
 
 			default:
@@ -3400,11 +3488,13 @@ void TektronixOscilloscope::SetCurrentMeterChannel(int chan)
 	m_dmmChannel = chan;
 	m_dmmChannelValid = true;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued(string("DVM:SOU ") + m_channels[chan]->GetHwname());
+			m_transport->SendCommand(string("DVM:SOU ") + m_channels[chan]->GetHwname());
 			break;
 
 		default:
@@ -3425,6 +3515,8 @@ void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
 	m_dmmMode = type;
 	m_dmmModeValid = true;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -3432,15 +3524,15 @@ void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
 			switch(type)
 			{
 				case Multimeter::DC_VOLTAGE:
-					m_transport->SendCommandQueued("DVM:MOD DC");
+					m_transport->SendCommand("DVM:MOD DC");
 					break;
 
 				case Multimeter::DC_RMS_AMPLITUDE:
-					m_transport->SendCommandQueued("DVM:MOD ACDCRMS");
+					m_transport->SendCommand("DVM:MOD ACDCRMS");
 					break;
 
 				case Multimeter::AC_RMS_AMPLITUDE:
-					m_transport->SendCommandQueued("DVM:MOD ACRMS");
+					m_transport->SendCommand("DVM:MOD ACRMS");
 					break;
 
 				//no other modes supported
@@ -3456,6 +3548,8 @@ void TektronixOscilloscope::SetMeterMode(MeasurementTypes type)
 
 void TektronixOscilloscope::SetMeterAutoRange(bool enable)
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	m_dmmAutorange = enable;
 	m_dmmAutorangeValid = true;
 
@@ -3464,9 +3558,9 @@ void TektronixOscilloscope::SetMeterAutoRange(bool enable)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			if(enable)
-				m_transport->SendCommandQueued("DVM:AUTOR ON");
+				m_transport->SendCommand("DVM:AUTOR ON");
 			else
-				m_transport->SendCommandQueued("DVM:AUTOR OFF");
+				m_transport->SendCommand("DVM:AUTOR OFF");
 			break;
 
 		default:
@@ -3479,11 +3573,14 @@ bool TektronixOscilloscope::GetMeterAutoRange()
 	if(m_dmmAutorangeValid)
 		return m_dmmAutorange;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_dmmAutorange = (stoi(m_transport->SendCommandWithReply("DVM:AUTOR?")) == 1);
+			m_transport->SendCommand("DVM:AUTOR?");
+			m_dmmAutorange = (stoi(m_transport->ReadReply()) == 1);
 			break;
 
 		default:
@@ -3496,11 +3593,13 @@ bool TektronixOscilloscope::GetMeterAutoRange()
 
 void TektronixOscilloscope::StartMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued("DVM:MOD DC");		//TODO: use saved operating mode
+			m_transport->SendCommand("DVM:MOD DC");		//TODO: use saved operating mode
 			break;
 
 		default:
@@ -3510,11 +3609,13 @@ void TektronixOscilloscope::StartMeter()
 
 void TektronixOscilloscope::StopMeter()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_transport->SendCommandQueued("DVM:MOD OFF");
+			m_transport->SendCommand("DVM:MOD OFF");
 			break;
 
 		default:
@@ -3524,16 +3625,20 @@ void TektronixOscilloscope::StopMeter()
 
 double TektronixOscilloscope::GetMeterValue()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return stod(m_transport->SendCommandWithReply("DVM:MEASU:VAL?"));
+			m_transport->SendCommand("DVM:MEASU:VAL?");
 			break;
 
 		default:
 			return 0;
 	}
+
+	return stod(m_transport->ReadReply());
 }
 
 int TektronixOscilloscope::GetMeterDigits()
