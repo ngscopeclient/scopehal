@@ -576,6 +576,9 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 void TektronixOscilloscope::EnableChannel(size_t i)
 {
+	if(i == m_extTrigChannel->GetIndex())
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -635,6 +638,9 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 bool TektronixOscilloscope::CanEnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	if(i == m_extTrigChannel->GetIndex())
+		return false;
 
 	//If we're an analog channel with a digital probe connected, the analog channel is unusable
 	if(IsAnalog(i) && (m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT) )
