@@ -53,7 +53,6 @@ public:
 	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
 	void SendCommandImmediate(std::string cmd);
 	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true);
-	void SendCommandImmediateWithRawReply(std::string cmd, size_t len, unsigned char* buf);
 	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len);
 	bool FlushCommandQueue();
 	void SetOpcRequired()
@@ -66,7 +65,7 @@ public:
 	//Immediate command API
 	virtual bool SendCommand(const std::string& cmd) =0;
 	virtual std::string ReadReply(bool endOnSemicolon = true) =0;
-	virtual void ReadRawData(size_t len, unsigned char* buf) =0;
+	virtual size_t ReadRawData(size_t len, unsigned char* buf) =0;
 	virtual void SendRawData(size_t len, const unsigned char* buf) =0;
 
 	virtual bool IsCommandBatchingSupported() =0;

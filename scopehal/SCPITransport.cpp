@@ -155,16 +155,6 @@ void SCPITransport::SendCommandImmediate(string cmd)
 }
 
 /**
-	@brief Sends a command (jumping ahead of the queue) which reads a raw response
- */
-void SCPITransport::SendCommandImmediateWithRawReply(string cmd, size_t len, unsigned char* buf)
-{
-	lock_guard<recursive_mutex> lock(m_netMutex);
-	SendCommand(cmd);
-	ReadRawData(len, buf);
-}
-
-/**
 	@brief Sends a command (jumping ahead of the queue) which reads a binary block response
  */
 void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len)
@@ -174,17 +164,20 @@ void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& l
 
 	//Read the length
 	char tmplen[3] = {0};
-	ReadRawData(2, (unsigned char*)tmplen);			//expect #n
-	int ndigits = atoi(tmplen+1);
+	if(2 != ReadRawData(2, (unsigned char*)tmplen))			//expect #n
+		return NULL;
+	if(tmplen[0] == 0)	//Not sure how this happens, but sometimes occurs on Tek MSO6?
+		return NULL;
+	size_t ndigits = stoull(tmplen+1);
 
 	//Read the digits
 	char digits[10] = {0};
-	ReadRawData(ndigits, (unsigned char*)digits);
+	if(ndigits != ReadRawData(ndigits, (unsigned char*)digits))
+		return NULL;
 	len = stoull(digits);
 
 	//Read the actual data
 	unsigned char* buf = new unsigned char[len];
-	ReadRawData(len, buf);
-
+	len = ReadRawData(len, buf);
 	return buf;
 }

@@ -88,8 +88,9 @@ void SCPINullTransport::SendRawData(size_t /*len*/, const unsigned char* /*buf*/
 {
 }
 
-void SCPINullTransport::ReadRawData(size_t /*len*/, unsigned char* /*buf*/)
+size_t SCPINullTransport::ReadRawData(size_t /*len*/, unsigned char* /*buf*/)
 {
+	return 0;
 }
 
 bool SCPINullTransport::IsCommandBatchingSupported()
