@@ -308,7 +308,7 @@ public:
 		///Just got triggered, data is ready to read
 		TRIGGER_MODE_TRIGGERED,
 
-		///WAIT - waiting for something (not sure what this means, some Rigol scopes use it?)
+		///WAIT - not yet fully armed
 		TRIGGER_MODE_WAIT,
 
 		///Auto trigger - waiting for auto-trigger

@@ -124,6 +124,8 @@ public:
 	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
 	virtual int64_t GetDeskewForChannel(size_t channel);
 
+	virtual void SetUseExternalRefclk(bool external);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 

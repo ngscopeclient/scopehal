@@ -576,6 +576,11 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 
 void TektronixOscilloscope::EnableChannel(size_t i)
 {
+	if(!CanEnableChannel(i))
+		return;
+	if(i == m_extTrigChannel->GetIndex())
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -1307,15 +1312,25 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 	if (!m_triggerArmed)
 		return TRIGGER_MODE_STOP;
 
+	//If AcquireData() is in progress, block until it's completed before allowing the poll.
+	lock_guard<recursive_mutex> lock(m_mutex);
+
 	// Based on example from 6000 Series Programmer's Guide
 	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
-	string ter = m_transport->SendCommandImmediateWithReply("TRIG:STATE?");
+
+	//Note, we need to push all pending commands
+	//(to make sure the trigger is armed if we just submitted an arm request)
+	string ter = m_transport->SendCommandQueuedWithReply("TRIG:STATE?");
 
 	if(ter == "SAV")
 	{
 		m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
+
+	//Trigger is armed but not yet ready to go
+	if(ter == "ARM")
+		return TRIGGER_MODE_WAIT;
 
 	if(ter == "REA")
 	{
@@ -1344,7 +1359,16 @@ bool TektronixOscilloscope::AcquireData()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			if(!AcquireDataMSO56(pending_waveforms))
+			{
+				//Clean up any partially acquired data
+				for(auto it : pending_waveforms)
+				{
+					auto vec = it.second;
+					for(auto w : vec)
+						delete w;
+				}
 				return false;
+			}
 			break;
 
 		default:
@@ -1712,10 +1736,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		size_t nsamples;
 		int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
 		if(samples == NULL)
-		{
-			pending_waveforms[i].push_back(NULL);
-			continue;
-		}
+			return false;
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1800,10 +1821,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		size_t msglen;
 		double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
 		if(samples == NULL)
-		{
-			pending_waveforms[nchan].push_back(NULL);
-			continue;
-		}
+			return false;
 		size_t nsamples = msglen/8;
 
 		//Set up the capture we're going to store our data into
@@ -1867,7 +1885,6 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		if(!enabled)
 			continue;
 
-
 		//Configuration
 		if(firstDigital)
 		{
@@ -1892,11 +1909,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		size_t msglen;
 		char* samples = (char*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
 		if(samples == NULL)
-		{
-			for(int j=0; j<8; j++)
-				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(NULL);
-			continue;
-		}
+			return false;
 
 		//Process the data for each channel
 		for(int j=0; j<8; j++)
@@ -2265,6 +2278,23 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		case FAMILY_MSO6:
 			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
 			m_transport->SendCommandQueued(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
+			break;
+
+		default:
+			break;
+	}
+}
+
+void TektronixOscilloscope::SetUseExternalRefclk(bool external)
+{
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+			if(external)
+				m_transport->SendCommandQueued("ROSC:SOU EXT");
+			else
+				m_transport->SendCommandQueued("ROSC:SOU INTER");
 			break;
 
 		default:
