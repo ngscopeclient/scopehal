@@ -40,6 +40,7 @@ using namespace std;
 SCPITransport::CreateMapType SCPITransport::m_createprocs;
 
 SCPITransport::SCPITransport()
+	: m_opcRequired(false)
 {
 }
 
@@ -97,10 +98,19 @@ bool SCPITransport::FlushCommandQueue()
 		m_txQueue.clear();
 	}
 
-	lock_guard<mutex> lock(m_netMutex);
+	lock_guard<recursive_mutex> lock(m_netMutex);
 	for(auto str : tmp)
+	{
 		SendCommand(str);
 
+		//Synchronize broken instruments without RX buffering
+		if(m_opcRequired)
+		{
+			uint8_t ignored[2];
+			SendCommand("*OPC?");
+			ReadRawData(2, ignored);	//always returns "1\n"
+		}
+	}
 	return true;
 }
 
@@ -109,21 +119,72 @@ bool SCPITransport::FlushCommandQueue()
 
 	This is an atomic operation requiring no mutexing at the caller side.
  */
-string SCPITransport::SendCommandWithReply(string cmd, bool endOnSemicolon)
+string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon)
 {
-	//Grab the queue, then immediately release the mutex so we can do more queued sends
-	list<string> tmp;
-	{
-		lock_guard<mutex> lock(m_queueMutex);
-		tmp = move(m_txQueue);
-		m_txQueue.clear();
-	}
+	FlushCommandQueue();
+	return SendCommandImmediateWithReply(cmd, endOnSemicolon);
+}
 
-	lock_guard<mutex> lock(m_netMutex);
+/**
+	@brief Sends a command (jumping ahead of the queue), then returns the response.
 
-	tmp.push_back(cmd);
-	for(auto str : tmp)
-		SendCommand(str);
-
+	This is an atomic operation requiring no mutexing at the caller side.
+ */
+string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon)
+{
+	lock_guard<recursive_mutex> lock(m_netMutex);
+	SendCommand(cmd);
 	return ReadReply(endOnSemicolon);
+}
+
+/**
+	@brief Sends a command (jumping ahead of the queue) which does not require a response.
+ */
+void SCPITransport::SendCommandImmediate(string cmd)
+{
+	lock_guard<recursive_mutex> lock(m_netMutex);
+	SendCommand(cmd);
+
+	//Synchronize broken instruments without RX buffering
+	if(m_opcRequired)
+	{
+		uint8_t ignored[2];
+		SendCommand("*OPC?");
+		ReadRawData(2, ignored);	//always returns "1\n"
+	}
+}
+
+/**
+	@brief Sends a command (jumping ahead of the queue) which reads a raw response
+ */
+void SCPITransport::SendCommandImmediateWithRawReply(string cmd, size_t len, unsigned char* buf)
+{
+	lock_guard<recursive_mutex> lock(m_netMutex);
+	SendCommand(cmd);
+	ReadRawData(len, buf);
+}
+
+/**
+	@brief Sends a command (jumping ahead of the queue) which reads a binary block response
+ */
+void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len)
+{
+	lock_guard<recursive_mutex> lock(m_netMutex);
+	SendCommand(cmd);
+
+	//Read the length
+	char tmplen[3] = {0};
+	ReadRawData(2, (unsigned char*)tmplen);			//expect #n
+	int ndigits = atoi(tmplen+1);
+
+	//Read the digits
+	char digits[10] = {0};
+	ReadRawData(ndigits, (unsigned char*)digits);
+	len = stoull(digits);
+
+	//Read the actual data
+	unsigned char* buf = new unsigned char[len];
+	ReadRawData(len, buf);
+
+	return buf;
 }

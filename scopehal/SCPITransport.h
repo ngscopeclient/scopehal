@@ -50,11 +50,17 @@ public:
 
 	//Queued command API
 	void SendCommandQueued(const std::string& cmd);
-	std::string SendCommandWithReply(std::string cmd, bool endOnSemicolon = true);
+	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
+	void SendCommandImmediate(std::string cmd);
+	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true);
+	void SendCommandImmediateWithRawReply(std::string cmd, size_t len, unsigned char* buf);
+	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len);
 	bool FlushCommandQueue();
+	void SetOpcRequired()
+	{ m_opcRequired = true; }
 
 	//Manual mutex locking for ReadRawData() etc
-	std::mutex& GetMutex()
+	std::recursive_mutex& GetMutex()
 	{ return m_netMutex; }
 
 	//Immediate command API
@@ -81,8 +87,11 @@ protected:
 
 	//Queued commands waiting to be sent
 	std::mutex m_queueMutex;
-	std::mutex m_netMutex;
+	std::recursive_mutex m_netMutex;
 	std::list<std::string> m_txQueue;
+
+	//True if we need to *OPC? between consecutive commands
+	bool m_opcRequired;
 };
 
 #define TRANSPORT_INITPROC(T) \
