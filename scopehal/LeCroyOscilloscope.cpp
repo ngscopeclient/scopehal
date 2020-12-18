@@ -1866,8 +1866,10 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	}
 
 	//Stopped, no data available
-	//TODO: how to handle auto / normal trigger mode?
-	return TRIGGER_MODE_RUN;
+	if(m_triggerArmed)
+		return TRIGGER_MODE_RUN;
+	else
+		return TRIGGER_MODE_STOP;
 }
 
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)

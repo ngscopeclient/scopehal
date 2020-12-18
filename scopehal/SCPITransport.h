@@ -55,9 +55,6 @@ public:
 	std::string SendCommandImmediateWithReply(std::string cmd, bool endOnSemicolon = true);
 	void* SendCommandImmediateWithRawBlockReply(std::string cmd, size_t& len);
 	bool FlushCommandQueue();
-	void SetOpcRequired()
-	{ m_opcRequired = true; }
-	bool OpcPing();
 
 	//Manual mutex locking for ReadRawData() etc
 	std::recursive_mutex& GetMutex()
@@ -89,9 +86,6 @@ protected:
 	std::mutex m_queueMutex;
 	std::recursive_mutex m_netMutex;
 	std::list<std::string> m_txQueue;
-
-	//True if we need to *OPC? between consecutive commands
-	bool m_opcRequired;
 };
 
 #define TRANSPORT_INITPROC(T) \

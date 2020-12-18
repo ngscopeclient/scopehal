@@ -607,6 +607,12 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		}
 	}
 
+	//Keep the cache mutex locked while pushing the command into the queue.
+	//This prevents races in which the trigger is armed before we can submit the actual enable command.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelEnableStatusDirty.emplace(i);
+	m_channelsEnabled[i] = true;
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -623,6 +629,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 						string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
 				}
 
+				//Difference between SELECT:CHx 1 vs this??
 				m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
 			}
 			break;
@@ -630,9 +637,6 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 		default:
 			break;
 	}
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelsEnabled[i] = true;
 }
 
 bool TektronixOscilloscope::CanEnableChannel(size_t i)
@@ -671,6 +675,12 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 			return;
 	}
 
+	//Keep the cache mutex locked while pushing the command into the queue.
+	//This prevents races in which the trigger is armed before we can submit the actual enable command.
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	m_channelEnableStatusDirty.emplace(i);
+	m_channelsEnabled[i] = false;
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -684,9 +694,6 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 		default:
 			break;
 	}
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelsEnabled[i] = false;
 }
 
 OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size_t i)
@@ -1307,20 +1314,22 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 	}
 }
 
+//Current implementation assumes MSO5/6, unsure about other models
 Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 {
 	if (!m_triggerArmed)
 		return TRIGGER_MODE_STOP;
 
 	//If AcquireData() is in progress, block until it's completed before allowing the poll.
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	// Based on example from 6000 Series Programmer's Guide
 	// Section 10 'Synchronizing Acquisitions' -> 'Polling Synchronization With Timeout'
 
 	//Note, we need to push all pending commands
-	//(to make sure the trigger is armed if we just submitted an arm request)
-	string ter = m_transport->SendCommandQueuedWithReply("TRIG:STATE?");
+	//(to make sure the trigger is armed if we just submitted an arm request).
+	m_transport->FlushCommandQueue();
+	string ter = m_transport->SendCommandImmediateWithReply("TRIG:STATE?");
 
 	if(ter == "SAV")
 	{
@@ -1333,13 +1342,26 @@ Oscilloscope::TriggerMode TektronixOscilloscope::PollTrigger()
 		return TRIGGER_MODE_WAIT;
 
 	if(ter == "REA")
-	{
-		m_triggerArmed = true;
 		return TRIGGER_MODE_RUN;
-	}
 
 	//TODO: AUTO, TRIGGER. For now consider that same as RUN
 	return TRIGGER_MODE_RUN;
+}
+
+//Current implementation assumes MSO5/6, unsure about other models
+bool TektronixOscilloscope::PeekTriggerArmed()
+{
+	//If AcquireData() is in progress, block until it's completed before allowing the poll.
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	//Note, we need to push all pending commands
+	//(to make sure the trigger is armed if we just submitted an arm request).
+	string ter = m_transport->SendCommandQueuedWithReply("TRIG:STATE?");
+
+	if(ter == "REA")
+		return true;
+	else
+		return false;
 }
 
 bool TektronixOscilloscope::AcquireData()
@@ -1348,9 +1370,7 @@ bool TektronixOscilloscope::AcquireData()
 
 	map<int, vector<WaveformBase*> > pending_waveforms;
 
-	//Critical to lock in this order to avoid deadlock!
-	lock_guard<recursive_mutex> lock2(m_transport->GetMutex());
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	LogIndenter li;
 
@@ -1467,6 +1487,9 @@ bool TektronixOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
+		lock_guard<recursive_mutex> lock3(m_cacheMutex);
+		FlushChannelEnableStates();
+
 		m_transport->SendCommandImmediate("ACQ:STATE ON");
 		m_triggerArmed = true;
 	}
@@ -1677,6 +1700,9 @@ void TektronixOscilloscope::Convert8BitSamplesAVX2(
 
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
+	//Seems like we might need a command before reading data after the trigger?
+	IDPing();
+
 	//Make sure record length is valid
 	GetSampleDepth();
 
@@ -1713,8 +1739,14 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		if(!IsChannelEnabled(i))
 			continue;
 
+		//If channel is enabled but was just turned on/off, skip this channel
+		if(IsEnableStateDirty(i))
+		{
+			pending_waveforms[i].push_back(NULL);
+			continue;
+		}
+
 		// Set source & get preamble+data
-		m_transport->OpcPing();
 		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
 
 		//Ask for the waveform preamble
@@ -1737,7 +1769,14 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		size_t nsamples;
 		int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
 		if(samples == NULL)
+		{
+			//Resynchronize
+			LogWarning("Timeout, attempting to recover\n");
+			while(IDPing() == "")
+			{}
+
 			return false;
+		}
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data or fine timestamping available on Tektronix scopes?)
@@ -1790,6 +1829,13 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		auto nchan = m_spectrumChannelBase + i;
 		if(!IsChannelEnabled(nchan))
 			continue;
+
+		//If channel is enabled but was just turned on/off, skip this channel
+		if(IsEnableStateDirty(i))
+		{
+			pending_waveforms[nchan].push_back(NULL);
+			continue;
+		}
 
 		//Select mode
 		if(firstSpectrum)
@@ -1886,6 +1932,14 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		if(!enabled)
 			continue;
 
+		//If channel is enabled but was just turned on/off, skip this channel
+		if(IsEnableStateDirty(i))
+		{
+			for(int j=0; j<8; j++)
+				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(NULL);
+			continue;
+		}
+
 		//Configuration
 		if(firstDigital)
 		{
@@ -1945,12 +1999,30 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		//Throw out garbage at the end of the message (why is this needed?)
 		m_transport->ReadReply();
 	}
-
 	return true;
+}
+
+bool TektronixOscilloscope::IsEnableStateDirty(size_t chan)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelEnableStatusDirty.find(chan) != m_channelEnableStatusDirty.end();
+}
+
+void TektronixOscilloscope::FlushChannelEnableStates()
+{
+	//Push all previous commands to the scope, then mark channel enable states as up to date
+	m_transport->FlushCommandQueue();
+	m_channelEnableStatusDirty.clear();
 }
 
 void TektronixOscilloscope::Start()
 {
+	//Flush enable states with the cache mutex locked.
+	//This is necessary to ensure the scope's view of what's enabled is consistent with ours at trigger time.
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	FlushChannelEnableStates();
+
 	m_transport->SendCommandQueued("ACQ:STATE ON");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
@@ -1958,6 +2030,10 @@ void TektronixOscilloscope::Start()
 
 void TektronixOscilloscope::StartSingleTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	FlushChannelEnableStates();
+
 	m_transport->SendCommandQueued("ACQ:STATE ON");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
@@ -1965,8 +2041,8 @@ void TektronixOscilloscope::StartSingleTrigger()
 
 void TektronixOscilloscope::Stop()
 {
-	m_transport->SendCommandQueued("ACQ:STATE STOP");
 	m_triggerArmed = false;
+	m_transport->SendCommandQueued("ACQ:STATE STOP");
 	m_triggerOneShot = true;
 }
 
@@ -2237,7 +2313,6 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 
 	//Shouldn't be necessary but the scope is derpy...
 	m_transport->FlushCommandQueue();
-	m_transport->OpcPing();
 
 	switch(m_family)
 	{
@@ -2297,6 +2372,7 @@ void TektronixOscilloscope::EnableTriggerOutput()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 				m_transport->SendCommandQueued("AUX:SOU ATRIG");
+				m_transport->SendCommandQueued("AUX:EDGE RIS");
 			break;
 
 		default:
@@ -2336,7 +2412,6 @@ int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 
 	int64_t deskew = 0;
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(m_family)
 		{
 			case FAMILY_MSO5:

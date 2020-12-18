@@ -324,6 +324,14 @@ public:
 	virtual Oscilloscope::TriggerMode PollTrigger() =0;
 
 	/**
+		@brief Checks if the trigger is armed, without altering internal state or checking caches.
+
+		The default implementation of this function simply calls PollTrigger(). This function should be overridden by
+		the driver class if PollTrigger() changes any internal driver state or updates caches.
+	 */
+	virtual bool PeekTriggerArmed();
+
+	/**
 		@brief Block until a trigger happens or a timeout elapses.
 
 		Note that this function has no provision to dispatch any UI events etc.

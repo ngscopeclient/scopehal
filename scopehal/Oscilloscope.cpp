@@ -245,7 +245,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		//Basic channel info
 		snprintf(tmp, sizeof(tmp), "            : \n");
 		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
+		snprintf(tmp, sizeof(tmp), "                id:  virtual bool IsTriggerArmed();        %d\n", table.emplace(chan));
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                index:       %zu\n", i);
 		config += tmp;
@@ -527,6 +527,11 @@ vector<string> Oscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	return ret;
+}
+
+bool Oscilloscope::PeekTriggerArmed()
+{
+	return (PollTrigger() == TRIGGER_MODE_RUN);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

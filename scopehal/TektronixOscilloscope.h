@@ -98,6 +98,7 @@ public:
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool PeekTriggerArmed();
 	virtual bool AcquireData();
 	virtual void Start();
 	virtual void StartSingleTrigger();
@@ -284,6 +285,24 @@ protected:
 
 	//Installed software options
 	bool m_hasDVM;
+
+	/**
+		@brief True if this channel's status has changed (on/off) since the last time the trigger was armed
+
+		This is needed to work around a bug in the MSO64 SCPI stack.
+
+		Per 5/6 series programmer manual for DAT:SOU:AVAIL?:
+
+			"This query returns a list of enumerations representing the source waveforms that currently available for
+			:CURVe? queries. This means that the waveforms have been acquired. If there are none, NONE is returned."
+
+		This is untrue. In reality it returns whether the channel is *currently* enabled. If a channel is enabled after
+		the trigger event, DAT:SOU:AVAIL? will report the channel as available, however CURV? queries will silently
+		fail and return no data.
+	*/
+	std::set<size_t> m_channelEnableStatusDirty;
+	bool IsEnableStateDirty(size_t chan);
+	void FlushChannelEnableStates();
 
 public:
 	static std::string GetDriverNameInternal();

@@ -202,7 +202,6 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSem
 
 	//make sure there's a null terminator
 	payload += "\0";
-
 	return payload;
 }
 

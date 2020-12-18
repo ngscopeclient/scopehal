@@ -40,7 +40,6 @@ using namespace std;
 SCPITransport::CreateMapType SCPITransport::m_createprocs;
 
 SCPITransport::SCPITransport()
-	: m_opcRequired(false)
 {
 }
 
@@ -100,13 +99,7 @@ bool SCPITransport::FlushCommandQueue()
 
 	lock_guard<recursive_mutex> lock(m_netMutex);
 	for(auto str : tmp)
-	{
 		SendCommand(str);
-
-		//Synchronize broken instruments without RX buffering
-		if(m_opcRequired)
-			OpcPing();
-	}
 	return true;
 }
 
@@ -140,10 +133,6 @@ void SCPITransport::SendCommandImmediate(string cmd)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
 	SendCommand(cmd);
-
-	//Synchronize broken instruments without RX buffering
-	if(m_opcRequired)
-		OpcPing();
 }
 
 /**
@@ -172,27 +161,4 @@ void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& l
 	unsigned char* buf = new unsigned char[len];
 	len = ReadRawData(len, buf);
 	return buf;
-}
-
-/**
-	@brief Blocks until the pending operation completes
- */
-bool SCPITransport::OpcPing()
-{
-	uint8_t tmp[2];
-	SendCommand("*OPC?");
-	if(2 != ReadRawData(2, tmp))
-	{
-		LogWarning("Response to *OPC? timed out\n");
-		return false;
-	}
-
-	//Sanity check
-	if( (tmp[0] != '1') || (tmp[1] != '\n') )
-	{
-		LogWarning("OpcPing(): got garbage instead of \"1\\n\" in response to *OPC?\n");
-		return false;
-	}
-
-	return true;
 }
