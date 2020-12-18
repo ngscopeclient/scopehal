@@ -125,6 +125,7 @@ public:
 	virtual int64_t GetDeskewForChannel(size_t channel);
 
 	virtual void SetUseExternalRefclk(bool external);
+	virtual void EnableTriggerOutput();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
@@ -246,7 +247,8 @@ protected:
 	void PullWindowTrigger();
 	void PushWindowTrigger(WindowTrigger* trig);
 
-	float ReadTriggerLevelMSO56();
+	float ReadTriggerLevelMSO56(OscilloscopeChannel* chan);
+	void SetTriggerLevelMSO56(Trigger* trig);
 
 	//Helpers for figuring out type of a channel by the index
 	bool IsAnalog(size_t index)

@@ -105,11 +105,7 @@ bool SCPITransport::FlushCommandQueue()
 
 		//Synchronize broken instruments without RX buffering
 		if(m_opcRequired)
-		{
-			uint8_t ignored[2];
-			SendCommand("*OPC?");
-			ReadRawData(2, ignored);	//always returns "1\n"
-		}
+			OpcPing();
 	}
 	return true;
 }
@@ -147,11 +143,7 @@ void SCPITransport::SendCommandImmediate(string cmd)
 
 	//Synchronize broken instruments without RX buffering
 	if(m_opcRequired)
-	{
-		uint8_t ignored[2];
-		SendCommand("*OPC?");
-		ReadRawData(2, ignored);	//always returns "1\n"
-	}
+		OpcPing();
 }
 
 /**
@@ -180,4 +172,27 @@ void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& l
 	unsigned char* buf = new unsigned char[len];
 	len = ReadRawData(len, buf);
 	return buf;
+}
+
+/**
+	@brief Blocks until the pending operation completes
+ */
+bool SCPITransport::OpcPing()
+{
+	uint8_t tmp[2];
+	SendCommand("*OPC?");
+	if(2 != ReadRawData(2, tmp))
+	{
+		LogWarning("Response to *OPC? timed out\n");
+		return false;
+	}
+
+	//Sanity check
+	if( (tmp[0] != '1') || (tmp[1] != '\n') )
+	{
+		LogWarning("OpcPing(): got garbage instead of \"1\\n\" in response to *OPC?\n");
+		return false;
+	}
+
+	return true;
 }

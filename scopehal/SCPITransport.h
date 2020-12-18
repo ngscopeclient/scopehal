@@ -57,6 +57,7 @@ public:
 	bool FlushCommandQueue();
 	void SetOpcRequired()
 	{ m_opcRequired = true; }
+	bool OpcPing();
 
 	//Manual mutex locking for ReadRawData() etc
 	std::recursive_mutex& GetMutex()

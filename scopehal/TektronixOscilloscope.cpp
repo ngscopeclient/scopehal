@@ -240,7 +240,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 	//See what options we have
 	vector<string> options;
-	string reply = m_transport->SendCommandImmediateWithReply("*OPT?", false) + ',';
+	string reply = m_transport->SendCommandQueuedWithReply("*OPT?", false) + ',';
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -447,7 +447,7 @@ void TektronixOscilloscope::DetectProbes()
 			//If a digital probe (TLP058), disable this channel and mark as not usable
 			for(size_t i=0; i<m_analogChannelCount; i++)
 			{
-				string reply = m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":PROBETYPE?");
+				string reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PROBETYPE?");
 
 				if(reply == "DIG")
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
@@ -455,7 +455,7 @@ void TektronixOscilloscope::DetectProbes()
 				//Treat anything else as analog. See what type
 				else
 				{
-					string id = TrimQuotes(m_transport->SendCommandImmediateWithReply(
+					string id = TrimQuotes(m_transport->SendCommandQueuedWithReply(
 						m_channels[i]->GetHwname() + ":PROBE:ID:TYP?"));
 
 					if(id == "TPP1000")
@@ -547,12 +547,12 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			//Undocumented command to toggle spectrum view state
 			if(IsSpectrum(i))
 			{
-				reply = m_transport->SendCommandImmediateWithReply(
+				reply = m_transport->SendCommandQueuedWithReply(
 					m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE?");
 			}
 			else
 			{
-				m_transport->SendCommandImmediateWithReply(
+				m_transport->SendCommandQueuedWithReply(
 					string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 			}
 			break;
@@ -709,9 +709,9 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				string coup = m_transport->SendCommandImmediateWithReply(
+				string coup = m_transport->SendCommandQueuedWithReply(
 					m_channels[i]->GetHwname() + ":COUP?");
-				float nterm = stof(m_transport->SendCommandImmediateWithReply(
+				float nterm = stof(m_transport->SendCommandQueuedWithReply(
 					m_channels[i]->GetHwname() + ":TER?"));
 
 				//TODO: Tek's 1 GHz passive probes are 250K ohm impedance at the scope side.
@@ -841,9 +841,9 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 		case FAMILY_MSO6:
 			{
 				float probegain = stof(
-					m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
+					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
 				float extatten = stof(
-					m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":PROBEF:EXTA?"));
+					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PROBEF:EXTA?"));
 
 				//Calculate the overall system attenuation.
 				//Note that probes report *gain* while the external is *attenuation*.
@@ -893,7 +893,7 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 				//We need to scale this by the probe gain to figure out the necessary external attenuation.
 				//At the moment, this isn't cached, but we probably should do this in the future.
 				float probegain = stof(
-					m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
+					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
 
 				m_transport->SendCommandQueued(
 					m_channels[i]->GetHwname() + ":PROBEF:EXTA " + to_string(atten * probegain));
@@ -925,7 +925,7 @@ int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				{
-					string reply = m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":BAN?");
+					string reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":BAN?");
 					if(reply == "FUL")		//no limit
 						bwl = 0;
 					else
@@ -1065,12 +1065,12 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 			case FAMILY_MSO6:
 				if(IsSpectrum(i))
 				{
-					range = 10 * stof(m_transport->SendCommandImmediateWithReply(
+					range = 10 * stof(m_transport->SendCommandQueuedWithReply(
 						string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:SCA?"));
 				}
 				else
 				{
-					range = 10 * stof(m_transport->SendCommandImmediateWithReply(
+					range = 10 * stof(m_transport->SendCommandQueuedWithReply(
 						m_channels[i]->GetHwname() + ":SCA?"));
 				}
 				break;
@@ -1163,7 +1163,7 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 			//Completely orthogonal design for analog and digital, and it even handles empty strings well!
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				name = TrimQuotes(m_transport->SendCommandImmediateWithReply(chan->GetHwname() + ":LAB:NAM?"));
+				name = TrimQuotes(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":LAB:NAM?"));
 				break;
 
 			default:
@@ -1251,12 +1251,12 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 				{
 					//Position is reported in divisions, not dBm.
 					//It also seems to be negative, and reported from the top of the display rather than the middle.
-					float pos = stof(m_transport->SendCommandImmediateWithReply(
+					float pos = stof(m_transport->SendCommandQueuedWithReply(
 						string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?"));
 					offset = (pos+5) * (GetChannelVoltageRange(i)/10);
 				}
 				else
-					offset = -stof(m_transport->SendCommandImmediateWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
+					offset = -stof(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
 				break;
 
 			default:
@@ -1714,6 +1714,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 
 		// Set source & get preamble+data
+		m_transport->OpcPing();
 		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
 
 		//Ask for the waveform preamble
@@ -2123,7 +2124,7 @@ uint64_t TektronixOscilloscope::GetSampleRate()
 		case FAMILY_MSO6:
 
 			//stoull seems to not handle scientific notation
-			m_sampleRate = stod(m_transport->SendCommandImmediateWithReply("HOR:MODE:SAMPLER?"));
+			m_sampleRate = stod(m_transport->SendCommandQueuedWithReply("HOR:MODE:SAMPLER?"));
 
 			break;
 
@@ -2145,7 +2146,7 @@ uint64_t TektronixOscilloscope::GetSampleDepth()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_sampleDepth = stos(m_transport->SendCommandImmediateWithReply("HOR:MODE:RECO?"));
+			m_sampleDepth = stos(m_transport->SendCommandQueuedWithReply("HOR:MODE:RECO?"));
 			m_transport->SendCommandQueued("DAT:START 0");
 			m_transport->SendCommandQueued(string("DAT:STOP ") + to_string(m_sampleDepth));
 			break;
@@ -2234,13 +2235,17 @@ int64_t TektronixOscilloscope::GetTriggerOffset()
 	if(m_triggerOffsetValid)
 		return m_triggerOffset;
 
+	//Shouldn't be necessary but the scope is derpy...
+	m_transport->FlushCommandQueue();
+	m_transport->OpcPing();
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 		{
 			//Instrument reports position of trigger from the midpoint of the display
-			double center_offset_sec = stod(m_transport->SendCommandImmediateWithReply("HOR:DELAY:TIME?"));
+			double center_offset_sec = stod(m_transport->SendCommandQueuedWithReply("HOR:DELAY:TIME?"));
 
 			//but we want to know position from the start of the capture
 			double capture_len_sec = 1.0 * GetSampleDepth() / GetSampleRate();
@@ -2278,6 +2283,20 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		case FAMILY_MSO6:
 			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
 			m_transport->SendCommandQueued(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
+			break;
+
+		default:
+			break;
+	}
+}
+
+void TektronixOscilloscope::EnableTriggerOutput()
+{
+	switch(m_family)
+	{
+		case FAMILY_MSO5:
+		case FAMILY_MSO6:
+				m_transport->SendCommandQueued("AUX:SOU ATRIG");
 			break;
 
 		default:
@@ -2324,7 +2343,7 @@ int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 			case FAMILY_MSO6:
 				//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
 				deskew = -round(FS_PER_SECOND * stof(
-					m_transport->SendCommandImmediateWithReply(m_channels[channel]->GetHwname() + ":DESK?")));
+					m_transport->SendCommandQueuedWithReply(m_channels[channel]->GetHwname() + ":DESK?")));
 				break;
 
 			default:
@@ -2368,7 +2387,7 @@ void TektronixOscilloscope::PullTrigger()
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
-				string reply = m_transport->SendCommandImmediateWithReply("TRIG:A:TYP?");
+				string reply = m_transport->SendCommandQueuedWithReply("TRIG:A:TYP?");
 
 				if(reply == "EDG")
 					PullEdgeTrigger();
@@ -2400,9 +2419,14 @@ void TektronixOscilloscope::PullTrigger()
 /**
 	@brief Parses a trigger level message
  */
-float TektronixOscilloscope::ReadTriggerLevelMSO56()
+float TektronixOscilloscope::ReadTriggerLevelMSO56(OscilloscopeChannel* chan)
 {
-	string reply = m_transport->SendCommandImmediateWithReply("TRIG:A:LEV?", false);
+	string reply;
+
+	if(chan == m_extTrigChannel)
+		reply = m_transport->SendCommandQueuedWithReply("TRIG:AUXLEV?", false);
+	else
+		reply = m_transport->SendCommandQueuedWithReply("TRIG:A:LEV?", false);
 
 	size_t off = reply.find(";");
 	if(off != string::npos)
@@ -2434,14 +2458,14 @@ void TektronixOscilloscope::PullEdgeTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:EDGE:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:EDGE:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56());
+				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
 
 				//Edge slope
-				reply = m_transport->SendCommandImmediateWithReply("TRIG:A:EDGE:SLO?");
+				reply = m_transport->SendCommandQueuedWithReply("TRIG:A:EDGE:SLO?");
 				if(reply == "RIS")
 					et->SetType(EdgeTrigger::EDGE_RISING);
 				else if(reply == "FALL")
@@ -2526,27 +2550,27 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:PULSEW:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//TODO: TRIG:A:PULSEW:LOGICQUAL?
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56());
+				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
 
 				Unit fs(Unit::UNIT_FS);
-				et->SetUpperBound(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:PULSEW:HIGHL?")));
-				et->SetLowerBound(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:PULSEW:LOWL?")));
+				et->SetUpperBound(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:HIGHL?")));
+				et->SetLowerBound(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:LOWL?")));
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:PULSEW:POL?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:POL?"));
 				if(reply == "POS")
 					et->SetType(EdgeTrigger::EDGE_RISING);
 				else if(reply == "NEG")
 					et->SetType(EdgeTrigger::EDGE_FALLING);
 
 				//Condition
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:PULSEW:WHE?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:WHE?"));
 				if(reply == "LESS")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				if(reply == "MORE")
@@ -2593,19 +2617,19 @@ void TektronixOscilloscope::PullDropoutTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:TIMEO:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:TIMEO:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56());
+				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
 
 				Unit fs(Unit::UNIT_FS);
-				et->SetDropoutTime(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:TIMEO:TIM?")));
+				et->SetDropoutTime(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:TIMEO:TIM?")));
 
 				//TODO: TRIG:A:TIMEO:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:TIMEO:POL?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:TIMEO:POL?"));
 				if(reply == "STAYSH")
 					et->SetType(DropoutTrigger::EDGE_RISING);
 				else if(reply == "STAYSL")
@@ -2643,18 +2667,18 @@ void TektronixOscilloscope::PullRuntTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:RUNT:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:RUNT:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetLowerBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetUpperBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:UPP:") + chname + "?")));
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:RUNT:WHE?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:RUNT:WHE?"));
 				if(reply == "LESS")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				else if(reply == "MORE")
@@ -2668,12 +2692,12 @@ void TektronixOscilloscope::PullRuntTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:RUNT:WID?")));
+				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:RUNT:WID?")));
 
 				//TODO: TRIG:A:RUNT:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:RUNT:POL?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:RUNT:POL?"));
 				if(reply == "POS")
 					et->SetSlope(RuntTrigger::EDGE_RISING);
 				else if(reply == "NEG")
@@ -2711,18 +2735,18 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:TRAN:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:TRAN:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetLowerBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetUpperBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:UPP:") + chname + "?")));
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:TRAN:WHE?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:TRAN:WHE?"));
 				if(reply == "FAST")
 					et->SetCondition(Trigger::CONDITION_LESS);
 				else if(reply == "SLOW")
@@ -2734,12 +2758,12 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:TRAN:DELT?")));
+				et->SetLowerInterval(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:TRAN:DELT?")));
 
 				//TODO: TRIG:A:TRAN:LOGICQUAL?
 
 				//Edge slope
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:TRAN:POL?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:TRAN:POL?"));
 				if(reply == "POS")
 					et->SetSlope(SlewRateTrigger::EDGE_RISING);
 				else if(reply == "NEG")
@@ -2777,20 +2801,20 @@ void TektronixOscilloscope::PullWindowTrigger()
 		case FAMILY_MSO6:
 			{
 				//Source channel
-				auto reply = m_transport->SendCommandImmediateWithReply("TRIG:A:WIN:SOU?");
+				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:WIN:SOU?");
 				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
-				et->SetLowerBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetLowerBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:LOW:") + chname + "?")));
-				et->SetUpperBound(stof(m_transport->SendCommandImmediateWithReply(
+				et->SetUpperBound(stof(m_transport->SendCommandQueuedWithReply(
 					string("TRIG:A:UPP:") + chname + "?")));
 
 				//TODO: TRIG:A:WIN:LOGICQUAL?
 
 				//Crossing direction (only used for inside/outside greater)
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:WIN:CROSSI?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:WIN:CROSSI?"));
 				if(reply == "UPP")
 					et->SetCrossingDirection(WindowTrigger::CROSS_UPPER);
 				else if(reply == "LOW")
@@ -2801,7 +2825,7 @@ void TektronixOscilloscope::PullWindowTrigger()
 					et->SetCrossingDirection(WindowTrigger::CROSS_NONE);
 
 				//Match condition
-				reply = Trim(m_transport->SendCommandImmediateWithReply("TRIG:A:WIN:WHE?"));
+				reply = Trim(m_transport->SendCommandQueuedWithReply("TRIG:A:WIN:WHE?"));
 				if(reply == "ENTERSW")
 					et->SetWindowType(WindowTrigger::WINDOW_ENTER);
 				else if(reply == "EXITSW")
@@ -2813,7 +2837,7 @@ void TektronixOscilloscope::PullWindowTrigger()
 
 				//Only lower interval supported, no upper
 				Unit fs(Unit::UNIT_FS);
-				et->SetWidth(fs.ParseString(m_transport->SendCommandImmediateWithReply("TRIG:A:WIN:WID?")));
+				et->SetWidth(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:WIN:WID?")));
 			}
 			break;
 
@@ -2850,6 +2874,19 @@ void TektronixOscilloscope::PushTrigger()
 		LogWarning("Unknown trigger type (not an edge)\n");
 }
 
+void TektronixOscilloscope::SetTriggerLevelMSO56(Trigger* trig)
+{
+	auto chan = trig->GetInput(0).m_channel;
+
+	if(chan == m_extTrigChannel)
+		m_transport->SendCommandQueued(string("TRIG:AUXLEVEL ") + to_string_sci(trig->GetLevel()));
+	else
+	{
+		m_transport->SendCommandQueued(
+			string("TRIG:A:LEV:") + chan->GetHwname() + " " + to_string_sci(trig->GetLevel()));
+	}
+}
+
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
@@ -2863,9 +2900,7 @@ void TektronixOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 				m_transport->SendCommandQueued("TRIG:A:TYP EDGE");
 
 				m_transport->SendCommandQueued(string("TRIG:A:EDGE:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
-					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
-					to_string_sci(trig->GetLevel()));
+				SetTriggerLevelMSO56(trig);
 
 				switch(trig->GetType())
 				{
@@ -2907,9 +2942,7 @@ void TektronixOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 				m_transport->SendCommandQueued("TRIG:A:TYP WID");
 
 				m_transport->SendCommandQueued(string("TRIG:A:PULSEW:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
-					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
-					to_string(trig->GetLevel()));
+				SetTriggerLevelMSO56(trig);
 
 				m_transport->SendCommandQueued(string("TRIG:A:PULSEW:HIGHL ") +
 					to_string_sci(trig->GetUpperBound() * SECONDS_PER_FS));
@@ -2971,9 +3004,7 @@ void TektronixOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 				m_transport->SendCommandQueued("TRIG:A:TYP TIMEO");
 
 				m_transport->SendCommandQueued(string("TRIG:A:TIMEO:SOU ") + trig->GetInput(0).m_channel->GetHwname());
-				m_transport->SendCommandQueued(
-					string("TRIG:A:LEV:") + trig->GetInput(0).m_channel->GetHwname() + " " +
-					to_string(trig->GetLevel()));
+				SetTriggerLevelMSO56(trig);
 
 				switch(trig->GetType())
 				{
@@ -3282,7 +3313,7 @@ float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			//note, group IDs are one based but lane IDs are zero based!
-			return stof(m_transport->SendCommandImmediateWithReply(
+			return stof(m_transport->SendCommandQueuedWithReply(
 				string("DIGGRP") + to_string(m_flexChannelParents[chan]+1) +
 				":D" + to_string(m_flexChannelLanes[chan]) + ":THR?"));
 
@@ -3351,7 +3382,7 @@ int64_t TektronixOscilloscope::GetSpan()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return round(stod(m_transport->SendCommandImmediateWithReply("SV:SPAN?")));
+			return round(stod(m_transport->SendCommandQueuedWithReply("SV:SPAN?")));
 
 		default:
 			return 1;
@@ -3379,7 +3410,7 @@ int64_t TektronixOscilloscope::GetCenterFrequency(size_t channel)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return round(stof(m_transport->SendCommandImmediateWithReply(
+			return round(stof(m_transport->SendCommandQueuedWithReply(
 				string("CH") + to_string(channel-m_spectrumChannelBase+1) + ":SV:CENTERFREQUENCY?")));
 
 		default:
@@ -3413,7 +3444,7 @@ int64_t TektronixOscilloscope::GetResolutionBandwidth()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_rbw = round(stod(m_transport->SendCommandImmediateWithReply("SV:RBW?")));
+			m_rbw = round(stod(m_transport->SendCommandQueuedWithReply("SV:RBW?")));
 			m_rbwValid = true;
 			return m_rbw;
 
@@ -3459,7 +3490,7 @@ int TektronixOscilloscope::GetCurrentMeterChannel()
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				m_dmmChannel = (int)GetChannelByHwName(Trim(m_transport->SendCommandImmediateWithReply(
+				m_dmmChannel = (int)GetChannelByHwName(Trim(m_transport->SendCommandQueuedWithReply(
 					"DVM:SOU?")))->GetIndex();
 				break;
 
@@ -3565,7 +3596,7 @@ bool TektronixOscilloscope::GetMeterAutoRange()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			m_dmmAutorange = (stoi(m_transport->SendCommandImmediateWithReply("DVM:AUTOR?")) == 1);
+			m_dmmAutorange = (stoi(m_transport->SendCommandQueuedWithReply("DVM:AUTOR?")) == 1);
 			break;
 
 		default:
@@ -3610,7 +3641,7 @@ double TektronixOscilloscope::GetMeterValue()
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			return stod(m_transport->SendCommandImmediateWithReply("DVM:MEASU:VAL?"));
+			return stod(m_transport->SendCommandQueuedWithReply("DVM:MEASU:VAL?"));
 
 		default:
 			return 0;
