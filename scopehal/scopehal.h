@@ -54,6 +54,9 @@
 #include "../graphwidget/Graph.h"
 
 #include "config.h"
+#ifdef HAVE_OPENCL
+#include <CL/cl.hpp>
+#endif
 
 #include "Unit.h"
 #include "Bijection.h"

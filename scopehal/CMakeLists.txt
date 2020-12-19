@@ -20,6 +20,8 @@ if(OpenCL_FOUND)
 	set(HAVE_OPENCL 1)
 else()
 	set(HAVE_OPENCL 0)
+	set(OpenCL_LIBRARIES "")
+	set(OpenCL_INCLUDE_DIRS "")
 endif()
 
 set(SCOPEHAL_SOURCES
