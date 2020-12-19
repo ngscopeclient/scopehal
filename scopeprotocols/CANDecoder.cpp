@@ -432,7 +432,7 @@ void CANDecoder::Refresh()
 					//CRC is 15 bits long
 					if(nbit == 15)
 					{
-						bool crc_ok = current_field == (crc & 0x7fff);
+						bool crc_ok = (current_field == (crc & 0x7fff));
 						auto type = crc_ok ? CANSymbol::TYPE_CRC_OK : CANSymbol::TYPE_CRC_BAD;
 
 						cap->m_offsets.push_back(tblockstart);
