@@ -27,6 +27,23 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-__kernel void FIRFilter()
+__kernel void FIRFilter(
+	__global const float* din,
+	__constant const float* coefficients,
+	__global float* dout,
+	unsigned long filterlen,
+	unsigned long end
+	)
 {
+	//Make sure we're actually in the block
+	unsigned long i = get_global_id(0);
+	if(i > end)
+		return;
+
+	//FIR reduction
+	float v = 0;
+	for(unsigned long j=0; j<filterlen; j++)
+		v += din[i+j] * coefficients[j];
+
+	dout[i] = v;
 }

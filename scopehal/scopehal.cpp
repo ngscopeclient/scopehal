@@ -124,87 +124,88 @@ void DetectCPUFeatures()
 void DetectGPUFeatures()
 {
 	#ifdef HAVE_OPENCL
-		LogDebug("Detecting OpenCL devices...\n");
-		LogIndenter li;
+		try
+		{
+			LogDebug("Detecting OpenCL devices...\n");
+			LogIndenter li;
 
-		//Find platforms and print info
-		vector<cl::Platform> platforms;
-		cl::Platform::get(&platforms);
-		if(platforms.empty())
-		{
-			LogNotice("No platforms found, disabling OpenCL\n");
-			return;
-		}
-		else
-		{
-			for(size_t i=0; i<platforms.size(); i++)
+			//Find platforms and print info
+			vector<cl::Platform> platforms;
+			cl::Platform::get(&platforms);
+			if(platforms.empty())
 			{
-				LogDebug("Platform %zu\n", i);
-				LogIndenter li2;
-
-				string name;
-				string profile;
-				string vendor;
-				string version;
-				platforms[i].getInfo(CL_PLATFORM_NAME, &name);
-				platforms[i].getInfo(CL_PLATFORM_PROFILE, &profile);
-				platforms[i].getInfo(CL_PLATFORM_VENDOR, &vendor);
-				platforms[i].getInfo(CL_PLATFORM_VERSION, &version);
-				LogDebug("CL_PLATFORM_NAME    = %s\n", name.c_str());
-				LogDebug("CL_PLATFORM_PROFILE = %s\n", profile.c_str());
-				LogDebug("CL_PLATFORM_VENDOR  = %s\n", vendor.c_str());
-				LogDebug("CL_PLATFORM_VERSION = %s\n", version.c_str());
-
-				vector<cl::Device> devices;
-				platforms[i].getDevices(CL_DEVICE_TYPE_GPU, &devices);
-				if(devices.empty())
-					LogDebug("No GPUs found\n");
-				for(size_t j=0; j<devices.size(); j++)
+				LogNotice("No platforms found, disabling OpenCL\n");
+				return;
+			}
+			else
+			{
+				for(size_t i=0; i<platforms.size(); i++)
 				{
-					LogDebug("Device %zu\n", j);
-					LogIndenter li3;
+					LogDebug("Platform %zu\n", i);
+					LogIndenter li2;
 
-					string dname;
-					string dcvers;
-					string dprof;
-					string dvendor;
-					string dversion;
-					string ddversion;
-					devices[j].getInfo(CL_DEVICE_NAME, &dname);
-					devices[j].getInfo(CL_DEVICE_OPENCL_C_VERSION, &dcvers);
-					devices[j].getInfo(CL_DEVICE_PROFILE, &dprof);
-					devices[j].getInfo(CL_DEVICE_VENDOR, &dvendor);
-					devices[j].getInfo(CL_DEVICE_VERSION, &dversion);
-					devices[j].getInfo(CL_DRIVER_VERSION, &ddversion);
+					string name;
+					string profile;
+					string vendor;
+					string version;
+					platforms[i].getInfo(CL_PLATFORM_NAME, &name);
+					platforms[i].getInfo(CL_PLATFORM_PROFILE, &profile);
+					platforms[i].getInfo(CL_PLATFORM_VENDOR, &vendor);
+					platforms[i].getInfo(CL_PLATFORM_VERSION, &version);
+					LogDebug("CL_PLATFORM_NAME    = %s\n", name.c_str());
+					LogDebug("CL_PLATFORM_PROFILE = %s\n", profile.c_str());
+					LogDebug("CL_PLATFORM_VENDOR  = %s\n", vendor.c_str());
+					LogDebug("CL_PLATFORM_VERSION = %s\n", version.c_str());
 
-					LogDebug("CL_DEVICE_NAME              = %s\n", dname.c_str());
-					LogDebug("CL_DEVICE_OPENCL_C_VERSION  = %s\n", dcvers.c_str());
-					LogDebug("CL_DEVICE_PROFILE           = %s\n", dprof.c_str());
-					LogDebug("CL_DEVICE_VENDOR            = %s\n", dvendor.c_str());
-					LogDebug("CL_DEVICE_VERSION           = %s\n", dversion.c_str());
-					LogDebug("CL_DRIVER_VERSION           = %s\n", ddversion.c_str());
-				}
-
-				//For now, create a context on the first device of the first detected platform and hope for the best
-				if(!g_clContext)
-				{
-					vector<cl::Device> devs;
-					devs.push_back(devices[0]);
-
-					//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
-					cl_int err;
-					g_clContext = new cl::Context(devs, NULL, NULL, NULL, &err);
-					if(err != CL_SUCCESS)
+					vector<cl::Device> devices;
+					platforms[i].getDevices(CL_DEVICE_TYPE_GPU, &devices);
+					if(devices.empty())
+						LogDebug("No GPUs found\n");
+					for(size_t j=0; j<devices.size(); j++)
 					{
-						LogNotice("OpenCL context creation failed (code %d), disabling OpenCL\n", err);
-						delete g_clContext;
-						g_clContext = NULL;
-						return;
+						LogDebug("Device %zu\n", j);
+						LogIndenter li3;
+
+						string dname;
+						string dcvers;
+						string dprof;
+						string dvendor;
+						string dversion;
+						string ddversion;
+						devices[j].getInfo(CL_DEVICE_NAME, &dname);
+						devices[j].getInfo(CL_DEVICE_OPENCL_C_VERSION, &dcvers);
+						devices[j].getInfo(CL_DEVICE_PROFILE, &dprof);
+						devices[j].getInfo(CL_DEVICE_VENDOR, &dvendor);
+						devices[j].getInfo(CL_DEVICE_VERSION, &dversion);
+						devices[j].getInfo(CL_DRIVER_VERSION, &ddversion);
+
+						LogDebug("CL_DEVICE_NAME              = %s\n", dname.c_str());
+						LogDebug("CL_DEVICE_OPENCL_C_VERSION  = %s\n", dcvers.c_str());
+						LogDebug("CL_DEVICE_PROFILE           = %s\n", dprof.c_str());
+						LogDebug("CL_DEVICE_VENDOR            = %s\n", dvendor.c_str());
+						LogDebug("CL_DEVICE_VERSION           = %s\n", dversion.c_str());
+						LogDebug("CL_DRIVER_VERSION           = %s\n", ddversion.c_str());
 					}
 
-					g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+					//For now, create a context on the first device of the first detected platform and hope for the best
+					if(!g_clContext)
+					{
+						vector<cl::Device> devs;
+						devs.push_back(devices[0]);
+
+						//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
+						g_clContext = new cl::Context(devs, NULL, NULL, NULL);
+						g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+					}
 				}
 			}
+		}
+		catch(const cl::Error& e)
+		{
+			LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+			delete g_clContext;
+			g_clContext = NULL;
+			return;
 		}
 
 	#else

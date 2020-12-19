@@ -251,6 +251,12 @@ void FIRFilter::DoFilterKernel(
 	float& vmin,
 	float& vmax)
 {
+	#ifdef HAVE_OPENCL
+	if(g_clContext && m_kernel)
+		DoFilterKernelOpenCL(coefficients, din, cap, vmin, vmax);
+	else
+	#endif
+
 	if(g_hasAvx512F)
 		DoFilterKernelAVX512F(coefficients, din, cap, vmin, vmax);
 	else if(g_hasAvx2)
@@ -258,6 +264,64 @@ void FIRFilter::DoFilterKernel(
 	else
 		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
 }
+
+#ifdef HAVE_OPENCL
+void FIRFilter::DoFilterKernelOpenCL(
+		std::vector<float>& coefficients,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax)
+{
+	//Setup
+	size_t len = din->m_samples.size();
+	size_t filterlen = coefficients.size();
+	size_t end = len - filterlen;
+
+	try
+	{
+		//Allocate memory and copy to the GPU
+		cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
+		cl::Buffer coeffbuf(*g_clContext, coefficients.begin(), coefficients.end(), true, true, NULL);
+		cl::Buffer outbuf(*g_clContext, CL_MEM_WRITE_ONLY, end * sizeof(float));
+
+		//Run the filter
+		cl::Event event;
+		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+		m_kernel->setArg(0, inbuf);
+		m_kernel->setArg(1, coeffbuf);
+		m_kernel->setArg(2, outbuf);
+		m_kernel->setArg(3, filterlen);
+		m_kernel->setArg(4, end);
+		queue.enqueueNDRangeKernel(
+			*m_kernel,
+			cl::NullRange,
+			cl::NDRange(end, 1),
+			cl::NullRange,
+			NULL,
+			&event);
+
+		//Done, copy output
+		event.wait();
+		cl::copy(queue, outbuf, cap->m_samples.begin(), cap->m_samples.end() );
+	}
+	catch(const cl::Error& e)
+	{
+		LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+	}
+
+	//Final reduction CPU-side for now
+	vmin = FLT_MAX;
+	vmax = -FLT_MAX;
+	for(size_t i=0; i<end; i++)
+	{
+		float v = cap->m_samples[i];
+		vmin = min(vmin, v);
+		vmax = max(vmax, v);
+	}
+}
+#endif
+
 
 /**
 	@brief Performs a FIR filter (does not assume symmetric)

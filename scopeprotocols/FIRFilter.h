@@ -60,7 +60,7 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(FIRFilter)
 
-	static void DoFilterKernel(
+	void DoFilterKernel(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,
@@ -86,21 +86,30 @@ protected:
 
 	static float Bessel(float x);
 
-	static void DoFilterKernelGeneric(
+	void DoFilterKernelGeneric(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,
 		float& vmin,
 		float& vmax);
 
-	static void DoFilterKernelAVX2(
+#ifdef HAVE_OPENCL
+	void DoFilterKernelOpenCL(
+		std::vector<float>& coefficients,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
+#endif
+
+	void DoFilterKernelAVX2(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,
 		float& vmin,
 		float& vmax);
 
-	static void DoFilterKernelAVX512F(
+	void DoFilterKernelAVX512F(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,

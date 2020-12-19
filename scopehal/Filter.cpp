@@ -81,36 +81,34 @@ Filter::Filter(
 
 		if(kernelPath != "")
 		{
-			//Build the program
-			string kernelSource = ReadFile(kernelPath);
-			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-			m_program = new cl::Program(*g_clContext, sources);
-			cl_int err = m_program->build(g_contextDevices);
-			if(err != CL_SUCCESS)
+			try
 			{
-				LogError("Failed to build OpenCL program from %s (code %d)\n", kernelPath.c_str(), err);
-				string log;
-				m_program->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Build log:\n");
-				LogDebug("%s\n", log.c_str());
-
-				delete m_program;
-				m_program = NULL;
-				return;
+				string kernelSource = ReadFile(kernelPath);
+				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
+				m_program = new cl::Program(*g_clContext, sources);
+				m_program->build(g_contextDevices);
+				m_kernel = new cl::Kernel(*m_program, kernelName.c_str());
 			}
-
-			//Make the kernel
-			m_kernel = new cl::Kernel(*m_program, kernelName.c_str(), &err);
-			if(err != CL_SUCCESS)
+			catch(const cl::Error& e)
 			{
-				LogError("Failed to create OpenCL kernel %s in %s (code %d)\n",
-					kernelName.c_str(), kernelPath.c_str(), err);
+				LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+
+				if(e.err() == CL_BUILD_PROGRAM_FAILURE)
+				{
+					LogError("Failed to build OpenCL program from %s\n", kernelPath.c_str());
+					string log;
+					m_program->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
 
 				delete m_program;
 				delete m_kernel;
 				m_program = NULL;
 				m_kernel = NULL;
+				return;
 			}
+
 		}
 
 	#endif

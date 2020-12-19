@@ -56,6 +56,7 @@
 #include "config.h"
 #ifdef HAVE_OPENCL
 #define CL_TARGET_OPENCL_VERSION 120
+#define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 #endif
 
