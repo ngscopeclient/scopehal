@@ -126,6 +126,12 @@ void CANDecoder::Refresh()
 	int frame_bytes_left = 0;
 	int32_t frame_id = 0;
 	char tmp[128];
+
+  // CRC (http://esd.cs.ucr.edu/webres/can20.pdf page 13)
+  const uint16_t crc_poly = 0x4599;
+  uint16_t crc = 0;
+
+
 	for(size_t i = 0; i < len; i++)
 	{
 		bool v = diff->m_samples[i];
@@ -218,6 +224,18 @@ void CANDecoder::Refresh()
 				current_field |= 1;
 			nbit ++;
 
+
+
+      if (state != STATE_CRC){
+        uint16_t crc_bit_14 = (crc >> 14) & 0x1;
+        uint16_t crc_nxt = sampled_value ^ crc_bit_14;
+        crc = crc << 1;
+
+        if (crc_nxt){
+          crc = crc ^ crc_poly;
+        }
+      }
+
 			switch(state)
 			{
 				//Wait for at least 7 bit times low
@@ -245,6 +263,7 @@ void CANDecoder::Refresh()
 
 					tblockstart = off;
 					nbit = 0;
+          crc = 0;
 					current_field = 0;
 					state = STATE_ID;
 					break;
@@ -416,10 +435,13 @@ void CANDecoder::Refresh()
 					//CRC is 15 bits long
 					if(nbit == 15)
 					{
-						//TODO: actually check the CRC
+
+            bool crc_ok = current_field == (crc & 0x7fff);
+            auto type = crc_ok ? CANSymbol::TYPE_CRC_OK : CANSymbol::TYPE_CRC_BAD;
+
 						cap->m_offsets.push_back(tblockstart);
 						cap->m_durations.push_back(end - tblockstart);
-						cap->m_samples.push_back(CANSymbol(CANSymbol::TYPE_CRC_OK, current_field));
+						cap->m_samples.push_back(CANSymbol(type, current_field));
 
 						state = STATE_CRC_DELIM;
 					}
