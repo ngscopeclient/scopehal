@@ -251,6 +251,8 @@ void FIRFilter::DoFilterKernel(
 	float& vmin,
 	float& vmax)
 {
+	double tstart = GetTime();
+
 	#ifdef HAVE_OPENCL
 	if(g_clContext && m_kernel)
 		DoFilterKernelOpenCL(coefficients, din, cap, vmin, vmax);
@@ -263,6 +265,15 @@ void FIRFilter::DoFilterKernel(
 		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
 	else
 		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
+
+	double dt = GetTime() - tstart;
+
+	static double total = 0;
+	static double count = 0;
+	total += dt;
+	count ++;
+
+	LogDebug("FIRFilter::DoFilterKernel avg %f ms\n", total * 1000 / count);
 }
 
 #ifdef HAVE_OPENCL
@@ -283,27 +294,20 @@ void FIRFilter::DoFilterKernelOpenCL(
 		//Allocate memory and copy to the GPU
 		cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
 		cl::Buffer coeffbuf(*g_clContext, coefficients.begin(), coefficients.end(), true, true, NULL);
-		cl::Buffer outbuf(*g_clContext, CL_MEM_WRITE_ONLY, end * sizeof(float));
+		cl::Buffer outbuf(*g_clContext, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
 
 		//Run the filter
-		cl::Event event;
 		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
 		m_kernel->setArg(0, inbuf);
 		m_kernel->setArg(1, coeffbuf);
 		m_kernel->setArg(2, outbuf);
 		m_kernel->setArg(3, filterlen);
 		m_kernel->setArg(4, end);
-		queue.enqueueNDRangeKernel(
-			*m_kernel,
-			cl::NullRange,
-			cl::NDRange(end, 1),
-			cl::NullRange,
-			NULL,
-			&event);
+		queue.enqueueNDRangeKernel(*m_kernel, cl::NullRange, cl::NDRange(end, 1), cl::NullRange, NULL);
 
-		//Done, copy output
-		event.wait();
-		cl::copy(queue, outbuf, cap->m_samples.begin(), cap->m_samples.end() );
+		//Map/unmap the buffer to synchronize output with the CPU
+		void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, end * sizeof(float));
+		queue.enqueueUnmapMemObject(outbuf, ptr);
 	}
 	catch(const cl::Error& e)
 	{
