@@ -245,7 +245,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		//Basic channel info
 		snprintf(tmp, sizeof(tmp), "            : \n");
 		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                id:  virtual bool IsTriggerArmed();        %d\n", table.emplace(chan));
+		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                index:       %zu\n", i);
 		config += tmp;
