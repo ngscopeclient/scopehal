@@ -251,8 +251,6 @@ void FIRFilter::DoFilterKernel(
 	float& vmin,
 	float& vmax)
 {
-	double tstart = GetTime();
-
 	#ifdef HAVE_OPENCL
 	if(g_clContext && m_kernel)
 		DoFilterKernelOpenCL(coefficients, din, cap, vmin, vmax);
@@ -265,15 +263,6 @@ void FIRFilter::DoFilterKernel(
 		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
 	else
 		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
-
-	double dt = GetTime() - tstart;
-
-	static double total = 0;
-	static double count = 0;
-	total += dt;
-	count ++;
-
-	LogDebug("FIRFilter::DoFilterKernel avg %f ms\n", total * 1000 / count);
 }
 
 #ifdef HAVE_OPENCL
