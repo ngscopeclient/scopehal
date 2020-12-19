@@ -53,6 +53,8 @@
 #include "../log/log.h"
 #include "../graphwidget/Graph.h"
 
+#include "config.h"
+
 #include "Unit.h"
 #include "Bijection.h"
 #include "IDTable.h"

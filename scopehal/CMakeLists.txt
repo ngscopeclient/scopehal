@@ -16,6 +16,12 @@ else()
 	set(LXI_LIBRARIES "")
 endif()
 
+if(OpenCL_FOUND)
+	set(HAVE_OPENCL 1)
+else()
+	set(HAVE_OPENCL 0)
+endif()
+
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
@@ -79,14 +85,19 @@ set(SCOPEHAL_SOURCES
 	TestWaveformSource.cpp
 	)
 
+configure_file(config.h.in config.h)
+
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp
-	${LXI_LIBRARIES} ${WIN_LIBS} ${LIBFFTS_LIBRARIES})
+	${LXI_LIBRARIES} ${WIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} )
 
 target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-	${LIBFFTS_INCLUDE_DIR})
+	${CMAKE_CURRENT_BINARY_DIR}
+	${LIBFFTS_INCLUDE_DIR}
+	${OpenCL_INCLUDE_DIRS}
+	)
 
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
