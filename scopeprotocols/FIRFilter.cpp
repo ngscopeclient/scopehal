@@ -278,12 +278,24 @@ void FIRFilter::DoFilterKernelOpenCL(
 	size_t filterlen = coefficients.size();
 	size_t end = len - filterlen;
 
+	//Round size up to next multiple of block size
+	//(must equal BLOCK_SIZE in kernel)
+	const size_t blocksize = 1024;
+	size_t globalsize = (end + blocksize);
+	globalsize -= (globalsize % blocksize);
+
+	//Allocate min/max buffer (first stage reduction on GPU, rest on CPU)
+	size_t nblocks = globalsize / blocksize;
+	vector<float> minmax;
+	minmax.resize(2 * nblocks);
+
 	try
 	{
 		//Allocate memory and copy to the GPU
 		cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
 		cl::Buffer coeffbuf(*g_clContext, coefficients.begin(), coefficients.end(), true, true, NULL);
 		cl::Buffer outbuf(*g_clContext, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
+		cl::Buffer minmaxbuf(*g_clContext, minmax.begin(), minmax.end(), false, true, NULL);
 
 		//Run the filter
 		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
@@ -292,25 +304,28 @@ void FIRFilter::DoFilterKernelOpenCL(
 		m_kernel->setArg(2, outbuf);
 		m_kernel->setArg(3, filterlen);
 		m_kernel->setArg(4, end);
-		queue.enqueueNDRangeKernel(*m_kernel, cl::NullRange, cl::NDRange(end, 1), cl::NullRange, NULL);
+		m_kernel->setArg(5, minmaxbuf);
+		queue.enqueueNDRangeKernel(
+			*m_kernel, cl::NullRange, cl::NDRange(globalsize, 1), cl::NDRange(blocksize, 1), NULL);
 
 		//Map/unmap the buffer to synchronize output with the CPU
 		void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, end * sizeof(float));
+		void* ptr2 = queue.enqueueMapBuffer(minmaxbuf, true, CL_MAP_READ, 0, 2 * nblocks * sizeof(float));
 		queue.enqueueUnmapMemObject(outbuf, ptr);
+		queue.enqueueUnmapMemObject(minmaxbuf, ptr2);
 	}
 	catch(const cl::Error& e)
 	{
-		LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+		LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
 	}
 
-	//Final reduction CPU-side for now
+	//Final reduction stage CPU-side
 	vmin = FLT_MAX;
 	vmax = -FLT_MAX;
-	for(size_t i=0; i<end; i++)
+	for(size_t i=0; i<nblocks; i++)
 	{
-		float v = cap->m_samples[i];
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
+		vmin = min(vmin, minmax[i*2]);
+		vmax = max(vmax, minmax[i*2 + 1]);
 	}
 }
 #endif
