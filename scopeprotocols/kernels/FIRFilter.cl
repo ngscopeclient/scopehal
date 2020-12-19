@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* ANTIKERNEL v0.1                                                                                                      *
+* LIBSCOPEHAL v0.1                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
@@ -27,113 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
-
-#ifndef scopehal_h
-#define scopehal_h
-
-#define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
-
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-#include <chrono>
-#include <thread>
-
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
-
-#include <yaml-cpp/yaml.h>
-
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
-
-#include "config.h"
-#ifdef HAVE_OPENCL
-#define CL_TARGET_OPENCL_VERSION 120
-#include <CL/cl.hpp>
-#endif
-
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
-
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
-
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
-
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
-#include "PowerSupply.h"
-
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "PeakDetectionFilter.h"
-#include "SpectrumChannel.h"
-
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
-
-uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
-
-std::string GetDefaultChannelColor(int i);
-
-std::string Trim(const std::string& str);
-std::string TrimQuotes(const std::string& str);
-std::string BaseName(const std::string& path);
-
-std::string ReadFile(const std::string& path);
-
-std::string to_string_sci(double d);
-
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializePlugins();
-void DetectCPUFeatures();
-void DetectGPUFeatures();
-
-float FreqToPhase(float hz);
-
-uint64_t next_pow2(uint64_t v);
-
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
-
-#define FS_PER_SECOND 1e15
-#define SECONDS_PER_FS 1e-15
-
-//string to size_t conversion
-#ifdef _WIN32
-#define stos(str) static_cast<size_t>(stoll(str))
-#else
-#define stos(str) static_cast<size_t>(stol(str))
-#endif
-
-#ifdef HAVE_OPENCL
-extern cl::Context* g_clContext;
-extern std::vector<cl::Device> g_contextDevices;
-#endif
-
-#endif
+__kernel void FIRFilter()
+{
+}

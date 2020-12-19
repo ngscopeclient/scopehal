@@ -62,7 +62,9 @@ Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 Filter::Filter(
 	OscilloscopeChannel::ChannelType type,
 	const string& color,
-	Category cat)
+	Category cat,
+	const string& kernelPath,
+	const string& kernelName)
 	: OscilloscopeChannel(NULL, "", type, color, 1)	//TODO: handle this better?
 	, m_category(cat)
 	, m_dirty(true)
@@ -70,10 +72,59 @@ Filter::Filter(
 {
 	m_physical = false;
 	m_filters.emplace(this);
+
+	//Load our OpenCL kernel, if we have one
+	#ifdef HAVE_OPENCL
+
+		m_kernel = NULL;
+		m_program = NULL;
+
+		if(kernelPath != "")
+		{
+			//Build the program
+			string kernelSource = ReadFile(kernelPath);
+			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
+			m_program = new cl::Program(*g_clContext, sources);
+			cl_int err = m_program->build(g_contextDevices);
+			if(err != CL_SUCCESS)
+			{
+				LogError("Failed to build OpenCL program from %s (code %d)\n", kernelPath.c_str(), err);
+				string log;
+				m_program->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+				LogDebug("Build log:\n");
+				LogDebug("%s\n", log.c_str());
+
+				delete m_program;
+				m_program = NULL;
+				return;
+			}
+
+			//Make the kernel
+			m_kernel = new cl::Kernel(*m_program, kernelName.c_str(), &err);
+			if(err != CL_SUCCESS)
+			{
+				LogError("Failed to create OpenCL kernel %s in %s (code %d)\n",
+					kernelName.c_str(), kernelPath.c_str(), err);
+
+				delete m_program;
+				delete m_kernel;
+				m_program = NULL;
+				m_kernel = NULL;
+			}
+		}
+
+	#endif
 }
 
 Filter::~Filter()
 {
+	#ifdef HAVE_OPENCL
+		delete m_kernel;
+		delete m_program;
+		m_kernel = NULL;
+		m_program = NULL;
+	#endif
+
 	m_filters.erase(this);
 
 	for(auto c : m_inputs)

@@ -37,7 +37,12 @@ using namespace std;
 // Construction / destruction
 
 FIRFilter::FIRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(
+		OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+		color,
+		CAT_MATH,
+		"kernels/FIRFilter.cl",
+		"FIRFilter")
 	, m_filterTypeName("Filter Type")
 	, m_filterLengthName("Length")
 	, m_stopbandAttenName("Stopband Attenuation")

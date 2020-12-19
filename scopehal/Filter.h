@@ -62,7 +62,12 @@ public:
 		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
 	};
 
-	Filter(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat);
+	Filter(
+		OscilloscopeChannel::ChannelType type,
+		const std::string& color,
+		Category cat,
+		const std::string& kernelPath = "",
+		const std::string& kernelName = "");
 	virtual ~Filter();
 
 	/**
@@ -237,6 +242,14 @@ public:
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
+
+#ifdef HAVE_OPENCL
+
+	//OpenCL state
+	cl::Program* m_program;
+	cl::Kernel* m_kernel;
+
+#endif
 
 public:
 	typedef Filter* (*CreateProcType)(const std::string&);

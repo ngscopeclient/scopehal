@@ -70,7 +70,10 @@ bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 
+#ifdef HAVE_OPENCL
 cl::Context* g_clContext = NULL;
+vector<cl::Device> g_contextDevices;
+#endif
 
 AlignedAllocator<float, 32> g_floatVectorAllocator;
 
@@ -198,6 +201,8 @@ void DetectGPUFeatures()
 						g_clContext = NULL;
 						return;
 					}
+
+					g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
 				}
 			}
 		}
@@ -531,4 +536,36 @@ uint64_t next_pow2(uint64_t v)
 	v++;
 	return v;
 #endif
+}
+
+/**
+	@brief Returns the contents of a file
+ */
+string ReadFile(const string& path)
+{
+	//Read the file
+	FILE* fp = fopen(path.c_str(), "rb");
+	if(!fp)
+	{
+		LogWarning("ReadFile: Could not open file \"%s\"\n", path.c_str());
+		return "";
+	}
+	fseek(fp, 0, SEEK_END);
+	size_t fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	char* buf = new char[fsize + 1];
+	if(fsize != fread(buf, 1, fsize, fp))
+	{
+		LogWarning("ReadFile: Could not read file \"%s\"\n", path.c_str());
+		delete[] buf;
+		fclose(fp);
+		return "";
+	}
+	buf[fsize] = 0;
+	fclose(fp);
+
+	string ret(buf);
+	delete[] buf;
+
+	return ret;
 }
