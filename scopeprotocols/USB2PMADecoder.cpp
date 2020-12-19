@@ -121,15 +121,16 @@ void USB2PMADecoder::Refresh()
 	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
 
 	//Figure out the line state for each input (no clock recovery yet)
+	auto threshold = (speed == SPEED_HIGH) ? 0.2 : 0.4;
 	auto cap = new USB2PMAWaveform;
 	for(size_t i=0; i<len; i++)
 	{
-		bool bp = (din_p->m_samples[i] > 0.4);
-		bool bn = (din_n->m_samples[i] > 0.4);
+		bool bp = (din_p->m_samples[i] > threshold);
+		bool bn = (din_n->m_samples[i] > threshold);
 		float vdiff = din_p->m_samples[i] - din_n->m_samples[i];
 
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
-		if(fabs(vdiff) > 0.4)
+		if(fabs(vdiff) > threshold)
 		{
 			if( (speed == SPEED_FULL) || (speed == SPEED_HIGH) )
 			{
