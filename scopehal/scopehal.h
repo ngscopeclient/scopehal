@@ -108,6 +108,7 @@ void DriverStaticInit();
 
 void InitializePlugins();
 void DetectCPUFeatures();
+void DetectGPUFeatures();
 
 float FreqToPhase(float hz);
 
@@ -126,6 +127,10 @@ extern bool g_hasAvx2;
 #define stos(str) static_cast<size_t>(stoll(str))
 #else
 #define stos(str) static_cast<size_t>(stol(str))
+#endif
+
+#ifdef HAVE_OPENCL
+extern cl::Context* g_clContext;
 #endif
 
 #endif
