@@ -123,6 +123,7 @@ protected:
 	void RefreshIterationSync(
 		size_t nin,
 		DecodeState& state,
+		BusSpeed speed,
 		size_t& ui_width,
 		USB2PCSWaveform* cap,
 		USB2PMAWaveform* din,
@@ -136,6 +137,7 @@ protected:
 		size_t nin,
 		size_t nlast,
 		DecodeState& state,
+		BusSpeed speed,
 		size_t& ui_width,
 		USB2PCSWaveform* cap,
 		USB2PMAWaveform* din,

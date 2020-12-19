@@ -129,7 +129,7 @@ void USB2PCSDecoder::Refresh()
 				break;
 
 			case STATE_SYNC:
-				RefreshIterationSync(i, state, ui_width, cap, din, count, offset, data, first);
+				RefreshIterationSync(i, state, speed, ui_width, cap, din, count, offset, data, first);
 				break;
 
 			case STATE_DATA:
@@ -137,6 +137,7 @@ void USB2PCSDecoder::Refresh()
 					i,
 					i-1,
 					state,
+					speed,
 					ui_width,
 					cap,
 					din,
@@ -220,6 +221,7 @@ void USB2PCSDecoder::RefreshIterationIdle(
 void USB2PCSDecoder::RefreshIterationSync(
 	size_t nin,
 	DecodeState& state,
+	BusSpeed speed,
 	size_t& ui_width,
 	USB2PCSWaveform* cap,
 	USB2PMAWaveform* din,
@@ -235,8 +237,23 @@ void USB2PCSDecoder::RefreshIterationSync(
 	count ++;
 	auto sin = din->m_samples[nin];
 
+
+	bool sync_odd, sync_even;
+
+	if (speed == SPEED_480M)
+	{
+		// TODO: rather than hard-coding the count, detect 2 K symbols for end of sync
+		sync_odd = (count & 1) && count < 30;
+		sync_even = !(count & 1) && count < 30;
+	}
+	else
+	{
+		sync_odd = (count == 1) || (count == 3) || (count == 5);
+		sync_even = (count == 2) || (count == 4);
+	}
+
 	//Odd numbered position
-	if( (count == 1) || (count == 3) || (count == 5) )
+	if(sync_odd)
 	{
 		//Should be one UI long, and a J. Complain if not.
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
@@ -270,7 +287,7 @@ void USB2PCSDecoder::RefreshIterationSync(
 	}
 
 	//Even numbered position, but not the last
-	else if( (count == 2) || (count == 4) )
+	else if(sync_even)
 	{
 		//Should be one UI long, and a K. Complain if not.
 		if( (sample_width_ui > 1.5) || (sample_width_ui < 0.5) ||
@@ -397,6 +414,7 @@ void USB2PCSDecoder::RefreshIterationData(
 	size_t nin,
 	size_t nlast,
 	DecodeState& state,
+	BusSpeed speed,
 	size_t& ui_width,
 	USB2PCSWaveform* cap,
 	USB2PMAWaveform* din,
@@ -451,6 +469,18 @@ void USB2PCSDecoder::RefreshIterationData(
 	//Process the actual data
 	size_t num_bits = round(sample_width_ui);
 	size_t last_num_bits = round(last_sample_width_ui);
+
+	//For high speed, bitstuff errors should be interpreted as EOP.
+	if(speed == SPEED_480M && num_bits > 7) {
+		cap->m_offsets.push_back(din->m_offsets[nin]);
+		cap->m_durations.push_back(din->m_durations[nin]);
+		cap->m_samples.push_back(USB2PCSSymbol(USB2PCSSymbol::TYPE_EOP, 0));
+
+		state = STATE_IDLE;
+		count = 0;
+		return;
+	}
+
 	for(size_t i=0; i<num_bits; i++)
 	{
 		//First bit is either a bitstuff or 0 bit
