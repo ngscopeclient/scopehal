@@ -98,7 +98,7 @@ target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
 	${LIBFFTS_INCLUDE_DIR}
-	${OpenCL_INCLUDE_DIRS}
+	${OpenCL_INCLUDE_DIR}
 	)
 
 if(${HAS_LXI})
