@@ -188,7 +188,7 @@ void JitterSpectrumFilter::Refresh()
 	//Loop over the input and copy samples.
 	//If we have runs of identical bits, extend the same jitter value.
 	//TODO: interpolate?
-	vector<float, AlignedAllocator<float, 64>> extended_samples;
+	vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>> extended_samples;
 	extended_samples.reserve(inlen);
 	for(size_t i=0; i<inlen; i++)
 	{
@@ -216,14 +216,6 @@ void JitterSpectrumFilter::Refresh()
 	if(m_cachedNumPoints != npoints_raw)
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 
-	//Copy the input with windowing, then zero pad to the desired input length
-	ApplyWindow(
-		&extended_samples[0],
-		npoints_raw,
-		&m_rdinbuf[0],
-		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
-	memset(&m_rdinbuf[npoints_raw], 0, (npoints - npoints_raw) * sizeof(float));
-
 	//and do the actual FFT processing
-	DoRefresh(din, ui_width_final, npoints, nouts, false);
+	DoRefresh(din, extended_samples, ui_width_final, npoints, nouts, false);
 }

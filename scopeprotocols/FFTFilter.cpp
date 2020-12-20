@@ -208,17 +208,9 @@ void FFTFilter::Refresh()
 
 	double start = GetTime();
 
-	//Copy the input with windowing, then zero pad to the desired input length
-	ApplyWindow(
-		(float*)&din->m_samples[0],
-		npoints_raw,
-		&m_rdinbuf[0],
-		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
-	memset(&m_rdinbuf[npoints_raw], 0, (npoints - npoints_raw) * sizeof(float));
-
 	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
 
-	DoRefresh(din, fs, npoints, nouts, true);
+	DoRefresh(din, din->m_samples, fs, npoints, nouts, true);
 
 	double dt = GetTime() - start;
 	static size_t count = 0;
@@ -228,8 +220,22 @@ void FFTFilter::Refresh()
 	LogDebug("FFTFilter: avg %f ms\n", time * 1000 / count);
 }
 
-void FFTFilter::DoRefresh(AnalogWaveform* din, double fs_per_sample, size_t npoints, size_t nouts, bool log_output)
+void FFTFilter::DoRefresh(
+	AnalogWaveform* din,
+	const vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
+	double fs_per_sample,
+	size_t npoints,
+	size_t nouts,
+	bool log_output)
 {
+	//Copy the input with windowing, then zero pad to the desired input length
+	ApplyWindow(
+		(float*)&data[0],
+		m_cachedNumPoints,
+		&m_rdinbuf[0],
+		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
+	memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+
 	float scale = 1.0 / npoints;
 
 	#ifdef HAVE_CLFFT

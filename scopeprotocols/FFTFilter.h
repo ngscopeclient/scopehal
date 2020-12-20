@@ -89,7 +89,10 @@ protected:
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
-	void DoRefresh(AnalogWaveform* din, double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
+	void DoRefresh(
+		AnalogWaveform* din,
+		const std::vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
+		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedNumPointsFFT;
