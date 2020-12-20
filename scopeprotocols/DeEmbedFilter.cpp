@@ -58,10 +58,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedRawSize = 0;
-
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
 }
 
 DeEmbedFilter::~DeEmbedFilter()
@@ -71,21 +67,8 @@ DeEmbedFilter::~DeEmbedFilter()
 	if(m_reversePlan)
 		ffts_free(m_reversePlan);
 
-	#ifdef _WIN32
-		_aligned_free(m_forwardInBuf);
-		_aligned_free(m_forwardOutBuf);
-		_aligned_free(m_reverseOutBuf);
-	#else
-		free(m_forwardInBuf);
-		free(m_forwardOutBuf);
-		free(m_reverseOutBuf);
-	#endif
-
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
-	m_forwardInBuf = NULL;
-	m_forwardOutBuf = NULL;
-	m_reverseOutBuf = NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,6 +206,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		return;
 	}
 
+	double start = GetTime();
+
 	auto din = GetAnalogInputWaveform(0);
 	const size_t npoints_raw = din->m_samples.size();
 
@@ -247,23 +232,55 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			ffts_free(m_reversePlan);
 		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
 
-		#ifdef _WIN32
-			m_forwardInBuf = (float*)_aligned_malloc(npoints * sizeof(float), 32);
-			m_forwardOutBuf = (float*)_aligned_malloc(2 * nouts * sizeof(float), 32);
-			m_reverseOutBuf = (float*)_aligned_malloc(npoints * sizeof(float), 32);
-		#else
-			posix_memalign((void**)&m_forwardInBuf, 32, npoints * sizeof(float));
-			posix_memalign((void**)&m_forwardOutBuf, 32, 2 * nouts * sizeof(float));
-			posix_memalign((void**)&m_reverseOutBuf, 32, npoints * sizeof(float));
-		#endif
+		m_forwardInBuf.resize(npoints);
+		m_forwardOutBuf.resize(2 * nouts);
+		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
 		m_cachedRawSize = npoints_raw;
 		sizechange = true;
+
+		#ifdef HAVE_CLFFT
+
+			//Set up the FFT object
+			if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
+			{
+				LogError("clfftCreateDefaultPlan failed\n");
+				abort();
+			}
+			clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
+			clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
+			clfftSetLayout(m_clfftForwardPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
+			clfftSetResultLocation(m_clfftForwardPlan, CLFFT_OUTOFPLACE);
+
+			if(CLFFT_SUCCESS != clfftCopyPlan(&m_clfftReversePlan, (*g_clContext)(), m_clfftForwardPlan))
+			{
+				LogError("clfftCreateDefaultPlan failed\n");
+				abort();
+			}
+			clfftSetLayout(m_clfftReversePlan, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
+
+			//Initialize the plan
+			cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+			cl_command_queue q = queue();
+			auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
+			if(CLFFT_SUCCESS != err)
+			{
+				LogError("clfftBakePlan failed (%d)\n", err);
+				abort();
+			}
+			err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
+			if(CLFFT_SUCCESS != err)
+			{
+				LogError("clfftBakePlan failed (%d)\n", err);
+				abort();
+			}
+
+		#endif
 	}
 
 	//Copy the input, then fill any extra space with zeroes
-	memcpy(m_forwardInBuf, &din->m_samples[0], npoints_raw*sizeof(float));
+	memcpy(&m_forwardInBuf[0], &din->m_samples[0], npoints_raw*sizeof(float));
 	for(size_t i=npoints_raw; i<npoints; i++)
 		m_forwardInBuf[i] = 0;
 
@@ -338,6 +355,13 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = -( (m_max - m_min)/2 + m_min );
+
+	double dt = GetTime() - start;
+	static double ttotal = 0;
+	static size_t ntotal = 0;
+	ntotal ++;
+	ttotal += dt;
+	LogDebug("DeEmbedFilter: %f ms\n", ttotal * 1000 / ntotal);
 }
 
 int64_t DeEmbedFilter::GetGroupDelay()

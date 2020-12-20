@@ -38,6 +38,10 @@
 #include "../scopehal/AlignedAllocator.h"
 #include <ffts.h>
 
+#ifdef HAVE_CLFFT
+#include <clFFT.h>
+#endif
+
 class DeEmbedFilter : public Filter
 {
 public:
@@ -87,12 +91,17 @@ protected:
 	size_t m_cachedNumPoints;
 	size_t m_cachedRawSize;
 
-	float* m_forwardInBuf;
-	float* m_forwardOutBuf;
-	float* m_reverseOutBuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
 
 	void MainLoop(size_t nouts);
 	void MainLoopAVX2(size_t nouts);
+
+	#ifdef HAVE_CLFFT
+	clfftPlanHandle m_clfftForwardPlan;
+	clfftPlanHandle m_clfftReversePlan;
+	#endif
 };
 
 #endif
