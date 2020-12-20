@@ -31,6 +31,7 @@
 #include "AgilentOscilloscope.h"
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "NthEdgeBurstTrigger.h"
 
 using namespace std;
 
@@ -683,6 +684,8 @@ void AgilentOscilloscope::PullTrigger()
 		PullEdgeTrigger();
 	else if (reply == "GLIT")
 		PullPulseWidthTrigger();
+	else if (reply == "EBUR")
+		PullNthEdgeBurstTrigger();
 
 	//Unrecognized trigger type
 	else
@@ -728,6 +731,47 @@ void AgilentOscilloscope::PullEdgeTrigger()
 	//Edge slope
 	m_transport->SendCommand("TRIG:SLOPE?");
 	GetTriggerSlope(et, m_transport->ReadReply());
+}
+
+void AgilentOscilloscope::PullNthEdgeBurstTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != NULL) && (dynamic_cast<NthEdgeBurstTrigger*>(m_trigger) != NULL) )
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new NthEdgeBurstTrigger(this);
+	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Source
+	m_transport->SendCommand("TRIG:EDGE:SOUR?");
+	string reply = m_transport->ReadReply();
+	auto chan = GetChannelByHwName(reply);
+	bt->SetInput(0, StreamDescriptor(chan, 0), true);
+	if(!chan)
+		LogWarning("Unknown trigger source %s\n", reply.c_str());
+
+	//Level
+	m_transport->SendCommand("TRIG:EDGE:LEV?");
+	bt->SetLevel(stof(m_transport->ReadReply()));
+
+	//Slope
+	m_transport->SendCommand("TRIG:EBUR:SLOP?");
+	GetTriggerSlope(bt, m_transport->ReadReply());
+
+	//Idle time
+	m_transport->SendCommand("TRIG:EBUR:IDLE?");
+	bt->SetIdleTime(stof(m_transport->ReadReply()) * FS_PER_SECOND);
+
+	//Edge number
+	m_transport->SendCommand("TRIG:EBUR:COUN?");
+	bt->SetEdgeNumber(stoi(m_transport->ReadReply()));
 }
 
 void AgilentOscilloscope::PullPulseWidthTrigger()
@@ -816,6 +860,19 @@ void AgilentOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 }
 
 /**
+	@brief Processes the slope for an Nth edge burst trigger
+ */
+void AgilentOscilloscope::GetTriggerSlope(NthEdgeBurstTrigger* trig, string reply)
+{
+	if (reply == "POS")
+		trig->SetSlope(NthEdgeBurstTrigger::EDGE_RISING);
+	else if (reply == "NEG")
+		trig->SetSlope(NthEdgeBurstTrigger::EDGE_FALLING);
+	else
+		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+}
+
+/**
 	@brief Parses a trigger condition
  */
 Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
@@ -835,9 +892,12 @@ Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
 
 void AgilentOscilloscope::PushTrigger()
 {
+	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(pt)
+	if(bt)
+		PushNthEdgeBurstTrigger(bt);
+	else if(pt)
 		PushPulseWidthTrigger(pt);
 	// Must go last
 	else if(et)
@@ -865,6 +925,22 @@ void AgilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 
 	//Slope
 	PushSlope("TRIG:SLOPE", trig->GetType());
+}
+
+/**
+	@brief Pushes settings for a Nth edge burst trigger to the instrument
+ */
+void AgilentOscilloscope::PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("TRIG:MODE EBUR");
+	m_transport->SendCommand("TRIG:EDGE:SOURCE " +
+		trig->GetInput(0).m_channel->GetHwname());
+	PushFloat("TRIG:EDGE:LEV", trig->GetLevel());
+	PushSlope("TRIG:EBUR:SLOP", trig->GetSlope());
+	PushFloat("TRIG:EBUR:IDLE", trig->GetIdleTime() * SECONDS_PER_FS);
+	m_transport->SendCommand("TRIG:EBUR:COUNT " + to_string(trig->GetEdgeNumber()));
 }
 
 /**
@@ -942,11 +1018,29 @@ void AgilentOscilloscope::PushSlope(string path, EdgeTrigger::EdgeType slope)
 	m_transport->SendCommand(path + " " + slope_str);
 }
 
+void AgilentOscilloscope::PushSlope(string path, NthEdgeBurstTrigger::EdgeType slope)
+{
+	string slope_str;
+	switch(slope)
+	{
+		case EdgeTrigger::EDGE_RISING:
+			slope_str = "POS";
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			slope_str = "NEG";
+			break;
+		default:
+			return;
+	}
+	m_transport->SendCommand(path + " " + slope_str);
+}
+
 vector<string> AgilentOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
 	ret.push_back(EdgeTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
+	ret.push_back(NthEdgeBurstTrigger::GetTriggerName());
 	return ret;
 }
 
