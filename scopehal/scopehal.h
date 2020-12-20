@@ -113,6 +113,8 @@ void InitializePlugins();
 void DetectCPUFeatures();
 void DetectGPUFeatures();
 
+void ScopehalStaticCleanup();
+
 float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);

@@ -1,4 +1,9 @@
-//We want HAVE_OPENCL defined only if CMake found it so we can #ifdef instead of #if
+//We want each variable defined only if CMake found it so we can #ifdef instead of #if
+
 #if @HAVE_OPENCL@
 #define HAVE_OPENCL
+#endif
+
+#if @HAVE_CLFFT@
+#define HAVE_CLFFT
 #endif

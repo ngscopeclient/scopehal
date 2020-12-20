@@ -220,9 +220,9 @@ void JitterSpectrumFilter::Refresh()
 	ApplyWindow(
 		&extended_samples[0],
 		npoints_raw,
-		m_rdin,
+		&m_rdinbuf[0],
 		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
-	memset(m_rdin + npoints_raw, 0, (npoints - npoints_raw) * sizeof(float));
+	memset(&m_rdinbuf[npoints_raw], 0, (npoints - npoints_raw) * sizeof(float));
 
 	//and do the actual FFT processing
 	DoRefresh(din, ui_width_final, npoints, nouts, false);

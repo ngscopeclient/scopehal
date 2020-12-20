@@ -24,6 +24,14 @@ else()
 	set(OpenCL_INCLUDE_DIR "")
 endif()
 
+if(CLFFT_FOUND)
+	set(HAVE_CLFFT 1)
+else()
+	set(HAVE_CLFFT 0)
+	set(CLFFT_LIBRARIES "")
+	set(CLFFT_INCLUDE_DIR "")
+endif()
+
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
@@ -92,13 +100,14 @@ configure_file(config.h.in config.h)
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget yaml-cpp
-	${LXI_LIBRARIES} ${WIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} )
+	${LXI_LIBRARIES} ${WIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} ${CLFFT_LIBRARIES})
 
 target_include_directories(scopehal
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
 	${LIBFFTS_INCLUDE_DIR}
 	${OpenCL_INCLUDE_DIR}
+	${CLFFT_INCLUDE_DIR}
 	)
 
 if(${HAS_LXI})

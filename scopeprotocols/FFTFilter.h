@@ -37,6 +37,10 @@
 
 #include <ffts.h>
 
+#ifdef HAVE_CLFFT
+#include <clFFT.h>
+#endif
+
 class FFTFilter : public PeakDetectionFilter
 {
 public:
@@ -78,10 +82,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
-	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, size_t npoints);
-	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints);
-	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, size_t npoints);
-	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, size_t npoints);
+	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
+	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
+	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
@@ -89,14 +93,18 @@ protected:
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedNumPointsFFT;
-	float* m_rdin;
-	float* m_rdout;
+	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
 	ffts_plan_t* m_plan;
 
 	float m_range;
 	float m_offset;
 
 	std::string m_windowName;
+
+	#ifdef HAVE_CLFFT
+	clfftPlanHandle m_clfftPlan;
+	#endif
 };
 
 #endif

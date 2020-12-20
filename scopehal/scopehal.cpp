@@ -63,6 +63,10 @@
 #include <shlwapi.h>
 #endif
 
+#ifdef HAVE_CLFFT
+#include <clFFT.h>
+#endif
+
 using namespace std;
 
 bool g_hasAvx512F = false;
@@ -208,11 +212,44 @@ void DetectGPUFeatures()
 			return;
 		}
 
+		#ifdef HAVE_CLFFT
+
+			clfftSetupData data;
+			clfftInitSetupData(&data);
+			if(CLFFT_SUCCESS != clfftSetup(&data))
+			{
+				LogError("clFFT init failed, aborting\n");
+				abort();
+			}
+
+			cl_uint major;
+			cl_uint minor;
+			cl_uint patch;
+			if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
+			{
+				LogError("clFFT version query failed, aborting\n");
+				abort();
+			}
+			LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
+
+		#else
+			LogNotice("clFFT support: not present at compile time\n");
+		#endif
+
 	#else
-		LogNotice("OpenCL support not present at compile time. GPU acceleration disabled.\n");
+		LogNotice("OpenCL support: not present at compile time. GPU acceleration disabled.\n");
 	#endif
 
 	LogDebug("\n");
+}
+
+void ScopehalStaticCleanup()
+{
+	#ifdef HAVE_OPENCL
+	#ifdef HAVE_CLFFT
+	clfftTeardown();
+	#endif
+	#endif
 }
 
 /**
