@@ -70,6 +70,10 @@ FFTFilter::FFTFilter(const string& color)
 		m_cosineSumWindowKernel = NULL;
 		m_blackmanHarrisWindowKernel = NULL;
 
+		m_normalizeProgram = NULL;
+		m_normalizeLogMagnitudeKernel = NULL;
+		m_normalizeMagnitudeKernel = NULL;
+
 		try
 		{
 			//Compile window functions
@@ -82,6 +86,16 @@ FFTFilter::FFTFilter(const string& color)
 			m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
 			m_cosineSumWindowKernel = new cl::Kernel(*m_windowProgram, "CosineSumWindow");
 			m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
+
+			//Compile normalization kernels
+			kernelSource = ReadFile("kernels/FFTNormalization.cl");
+			cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
+			m_normalizeProgram = new cl::Program(*g_clContext, sources2);
+			m_normalizeProgram->build(g_contextDevices);
+
+			//Extract normalization kernels
+			m_normalizeLogMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToLogMagnitude");
+			m_normalizeMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToMagnitude");
 		}
 		catch(const cl::Error& e)
 		{
@@ -95,6 +109,10 @@ FFTFilter::FFTFilter(const string& color)
 				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
 				LogDebug("Window program build log:\n");
 				LogDebug("%s\n", log.c_str());
+
+				m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+				LogDebug("Normalize program build log:\n");
+				LogDebug("%s\n", log.c_str());
 			}
 
 			delete m_windowProgram;
@@ -102,10 +120,18 @@ FFTFilter::FFTFilter(const string& color)
 			delete m_cosineSumWindowKernel;
 			delete m_blackmanHarrisWindowKernel;
 
+			delete m_normalizeProgram;
+			delete m_normalizeLogMagnitudeKernel;
+			delete m_normalizeMagnitudeKernel;
+
 			m_windowProgram = NULL;
 			m_rectangularWindowKernel = NULL;
 			m_cosineSumWindowKernel = NULL;
 			m_blackmanHarrisWindowKernel = NULL;
+
+			m_normalizeProgram = NULL;
+			m_normalizeLogMagnitudeKernel = NULL;
+			m_normalizeMagnitudeKernel = NULL;
 		}
 
 	#endif
@@ -267,18 +293,8 @@ void FFTFilter::Refresh()
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
-	double start = GetTime();
-
 	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-
 	DoRefresh(din, din->m_samples, fs, npoints, nouts, true);
-
-	double dt = GetTime() - start;
-	static size_t count = 0;
-	static double time = 0;
-	count ++;
-	time += dt;
-	LogDebug("FFTFilter: avg %f ms\n", time * 1000 / count);
 }
 
 void FFTFilter::DoRefresh(
@@ -290,7 +306,7 @@ void FFTFilter::DoRefresh(
 	bool log_output)
 {
 	//Look up some parameters
-	float scale = 1.0 / npoints;
+	float scale = 2.0 / npoints;
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
@@ -322,14 +338,15 @@ void FFTFilter::DoRefresh(
 	}
 
 	#ifdef HAVE_CLFFT
-		if(g_clContext && m_windowProgram)
+		if(g_clContext && m_windowProgram && m_normalizeProgram)
 		{
 			try
 			{
 				//Make buffers
 				cl::Buffer inbuf(*g_clContext, data.begin(), data.end(), true, true, NULL);
-				cl::Buffer windowed(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-				cl::Buffer outbuf(*g_clContext, m_rdoutbuf.begin(), m_rdoutbuf.end(), false, true, NULL);
+				cl::Buffer windowoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
+				cl::Buffer fftoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
+				cl::Buffer outbuf(*g_clContext, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
 
 				//Apply the window function
 				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
@@ -343,14 +360,14 @@ void FFTFilter::DoRefresh(
 
 					case WINDOW_HAMMING:
 						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(5, 25.0f / 46.0f);
-						windowKernel->setArg(6, 1.0f - (25.0f / 46.0f));
+						windowKernel->setArg(4, 25.0f / 46.0f);
+						windowKernel->setArg(5, 1.0f - (25.0f / 46.0f));
 						break;
 
 					case WINDOW_HANN:
 						windowKernel = m_cosineSumWindowKernel;
+						windowKernel->setArg(4, 0.5);
 						windowKernel->setArg(5, 0.5);
-						windowKernel->setArg(6, 0.5);
 						break;
 
 					case WINDOW_BLACKMAN_HARRIS:
@@ -359,28 +376,38 @@ void FFTFilter::DoRefresh(
 						break;
 				}
 				windowKernel->setArg(0, inbuf);
-				windowKernel->setArg(1, windowed);
+				windowKernel->setArg(1, windowoutbuf);
 				windowKernel->setArg(2, m_cachedNumPoints);
-				windowKernel->setArg(3, npoints);
 				if(window != WINDOW_RECTANGULAR)
-					windowKernel->setArg(4, windowscale);
+					windowKernel->setArg(3, windowscale);
 				queue.enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
 
 				//Run the FFT
 				cl_command_queue q = queue();
-				cl_mem inbufs[1] = { windowed() };
-				cl_mem outbufs[1] = { outbuf() };
+				cl_mem inbufs[1] = { windowoutbuf() };
+				cl_mem outbufs[1] = { fftoutbuf() };
 				if(CLFFT_SUCCESS != clfftEnqueueTransform(
 					m_clfftPlan, CLFFT_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
 				{
 					LogError("clfftEnqueueTransform failed\n");
 					abort();
 				}
-				//Map/unmap the buffer to synchronize output with the CPU
-				void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, m_rdoutbuf.size() * sizeof(float));
-				queue.enqueueUnmapMemObject(outbuf, ptr);
 
-				//TODO: OpenCL normalization
+				//Normalize output
+				cl::Kernel* normalizeKernel = NULL;
+				if(log_output)
+					normalizeKernel = m_normalizeLogMagnitudeKernel;
+				else
+					normalizeKernel = m_normalizeMagnitudeKernel;
+				normalizeKernel->setArg(0, fftoutbuf);
+				normalizeKernel->setArg(1, outbuf);
+				normalizeKernel->setArg(2, scale);
+				queue.enqueueNDRangeKernel(
+					*normalizeKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
+
+				//Map/unmap the buffer to synchronize output with the CPU
+				void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, nouts * sizeof(float));
+				queue.enqueueUnmapMemObject(outbuf, ptr);
 			}
 			catch(const cl::Error& e)
 			{
@@ -402,25 +429,25 @@ void FFTFilter::DoRefresh(
 		//Calculate the FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
 
+		//Normalize magnitudes
+		if(log_output)
+		{
+			if(g_hasAvx2)
+				NormalizeOutputLogAVX2(cap, nouts, scale);
+			else
+				NormalizeOutputLog(cap, nouts, scale);
+		}
+		else
+		{
+			if(g_hasAvx2)
+				NormalizeOutputLinearAVX2(cap, nouts, scale);
+			else
+				NormalizeOutputLinear(cap, nouts, scale);
+		}
+
 	#ifdef HAVE_CLFFT
 		}
 	#endif
-
-	//Normalize magnitudes
-	if(log_output)
-	{
-		if(g_hasAvx2)
-			NormalizeOutputLogAVX2(cap, nouts, scale);
-		else
-			NormalizeOutputLog(cap, nouts, scale);
-	}
-	else
-	{
-		if(g_hasAvx2)
-			NormalizeOutputLinearAVX2(cap, nouts, scale);
-		else
-			NormalizeOutputLinear(cap, nouts, scale);
-	}
 
 	//Peak search
 	FindPeaks(cap);
@@ -436,7 +463,6 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
 {
 	//assume constant 50 ohms for now
 	const float impedance = 50;
-	scale *= 2;
 	for(size_t i=0; i<nouts; i++)
 	{
 		float real = m_rdoutbuf[i*2];
@@ -454,7 +480,6 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
  */
 void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale)
 {
-	scale *= 2;
 	for(size_t i=0; i<nouts; i++)
 	{
 		float real = m_rdoutbuf[i*2];
@@ -473,8 +498,7 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 	size_t end = nouts - (nouts % 8);
 
 	//double since we only look at positive half
-	float norm = 2.0f * scale;
-	__m256 norm_f = { norm, norm, norm, norm, norm, norm, norm, norm };
+	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
 
 	//1 / nominal line impedance
 	float impedance = 50;
@@ -557,8 +581,7 @@ void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, flo
 	size_t end = nouts - (nouts % 8);
 
 	//double since we only look at positive half
-	float norm = 2.0f * scale;
-	__m256 norm_f = { norm, norm, norm, norm, norm, norm, norm, norm };
+	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
 
 	float* pout = (float*)&cap->m_samples[0];
 	float* pin = &m_rdoutbuf[0];

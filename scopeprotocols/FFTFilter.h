@@ -112,6 +112,11 @@ protected:
 	cl::Kernel* m_rectangularWindowKernel;
 	cl::Kernel* m_cosineSumWindowKernel;
 	cl::Kernel* m_blackmanHarrisWindowKernel;
+
+	cl::Program* m_normalizeProgram;
+	cl::Kernel* m_normalizeMagnitudeKernel;
+	cl::Kernel* m_normalizeLogMagnitudeKernel;
+
 	#endif
 };
 

@@ -27,79 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/*
-	All kernels in this file apply a window function, then zero-pad to a specified length.
-
-	Outlen must be >= inlen.
-
-	Most filters take several constant arguments which are precomputed host side.
- */
-
 /**
-	@brief Blackman-Harris window
+	@brief Kernels to normalize FFT output and calculate scalar magnitude
  */
-__kernel void BlackmanHarrisWindow(
-	__global const float* din,
+
+__kernel void NormalizeToMagnitude(
+	__global float* din,
 	__global float* dout,
-	unsigned long inlen,
-	float scale)				//2 * M_PI / inlen
+	float scale)
 {
 	unsigned long i = get_global_id(0);
-	if(i >= inlen)
-	{
-		dout[i] = 0;
-		return;
-	}
 
-	const float alpha0 = 0.35875;
-	const float alpha1 = 0.48829;
-	const float alpha2 = 0.14128;
-	const float alpha3 = 0.01168;
+	float real = din[i*2];
+	float imag = din[i*2 + 1];
 
-	float num = i * scale;
-	float w =
-		alpha0 -
-		alpha1 * cos(num) +
-		alpha2 * cos(2*num) -
-		alpha3 * cos(6*num);
-
-	dout[i] = w * din[i];
+	dout[i] = sqrt(real*real + imag*imag) * scale;
 }
 
-/**
-	@brief Cosine-sum window (Hann, Hanning, and similar)
- */
-__kernel void CosineSumWindow(
-	__global const float* din,
+__kernel void NormalizeToLogMagnitude(
+	__global float* din,
 	__global float* dout,
-	unsigned long inlen,
-	float scale,					//2 * M_PI / inlen
-	float alpha0,					//0.5 for Hann, 25/46 for Hamming
-	float alpha1)					//1 - alpha0
-{
-	unsigned long i = get_global_id(0);
-	if(i >= inlen)
-	{
-		dout[i] = 0;
-		return;
-	}
-
-	float w = alpha0 - alpha1*cos(i*scale);
-	dout[i] = w * din[i];
-}
-
-/**
-	@brief Rectangular window (glorified memcpy)
- */
-__kernel void RectangularWindow(
-	__global const float* din,
-	__global float* dout,
-	unsigned long inlen)
+	float scale)
 {
 	unsigned long i = get_global_id(0);
 
-	if(i >= inlen)
-		dout[i] = 0;
-	else
-		dout[i] = din[i];
+	float real = din[i*2];
+	float imag = din[i*2 + 1];
+
+	float v = sqrt(real*real + imag*imag) * scale;
+
+	const float impedance = 50;
+	dout[i] = (10 * log10(v*v / impedance) + 30);
 }
