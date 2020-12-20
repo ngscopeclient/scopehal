@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* ANTIKERNEL v0.1                                                                                                      *
+* LIBSCOPEHAL v0.1                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
@@ -27,92 +27,82 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FFTFilter
+/*
+	All kernels in this file apply a window function, then zero-pad to a specified length.
+
+	Outlen must be >= inlen.
+
+	Most filters take several constant arguments which are precomputed host side.
  */
-#ifndef FFTFilter_h
-#define FFTFilter_h
 
-#include <ffts.h>
-
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
-class FFTFilter : public PeakDetectionFilter
+/**
+	@brief Blackman-Harris window
+ */
+__kernel void BlackmanHarrisWindow(
+	__global const float* din,
+	__global float* dout,
+	unsigned long inlen,
+	unsigned long outlen,
+	float scale)				//2 * M_PI / inlen
 {
-public:
-	FFTFilter(const std::string& color);
-	virtual ~FFTFilter();
-
-	virtual void Refresh();
-
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void SetVoltageRange(double range);
-	virtual void SetOffset(double offset);
-
-	enum WindowFunction
+	unsigned long i = get_global_id(0);
+	if(i >= inlen)
 	{
-		WINDOW_RECTANGULAR,
-		WINDOW_HANN,
-		WINDOW_HAMMING,
-		WINDOW_BLACKMAN_HARRIS
-	};
+		dout[i] = 0;
+		return;
+	}
 
-	//Window function helpers
-	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
-	static void HannWindow(const float* data, size_t len, float* out);
-	static void HammingWindow(const float* data, size_t len, float* out);
-	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
-	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
-	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
-	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
+	const float alpha0 = 0.35875;
+	const float alpha1 = 0.48829;
+	const float alpha2 = 0.14128;
+	const float alpha3 = 0.01168;
 
-	PROTOCOL_DECODER_INITPROC(FFTFilter)
+	float num = i * scale;
+	float w =
+		alpha0 -
+		alpha1 * cos(num) +
+		alpha2 * cos(2*num) -
+		alpha3 * cos(6*num);
 
-protected:
-	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+	dout[i] = w * din[i];
+}
 
-	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
+/**
+	@brief Cosine-sum window (Hann, Hanning, and similar)
+ */
+__kernel void CosineSumWindow(
+	__global const float* din,
+	__global float* dout,
+	unsigned long inlen,
+	unsigned long outlen,
+	float scale,					//2 * M_PI / inlen
+	float alpha0,					//0.5 for Hann, 25/46 for Hamming
+	float alpha1)					//1 - alpha0
+{
+	unsigned long i = get_global_id(0);
+	if(i >= inlen)
+	{
+		dout[i] = 0;
+		return;
+	}
 
-	void DoRefresh(
-		AnalogWaveform* din,
-		std::vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
-		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
+	float w = alpha0 - alpha1*cos(i*scale);
+	dout[i] = w * din[i];
+}
 
-	size_t m_cachedNumPoints;
-	size_t m_cachedNumPointsFFT;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
-	ffts_plan_t* m_plan;
+/**
+	@brief Rectangular window (glorified memcpy)
+ */
+__kernel void RectangularWindow(
+	__global const float* din,
+	__global float* dout,
+	unsigned long inlen,
+	unsigned long outlen)
+{
+	unsigned long i = get_global_id(0);
 
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-
-	#ifdef HAVE_CLFFT
-	clfftPlanHandle m_clfftPlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-	cl::Kernel* m_cosineSumWindowKernel;
-	cl::Kernel* m_blackmanHarrisWindowKernel;
-	#endif
-};
-
-#endif
+	if(i >= inlen)
+		dout[i] = 0;
+	else
+		dout[i] = din[i];
+}

@@ -62,12 +62,73 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_windowName].AddEnumValue("Hann", WINDOW_HANN);
 	m_parameters[m_windowName].AddEnumValue("Rectangular", WINDOW_RECTANGULAR);
 	m_parameters[m_windowName].SetIntVal(WINDOW_HAMMING);
+
+	#ifdef HAVE_CLFFT
+
+		m_windowProgram = NULL;
+		m_rectangularWindowKernel = NULL;
+		m_cosineSumWindowKernel = NULL;
+		m_blackmanHarrisWindowKernel = NULL;
+
+		try
+		{
+			//Compile window functions
+			string kernelSource = ReadFile("kernels/WindowFunctions.cl");
+			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
+			m_windowProgram = new cl::Program(*g_clContext, sources);
+			m_windowProgram->build(g_contextDevices);
+
+			//Extract each kernel
+			m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
+			m_cosineSumWindowKernel = new cl::Kernel(*m_windowProgram, "CosineSumWindow");
+			m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
+		}
+		catch(const cl::Error& e)
+		{
+			LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+
+			if(e.err() == CL_BUILD_PROGRAM_FAILURE)
+			{
+				LogError("Failed to build OpenCL program for FFT\n");
+
+				string log;
+				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+				LogDebug("Window program build log:\n");
+				LogDebug("%s\n", log.c_str());
+			}
+
+			delete m_windowProgram;
+			delete m_rectangularWindowKernel;
+			delete m_cosineSumWindowKernel;
+			delete m_blackmanHarrisWindowKernel;
+
+			m_windowProgram = NULL;
+			m_rectangularWindowKernel = NULL;
+			m_cosineSumWindowKernel = NULL;
+			m_blackmanHarrisWindowKernel = NULL;
+		}
+
+	#endif
 }
 
 FFTFilter::~FFTFilter()
 {
 	if(m_plan)
 		ffts_free(m_plan);
+
+
+	#ifdef HAVE_CLFFT
+		delete m_windowProgram;
+		delete m_rectangularWindowKernel;
+		delete m_cosineSumWindowKernel;
+		delete m_blackmanHarrisWindowKernel;
+
+		m_windowProgram = NULL;
+		m_rectangularWindowKernel = NULL;
+		m_cosineSumWindowKernel = NULL;
+		m_blackmanHarrisWindowKernel = NULL;
+
+	#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,35 +283,76 @@ void FFTFilter::Refresh()
 
 void FFTFilter::DoRefresh(
 	AnalogWaveform* din,
-	const vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
+	vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
 	double fs_per_sample,
 	size_t npoints,
 	size_t nouts,
 	bool log_output)
 {
-	//Copy the input with windowing, then zero pad to the desired input length
-	ApplyWindow(
-		(float*)&data[0],
-		m_cachedNumPoints,
-		&m_rdinbuf[0],
-		static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal()));
-	memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
-
 	float scale = 1.0 / npoints;
 
+	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
+
+	//Set up output and copy timestamps
+	auto cap = new AnalogWaveform;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+
+	//Calculate size of each bin
+	double sample_ghz = 1e6 / fs_per_sample;
+	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
+	cap->m_timescale = bin_hz;
+	LogTrace("bin_hz: %f\n", bin_hz);
+	cap->Resize(nouts);
+
 	#ifdef HAVE_CLFFT
-		if(g_clContext)
+		if(g_clContext && m_windowProgram)
 		{
 			try
 			{
-				//Make buffers for the waveforms
-				cl::Buffer realbuf(*g_clContext, m_rdinbuf.begin(), m_rdinbuf.end(), true, true, NULL);
+				//Make buffers
+				cl::Buffer inbuf(*g_clContext, data.begin(), data.end(), true, true, NULL);
+				cl::Buffer windowed(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
 				cl::Buffer outbuf(*g_clContext, m_rdoutbuf.begin(), m_rdoutbuf.end(), false, true, NULL);
 
-				//Run the FFT
+				//Apply the window function
 				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+				cl::Kernel* windowKernel = NULL;
+				float windowscale = 2 * M_PI / m_cachedNumPoints;
+				switch(window)
+				{
+					case WINDOW_RECTANGULAR:
+						windowKernel = m_rectangularWindowKernel;
+						break;
+
+					case WINDOW_HAMMING:
+						windowKernel = m_cosineSumWindowKernel;
+						windowKernel->setArg(5, 25.0f / 46.0f);
+						windowKernel->setArg(6, 1.0f - (25.0f / 46.0f));
+						break;
+
+					case WINDOW_HANN:
+						windowKernel = m_cosineSumWindowKernel;
+						windowKernel->setArg(5, 0.5);
+						windowKernel->setArg(6, 0.5);
+						break;
+
+					case WINDOW_BLACKMAN_HARRIS:
+					default:
+						windowKernel = m_blackmanHarrisWindowKernel;
+						break;
+				}
+				windowKernel->setArg(0, inbuf);
+				windowKernel->setArg(1, windowed);
+				windowKernel->setArg(2, m_cachedNumPoints);
+				windowKernel->setArg(3, npoints);
+				if(window != WINDOW_RECTANGULAR)
+					windowKernel->setArg(4, windowscale);
+				queue.enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
+
+				//Run the FFT
 				cl_command_queue q = queue();
-				cl_mem inbufs[1] = { realbuf() };
+				cl_mem inbufs[1] = { windowed() };
 				cl_mem outbufs[1] = { outbuf() };
 				if(CLFFT_SUCCESS != clfftEnqueueTransform(
 					m_clfftPlan, CLFFT_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
@@ -273,26 +375,22 @@ void FFTFilter::DoRefresh(
 		{
 	#endif
 
-	//Calculate the FFT
-	ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
+		//Copy the input with windowing, then zero pad to the desired input length
+		ApplyWindow(
+			(float*)&data[0],
+			m_cachedNumPoints,
+			&m_rdinbuf[0],
+			window);
+		memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+
+		//Calculate the FFT
+		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
 
 	#ifdef HAVE_CLFFT
 		}
 	#endif
 
-	//Set up output and copy timestamps
-	auto cap = new AnalogWaveform;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-
-	//Calculate size of each bin
-	double sample_ghz = 1e6 / fs_per_sample;
-	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-	cap->m_timescale = bin_hz;
-	LogTrace("bin_hz: %f\n", bin_hz);
-
 	//Normalize magnitudes
-	cap->Resize(nouts);
 	if(log_output)
 	{
 		if(g_hasAvx2)
@@ -571,7 +669,6 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 	}
 }
 
-//TODO: vectorization
 void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
 {
 	float alpha1 = 1 - alpha0;
