@@ -289,21 +289,37 @@ void FFTFilter::DoRefresh(
 	size_t nouts,
 	bool log_output)
 {
+	//Look up some parameters
 	float scale = 1.0 / npoints;
-
-	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
-
-	//Set up output and copy timestamps
-	auto cap = new AnalogWaveform;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-
-	//Calculate size of each bin
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-	cap->m_timescale = bin_hz;
+	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	LogTrace("bin_hz: %f\n", bin_hz);
+
+	//Set up output and copy time scales / configuration
+	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	if(cap == NULL)
+	{
+		cap = new AnalogWaveform;
+		SetData(cap, 0);
+	}
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
+	cap->m_timescale = bin_hz;
+	cap->m_densePacked = true;
+
+	//Update output timestamps if capture depth grew
+	size_t oldlen = cap->m_offsets.size();
 	cap->Resize(nouts);
+	if(nouts > oldlen)
+	{
+		for(size_t i = oldlen; i < nouts; i++)
+		{
+			cap->m_offsets[i] = i;
+			cap->m_durations[i] = 1;
+		}
+	}
 
 	#ifdef HAVE_CLFFT
 		if(g_clContext && m_windowProgram)
@@ -408,9 +424,6 @@ void FFTFilter::DoRefresh(
 
 	//Peak search
 	FindPeaks(cap);
-
-	//Done
-	SetData(cap, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,9 +439,6 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
 	scale *= 2;
 	for(size_t i=0; i<nouts; i++)
 	{
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
-
 		float real = m_rdoutbuf[i*2];
 		float imag = m_rdoutbuf[i*2 + 1];
 
@@ -447,9 +457,6 @@ void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float s
 	scale *= 2;
 	for(size_t i=0; i<nouts; i++)
 	{
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
-
 		float real = m_rdoutbuf[i*2];
 		float imag = m_rdoutbuf[i*2 + 1];
 
@@ -463,18 +470,7 @@ void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float s
 __attribute__((target("avx2")))
 void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale)
 {
-	int64_t* offs = (int64_t*)&cap->m_offsets[0];
-	int64_t* durs = (int64_t*)&cap->m_durations[0];
-
 	size_t end = nouts - (nouts % 8);
-
-	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
-	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
-	int64_t __attribute__ ((aligned(32))) count_x4[] = {0, 1, 2, 3};
-
-	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
-	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	//double since we only look at positive half
 	float norm = 2.0f * scale;
@@ -498,16 +494,6 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 	//Vectorized processing (8 samples per iteration)
 	for(size_t k=0; k<end; k += 8)
 	{
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-
 		//Read interleaved real/imaginary FFT output (riririri riririri)
 		__m256 din0 = _mm256_load_ps(pin + k*2);
 		__m256 din1 = _mm256_load_ps(pin + k*2 + 8);
@@ -552,9 +538,6 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 	//Get any extras we didn't get in the SIMD loop
 	for(size_t k=end; k<nouts; k++)
 	{
-		cap->m_offsets[k] = k;
-		cap->m_durations[k] = 1;
-
 		float real = m_rdoutbuf[k*2];
 		float imag = m_rdoutbuf[k*2 + 1];
 
@@ -571,18 +554,7 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 __attribute__((target("avx2")))
 void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale)
 {
-	int64_t* offs = (int64_t*)&cap->m_offsets[0];
-	int64_t* durs = (int64_t*)&cap->m_durations[0];
-
 	size_t end = nouts - (nouts % 8);
-
-	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
-	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
-	int64_t __attribute__ ((aligned(32))) count_x4[] = {0, 1, 2, 3};
-
-	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
-	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	//double since we only look at positive half
 	float norm = 2.0f * scale;
@@ -594,16 +566,6 @@ void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, flo
 	//Vectorized processing (8 samples per iteration)
 	for(size_t k=0; k<end; k += 8)
 	{
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-
 		//Read interleaved real/imaginary FFT output (riririri riririri)
 		__m256 din0 = _mm256_load_ps(pin + k*2);
 		__m256 din1 = _mm256_load_ps(pin + k*2 + 8);
@@ -634,9 +596,6 @@ void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, flo
 	//Get any extras we didn't get in the SIMD loop
 	for(size_t k=end; k<nouts; k++)
 	{
-		cap->m_offsets[k] = k;
-		cap->m_durations[k] = 1;
-
 		float real = m_rdoutbuf[k*2];
 		float imag = m_rdoutbuf[k*2 + 1];
 
