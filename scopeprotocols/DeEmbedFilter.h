@@ -101,6 +101,9 @@ protected:
 	#ifdef HAVE_CLFFT
 	clfftPlanHandle m_clfftForwardPlan;
 	clfftPlanHandle m_clfftReversePlan;
+
+	cl::Program* m_windowProgram;
+	cl::Kernel* m_rectangularWindowKernel;
 	#endif
 };
 

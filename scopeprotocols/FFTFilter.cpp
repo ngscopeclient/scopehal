@@ -243,25 +243,28 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 
 		#ifdef HAVE_CLFFT
 
-			//Set up the FFT object
-			if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
+			if(g_clContext)
 			{
-				LogError("clfftCreateDefaultPlan failed\n");
-				abort();
-			}
-			clfftSetPlanBatchSize(m_clfftPlan, 1);
-			clfftSetPlanPrecision(m_clfftPlan, CLFFT_SINGLE);
-			clfftSetLayout(m_clfftPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
-			clfftSetResultLocation(m_clfftPlan, CLFFT_OUTOFPLACE);
+				//Set up the FFT object
+				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
+				{
+					LogError("clfftCreateDefaultPlan failed\n");
+					abort();
+				}
+				clfftSetPlanBatchSize(m_clfftPlan, 1);
+				clfftSetPlanPrecision(m_clfftPlan, CLFFT_SINGLE);
+				clfftSetLayout(m_clfftPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
+				clfftSetResultLocation(m_clfftPlan, CLFFT_OUTOFPLACE);
 
-			//Initialize the plan
-			cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-			cl_command_queue q = queue();
-			auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
-			if(CLFFT_SUCCESS != err)
-			{
-				LogError("clfftBakePlan failed (%d)\n", err);
-				abort();
+				//Initialize the plan
+				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+				cl_command_queue q = queue();
+				auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
+				if(CLFFT_SUCCESS != err)
+				{
+					LogError("clfftBakePlan failed (%d)\n", err);
+					abort();
+				}
 			}
 
 		#endif
