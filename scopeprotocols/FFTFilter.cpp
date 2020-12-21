@@ -142,7 +142,6 @@ FFTFilter::~FFTFilter()
 	if(m_plan)
 		ffts_free(m_plan);
 
-
 	#ifdef HAVE_CLFFT
 		delete m_windowProgram;
 		delete m_rectangularWindowKernel;

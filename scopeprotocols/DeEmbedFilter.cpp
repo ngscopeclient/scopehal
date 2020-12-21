@@ -62,17 +62,29 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	#ifdef HAVE_CLFFT
 
 		m_windowProgram = NULL;
+		m_deembedProgram = NULL;
+		m_rectangularWindowKernel = NULL;
+		m_deembedKernel = NULL;
+
+		m_sinbuf = NULL;
+		m_cosbuf = NULL;
+		m_fftoutbuf = NULL;
+		m_windowbuf = NULL;
 
 		try
 		{
-			//Compile window functions
+			//Load window function kernel
 			string kernelSource = ReadFile("kernels/WindowFunctions.cl");
 			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
 			m_windowProgram = new cl::Program(*g_clContext, sources);
 			m_windowProgram->build(g_contextDevices);
-
-			//Extract each kernel
 			m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
+
+			kernelSource = ReadFile("kernels/DeEmbedFilter.cl");
+			cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
+			m_deembedProgram = new cl::Program(*g_clContext, sources2);
+			m_deembedProgram->build(g_contextDevices);
+			m_deembedKernel = new cl::Kernel(*m_deembedProgram, "DeEmbed");
 		}
 		catch(const cl::Error& e)
 		{
@@ -86,13 +98,22 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
 				LogDebug("Window program build log:\n");
 				LogDebug("%s\n", log.c_str());
+
+				m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+				LogDebug("De-embed program build log:\n");
+				LogDebug("%s\n", log.c_str());
 			}
 
 			delete m_windowProgram;
 			delete m_rectangularWindowKernel;
 
+			delete m_deembedProgram;
+			delete m_deembedKernel;
+
 			m_windowProgram = NULL;
+			m_deembedProgram = NULL;
 			m_rectangularWindowKernel = NULL;
+			m_deembedKernel = NULL;
 		}
 
 	#endif
@@ -100,6 +121,31 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 DeEmbedFilter::~DeEmbedFilter()
 {
+#ifdef HAVE_CLFFT
+	delete m_windowProgram;
+	delete m_rectangularWindowKernel;
+
+	delete m_deembedProgram;
+	delete m_deembedKernel;
+
+	delete m_sinbuf;
+	delete m_cosbuf;
+
+	delete m_fftoutbuf;
+	delete m_windowbuf;
+
+	m_windowProgram = NULL;
+	m_deembedProgram = NULL;
+	m_rectangularWindowKernel = NULL;
+	m_deembedKernel = NULL;
+
+	m_sinbuf = NULL;
+	m_cosbuf = NULL;
+
+	m_fftoutbuf = NULL;
+	m_windowbuf = NULL;
+#endif
+
 	if(m_forwardPlan)
 		ffts_free(m_forwardPlan);
 	if(m_reversePlan)
@@ -216,7 +262,6 @@ bool DeEmbedFilter::LoadSparameters()
 		m_cachedBinSize = 0;
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
-		m_resampledSparamAmplitudes.clear();
 	}
 
 	//Don't die if the file couldn't be loaded
@@ -243,8 +288,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		SetData(NULL, 0);
 		return;
 	}
-
-	double start = GetTime();
 
 	auto din = GetAnalogInputWaveform(0);
 	const size_t npoints_raw = din->m_samples.size();
@@ -319,6 +362,12 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					LogError("clfftBakePlan failed (%d)\n", err);
 					abort();
 				}
+
+				//Allocate buffers
+				delete m_windowbuf;
+				delete m_fftoutbuf;
+				m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
+				m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
 			}
 
 		#endif
@@ -335,33 +384,40 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	{
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
-		m_resampledSparamAmplitudes.clear();
 		InterpolateSparameters(bin_hz, invert, nouts);
+
+		#ifdef HAVE_CLFFT
+			delete m_sinbuf;
+			delete m_cosbuf;
+
+			m_sinbuf = new cl::Buffer(
+				*g_clContext, m_resampledSparamSines.begin(), m_resampledSparamSines.end(), true, true, NULL);
+			m_cosbuf = new cl::Buffer(
+				*g_clContext, m_resampledSparamCosines.begin(), m_resampledSparamCosines.end(), true, true, NULL);
+		#endif
 	}
 
 	#ifdef HAVE_CLFFT
-		if(g_clContext && m_windowProgram)
+		if(g_clContext && m_windowProgram && m_deembedProgram)
 		{
 			try
 			{
 				//Set up buffers
 				cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
-				cl::Buffer windowoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-				cl::Buffer fftoutbuf(*g_clContext, m_forwardOutBuf.begin(), m_forwardOutBuf.end(), false, true, NULL);
 				cl::Buffer ifftoutbuf(*g_clContext, m_reverseOutBuf.begin(), m_reverseOutBuf.end(), false, true, NULL);
 
 				//Copy and zero pad input
 				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
 				m_rectangularWindowKernel->setArg(0, inbuf);
-				m_rectangularWindowKernel->setArg(1, windowoutbuf);
+				m_rectangularWindowKernel->setArg(1, *m_windowbuf);
 				m_rectangularWindowKernel->setArg(2, m_cachedNumPoints);
 				queue.enqueueNDRangeKernel(
 					*m_rectangularWindowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
 
 				//Do the FFT
 				cl_command_queue q = queue();
-				cl_mem inbufs[1] = { windowoutbuf() };
-				cl_mem outbufs[1] = { fftoutbuf() };
+				cl_mem inbufs[1] = { (*m_windowbuf)() };
+				cl_mem outbufs[1] = { (*m_fftoutbuf)() };
 				if(CLFFT_SUCCESS != clfftEnqueueTransform(
 					m_clfftForwardPlan, CLFFT_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
 				{
@@ -369,22 +425,15 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					abort();
 				}
 
-				//Sync FFT output, then re-map for writing
-				void* ptr = queue.enqueueMapBuffer(fftoutbuf, true, CL_MAP_READ, 0, 2 * nouts * sizeof(float));
-				queue.enqueueUnmapMemObject(fftoutbuf, ptr);
-				ptr = queue.enqueueMapBuffer(fftoutbuf, true, CL_MAP_WRITE, 0, 2 * nouts * sizeof(float));
-
-				//Do the de-embed loop
-				if(g_hasAvx2)
-					MainLoopAVX2(nouts);
-				else
-					MainLoop(nouts);
-
-				//Unmap so the GPU sees the updates
-				queue.enqueueUnmapMemObject(fftoutbuf, ptr);
+				//Do the de-embed
+				m_deembedKernel->setArg(0, *m_fftoutbuf);
+				m_deembedKernel->setArg(1, *m_sinbuf);
+				m_deembedKernel->setArg(2, *m_cosbuf);
+				queue.enqueueNDRangeKernel(
+					*m_deembedKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
 
 				//Do the inverse FFT
-				inbufs[0] = fftoutbuf();
+				inbufs[0] = (*m_fftoutbuf)();
 				outbufs[0] = ifftoutbuf();
 				if(CLFFT_SUCCESS != clfftEnqueueTransform(
 					m_clfftReversePlan, CLFFT_BACKWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
@@ -394,7 +443,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 				}
 
 				//Sync IFFT output
-				ptr = queue.enqueueMapBuffer(ifftoutbuf, true, CL_MAP_READ, 0, npoints * sizeof(float));
+				void* ptr = queue.enqueueMapBuffer(ifftoutbuf, true, CL_MAP_READ, 0, npoints * sizeof(float));
 				queue.enqueueUnmapMemObject(ifftoutbuf, ptr);
 			}
 			catch(const cl::Error& e)
@@ -471,13 +520,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = -( (m_max - m_min)/2 + m_min );
-
-	double dt = GetTime() - start;
-	static double ttotal = 0;
-	static size_t ntotal = 0;
-	ntotal ++;
-	ttotal += dt;
-	LogDebug("DeEmbedFilter: %f ms\n", ttotal * 1000 / ntotal);
 }
 
 int64_t DeEmbedFilter::GetGroupDelay()
@@ -505,21 +547,19 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 		//De-embedding
 		if(invert)
 		{
-			m_resampledSparamSines.push_back(sin(-point.m_phase));
-			m_resampledSparamCosines.push_back(cos(-point.m_phase));
+			float amp = 0;
+			if(fabs(point.m_amplitude) > FLT_EPSILON)
+				amp = 1.0f / point.m_amplitude;
 
-			if(fabs(point.m_amplitude) < FLT_EPSILON)
-				m_resampledSparamAmplitudes.push_back(0);
-			else
-				m_resampledSparamAmplitudes.push_back(1.0f / point.m_amplitude);
+			m_resampledSparamSines.push_back(sin(-point.m_phase) * amp);
+			m_resampledSparamCosines.push_back(cos(-point.m_phase) * amp);
 		}
 
 		//Channel emulation
 		else
 		{
-			m_resampledSparamSines.push_back(sin(point.m_phase));
-			m_resampledSparamCosines.push_back(cos(point.m_phase));
-			m_resampledSparamAmplitudes.push_back(point.m_amplitude);
+			m_resampledSparamSines.push_back(sin(point.m_phase) * point.m_amplitude);
+			m_resampledSparamCosines.push_back(cos(point.m_phase) * point.m_amplitude);
 		}
 	}
 }
@@ -528,7 +568,6 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 {
 	for(size_t i=0; i<nouts; i++)
 	{
-		float amplitude = m_resampledSparamAmplitudes[i];
 		float cosval = m_resampledSparamSines[i];
 		float sinval = m_resampledSparamCosines[i];
 
@@ -536,13 +575,9 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 		float real_orig = m_forwardOutBuf[i*2 + 0];
 		float imag_orig = m_forwardOutBuf[i*2 + 1];
 
-		//Phase correction
-		float real = real_orig*cosval - imag_orig*sinval;
-		float imag = real_orig*sinval + imag_orig*cosval;
-
 		//Amplitude correction
-		m_forwardOutBuf[i*2 + 0] = real * amplitude;
-		m_forwardOutBuf[i*2 + 1] = imag * amplitude;
+		m_forwardOutBuf[i*2 + 0] = real_orig*cosval - imag_orig*sinval;
+		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
 	}
 }
 
@@ -555,8 +590,7 @@ void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 	for(size_t i=0; i<end; i += 8)
 	{
 		//Load S-parameters
-		//Precompute sin/cos since there's no AVX instruction to do this
-		__m256 amplitude = _mm256_load_ps(&m_resampledSparamAmplitudes[i]);
+		//Precomputed sin/cos vector scaled by amplitude already
 		__m256 sinval = _mm256_load_ps(&m_resampledSparamSines[i]);
 		__m256 cosval = _mm256_load_ps(&m_resampledSparamCosines[i]);
 
@@ -589,10 +623,6 @@ void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 		real = _mm256_sub_ps(real_cos, imag_sin);
 		imag = _mm256_add_ps(real_sin, imag_cos);
 
-		//Amplitude correction
-		real = _mm256_mul_ps(real, amplitude);
-		imag = _mm256_mul_ps(imag, amplitude);
-
 		//Math is done, now we need to shuffle them back
 		//Shuffle 128-bit values to get rrrriiii rrrriiii.
 		block0 = _mm256_permute2x128_si256(_mm256_castps_si256(real), _mm256_castps_si256(imag), 0x20);
@@ -614,20 +644,14 @@ void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 	//Do any leftovers
 	for(size_t i=end; i<nouts; i++)
 	{
-		float amplitude = m_resampledSparamAmplitudes[i];
+		//Fetch inputs
 		float cosval = m_resampledSparamCosines[i];
 		float sinval = m_resampledSparamSines[i];
-
-		//Uncorrected complex value
 		float real_orig = m_forwardOutBuf[i*2 + 0];
 		float imag_orig = m_forwardOutBuf[i*2 + 1];
 
-		//Phase correction
-		float real = real_orig*cosval - imag_orig*sinval;
-		float imag = real_orig*sinval + imag_orig*cosval;
-
-		//Amplitude correction
-		m_forwardOutBuf[i*2 + 0] = real * amplitude;
-		m_forwardOutBuf[i*2 + 1] = imag * amplitude;
+		//Do the actual phase correction
+		m_forwardOutBuf[i*2 + 0] = real_orig*cosval - imag_orig*sinval;
+		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
 	}
 }

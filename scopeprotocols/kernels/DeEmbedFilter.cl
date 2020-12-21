@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* ANTIKERNEL v0.1                                                                                                      *
+* LIBSCOPEHAL v0.1                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
@@ -28,90 +28,22 @@
 ***********************************************************************************************************************/
 
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DeEmbedFilter
+	@brief S-parameter de-embedding (in place)
  */
-#ifndef DeEmbedFilter_h
-#define DeEmbedFilter_h
-
-#include "../scopehal/AlignedAllocator.h"
-#include <ffts.h>
-
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
-class DeEmbedFilter : public Filter
+__kernel void DeEmbed(
+	__global float* data,
+	const __global float* sines,
+	const __global float* cosines
+	)
 {
-public:
-	DeEmbedFilter(const std::string& color);
-	virtual ~DeEmbedFilter();
+	unsigned long i = get_global_id(0);
 
-	virtual void Refresh();
+	float real = data[i*2];
+	float imag = data[i*2 + 1];
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+	float sinval = sines[i];
+	float cosval = cosines[i];
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void ClearSweeps();
-
-	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
-
-protected:
-	virtual int64_t GetGroupDelay();
-	void DoRefresh(bool invert = true);
-	virtual bool LoadSparameters();
-	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
-
-	std::string m_fname;
-
-	std::vector<std::string> m_cachedFileNames;
-
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
-
-	double m_cachedBinSize;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
-
-	SParameters m_sparams;
-
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
-	size_t m_cachedNumPoints;
-	size_t m_cachedRawSize;
-
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
-
-	void MainLoop(size_t nouts);
-	void MainLoopAVX2(size_t nouts);
-
-	#ifdef HAVE_CLFFT
-	clfftPlanHandle m_clfftForwardPlan;
-	clfftPlanHandle m_clfftReversePlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-
-	cl::Program* m_deembedProgram;
-	cl::Kernel* m_deembedKernel;
-
-	cl::Buffer* m_sinbuf;
-	cl::Buffer* m_cosbuf;
-	cl::Buffer* m_windowbuf;
-	cl::Buffer* m_fftoutbuf;
-	#endif
-};
-
-#endif
+	data[i*2 + 0] = real*cosval - imag*sinval;
+	data[i*2 + 1] = real*sinval + imag*cosval;
+}
