@@ -120,8 +120,27 @@ void USB2PMADecoder::Refresh()
 	//Figure out our speed so we know what's going on
 	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
 
-	//Figure out the line state for each input (no clock recovery yet)
+	//Set appropriate thresholds for different speeds
 	auto threshold = (speed == SPEED_HIGH) ? 0.2 : 0.4;
+	int64_t transition_time;
+	switch(speed)
+	{
+	case SPEED_HIGH:
+		// 1 UI width
+		transition_time = 2083000;
+		break;
+	case SPEED_FULL:
+		// TFST = 14ns (Section 7.1.4.1)
+		transition_time = 14000000;
+		break;
+	case SPEED_LOW:
+		// TLST = 210ns (Section 7.1.4.1)
+		transition_time = 210000000;
+		break;
+	}
+
+
+	//Figure out the line state for each input (no clock recovery yet)
 	auto cap = new USB2PMAWaveform;
 	for(size_t i=0; i<len; i++)
 	{
@@ -174,7 +193,7 @@ void USB2PMADecoder::Refresh()
 		int64_t last_fs = cap->m_durations[iold] * din_p->m_timescale;
 		if(
 			( (oldtype == USB2PMASymbol::TYPE_SE0) || (oldtype == USB2PMASymbol::TYPE_SE1) ) &&
-			(last_fs < 100000000))
+			(last_fs < transition_time))
 		{
 			cap->m_samples[iold].m_type = type;
 			cap->m_durations[iold] += din_p->m_durations[i];
