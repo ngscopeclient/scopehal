@@ -32,6 +32,7 @@
 
 #include "EdgeTrigger.h"
 #include "PulseWidthTrigger.h"
+#include "NthEdgeBurstTrigger.h"
 
 class AgilentOscilloscope : public SCPIOscilloscope
 {
@@ -112,16 +113,20 @@ protected:
 	bool m_triggerOneShot;
 
 	void PullEdgeTrigger();
+	void PullNthEdgeBurstTrigger();
 	void PullPulseWidthTrigger();
 
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
+	void GetTriggerSlope(NthEdgeBurstTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
+	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
 	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
 	void PushCondition(std::string path, Trigger::Condition cond);
 	void PushFloat(std::string path, float f);
 	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
+	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
 
 public:
 	static std::string GetDriverNameInternal();
