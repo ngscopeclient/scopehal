@@ -100,6 +100,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 
 		//Request all points when we download
 		m_transport->SendCommand(":WAV:POIN:MODE RAW");
+		m_transport->SendCommand(":WAV:POIN 4000000");
 	}
 	m_analogChannelCount = nchans;
 
