@@ -556,6 +556,24 @@ string to_string_sci(double d)
 }
 
 /**
+	@brief Like std::to_string, but output in hex
+ */
+string to_string_hex(uint64_t n, bool zeropad, int len)
+{
+	char format[32];
+	if(zeropad)
+		snprintf(format, sizeof(format), "%%0%dlx", len);
+	else if(len > 0)
+		snprintf(format, sizeof(format), "%%%dlx", len);
+	else
+		snprintf(format, sizeof(format), "%%lx");
+
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), format, n);
+	return tmp;
+}
+
+/**
 	@brief Rounds a 64-bit integer up to the next power of 2
  */
 uint64_t next_pow2(uint64_t v)
