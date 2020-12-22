@@ -424,6 +424,9 @@ void USB2PacketDecoder::FindPackets(USB2PacketWaveform* cap)
 	ClearPackets();
 
 	//Stop when we have no chance of fitting a full packet
+	if(cap->m_samples.size() < 2)
+		return;
+
 	for(size_t i=0; i<cap->m_samples.size() - 2;)
 	{
 		//Every packet should start with a PID. Discard unknown garbage.
