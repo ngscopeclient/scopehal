@@ -381,11 +381,23 @@ void SPIFlashDecoder::Refresh()
 							break;
 
 						//Read the IDCODE
+						//Winbond W25N has a dummy cycle before the reply, standard flash does not
 						case 0x9f:
 							current_cmd = SPIFlashSymbol::CMD_READ_JEDEC_ID;
-							state = STATE_DUMMY_BEFORE_DATA;
-							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
 
+							switch(flashtype)
+							{
+								case FLASH_TYPE_WINBOND_W25N:
+									state = STATE_DUMMY_BEFORE_DATA;
+									break;
+
+								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								default:
+									state = STATE_READ_DATA;
+									break;
+							}
+
+							data_type = SPIFlashSymbol::TYPE_VENDOR_ID;
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 							break;
 
@@ -1103,6 +1115,8 @@ string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s
 					return "W25Q32xx";
 				case 0x6018:
 					return "W25Q128xx (QPI mode)";
+				case 0x7018:
+					return "W25Q128JV-DTR";
 
 				//QSPI NAND
 				case 0xaa21:
