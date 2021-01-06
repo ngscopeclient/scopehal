@@ -348,6 +348,16 @@ void SPIFlashDecoder::Refresh()
 
 						//0x3b 1-1-2 fast read
 
+						//Read SFDP
+						case 0x5a:
+							current_cmd = SPIFlashSymbol::CMD_READ_SFDP;
+							state = STATE_ADDRESS;
+							addr = 0;
+							addr_start = din->m_offsets[iin+1];
+							address_bytes_left = 3;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+							break;
+
 						//1-1-4 fast read
 						case 0x6b:
 							current_cmd = SPIFlashSymbol::CMD_READ_1_1_4;
@@ -653,6 +663,10 @@ void SPIFlashDecoder::Refresh()
 								state = STATE_QUAD_DATA;
 								break;
 
+							//Reading SFDP
+							case SPIFlashSymbol::CMD_READ_SFDP:
+								state = STATE_DUMMY_BEFORE_DATA;
+
 							default:
 								break;
 						}
@@ -894,6 +908,8 @@ string SPIFlashDecoder::GetText(int i)
 				{
 					case SPIFlashSymbol::CMD_READ:
 						return "Read";
+					case SPIFlashSymbol::CMD_READ_SFDP:
+						return "Read SFDP";
 					case SPIFlashSymbol::CMD_FAST_READ:
 						return "Read Fast";
 					case SPIFlashSymbol::CMD_READ_1_1_4:

@@ -78,6 +78,7 @@ public:
 		CMD_BLOCK_ERASE,
 		CMD_PAGE_PROGRAM,
 		CMD_QUAD_PAGE_PROGRAM,
+		CMD_READ_SFDP,		//read serial flash discovery parameters
 
 		//Winbond W25N specific
 		CMD_W25N_READ_PAGE,
