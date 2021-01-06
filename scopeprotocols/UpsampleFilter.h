@@ -45,6 +45,9 @@ public:
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
 
+	virtual double GetOffset();
+	virtual double GetVoltageRange();
+
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 

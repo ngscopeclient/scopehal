@@ -115,6 +115,24 @@ bool UpsampleFilter::NeedsConfig()
 	return true;
 }
 
+double UpsampleFilter::GetOffset()
+{
+	auto chan = m_inputs[0].m_channel;
+	if(chan == NULL)
+		return 0;
+	else
+		return chan->GetOffset();
+}
+
+double UpsampleFilter::GetVoltageRange()
+{
+	auto chan = m_inputs[0].m_channel;
+	if(chan == NULL)
+		return 0;
+	else
+		return chan->GetVoltageRange();
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
