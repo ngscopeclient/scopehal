@@ -112,6 +112,7 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 	uint64_t m_srate;
+	uint64_t m_mdepth;
 
 	/*
 
@@ -121,7 +122,6 @@ protected:
 	std::map<size_t, unsigned int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_mdepthValid;
-	uint64_t m_mdepth;
 	int64_t m_triggerOffset;
 	bool m_triggerOffsetValid;
 

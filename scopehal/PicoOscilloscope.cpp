@@ -108,8 +108,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		SetChannelVoltageRange(i, 5);
 	}
 
-	//Set initial sample rate
+	//Set initial memory configuration
 	SetSampleRate(1250000000L);
+	SetSampleDepth(1000000);
 
 	//Add the external trigger input
 	m_extTrigChannel =
@@ -436,17 +437,29 @@ set<Oscilloscope::InterleaveConflict> PicoOscilloscope::GetInterleaveConflicts()
 
 vector<uint64_t> PicoOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
-/*	if(m_protocol == MSO5)
-		ret = {
-			1000,
-			10 * 1000,
-			100 * 1000,
-			1000 * 1000,
-			10 * 1000 * 1000,
-			25 * 1000 * 1000,
-		};*/
+
+	string depths;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand("DEPTHS?");
+		depths = m_transport->ReadReply();
+	}
+
+	size_t i=0;
+	while(true)
+	{
+		size_t istart = i;
+		i = depths.find(',', i+1);
+		if(i == string::npos)
+			break;
+
+		ret.push_back(stol(depths.substr(istart, i-istart)));
+
+		//skip the comma
+		i++;
+	}
+
 	return ret;
 }
 
@@ -464,74 +477,14 @@ uint64_t PicoOscilloscope::GetSampleRate()
 
 uint64_t PicoOscilloscope::GetSampleDepth()
 {
-	/*
-	if(m_mdepthValid)
-		return m_mdepth;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand(":ACQ:MDEP?");
-	string ret = m_transport->ReadReply();
-
-	double depth;
-	sscanf(ret.c_str(), "%lf", &depth);
-	m_mdepth = (uint64_t)depth;
-	m_mdepthValid = true;
 	return m_mdepth;
-	*/
-	return 1;
 }
 
 void PicoOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if(m_protocol == MSO5)
-	{
-		switch(depth)
-		{
-			case 1000:
-				m_transport->SendCommand("ACQ:MDEP 1k");
-				break;
-			case 10000:
-				m_transport->SendCommand("ACQ:MDEP 10k");
-				break;
-			case 100000:
-				m_transport->SendCommand("ACQ:MDEP 100k");
-				break;
-			case 1000000:
-				m_transport->SendCommand("ACQ:MDEP 1M");
-				break;
-			case 10000000:
-				m_transport->SendCommand("ACQ:MDEP 10M");
-				break;
-			case 25000000:
-				m_transport->SendCommand("ACQ:MDEP 25M");
-				break;
-			case 50000000:
-				if(m_opt200M)
-					m_transport->SendCommand("ACQ:MDEP 50M");
-				else
-					LogError("Invalid memory depth for channel: %lu\n", depth);
-				break;
-			case 100000000:
-				//m_transport->SendCommand("ACQ:MDEP 100M");
-				LogError("Invalid memory depth for channel: %lu\n", depth);
-				break;
-			case 200000000:
-				//m_transport->SendCommand("ACQ:MDEP 200M");
-				LogError("Invalid memory depth for channel: %lu\n", depth);
-				break;
-			default:
-				LogError("Invalid memory depth for channel: %lu\n", depth);
-		}
-	}
-	else
-	{
-		LogError("Memory depth setting not implemented for this series");
-	}
-	m_mdepthValid = false;
-	*/
+	m_transport->SendCommand(string("DEPTH ") + to_string(depth));
+	m_mdepth = depth;
 }
 
 void PicoOscilloscope::SetSampleRate(uint64_t rate)
