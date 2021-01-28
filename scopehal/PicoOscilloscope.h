@@ -110,6 +110,8 @@ protected:
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
 	bool m_triggerArmed;
+	bool m_triggerOneShot;
+	uint64_t m_srate;
 
 	/*
 
@@ -118,8 +120,6 @@ protected:
 	std::map<size_t, double> m_channelAttenuations;
 	std::map<size_t, unsigned int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
-	bool m_srateValid;
-	uint64_t m_srate;
 	bool m_mdepthValid;
 	uint64_t m_mdepth;
 	int64_t m_triggerOffset;

@@ -108,6 +108,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		SetChannelVoltageRange(i, 5);
 	}
 
+	//Set initial sample rate
+	SetSampleRate(1250000000L);
+
 	//Add the external trigger input
 	m_extTrigChannel =
 		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
@@ -289,16 +292,16 @@ Oscilloscope::TriggerMode PicoOscilloscope::PollTrigger()
 
 bool PicoOscilloscope::AcquireData()
 {
-	LogDebug("Acquiring data\n");
-	LogIndenter li;
-
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
 	if(!m_dataSocket->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
 		return false;
 
-	//TODO: Figure out timebase config
-	int64_t fs_per_sample = 800000;
+	//Get the sample interval.
+	//May be different from m_srate if we changed the rate after the trigger was armed
+	int64_t fs_per_sample;
+	if(!m_dataSocket->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+		return false;
 
 	//Acquire data for each channel
 	size_t chnum;
@@ -322,7 +325,6 @@ bool PicoOscilloscope::AcquireData()
 		if(!m_dataSocket->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
 			return false;
 
-		auto range = GetChannelVoltageRange(chnum);
 		auto offset = GetChannelOffset(chnum);
 
 		//Create our waveform
@@ -352,27 +354,10 @@ bool PicoOscilloscope::AcquireData()
 	m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();
 
-	/*
-	//Re-arm the trigger if not in one-shot mode
-	if(!m_triggerOneShot)
-	{
-		if (m_protocol == DS_OLD)
-		{
-			m_transport->SendCommand(":STOP");
-			m_transport->SendCommand(":TRIG:EDGE:SWE SING");
-			m_transport->SendCommand(":RUN");
-		}
-		else
-		{
-			m_transport->SendCommand(":SING");
-			m_transport->SendCommand("*WAI");
-		}
-		m_triggerArmed = true;
-	}
-	*/
+	//If this was a one-shot trigger we're no longer armed
+	if(m_triggerOneShot)
+		m_triggerArmed = false;
 
-	//Temporary
-	//Start();
 	return true;
 }
 
@@ -381,26 +366,15 @@ void PicoOscilloscope::Start()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("START");
 	m_triggerArmed = true;
-	//m_triggerOneShot = false;
+	m_triggerOneShot = false;
 }
 
 void PicoOscilloscope::StartSingleTrigger()
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if (m_protocol == DS_OLD)
-	{
-		m_transport->SendCommand(":TRIG:EDGE:SWE SING");
-		m_transport->SendCommand(":RUN");
-	}
-	else
-	{
-		m_transport->SendCommand(":SING");
-		m_transport->SendCommand("*WAI");
-	}
+	m_transport->SendCommand("SINGLE");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
-	*/
 }
 
 void PicoOscilloscope::Stop()
@@ -408,16 +382,11 @@ void PicoOscilloscope::Stop()
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("STOP");
 	m_triggerArmed = false;
-
-	//m_triggerOneShot = true;
 }
 
 bool PicoOscilloscope::IsTriggerArmed()
 {
-	/*
 	return m_triggerArmed;
-	*/
-	return true;
 }
 
 vector<uint64_t> PicoOscilloscope::GetSampleRatesNonInterleaved()
@@ -490,21 +459,7 @@ vector<uint64_t> PicoOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t PicoOscilloscope::GetSampleRate()
 {
-	/*
-	if(m_srateValid)
-		return m_srate;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand(":ACQ:SRAT?");
-	string ret = m_transport->ReadReply();
-
-	uint64_t rate;
-	sscanf(ret.c_str(), "%lu", &rate);
-	m_srate = rate;
-	m_srateValid = true;
-	return rate;
-	*/return 1;
+	return m_srate;
 }
 
 uint64_t PicoOscilloscope::GetSampleDepth()
@@ -581,17 +536,10 @@ void PicoOscilloscope::SetSampleDepth(uint64_t depth)
 
 void PicoOscilloscope::SetSampleRate(uint64_t rate)
 {
-	/*
-	//FIXME, you can set :TIMebase:SCALe
+	m_srate = rate;
+
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_mdepthValid = false;
-	double sampletime = GetSampleDepth() / (double)rate;
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":TIM:SCAL %f", sampletime / 10);
-	m_transport->SendCommand(buf);
-	m_srateValid = false;
-	m_mdepthValid = false;
-	*/
+	m_transport->SendCommand( string("RATE ") + to_string(rate));
 }
 
 void PicoOscilloscope::SetTriggerOffset(int64_t offset)
