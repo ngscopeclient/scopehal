@@ -76,8 +76,9 @@ set(SCOPEHAL_SOURCES
 	DemoOscilloscope.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
-	SiglentSCPIOscilloscope.cpp
+	PicoOscilloscope.cpp
 	RigolOscilloscope.cpp
+	SiglentSCPIOscilloscope.cpp
 	SignalGeneratorOscilloscope.cpp
 	TektronixOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp

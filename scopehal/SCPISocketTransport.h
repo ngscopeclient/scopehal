@@ -45,6 +45,7 @@ class SCPISocketTransport : public SCPITransport
 {
 public:
 	SCPISocketTransport(const std::string& args);
+	SCPISocketTransport(const std::string& hostname, unsigned short port);
 	virtual ~SCPISocketTransport();
 
 	virtual std::string GetConnectionString();
@@ -63,7 +64,13 @@ public:
 	const std::string& GetHostname()
 	{ return m_hostname; }
 
+	unsigned short GetPort()
+	{ return m_port; }
+
 protected:
+
+	void SharedCtorInit();
+
 	Socket m_socket;
 
 	std::string m_hostname;

@@ -49,7 +49,7 @@ SCPISocketTransport::SCPISocketTransport(const string& args)
 	{
 		//default if port not specified
 		m_hostname = args;
-		m_port = 1861;
+		m_port = 5025;
 	}
 	else
 	{
@@ -57,6 +57,19 @@ SCPISocketTransport::SCPISocketTransport(const string& args)
 		m_port = port;
 	}
 
+	SharedCtorInit();
+}
+
+SCPISocketTransport::SCPISocketTransport(const string& hostname, unsigned short port)
+	: m_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	, m_hostname(hostname)
+	, m_port(port)
+{
+	SharedCtorInit();
+}
+
+void SCPISocketTransport::SharedCtorInit()
+{
 	LogDebug("Connecting to SCPI oscilloscope at %s:%d\n", m_hostname.c_str(), m_port);
 
 	if(!m_socket.Connect(m_hostname, m_port))
