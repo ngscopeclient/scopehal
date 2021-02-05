@@ -74,7 +74,7 @@ public:
 
 	SParameterVector& operator *=(const SParameterVector& rhs);
 
-	SParameterPoint operator[](size_t i)
+	SParameterPoint& operator[](size_t i)
 	{ return m_points[i]; }
 };
 
