@@ -65,6 +65,8 @@ FFTFilter::FFTFilter(const string& color)
 
 	#ifdef HAVE_CLFFT
 
+		m_clfftPlan = 0;
+
 		m_windowProgram = NULL;
 		m_rectangularWindowKernel = NULL;
 		m_cosineSumWindowKernel = NULL;
@@ -143,6 +145,9 @@ FFTFilter::~FFTFilter()
 		ffts_free(m_plan);
 
 	#ifdef HAVE_CLFFT
+		if(m_clfftPlan != 0)
+			clfftDestroyPlan(&m_clfftPlan);
+
 		delete m_windowProgram;
 		delete m_rectangularWindowKernel;
 		delete m_cosineSumWindowKernel;
@@ -234,7 +239,8 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 			ffts_free(m_plan);
 
 			#ifdef HAVE_CLFFT
-			clfftDestroyPlan(&m_clfftPlan);
+			if(m_clfftPlan != 0)
+				clfftDestroyPlan(&m_clfftPlan);
 			#endif
 		}
 
