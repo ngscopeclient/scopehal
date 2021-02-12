@@ -56,6 +56,12 @@ EyeMask::~EyeMask()
 
 bool EyeMask::Load(string path)
 {
+	//Clear out any previous state
+	m_polygons.clear();
+	m_hitrate = 0;
+	m_timebaseIsRelative = false;
+	m_maskname = "";
+
 	try
 	{
 		m_fname = path;
