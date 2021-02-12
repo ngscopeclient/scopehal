@@ -96,6 +96,7 @@ bool EyeMask::Load(const YAML::Node& node)
 	//Load units
 	auto units = node["units"];
 	float yscale = 1;
+	float timebaseScale = 1;
 	for(auto it : units)
 	{
 		auto name = it.first.as<string>();
@@ -105,6 +106,11 @@ bool EyeMask::Load(const YAML::Node& node)
 			if(scale == "ui")
 				m_timebaseIsRelative = true;
 			else if(scale == "ps")
+			{
+				m_timebaseIsRelative = false;
+				timebaseScale = 1000;
+			}
+			else if(scale == "fs")
 				m_timebaseIsRelative = false;
 			else
 				LogError("Unrecognized xscale \"%s\"\n", scale.c_str());
@@ -138,7 +144,7 @@ bool EyeMask::Load(const YAML::Node& node)
 
 		auto points = p["points"];
 		for(auto v : points)
-			poly.m_points.push_back(EyeMaskPoint(v["x"].as<float>(), v["y"].as<float>() * yscale));
+			poly.m_points.push_back(EyeMaskPoint(v["x"].as<float>() * timebaseScale, v["y"].as<float>() * yscale));
 
 		m_polygons.push_back(poly);
 	}
