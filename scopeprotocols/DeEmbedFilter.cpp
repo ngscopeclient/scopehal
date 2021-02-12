@@ -61,6 +61,9 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	#ifdef HAVE_CLFFT
 
+		m_clfftForwardPlan = 0;
+		m_clfftReversePlan = 0;
+
 		m_windowProgram = NULL;
 		m_deembedProgram = NULL;
 		m_rectangularWindowKernel = NULL;
@@ -122,6 +125,11 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 DeEmbedFilter::~DeEmbedFilter()
 {
 #ifdef HAVE_CLFFT
+	if(m_clfftForwardPlan != 0)
+		clfftDestroyPlan(&m_clfftForwardPlan);
+	if(m_clfftReversePlan != 0)
+		clfftDestroyPlan(&m_clfftReversePlan);
+
 	delete m_windowProgram;
 	delete m_rectangularWindowKernel;
 
@@ -325,6 +333,11 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 			if(g_clContext)
 			{
+				if(m_clfftForwardPlan != 0)
+					clfftDestroyPlan(&m_clfftForwardPlan);
+				if(m_clfftReversePlan != 0)
+					clfftDestroyPlan(&m_clfftReversePlan);
+
 				//Set up the FFT object
 				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 				{
