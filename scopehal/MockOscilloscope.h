@@ -42,7 +42,61 @@ public:
 	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
 	virtual ~MockOscilloscope();
 
+	//Capture file importing
+	char* ReadFromFile(int len, FILE* fp);
+	short BytesToShort(char* b);
+	int BytesToInt(char* b, int len);
+	float BytesToFloat(char* b);
+	double BytesToDouble(char* b);
 	bool LoadCSV(const std::string& path);
+	bool LoadBIN(const std::string& path);
+
+	//Agilent/Keysight/Rigol binary capture structs
+	struct FileHeader
+	{
+		char* magic;		//File magic string ("AG" / "RG")
+		char* version;		//File format version
+		int length;			//Length of file in bytes
+		size_t count;		//Number of waveforms
+	};
+	struct WaveHeader
+	{
+		int size;			//Waveform header length (0x8C)
+		int type;			//Waveform type
+		size_t buffers;		//Number of buffers
+		size_t samples;		//Number of samples
+		int averaging;		//Averaging count
+		float duration;		//Capture duration
+		double start;		//Display start time
+		double interval;	//Sample time interval
+		double origin;		//Capture origin time
+		int x;				//X axis unit
+		int y;				//Y axis unit
+		char* date;			//Capture date
+		char* time;			//Capture time
+		char* frame;		//Frame model
+		char* serial;		//Frame serial
+		char* label;		//Waveform label
+		double holdoff;		//Trigger holdoff
+		int segment;		//Segment number
+		uint64_t rate;		//Sample rate
+	};
+	struct DataHeader
+	{
+		int size;			//Waveform data header length
+		int type;			//Sample data type
+		int depth;			//Sample bit depth
+		int length;			//Data buffer length
+	};
+	Unit::UnitType units[7] = {
+		Unit::UNIT_COUNTS,	//Unused
+		Unit::UNIT_VOLTS,
+		Unit::UNIT_FS,
+		Unit::UNIT_COUNTS,	//"Constant"
+		Unit::UNIT_AMPS,
+		Unit::UNIT_DB,
+		Unit::UNIT_HZ
+	};
 
 	//not copyable or assignable
 	MockOscilloscope(const MockOscilloscope& rhs) =delete;
@@ -129,4 +183,3 @@ public:
 };
 
 #endif
-
