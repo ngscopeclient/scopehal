@@ -603,7 +603,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
  */
 bool MockOscilloscope::LoadBIN(const string& path)
 {
-	LogTrace("Importing Agilent/Keysight/Rigol BIN file \"%s\"\n", path.c_str());
+	LogTrace("Importing BIN file \"%s\"\n", path.c_str());
 	LogIndenter li_f;
 
 	//Open .bin file in binary mode
@@ -622,12 +622,22 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	fh.count = BytesToInt(ReadFromFile(4, fp), 4);		//Number of waveforms
 
 	//Check file signature
-	if(strcmp(fh.magic, "AG") != 0 && strcmp(fh.magic, "RG") != 0)
+	switch(fh.magic[0])
 	{
-		LogError("Unknown file format");
-		return false;
-	}
+		case 'A':	//"AG"
+			m_vendor = "Agilent/Keysight";
+			break;
 
+		case 'R':	//"RG"
+			m_vendor = "Rigol";
+			break;
+
+		default:
+			LogError("Unknown file format");
+			return false;
+	}
+	
+	LogDebug("Vendor: %s\n\n", m_vendor.c_str());
 	//LogDebug("File size: %i KB\n", fh.length / 1024);
 	//LogDebug("Waveforms: %i\n\n", (int)fh.count);
 
@@ -692,7 +702,6 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		LogDebug("Serial:       %s\n\n", wh.serial);
 
 		//Set oscilloscope metadata
-		m_vendor = "Agilent/Keysight/Rigol";
 		m_name = wh.frame;
 		m_serial = wh.serial;
 
