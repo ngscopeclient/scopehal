@@ -52,19 +52,22 @@ public:
 	bool LoadBIN(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
+	#pragma pack(1)
 	struct FileHeader
 	{
-		char* magic;		//File magic string ("AG" / "RG")
-		char* version;		//File format version
+		char magic[2];		//File magic string ("AG" / "RG")
+		char version[2];	//File format version
 		int length;			//Length of file in bytes
-		size_t count;		//Number of waveforms
+		int count;			//Number of waveforms
 	};
+
+	#pragma pack(1)
 	struct WaveHeader
 	{
 		int size;			//Waveform header length (0x8C)
 		int type;			//Waveform type
-		size_t buffers;		//Number of buffers
-		size_t samples;		//Number of samples
+		int buffers;		//Number of buffers
+		int samples;		//Number of samples
 		int averaging;		//Averaging count
 		float duration;		//Capture duration
 		double start;		//Display start time
@@ -72,22 +75,23 @@ public:
 		double origin;		//Capture origin time
 		int x;				//X axis unit
 		int y;				//Y axis unit
-		char* date;			//Capture date
-		char* time;			//Capture time
-		char* frame;		//Frame model
-		char* serial;		//Frame serial
-		char* label;		//Waveform label
+		char date[16];		//Capture date
+		char time[16];		//Capture time
+		char hardware[24];	//Model and serial
+		char label[16];		//Waveform label
 		double holdoff;		//Trigger holdoff
 		int segment;		//Segment number
-		uint64_t rate;		//Sample rate
 	};
+
+	#pragma pack(1)
 	struct DataHeader
 	{
 		int size;			//Waveform data header length
-		int type;			//Sample data type
-		int depth;			//Sample bit depth
+		short type;			//Sample data type
+		short depth;		//Sample bit depth
 		int length;			//Data buffer length
 	};
+
 	Unit::UnitType units[7] = {
 		Unit::UNIT_COUNTS,	//Unused
 		Unit::UNIT_VOLTS,

@@ -345,75 +345,6 @@ void MockOscilloscope::PullTrigger()
 // Import a waveform from file
 
 /**
-	@brief Reads bytes from file into array and returns the array pointer
- */
-char* MockOscilloscope::ReadFromFile(int len, FILE* fp)
-{
-	char* buf = new char[len + 1]();
-	fread(buf, 1, len, fp);
-
-	return buf;
-}
-
-/**
-	@brief Converts char array to integer
- */
-int MockOscilloscope::BytesToInt(char* b, int len)
-{
-	int i = (uint8_t)b[0] | ((uint8_t)b[1] << 8);
-	if (len==4)
-		i |= ((uint8_t)b[2] << 16) | ((uint8_t)b[3] << 24);
-
-	return i;
-}
-
-/**
-	@brief Converts char array to float
- */
-float MockOscilloscope::BytesToFloat(char* b)
-{
-	union
-	{
-		float f;
-		char b[4];
-	} u;
-
-	u.b[0] = b[0];
-	u.b[1] = b[1];
-	u.b[2] = b[2];
-	u.b[3] = b[3];
-
-	return u.f;
-
-	//FIXME: There's probably a better way to do this, but it works
-}
-
-/**
-	@brief Converts char array to double
- */
-double MockOscilloscope::BytesToDouble(char* b)
-{
-	union
-	{
-		double d;
-		char b[8];
-	} u;
-
-	u.b[0] = b[0];
-	u.b[1] = b[1];
-	u.b[2] = b[2];
-	u.b[3] = b[3];
-	u.b[4] = b[4];
-	u.b[5] = b[5];
-	u.b[6] = b[6];
-	u.b[7] = b[7];
-
-	return u.d;
-
-	//FIXME: There's probably a better way to do this, but it works
-}
-
-/**
 	@brief Imports waveforms from Comma Separated Value files
  */
 bool MockOscilloscope::LoadCSV(const string& path)
@@ -606,29 +537,21 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	LogTrace("Importing BIN file \"%s\"\n", path.c_str());
 	LogIndenter li_f;
 
-	//Open .bin file in binary mode
-	FILE* fp = fopen(path.c_str(), "rb");
-	if(!fp)
-	{
-		LogError("Failed to open file");
-		return false;
-	}
+	string f = ReadFile(path);
+	unsigned int fpos = 0;
 
-	//Parse file header
-	FileHeader fh;
-	fh.magic = ReadFromFile(2, fp);						//File signature ("AG")
-	fh.version = ReadFromFile(2, fp);					//File format version
-	fh.length = BytesToInt(ReadFromFile(4, fp), 4);		//Length of file in bytes
-	fh.count = BytesToInt(ReadFromFile(4, fp), 4);		//Number of waveforms
+	FileHeader* fh = new FileHeader();
+	f.copy((char*)fh, sizeof(FileHeader), fpos);
+	fpos += sizeof(FileHeader);
 
-	//Check file signature
-	switch(fh.magic[0])
+	//Get vendor from file signature
+	switch(fh->magic[0])
 	{
-		case 'A':	//"AG"
+		case 'A':
 			m_vendor = "Agilent/Keysight";
 			break;
 
-		case 'R':	//"RG"
+		case 'R':
 			m_vendor = "Rigol";
 			break;
 
@@ -637,82 +560,61 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			return false;
 	}
 	
-	LogDebug("Vendor: %s\n\n", m_vendor.c_str());
-	//LogDebug("File size: %i KB\n", fh.length / 1024);
-	//LogDebug("Waveforms: %i\n\n", (int)fh.count);
+	LogDebug("Vendor:    %s\n", m_vendor.c_str());
+	//LogDebug("File size: %i bytes\n", fh->length);
+	LogDebug("Waveforms: %i\n\n", fh->count);
 
 	//Load waveforms
 	vector<AnalogWaveform*> waveforms;
-	for(size_t i=0; i<fh.count; i++)
+	for(int i=0; i<fh->count; i++)
 	{
-		LogDebug("Waveform %i:\n", (int)i+1);
+		LogDebug("Waveform %i:\n", i+1);
 		LogIndenter li_w;
 
 		//Parse waveform header
-		WaveHeader wh;
-		wh.size = BytesToInt(ReadFromFile(4, fp), 4);		//Waveform header length (0x8C)
-		wh.type = BytesToInt(ReadFromFile(4, fp), 4);		//Waveform type
-		wh.buffers = BytesToInt(ReadFromFile(4, fp), 4);	//Number of buffers
-		wh.samples = BytesToInt(ReadFromFile(4, fp), 4);	//Number of samples
-		wh.averaging = BytesToInt(ReadFromFile(4, fp), 4);	//Averaging count
-		wh.duration = BytesToFloat(ReadFromFile(4, fp));	//Capture duration
-		wh.start = BytesToDouble(ReadFromFile(8, fp));		//Display start time
-		wh.interval = BytesToDouble(ReadFromFile(8, fp));	//Sample time interval
-		wh.origin = BytesToDouble(ReadFromFile(8, fp));		//Capture origin time
-		wh.x = BytesToInt(ReadFromFile(4, fp), 4);			//X axis unit
-		wh.y = BytesToInt(ReadFromFile(4, fp), 4);			//Y axis unit
-		wh.date = ReadFromFile(16, fp);						//Capture date
-		wh.time = ReadFromFile(16, fp);						//Capture time
-		char* hardware = ReadFromFile(24, fp);				//Hardware string (model + serial)
-		wh.label = ReadFromFile(16, fp);					//Waveform label	
-		wh.holdoff = BytesToDouble(ReadFromFile(8, fp));	//Trigger holdoff
-		wh.segment = BytesToInt(ReadFromFile(4, fp), 4);	//Segment number
-		wh.rate = (uint64_t)(1 / wh.interval);				//Calculated sample rate
+		WaveHeader* wh = new WaveHeader();
+		f.copy((char*)wh, sizeof(WaveHeader), fpos);
+		fpos += sizeof(WaveHeader);
 
 		// Split hardware string
 		int idx = 0;
 		for(int c=0; c<24; c++)
 		{
-			if(hardware[c] == ':')
+			if(wh->hardware[c] == ':')
 			{
 				idx = c;
 				break;
 			}
 		}
 
-		//Frame model
-		wh.frame = new char[idx + 1]();
-		strncpy(wh.frame, hardware, idx);
-
-		//Frame serial
-		wh.serial = new char[24 - idx]();
-		strncpy(wh.serial, hardware + idx + 1, 24 - idx - 1);
-
-		//Log waveform info
-		LogDebug("Samples:      %i\n", (int)wh.samples);
-		LogDebug("Buffers:      %i\n", (int)wh.buffers);
-		LogDebug("Type:         %i\n", wh.type);
-		LogDebug("Duration:     %.*f us\n", 2, wh.duration * 1e6);
-		LogDebug("Start:        %.*f us\n", 2, wh.start * 1e6);
-		LogDebug("Interval:     %.*f ns\n", 2, wh.interval * 1e9);
-		LogDebug("Origin:       %.*f us\n", 2, wh.origin * 1e6);
-		LogDebug("Holdoff:      %.*f ms\n", 2, wh.holdoff * 1e3);
-		LogDebug("Sample Rate:  %.*f Msps\n", 2, wh.rate / 1e6);
-		LogDebug("Frame:        %s\n", wh.frame);
-		LogDebug("Serial:       %s\n\n", wh.serial);
-
 		//Set oscilloscope metadata
-		m_name = wh.frame;
-		m_serial = wh.serial;
+		char* name = new char[idx]();
+		char* serial = new char[24-idx]();
+		strncpy(name, wh->hardware, idx);
+		strncpy(serial, wh->hardware + idx + 1, 24 - idx - 1);
+		m_name = name;
+		m_serial = serial;
+
+		LogDebug("Samples:      %i\n", wh->samples);
+		LogDebug("Buffers:      %i\n", wh->buffers);
+		LogDebug("Type:         %i\n", wh->type);
+		LogDebug("Duration:     %.*f us\n", 2, wh->duration * 1e6);
+		LogDebug("Start:        %.*f us\n", 2, wh->start * 1e6);
+		LogDebug("Interval:     %.*f ns\n", 2, wh->interval * 1e9);
+		LogDebug("Origin:       %.*f us\n", 2, wh->origin * 1e6);
+		LogDebug("Holdoff:      %.*f ms\n", 2, wh->holdoff * 1e3);
+		LogDebug("Sample Rate:  %.*f Msps\n", 2, (1 / wh->interval) / 1e6);
+		LogDebug("Frame:        %s\n", m_name.c_str());
+		LogDebug("Serial:       %s\n\n", m_serial.c_str());
 
 		// Create new channel
 		auto chan = new OscilloscopeChannel(
 			this,			//Parent scope
-			wh.label,		//Channel name
+			wh->label,		//Channel name
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetDefaultChannelColor(i),
-			units[wh.x],
-			units[wh.y],
+			units[wh->x],
+			units[wh->y],
 			1,				//Bus width
 			i,				//Channel index
 			true			//Is physical channel
@@ -722,7 +624,7 @@ bool MockOscilloscope::LoadBIN(const string& path)
 
 		//Create new waveform for channel
 		auto wfm = new AnalogWaveform;
-		wfm->m_timescale = wh.interval * 1e15;
+		wfm->m_timescale = wh->interval * 1e15;
 		wfm->m_startTimestamp = 0;
 		wfm->m_startFemtoseconds = 0;
 		wfm->m_triggerPhase = 0;
@@ -733,49 +635,44 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		auto w = waveforms[i];
 		float vmin = FLT_MAX;
 		float vmax = -FLT_MAX;
-		for(size_t j=0; j<wh.buffers; j++)
+		for(int j=0; j<wh->buffers; j++)
 		{
-			LogDebug("Buffer %i:\n", (int)j+1);
+			LogDebug("Buffer %i:\n", j+1);
 			LogIndenter li_b;
 
 			//Parse waveform data header
-			DataHeader dh;
-			dh.size = BytesToInt(ReadFromFile(4, fp), 4);		//Waveform data header length
-			dh.type = BytesToInt(ReadFromFile(2, fp), 2);		//Sample data type
-			dh.depth = BytesToInt(ReadFromFile(2, fp), 2) * 8;	//Sample bit depth
-			dh.length = BytesToInt(ReadFromFile(4, fp), 4);		//Data buffer length
+			DataHeader* dh = new DataHeader();
+			f.copy((char*)dh, sizeof(DataHeader), fpos);
+			fpos += sizeof(DataHeader);
 
-    		LogDebug("Data Type:      %i\n", dh.type);
-    		LogDebug("Sample depth:   %i bits\n", dh.depth);
-    		LogDebug("Buffer length:  %i KB\n\n\n", dh.length / 1024);
+    		LogDebug("Data Type:      %i\n", dh->type);
+    		LogDebug("Sample depth:   %i bits\n", dh->depth*8);
+    		LogDebug("Buffer length:  %i KB\n\n\n", dh->length/1024);
 
 			//Loop through waveform samples
-			for(size_t k=0; k<wh.samples; k++)
+			float sample;
+			int sample_i;
+			for(int k=0; k<wh->samples; k++)
 			{
-				//Handle different data types
-				float sample;
-				if(dh.type == 6 && dh.depth == 8)
+				if (dh->type == 6)
 				{
-					//8-bit integer samples
-					uint8_t sample_i = (int)ReadFromFile(1, fp)[0];
-					sample = (float)sample_i;
-				}
-				else if(dh.type == 6 && dh.depth == 16)
-				{
-					//16-bit integer samples
-					uint16_t sample_i = BytesToInt(ReadFromFile(2, fp), 2);
+					//Integer samples (digital waveforms)
+					memcpy(&sample_i, f.c_str() + fpos, dh->depth);
 					sample = (float)sample_i;
 				}
 				else
 				{
-					//32-bit float samples
-					sample = BytesToFloat(ReadFromFile(4, fp));
+					//Float samples (analog waveforms)
+					memcpy(&sample, f.c_str() + fpos, dh->depth);
 				}
+				fpos += dh->depth;
 
+				//Push sample to waveform
 				w->m_offsets.push_back(k);
 				w->m_samples.push_back(sample);
 				w->m_durations.push_back(1);
 
+				//Update voltage min/max values
 				vmax = max(vmax, sample);
 				vmin = min(vmin, sample);
 			}
@@ -785,8 +682,6 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		chan->SetVoltageRange((vmax-vmin) * 1.5);
 		chan->SetOffset(-((vmax-abs(vmin)) / 2));
 	}
-
-	fclose(fp);
 
 	return true;
 }
