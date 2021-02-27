@@ -540,12 +540,12 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	string f = ReadFile(path);
 	unsigned int fpos = 0;
 
-	FileHeader* fh = new FileHeader();
-	f.copy((char*)fh, sizeof(FileHeader), fpos);
+	FileHeader fh;
+	f.copy((char*)&fh, sizeof(FileHeader), fpos);
 	fpos += sizeof(FileHeader);
 
 	//Get vendor from file signature
-	switch(fh->magic[0])
+	switch(fh.magic[0])
 	{
 		case 'A':
 			m_vendor = "Agilent/Keysight";
@@ -561,25 +561,25 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	}
 	
 	LogDebug("Vendor:    %s\n", m_vendor.c_str());
-	//LogDebug("File size: %i bytes\n", fh->length);
-	LogDebug("Waveforms: %i\n\n", fh->count);
+	//LogDebug("File size: %i bytes\n", fh.length);
+	LogDebug("Waveforms: %i\n\n", fh.count);
 
 	//Load waveforms
-	for(int i=0; i<fh->count; i++)
+	for(int i=0; i<fh.count; i++)
 	{
 		LogDebug("Waveform %i:\n", i+1);
 		LogIndenter li_w;
 
 		//Parse waveform header
-		WaveHeader* wh = new WaveHeader();
-		f.copy((char*)wh, sizeof(WaveHeader), fpos);
+		WaveHeader wh;
+		f.copy((char*)&wh, sizeof(WaveHeader), fpos);
 		fpos += sizeof(WaveHeader);
 
 		// Split hardware string
 		int idx = 0;
 		for(int c=0; c<24; c++)
 		{
-			if(wh->hardware[c] == ':')
+			if(wh.hardware[c] == ':')
 			{
 				idx = c;
 				break;
@@ -589,31 +589,31 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		//Set oscilloscope metadata
 		char* name = new char[idx]();
 		char* serial = new char[24-idx]();
-		strncpy(name, wh->hardware, idx);
-		strncpy(serial, wh->hardware + idx + 1, 24 - idx - 1);
+		strncpy(name, wh.hardware, idx);
+		strncpy(serial, wh.hardware + idx + 1, 24 - idx - 1);
 		m_name = name;
 		m_serial = serial;
 
-		LogDebug("Samples:      %i\n", wh->samples);
-		LogDebug("Buffers:      %i\n", wh->buffers);
-		LogDebug("Type:         %i\n", wh->type);
-		LogDebug("Duration:     %.*f us\n", 2, wh->duration * 1e6);
-		LogDebug("Start:        %.*f us\n", 2, wh->start * 1e6);
-		LogDebug("Interval:     %.*f ns\n", 2, wh->interval * 1e9);
-		LogDebug("Origin:       %.*f us\n", 2, wh->origin * 1e6);
-		LogDebug("Holdoff:      %.*f ms\n", 2, wh->holdoff * 1e3);
-		LogDebug("Sample Rate:  %.*f Msps\n", 2, (1 / wh->interval) / 1e6);
+		LogDebug("Samples:      %i\n", wh.samples);
+		LogDebug("Buffers:      %i\n", wh.buffers);
+		LogDebug("Type:         %i\n", wh.type);
+		LogDebug("Duration:     %.*f us\n", 2, wh.duration * 1e6);
+		LogDebug("Start:        %.*f us\n", 2, wh.start * 1e6);
+		LogDebug("Interval:     %.*f ns\n", 2, wh.interval * 1e9);
+		LogDebug("Origin:       %.*f us\n", 2, wh.origin * 1e6);
+		LogDebug("Holdoff:      %.*f ms\n", 2, wh.holdoff * 1e3);
+		LogDebug("Sample Rate:  %.*f Msps\n", 2, (1 / wh.interval) / 1e6);
 		LogDebug("Frame:        %s\n", m_name.c_str());
 		LogDebug("Serial:       %s\n\n", m_serial.c_str());
 
 		// Create new channel
 		auto chan = new OscilloscopeChannel(
 			this,			//Parent scope
-			wh->label,		//Channel name
+			wh.label,		//Channel name
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetDefaultChannelColor(i),
-			units[wh->x],
-			units[wh->y],
+			units[wh.x],
+			units[wh.y],
 			1,				//Bus width
 			i,				//Channel index
 			true			//Is physical channel
@@ -623,7 +623,7 @@ bool MockOscilloscope::LoadBIN(const string& path)
 
 		//Create new waveform for channel
 		auto wfm = new AnalogWaveform;
-		wfm->m_timescale = wh->interval * 1e15;
+		wfm->m_timescale = wh.interval * 1e15;
 		wfm->m_startTimestamp = 0;
 		wfm->m_startFemtoseconds = 0;
 		wfm->m_triggerPhase = 0;
@@ -632,37 +632,37 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		//Loop through waveform buffers
 		float vmin = FLT_MAX;
 		float vmax = -FLT_MAX;
-		for(int j=0; j<wh->buffers; j++)
+		for(int j=0; j<wh.buffers; j++)
 		{
 			LogDebug("Buffer %i:\n", j+1);
 			LogIndenter li_b;
 
 			//Parse waveform data header
-			DataHeader* dh = new DataHeader();
-			f.copy((char*)dh, sizeof(DataHeader), fpos);
+			DataHeader dh;
+			f.copy((char*)&dh, sizeof(DataHeader), fpos);
 			fpos += sizeof(DataHeader);
 
-    		LogDebug("Data Type:      %i\n", dh->type);
-    		LogDebug("Sample depth:   %i bits\n", dh->depth*8);
-    		LogDebug("Buffer length:  %i KB\n\n\n", dh->length/1024);
+    		LogDebug("Data Type:      %i\n", dh.type);
+    		LogDebug("Sample depth:   %i bits\n", dh.depth*8);
+    		LogDebug("Buffer length:  %i KB\n\n\n", dh.length/1024);
 
 			//Loop through waveform samples
 			float sample;
 			int sample_i;
-			for(int k=0; k<wh->samples; k++)
+			for(int k=0; k<wh.samples; k++)
 			{
-				if (dh->type == 6)
+				if (dh.type == 6)
 				{
 					//Integer samples (digital waveforms)
-					memcpy(&sample_i, f.c_str() + fpos, dh->depth);
+					memcpy(&sample_i, f.c_str() + fpos, dh.depth);
 					sample = (float)sample_i;
 				}
 				else
 				{
 					//Float samples (analog waveforms)
-					memcpy(&sample, f.c_str() + fpos, dh->depth);
+					memcpy(&sample, f.c_str() + fpos, dh.depth);
 				}
-				fpos += dh->depth;
+				fpos += dh.depth;
 
 				//Push sample to waveform
 				wfm->m_offsets.push_back(k);
