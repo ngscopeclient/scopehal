@@ -654,19 +654,19 @@ bool MockOscilloscope::LoadBIN(const string& path)
 
 			//Loop through waveform samples
 			float sample = 0;
-			int sample_i = 0;
+			uint8_t sample_i = 0;
 			for(int k=0; k<wh.samples; k++)
 			{
 				if (dh.type == 6)
 				{
 					//Integer samples (digital waveforms)
-					memcpy(&sample_i, f.c_str() + fpos, dh.depth);
+					memcpy(&sample_i, f.c_str() + fpos, 1);
 					sample = (float)sample_i;
 				}
 				else
 				{
 					//Float samples (analog waveforms)
-					memcpy(&sample, f.c_str() + fpos, dh.depth);
+					memcpy(&sample, f.c_str() + fpos, 4);
 				}
 				fpos += dh.depth;
 
