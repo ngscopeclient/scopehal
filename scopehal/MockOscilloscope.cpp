@@ -575,24 +575,28 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		f.copy((char*)&wh, sizeof(WaveHeader), fpos);
 		fpos += sizeof(WaveHeader);
 
-		// Split hardware string
-		int idx = 0;
-		for(int c=0; c<24; c++)
+		// Only set name/serial on first waveform
+		if (i == 0)
 		{
-			if(wh.hardware[c] == ':')
+			// Split hardware string
+			int idx = 0;
+			for(int c=0; c<24; c++)
 			{
-				idx = c;
-				break;
+				if(wh.hardware[c] == ':')
+				{
+					idx = c;
+					break;
+				}
 			}
-		}
 
-		//Set oscilloscope metadata
-		char* name = new char[idx]();
-		char* serial = new char[24-idx]();
-		strncpy(name, wh.hardware, idx);
-		strncpy(serial, wh.hardware + idx + 1, 24 - idx - 1);
-		m_name = name;
-		m_serial = serial;
+			//Set oscilloscope metadata
+			char* name = new char[idx]();
+			char* serial = new char[24-idx]();
+			strncpy(name, wh.hardware, idx);
+			strncpy(serial, wh.hardware + idx + 1, 24 - idx - 1);
+			m_name = name;
+			m_serial = serial;
+		}
 
 		LogDebug("Samples:      %i\n", wh.samples);
 		LogDebug("Buffers:      %i\n", wh.buffers);
