@@ -565,7 +565,6 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	LogDebug("Waveforms: %i\n\n", fh->count);
 
 	//Load waveforms
-	vector<AnalogWaveform*> waveforms;
 	for(int i=0; i<fh->count; i++)
 	{
 		LogDebug("Waveform %i:\n", i+1);
@@ -628,11 +627,9 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		wfm->m_startTimestamp = 0;
 		wfm->m_startFemtoseconds = 0;
 		wfm->m_triggerPhase = 0;
-		waveforms.push_back(wfm);
 		chan->SetData(wfm, 0);
 
 		//Loop through waveform buffers
-		auto w = waveforms[i];
 		float vmin = FLT_MAX;
 		float vmax = -FLT_MAX;
 		for(int j=0; j<wh->buffers; j++)
@@ -668,9 +665,9 @@ bool MockOscilloscope::LoadBIN(const string& path)
 				fpos += dh->depth;
 
 				//Push sample to waveform
-				w->m_offsets.push_back(k);
-				w->m_samples.push_back(sample);
-				w->m_durations.push_back(1);
+				wfm->m_offsets.push_back(k);
+				wfm->m_samples.push_back(sample);
+				wfm->m_durations.push_back(1);
 
 				//Update voltage min/max values
 				vmax = max(vmax, sample);
