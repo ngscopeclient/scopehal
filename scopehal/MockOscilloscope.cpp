@@ -596,6 +596,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			strncpy(serial, wh.hardware + idx + 1, 24 - idx - 1);
 			m_name = name;
 			m_serial = serial;
+			delete[] name;
+			delete[] serial;
 		}
 
 		LogDebug("Samples:      %i\n", wh.samples);
