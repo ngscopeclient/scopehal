@@ -653,8 +653,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
     		LogDebug("Buffer length:  %i KB\n\n\n", dh.length/1024);
 
 			//Loop through waveform samples
-			float sample;
-			int sample_i;
+			float sample = 0;
+			int sample_i = 0;
 			for(int k=0; k<wh.samples; k++)
 			{
 				if (dh.type == 6)
