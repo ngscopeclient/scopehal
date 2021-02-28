@@ -43,11 +43,6 @@ public:
 	virtual ~MockOscilloscope();
 
 	//Capture file importing
-	char* ReadFromFile(int len, FILE* fp);
-	short BytesToShort(char* b);
-	int BytesToInt(char* b, int len);
-	float BytesToFloat(char* b);
-	double BytesToDouble(char* b);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
 
