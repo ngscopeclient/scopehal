@@ -590,14 +590,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			}
 
 			//Set oscilloscope metadata
-			char* name = new char[idx]();
-			char* serial = new char[24-idx]();
-			strncpy(name, wh.hardware, idx);
-			strncpy(serial, wh.hardware + idx + 1, 24 - idx - 1);
-			m_name = name;
-			m_serial = serial;
-			delete[] name;
-			delete[] serial;
+			m_name.assign(wh.hardware, idx);
+			m_serial.assign(wh.hardware + idx + 1, 24 - idx);
 		}
 
 		LogDebug("Samples:      %i\n", wh.samples);
