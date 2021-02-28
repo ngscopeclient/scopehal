@@ -76,18 +76,23 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 		try
 		{
-			//Load window function kernel
-			string kernelSource = ReadFile("kernels/WindowFunctions.cl");
-			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-			m_windowProgram = new cl::Program(*g_clContext, sources);
-			m_windowProgram->build(g_contextDevices);
-			m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
+			//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
+			//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
+			if(g_clContext)
+			{
+				//Load window function kernel
+				string kernelSource = ReadFile("kernels/WindowFunctions.cl");
+				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
+				m_windowProgram = new cl::Program(*g_clContext, sources);
+				m_windowProgram->build(g_contextDevices);
+				m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
 
-			kernelSource = ReadFile("kernels/DeEmbedFilter.cl");
-			cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
-			m_deembedProgram = new cl::Program(*g_clContext, sources2);
-			m_deembedProgram->build(g_contextDevices);
-			m_deembedKernel = new cl::Kernel(*m_deembedProgram, "DeEmbed");
+				kernelSource = ReadFile("kernels/DeEmbedFilter.cl");
+				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
+				m_deembedProgram = new cl::Program(*g_clContext, sources2);
+				m_deembedProgram->build(g_contextDevices);
+				m_deembedKernel = new cl::Kernel(*m_deembedProgram, "DeEmbed");
+			}
 		}
 		catch(const cl::Error& e)
 		{
@@ -400,13 +405,16 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		InterpolateSparameters(bin_hz, invert, nouts);
 
 		#ifdef HAVE_CLFFT
-			delete m_sinbuf;
-			delete m_cosbuf;
+			if(g_clContext)
+			{
+				delete m_sinbuf;
+				delete m_cosbuf;
 
-			m_sinbuf = new cl::Buffer(
-				*g_clContext, m_resampledSparamSines.begin(), m_resampledSparamSines.end(), true, true, NULL);
-			m_cosbuf = new cl::Buffer(
-				*g_clContext, m_resampledSparamCosines.begin(), m_resampledSparamCosines.end(), true, true, NULL);
+				m_sinbuf = new cl::Buffer(
+					*g_clContext, m_resampledSparamSines.begin(), m_resampledSparamSines.end(), true, true, NULL);
+				m_cosbuf = new cl::Buffer(
+					*g_clContext, m_resampledSparamCosines.begin(), m_resampledSparamCosines.end(), true, true, NULL);
+			}
 		#endif
 	}
 

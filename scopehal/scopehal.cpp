@@ -75,6 +75,7 @@ bool g_hasAvx512F = false;
 bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
+bool g_disableOpenCL = false;
 
 #ifdef HAVE_OPENCL
 cl::Context* g_clContext = NULL;
@@ -133,7 +134,14 @@ void DetectGPUFeatures()
 		try
 		{
 			LogDebug("Detecting OpenCL devices...\n");
+
 			LogIndenter li;
+
+			if(g_disableOpenCL)
+			{
+				LogNotice("g_disableOpenCL set, disabling OpenCL\n");
+				return;
+			}
 
 			//Find platforms and print info
 			vector<cl::Platform> platforms;

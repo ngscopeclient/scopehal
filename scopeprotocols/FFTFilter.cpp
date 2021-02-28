@@ -78,26 +78,31 @@ FFTFilter::FFTFilter(const string& color)
 
 		try
 		{
-			//Compile window functions
-			string kernelSource = ReadFile("kernels/WindowFunctions.cl");
-			cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-			m_windowProgram = new cl::Program(*g_clContext, sources);
-			m_windowProgram->build(g_contextDevices);
+			//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
+			//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
+			if(g_clContext)
+			{
+				//Compile window functions
+				string kernelSource = ReadFile("kernels/WindowFunctions.cl");
+				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
+				m_windowProgram = new cl::Program(*g_clContext, sources);
+				m_windowProgram->build(g_contextDevices);
 
-			//Extract each kernel
-			m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
-			m_cosineSumWindowKernel = new cl::Kernel(*m_windowProgram, "CosineSumWindow");
-			m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
+				//Extract each kernel
+				m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
+				m_cosineSumWindowKernel = new cl::Kernel(*m_windowProgram, "CosineSumWindow");
+				m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
 
-			//Compile normalization kernels
-			kernelSource = ReadFile("kernels/FFTNormalization.cl");
-			cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
-			m_normalizeProgram = new cl::Program(*g_clContext, sources2);
-			m_normalizeProgram->build(g_contextDevices);
+				//Compile normalization kernels
+				kernelSource = ReadFile("kernels/FFTNormalization.cl");
+				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
+				m_normalizeProgram = new cl::Program(*g_clContext, sources2);
+				m_normalizeProgram->build(g_contextDevices);
 
-			//Extract normalization kernels
-			m_normalizeLogMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToLogMagnitude");
-			m_normalizeMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToMagnitude");
+				//Extract normalization kernels
+				m_normalizeLogMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToLogMagnitude");
+				m_normalizeMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToMagnitude");
+			}
 		}
 		catch(const cl::Error& e)
 		{
@@ -239,8 +244,8 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 			ffts_free(m_plan);
 
 			#ifdef HAVE_CLFFT
-			if(m_clfftPlan != 0)
-				clfftDestroyPlan(&m_clfftPlan);
+				if(m_clfftPlan != 0)
+					clfftDestroyPlan(&m_clfftPlan);
 			#endif
 		}
 

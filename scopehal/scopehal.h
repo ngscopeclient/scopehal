@@ -135,6 +135,9 @@ extern bool g_hasAvx2;
 #define stos(str) static_cast<size_t>(stol(str))
 #endif
 
+//Set true prior to calling DetectGPUFeatures() to force OpenCL to not be used
+extern bool g_disableOpenCL;
+
 #ifdef HAVE_OPENCL
 extern cl::Context* g_clContext;
 extern std::vector<cl::Device> g_contextDevices;

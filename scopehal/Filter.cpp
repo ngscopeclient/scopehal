@@ -79,7 +79,9 @@ Filter::Filter(
 		m_kernel = NULL;
 		m_program = NULL;
 
-		if(kernelPath != "")
+		//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
+		//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
+		if(kernelPath != "" && g_clContext)
 		{
 			try
 			{
