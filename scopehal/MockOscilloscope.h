@@ -52,39 +52,39 @@ public:
 	{
 		char magic[2];		//File magic string ("AG" / "RG")
 		char version[2];	//File format version
-		int length;			//Length of file in bytes
-		int count;			//Number of waveforms
+		uint32_t length;	//Length of file in bytes
+		uint32_t count;		//Number of waveforms
 	};
 
 	#pragma pack(1)
 	struct WaveHeader
 	{
-		int size;			//Waveform header length (0x8C)
-		int type;			//Waveform type
-		int buffers;		//Number of buffers
-		int samples;		//Number of samples
-		int averaging;		//Averaging count
+		uint32_t size;		//Waveform header length (0x8C)
+		uint32_t type;		//Waveform type
+		uint32_t buffers;	//Number of buffers
+		uint32_t samples;	//Number of samples
+		uint32_t averaging;	//Averaging count
 		float duration;		//Capture duration
 		double start;		//Display start time
 		double interval;	//Sample time interval
 		double origin;		//Capture origin time
-		int x;				//X axis unit
-		int y;				//Y axis unit
+		uint32_t x;			//X axis unit
+		uint32_t y;			//Y axis unit
 		char date[16];		//Capture date
 		char time[16];		//Capture time
 		char hardware[24];	//Model and serial
 		char label[16];		//Waveform label
 		double holdoff;		//Trigger holdoff
-		int segment;		//Segment number
+		uint32_t segment;	//Segment number
 	};
 
 	#pragma pack(1)
 	struct DataHeader
 	{
-		int size;			//Waveform data header length
+		uint32_t size;		//Waveform data header length
 		short type;			//Sample data type
 		short depth;		//Sample bit depth
-		int length;			//Data buffer length
+		uint32_t length;	//Data buffer length
 	};
 
 	Unit::UnitType units[7] = {

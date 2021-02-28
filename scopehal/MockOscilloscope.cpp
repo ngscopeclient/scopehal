@@ -565,9 +565,9 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	LogDebug("Waveforms: %i\n\n", fh.count);
 
 	//Load waveforms
-	for(int i=0; i<fh.count; i++)
+	for(size_t i=0; i<fh.count; i++)
 	{
-		LogDebug("Waveform %i:\n", i+1);
+		LogDebug("Waveform %i:\n", (int)i+1);
 		LogIndenter li_w;
 
 		//Parse waveform header
@@ -638,9 +638,9 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		//Loop through waveform buffers
 		float vmin = FLT_MAX;
 		float vmax = -FLT_MAX;
-		for(int j=0; j<wh.buffers; j++)
+		for(size_t j=0; j<wh.buffers; j++)
 		{
-			LogDebug("Buffer %i:\n", j+1);
+			LogDebug("Buffer %i:\n", (int)j+1);
 			LogIndenter li_b;
 
 			//Parse waveform data header
@@ -655,7 +655,7 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			//Loop through waveform samples
 			float sample = 0;
 			uint8_t sample_i = 0;
-			for(int k=0; k<wh.samples; k++)
+			for(size_t k=0; k<wh.samples; k++)
 			{
 				if (dh.type == 6)
 				{
