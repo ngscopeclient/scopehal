@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -75,6 +75,34 @@ TestWaveformSource::~TestWaveformSource()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Signal generation
+
+/**
+	@brief Generates a unit step
+ */
+WaveformBase* TestWaveformSource::GenerateStep(
+	float vlo,
+	float vhi,
+	int64_t sampleperiod,
+	size_t depth)
+{
+	auto ret = new AnalogWaveform;
+	ret->m_timescale = sampleperiod;
+	ret->Resize(depth);
+
+	size_t mid = depth/2;
+	for(size_t i=0; i<depth; i++)
+	{
+		if(i < mid)
+			ret->m_samples[i] = vlo;
+		else
+			ret->m_samples[i] = vhi;
+
+		ret->m_offsets[i] = i;
+		ret->m_durations[i] = 1;
+	}
+
+	return ret;
+}
 
 /**
 	@brief Generates a sinewave with a bit of extra noise added
@@ -153,7 +181,10 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
-	size_t depth)
+	size_t depth,
+	bool lpf,
+	float noise_amplitude
+	)
 {
 	auto ret = new AnalogWaveform;
 	ret->m_timescale = sampleperiod;
@@ -200,7 +231,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
 
 	return ret;
 }
@@ -209,7 +240,9 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	float amplitude,
 	float period,
 	int64_t sampleperiod,
-	size_t depth)
+	size_t depth,
+	bool lpf,
+	float noise_amplitude)
 {
 	auto ret = new AnalogWaveform;
 	ret->m_timescale = sampleperiod;
@@ -263,7 +296,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 		}
 	}
 
-	DegradeSerialData(ret, sampleperiod, depth);
+	DegradeSerialData(ret, sampleperiod, depth, lpf, noise_amplitude);
 
 	return ret;
 }
@@ -273,10 +306,15 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 
 	by adding noise and a band-limiting filter
  */
-void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth)
+void TestWaveformSource::DegradeSerialData(
+	AnalogWaveform* cap,
+	int64_t sampleperiod,
+	size_t depth,
+	bool lpf,
+	float noise_amplitude)
 {
 	//RNGs
-	normal_distribution<> noise(0, 0.01);
+	normal_distribution<> noise(0, noise_amplitude);
 
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
 	const size_t npoints = next_pow2(depth);
@@ -298,34 +336,44 @@ void TestWaveformSource::DegradeSerialData(AnalogWaveform* cap, int64_t samplepe
 		m_cachedNumPoints = npoints;
 	}
 
-	//Copy the input, then fill any extra space with zeroes
-	memcpy(m_forwardInBuf, &cap->m_samples[0], depth*sizeof(float));
-	for(size_t i=depth; i<npoints; i++)
-		m_forwardInBuf[i] = 0;
-
-	//Do the forward FFT
-	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
-
-	//Simple channel response model
-	double sample_ghz = 1e6 / sampleperiod;
-	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-	complex<float> pole(0, -FreqToPhase(5e9));
-	float prescale = abs(pole);
-	for(size_t i = 0; i<nouts; i++)
+	if(lpf)
 	{
-		complex<float> s(0, FreqToPhase(bin_hz * i));
-		complex<float> h = prescale * complex<float>(1, 0) / (s - pole);
 
-		float binscale = abs(h);
-		m_forwardOutBuf[i*2] *= binscale;		//real
-		m_forwardOutBuf[i*2 + 1] *= binscale;	//imag
+		//Copy the input, then fill any extra space with zeroes
+		memcpy(m_forwardInBuf, &cap->m_samples[0], depth*sizeof(float));
+		for(size_t i=depth; i<npoints; i++)
+			m_forwardInBuf[i] = 0;
+
+		//Do the forward FFT
+		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
+
+		//Simple channel response model
+		double sample_ghz = 1e6 / sampleperiod;
+		double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
+		complex<float> pole(0, -FreqToPhase(5e9));
+		float prescale = abs(pole);
+		for(size_t i = 0; i<nouts; i++)
+		{
+			complex<float> s(0, FreqToPhase(bin_hz * i));
+			complex<float> h = prescale * complex<float>(1, 0) / (s - pole);
+
+			float binscale = abs(h);
+			m_forwardOutBuf[i*2] *= binscale;		//real
+			m_forwardOutBuf[i*2 + 1] *= binscale;	//imag
+		}
+
+		//Calculate the inverse FFT
+		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
+
+		//Rescale the FFT output and copy to the output, then add noise
+		float fftscale = 1.0f / npoints;
+		for(size_t i=0; i<depth; i++)
+			cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(m_rng);
 	}
 
-	//Calculate the inverse FFT
-	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
-
-	//Rescale the FFT output and copy to the output, then add noise
-	float fftscale = 1.0f / npoints;
-	for(size_t i=0; i<depth; i++)
-		cap->m_samples[i] = m_reverseOutBuf[i] * fftscale + noise(m_rng);
+	else
+	{
+		for(size_t i=0; i<depth; i++)
+			cap->m_samples[i] += noise(m_rng);
+	}
 }

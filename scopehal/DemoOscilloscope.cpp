@@ -59,7 +59,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	static const char* colors[8] =
 	{ "#ffff00", "#ff6abc", "#00ffff", "#00c100", "#d7ffd7", "#8482ff", "#ff0000", "#ff8000" };
 
-	for(size_t i=0; i<4; i++)
+	for(size_t i=0; i<5; i++)
 	{
 		m_channels.push_back(
 			new OscilloscopeChannel(
@@ -78,6 +78,8 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 		m_channelBandwidth[i] = 0;
 		m_channelVoltageRange[i] = 1;
 		m_channelOffset[i] = 0;
+
+		m_channelModes[i] = CHANNEL_MODE_NOISE_LPF;
 	}
 
 	m_sweepFreq = 1e9;
@@ -90,6 +92,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[1]->SetDisplayName("Ramp");
 	m_channels[2]->SetDisplayName("PRBS31");
 	m_channels[3]->SetDisplayName("8B10B");
+	m_channels[4]->SetDisplayName("FastStep");
 }
 
 DemoOscilloscope::~DemoOscilloscope()
@@ -377,6 +380,50 @@ void DemoOscilloscope::PullTrigger()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Waveform degradation modes
+
+vector<string> DemoOscilloscope::GetADCModeNames(size_t /*channel*/)
+{
+	vector<string> ret;
+	ret.push_back("Ideal");
+	ret.push_back("10 mV noise");
+	ret.push_back("10 mV noise + 5 GHz LPF");
+	return ret;
+}
+
+size_t DemoOscilloscope::GetADCMode(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	return m_channelModes[channel];
+}
+
+void DemoOscilloscope::SetADCMode(size_t channel, size_t mode)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_channelModes[channel] = mode;
+}
+
+bool DemoOscilloscope::IsADCModeConfigurable()
+{
+	return true;
+}
+
+vector<Oscilloscope::AnalogBank> DemoOscilloscope::GetAnalogBanks()
+{
+	vector<AnalogBank> ret;
+	for(size_t i=0; i<GetChannelCount(); i++)
+		ret.push_back(GetAnalogBank(i));
+	return ret;
+}
+
+Oscilloscope::AnalogBank DemoOscilloscope::GetAnalogBank(size_t channel)
+{
+	AnalogBank bank;
+	bank.push_back(m_channels[channel]);
+	return bank;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Waveform synthesis
 
 bool DemoOscilloscope::AcquireData()
@@ -390,14 +437,35 @@ bool DemoOscilloscope::AcquireData()
 		m_sweepFreq = 1.1e9;
 	float sweepPeriod = FS_PER_SECOND / m_sweepFreq;
 
+	//Signal degradations
+	float noise[5] =
+	{
+		0.01, 0.01, 0.01, 0.01, 0.01
+	};
+	bool lpf2 = false;
+	bool lpf3 = false;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		for(size_t i=0; i<5; i++)
+		{
+			if(m_channelModes[i] == CHANNEL_MODE_IDEAL)
+				noise[i] = 0;
+		}
+		if(m_channelModes[2] == CHANNEL_MODE_NOISE_LPF)
+			lpf2 = true;
+		if(m_channelModes[3] == CHANNEL_MODE_NOISE_LPF)
+			lpf3 = true;
+	}
+
 	//Generate waveforms
 	SequenceSet s;
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	s[m_channels[0]] = m_source.GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth);
-	s[m_channels[1]] = m_source.GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth);
-	s[m_channels[2]] = m_source.GeneratePRBS31(0.9, 96969.6, sampleperiod, depth);
-	s[m_channels[3]] = m_source.Generate8b10b(0.9, 800e3, sampleperiod, depth);
+	s[m_channels[0]] = m_source.GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+	s[m_channels[1]] = m_source.GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+	s[m_channels[2]] = m_source.GeneratePRBS31(0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+	s[m_channels[3]] = m_source.Generate8b10b(0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+	s[m_channels[4]] = m_source.GenerateStep(0, 1, sampleperiod, depth);
 
 	//Timestamp the waveform(s)
 	float now = GetTime();

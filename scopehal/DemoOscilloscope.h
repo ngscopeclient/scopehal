@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -94,6 +94,13 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
+	virtual bool IsADCModeConfigurable();
+	virtual std::vector<std::string> GetADCModeNames(size_t channel);
+	virtual size_t GetADCMode(size_t channel);
+	virtual void SetADCMode(size_t channel, size_t mode);
+	virtual std::vector<AnalogBank> GetAnalogBanks();
+	virtual AnalogBank GetAnalogBank(size_t channel);
+
 	virtual unsigned int GetInstrumentTypes();
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
@@ -107,6 +114,14 @@ protected:
 	std::map<size_t, unsigned int> m_channelBandwidth;
 	std::map<size_t, double> m_channelVoltageRange;
 	std::map<size_t, double> m_channelOffset;
+	std::map<size_t, size_t> m_channelModes;
+
+	enum ChannelModes
+	{
+		CHANNEL_MODE_IDEAL,
+		CHANNEL_MODE_NOISE,
+		CHANNEL_MODE_NOISE_LPF
+	};
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;

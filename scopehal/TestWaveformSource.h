@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,15 +76,25 @@ public:
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
-		size_t depth);
+		size_t depth,
+		bool lpf = true,
+		float noise_amplitude = 0.01);
 
 	WaveformBase* Generate8b10b(
 		float amplitude,
 		float period,
 		int64_t sampleperiod,
+		size_t depth,
+		bool lpf = true,
+		float noise_amplitude = 0.01);
+
+	WaveformBase* GenerateStep(
+		float vlo,
+		float vhi,
+		int64_t sampleperiod,
 		size_t depth);
 
-	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth);
+	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth, bool lpf, float noise_amplitude);
 
 protected:
 	std::mt19937& m_rng;
