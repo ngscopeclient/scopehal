@@ -47,7 +47,7 @@ public:
 	bool LoadBIN(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
-	#pragma pack(1)
+	#pragma pack(push, 1)
 	struct FileHeader
 	{
 		char magic[2];		//File magic string ("AG" / "RG")
@@ -56,7 +56,6 @@ public:
 		uint32_t count;		//Number of waveforms
 	};
 
-	#pragma pack(1)
 	struct WaveHeader
 	{
 		uint32_t size;		//Waveform header length (0x8C)
@@ -78,7 +77,6 @@ public:
 		uint32_t segment;	//Segment number
 	};
 
-	#pragma pack(1)
 	struct DataHeader
 	{
 		uint32_t size;		//Waveform data header length
@@ -86,6 +84,7 @@ public:
 		short depth;		//Sample bit depth
 		uint32_t length;	//Data buffer length
 	};
+	#pragma pack(pop)
 
 	Unit::UnitType units[7] = {
 		Unit::UNIT_COUNTS,	//Unused
