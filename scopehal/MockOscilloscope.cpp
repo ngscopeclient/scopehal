@@ -538,7 +538,7 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	LogIndenter li_f;
 
 	string f = ReadFile(path);
-	unsigned int fpos = 0;
+	uint32_t fpos = 0;
 
 	FileHeader fh;
 	f.copy((char*)&fh, sizeof(FileHeader), fpos);
@@ -647,22 +647,23 @@ bool MockOscilloscope::LoadBIN(const string& path)
     		LogDebug("Buffer length:  %i KB\n\n\n", dh.length/1024);
 
 			//Loop through waveform samples
+			float* sample_f = nullptr;
+			uint8_t* sample_i = nullptr;
 			float sample = 0;
-			uint8_t sample_i = 0;
 			for(size_t k=0; k<wh.samples; k++)
 			{
 				if (dh.type == 6)
 				{
 					//Integer samples (digital waveforms)
-					memcpy(&sample_i, f.c_str() + fpos, 1);
-					sample = (float)sample_i;
+					sample_i = (uint8_t*)(f.c_str() + fpos);
+					sample = (float)*sample_i;
 				}
 				else
 				{
 					//Float samples (analog waveforms)
-					memcpy(&sample, f.c_str() + fpos, 4);
+					sample_f = (float*)(f.c_str() + fpos);
+					sample = *sample_f;
 				}
-				fpos += dh.depth;
 
 				//Push sample to waveform
 				wfm->m_offsets.push_back(k);
@@ -672,6 +673,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
 				//Update voltage min/max values
 				vmax = max(vmax, sample);
 				vmin = min(vmin, sample);
+
+				fpos += dh.depth;
 			}
 		}
 
