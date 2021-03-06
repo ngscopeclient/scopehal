@@ -647,34 +647,48 @@ bool MockOscilloscope::LoadBIN(const string& path)
     		LogDebug("Buffer length:  %i KB\n\n\n", dh.length/1024);
 
 			//Loop through waveform samples
-			float* sample_f = nullptr;
-			uint8_t* sample_i = nullptr;
 			float sample = 0;
-			for(size_t k=0; k<wh.samples; k++)
+			if (dh.type == 6)
 			{
-				if (dh.type == 6)
+				//Integer samples (digital waveforms)
+				uint8_t* sample_i = nullptr;
+				for(size_t k=0; k<wh.samples; k++)
 				{
-					//Integer samples (digital waveforms)
 					sample_i = (uint8_t*)(f.c_str() + fpos);
 					sample = (float)*sample_i;
+
+					//Push sample to waveform
+					wfm->m_offsets.push_back(k);
+					wfm->m_samples.push_back(sample);
+					wfm->m_durations.push_back(1);
+
+					//Update voltage min/max values
+					vmax = max(vmax, sample);
+					vmin = min(vmin, sample);
+
+					fpos += dh.depth;
 				}
-				else
+			}
+			else
+			{
+				//Float samples (analog waveforms)
+				float* sample_f = nullptr;
+				for(size_t k=0; k<wh.samples; k++)
 				{
-					//Float samples (analog waveforms)
 					sample_f = (float*)(f.c_str() + fpos);
 					sample = *sample_f;
+
+					//Push sample to waveform
+					wfm->m_offsets.push_back(k);
+					wfm->m_samples.push_back(sample);
+					wfm->m_durations.push_back(1);
+
+					//Update voltage min/max values
+					vmax = max(vmax, sample);
+					vmin = min(vmin, sample);
+
+					fpos += dh.depth;
 				}
-
-				//Push sample to waveform
-				wfm->m_offsets.push_back(k);
-				wfm->m_samples.push_back(sample);
-				wfm->m_durations.push_back(1);
-
-				//Update voltage min/max values
-				vmax = max(vmax, sample);
-				vmin = min(vmin, sample);
-
-				fpos += dh.depth;
 			}
 		}
 
