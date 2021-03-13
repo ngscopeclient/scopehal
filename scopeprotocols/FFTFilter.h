@@ -62,6 +62,8 @@ public:
 	virtual void SetVoltageRange(double range);
 	virtual void SetOffset(double offset);
 
+	virtual bool UsesCLFFT();
+
 	enum WindowFunction
 	{
 		WINDOW_RECTANGULAR,
@@ -106,6 +108,8 @@ protected:
 	std::string m_windowName;
 
 	#ifdef HAVE_CLFFT
+	cl::CommandQueue* m_queue;
+
 	clfftPlanHandle m_clfftPlan;
 
 	cl::Program* m_windowProgram;

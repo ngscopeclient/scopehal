@@ -62,6 +62,8 @@ public:
 
 	virtual void ClearSweeps();
 
+	virtual bool UsesCLFFT();
+
 	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
 
 protected:

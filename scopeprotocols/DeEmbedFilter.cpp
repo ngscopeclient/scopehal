@@ -284,6 +284,15 @@ bool DeEmbedFilter::LoadSparameters()
 	return true;
 }
 
+bool DeEmbedFilter::UsesCLFFT()
+{
+	#ifdef HAVE_CLFFT
+		return (m_clfftForwardPlan != 0);
+	#else
+		return false;
+	#endif
+}
+
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
@@ -338,54 +347,61 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 			if(g_clContext)
 			{
-				if(m_clfftForwardPlan != 0)
-					clfftDestroyPlan(&m_clfftForwardPlan);
-				if(m_clfftReversePlan != 0)
-					clfftDestroyPlan(&m_clfftReversePlan);
-
-				//Set up the FFT object
-				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
+				try
 				{
-					LogError("clfftCreateDefaultPlan failed\n");
-					abort();
-				}
-				clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
-				clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
-				clfftSetLayout(m_clfftForwardPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
-				clfftSetResultLocation(m_clfftForwardPlan, CLFFT_OUTOFPLACE);
+					if(m_clfftForwardPlan != 0)
+						clfftDestroyPlan(&m_clfftForwardPlan);
+					if(m_clfftReversePlan != 0)
+						clfftDestroyPlan(&m_clfftReversePlan);
 
-				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftReversePlan, (*g_clContext)(), CLFFT_1D, &npoints))
-				{
-					LogError("clfftCreateDefaultPlan failed\n");
-					abort();
-				}
-				clfftSetPlanBatchSize(m_clfftReversePlan, 1);
-				clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
-				clfftSetLayout(m_clfftReversePlan, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
-				clfftSetResultLocation(m_clfftReversePlan, CLFFT_OUTOFPLACE);
-				clfftSetPlanScale(m_clfftReversePlan, CLFFT_BACKWARD, 1);
+					//Set up the FFT object
+					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
+					{
+						LogError("clfftCreateDefaultPlan failed\n");
+						abort();
+					}
+					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
+					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
+					clfftSetLayout(m_clfftForwardPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
+					clfftSetResultLocation(m_clfftForwardPlan, CLFFT_OUTOFPLACE);
 
-				//Initialize the plan
-				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-				cl_command_queue q = queue();
-				auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
-				if(CLFFT_SUCCESS != err)
-				{
-					LogError("clfftBakePlan failed (%d)\n", err);
-					abort();
-				}
-				err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
-				if(CLFFT_SUCCESS != err)
-				{
-					LogError("clfftBakePlan failed (%d)\n", err);
-					abort();
-				}
+					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftReversePlan, (*g_clContext)(), CLFFT_1D, &npoints))
+					{
+						LogError("clfftCreateDefaultPlan failed\n");
+						abort();
+					}
+					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
+					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
+					clfftSetLayout(m_clfftReversePlan, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
+					clfftSetResultLocation(m_clfftReversePlan, CLFFT_OUTOFPLACE);
+					clfftSetPlanScale(m_clfftReversePlan, CLFFT_BACKWARD, 1);
 
-				//Allocate buffers
-				delete m_windowbuf;
-				delete m_fftoutbuf;
-				m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-				m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
+					//Initialize the plan
+					cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+					cl_command_queue q = queue();
+					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
+					if(CLFFT_SUCCESS != err)
+					{
+						LogError("clfftBakePlan failed (%d)\n", err);
+						abort();
+					}
+					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
+					if(CLFFT_SUCCESS != err)
+					{
+						LogError("clfftBakePlan failed (%d)\n", err);
+						abort();
+					}
+
+					//Allocate buffers
+					delete m_windowbuf;
+					delete m_fftoutbuf;
+					m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
+					m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
+				}
+				catch(const cl::Error& e)
+				{
+					LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
+				}
 			}
 
 		#endif
@@ -465,6 +481,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 				//Sync IFFT output
 				void* ptr = queue.enqueueMapBuffer(ifftoutbuf, true, CL_MAP_READ, 0, npoints * sizeof(float));
+				if(ptr == NULL)
+					LogError("memory map failed\n");
 				queue.enqueueUnmapMemObject(ifftoutbuf, ptr);
 			}
 			catch(const cl::Error& e)

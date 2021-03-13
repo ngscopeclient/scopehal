@@ -292,13 +292,13 @@ void FIRFilter::DoFilterKernelOpenCL(
 	try
 	{
 		//Allocate memory and copy to the GPU
-		cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
-		cl::Buffer coeffbuf(*g_clContext, coefficients.begin(), coefficients.end(), true, true, NULL);
-		cl::Buffer outbuf(*g_clContext, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
-		cl::Buffer minmaxbuf(*g_clContext, minmax.begin(), minmax.end(), false, true, NULL);
+		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
+		cl::Buffer inbuf(queue, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
+		cl::Buffer coeffbuf(queue, coefficients.begin(), coefficients.end(), true, true, NULL);
+		cl::Buffer outbuf(queue, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
+		cl::Buffer minmaxbuf(queue, minmax.begin(), minmax.end(), false, true, NULL);
 
 		//Run the filter
-		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
 		m_kernel->setArg(0, inbuf);
 		m_kernel->setArg(1, coeffbuf);
 		m_kernel->setArg(2, outbuf);

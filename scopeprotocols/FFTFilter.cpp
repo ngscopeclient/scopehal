@@ -76,12 +76,16 @@ FFTFilter::FFTFilter(const string& color)
 		m_normalizeLogMagnitudeKernel = NULL;
 		m_normalizeMagnitudeKernel = NULL;
 
+		m_queue = NULL;
+
 		try
 		{
 			//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
 			//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
 			if(g_clContext)
 			{
+				m_queue = new cl::CommandQueue(*g_clContext, g_contextDevices[0], 0);
+
 				//Compile window functions
 				string kernelSource = ReadFile("kernels/WindowFunctions.cl");
 				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
@@ -162,6 +166,8 @@ FFTFilter::~FFTFilter()
 		m_rectangularWindowKernel = NULL;
 		m_cosineSumWindowKernel = NULL;
 		m_blackmanHarrisWindowKernel = NULL;
+
+		delete m_queue;
 
 	#endif
 }
@@ -267,8 +273,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				clfftSetResultLocation(m_clfftPlan, CLFFT_OUTOFPLACE);
 
 				//Initialize the plan
-				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-				cl_command_queue q = queue();
+				cl_command_queue q = (*m_queue)();
 				auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
 				if(CLFFT_SUCCESS != err)
 				{
@@ -356,13 +361,12 @@ void FFTFilter::DoRefresh(
 			try
 			{
 				//Make buffers
-				cl::Buffer inbuf(*g_clContext, data.begin(), data.end(), true, true, NULL);
+				cl::Buffer inbuf(*m_queue, data.begin(), data.end(), true, true, NULL);
 				cl::Buffer windowoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
 				cl::Buffer fftoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
-				cl::Buffer outbuf(*g_clContext, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
+				cl::Buffer outbuf(*m_queue, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
 
 				//Apply the window function
-				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
 				cl::Kernel* windowKernel = NULL;
 				float windowscale = 2 * M_PI / m_cachedNumPoints;
 				switch(window)
@@ -393,10 +397,10 @@ void FFTFilter::DoRefresh(
 				windowKernel->setArg(2, m_cachedNumPoints);
 				if(window != WINDOW_RECTANGULAR)
 					windowKernel->setArg(3, windowscale);
-				queue.enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
+				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
 
 				//Run the FFT
-				cl_command_queue q = queue();
+				cl_command_queue q = (*m_queue)();
 				cl_mem inbufs[1] = { windowoutbuf() };
 				cl_mem outbufs[1] = { fftoutbuf() };
 				if(CLFFT_SUCCESS != clfftEnqueueTransform(
@@ -415,12 +419,12 @@ void FFTFilter::DoRefresh(
 				normalizeKernel->setArg(0, fftoutbuf);
 				normalizeKernel->setArg(1, outbuf);
 				normalizeKernel->setArg(2, scale);
-				queue.enqueueNDRangeKernel(
+				m_queue->enqueueNDRangeKernel(
 					*normalizeKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
 
 				//Map/unmap the buffer to synchronize output with the CPU
-				void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, nouts * sizeof(float));
-				queue.enqueueUnmapMemObject(outbuf, ptr);
+				void* ptr = m_queue->enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, nouts * sizeof(float));
+				m_queue->enqueueUnmapMemObject(outbuf, ptr);
 			}
 			catch(const cl::Error& e)
 			{
@@ -464,6 +468,15 @@ void FFTFilter::DoRefresh(
 
 	//Peak search
 	FindPeaks(cap);
+}
+
+bool FFTFilter::UsesCLFFT()
+{
+	#ifdef HAVE_CLFFT
+		return (m_clfftPlan != 0);
+	#else
+		return false;
+	#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

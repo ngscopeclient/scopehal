@@ -168,6 +168,13 @@ public:
 
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
+	/**
+		@brief Returns true if this filter uses the clFFT library.
+
+		Needed to enable some workarounds for broken OpenCL stacks.
+	 */
+	virtual bool UsesCLFFT();
+
 protected:
 
 	///Group used for the display menu
