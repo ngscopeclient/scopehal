@@ -103,6 +103,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		chan->SetDefaultDisplayName();
 
 		//Set initial configuration so we have a well-defined instrument state
+		m_channelAttenuations[i] = 1;
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
 		SetChannelOffset(i, 0);
 		SetChannelVoltageRange(i, 5);
@@ -122,6 +123,15 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
 	if(!csock)
 		LogFatal("PicoOscilloscope expects a SCPISocketTransport\n");
+
+	//Configure the trigger
+	auto trig = new EdgeTrigger(this);
+	trig->SetType(EdgeTrigger::EDGE_RISING);
+	trig->SetLevel(0);
+	trig->SetInput(0, StreamDescriptor(m_channels[0]));
+	SetTrigger(trig);
+	m_triggerOffset = 0;
+	PushTrigger();
 
 	//For now, assume control plane port is data plane +1
 	LogDebug("Connecting to data plane socket\n");
@@ -224,19 +234,28 @@ void PicoOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Couplin
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
-	return 1;
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelAttenuations[i];
 }
 
 void PicoOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	double oldAtten = m_channelAttenuations[i];
+	m_channelAttenuations[i] = atten;
+
+	//Rescale channel voltage range and offset
+	double delta = atten / oldAtten;
+	m_channelVoltageRanges[i] *= delta;
+	m_channelOffsets[i] *= delta;
 }
 
-int PicoOscilloscope::GetChannelBandwidthLimit(size_t i)
+int PicoOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	return 0;
 }
 
-void PicoOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
+void PicoOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
 {
 }
 
@@ -255,7 +274,7 @@ void PicoOscilloscope::SetChannelVoltageRange(size_t i, double range)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range);
+	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
 	m_transport->SendCommand(buf);
 }
 
@@ -280,7 +299,7 @@ void PicoOscilloscope::SetChannelOffset(size_t i, double offset)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), offset);
+	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
 	m_transport->SendCommand(buf);
 }
 
@@ -318,6 +337,7 @@ bool PicoOscilloscope::AcquireData()
 			return false;
 		if(!m_dataSocket->ReadRawData(sizeof(scale), (uint8_t*)&scale))
 			return false;
+		scale *= GetChannelAttenuation(chnum);
 
 		//TODO: stream timestamp from the server
 
@@ -497,34 +517,14 @@ void PicoOscilloscope::SetSampleRate(uint64_t rate)
 
 void PicoOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
-
-	double offsetval = (double)offset / FS_PER_SECOND;
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":TIM:MAIN:OFFS %f", offsetval);
-	m_transport->SendCommand(buf);
-	*/
+	m_triggerOffset = offset;
+	PushTrigger();
 }
 
 int64_t PicoOscilloscope::GetTriggerOffset()
 {
-	/*
-	if(m_triggerOffsetValid)
-		return m_triggerOffset;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand(":TIM:MAIN:OFFS?");
-	string ret = m_transport->ReadReply();
-
-	double offsetval;
-	sscanf(ret.c_str(), "%lf", &offsetval);
-	m_triggerOffset = (uint64_t)(offsetval * FS_PER_SECOND);
-	m_triggerOffsetValid = true;
 	return m_triggerOffset;
-	*/
-	return 0;
 }
 
 bool PicoOscilloscope::IsInterleaving()
@@ -541,79 +541,17 @@ bool PicoOscilloscope::SetInterleaving(bool /*combine*/)
 
 void PicoOscilloscope::PullTrigger()
 {
-	/*
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Figure out what kind of trigger is active.
-	m_transport->SendCommand(":TRIG:MODE?");
-	string reply = m_transport->ReadReply();
-	if (reply == "EDGE")
-		PullEdgeTrigger();
-
-	//Unrecognized trigger type
-	else
-	{
-		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
-		m_trigger = NULL;
-		return;
-	}
-	*/
-}
-
-/**
-	@brief Reads settings for an edge trigger from the instrument
- */
-void PicoOscilloscope::PullEdgeTrigger()
-{
-	/*
-	//Clear out any triggers of the wrong type
-	if( (m_trigger != NULL) && (dynamic_cast<EdgeTrigger*>(m_trigger) != NULL) )
-	{
-		delete m_trigger;
-		m_trigger = NULL;
-	}
-
-	//Create a new trigger if necessary
-	if(m_trigger == NULL)
-		m_trigger = new EdgeTrigger(this);
-	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Source
-	m_transport->SendCommand(":TRIG:EDGE:SOUR?");
-	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
-	et->SetInput(0, StreamDescriptor(chan, 0), true);
-	if(!chan)
-		LogWarning("Unknown trigger source %s\n", reply.c_str());
-
-	//Level
-	m_transport->SendCommand(":TRIG:EDGE:LEV?");
-	reply = m_transport->ReadReply();
-	et->SetLevel(stof(reply));
-
-	//Edge slope
-	m_transport->SendCommand(":TRIG:EDGE:SLOPE?");
-	reply = m_transport->ReadReply();
-	if (reply == "POS")
-		et->SetType(EdgeTrigger::EDGE_RISING);
-	else if (reply == "NEG")
-		et->SetType(EdgeTrigger::EDGE_FALLING);
-	else if (reply == "RFAL")
-		et->SetType(EdgeTrigger::EDGE_ANY);
-		*/
+	//pulling not needed, we always have a valid trigger cached
 }
 
 void PicoOscilloscope::PushTrigger()
 {
-	/*
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	if(et)
 		PushEdgeTrigger(et);
 
 	else
-		LogWarning("Unknown trigger type (not an edge)\n");*/
+		LogWarning("Unknown trigger type (not an edge)\n");
 }
 
 /**
@@ -621,35 +559,36 @@ void PicoOscilloscope::PushTrigger()
  */
 void PicoOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//Type
-	m_transport->SendCommand(":TRIG:MODE EDGE");
+	//m_transport->SendCommand(":TRIG:MODE EDGE");
+
+	//Delay
+	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
 
 	//Source
-	m_transport->SendCommand(":TRIG:EDGE:SOUR " + trig->GetInput(0).m_channel->GetHwname());
+	m_transport->SendCommand("TRIG:SOU " + trig->GetInput(0).m_channel->GetHwname());
 
 	//Level
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":TRIG:EDGE:LEV %f", trig->GetLevel());
+	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel());
 	m_transport->SendCommand(buf);
 
 	//Slope
 	switch(trig->GetType())
 	{
 		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE POS");
+			m_transport->SendCommand("TRIG:EDGE:DIR RISING");
 			break;
 		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE NEG");
+			m_transport->SendCommand("TRIG:EDGE:DIR FALLING");
 			break;
 		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand(":TRIG:EDGE:SLOPE RFAL");
+			m_transport->SendCommand("TRIG:EDGE:DIR ANY");
 			break;
 		default:
 			LogWarning("Unknown edge type\n");
 			return;
 	}
-	*/
 }

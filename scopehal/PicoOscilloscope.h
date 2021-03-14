@@ -113,28 +113,10 @@ protected:
 	bool m_triggerOneShot;
 	uint64_t m_srate;
 	uint64_t m_mdepth;
-
-	/*
-
-
-	//config cache
-	std::map<size_t, double> m_channelAttenuations;
-	std::map<size_t, unsigned int> m_channelBandwidthLimits;
-	std::map<int, bool> m_channelsEnabled;
-	bool m_mdepthValid;
 	int64_t m_triggerOffset;
-	bool m_triggerOffsetValid;
+	std::map<size_t, double> m_channelAttenuations;
 
-	bool m_triggerWasLive;
-	bool m_triggerOneShot;
-
-	int m_modelNumber;
-	unsigned int m_bandwidth;
-	bool m_opt200M;
-	protocol_version m_protocol;
-	*/
 	void PushEdgeTrigger(EdgeTrigger* trig);
-	void PullEdgeTrigger();
 
 	SCPITransport* m_dataSocket;
 
