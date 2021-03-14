@@ -960,16 +960,18 @@ vector<size_t> Filter::MakeHistogram(AnalogWaveform* cap, float low, float high,
 	for(size_t i=0; i<bins; i++)
 		ret.push_back(0);
 
+	//Early out if we have zero span
+	if(bins == 0)
+		return ret;
+
 	float delta = high-low;
 
 	for(float v : cap->m_samples)
 	{
 		float fbin = (v-low) / delta;
 		size_t bin = floor(fbin * bins);
-		if(fbin < 0)
-			bin = 0;
-		if(bin >= bins)
-			bin = bin-1;
+		bin = max(bin, (size_t)0);
+		bin = min(bin, bins-1);
 		ret[bin] ++;
 	}
 
