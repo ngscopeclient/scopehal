@@ -51,6 +51,12 @@ FlowGraphNode::FlowGraphNode()
 
 FlowGraphNode::~FlowGraphNode()
 {
+	//Release any inputs we currently have refs to
+	for(auto c : m_inputs)
+	{
+		if(c.m_channel != NULL)
+			c.m_channel->Release();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
