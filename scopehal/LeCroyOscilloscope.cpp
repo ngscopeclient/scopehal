@@ -189,6 +189,17 @@ void LeCroyOscilloscope::IdentifyHardware()
 
 		m_maxBandwidth = stoi(m_model.substr(3, 2)) * 1000;
 	}
+	else if(m_model.find("SDA8") == 0)
+	{
+		if(m_model.find("ZI-B") != string::npos)
+			m_modelid = MODEL_SDA_8ZI_B;
+		else if(m_model.find("ZI-A") != string::npos)
+			m_modelid = MODEL_SDA_8ZI_A;
+		else
+			m_modelid = MODEL_SDA_8ZI;
+
+		m_maxBandwidth = stoi(m_model.substr(4, 2)) * 1000;
+	}
 	else if(m_model.find("WAVERUNNER8") == 0)
 	{
 		m_modelid = MODEL_WAVERUNNER_8K;
@@ -732,6 +743,7 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	* WAVERUNNER8104-MS has 4 channels (plus 16 digital)
 	* DDA5005 / DDA5005A have 4 channels
 	* SDA3010 have 4 channels
+	* SDA8xxZi have 4 channels
 	* LabMaster just calls itself "MCM-Zi-A" and there's no information on the number of modules!
  */
 void LeCroyOscilloscope::DetectAnalogChannels()
@@ -744,6 +756,14 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 		//SDA3010 have 4 channels despite a model number ending in 0
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
+			nchans = 4;
+			break;
+
+		//All SDA / WaveMaster 8Zi have 4 channels
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_B:
 			nchans = 4;
 			break;
 
