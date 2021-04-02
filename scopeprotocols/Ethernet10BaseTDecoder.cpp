@@ -84,9 +84,9 @@ void Ethernet10BaseTDecoder::Refresh()
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
-	const int64_t ui_width 		= 100000;
-	const int64_t ui_halfwidth 	= 50000;
-	const int64_t jitter_tol 	= 10000;
+	const int64_t ui_width 		= 100000 * 1000;
+	const int64_t ui_halfwidth 	= 50000 * 1000;
+	const int64_t jitter_tol 	= 10000 * 1000;
 
 	const int64_t eye_start = ui_halfwidth - jitter_tol;
 	const int64_t eye_end = ui_halfwidth + jitter_tol;
@@ -118,7 +118,7 @@ void Ethernet10BaseTDecoder::Refresh()
 		bool current_state = false;
 		int64_t ui_start = din->m_offsets[i] * cap->m_timescale;
 		int64_t byte_start = ui_start;
-		//LogDebug("[T = %.3f ns] Found initial falling edge\n", ui_start * 1e-3f);
+		//LogDebug("[T = %.3f ns] Found initial falling edge\n", ui_start * 1e-6f);
 		while(i < len)
 		{
 			//When we get here, i points to the start of our UI
@@ -136,10 +136,10 @@ void Ethernet10BaseTDecoder::Refresh()
 			int64_t edgepos = din->m_offsets[i] * cap->m_timescale;
 			int64_t delta = edgepos - ui_start;
 			/*LogDebug("[T = %.3f ns] Found edge! edgepos=%d ui_start = %d, Delta = %.3f ns (%.2f UI)\n",
-				edgepos * 1e-3f,
+				edgepos * 1e-6f,
 				(int)edgepos,
 				(int)ui_start,
-				delta * 1e-3f,
+				delta * 1e-6f,
 				delta * 1.0f / ui_width);*/
 			if(delta > 10 * ui_width)
 			{
