@@ -79,10 +79,10 @@ void Ethernet100BaseTDecoder::Refresh()
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 
-	const int64_t ui_width 			= 8000;
+	const int64_t ui_width 			= 8000000;
 	const int64_t ui_width_samples	= ui_width / din->m_timescale;
-	//const int64_t ui_halfwidth 		= 4000;
-	//const int64_t jitter_tol 		= 1500;
+	//const int64_t ui_halfwidth 		= 4000000;
+	//const int64_t jitter_tol 		= 1500000;
 
 	//Logical voltage of each point after some hysteresis
 	vector<EmptyConstructorWrapper<int>> voltages;
