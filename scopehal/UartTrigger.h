@@ -58,7 +58,9 @@ public:
 	{
 		PARITY_NONE,
 		PARITY_ODD,
-		PARITY_EVEN
+		PARITY_EVEN,
+                PARITY_MARK,
+                PARITY_SPACE
 	};
 
 	void SetParityType(ParityType type)
@@ -70,7 +72,9 @@ public:
 	enum MatchType
 	{
 		TYPE_DATA,
-		TYPE_PARITY_ERR
+		TYPE_PARITY_ERR,
+                TYPE_START,
+                TYPE_STOP
 	};
 
 	void SetMatchType(MatchType type)

@@ -51,6 +51,7 @@ public:
 	virtual std::string GetConnectionString();
 	static std::string GetTransportName();
 
+	virtual void FlushRXBuffer(void);
 	virtual bool SendCommand(const std::string& cmd);
 	virtual std::string ReadReply(bool endOnSemicolon = true);
 	virtual size_t ReadRawData(size_t len, unsigned char* buf);

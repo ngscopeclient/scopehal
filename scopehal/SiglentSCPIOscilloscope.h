@@ -3,6 +3,8 @@
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Contributions (c) 2021 Dave Marples                                                                                  *
+*                                                                                                                      *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -11,7 +13,7 @@
 *    * Redistributions of source code must retain the above copyright notice, this list of conditions, and the         *
 *      following disclaimer.                                                                                           *
 *                                                                                                                      *
-*    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the       *
+*    * Redistributions in binary form must reproduce the above copyright notice, this list of condibtions and the       *
 *      following disclaimer in the documentation and/or other materials provided with the distribution.                *
 *                                                                                                                      *
 *    * Neither the name of the author nor the names of any contributors may be used to endorse or promote products     *
@@ -30,177 +32,263 @@
 #ifndef SiglentSCPIOscilloscope_h
 #define SiglentSCPIOscilloscope_h
 
-#include "../xptools/Socket.h"
+#include <mutex>
 
-#include "LeCroyOscilloscope.h"
-
-// temp forward declaration
-struct SiglentWaveformDesc_t;
+class DropoutTrigger;
+class EdgeTrigger;
+class GlitchTrigger;
+class PulseWidthTrigger;
+class RuntTrigger;
+class SlewRateTrigger;
+class UartTrigger;
+class WindowTrigger;
 
 /**
-	@brief A Siglent SCPI (SCPI/TCP) oscilloscope
+	@brief A Siglent new generation scope based on linux (SDS2000X+/SDS5000/SDS6000)
 
-	Protocol layer is based on Siglent's reference manual
-	Implementation here modeled off of the LeCroy support in LeCroyVICPOscilloscope.cpp
  */
-class SiglentSCPIOscilloscope
-	: public LeCroyOscilloscope
+
+#define MAX_ANALOG 4
+#define WAVEDESC_SIZE 346
+
+// These scopes will actually sample 200MPoints, but the maxiumum it can transfer in one
+// chunk is 10MPoints
+#define WAVEFORM_SIZE (20 * 1000 * 1000)
+
+class SiglentSCPIOscilloscope : public SCPIOscilloscope
 {
 public:
 	SiglentSCPIOscilloscope(SCPITransport* transport);
 	virtual ~SiglentSCPIOscilloscope();
 
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	//not copyable or assignable
+	SiglentSCPIOscilloscope(const SiglentSCPIOscilloscope& rhs) = delete;
+	SiglentSCPIOscilloscope& operator=(const SiglentSCPIOscilloscope& rhs) = delete;
 
-	virtual bool AcquireData();
+private:
+	std::string converse(const char* fmt, ...);
+	void sendOnly(const char* fmt, ...);
 
 protected:
+	void IdentifyHardware();
+	void SharedCtorInit();
+	virtual void DetectAnalogChannels();
+	void AddDigitalChannels(unsigned int count);
+	void DetectOptions();
 
-	void ReadWaveDescriptorBlock(SiglentWaveformDesc_t *descriptor, unsigned int channel);
-	int ReadWaveHeader(char *header);
+public:
+	//Device information
+	virtual std::string GetName();
+	virtual std::string GetVendor();
+	virtual std::string GetSerial();
+	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetMeasurementTypes();
 
-	bool m_acquiredDataIsSigned;
-	bool m_hasVdivAttnBug;
+	virtual void FlushConfigCache();
+
+	//Channel configuration
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual bool CanEnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
+	virtual double GetChannelAttenuation(size_t i);
+	virtual void SetChannelAttenuation(size_t i, double atten);
+	virtual int GetChannelBandwidthLimit(size_t i);
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
+	virtual double GetChannelVoltageRange(size_t i);
+	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual OscilloscopeChannel* GetExternalTrigger();
+	virtual double GetChannelOffset(size_t i);
+	virtual void SetChannelOffset(size_t i, double offset);
+	virtual std::string GetChannelDisplayName(size_t i);
+	virtual void SetChannelDisplayName(size_t i, std::string name);
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
+	virtual bool CanInvert(size_t i);
+	virtual void Invert(size_t i, bool invert);
+	virtual bool IsInverted(size_t i);
+
+	//Triggering
+	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool AcquireData();
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void Stop();
+	virtual bool IsTriggerArmed();
+	virtual void PushTrigger();
+	virtual void PullTrigger();
+	virtual void EnableTriggerOutput();
+	virtual std::vector<std::string> GetTriggerTypes();
+
+	//Scope models.
+	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
+	enum Model
+	{
+		MODEL_SIGLENT_SDS2000XP,
+		MODEL_SIGLENT_SDS5000X,
+		MODEL_UNKNOWN
+	};
+
+	Model GetModelID() { return m_modelid; }
+
+	//Timebase
+	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
+	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
+	virtual void SetSampleDepth(uint64_t depth);
+	virtual void SetSampleRate(uint64_t rate);
+	virtual void SetUseExternalRefclk(bool external);
+	virtual bool IsInterleaving();
+	virtual bool SetInterleaving(bool combine);
+
+	virtual void SetTriggerOffset(int64_t offset);
+	virtual int64_t GetTriggerOffset();
+	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
+	virtual int64_t GetDeskewForChannel(size_t channel);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Logic analyzer configuration
+
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+	virtual DigitalBank GetDigitalBank(size_t channel);
+	virtual bool IsDigitalHysteresisConfigurable();
+	virtual bool IsDigitalThresholdConfigurable();
+	virtual float GetDigitalHysteresis(size_t channel);
+	virtual float GetDigitalThreshold(size_t channel);
+	virtual void SetDigitalHysteresis(size_t channel, float level);
+	virtual void SetDigitalThreshold(size_t channel, float level);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// ADC bit depth configuration
+
+	//All currently supported Sig2 scopes have only one analog bank (same ADC config for all channels)
+	//so no need to override those
+
+	virtual bool IsADCModeConfigurable();
+	virtual std::vector<std::string> GetADCModeNames(size_t channel);
+	virtual size_t GetADCMode(size_t channel);
+	virtual void SetADCMode(size_t channel, size_t mode);
+
+protected:
+	void PullDropoutTrigger();
+	void PullEdgeTrigger();
+	void PullPulseWidthTrigger();
+	void PullRuntTrigger();
+	void PullSlewRateTrigger();
+	void PullUartTrigger();
+	void PullWindowTrigger();
+	void PullTriggerSource(Trigger* trig, std::string triggerModeName);
+
+	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
+	Trigger::Condition GetCondition(std::string reply);
+
+	void PushDropoutTrigger(DropoutTrigger* trig);
+	void PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType);
+	void PushGlitchTrigger(GlitchTrigger* trig);
+	void PushCondition(const std::string& path, Trigger::Condition cond);
+	void PushPatternCondition(const std::string& path, Trigger::Condition cond);
+	void PushFloat(std::string path, float f);
+	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
+	void PushRuntTrigger(RuntTrigger* trig);
+	void PushSlewRateTrigger(SlewRateTrigger* trig);
+	void PushUartTrigger(UartTrigger* trig);
+	void PushWindowTrigger(WindowTrigger* trig);
+
+	void BulkCheckChannelEnableState();
+
+	std::string GetPossiblyEmptyString(const std::string& property);
+
+	//  bool ReadWaveformBlock(std::string& data);
+	int ReadWaveformBlock(uint32_t maxsize, char* data);
+	//  	bool ReadWavedescs(
+	//		std::vector<std::string>& wavedescs,
+	//		bool* enabled,
+	//		unsigned int& firstEnabledChannel,
+	//		bool& any_enabled);
+	bool ReadWavedescs(
+		char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled);
+
+	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
+	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
+
+	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
+		size_t datalen,
+		char* wavedesc,
+		uint32_t num_sequences,
+		time_t ttime,
+		double basetime,
+		double* wavetime);
+	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
+
+	void Convert8BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void Convert8BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+
+	//hardware analog channel count, independent of LA option etc
+	unsigned int m_analogChannelCount;
+	unsigned int m_digitalChannelCount;
+	size_t m_digitalChannelBase;
+
+	Model m_modelid;
+
+	//set of SW/HW options we have
+	bool m_hasLA;
+	bool m_hasDVM;
+	bool m_hasFunctionGen;
+	bool m_hasFastSampleRate;	 //-M models
+	int m_memoryDepthOption;	 //0 = base, after that number is max sample count in millions
+	bool m_hasI2cTrigger;
+	bool m_hasSpiTrigger;
+	bool m_hasUartTrigger;
+
+	///Maximum bandwidth we support, in MHz
+	unsigned int m_maxBandwidth;
+
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+
+	// Transfer buffer. This is a bit hacky
+	char m_analogWaveformData[MAX_ANALOG][WAVEFORM_SIZE];
+	int m_analogWaveformDataSize[MAX_ANALOG];
+	char m_wavedescs[MAX_ANALOG][WAVEDESC_SIZE];
+	char m_digitalWaveformDataBytes[WAVEFORM_SIZE];
+	std::string m_digitalWaveformData;
+
+	//Cached configuration
+	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<size_t, double> m_channelOffsets;
+	std::map<int, bool> m_channelsEnabled;
+	bool m_sampleRateValid;
+	int64_t m_sampleRate;
+	bool m_memoryDepthValid;
+	int64_t m_memoryDepth;
+	bool m_triggerOffsetValid;
+	int64_t m_triggerOffset;
+	std::map<size_t, int64_t> m_channelDeskew;
+	bool m_interleaving;
+	bool m_interleavingValid;
+	Multimeter::MeasurementTypes m_meterMode;
+	bool m_meterModeValid;
+	std::map<size_t, bool> m_probeIsActive;
+
+	//True if we have >8 bit capture depth
+	bool m_highDefinition;
+
+	//External trigger input
+	OscilloscopeChannel* m_extTrigChannel;
+	std::vector<OscilloscopeChannel*> m_digitalChannels;
+
+	//Mutexing for thread safety
+	std::recursive_mutex m_cacheMutex;
 
 public:
 	static std::string GetDriverNameInternal();
-
 	OSCILLOSCOPE_INITPROC(SiglentSCPIOscilloscope)
-
 };
-
-#pragma pack(1)
-
-struct SignalWaveformTimestamp_t
-{
-	double Seconds;
-	uint8_t Minutes;
-	uint8_t Hours;
-	uint8_t Days;
-	uint8_t Months;
-	uint16_t Years;
-	uint16_t Unused;
-};
-
-#pragma pack(1)
-struct SiglentWaveformDesc_t
-{
-	// nominally always "WAVEDESC"
-	char DescName[16];
-	// nominally always "WAVEACE"
-	char TemplateName[16];
-	// 0: byte, 1: word (error if != 0...)
-	uint16_t CommType;
-	// 0: big endian, 1: little endian
-	uint16_t CommOrder;
-	// length of wave descriptor (this block)
-	uint32_t WaveDescLen;
-	// length of user text block
-	uint32_t UserTextLen;
-	// length of whatever ResDesc1 is
-	uint32_t ResDesc1Len;
-	// length of TRIGTIME array
-	uint32_t TriggerTimeArrayLen;
-	// length of RIS_TIME array
-	uint32_t RISTimeArrayLen;
-	// weird reserved array
-	uint32_t ReservedArrayLen;
-	// length of the actual sample data
-	uint32_t WaveformArrayLen;
-	// length of the second waveform (?)
-	uint32_t Waveform2ArrayLen;
-	// two reserved entries
-	uint32_t ReservedLen1;
-	uint32_t ReservedLen2;
-	// Instrument name
-	char InstrumentName[16];
-	uint32_t InstrumentNumber;
-	// seems to be garbage
-	char TraceLabel[16];
-	uint16_t ReservedWord1;
-	uint16_t ReservedWord2;
-	// Num. points in data array (not bytes!)
-	uint32_t WaveArrayCount;
-	uint32_t PointsPerScreen;
-	uint32_t FirstValidPoint;
-	uint32_t LastValidPoint;
-	uint32_t FirstPoint;
-	uint32_t SparsingFactor;
-	uint32_t SegmentIndex;
-	uint32_t SubarrayCount;
-	uint32_t SweepsPerAcquisition;
-	// Apparently used for peak detect
-	uint16_t PointsPerPair;
-	uint16_t PairOffset;
-	float VerticalGain;
-	float VerticalOffset;
-	float MaximumValue;
-	float MinumumValue;
-	// scope makes a guess as to bitness...
-	uint16_t NominalBits;
-	uint16_t NominalSubarrayCount;
-	float HorizontalInterval;
-	double HorizontalOffset;
-	double PixelOffset;
-	char VerticalUnit[48];
-	char HorizontalUnit[48];
-	// jitter between acquisitions
-	float HorizontalUncertainty;
-	struct SignalWaveformTimestamp_t Timestamp;
-	float AcquisitionDuration;
-	/*
-		0: single sweep
-		1: interleaved
-		2: histogram
-		3: graph
-		4: filter coefficient
-		5: complex
-		6: extrema
-		7: sequence (obsolete?)
-		8: centered RIS
-		9: peak detect
-	*/
-	uint16_t RecordType;
-	/*
-		0: no processing
-		1: fir filter
-		2: interpolated
-		3: sparsed
-		4: autoscaled
-		5: no result (?)
-		6: rolling
-		7: cumulative
-	*/
-	uint16_t ProcessingDone;
-	uint16_t ReservedWord5;
-	uint16_t RISSweeps;
-	// enum from 0..35 for 200ps..100s
-	// 100 -> external
-	uint16_t Timebase;
-	/*
-		0: DC
-		1: AC
-		2: GND
-	*/
-	uint16_t VerticalCoupling;
-	float ProbeAttenuation;
-	uint16_t FixedVerticalGain;
-	/*
-		0: off
-		1: 20M
-		2: 200M
-	*/
-	uint16_t BandwidthLimit;
-	float VerticalVernier;
-	float AcquisitionVerticalOffset;
-	/*
-		0: Chan 1
-		1: Chan 2
-		2: Chan 3
-		3: Chan 4
-		9: Unknown
-	*/
-	uint16_t WaveformSource;
-};
-
 #endif

@@ -145,6 +145,12 @@ string SCPISocketTransport::ReadReply(bool endOnSemicolon)
 	return ret;
 }
 
+void SCPISocketTransport::FlushRXBuffer(void)
+
+{
+	m_socket.FlushRxBuffer();
+}
+
 void SCPISocketTransport::SendRawData(size_t len, const unsigned char* buf)
 {
 	m_socket.SendLooped(buf, len);
