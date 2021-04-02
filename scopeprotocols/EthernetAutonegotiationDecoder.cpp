@@ -110,7 +110,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	{
 		bool sample_value = (din->m_samples[i] > 1.25);
 		int64_t tm = din->m_offsets[i] * din->m_timescale;
-		float dt = (tm - last_pulse) * 1e-6f;
+		float dt = (tm - last_pulse) * 1e-9f;
 
 		if(sample_value && !old_value)
 		{
