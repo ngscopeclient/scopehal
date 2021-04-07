@@ -43,6 +43,8 @@
 #undef PARITY_NONE
 #undef PARITY_ODD
 #undef PARITY_EVEN
+#undef PARITY_MARK
+#undef PARITY_SPACE
 #endif
 
 /**
