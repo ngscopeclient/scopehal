@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,29 +30,58 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DDR3Decoder
+	@brief Base class for all SDRAM decodes
  */
+#ifndef SDRAMDecoder_h
+#define SDRAMDecoder_h
 
-#ifndef DDR3Decoder_h
-#define DDR3Decoder_h
-
-#include "SDRAMDecoderBase.h"
-
-class DDR3Decoder : public SDRAMDecoderBase
+class SDRAMSymbol
 {
 public:
-	DDR3Decoder(const std::string& color);
+	enum stype
+	{
+		TYPE_MRS,
+		TYPE_REF,
+		TYPE_PRE,
+		TYPE_PREA,
+		TYPE_ACT,
+		TYPE_WR,
+		TYPE_WRA,
+		TYPE_RD,
+		TYPE_RDA,
 
-	virtual void Refresh();
+		TYPE_ERROR
+	};
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	SDRAMSymbol()
+	{}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	SDRAMSymbol(stype t, int bank = 0)
+	 : m_stype(t)
+	 , m_bank(bank)
+	{}
 
-	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
+	stype m_stype;
+	int m_bank;
 
-protected:
+	bool operator== (const SDRAMSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_bank == s.m_bank);
+	}
+};
+
+typedef Waveform<SDRAMSymbol> SDRAMWaveform;
+
+class SDRAMDecoderBase : public Filter
+{
+public:
+	SDRAMDecoderBase(const std::string& color);
+	virtual ~SDRAMDecoderBase();
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual bool NeedsConfig();
 };
 
 #endif

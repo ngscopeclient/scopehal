@@ -55,7 +55,7 @@ bool DramRefreshActivateMeasurement::ValidateChannel(size_t i, StreamDescriptor 
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<DDR3Waveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
 		return true;
 
 	return false;
@@ -110,7 +110,7 @@ void DramRefreshActivateMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = dynamic_cast<DDR3Waveform*>(GetInputWaveform(0));
+	auto din = dynamic_cast<SDRAMWaveform*>(GetInputWaveform(0));
 
 	//Create the output
 	auto cap = new AnalogWaveform;
@@ -133,11 +133,11 @@ void DramRefreshActivateMeasurement::Refresh()
 			continue;
 
 		//If it's a refresh, update the last refresh time
-		if(sample.m_stype == DDR3Symbol::TYPE_REF)
+		if(sample.m_stype == SDRAMSymbol::TYPE_REF)
 			lastRef[sample.m_bank] = din->m_offsets[i] * din->m_timescale;
 
 		//If it's an activate, measure the latency
-		else if(sample.m_stype == DDR3Symbol::TYPE_ACT)
+		else if(sample.m_stype == SDRAMSymbol::TYPE_ACT)
 		{
 			int64_t tact = din->m_offsets[i] * din->m_timescale;
 

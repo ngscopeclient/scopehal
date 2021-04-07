@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,32 +27,108 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DDR3Decoder
- */
-
-#ifndef DDR3Decoder_h
-#define DDR3Decoder_h
-
+#include "../scopehal/scopehal.h"
 #include "SDRAMDecoderBase.h"
+#include <algorithm>
 
-class DDR3Decoder : public SDRAMDecoderBase
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SDRAMDecoderBase
+
+SDRAMDecoderBase::SDRAMDecoderBase(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
 {
-public:
-	DDR3Decoder(const std::string& color);
 
-	virtual void Refresh();
+}
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+SDRAMDecoderBase::~SDRAMDecoderBase()
+{
+}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	PROTOCOL_DECODER_INITPROC(DDR3Decoder)
+bool SDRAMDecoderBase::NeedsConfig()
+{
+	return true;
+}
 
-protected:
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pretty printing
 
-#endif
+Gdk::Color SDRAMDecoderBase::GetColor(int i)
+{
+	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
+	if(capture != NULL)
+	{
+		const SDRAMSymbol& s = capture->m_samples[i];
+
+		switch(s.m_stype)
+		{
+			case SDRAMSymbol::TYPE_MRS:
+			case SDRAMSymbol::TYPE_REF:
+			case SDRAMSymbol::TYPE_PRE:
+			case SDRAMSymbol::TYPE_PREA:
+				return m_standardColors[COLOR_CONTROL];
+
+			case SDRAMSymbol::TYPE_ACT:
+			case SDRAMSymbol::TYPE_WR:
+			case SDRAMSymbol::TYPE_WRA:
+			case SDRAMSymbol::TYPE_RD:
+			case SDRAMSymbol::TYPE_RDA:
+				return m_standardColors[COLOR_ADDRESS];
+
+			case SDRAMSymbol::TYPE_ERROR:
+			default:
+				return m_standardColors[COLOR_ERROR];
+		}
+	}
+
+	//error
+	return m_standardColors[COLOR_ERROR];
+}
+
+string SDRAMDecoderBase::GetText(int i)
+{
+	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
+	if(capture != NULL)
+	{
+		const SDRAMSymbol& s = capture->m_samples[i];
+
+		switch(s.m_stype)
+		{
+			case SDRAMSymbol::TYPE_MRS:
+				return "MRS";
+
+			case SDRAMSymbol::TYPE_REF:
+				return "REF";
+
+			case SDRAMSymbol::TYPE_PRE:
+				return "PRE";
+
+			case SDRAMSymbol::TYPE_PREA:
+				return "PREA";
+
+			case SDRAMSymbol::TYPE_ACT:
+				return "ACT";
+
+			case SDRAMSymbol::TYPE_WR:
+				return "WR";
+
+			case SDRAMSymbol::TYPE_WRA:
+				return "WRA";
+
+			case SDRAMSymbol::TYPE_RD:
+				return "RD";
+
+			case SDRAMSymbol::TYPE_RDA:
+				return "RDA";
+
+			case SDRAMSymbol::TYPE_ERROR:
+			default:
+				return "ERR";
+		}
+	}
+	return "";
+}

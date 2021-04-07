@@ -55,7 +55,7 @@ bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, StreamDescriptor
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<DDR3Waveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
 		return true;
 
 	return false;
@@ -110,7 +110,7 @@ void DramRowColumnLatencyMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = dynamic_cast<DDR3Waveform*>(GetInputWaveform(0));
+	auto din = dynamic_cast<SDRAMWaveform*>(GetInputWaveform(0));
 
 	//Create the output
 	auto cap = new AnalogWaveform;
@@ -133,14 +133,14 @@ void DramRowColumnLatencyMeasurement::Refresh()
 			continue;
 
 		//If it's an activate, update the last activation time
-		if(sample.m_stype == DDR3Symbol::TYPE_ACT)
+		if(sample.m_stype == SDRAMSymbol::TYPE_ACT)
 			lastAct[sample.m_bank] = tnow;
 
 		//If it's a read or write, measure the latency
-		else if( (sample.m_stype == DDR3Symbol::TYPE_WR) |
-			(sample.m_stype == DDR3Symbol::TYPE_WRA) |
-			(sample.m_stype == DDR3Symbol::TYPE_RD) |
-			(sample.m_stype == DDR3Symbol::TYPE_RDA) )
+		else if( (sample.m_stype == SDRAMSymbol::TYPE_WR) |
+			(sample.m_stype == SDRAMSymbol::TYPE_WRA) |
+			(sample.m_stype == SDRAMSymbol::TYPE_RD) |
+			(sample.m_stype == SDRAMSymbol::TYPE_RDA) )
 		{
 			int64_t tcol = tnow;
 

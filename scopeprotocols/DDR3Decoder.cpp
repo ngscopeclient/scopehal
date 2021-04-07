@@ -43,7 +43,7 @@ using namespace std;
 // Construction / destruction
 
 DDR3Decoder::DDR3Decoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: SDRAMDecoderBase(color)
 {
 	CreateInput("CLK");
 	CreateInput("WE#");
@@ -56,11 +56,6 @@ DDR3Decoder::DDR3Decoder(const string& color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool DDR3Decoder::NeedsConfig()
-{
-	return true;
-}
 
 bool DDR3Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
@@ -121,7 +116,7 @@ void DDR3Decoder::Refresh()
 	SampleOnRisingEdges(caps[6], cclk, a10);
 
 	//Create the capture
-	auto cap = new DDR3Waveform;
+	auto cap = new SDRAMWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
 	cap->m_startFemtoseconds = 0;
@@ -148,31 +143,31 @@ void DDR3Decoder::Refresh()
 			if(sras && scas && swe)
 				continue;
 
-			DDR3Symbol sym(DDR3Symbol::TYPE_ERROR);
+			SDRAMSymbol sym(SDRAMSymbol::TYPE_ERROR);
 
 			if(!sras && !scas && !swe)
-				sym.m_stype = DDR3Symbol::TYPE_MRS;
+				sym.m_stype = SDRAMSymbol::TYPE_MRS;
 			else if(!sras && !scas && swe)
-				sym.m_stype = DDR3Symbol::TYPE_REF;
+				sym.m_stype = SDRAMSymbol::TYPE_REF;
 			else if(!sras && scas && !swe && !sa10)
-				sym.m_stype = DDR3Symbol::TYPE_PRE;
+				sym.m_stype = SDRAMSymbol::TYPE_PRE;
 			else if(!sras && scas && !swe && sa10)
-				sym.m_stype = DDR3Symbol::TYPE_PREA;
+				sym.m_stype = SDRAMSymbol::TYPE_PREA;
 			else if(!sras && scas && swe)
-				sym.m_stype = DDR3Symbol::TYPE_ACT;
+				sym.m_stype = SDRAMSymbol::TYPE_ACT;
 			else if(sras && !scas && !swe)
 			{
 				if(!sa10)
-					sym.m_stype = DDR3Symbol::TYPE_WR;
+					sym.m_stype = SDRAMSymbol::TYPE_WR;
 				else
-					sym.m_stype = DDR3Symbol::TYPE_WRA;
+					sym.m_stype = SDRAMSymbol::TYPE_WRA;
 			}
 			else if(sras && !scas && swe)
 			{
 				if(!sa10)
-					sym.m_stype = DDR3Symbol::TYPE_RD;
+					sym.m_stype = SDRAMSymbol::TYPE_RD;
 				else
-					sym.m_stype = DDR3Symbol::TYPE_RDA;
+					sym.m_stype = SDRAMSymbol::TYPE_RDA;
 			}
 
 			//Unknown
@@ -187,80 +182,4 @@ void DDR3Decoder::Refresh()
 		}
 	}
 	SetData(cap, 0);
-}
-
-Gdk::Color DDR3Decoder::GetColor(int i)
-{
-	auto capture = dynamic_cast<DDR3Waveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const DDR3Symbol& s = capture->m_samples[i];
-
-		switch(s.m_stype)
-		{
-			case DDR3Symbol::TYPE_MRS:
-			case DDR3Symbol::TYPE_REF:
-			case DDR3Symbol::TYPE_PRE:
-			case DDR3Symbol::TYPE_PREA:
-				return m_standardColors[COLOR_CONTROL];
-
-			case DDR3Symbol::TYPE_ACT:
-			case DDR3Symbol::TYPE_WR:
-			case DDR3Symbol::TYPE_WRA:
-			case DDR3Symbol::TYPE_RD:
-			case DDR3Symbol::TYPE_RDA:
-				return m_standardColors[COLOR_ADDRESS];
-
-			case DDR3Symbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
-	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
-}
-
-string DDR3Decoder::GetText(int i)
-{
-	auto capture = dynamic_cast<DDR3Waveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const DDR3Symbol& s = capture->m_samples[i];
-
-		switch(s.m_stype)
-		{
-			case DDR3Symbol::TYPE_MRS:
-				return "MRS";
-
-			case DDR3Symbol::TYPE_REF:
-				return "REF";
-
-			case DDR3Symbol::TYPE_PRE:
-				return "PRE";
-
-			case DDR3Symbol::TYPE_PREA:
-				return "PREA";
-
-			case DDR3Symbol::TYPE_ACT:
-				return "ACT";
-
-			case DDR3Symbol::TYPE_WR:
-				return "WR";
-
-			case DDR3Symbol::TYPE_WRA:
-				return "WRA";
-
-			case DDR3Symbol::TYPE_RD:
-				return "RD";
-
-			case DDR3Symbol::TYPE_RDA:
-				return "RDA";
-
-			case DDR3Symbol::TYPE_ERROR:
-			default:
-				return "ERR";
-		}
-	}
-	return "";
 }
