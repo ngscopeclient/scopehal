@@ -27,112 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of DDR1Decoder
+ */
+
+#ifndef DDR1Decoder_h
+#define DDR1Decoder_h
+
 #include "SDRAMDecoderBase.h"
-#include <algorithm>
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SDRAMDecoderBase
-
-SDRAMDecoderBase::SDRAMDecoderBase(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+class DDR1Decoder : public SDRAMDecoderBase
 {
+public:
+	DDR1Decoder(const std::string& color);
 
-}
+	virtual void Refresh();
 
-SDRAMDecoderBase::~SDRAMDecoderBase()
-{
-}
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-bool SDRAMDecoderBase::NeedsConfig()
-{
-	return true;
-}
+	PROTOCOL_DECODER_INITPROC(DDR1Decoder)
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Pretty printing
+protected:
+};
 
-Gdk::Color SDRAMDecoderBase::GetColor(int i)
-{
-	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const SDRAMSymbol& s = capture->m_samples[i];
-
-		switch(s.m_stype)
-		{
-			case SDRAMSymbol::TYPE_MRS:
-			case SDRAMSymbol::TYPE_REF:
-			case SDRAMSymbol::TYPE_PRE:
-			case SDRAMSymbol::TYPE_PREA:
-			case SDRAMSymbol::TYPE_STOP:
-				return m_standardColors[COLOR_CONTROL];
-
-			case SDRAMSymbol::TYPE_ACT:
-			case SDRAMSymbol::TYPE_WR:
-			case SDRAMSymbol::TYPE_WRA:
-			case SDRAMSymbol::TYPE_RD:
-			case SDRAMSymbol::TYPE_RDA:
-				return m_standardColors[COLOR_ADDRESS];
-
-			case SDRAMSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
-	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
-}
-
-string SDRAMDecoderBase::GetText(int i)
-{
-	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const SDRAMSymbol& s = capture->m_samples[i];
-
-		switch(s.m_stype)
-		{
-			case SDRAMSymbol::TYPE_MRS:
-				return "MRS";
-
-			case SDRAMSymbol::TYPE_REF:
-				return "REF";
-
-			case SDRAMSymbol::TYPE_PRE:
-				return "PRE";
-
-			case SDRAMSymbol::TYPE_PREA:
-				return "PREA";
-
-			case SDRAMSymbol::TYPE_STOP:
-				return "STOP";
-
-			case SDRAMSymbol::TYPE_ACT:
-				return "ACT";
-
-			case SDRAMSymbol::TYPE_WR:
-				return "WR";
-
-			case SDRAMSymbol::TYPE_WRA:
-				return "WRA";
-
-			case SDRAMSymbol::TYPE_RD:
-				return "RD";
-
-			case SDRAMSymbol::TYPE_RDA:
-				return "RDA";
-
-			case SDRAMSymbol::TYPE_ERROR:
-			default:
-				return "ERR";
-		}
-	}
-	return "";
-}
+#endif

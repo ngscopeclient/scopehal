@@ -27,112 +27,156 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Implementation of DDR1Decoder
+ */
+
 #include "../scopehal/scopehal.h"
-#include "SDRAMDecoderBase.h"
+#include "DDR1Decoder.h"
 #include <algorithm>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SDRAMDecoderBase
+// Construction / destruction
 
-SDRAMDecoderBase::SDRAMDecoderBase(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+DDR1Decoder::DDR1Decoder(const string& color)
+	: SDRAMDecoderBase(color)
 {
-
-}
-
-SDRAMDecoderBase::~SDRAMDecoderBase()
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-bool SDRAMDecoderBase::NeedsConfig()
-{
-	return true;
+	CreateInput("CLK");
+	CreateInput("WE#");
+	CreateInput("RAS#");
+	CreateInput("CAS#");
+	CreateInput("CS#");
+	CreateInput("A10");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Pretty printing
+// Factory methods
 
-Gdk::Color SDRAMDecoderBase::GetColor(int i)
+bool DDR1Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const SDRAMSymbol& s = capture->m_samples[i];
+	if(stream.m_channel == NULL)
+		return false;
 
-		switch(s.m_stype)
-		{
-			case SDRAMSymbol::TYPE_MRS:
-			case SDRAMSymbol::TYPE_REF:
-			case SDRAMSymbol::TYPE_PRE:
-			case SDRAMSymbol::TYPE_PREA:
-			case SDRAMSymbol::TYPE_STOP:
-				return m_standardColors[COLOR_CONTROL];
+	if( (i < 6) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+		return true;
 
-			case SDRAMSymbol::TYPE_ACT:
-			case SDRAMSymbol::TYPE_WR:
-			case SDRAMSymbol::TYPE_WRA:
-			case SDRAMSymbol::TYPE_RD:
-			case SDRAMSymbol::TYPE_RDA:
-				return m_standardColors[COLOR_ADDRESS];
-
-			case SDRAMSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
-	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
+	return false;
 }
 
-string SDRAMDecoderBase::GetText(int i)
+string DDR1Decoder::GetProtocolName()
 {
-	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
-	if(capture != NULL)
+	return "DDR1 Command Bus";
+}
+
+void DDR1Decoder::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "DDR1Cmd(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void DDR1Decoder::Refresh()
+{
+	if(!VerifyAllInputsOK())
 	{
-		const SDRAMSymbol& s = capture->m_samples[i];
+		SetData(NULL, 0);
+		return;
+	}
 
-		switch(s.m_stype)
+	//Get the input data
+	DigitalWaveform* caps[6] = {0};
+	for(int i=0; i<6; i++)
+		caps[i] = GetDigitalInputWaveform(i);
+
+	//Sample all of the inputs
+	DigitalWaveform* cclk = caps[0];
+	DigitalWaveform we;
+	DigitalWaveform ras;
+	DigitalWaveform cas;
+	DigitalWaveform cs;
+	DigitalWaveform a10;
+	SampleOnRisingEdges(caps[1], cclk, we);
+	SampleOnRisingEdges(caps[2], cclk, ras);
+	SampleOnRisingEdges(caps[3], cclk, cas);
+	SampleOnRisingEdges(caps[4], cclk, cs);
+	SampleOnRisingEdges(caps[5], cclk, a10);
+
+	//Create the capture
+	auto cap = new SDRAMWaveform;
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = cclk->m_startTimestamp;
+	cap->m_startFemtoseconds = 0;
+
+	//Loop over the data and look for events on clock edges
+	size_t len = we.m_samples.size();
+	len = min(len, ras.m_samples.size());
+	len = min(len, cas.m_samples.size());
+	len = min(len, cs.m_samples.size());
+	len = min(len, a10.m_samples.size());
+	for(size_t i=0; i<len; i++)
+	{
+		bool swe = we.m_samples[i];
+		bool sras = ras.m_samples[i];
+		bool scas = cas.m_samples[i];
+		bool scs = cs.m_samples[i];
+		bool sa10 = a10.m_samples[i];
+
+		if(!scs)
 		{
-			case SDRAMSymbol::TYPE_MRS:
-				return "MRS";
+			//NOP
+			if(sras && scas && swe)
+				continue;
 
-			case SDRAMSymbol::TYPE_REF:
-				return "REF";
+			SDRAMSymbol sym(SDRAMSymbol::TYPE_ERROR);
 
-			case SDRAMSymbol::TYPE_PRE:
-				return "PRE";
+			if(!sras && scas && swe)
+				sym.m_stype = SDRAMSymbol::TYPE_ACT;
+			else if(!sras && scas && !swe && !sa10)
+				sym.m_stype = SDRAMSymbol::TYPE_PRE;
+			else if(!sras && scas && !swe && sa10)
+				sym.m_stype = SDRAMSymbol::TYPE_PREA;
+			else if(sras && !scas && !swe)
+			{
+				if(!sa10)
+					sym.m_stype = SDRAMSymbol::TYPE_WR;
+				else
+					sym.m_stype = SDRAMSymbol::TYPE_WRA;
+			}
+			else if(sras && !scas && swe)
+			{
+				if(!sa10)
+					sym.m_stype = SDRAMSymbol::TYPE_RD;
+				else
+					sym.m_stype = SDRAMSymbol::TYPE_RDA;
+			}
+			else if(!sras && !scas && !swe)
+				sym.m_stype = SDRAMSymbol::TYPE_MRS;		//TODO: MRS / EMRS depending on BA0
+			else if(sras && scas && !swe)
+				sym.m_stype = SDRAMSymbol::TYPE_STOP;
+			else if(!sras && !scas && swe)
+				sym.m_stype = SDRAMSymbol::TYPE_REF;
 
-			case SDRAMSymbol::TYPE_PREA:
-				return "PREA";
+			//Unknown
+			//TODO: self refresh entry/exit (we don't have CKE in the current test data source so can't use it)
+			else
+				LogDebug("[%zu] Unknown command (RAS=%d, CAS=%d, WE=%d, A10=%d)\n", i, sras, scas, swe, sa10);
 
-			case SDRAMSymbol::TYPE_STOP:
-				return "STOP";
-
-			case SDRAMSymbol::TYPE_ACT:
-				return "ACT";
-
-			case SDRAMSymbol::TYPE_WR:
-				return "WR";
-
-			case SDRAMSymbol::TYPE_WRA:
-				return "WRA";
-
-			case SDRAMSymbol::TYPE_RD:
-				return "RD";
-
-			case SDRAMSymbol::TYPE_RDA:
-				return "RDA";
-
-			case SDRAMSymbol::TYPE_ERROR:
-			default:
-				return "ERR";
+			//Create the symbol
+			cap->m_offsets.push_back(we.m_offsets[i]);
+			cap->m_durations.push_back(we.m_durations[i]);
+			cap->m_samples.push_back(sym);
 		}
 	}
-	return "";
+	SetData(cap, 0);
 }

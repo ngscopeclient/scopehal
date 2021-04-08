@@ -14,6 +14,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DCDMeasurement.cpp
 	DCOffsetFilter.cpp
 	DDJMeasurement.cpp
+	DDR1Decoder.cpp
 	DDR3Decoder.cpp
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp

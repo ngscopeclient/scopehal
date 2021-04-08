@@ -49,6 +49,7 @@ public:
 		TYPE_WRA,
 		TYPE_RD,
 		TYPE_RDA,
+		TYPE_STOP,
 
 		TYPE_ERROR
 	};
