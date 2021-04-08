@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -105,7 +105,15 @@ public:
 	///@brief Fractional start time of the acquisition (femtoseconds since m_startTimestamp)
 	int64_t m_startFemtoseconds;
 
-	///@brief Phase offset, in femtoseconds, from the trigger to the sampling clock.
+	/**
+		@brief Offset, in femtoseconds, from the trigger to the sampling clock.
+
+		This is most commonly the output of a time-to-digital converter and ranges from 0 to 1 sample, but this
+		should NOT be assumed to be the case in all waveforms.
+
+		LeCroy oscilloscopes, for example, can have negative trigger phases of 150ns or more on digital channels
+		since the digital waveform can start significantly before the analog waveform!
+	 */
 	int64_t m_triggerPhase;
 
 	/**

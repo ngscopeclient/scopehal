@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -2113,7 +2113,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	//Parse the wavedesc headers
 	auto pdesc = (unsigned char*)(&wavedesc[0]);
 	//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-	//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
 
 	//cppcheck-suppress invalidPointerCast
 	float v_gain = *reinterpret_cast<float*>(pdesc + 156);
@@ -2364,8 +2363,13 @@ void LeCroyOscilloscope::Convert8BitSamplesAVX2(
 	}
 }
 
-map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data)
+map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data, int64_t analog_hoff)
 {
+	//DEBUG
+	FILE* fp = fopen("/tmp/waveform.xml", "w");
+	fwrite(data.c_str(), data.length(), 1, fp);
+	fclose(fp);
+
 	map<int, DigitalWaveform*> ret;
 
 	//See what channels are enabled
@@ -2381,6 +2385,10 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	tmp = tmp.substr(0, tmp.find("</HorPerStep>"));
 	float interval = atof(tmp.c_str()) * FS_PER_SECOND;
 	//LogDebug("Sample interval: %.2f fs\n", interval);
+
+	tmp = data.substr(data.find("<HorStart>") + 10);
+	tmp = tmp.substr(0, tmp.find("</HorStart>"));
+	float horstart = atof(tmp.c_str()) * FS_PER_SECOND;
 
 	tmp = data.substr(data.find("<NumSamples>") + 12);
 	tmp = tmp.substr(0, tmp.find("</NumSamples>"));
@@ -2423,6 +2431,11 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	int64_t start_sec = (timestamp - start_ns) / ns_per_sec;
 	time_t start_time = epoch_stamp + start_sec;
 
+	//Figure out delta in trigger time between analog and digital channels
+	int64_t trigger_phase = 0;
+	if(analog_hoff != 0)
+		trigger_phase = horstart - analog_hoff;
+
 	//Pull out the actual binary data (Base64 coded)
 	tmp = data.substr(data.find("<BinaryData>") + 12);
 	tmp = tmp.substr(0, tmp.find("</BinaryData>"));
@@ -2447,6 +2460,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
 			cap->m_startFemtoseconds = start_fs;
+			cap->m_triggerPhase = trigger_phase;
 
 			//Preallocate memory assuming no deduplication possible
 			cap->Resize(num_samples);
@@ -2624,6 +2638,9 @@ bool LeCroyOscilloscope::AcquireData()
 		m_triggerArmed = true;
 	}
 
+	//Offset from start of waveform to trigger
+	double analog_hoff = 0;
+
 	//Process analog waveforms
 	vector< vector<WaveformBase*> > waveforms;
 	waveforms.resize(m_analogChannelCount);
@@ -2631,6 +2648,11 @@ bool LeCroyOscilloscope::AcquireData()
 	{
 		if(enabled[i])
 		{
+			//Extract timestamp of waveform
+			auto pdesc = (unsigned char*)(&wavedescs[i][0]);
+			//cppcheck-suppress invalidPointerCast
+			analog_hoff = *reinterpret_cast<double*>(pdesc + 180) * FS_PER_SECOND;
+
 			waveforms[i] = ProcessAnalogWaveform(
 				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
 				analogWaveformData[i].size() - 16,
@@ -2658,7 +2680,7 @@ bool LeCroyOscilloscope::AcquireData()
 	if(denabled)
 	{
 		//This is a weird XML-y format but I can't find any other way to get it :(
-		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData);
+		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, analog_hoff);
 
 		//Done, update the data
 		for(auto it : digwaves)

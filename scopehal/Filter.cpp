@@ -307,8 +307,8 @@ void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, 
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
-		while( (ndata+1 < dlen) && (data->m_offsets[ndata+1] * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
 			ndata ++;
 		if(ndata >= dlen)
 			break;
@@ -353,8 +353,8 @@ void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* cloc
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
-		while( (ndata+1 < dlen) && (data->m_offsets[ndata+1] * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
 			ndata ++;
 		if(ndata >= dlen)
 			break;
@@ -399,8 +399,8 @@ void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock,
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
-		while( (ndata+1 < dlen) && (data->m_offsets[ndata+1] * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
 			ndata ++;
 		if(ndata >= dlen)
 			break;
@@ -445,8 +445,8 @@ void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, Dig
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
-		while( (ndata+1 < dlen) && (data->m_offsets[ndata+1] * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
 			ndata ++;
 		if(ndata >= dlen)
 			break;
@@ -491,8 +491,8 @@ void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, 
 			continue;
 
 		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale;
-		while( (ndata+1 < dlen) && (data->m_offsets[ndata+1] * data->m_timescale < clkstart) )
+		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
 			ndata ++;
 		if(ndata >= dlen)
 			break;

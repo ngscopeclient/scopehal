@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -271,7 +271,7 @@ protected:
 		double basetime,
 		double* wavetime
 		);
-	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
+	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data, int64_t analog_hoff);
 
 	void Convert8BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
