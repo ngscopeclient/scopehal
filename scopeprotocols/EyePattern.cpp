@@ -447,7 +447,7 @@ void EyePattern::Refresh()
 	if(cap->m_uiWidth < FLT_EPSILON)
 		RecalculateUIWidth();
 
-	//Shift the clock by half a UI if it's edge aligned
+	//Shift the clock leby half a UI if it's edge aligned
 	//All of the eye creation logic assumes a center aligned clock.
 	if(clock_align == ALIGN_EDGE)
 	{
@@ -477,9 +477,9 @@ void EyePattern::Refresh()
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
 		if(waveform->m_densePacked)
 		{
-			if(g_hasAvx2)
+			/*if(g_hasAvx2)
 				DensePackedInnerLoopAVX2(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
-			else
+			else*/
 				DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 		}
 
@@ -528,6 +528,10 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	float yoff
 	)
 {
+	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	int64_t width = cap->GetUIWidth();
+	int64_t halfwidth = width/2;
+
 	size_t iclock = 0;
 
 	size_t wend_rounded = wend - (wend % 8);
@@ -573,6 +577,12 @@ void EyePattern::DensePackedInnerLoopAVX2(
 				//Figure out the offset to the next edge
 				offset[j] = tstart - tnext;
 			}
+
+			//Drop anything past half a UI if the next clock edge is a long ways out
+			//(this is needed for irregularly sampled data like DDR RAM)
+			int64_t ttnext = tnext - tstart;
+			if( (offset[j] > halfwidth) && (ttnext > width) )
+				offset[j] = -INT_MAX;
 		}
 
 		//Interpolate X position
@@ -661,6 +671,12 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		if(pixel_x_round > xmax)
 			continue;
 
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
+
 		//Interpolate voltage, early out if clipping
 		float dv = waveform->m_samples[i+1] - waveform->m_samples[i];
 		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
@@ -693,6 +709,10 @@ void EyePattern::DensePackedInnerLoop(
 	float yoff
 	)
 {
+	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	int64_t width = cap->GetUIWidth();
+	int64_t halfwidth = width/2;
+
 	size_t iclock = 0;
 	for(size_t i=0; i<wend && iclock < cend; i++)
 	{
@@ -719,6 +739,12 @@ void EyePattern::DensePackedInnerLoop(
 		float pixel_x_f = (offset - m_xoff) * m_xscale;
 		float pixel_x_fround = floor(pixel_x_f);
 		float dx_frac = (pixel_x_f - pixel_x_fround ) / xtimescale;
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
 
 		//Early out if off end of plot
 		int32_t pixel_x_round = floor(pixel_x_f);
@@ -757,6 +783,10 @@ void EyePattern::SparsePackedInnerLoop(
 	float yoff
 	)
 {
+	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	int64_t width = cap->GetUIWidth();
+	int64_t halfwidth = width/2;
+
 	size_t iclock = 0;
 	for(size_t i=0; i<wend && iclock < cend; i++)
 	{
@@ -778,6 +808,12 @@ void EyePattern::SparsePackedInnerLoop(
 			//Figure out the offset to the next edge
 			offset = tstart - tnext;
 		}
+
+		//Drop anything past half a UI if the next clock edge is a long ways out
+		//(this is needed for irregularly sampled data like DDR RAM)
+		int64_t ttnext = tnext - tstart;
+		if( (offset > halfwidth) && (ttnext > width) )
+			continue;
 
 		//Interpolate position
 		int64_t dt = waveform->m_offsets[i+1] - waveform->m_offsets[i];
