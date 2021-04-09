@@ -429,6 +429,10 @@ void EyePattern::Refresh()
 			break;
 	}
 
+	//If no clock edges, don't change anything
+	if(clock_edges.empty())
+		return;
+
 	//Calculate the nominal UI width
 	if(cap->m_uiWidth < FLT_EPSILON)
 		RecalculateUIWidth();
@@ -829,6 +833,10 @@ void EyePattern::RecalculateUIWidth()
 			FindZeroCrossings(clock, clock_edges);
 			break;
 	}
+
+	//If no clock edges, don't change anything
+	if(clock_edges.empty())
+		return;
 
 	//Find width of each UI
 	vector<int64_t> ui_widths;
