@@ -62,12 +62,6 @@ DramClockFilter::DramClockFilter(const string& color)
 	m_casname = "CAS# Latency";
 	m_parameters[m_casname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_casname].SetFloatVal(2);
-
-	m_skiplastname = "Last DQS Edge";
-	m_parameters[m_skiplastname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_skiplastname].AddEnumValue("Keep", 0);
-	m_parameters[m_skiplastname].AddEnumValue("Skip", 1);
-	m_parameters[m_skiplastname].SetIntVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,8 +159,6 @@ void DramClockFilter::Refresh()
 
 	//Extract some parameters
 	int bl = m_parameters[m_burstname].GetIntVal();
-	if(m_parameters[m_skiplastname].GetIntVal())
-		bl --;
 	float tcas_cycles = m_parameters[m_casname].GetFloatVal();
 	int tcas_halfcycles = round(tcas_cycles * 2);
 

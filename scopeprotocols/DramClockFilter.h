@@ -56,7 +56,6 @@ protected:
 	std::string m_dqsthreshname;
 	std::string m_burstname;
 	std::string m_casname;
-	std::string m_skiplastname;
 };
 
 #endif
