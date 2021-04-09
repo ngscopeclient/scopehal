@@ -113,6 +113,8 @@ EyePattern::EyePattern(const string& color)
 	, m_vmodeName("Vertical Scale Mode")
 	, m_rangeName("Vertical Range")
 	, m_clockAlignName("Clock Alignment")
+	, m_rateModeName("Bit Rate Mode")
+	, m_rateName("Bit Rate")
 {
 	//Set up channels
 	CreateInput("din");
@@ -146,6 +148,14 @@ EyePattern::EyePattern(const string& color)
 	m_parameters[m_clockAlignName].AddEnumValue("Center", ALIGN_CENTER);
 	m_parameters[m_clockAlignName].AddEnumValue("Edge", ALIGN_EDGE);
 	m_parameters[m_clockAlignName].SetIntVal(ALIGN_CENTER);
+
+	m_parameters[m_rateModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_rateModeName].AddEnumValue("Auto", MODE_AUTO);
+	m_parameters[m_rateModeName].AddEnumValue("Fixed", MODE_FIXED);
+	m_parameters[m_rateModeName].SetIntVal(MODE_AUTO);
+
+	m_parameters[m_rateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_parameters[m_rateName].SetIntVal(1250000000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -812,6 +822,13 @@ void EyePattern::RecalculateUIWidth()
 	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	if(!cap)
 		cap = ReallocateWaveform();
+
+	//If manual override, don't look at anything else
+	if(m_parameters[m_rateModeName].GetIntVal() == MODE_FIXED)
+	{
+		cap->m_uiWidth = FS_PER_SECOND * 1.0 / m_parameters[m_rateName].GetIntVal();
+		return;
+	}
 
 	auto clock = GetDigitalInputWaveform(1);
 	if(!clock)

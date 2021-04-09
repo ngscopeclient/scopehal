@@ -23,6 +23,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DPhyDataDecoder.cpp
 	DPhyHSClockRecoveryFilter.cpp
 	DPhySymbolDecoder.cpp
+	DramClockFilter.cpp
 	DramRefreshActivateMeasurement.cpp
 	DramRowColumnLatencyMeasurement.cpp
 	DSIFrameDecoder.cpp

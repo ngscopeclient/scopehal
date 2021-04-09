@@ -60,6 +60,7 @@
 #include "DPhyDataDecoder.h"
 #include "DPhyHSClockRecoveryFilter.h"
 #include "DPhySymbolDecoder.h"
+#include "DramClockFilter.h"
 #include "DramRefreshActivateMeasurement.h"
 #include "DramRowColumnLatencyMeasurement.h"
 #include "DSIFrameDecoder.h"
