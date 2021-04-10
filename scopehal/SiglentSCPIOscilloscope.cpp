@@ -1004,6 +1004,9 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	float v_off = *reinterpret_cast<float*>(pdesc + 160);
 
 	//cppcheck-suppress invalidPointerCast
+	float v_probefactor = *reinterpret_cast<float*>(pdesc + 328);
+
+	//cppcheck-suppress invalidPointerCast
 	float interval = *reinterpret_cast<float*>(pdesc + 176) * FS_PER_SECOND;
 
 	//cppcheck-suppress invalidPointerCast
@@ -1029,6 +1032,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	size_t num_per_segment = num_samples / num_sequences;
 	int16_t* wdata = (int16_t*)&data[0];
 	int8_t* bdata = (int8_t*)&data[0];
+
+	// SDS2000X+ and SDS5000X have 30 codes per div. Todo; SDS6000X has 425.
+        // We also need to accomodate probe attenuation here.
+	v_gain = v_gain * v_probefactor / 30;
 
 	for(size_t j = 0; j < num_sequences; j++)
 	{
@@ -1075,7 +1082,6 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 					size_t lastblock = numblocks - 1;
 					size_t blocksize = num_per_segment / numblocks;
 					blocksize = blocksize - (blocksize % 32);
-
 #pragma omp parallel for
 					for(size_t i = 0; i < numblocks; i++)
 					{
