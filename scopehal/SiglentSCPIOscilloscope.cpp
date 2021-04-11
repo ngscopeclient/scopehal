@@ -215,8 +215,8 @@ void SiglentSCPIOscilloscope::DetectOptions()
  */
 void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int count)
 {
-	LogWarning("Digital channels not implemented\n");
-	// Old code from LeCroy implementation
+  LogWarning("Digital channels not implemented\n");
+  // Old code from LeCroy implementation
 	// m_hasLA = true;
 	// LogIndenter li;
 
@@ -834,7 +834,7 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 
 	for(auto i : uncached)
 	{
-		string reply = converse(":CHANNEL%d:LABEL:SWITCH?", i + 1);
+		string reply = converse(":CHANNEL%d:SWITCH?", i + 1);
 		if(reply == "OFF")
 			m_channelsEnabled[i] = false;
 		else
@@ -1258,8 +1258,9 @@ map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(strin
 {
 	map<int, DigitalWaveform*> ret;
 
-	// Digital channels not yet implemented
-	return ret;
+        // Digital channels not yet implemented
+        return ret;
+
 
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
@@ -1646,7 +1647,7 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, double offset)
 
 	{
 		lock_guard<recursive_mutex> lock2(m_mutex);
-		sendOnly(":CHANNEL%ld:OFFSET %f", i + 1, offset);
+		sendOnly(":CHANNEL%ld:OFFSET %e", i + 1, offset);
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1831,7 +1832,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_memoryDepthValid = false;
 	double sampletime = GetSampleDepth() / (double)rate;
-	sendOnly(":TIMEBASE:SCALE %f", sampletime / 10);
+	sendOnly(":TIMEBASE:SCALE %e", sampletime / 10);
 	m_memoryDepthValid = false;
 }
 
@@ -1904,7 +1905,7 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	sendOnly(":CHANNEL%ld:SKEW %f", channel, skew * SECONDS_PER_FS);
+	sendOnly(":CHANNEL%ld:SKEW %e", channel, skew * SECONDS_PER_FS);
 
 	//Update cache
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -2049,7 +2050,7 @@ void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*l
 void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	sendOnly(":DIGITAL:THRESHOLD%d %f", (channel / 8) + 1, level);
+	sendOnly(":DIGITAL:THRESHOLD%d %e", (channel / 8) + 1, level);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2494,7 +2495,7 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
 	//Level
-	sendOnly(":TRIGGER:%s:LEVEL %f", trigType.c_str(), trig->GetLevel());
+	sendOnly(":TRIGGER:%s:LEVEL %e", trigType.c_str(), trig->GetLevel());
 
 	//Slope
 	switch(trig->GetType())
