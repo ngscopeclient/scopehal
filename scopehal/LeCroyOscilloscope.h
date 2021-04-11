@@ -56,8 +56,8 @@ public:
 	virtual ~LeCroyOscilloscope();
 
 	//not copyable or assignable
-	LeCroyOscilloscope(const LeCroyOscilloscope& rhs) =delete;
-	LeCroyOscilloscope& operator=(const LeCroyOscilloscope& rhs) =delete;
+	LeCroyOscilloscope(const LeCroyOscilloscope& rhs) = delete;
+	LeCroyOscilloscope& operator=(const LeCroyOscilloscope& rhs) = delete;
 
 protected:
 	void IdentifyHardware();
@@ -174,13 +174,10 @@ public:
 
 		MODEL_WAVESURFER_3K,
 
-		MODEL_SIGLENT_SDS2000X,
-
 		MODEL_UNKNOWN
 	};
 
-	Model GetModelID()
-	{ return m_modelid; }
+	Model GetModelID() { return m_modelid; }
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -256,21 +253,16 @@ protected:
 
 	bool ReadWaveformBlock(std::string& data);
 	bool ReadWavedescs(
-		std::vector<std::string>& wavedescs,
-		bool* enabled,
-		unsigned int& firstEnabledChannel,
-		bool& any_enabled);
+		std::vector<std::string>& wavedescs, bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled);
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
 	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
-	std::vector<WaveformBase*> ProcessAnalogWaveform(
-		const char* data,
+	std::vector<WaveformBase*> ProcessAnalogWaveform(const char* data,
 		size_t datalen,
 		std::string& wavedesc,
 		uint32_t num_sequences,
 		time_t ttime,
 		double basetime,
-		double* wavetime
-		);
+		double* wavetime);
 	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
 
 	void Convert8BitSamples(
@@ -289,8 +281,8 @@ protected:
 	bool m_hasLA;
 	bool m_hasDVM;
 	bool m_hasFunctionGen;
-	bool m_hasFastSampleRate;	//-M models
-	int m_memoryDepthOption;	//0 = base, after that number is max sample count in millions
+	bool m_hasFastSampleRate;	 //-M models
+	int m_memoryDepthOption;	 //0 = base, after that number is max sample count in millions
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;

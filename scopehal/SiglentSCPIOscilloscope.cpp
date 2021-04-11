@@ -34,6 +34,18 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/* Current State
+ * =============
+ *
+ * - Basic functionality for analog channels works.
+ * - There is no feature detection because the scope does not support *IDN? (Request made)
+ * - Digital channels are not implemented (code in here is leftover from LeCroy)
+ * - Triggers are untested.
+ * - Sampling lengths up to 10KSamples are supported. 50K and 100K need to be batched and will be
+ *   horribly slow.
+ *
+ */
+
 #include "scopehal.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "base64.h"
@@ -44,7 +56,6 @@
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
-#include "GlitchTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
@@ -52,9 +63,6 @@
 #include "WindowTrigger.h"
 
 using namespace std;
-
-// Define this to get a debug of the exchanges with the scope
-//#define SHOW_TRANSACTIONS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -103,10 +111,6 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
 	ret = m_transport->ReadReply();
-#ifdef SHOW_TRANSACTIONS
-	if(strncmp(opString, ":TRIGGER:STATUS?", 15))
-		printf("[%s] Returned [%s]\n", opString, ret.c_str());
-#endif
 	return ret;
 }
 
@@ -211,26 +215,28 @@ void SiglentSCPIOscilloscope::DetectOptions()
  */
 void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int count)
 {
-	m_hasLA = true;
-	LogIndenter li;
+	LogWarning("Digital channels not implemented\n");
+	// Old code from LeCroy implementation
+	// m_hasLA = true;
+	// LogIndenter li;
 
-	m_digitalChannelCount = count;
-	m_digitalChannelBase = m_channels.size();
+	// m_digitalChannelCount = count;
+	// m_digitalChannelBase = m_channels.size();
 
-	char chn[32];
-	for(unsigned int i = 0; i < count; i++)
-	{
-		snprintf(chn, sizeof(chn), "D%u", i);
-		auto chan = new OscilloscopeChannel(this,
-			chn,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-			GetDefaultChannelColor(m_channels.size()),
-			1,
-			m_channels.size(),
-			true);
-		m_channels.push_back(chan);
-		m_digitalChannels.push_back(chan);
-	}
+	// char chn[32];
+	// for(unsigned int i = 0; i < count; i++)
+	// {
+	// 	snprintf(chn, sizeof(chn), "D%u", i);
+	// 	auto chan = new OscilloscopeChannel(this,
+	// 		chn,
+	// 		OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+	// 		GetDefaultChannelColor(m_channels.size()),
+	// 		1,
+	// 		m_channels.size(),
+	// 		true);
+	// 	m_channels.push_back(chan);
+	// 	m_digitalChannels.push_back(chan);
+	// }
 }
 
 /**
@@ -264,7 +270,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 		//Color the channels based on Siglents standard color sequence
 		//yellow-pink-cyan-green-lightgreen
 		string color = "#ffffff";
-		switch(i % 8)
+		switch(i % 4)
 		{
 			case 0:
 				color = "#ffff00";
@@ -394,16 +400,16 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 	}
 
 	//Digital
-	else
-	{
-		//See if the channel is on
-		size_t nchan = i - (m_analogChannelCount + 1);
-		string str = converse(":DIG:D%d?", nchan);
-		if(str == "OFF")
-			m_channelsEnabled[i] = false;
-		else
-			m_channelsEnabled[i] = true;
-	}
+	// else
+	// {
+	// 	//See if the channel is on
+	// 	size_t nchan = i - (m_analogChannelCount + 1);
+	// 	string str = converse(":DIG:D%d?", nchan);
+	// 	if(str == "OFF")
+	// 		m_channelsEnabled[i] = false;
+	// 	else
+	// 		m_channelsEnabled[i] = true;
+	// }
 
 	return m_channelsEnabled[i];
 }
@@ -424,26 +430,26 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 	}
 
 	//Digital channel
-	else
-	{
-		//If we have NO digital channels enabled, enable the first digital bus
-		bool anyDigitalEnabled = false;
-		for(auto c : m_digitalChannels)
-		{
-			if(m_channelsEnabled[c->GetIndex()])
-			{
-				anyDigitalEnabled = true;
-				break;
-			}
-		}
+	// else
+	// {
+	// 	//If we have NO digital channels enabled, enable the first digital bus
+	// 	bool anyDigitalEnabled = false;
+	// 	for(auto c : m_digitalChannels)
+	// 	{
+	// 		if(m_channelsEnabled[c->GetIndex()])
+	// 		{
+	// 			anyDigitalEnabled = true;
+	// 			break;
+	// 		}
+	// 	}
 
-		if(!anyDigitalEnabled)
-			sendOnly(":DIGITAL:BUS1:DISP ON");
+	// 	if(!anyDigitalEnabled)
+	// 		sendOnly(":DIGITAL:BUS1:DISP ON");
 
-		//Enable this channel on the hardware
-		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
-		sendOnly(":DIGD%d ON", i - (m_analogChannelCount + 1));
-	}
+	// 	//Enable this channel on the hardware
+	// 	//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
+	// 	sendOnly(":DIGD%d ON", i - (m_analogChannelCount + 1));
+	// }
 
 	m_channelsEnabled[i] = true;
 }
@@ -469,24 +475,24 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 	}
 
 	//Digital channel
-	else
-	{
-		//If we have NO digital channels enabled, disable the first digital bus
-		bool anyDigitalEnabled = false;
-		for(auto c : m_digitalChannels)
-		{
-			if(m_channelsEnabled[c->GetIndex()])
-			{
-				anyDigitalEnabled = true;
-				break;
-			}
-		}
-		if(!anyDigitalEnabled)
-			sendOnly(":DIGITAL:BUS1:DISP OFF");
+	// else
+	// {
+	// 	//If we have NO digital channels enabled, disable the first digital bus
+	// 	bool anyDigitalEnabled = false;
+	// 	for(auto c : m_digitalChannels)
+	// 	{
+	// 		if(m_channelsEnabled[c->GetIndex()])
+	// 		{
+	// 			anyDigitalEnabled = true;
+	// 			break;
+	// 		}
+	// 	}
+	// 	if(!anyDigitalEnabled)
+	// 		sendOnly(":DIGITAL:BUS1:DISP OFF");
 
-		//Disable this channel
-		sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
-	}
+	// 	//Disable this channel
+	// 	sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
+	// }
 }
 
 OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(size_t i)
@@ -835,22 +841,21 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 			m_channelsEnabled[i] = true;
 	}
 
-	/*
 	//Check digital status
 	//TODO: better per-lane queries
-	m_transport->SendCommand("Digital1:TRACE?");
+	// m_transport->SendCommand("Digital1:TRACE?");
 
-	string reply = m_transport->ReadReply();
-	if(reply == "OFF")
-	{
-		for(size_t i=0; i<m_digitalChannelCount; i++)
-			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
-	}
-	else
-	{
-		for(size_t i=0; i<m_digitalChannelCount; i++)
-			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
-	}*/
+	// string reply = m_transport->ReadReply();
+	// if(reply == "OFF")
+	// {
+	// 	for(size_t i=0; i<m_digitalChannelCount; i++)
+	// 		m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
+	// }
+	// else
+	// {
+	// 	for(size_t i=0; i<m_digitalChannelCount; i++)
+	// 		m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
+	// }
 }
 
 bool SiglentSCPIOscilloscope::ReadWavedescs(
@@ -922,8 +927,8 @@ void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_seque
 	}
 
 	//Ask for the digital waveforms
-	if(denabled)
-		sendOnly("Digital1:WF?");
+	// if(denabled)
+	// 	sendOnly("Digital1:WF?");
 }
 
 time_t SiglentSCPIOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& basetime)
@@ -1034,7 +1039,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	int8_t* bdata = (int8_t*)&data[0];
 
 	// SDS2000X+ and SDS5000X have 30 codes per div. Todo; SDS6000X has 425.
-        // We also need to accomodate probe attenuation here.
+	// We also need to accomodate probe attenuation here.
 	v_gain = v_gain * v_probefactor / 30;
 
 	for(size_t j = 0; j < num_sequences; j++)
@@ -1252,6 +1257,9 @@ __attribute__((target("avx2"))) void SiglentSCPIOscilloscope::Convert8BitSamples
 map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& data)
 {
 	map<int, DigitalWaveform*> ret;
+
+	// Digital channels not yet implemented
+	return ret;
 
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
@@ -1543,15 +1551,15 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	}
 
 	//TODO: proper support for sequenced capture when digital channels are active
-	if(denabled)
-	{
-		//This is a weird XML-y format but I can't find any other way to get it :(
-		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(m_digitalWaveformData);
+	// if(denabled)
+	// {
+	// 	//This is a weird XML-y format but I can't find any other way to get it :(
+	// 	map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(m_digitalWaveformData);
 
-		//Done, update the data
-		for(auto it : digwaves)
-			pending_waveforms[it.first].push_back(it.second);
-	}
+	// 	//Done, update the data
+	// 	for(auto it : digwaves)
+	// 		pending_waveforms[it.first].push_back(it.second);
+	// }
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
@@ -1896,7 +1904,7 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	sendOnly(":CHENNEL%ld:SKEW %f", channel, skew * SECONDS_PER_FS);
+	sendOnly(":CHANNEL%ld:SKEW %f", channel, skew * SECONDS_PER_FS);
 
 	//Update cache
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -1965,7 +1973,7 @@ size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 
 void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t /*mode*/)
 {
-	LogWarning("SetADCMode is not implemented\n");
+	return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2297,29 +2305,6 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
 	//Level
 	ut->SetLevel(stof(converse(":TRIGGER:UART:LIMIT?")));
 
-	//Ignore ByteBitOrder, assume LSB for now
-	//Ignore NumDataBits, assume 8 for now
-
-	/*
-		Ignore these as they seem redundant or have unknown functionality:
-		* BytesPerStreamWrite
-		* DataBytesLenValue1
-		* DataBytesLenValue2
-		* DataCondition
-		* DefaultLevel
-		* FrameDelimiter
-		* HeaderByteVal
-		* InterFrameMinBits
-		* NeedDualLevels
-		* NeededSources
-		* PatternLength
-		* PatternPosition
-		* RS232Mode (how is this different from polarity inversion?)
-		* SupportsDigital
-		* UARTCondition
-		* ViewingMode
-	*/
-
 	//Parity
 	auto reply = Trim(converse(":TRIGGER:UART:PARITY?"));
 	if(reply == "NONE")
@@ -2432,15 +2417,6 @@ void SiglentSCPIOscilloscope::PushTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//Source is the same for every channel
-	char tmp[128];
-	snprintf(tmp,
-		sizeof(tmp),
-		"VBS? 'app.Acquisition.Trigger.Source = \"%s\"'",
-		m_trigger->GetInput(0).m_channel->GetHwname().c_str());
-	m_transport->SendCommand(tmp);
-
-	//The rest depends on the type
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
@@ -2448,39 +2424,52 @@ void SiglentSCPIOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
+
 	if(dt)
 	{
 		sendOnly(":TRIGGER:TYPE DROPOUT");
+		sendOnly(":TRIGGER:DROPOUT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushDropoutTrigger(dt);
 	}
 	else if(pt)
 	{
 		sendOnly(":TRIGGER:TYPE INTERVAL");
+		sendOnly(":TRIGGER:INTERVAL:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushPulseWidthTrigger(pt);
 	}
 	else if(rt)
 	{
 		sendOnly(":TRIGGER:TYPE RUNT");
+		sendOnly(":TRIGGER:RUNT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushRuntTrigger(rt);
 	}
 	else if(st)
 	{
 		sendOnly(":TRIGGER:TYPE SLOPE");
+		sendOnly(":TRIGGER:SLOPE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushSlewRateTrigger(st);
 	}
 	else if(ut)
 	{
 		sendOnly(":TRIGGER:TYPE UART");
+		// TODO: Validate these trigger allocations
+		sendOnly(":TRIGGER:UART:RXSOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+		sendOnly(":TRIGGER:UART:TXSOURCE C%d", m_trigger->GetInput(1).m_channel->GetIndex() + 1);
 		PushUartTrigger(ut);
 	}
 	else if(wt)
 	{
 		sendOnly(":TRIGGER:TYPE WINDOW");
+		sendOnly(":TRIGGER:WINDOW:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushWindowTrigger(wt);
 	}
+
+	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+
 	else if(et)	   //must be last
 	{
 		sendOnly(":TRIGGER:TYPE EDGE");
+		sendOnly(":TRIGGER:EDGE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
 		PushEdgeTrigger(et, "EDGE");
 	}
 
@@ -2534,20 +2523,9 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
 	PushEdgeTrigger(trig, "INTERVAL");
-	//	PushCondition(":TRIGGER:INTERVAL:CONDITION", trig->GetCondition());
+	PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
 	PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:INTERVAL:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
-}
-
-/**
-	@brief Pushes settings for a glitch trigger to the instrument
- */
-void SiglentSCPIOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
-{
-	PushEdgeTrigger(trig, "app.Acquisition.Trigger.Glitch");
-	//	PushCondition("app.Acquisition.Trigger.Glitch.Condition", trig->GetCondition());
-	PushFloat("app.Acquisition.Trigger.Glitch.TimeHigh", trig->GetUpperBound() * SECONDS_PER_FS);
-	PushFloat("app.Acquisition.Trigger.Glitch.TimeLow", trig->GetLowerBound() * SECONDS_PER_FS);
 }
 
 /**
@@ -2555,7 +2533,7 @@ void SiglentSCPIOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
-	//  PushCondition(":TRIGGER:RUNT:CONDITION", trig->GetCondition());
+	PushCondition(":TRIGGER:RUNT", trig->GetCondition());
 	PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetUpperBound());
@@ -2569,7 +2547,7 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 {
-	//	PushCondition("app.Acquisition.Trigger.SlewRate.Condition", trig->GetCondition());
+	PushCondition(":TRIGGER:SLEW", trig->GetCondition());
 	PushFloat(":TRIGGER:SLEW:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:SLEW:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:SLEW:HLEVEL", trig->GetUpperBound());
@@ -2624,9 +2602,9 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
 	//Pattern length depends on the current format.
 	//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
 	auto pattern1 = trig->GetPattern1();
-	sendOnly(":TRIGGER:UART:DATA \"%d\"", (int)pattern1.length() / 8);
+	sendOnly(":TRIGGER:UART:DLENGTH \"%d\"", (int)pattern1.length() / 8);
 
-	PushPatternCondition("app.Acquisition.Trigger.Serial.UART.PatternOperator", trig->GetCondition());
+	PushCondition(":TRIGGER:UART", trig->GetCondition());
 
 	//Polarity
 	sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
@@ -2678,69 +2656,22 @@ void SiglentSCPIOscilloscope::PushCondition(const string& path, Trigger::Conditi
 	switch(cond)
 	{
 		case Trigger::CONDITION_LESS:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"LessThan\"'");
+			sendOnly("%s:LIMIT LESSTHAN", path);
 			break;
 
 		case Trigger::CONDITION_GREATER:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterThan\"'");
+			sendOnly("%s:LIMIT GREATERTHAN", path);
 			break;
 
 		case Trigger::CONDITION_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
+			sendOnly("%s:LIMIT INNER", path);
 			break;
 
 		case Trigger::CONDITION_NOT_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"OutOfRange\"'");
+			sendOnly("%s:LIMIT OUTER", path);
 			break;
 
 		//Other values are not legal here, it seems
-		default:
-			break;
-	}
-}
-
-/**
-	@brief Pushes settings for a trigger condition under a .PatternOperator field
- */
-void SiglentSCPIOscilloscope::PushPatternCondition(const string& path, Trigger::Condition cond)
-{
-	//Note that these enum strings are NOT THE SAME as used by PushCondition()!
-	//For example CONDITION_LESS is "Smaller" vs "LessThan"
-	switch(cond)
-	{
-		case Trigger::CONDITION_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Equal\"'");
-			break;
-
-		case Trigger::CONDITION_NOT_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"NotEqual\"'");
-			break;
-
-		case Trigger::CONDITION_LESS:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Smaller\"'");
-			break;
-
-		case Trigger::CONDITION_LESS_OR_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"SmallerOrEqual\"'");
-			break;
-
-		case Trigger::CONDITION_GREATER:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Greater\"'");
-			break;
-
-		case Trigger::CONDITION_GREATER_OR_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterOrEqual\"'");
-			break;
-
-		case Trigger::CONDITION_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
-			break;
-
-		case Trigger::CONDITION_NOT_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"OutRange\"'");
-			break;
-
-		//CONDITION_ANY not supported by Siglent scopes
 		default:
 			break;
 	}
@@ -2756,7 +2687,6 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 	vector<string> ret;
 	ret.push_back(DropoutTrigger::GetTriggerName());
 	ret.push_back(EdgeTrigger::GetTriggerName());
-	ret.push_back(GlitchTrigger::GetTriggerName());
 	ret.push_back(PulseWidthTrigger::GetTriggerName());
 	ret.push_back(RuntTrigger::GetTriggerName());
 	ret.push_back(SlewRateTrigger::GetTriggerName());
@@ -2764,6 +2694,6 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 		ret.push_back(UartTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
-	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
+	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
 }
