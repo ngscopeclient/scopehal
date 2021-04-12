@@ -29,13 +29,15 @@
 
 #include "scopehal.h"
 #include "UartTrigger.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-UartTrigger::UartTrigger(Oscilloscope* scope) : SerialTrigger(scope)
+UartTrigger::UartTrigger(Oscilloscope* scope)
+	: SerialTrigger(scope)
 {
 	CreateInput("din");
 
@@ -47,8 +49,13 @@ UartTrigger::UartTrigger(Oscilloscope* scope) : SerialTrigger(scope)
 	m_parameters[m_ptypename].AddEnumValue("None", PARITY_NONE);
 	m_parameters[m_ptypename].AddEnumValue("Even", PARITY_EVEN);
 	m_parameters[m_ptypename].AddEnumValue("Odd", PARITY_ODD);
-	m_parameters[m_ptypename].AddEnumValue("Mark", PARITY_MARK);
-	m_parameters[m_ptypename].AddEnumValue("Space", PARITY_SPACE);
+
+	//Constant 0/1 parity bits are not supported by some scopes as they're pretty rare
+	if(dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL)
+	{
+		m_parameters[m_ptypename].AddEnumValue("Mark", PARITY_MARK);
+		m_parameters[m_ptypename].AddEnumValue("Space", PARITY_SPACE);
+	}
 
 	m_typename = "Trigger Type";
 	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));

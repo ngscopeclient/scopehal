@@ -4258,6 +4258,11 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 		case UartTrigger::PARITY_EVEN:
 			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Even\"");
 			break;
+
+		case UartTrigger::PARITY_MARK:
+		case UartTrigger::PARITY_SPACE:
+			LogWarning("LeCroy UART trigger does not support mark or space parity\n");
+			break;
 	}
 
 	//Pattern length depends on the current format.
