@@ -162,3 +162,9 @@ void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& l
 	len = ReadRawData(len, buf);
 	return buf;
 }
+
+void SCPITransport::FlushRXBuffer(void)
+
+{
+	LogError("SCPITransport::FlushRXBuffer is unimplemented");
+}

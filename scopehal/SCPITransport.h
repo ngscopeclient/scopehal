@@ -61,6 +61,7 @@ public:
 	{ return m_netMutex; }
 
 	//Immediate command API
+	virtual void FlushRXBuffer(void);
 	virtual bool SendCommand(const std::string& cmd) =0;
 	virtual std::string ReadReply(bool endOnSemicolon = true) =0;
 	virtual size_t ReadRawData(size_t len, unsigned char* buf) =0;
