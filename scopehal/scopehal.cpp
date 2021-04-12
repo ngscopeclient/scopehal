@@ -632,7 +632,7 @@ string ReadFile(const string& path)
 	buf[fsize] = 0;
 	fclose(fp);
 
-	string ret(buf);
+	string ret(buf, fsize);
 	delete[] buf;
 
 	return ret;
