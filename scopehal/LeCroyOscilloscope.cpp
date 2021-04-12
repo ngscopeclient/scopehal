@@ -224,17 +224,6 @@ void LeCroyOscilloscope::IdentifyHardware()
 		m_modelid = MODEL_WAVESURFER_3K;
 		m_maxBandwidth = stoi(m_model.substr(3, 2)) * 100;
 	}
-	else if (m_vendor.compare("SIGLENT") == 0)
-	{
-		// TODO: if LeCroy and Siglent classes get split, then this should obviously
-		// move to the Siglent class.
-		if (m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 'X')
-			m_modelid = MODEL_SIGLENT_SDS2000X;
-
-		//FIXME
-		m_maxBandwidth = 200;
-	}
-
 	else
 	{
 		LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
@@ -1103,7 +1092,6 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVEPRO_HD:
 		case MODEL_WAVERUNNER_9K:
-		case MODEL_SIGLENT_SDS2000X:
 			return (i == 1) || (i == 2) || (i > m_analogChannelCount);
 
 		case MODEL_WAVESURFER_3K:			//TODO: can use ch1 if not 2, and ch3 if not 4
@@ -1372,7 +1360,6 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 		//Only the default 20/200
 		case MODEL_HDO_4KA:
 		case MODEL_HDO_6KA:
-		case MODEL_SIGLENT_SDS2000X:
 		default:
 			break;
 	}
