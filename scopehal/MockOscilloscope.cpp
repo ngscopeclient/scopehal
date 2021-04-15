@@ -367,10 +367,22 @@ bool MockOscilloscope::LoadCSV(const string& path)
 	vector<string> channel_names;
 	while(!feof(fp))
 	{
-		nrow ++;
-
 		if(!fgets(line, sizeof(line), fp))
 			break;
+
+		//Discard blank lines
+		string s = Trim(line);
+		if(s.empty())
+			continue;
+
+		//If the line starts with a #, it's a comment. Discard it.
+		if(line[0] == '#')
+		{
+			//TODO: parse metadata out of Digilent WaveForms CSVs (#409).
+			continue;
+		}
+
+		nrow ++;
 
 		//Parse the samples for each row
 		//TODO: be more efficient about this
@@ -559,7 +571,7 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			LogError("Unknown file format");
 			return false;
 	}
-	
+
 	LogDebug("Vendor:    %s\n", m_vendor.c_str());
 	//LogDebug("File size: %i bytes\n", fh.length);
 	LogDebug("Waveforms: %i\n\n", fh.count);
