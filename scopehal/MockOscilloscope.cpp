@@ -531,11 +531,12 @@ bool MockOscilloscope::LoadCSV(const string& path)
 			vmin = min(vmin, (float)v);
 		}
 
-		//LogDebug("vmax = %f, vmin = %f\n", vmax, vmin);
+		float vrange = vmax - vmin;
+		float vavg = vmin + vrange/2;
 
 		auto chan = GetChannel(i);
-		chan->SetVoltageRange(vmax - vmin);
-		chan->SetOffset((vmin-vmax) / 2);
+		chan->SetVoltageRange(vrange);
+		chan->SetOffset(-vavg);
 	}
 
 	return true;
