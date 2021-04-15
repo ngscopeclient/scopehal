@@ -361,6 +361,8 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 	vector<AnalogWaveform*> waveforms;
 
+	bool digilentFormat = false;
+
 	char line[1024];
 	size_t nrow = 0;
 	size_t ncols = 0;
@@ -376,9 +378,22 @@ bool MockOscilloscope::LoadCSV(const string& path)
 			continue;
 
 		//If the line starts with a #, it's a comment. Discard it.
-		if(line[0] == '#')
+		if(s[0] == '#')
 		{
-			//TODO: parse metadata out of Digilent WaveForms CSVs (#409).
+			if(s == "#Digilent WaveForms Oscilloscope Acquisition")
+			{
+				digilentFormat = true;
+				m_vendor = "Digilent";
+			}
+
+			else if(digilentFormat)
+			{
+				if(s.find("#Device Name: ") == 0)
+					m_name = s.substr(14);
+				if(s.find("#Serial Number: ") == 0)
+					m_serial = s.substr(16);
+				//TODO: parse date/time
+			}
 			continue;
 		}
 
