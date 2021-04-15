@@ -30,121 +30,129 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief Declaration of ESPIDecoder
  */
+#ifndef ESPIDecoder_h
+#define ESPIDecoder_h
 
-#ifndef scopeprotocols_h
-#define scopeprotocols_h
+#include "../scopehal/PacketDecoder.h"
 
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
+class ESPISymbol
+{
+public:
 
-#include "ACCoupleFilter.h"
-#include "ADL5205Decoder.h"
-#include "AutocorrelationFilter.h"
-#include "BaseMeasurement.h"
-#include "CANDecoder.h"
-#include "ChannelEmulationFilter.h"
-#include "ClockRecoveryFilter.h"
-#include "CTLEFilter.h"
-#include "CurrentShuntFilter.h"
-#include "DCDMeasurement.h"
-#include "DCOffsetFilter.h"
-#include "DDJMeasurement.h"
-#include "DDR1Decoder.h"
-#include "DDR3Decoder.h"
-#include "DeEmbedFilter.h"
-#include "DeskewFilter.h"
-#include "DownconvertFilter.h"
-#include "DownsampleFilter.h"
-#include "DPhyDataDecoder.h"
-#include "DPhyHSClockRecoveryFilter.h"
-#include "DPhySymbolDecoder.h"
-#include "DramClockFilter.h"
-#include "DramRefreshActivateMeasurement.h"
-#include "DramRowColumnLatencyMeasurement.h"
-#include "DSIFrameDecoder.h"
-#include "DSIPacketDecoder.h"
-#include "DutyCycleMeasurement.h"
-#include "DVIDecoder.h"
-#include "EmphasisFilter.h"
-#include "EmphasisRemovalFilter.h"
-#include "ESPIDecoder.h"
-#include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
-#include "EthernetAutonegotiationDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include "EthernetRGMIIDecoder.h"
-#include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
-#include "Ethernet1000BaseXDecoder.h"
-#include "Ethernet10GBaseRDecoder.h"
-#include "Ethernet64b66bDecoder.h"
-#include "EyeBitRateMeasurement.h"
-#include "EyePattern.h"
-#include "EyeHeightMeasurement.h"
-#include "EyeJitterMeasurement.h"
-#include "EyePeriodMeasurement.h"
-#include "EyeWidthMeasurement.h"
-#include "FallMeasurement.h"
-#include "FFTFilter.h"
-#include "FIRFilter.h"
-#include "FrequencyMeasurement.h"
-#include "HistogramFilter.h"
-#include "HorizontalBathtub.h"
-#include "IBM8b10bDecoder.h"
-#include "I2CDecoder.h"
-#include "I2CEepromDecoder.h"
-#include "IPv4Decoder.h"
-#include "ISIMeasurement.h"
-#include "JitterSpectrumFilter.h"
-#include "JtagDecoder.h"
-#include "MagnitudeFilter.h"
-#include "MDIODecoder.h"
-#include "MovingAverageFilter.h"
-#include "MultiplyFilter.h"
-#include "OFDMDemodulator.h"
-#include "OneWireDecoder.h"
-#include "OvershootMeasurement.h"
-#include "ParallelBus.h"
-#include "PCIeDataLinkDecoder.h"
-#include "PCIeGen2LogicalDecoder.h"
-#include "PCIeTransportDecoder.h"
-#include "PeakHoldFilter.h"
-#include "PeriodMeasurement.h"
-#include "PkPkMeasurement.h"
-#include "RjBUjFilter.h"
-#include "QSPIDecoder.h"
-#include "QuadratureDecoder.h"
-#include "RiseMeasurement.h"
-#include "SDCmdDecoder.h"
-#include "SDDataDecoder.h"
-#include "SPIDecoder.h"
-#include "SPIFlashDecoder.h"
-#include "SubtractFilter.h"
-#include "SWDDecoder.h"
-#include "SWDMemAPDecoder.h"
-#include "TachometerFilter.h"
-#include "TappedDelayLineFilter.h"
-#include "ThresholdFilter.h"
-#include "TIEMeasurement.h"
-#include "TMDSDecoder.h"
-#include "TopMeasurement.h"
-#include "UARTDecoder.h"
-#include "UartClockRecoveryFilter.h"
-#include "UndershootMeasurement.h"
-#include "UpsampleFilter.h"
-#include "USB2ActivityDecoder.h"
-#include "USB2PacketDecoder.h"
-#include "USB2PCSDecoder.h"
-#include "USB2PMADecoder.h"
-#include "VerticalBathtub.h"
-#include "Waterfall.h"
-#include "WindowedAutocorrelationFilter.h"
+	enum ESpiType
+	{
+		TYPE_COMMAND_TYPE,
+		TYPE_COMMAND_ADDR_16,
+		TYPE_COMMAND_ADDR_32,
+		TYPE_COMMAND_ADDR_64,
 
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
+		/*
+		TYPE_COMMAND_DATA,
+		TYPE_COMMAND_CRC_GOOD,
+		TYPE_COMMAND_CRC_BAD,
 
-void ScopeProtocolStaticInit();
+		TYPE_RESPONSE_TYPE,
+		TYPE_RESPONSE_HEADER,
+		TYPE_RESPONSE_DATA,
+		TYPE_RESPONSE_STATUS,
+		TYPE_RESPONSE_CRC_GOOD,
+		TYPE_RESPONSE_CRC_BAD,
+		*/
+
+		TYPE_ERROR
+	} m_type;
+
+	//Table 3
+	enum ESpiCommand
+	{
+		//Table 6
+		COMMAND_PUT_PC				= 0x00,
+		COMMAND_GET_PC				= 0x01,
+		COMMAND_PUT_NP				= 0x02,
+		COMMAND_GET_NP				= 0x03,
+		COMMAND_PUT_OOB				= 0x06,
+		COMMAND_GET_OOB				= 0x07,
+		COMMAND_PUT_FLASH_C			= 0x08,
+		COMMAND_GET_FLASH_NP		= 0x09,
+
+		//Figure 37
+		COMMAND_PUT_IORD_SHORT_x1		= 0x40,
+		COMMAND_PUT_IORD_SHORT_x2		= 0x41,
+		COMMAND_PUT_IORD_SHORT_x4		= 0x43,
+		COMMAND_PUT_IOWR_SHORT_x1		= 0x44,
+		COMMAND_PUT_IOWR_SHORT_x2		= 0x45,
+		COMMAND_PUT_IOWR_SHORT_x4		= 0x47,
+		COMMAND_PUT_MEMRD32_SHORT_x1	= 0x48,
+		COMMAND_PUT_MEMRD32_SHORT_x2	= 0x49,
+		COMMAND_PUT_MEMRD32_SHORT_x4	= 0x4b,
+		COMMAND_PUT_MEMWR32_SHORT_x1	= 0x4c,
+		COMMAND_PUT_MEMWR32_SHORT_x2	= 0x4d,
+		COMMAND_PUT_MEMWR32_SHORT_x4	= 0x4f,
+
+		//Figure 40
+		COMMAND_PUT_VWIRE			= 0x04,
+		COMMAND_GET_VWIRE			= 0x05,
+
+		COMMAND_GET_STATUS			= 0x25,
+		COMMAND_SET_CONFIGURATION	= 0x22,
+		COMMAND_GET_CONFIGURATION	= 0x21,
+		COMMAND_RESET				= 0xff,
+
+		LEN_1						= 0x00,
+		LEN_2						= 0x01,
+		LEN_4						= 0x03,
+
+		COMMAND_NONE				= 0x100
+	} m_cmd;
+
+	uint64_t m_data;
+	ESPISymbol()
+	{}
+
+	ESPISymbol(ESpiType type, uint64_t data = 0)
+	 : m_type(type)
+	 , m_data(data)
+	{}
+
+	bool operator== (const ESPISymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_data == s.m_data);
+	}
+};
+
+typedef Waveform<ESPISymbol> ESPIWaveform;
+
+/**
+	@brief Decoder for Intel Enhanced Serial Peripheral Interface (eSPI)
+
+	Reference: Enhanced Serial Peripheral Interface (eSPI) Base Specification (Intel document 327432-004)
+ */
+class ESPIDecoder : public PacketDecoder
+{
+public:
+	ESPIDecoder(const std::string& color);
+
+	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(int i);
+
+	virtual void Refresh();
+
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	std::vector<std::string> GetHeaders();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
+
+	PROTOCOL_DECODER_INITPROC(ESPIDecoder)
+};
 
 #endif
