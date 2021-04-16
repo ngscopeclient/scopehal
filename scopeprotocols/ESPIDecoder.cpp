@@ -39,9 +39,12 @@ using namespace std;
 ESPIDecoder::ESPIDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
-	CreateInput("spi_mosi");
-	CreateInput("spi_miso");
-	CreateInput("qspi");
+	CreateInput("clk");
+	CreateInput("cs#");
+	CreateInput("dq3");
+	CreateInput("dq2");
+	CreateInput("dq1");
+	CreateInput("dq0");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,8 +55,14 @@ bool ESPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 3) && (dynamic_cast<SPIWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if(
+		(i < 6) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
+	}
 
 	return false;
 }
@@ -79,7 +88,12 @@ bool ESPIDecoder::NeedsConfig()
 void ESPIDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "eSPI(%s)",	GetInputDisplayName(0).c_str());
+	snprintf(hwname, sizeof(hwname), "eSPI(%s, %s, %s, %s)",
+		GetInputDisplayName(2).c_str(),
+		GetInputDisplayName(3).c_str(),
+		GetInputDisplayName(4).c_str(),
+		GetInputDisplayName(5).c_str()
+		);
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -89,8 +103,8 @@ vector<string> ESPIDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Command");
 	ret.push_back("Address");
-/*	ret.push_back("Info");
-	ret.push_back("Len");*/
+	ret.push_back("Response");
+	ret.push_back("Status");
 	return ret;
 }
 
@@ -108,375 +122,508 @@ void ESPIDecoder::Refresh()
 		return;
 	}
 
-	auto din = dynamic_cast<SPIWaveform*>(GetInputWaveform(0));
-	auto dout = dynamic_cast<SPIWaveform*>(GetInputWaveform(1));
-	auto dquad = dynamic_cast<SPIWaveform*>(GetInputWaveform(2));
-	if(!din || !dout || !dquad)
-	{
-		SetData(NULL, 0);
-		return;
-	}
+	//Get the input data
+	auto clk = GetDigitalInputWaveform(0);
+	auto csn = GetDigitalInputWaveform(1);
+	auto data3 = GetDigitalInputWaveform(2);
+	auto data2 = GetDigitalInputWaveform(3);
+	auto data1 = GetDigitalInputWaveform(4);
+	auto data0 = GetDigitalInputWaveform(5);
 
-	size_t quadlen = dquad->m_samples.size();
+	size_t clklen = clk->m_samples.size();
+	size_t cslen = csn->m_samples.size();
+	size_t datalen[4] =
+	{
+		data0->m_samples.size(),
+		data1->m_samples.size(),
+		data2->m_samples.size(),
+		data3->m_samples.size()
+	};
+
+	size_t ics			= 0;
+	size_t iclk			= 0;
+	size_t idata[4]		= {0};
+	int64_t timestamp	= 0;
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
 	auto cap = new ESPIWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_timescale = clk->m_timescale;
+	cap->m_startTimestamp = clk->m_startTimestamp;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	SetData(cap, 0);
 
-	//Loop over the SPI events and process stuff
-	//For now, assume the MISO/MOSI SPI captures are synchronized (sample N is at the same point in time)
 	ESPISymbol samp;
-	size_t len = din->m_samples.size();
 	enum
 	{
-		STATE_IDLE,
-		STATE_OPCODE,
-		STATE_CONFIG_ADDRESS,
-		STATE_CONFIG_DATA,
-		STATE_COMMAND_CRC8,
+		LINK_STATE_DESELECTED,
+		LINK_STATE_SELECTED_CLKLO,
+		LINK_STATE_SELECTED_CLKHI
 
-		STATE_HANG
-	} state = STATE_IDLE;
+	} link_state = LINK_STATE_DESELECTED;
+
+	enum
+	{
+		TXN_STATE_IDLE,
+
+		TXN_STATE_OPCODE,
+		TXN_STATE_CONFIG_ADDRESS,
+		TXN_STATE_CONFIG_DATA,
+		TXN_STATE_COMMAND_CRC8,
+
+		TXN_STATE_RESPONSE,
+		TXN_STATE_RESPONSE_DATA,
+		TXN_STATE_STATUS,
+		TXN_STATE_RESPONSE_CRC8
+
+	} txn_state = TXN_STATE_IDLE;
 
 	ESPISymbol::ESpiCommand current_cmd = ESPISymbol::COMMAND_RESET;
 	Packet* pack = NULL;
-	bool quad_mode = false;
+
+	enum
+	{
+		READ_SI,
+		READ_SO,
+		READ_QUAD
+	} read_mode = READ_SI;
+
 	size_t count = 0;
-	uint64_t addr = 0;
 	size_t tstart = 0;
 	uint8_t crc = 0;
 	uint64_t data = 0;
-	for(size_t iin = 0, iquad=0; (iin < len) && (iquad < quadlen) ;)
+
+	int skip_bits			= 0;
+	int bitcount			= 0;
+	int64_t bytestart		= 0;
+	uint8_t current_byte	= 0;
+	bool byte_valid_next	= false;
+	ESPISymbol::ESpiCompletion completion_type	= ESPISymbol::COMPLETION_NONE;
+
+	while(true)
 	{
-		//Figure out what the incoming packet is.
-		auto s = din->m_samples[iin];
-		auto r = dout->m_samples[iin];
-		auto sq = dquad->m_samples[iquad];
+		bool cur_cs = csn->m_samples[ics];
+		bool cur_clk = clk->m_samples[iclk];
+		uint8_t cur_data =
+			(data3->m_samples[idata[3]] ? 0x8 : 0) |
+			(data2->m_samples[idata[2]] ? 0x4 : 0) |
+			(data1->m_samples[idata[1]] ? 0x2 : 0) |
+			(data0->m_samples[idata[0]] ? 0x1 : 0);
 
-		switch(state)
+		bool byte_valid = false;
+
+		switch(link_state)
 		{
-			//When idle, look for a TYPE_SELECT frame.
-			//This re-synchronizes us to the start of a new transaction
-			case STATE_IDLE:
-				if(s.m_stype == SPISymbol::TYPE_SELECT)
+			case LINK_STATE_DESELECTED:
+				if(!cur_cs)
 				{
-					state = STATE_OPCODE;
+					link_state = LINK_STATE_SELECTED_CLKLO;
+					current_byte = 0;
+					bitcount = 0;
+					bytestart = timestamp;
 
-					//Discard samples on the quad bus until we're synchronized
-					while(iquad < quadlen)
-					{
-						if(dquad->m_offsets[iquad]*dquad->m_timescale >= din->m_offsets[iin]*din->m_timescale)
-							break;
-						iquad ++;
-					}
-					sq = dquad->m_samples[iquad];
-
-					//Expect a select symbol
-					if(sq.m_stype == SPISymbol::TYPE_SELECT)
-						iquad ++;
-					else
-						LogWarning("Expected select on quad bus, got something else\n");
-
-					//Clear the CRC
+					//Re-sync the transaction parsing
+					txn_state = TXN_STATE_OPCODE;
 					crc = 0;
 				}
-				iin ++;
-				break;	//end STATE_IDLE
+				break;	//end LINK_STATE_DESELECTED
 
-			//Frame should begin with an opcode
-			case STATE_OPCODE:
-				if(s.m_stype != SPISymbol::TYPE_DATA)
+			//wait for rising edge of clk
+			case LINK_STATE_SELECTED_CLKLO:
+				if(cur_clk)
 				{
-					cap->m_offsets.push_back(din->m_offsets[iin]);
-					cap->m_durations.push_back(din->m_durations[iin]);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_ERROR));
-					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-
-					iin ++;
-				}
-				else
-				{
-					pack = new Packet;
-
-					//HEURISTIC
-					//If the MISO byte is not 0xFF, we're probably in quad mode
-					if(r.m_data != 0xff)
+					if(skip_bits > 0)
 					{
-						current_cmd = (ESPISymbol::ESpiCommand)sq.m_data;
-
-						//Add symbol for packet type
-						tstart = dquad->m_offsets[iquad];
-						pack->m_offset = tstart * dquad->m_timescale;
-						cap->m_offsets.push_back(tstart);
-						cap->m_durations.push_back(dquad->m_durations[iquad]);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, sq.m_data));
-
-						quad_mode = true;
-						iquad ++;
-						state = STATE_IDLE;
+						skip_bits --;
+						bytestart = timestamp;
 					}
 					else
 					{
-						current_cmd = (ESPISymbol::ESpiCommand)s.m_data;
+						switch(read_mode)
+						{
+							case READ_SI:
+								bitcount ++;
+								current_byte <<= 1;
+								current_byte |= (cur_data & 1);
+								break;
 
-						//Add symbol for packet type
-						tstart = din->m_offsets[iin];
-						pack->m_offset = tstart * din->m_timescale;
-						cap->m_offsets.push_back(tstart);
-						cap->m_durations.push_back(din->m_durations[iin]);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, s.m_data));
+							case READ_SO:
+								bitcount ++;
+								current_byte <<= 1;
+								current_byte |= (cur_data & 2) >> 1;
+								break;
 
-						quad_mode = false;
-						iin ++;
+							case READ_QUAD:
+								bitcount += 4;
+								current_byte <<= 4;
+								current_byte |= cur_data;
+								break;
+						}
+
+						if(bitcount == 8)
+						{
+							byte_valid_next = true;
+							bitcount = 0;
+						}
 					}
 
-					//Checksum this byte
-					crc = UpdateCRC8(crc, current_cmd);
+					link_state = LINK_STATE_SELECTED_CLKHI;
+				}
 
-					//Create a new packet for this transaction
+				break;	//end LINK_STATE_SELECTED_CLKLO
+
+			//wait for falling edge of clk
+			case LINK_STATE_SELECTED_CLKHI:
+				if(!cur_clk)
+				{
+					link_state = LINK_STATE_SELECTED_CLKLO;
+					if(byte_valid_next)
+					{
+						byte_valid = true;
+						byte_valid_next = false;
+					}
+				}
+				break;
+		}
+
+		//end of packet
+		//TODO: error if a byte is truncated
+		if( (link_state != LINK_STATE_DESELECTED) && cur_cs)
+		{
+			if(pack)
+			{
+				pack->m_len = (timestamp * clk->m_timescale) - pack->m_offset;
+				pack = NULL;
+			}
+
+			bytestart = timestamp;
+			link_state = LINK_STATE_DESELECTED;
+			read_mode = READ_SI;
+		}
+
+		if(byte_valid)
+		{
+			switch(txn_state)
+			{
+				//Nothign to do
+				case TXN_STATE_IDLE:
+					break;	//end STATE_IDLE
+
+				//Frame should begin with an opcode
+				case TXN_STATE_OPCODE:
+
+					//Create a new packet
+					pack = new Packet;
 					pack->m_len = 0;
 					m_packets.push_back(pack);
+
+					current_cmd = (ESPISymbol::ESpiCommand)current_byte;
+
+					//Add symbol for packet type
+					tstart = timestamp;
+					pack->m_offset = bytestart * clk->m_timescale;
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, current_byte));
 					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1);
 
 					//Decide what to do based on the opcode
 					count = 0;
-					addr = 0;
+					data = 0;
+
 					switch(current_cmd)
 					{
 						//Expect a 16 bit address
 						case ESPISymbol::COMMAND_GET_CONFIGURATION:
 						case ESPISymbol::COMMAND_SET_CONFIGURATION:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
-							state = STATE_CONFIG_ADDRESS;
+							txn_state = TXN_STATE_CONFIG_ADDRESS;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x2:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x4:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x2:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x4:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_PUT_PC:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_GET_PC:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_GET_VWIRE:
 						case ESPISymbol::COMMAND_PUT_VWIRE:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_GET_STATUS:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_RESET:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						case ESPISymbol::COMMAND_GET_FLASH_NP:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_FLASH_C:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 
 						case ESPISymbol::COMMAND_GET_OOB:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_OOB:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
 							break;
-
 
 						//Unknown
 						default:
-							state = STATE_IDLE;
+							txn_state = TXN_STATE_IDLE;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 							break;
 					}
-				}
-				break;	//end STATE_OPCODE
 
-			case STATE_CONFIG_ADDRESS:
-				if(quad_mode)
-				{
-					LogWarning("STATE_CONFIG_ADDRESS doesn't handle quad mode yet\n");
-					state = STATE_HANG;
-					break;
-				}
+					break;	//end TXN_STATE_OPCODE
 
-				if(s.m_stype != SPISymbol::TYPE_DATA)
-				{
-					cap->m_offsets.push_back(din->m_offsets[iin]);
-					cap->m_durations.push_back(din->m_durations[iin]);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_ERROR));
-					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-					iin ++;
-					state = STATE_IDLE;
-				}
-				else
-				{
-					//Checksum this byte
-					crc = UpdateCRC8(crc, s.m_data);
+				case TXN_STATE_CONFIG_ADDRESS:
 
 					//Save start time
 					if(count == 0)
 					{
-						tstart = din->m_offsets[iin];
+						tstart = bytestart;
 						cap->m_offsets.push_back(tstart);
 					}
 
 					//Save data
-					addr = (addr << 8) | s.m_data;
+					data = (data << 8) | current_byte;
 					count ++;
 
 					//Add data
 					if(count == 2)
 					{
-						cap->m_durations.push_back(din->m_offsets[iin] + din->m_durations[iin] - tstart);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, addr));
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, data));
 						pack->m_headers["Address"] = GetText(cap->m_samples.size()-1);
 
 						if(current_cmd == ESPISymbol::COMMAND_SET_CONFIGURATION)
 						{
-							state = STATE_CONFIG_DATA;
+							txn_state = TXN_STATE_CONFIG_DATA;
 							data = 0;
 							count = 0;
 						}
 						else
-							state = STATE_COMMAND_CRC8;
+							txn_state = TXN_STATE_COMMAND_CRC8;
 					}
 
-					iin ++;
-				}
-				break;	//end STATE_CONFIG_ADDRESS
+					break;	//end TXN_STATE_CONFIG_ADDRESS
 
-			case STATE_CONFIG_DATA:
-				if(quad_mode)
-				{
-					LogWarning("STATE_CONFIG_DATA doesn't handle quad mode yet\n");
-					state = STATE_HANG;
-					break;
-				}
-
-				if(s.m_stype != SPISymbol::TYPE_DATA)
-				{
-					cap->m_offsets.push_back(din->m_offsets[iin]);
-					cap->m_durations.push_back(din->m_durations[iin]);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_ERROR));
-					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-					iin ++;
-					state = STATE_IDLE;
-				}
-				else
-				{
-					//Checksum this byte
-					crc = UpdateCRC8(crc, s.m_data);
+				case TXN_STATE_CONFIG_DATA:
 
 					//Save start time
 					if(count == 0)
 					{
-						tstart = din->m_offsets[iin];
+						tstart = bytestart;
 						cap->m_offsets.push_back(tstart);
 					}
 
 					//Save data
-					data = (data << 8) | s.m_data;
-					pack->m_data.push_back(s.m_data);
+					data = (data << 8) | current_byte;
+					pack->m_data.push_back(current_byte);
 					count ++;
 
 					//Add data
 					if(count == 4)
 					{
-						cap->m_durations.push_back(din->m_offsets[iin] + din->m_durations[iin] - tstart);
+						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_DATA_32, data));
 
-						state = STATE_COMMAND_CRC8;
+						txn_state = TXN_STATE_COMMAND_CRC8;
 					}
 
-					iin ++;
-				}
-				break;	//end STATE_CONFIG_DATA
+					break;	//end TXN_STATE_CONFIG_DATA
 
-			case STATE_COMMAND_CRC8:
-				if(quad_mode)
-				{
-					LogWarning("STATE_COMMAND_CRC8 doesn't handle quad mode yet\n");
-					state = STATE_HANG;
-					break;
-				}
+				case TXN_STATE_COMMAND_CRC8:
 
-				if(s.m_stype != SPISymbol::TYPE_DATA)
-				{
-					cap->m_offsets.push_back(din->m_offsets[iin]);
-					cap->m_durations.push_back(din->m_durations[iin]);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_ERROR));
-					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-					iin ++;
-					state = STATE_IDLE;
-				}
-				else
-				{
-					cap->m_offsets.push_back(din->m_offsets[iin]);
-					cap->m_durations.push_back(din->m_durations[iin]);
-					if(s.m_data == crc)
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, s.m_data));
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					if(current_byte == crc)
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, current_byte));
 					else
 					{
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_BAD, s.m_data));
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_BAD, current_byte));
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					}
-					iin ++;
 
-					//TODO
-					state = STATE_IDLE;
-				}
-				break;	//end STATE_COMMAND_CRC8
+					switch(current_cmd)
+					{
+						//Expect a response after a 2-cycle bus turnaround
+						case ESPISymbol::COMMAND_GET_CONFIGURATION:
+							txn_state = TXN_STATE_RESPONSE;
+							skip_bits = 2;
+							break;
 
-			//When in doubt, move to the next full SPI sample
-			default:
-				iin ++;
+						//don't know what to do
+						default:
+							txn_state = TXN_STATE_IDLE;
+							break;
+					}
+
+					//If running in x1 mode, switch to reading the other data line.
+					//If in x4 mode, no action needed.
+					if(read_mode == READ_SI)
+						read_mode = READ_SO;
+
+					break;	//end TXN_STATE_COMMAND_CRC8
+
+				case TXN_STATE_RESPONSE:
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_OP, current_byte));
+
+					completion_type = static_cast<ESPISymbol::ESpiCompletion>(current_byte >> 6);
+
+					pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
+
+					switch(current_cmd)
+					{
+						case ESPISymbol::COMMAND_GET_CONFIGURATION:
+							txn_state = TXN_STATE_RESPONSE_DATA;
+							count = 0;
+							data = 0;
+							break;
+
+						default:
+							txn_state = TXN_STATE_IDLE;
+					}
+
+					break;	//end TXN_STATE_RESPONSE
+
+				case TXN_STATE_RESPONSE_DATA:
+
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//per page 93, data is LSB to MSB
+					data |= current_byte << ( (count & 3) * 8);
+					count ++;
+
+					//TODO: different commands have different lengths for reply data
+					if(count == 4)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+
+						count = 0;
+						data = 0;
+						txn_state = TXN_STATE_STATUS;
+					}
+
+					break;	//end TXN_STATE_RESPONSE_DATA
+
+				case TXN_STATE_STATUS:
+
+					//Save start time
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//Save data (LSB to MSB)
+					data |= current_byte << ( (count & 3) * 8);
+					count ++;
+
+					//Add data
+					if(count == 2)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_STATUS, data));
+
+						txn_state = TXN_STATE_RESPONSE_CRC8;
+					}
+
+					break;	//end TXN_STATE_STATUS
+
+				case TXN_STATE_RESPONSE_CRC8:
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					if(current_byte == crc)
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_GOOD, current_byte));
+					else
+					{
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_BAD, current_byte));
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					}
+
+					//Done with the packet
+					txn_state = TXN_STATE_IDLE;
+					break;	//end TXN_STATE_COMMAND_CRC8
+			}
+
+			//Checksum this byte
+			crc = UpdateCRC8(crc, current_byte);
+			bytestart = timestamp;
 		}
+
+		//Get timestamps of next event on each channel
+		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
+
+		//If we can't move forward, stop (don't bother looking for glitches on data)
+		int64_t next_timestamp = min(next_clk, next_cs);
+		if(next_timestamp == timestamp)
+			break;
+
+		//All good, move on
+		timestamp = next_timestamp;
+		AdvanceToTimestamp(csn, ics, cslen, timestamp);
+		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
+		AdvanceToTimestamp(data0, idata[0], datalen[0], timestamp);
+		AdvanceToTimestamp(data1, idata[1], datalen[1], timestamp);
+		AdvanceToTimestamp(data2, idata[2], datalen[2], timestamp);
+		AdvanceToTimestamp(data3, idata[3], datalen[3], timestamp);
 	}
 }
 
@@ -508,6 +655,8 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 		switch(s.m_type)
 		{
 			case ESPISymbol::TYPE_COMMAND_TYPE:
+			case ESPISymbol::TYPE_RESPONSE_OP:
+			case ESPISymbol::TYPE_RESPONSE_STATUS:
 				return m_standardColors[COLOR_CONTROL];
 
 			case ESPISymbol::TYPE_CAPS_ADDR:
@@ -522,6 +671,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 				return m_standardColors[COLOR_CHECKSUM_BAD];
 
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
+			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 				return m_standardColors[COLOR_DATA];
 
 			default:
@@ -539,6 +689,7 @@ string ESPIDecoder::GetText(int i)
 	{
 		const ESPISymbol& s = capture->m_samples[i];
 		char tmp[128];
+		string stmp;
 
 		switch(s.m_type)
 		{
@@ -610,9 +761,60 @@ string ESPIDecoder::GetText(int i)
 				snprintf(tmp, sizeof(tmp), "CRC: %02lx", s.m_data);
 				return tmp;
 
+			case ESPISymbol::TYPE_RESPONSE_OP:
+				switch(s.m_data & 0xf)
+				{
+					case ESPISymbol::RESPONSE_DEFER:
+						return "Defer";
+
+					case ESPISymbol::RESPONSE_NONFATAL_ERROR:
+						return "Nonfatal Error";
+
+					case ESPISymbol::RESPONSE_FATAL_ERROR:
+						return "Fatal Error";
+
+					case ESPISymbol::RESPONSE_ACCEPT:
+						return "Accept";
+
+					case ESPISymbol::RESPONSE_NONE:
+						return "No Response";
+
+					default:
+						snprintf(tmp, sizeof(tmp), "Unknown response %lx", s.m_data & 0xf);
+						return tmp;
+				}
+				break;
+
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
 				return tmp;
+
+			case ESPISymbol::TYPE_RESPONSE_DATA_32:
+				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_RESPONSE_STATUS:
+				if(s.m_data & 0x2000)
+					stmp += "FLASH_NP_AVAIL ";
+				if(s.m_data & 0x1000)
+					stmp += "FLASH_C_AVAIL ";
+				if(s.m_data & 0x0200)
+					stmp += "FLASH_NP_FREE ";
+				if(s.m_data & 0x0080)
+					stmp += "OOB_AVAIL ";
+				if(s.m_data & 0x0040)
+					stmp += "VWIRE_AVAIL ";
+				if(s.m_data & 0x0020)
+					stmp += "NP_AVAIL ";
+				if(s.m_data & 0x0010)
+					stmp += "PC_AVAIL ";
+				if(s.m_data & 0x0008)
+					stmp += "OOB_FREE ";
+				if(s.m_data & 0x0002)
+					stmp += "NP_FREE ";
+				if(s.m_data & 0x0001)
+					stmp += "PC_FREE";
+				return stmp;
 
 			/*case ESPISymbol::TYPE_COMMAND_ADDR_16:
 				snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
