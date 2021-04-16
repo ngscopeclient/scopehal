@@ -44,16 +44,21 @@ public:
 	enum ESpiType
 	{
 		TYPE_COMMAND_TYPE,
-		TYPE_COMMAND_ADDR_16,
-		TYPE_COMMAND_ADDR_32,
-		TYPE_COMMAND_ADDR_64,
 
-		/*
-		TYPE_COMMAND_DATA,
+		TYPE_CAPS_ADDR,
+
+		/*TYPE_COMMAND_ADDR_16,
+		TYPE_COMMAND_ADDR_32,
+		TYPE_COMMAND_ADDR_64,*/
+
+		TYPE_COMMAND_DATA_32,
+
 		TYPE_COMMAND_CRC_GOOD,
 		TYPE_COMMAND_CRC_BAD,
 
-		TYPE_RESPONSE_TYPE,
+		TYPE_RESPONSE_OP,
+
+		/*
 		TYPE_RESPONSE_HEADER,
 		TYPE_RESPONSE_DATA,
 		TYPE_RESPONSE_STATUS,
@@ -153,6 +158,9 @@ public:
 	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(ESPIDecoder)
+
+protected:
+	uint8_t UpdateCRC8(uint8_t crc, uint8_t data);
 };
 
 #endif
