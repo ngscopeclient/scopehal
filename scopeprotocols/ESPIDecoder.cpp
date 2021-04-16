@@ -221,7 +221,7 @@ void ESPIDecoder::Refresh()
 					bitcount = 0;
 					bytestart = timestamp;
 
-					//Re-sync the transaction parsing
+					//Start a new packet
 					txn_state = TXN_STATE_OPCODE;
 					crc = 0;
 				}
@@ -238,6 +238,15 @@ void ESPIDecoder::Refresh()
 					}
 					else
 					{
+						//If this is the beginning of a byte, see if either DQ2 or DQ3 is low.
+						//This means they're actively driven (since they have pullups) and means
+						//that we're definitely in quad mode.
+						if(bitcount == 0)
+						{
+							if( (cur_data & 0xc) != 0xc)
+								read_mode = READ_QUAD;
+						}
+
 						switch(read_mode)
 						{
 							case READ_SI:
@@ -514,6 +523,10 @@ void ESPIDecoder::Refresh()
 					break;	//end TXN_STATE_COMMAND_CRC8
 
 				case TXN_STATE_RESPONSE:
+
+					//Start with a fresh CRC for the response phase
+					crc = 0;
+
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_OP, current_byte));
@@ -547,6 +560,8 @@ void ESPIDecoder::Refresh()
 					//per page 93, data is LSB to MSB
 					data |= current_byte << ( (count & 3) * 8);
 					count ++;
+
+					pack->m_data.push_back(current_byte);
 
 					//TODO: different commands have different lengths for reply data
 					if(count == 4)
@@ -604,6 +619,7 @@ void ESPIDecoder::Refresh()
 
 			//Checksum this byte
 			crc = UpdateCRC8(crc, current_byte);
+
 			bytestart = timestamp;
 		}
 
@@ -666,8 +682,10 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 				return m_standardColors[COLOR_ADDRESS];
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
+			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
 				return m_standardColors[COLOR_CHECKSUM_OK];
 			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
+			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
 				return m_standardColors[COLOR_CHECKSUM_BAD];
 
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
@@ -758,6 +776,8 @@ string ESPIDecoder::GetText(int i)
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
 			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
+			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
+			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
 				snprintf(tmp, sizeof(tmp), "CRC: %02lx", s.m_data);
 				return tmp;
 
