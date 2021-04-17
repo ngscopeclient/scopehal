@@ -499,6 +499,11 @@ void ESPIDecoder::Refresh()
 										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
 										break;
 
+									case 0x30:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_WR, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
 									default:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_DATA_32, data));
 								}
@@ -517,7 +522,7 @@ void ESPIDecoder::Refresh()
 				case TXN_STATE_COMMAND_CRC8:
 
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(timestamp - bytestart);pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+					cap->m_durations.push_back(timestamp - bytestart);
 					if(current_byte == crc)
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, current_byte));
 					else
@@ -595,7 +600,6 @@ void ESPIDecoder::Refresh()
 					count = current_byte;
 
 					txn_state = TXN_STATE_VWIRE_INDEX;
-					pack->m_headers["Info"] = "";
 					break;	//end TXN_STATE_VWIRE_COUNT
 
 				case TXN_STATE_VWIRE_INDEX:
@@ -769,6 +773,11 @@ void ESPIDecoder::Refresh()
 										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
 										break;
 
+									case 0x30:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_RD, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
 									default:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
 										break;
@@ -920,6 +929,8 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_GENERAL_CAPS:
 			case ESPISymbol::TYPE_CH1_CAPS_RD:
 			case ESPISymbol::TYPE_CH1_CAPS_WR:
+			case ESPISymbol::TYPE_CH2_CAPS_RD:
+			case ESPISymbol::TYPE_CH2_CAPS_WR:
 			case ESPISymbol::TYPE_VWIRE_DATA:
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
@@ -1193,6 +1204,80 @@ string ESPIDecoder::GetText(int i)
 					stmp += "Disabled\n";
 
 				return stmp;	//end TYPE_CH1_CAPS_WR
+
+			case ESPISymbol::TYPE_CH2_CAPS_RD:
+
+				stmp += "Max OOB payload selected: ";
+				switch( (s.m_data >> 8) & 0x7)
+				{
+					case 1:
+						stmp += "64 bytes\n";
+						break;
+					case 2:
+						stmp += "128 bytes\n";
+						break;
+					case 3:
+						stmp += "256 bytes\n";
+						break;
+					default:
+						stmp += "Reserved\n";
+						break;
+				}
+
+				stmp += "Max OOB payload supported: ";
+				switch( (s.m_data >> 4) & 0x7)
+				{
+					case 1:
+						stmp += "64 bytes\n";
+						break;
+					case 2:
+						stmp += "128 bytes\n";
+						break;
+					case 3:
+						stmp += "256 bytes\n";
+						break;
+					default:
+						stmp += "Reserved\n";
+						break;
+				}
+
+				if(s.m_data & 2)
+					stmp += "OOB channel ready\n";
+				else
+					stmp += "OOB channel not ready\n";
+
+				if(s.m_data & 1)
+					stmp += "OOB channel enabled\n";
+				else
+					stmp += "OOB channel disabled\n";
+
+				return stmp;	//end TYPE_CH2_CAPS_RD
+
+			case ESPISymbol::TYPE_CH2_CAPS_WR:
+
+				stmp += "Max OOB payload selected: ";
+				switch( (s.m_data >> 8) & 0x7)
+				{
+					case 1:
+						stmp += "64 bytes\n";
+						break;
+					case 2:
+						stmp += "128 bytes\n";
+						break;
+					case 3:
+						stmp += "256 bytes\n";
+						break;
+					default:
+						stmp += "Reserved\n";
+						break;
+				}
+
+				if(s.m_data & 1)
+					stmp += "OOB channel enabled\n";
+				else
+					stmp += "OOB channel disabled\n";
+
+				return stmp;	//end TYPE_CH2_CAPS_WR
 
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
