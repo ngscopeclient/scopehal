@@ -105,6 +105,7 @@ vector<string> ESPIDecoder::GetHeaders()
 	ret.push_back("Address");
 	ret.push_back("Response");
 	ret.push_back("Status");
+	ret.push_back("Info");
 	return ret;
 }
 
@@ -191,6 +192,7 @@ void ESPIDecoder::Refresh()
 	size_t tstart = 0;
 	uint8_t crc = 0;
 	uint64_t data = 0;
+	uint64_t addr = 0;
 
 	int skip_bits			= 0;
 	int bitcount			= 0;
@@ -338,6 +340,7 @@ void ESPIDecoder::Refresh()
 					//Decide what to do based on the opcode
 					count = 0;
 					data = 0;
+					addr = 0;
 
 					switch(current_cmd)
 					{
@@ -442,14 +445,14 @@ void ESPIDecoder::Refresh()
 					}
 
 					//Save data
-					data = (data << 8) | current_byte;
+					addr = (addr << 8) | current_byte;
 					count ++;
 
 					//Add data
 					if(count == 2)
 					{
 						cap->m_durations.push_back(timestamp - tstart);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, data));
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, addr));
 						pack->m_headers["Address"] = GetText(cap->m_samples.size()-1);
 
 						if(current_cmd == ESPISymbol::COMMAND_SET_CONFIGURATION)
@@ -474,7 +477,7 @@ void ESPIDecoder::Refresh()
 					}
 
 					//Save data
-					data = (data << 8) | current_byte;
+					data |= current_byte << ( (count & 3) * 8);
 					pack->m_data.push_back(current_byte);
 					count ++;
 
@@ -482,7 +485,26 @@ void ESPIDecoder::Refresh()
 					if(count == 4)
 					{
 						cap->m_durations.push_back(timestamp - tstart);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_DATA_32, data));
+
+						switch(current_cmd)
+						{
+							case ESPISymbol::COMMAND_SET_CONFIGURATION:
+								switch(addr)
+								{
+									case 0x20:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_WR, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									default:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_DATA_32, data));
+								}
+								break;
+
+							default:
+								cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_DATA_32, data));
+								break;
+						}
 
 						txn_state = TXN_STATE_COMMAND_CRC8;
 					}
@@ -505,6 +527,7 @@ void ESPIDecoder::Refresh()
 					{
 						//Expect a response after a 2-cycle bus turnaround
 						case ESPISymbol::COMMAND_GET_CONFIGURATION:
+						case ESPISymbol::COMMAND_SET_CONFIGURATION:
 							txn_state = TXN_STATE_RESPONSE;
 							skip_bits = 2;
 							break;
@@ -567,7 +590,32 @@ void ESPIDecoder::Refresh()
 					if(count == 4)
 					{
 						cap->m_durations.push_back(timestamp - tstart);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+
+						switch(current_cmd)
+						{
+							case ESPISymbol::COMMAND_GET_CONFIGURATION:
+								switch(addr)
+								{
+									case 0x8:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									case 0x20:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_RD, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									default:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+										break;
+								}
+								break;
+
+							default:
+								cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+								break;
+						}
 
 						count = 0;
 						data = 0;
@@ -688,6 +736,9 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
 				return m_standardColors[COLOR_CHECKSUM_BAD];
 
+			case ESPISymbol::TYPE_GENERAL_CAPS:
+			case ESPISymbol::TYPE_CH1_CAPS_RD:
+			case ESPISymbol::TYPE_CH1_CAPS_WR:
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 				return m_standardColors[COLOR_DATA];
@@ -804,6 +855,153 @@ string ESPIDecoder::GetText(int i)
 						return tmp;
 				}
 				break;
+
+			case ESPISymbol::TYPE_GENERAL_CAPS:
+				if(s.m_data & 0x80000000)
+					stmp += "CRC checking enabled\n";
+				if(s.m_data & 0x40000000)
+					stmp += "Response modifier enabled\n";
+				if( (s.m_data & 0x10000000) == 0)
+					stmp += "DQ1 used as alert\n";
+				else
+					stmp += "ALERT# used as alert\n";
+				switch( (s.m_data >> 26) & 0x3)
+				{
+					case 0:
+						stmp += "x1 mode\n";
+						break;
+					case 1:
+						stmp += "x2 mode\n";
+						break;
+					case 2:
+						stmp += "x4 mode\n";
+						break;
+					default:
+						stmp += "Invalid IO mode\n";
+						break;
+				}
+
+				switch( (s.m_data >> 24) & 0x3)
+				{
+					case 0:
+						stmp += "Supports x1 mode only\n";
+						break;
+					case 1:
+						stmp += "Supports x1 and x2 modes\n";
+						break;
+					case 2:
+						stmp += "Supports x1 and x4 modes\n";
+						break;
+					default:
+						stmp += "Supports x1, x2, and x4 modes\n";
+						break;
+				}
+
+				if(s.m_data & 0x00800000)
+					stmp += "ALERT# configured as open drain\n";
+				else
+					stmp += "ALERT# configured as push-pull\n";
+
+				switch( (s.m_data >> 20) & 0x7)
+				{
+					case 0:
+						stmp += "20MHz SCK\n";
+						break;
+					case 1:
+						stmp += "25MHz SCK\n";
+						break;
+					case 2:
+						stmp += "33MHz SCK\n";
+						break;
+					case 3:
+						stmp += "50MHz SCK\n";
+						break;
+					case 4:
+						stmp += "66MHz SCK\n";
+						break;
+					default:
+						stmp += "Invalid SCK speed\n";
+						break;
+				}
+
+				if(s.m_data & 0x00080000)
+					stmp += "ALERT# supports open drain mode\n";
+
+				switch( (s.m_data >> 16) & 0x7)
+				{
+					case 0:
+						stmp += "Max SCK: 20 MHz\n";
+						break;
+					case 1:
+						stmp += "Max SCK: 25 MHz\n";
+						break;
+					case 2:
+						stmp += "Max SCK: 33 MHz\n";
+						break;
+					case 3:
+						stmp += "Max SCK: 50 MHz\n";
+						break;
+					case 4:
+						stmp += "Max SCK: 66 MHz\n";
+						break;
+					default:
+						stmp += "Invalid max SCK speed\n";
+						break;
+				}
+
+				//15:12 = max wait states
+				if( ( (s.m_data >> 12) & 0xf) == 0)
+					stmp += "Max wait states: 16\n";
+				else
+					stmp += string("Max wait states: ") + to_string((s.m_data >> 12) & 0xf) + "\n";
+
+				if(s.m_data & 0x80)
+					stmp += "Platform channel 7 present\n";
+				if(s.m_data & 0x40)
+					stmp += "Platform channel 6 present\n";
+				if(s.m_data & 0x20)
+					stmp += "Platform channel 5 present\n";
+				if(s.m_data & 0x10)
+					stmp += "Platform channel 4 present\n";
+				if(s.m_data & 0x08)
+					stmp += "Flash channel present\n";
+				if(s.m_data & 0x04)
+					stmp += "OOB channel present\n";
+				if(s.m_data & 0x02)
+					stmp += "Virtual wire channel present\n";
+				if(s.m_data & 0x01)
+					stmp += "Peripheral channel present\n";
+				return stmp;	//end TYPE_GENERAL_CAPS
+
+			case ESPISymbol::TYPE_CH1_CAPS_RD:
+				stmp += "Operating max vwires: ";
+				stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
+
+				stmp += "Max vwires supported: ";
+				stmp += to_string( ((s.m_data >> 8) & 0x3f) + 1) + "\n";
+
+				if(s.m_data & 2)
+					stmp += "Ready\n";
+				else
+					stmp += "Not ready\n";
+
+				if(s.m_data & 1)
+					stmp += "Enabled\n";
+				else
+					stmp += "Disabled\n";
+
+				return stmp;	//end TYPE_CH1_CAPS_RD
+
+			case ESPISymbol::TYPE_CH1_CAPS_WR:
+				stmp += "Operating max vwires: ";
+				stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
+
+				if(s.m_data & 1)
+					stmp += "Enabled\n";
+				else
+					stmp += "Disabled\n";
+
+				return stmp;	//end TYPE_CH1_CAPS_WR
 
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
