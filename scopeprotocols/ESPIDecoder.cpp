@@ -103,9 +103,9 @@ vector<string> ESPIDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Command");
 	ret.push_back("Address");
+	ret.push_back("Info");
 	ret.push_back("Response");
 	ret.push_back("Status");
-	ret.push_back("Info");
 	return ret;
 }
 
@@ -174,7 +174,11 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_RESPONSE,
 		TXN_STATE_RESPONSE_DATA,
 		TXN_STATE_STATUS,
-		TXN_STATE_RESPONSE_CRC8
+		TXN_STATE_RESPONSE_CRC8,
+
+		TXN_STATE_VWIRE_COUNT,
+		TXN_STATE_VWIRE_INDEX,
+		TXN_STATE_VWIRE_DATA
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -351,6 +355,17 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_CONFIG_ADDRESS;
 							break;
 
+						//No arguments
+						case ESPISymbol::COMMAND_GET_STATUS:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+							txn_state = TXN_STATE_COMMAND_CRC8;
+							break;
+						case ESPISymbol::COMMAND_GET_FLASH_NP:
+						case ESPISymbol::COMMAND_GET_VWIRE:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							txn_state = TXN_STATE_COMMAND_CRC8;
+							break;
+
 						//TODO
 						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
@@ -390,26 +405,14 @@ void ESPIDecoder::Refresh()
 							break;
 
 						//TODO
-						case ESPISymbol::COMMAND_GET_VWIRE:
 						case ESPISymbol::COMMAND_PUT_VWIRE:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						//TODO
-						case ESPISymbol::COMMAND_GET_STATUS:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
 						case ESPISymbol::COMMAND_RESET:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						case ESPISymbol::COMMAND_GET_FLASH_NP:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							txn_state = TXN_STATE_IDLE;
 							break;
 						case ESPISymbol::COMMAND_PUT_FLASH_C:
@@ -514,7 +517,7 @@ void ESPIDecoder::Refresh()
 				case TXN_STATE_COMMAND_CRC8:
 
 					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
 					if(current_byte == crc)
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, current_byte));
 					else
@@ -528,6 +531,9 @@ void ESPIDecoder::Refresh()
 						//Expect a response after a 2-cycle bus turnaround
 						case ESPISymbol::COMMAND_GET_CONFIGURATION:
 						case ESPISymbol::COMMAND_SET_CONFIGURATION:
+						case ESPISymbol::COMMAND_GET_STATUS:
+						case ESPISymbol::COMMAND_GET_FLASH_NP:
+						case ESPISymbol::COMMAND_GET_VWIRE:
 							txn_state = TXN_STATE_RESPONSE;
 							skip_bits = 2;
 							break;
@@ -558,12 +564,21 @@ void ESPIDecoder::Refresh()
 
 					pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
 
+					count = 0;
+					data = 0;
+
 					switch(current_cmd)
 					{
 						case ESPISymbol::COMMAND_GET_CONFIGURATION:
 							txn_state = TXN_STATE_RESPONSE_DATA;
-							count = 0;
-							data = 0;
+							break;
+
+						case ESPISymbol::COMMAND_GET_STATUS:
+							txn_state = TXN_STATE_STATUS;
+							break;
+
+						case ESPISymbol::COMMAND_GET_VWIRE:
+							txn_state = TXN_STATE_VWIRE_COUNT;
 							break;
 
 						default:
@@ -571,6 +586,154 @@ void ESPIDecoder::Refresh()
 					}
 
 					break;	//end TXN_STATE_RESPONSE
+
+				case TXN_STATE_VWIRE_COUNT:
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_VWIRE_COUNT, current_byte));
+
+					count = current_byte;
+
+					txn_state = TXN_STATE_VWIRE_INDEX;
+					pack->m_headers["Info"] = "";
+					break;	//end TXN_STATE_VWIRE_COUNT
+
+				case TXN_STATE_VWIRE_INDEX:
+					txn_state = TXN_STATE_VWIRE_DATA;
+
+					addr = current_byte;
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_VWIRE_INDEX, current_byte));
+
+					break;	//end TXN_STATE_VWIRE_INDEX
+
+				case TXN_STATE_VWIRE_DATA:
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_VWIRE_DATA, current_byte));
+
+					//Virtual wire indexes 0/1 are IRQs
+					if(addr <= 1)
+					{
+						string tmp = "IRQ";
+						if(addr == 0)
+							tmp += to_string(current_byte & 0x7f);
+						else
+							tmp += to_string( (current_byte & 0x7f) + 128 );
+						if(current_byte & 0x80)
+							tmp += " high\n";
+						else
+							tmp += " low\n";
+
+						pack->m_headers["Info"] += tmp;
+					}
+
+					//Indexes 2-7 are "system events".
+					//See table 10-15
+					else if(addr <= 7)
+					{
+						string tmp;
+						switch(addr)
+						{
+							//Table 10
+							case 2:
+								if(current_byte & 0x40)
+									tmp += string("SLP_S5#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x20)
+									tmp += string("SLP_S4#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("SLP_S3#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+
+							//Table 11
+							case 3:
+								if(current_byte & 0x40)
+									tmp += string("OOB_RST_WARN: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x20)
+									tmp += string("PLTRST#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("SUS_STAT#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+
+							//Table 12
+							case 4:
+								if(current_byte & 0x80)
+									tmp += string("PME#: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+								if(current_byte & 0x40)
+									tmp += string("WAKE#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("OOB_RST_ACK: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+
+							//Table 13
+							case 5:
+								if(current_byte & 0x80)
+									tmp += string("SLAVE_BOOT_LOAD_STATUS: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+								if(current_byte & 0x40)
+									tmp += string("ERROR_NONFATAL: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x20)
+									tmp += string("ERROR_FATAL: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("SLAVE_BOOT_LOAD_DONE: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+
+							//Table 14
+							case 6:
+								if(current_byte & 0x80)
+									tmp += string("HOST_RST_ACK: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+								if(current_byte & 0x40)
+									tmp += string("RCIN#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x20)
+									tmp += string("SMI#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("SCI#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+
+							//Table 15
+							case 7:
+								if(current_byte & 0x40)
+									tmp += string("NMIOUT#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+								if(current_byte & 0x20)
+									tmp += string("SMIOUT#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+								if(current_byte & 0x10)
+									tmp += string("HOST_RST_WARN: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+								break;
+						}
+
+						pack->m_headers["Info"] += tmp;
+					}
+
+					//Indexes 8-73 are reserved
+					else if(addr <= 63)
+						pack->m_headers["Info"] += "Reserved index\n";
+
+					//64-127 platform specific
+					else if(addr <= 127)
+						pack->m_headers["Info"] += "Platform specific\n";
+
+					//128-255 GPIO expander TODO
+					else
+						pack->m_headers["Info"] += "GPIO expander decode not implemented\n";
+
+					//TODO: handle PUT_VWIRE here
+					if(count == 0)
+					{
+						//Remove trailing newline
+						pack->m_headers["Info"] = Trim(pack->m_headers["Info"]);
+
+						txn_state = TXN_STATE_STATUS;
+						data = 0;
+					}
+					else
+					{
+						txn_state = TXN_STATE_VWIRE_INDEX;
+						count --;
+					}
+
+					break;	//end TXN_STATE_VWIRE_DATA
 
 				case TXN_STATE_RESPONSE_DATA:
 
@@ -643,6 +806,21 @@ void ESPIDecoder::Refresh()
 						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_STATUS, data));
 
+						//Don't report free space in the protocol analyzer
+						//to save column space
+						string tmp;
+						if(data & 0x2000)
+							tmp += "FLASH_NP_AVAIL ";
+						if(data & 0x1000)
+							tmp += "FLASH_C_AVAIL ";
+						if(data & 0x0200)
+							tmp += "FLASH_NP_FREE ";
+						if(data & 0x0080)
+							tmp += "OOB_AVAIL ";
+						if(data & 0x0040)
+							tmp += "VWIRE_AVAIL ";
+						pack->m_headers["Status"] = tmp;
+
 						txn_state = TXN_STATE_RESPONSE_CRC8;
 					}
 
@@ -656,6 +834,7 @@ void ESPIDecoder::Refresh()
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_GOOD, current_byte));
 					else
 					{
+						LogDebug("Invalid response CRC (got %02x, expected %02x)\n", current_byte, crc);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_BAD, current_byte));
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					}
@@ -724,6 +903,8 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 				return m_standardColors[COLOR_CONTROL];
 
 			case ESPISymbol::TYPE_CAPS_ADDR:
+			case ESPISymbol::TYPE_VWIRE_COUNT:
+			case ESPISymbol::TYPE_VWIRE_INDEX:
 			/*case ESPISymbol::TYPE_COMMAND_ADDR_16:
 			case ESPISymbol::TYPE_COMMAND_ADDR_32:
 			case ESPISymbol::TYPE_COMMAND_ADDR_64:*/
@@ -739,6 +920,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_GENERAL_CAPS:
 			case ESPISymbol::TYPE_CH1_CAPS_RD:
 			case ESPISymbol::TYPE_CH1_CAPS_WR:
+			case ESPISymbol::TYPE_VWIRE_DATA:
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 				return m_standardColors[COLOR_DATA];
@@ -829,7 +1011,16 @@ string ESPIDecoder::GetText(int i)
 			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
 			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
 			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
-				snprintf(tmp, sizeof(tmp), "CRC: %02lx", s.m_data);
+				return string("CRC: ") + to_string_hex(s.m_data);
+
+			case ESPISymbol::TYPE_VWIRE_COUNT:
+				return string("Count: ") + to_string(s.m_data + 1);
+
+			case ESPISymbol::TYPE_VWIRE_INDEX:
+				return string("Index: ") + to_string(s.m_data);
+
+			case ESPISymbol::TYPE_VWIRE_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
 
 			case ESPISymbol::TYPE_RESPONSE_OP:
@@ -1054,29 +1245,12 @@ string ESPIDecoder::GetText(int i)
 	return "";
 }
 
-bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+bool ESPIDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
 {
-	/*
-	//Merge read-status packets
-	if( (first->m_headers["Op"] == "Read Status") && (next->m_headers["Op"] == "Read Status") )
-		return true;
-	*/
 	return false;
 }
 
-Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t /*i*/)
+Packet* ESPIDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
 {
-	/*
-	if(pack->m_headers["Op"] == "Read Status")
-	{
-		Packet* ret = new Packet;
-		ret->m_offset = pack->m_offset;
-		ret->m_len = pack->m_len;			//TODO: extend?
-		ret->m_headers["Op"] = "Poll Status";
-		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
-
-		//TODO: add other fields?
-		return ret;
-	}*/
 	return NULL;
 }
