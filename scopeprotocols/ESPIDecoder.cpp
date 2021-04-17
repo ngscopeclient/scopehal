@@ -189,7 +189,8 @@ void ESPIDecoder::Refresh()
 	{
 		READ_SI,
 		READ_SO,
-		READ_QUAD
+		READ_QUAD_RISING,
+		READ_QUAD_FALLING
 	} read_mode = READ_SI;
 
 	size_t count = 0;
@@ -199,6 +200,7 @@ void ESPIDecoder::Refresh()
 	uint64_t addr = 0;
 
 	int skip_bits			= 0;
+	bool skip_next_falling	= false;
 	int bitcount			= 0;
 	int64_t bytestart		= 0;
 	uint8_t current_byte	= 0;
@@ -241,18 +243,31 @@ void ESPIDecoder::Refresh()
 					{
 						skip_bits --;
 						bytestart = timestamp;
+						skip_next_falling = true;
 					}
 					else
 					{
+						skip_next_falling = false;
+
 						//If this is the beginning of a byte, see if either DQ2 or DQ3 is low.
 						//This means they're actively driven (since they have pullups) and means
 						//that we're definitely in quad mode.
 						if(bitcount == 0)
 						{
-							if( (cur_data & 0xc) != 0xc)
-								read_mode = READ_QUAD;
+							switch(read_mode)
+							{
+								case READ_SI:
+								case READ_SO:
+									if( (cur_data & 0xc) != 0xc)
+										read_mode = READ_QUAD_RISING;
+									break;
+
+								default:
+									break;
+							}
 						}
 
+						//Sample on rising edges
 						switch(read_mode)
 						{
 							case READ_SI:
@@ -267,10 +282,14 @@ void ESPIDecoder::Refresh()
 								current_byte |= (cur_data & 2) >> 1;
 								break;
 
-							case READ_QUAD:
+							case READ_QUAD_RISING:
 								bitcount += 4;
 								current_byte <<= 4;
 								current_byte |= cur_data;
+								break;
+
+							//READ_QUAD_FALLING handled in LINK_STATE_SELECTED_CLKHI
+							default:
 								break;
 						}
 
@@ -290,6 +309,19 @@ void ESPIDecoder::Refresh()
 			case LINK_STATE_SELECTED_CLKHI:
 				if(!cur_clk)
 				{
+					if( (read_mode == READ_QUAD_FALLING) && !skip_next_falling)
+					{
+						bitcount += 4;
+						current_byte <<= 4;
+						current_byte |= cur_data;
+
+						if(bitcount == 8)
+						{
+							byte_valid_next = true;
+							bitcount = 0;
+						}
+					}
+
 					link_state = LINK_STATE_SELECTED_CLKLO;
 					if(byte_valid_next)
 					{
@@ -549,10 +581,11 @@ void ESPIDecoder::Refresh()
 							break;
 					}
 
-					//If running in x1 mode, switch to reading the other data line.
-					//If in x4 mode, no action needed.
+					//Switch read polarity
 					if(read_mode == READ_SI)
 						read_mode = READ_SO;
+					else if(read_mode == READ_QUAD_RISING)
+						read_mode = READ_QUAD_FALLING;
 
 					break;	//end TXN_STATE_COMMAND_CRC8
 
