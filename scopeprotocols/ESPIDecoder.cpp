@@ -103,6 +103,8 @@ vector<string> ESPIDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Command");
 	ret.push_back("Address");
+	ret.push_back("Len");
+	ret.push_back("Tag");
 	ret.push_back("Info");
 	ret.push_back("Response");
 	ret.push_back("Status");
@@ -178,7 +180,12 @@ void ESPIDecoder::Refresh()
 
 		TXN_STATE_VWIRE_COUNT,
 		TXN_STATE_VWIRE_INDEX,
-		TXN_STATE_VWIRE_DATA
+		TXN_STATE_VWIRE_DATA,
+
+		TXN_STATE_FLASH_TYPE,
+		TXN_STATE_FLASH_TAG_LENHI,
+		TXN_STATE_FLASH_LENLO,
+		TXN_STATE_FLASH_ADDR
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -206,6 +213,7 @@ void ESPIDecoder::Refresh()
 	uint8_t current_byte	= 0;
 	bool byte_valid_next	= false;
 	ESPISymbol::ESpiCompletion completion_type	= ESPISymbol::COMPLETION_NONE;
+	ESPISymbol::ESpiFlashType flash_type = ESPISymbol::FLASH_READ;
 
 	while(true)
 	{
@@ -351,6 +359,9 @@ void ESPIDecoder::Refresh()
 		{
 			switch(txn_state)
 			{
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Generic command parsing
+
 				//Nothign to do
 				case TXN_STATE_IDLE:
 					break;	//end STATE_IDLE
@@ -470,6 +481,47 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_OPCODE
 
+				case TXN_STATE_COMMAND_CRC8:
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					if(current_byte == crc)
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, current_byte));
+					else
+					{
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_BAD, current_byte));
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					}
+
+					switch(current_cmd)
+					{
+						//Expect a response after a 2-cycle bus turnaround
+						case ESPISymbol::COMMAND_GET_CONFIGURATION:
+						case ESPISymbol::COMMAND_SET_CONFIGURATION:
+						case ESPISymbol::COMMAND_GET_STATUS:
+						case ESPISymbol::COMMAND_GET_FLASH_NP:
+						case ESPISymbol::COMMAND_GET_VWIRE:
+							txn_state = TXN_STATE_RESPONSE;
+							skip_bits = 2;
+							break;
+
+						//don't know what to do
+						default:
+							txn_state = TXN_STATE_IDLE;
+							break;
+					}
+
+					//Switch read polarity
+					if(read_mode == READ_SI)
+						read_mode = READ_SO;
+					else if(read_mode == READ_QUAD_RISING)
+						read_mode = READ_QUAD_FALLING;
+
+					break;	//end TXN_STATE_COMMAND_CRC8
+
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Configuration packets
+
 				case TXN_STATE_CONFIG_ADDRESS:
 
 					//Save start time
@@ -551,43 +603,8 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_CONFIG_DATA
 
-				case TXN_STATE_COMMAND_CRC8:
-
-					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(timestamp - bytestart);
-					if(current_byte == crc)
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_GOOD, current_byte));
-					else
-					{
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_CRC_BAD, current_byte));
-						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-					}
-
-					switch(current_cmd)
-					{
-						//Expect a response after a 2-cycle bus turnaround
-						case ESPISymbol::COMMAND_GET_CONFIGURATION:
-						case ESPISymbol::COMMAND_SET_CONFIGURATION:
-						case ESPISymbol::COMMAND_GET_STATUS:
-						case ESPISymbol::COMMAND_GET_FLASH_NP:
-						case ESPISymbol::COMMAND_GET_VWIRE:
-							txn_state = TXN_STATE_RESPONSE;
-							skip_bits = 2;
-							break;
-
-						//don't know what to do
-						default:
-							txn_state = TXN_STATE_IDLE;
-							break;
-					}
-
-					//Switch read polarity
-					if(read_mode == READ_SI)
-						read_mode = READ_SO;
-					else if(read_mode == READ_QUAD_RISING)
-						read_mode = READ_QUAD_FALLING;
-
-					break;	//end TXN_STATE_COMMAND_CRC8
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Generic reply packets
 
 				case TXN_STATE_RESPONSE:
 
@@ -619,11 +636,131 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_VWIRE_COUNT;
 							break;
 
+						case ESPISymbol::COMMAND_GET_FLASH_NP:
+							txn_state = TXN_STATE_FLASH_TYPE;
+							break;
+
 						default:
 							txn_state = TXN_STATE_IDLE;
 					}
 
 					break;	//end TXN_STATE_RESPONSE
+
+				case TXN_STATE_RESPONSE_DATA:
+
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//per page 93, data is LSB to MSB
+					data |= current_byte << ( (count & 3) * 8);
+					count ++;
+
+					pack->m_data.push_back(current_byte);
+
+					//TODO: different commands have different lengths for reply data
+					if(count == 4)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+
+						switch(current_cmd)
+						{
+							case ESPISymbol::COMMAND_GET_CONFIGURATION:
+								switch(addr)
+								{
+									case 0x8:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									case 0x20:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_RD, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									case 0x30:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_RD, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									default:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+										break;
+								}
+								break;
+
+							default:
+								cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
+								break;
+						}
+
+						count = 0;
+						data = 0;
+						txn_state = TXN_STATE_STATUS;
+					}
+
+					break;	//end TXN_STATE_RESPONSE_DATA
+
+				case TXN_STATE_STATUS:
+
+					//Save start time
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//Save data (LSB to MSB)
+					data |= current_byte << ( (count & 3) * 8);
+					count ++;
+
+					//Add data
+					if(count == 2)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_STATUS, data));
+
+						//Don't report free space in the protocol analyzer
+						//to save column space
+						string tmp;
+						if(data & 0x2000)
+							tmp += "FLASH_NP_AVAIL ";
+						if(data & 0x1000)
+							tmp += "FLASH_C_AVAIL ";
+						if(data & 0x0200)
+							tmp += "FLASH_NP_FREE ";
+						if(data & 0x0080)
+							tmp += "OOB_AVAIL ";
+						if(data & 0x0040)
+							tmp += "VWIRE_AVAIL ";
+						pack->m_headers["Status"] = tmp;
+
+						txn_state = TXN_STATE_RESPONSE_CRC8;
+					}
+
+					break;	//end TXN_STATE_STATUS
+
+				case TXN_STATE_RESPONSE_CRC8:
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					if(current_byte == crc)
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_GOOD, current_byte));
+					else
+					{
+						LogDebug("Invalid response CRC (got %02x, expected %02x)\n", current_byte, crc);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_BAD, current_byte));
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					}
+
+					//Done with the packet
+					txn_state = TXN_STATE_IDLE;
+					break;	//end TXN_STATE_COMMAND_CRC8
+
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Virtual wire channel
 
 				case TXN_STATE_VWIRE_COUNT:
 					cap->m_offsets.push_back(bytestart);
@@ -772,64 +909,73 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_VWIRE_DATA
 
-				case TXN_STATE_RESPONSE_DATA:
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Flash channel
 
-					if(count == 0)
-					{
-						tstart = bytestart;
-						cap->m_offsets.push_back(tstart);
-					}
-
-					//per page 93, data is LSB to MSB
-					data |= current_byte << ( (count & 3) * 8);
-					count ++;
-
+				case TXN_STATE_FLASH_TYPE:
 					pack->m_data.push_back(current_byte);
 
-					//TODO: different commands have different lengths for reply data
-					if(count == 4)
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_TYPE, current_byte));
+					txn_state = TXN_STATE_FLASH_TAG_LENHI;
+
+					flash_type = (ESPISymbol::ESpiFlashType)current_byte;
+
+					switch(flash_type)
 					{
-						cap->m_durations.push_back(timestamp - tstart);
+						case ESPISymbol::FLASH_ERASE:
+							pack->m_headers["Info"] = "Erase";
+							break;
 
-						switch(current_cmd)
-						{
-							case ESPISymbol::COMMAND_GET_CONFIGURATION:
-								switch(addr)
-								{
-									case 0x8:
-										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
-										break;
+						case ESPISymbol::FLASH_READ:
+							pack->m_headers["Info"] = "Read";
+							break;
 
-									case 0x20:
-										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
-										break;
+						case ESPISymbol::FLASH_WRITE:
+							pack->m_headers["Info"] = "Write";
+							break;
 
-									case 0x30:
-										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
-										break;
-
-									default:
-										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
-										break;
-								}
-								break;
-
-							default:
-								cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_DATA_32, data));
-								break;
-						}
-
-						count = 0;
-						data = 0;
-						txn_state = TXN_STATE_STATUS;
+						default:
+							pack->m_headers["Info"] = "Unknown flash op";
+							break;
 					}
 
-					break;	//end TXN_STATE_RESPONSE_DATA
+					break;	//end TXN_STATE_FLASH_TYPE
 
-				case TXN_STATE_STATUS:
+				case TXN_STATE_FLASH_TAG_LENHI:
+					pack->m_data.push_back(current_byte);
+
+					//Tag is high 4 bits
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_TAG, current_byte >> 4));
+					pack->m_headers["Tag"] = to_string(current_byte >> 4);
+
+					//Low 4 bits of this byte are the high length bits
+					data = current_byte & 0xf;
+
+					txn_state = TXN_STATE_FLASH_LENLO;
+					break;	//end TXN_STATE_FLASH_TAG_LENHI
+
+				case TXN_STATE_FLASH_LENLO:
+					pack->m_data.push_back(current_byte);
+
+					//Save the rest of the length
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_LEN, current_byte | data));
+
+					pack->m_headers["Len"] = to_string(current_byte | data);
+
+					//Get ready to read the address
+					count = 0;
+					data = 0;
+					txn_state = TXN_STATE_FLASH_ADDR;
+
+					break;	//end TXN_STATE_FLASH_LENLO
+
+				case TXN_STATE_FLASH_ADDR:
 
 					//Save start time
 					if(count == 0)
@@ -838,52 +984,35 @@ void ESPIDecoder::Refresh()
 						cap->m_offsets.push_back(tstart);
 					}
 
-					//Save data (LSB to MSB)
-					data |= current_byte << ( (count & 3) * 8);
+					//Save address (MSB to LSB)
+					data = (data << 8) | current_byte;
 					count ++;
 
 					//Add data
-					if(count == 2)
+					if(count == 4)
 					{
 						cap->m_durations.push_back(timestamp - tstart);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_STATUS, data));
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_ADDR, data));
 
 						//Don't report free space in the protocol analyzer
 						//to save column space
-						string tmp;
-						if(data & 0x2000)
-							tmp += "FLASH_NP_AVAIL ";
-						if(data & 0x1000)
-							tmp += "FLASH_C_AVAIL ";
-						if(data & 0x0200)
-							tmp += "FLASH_NP_FREE ";
-						if(data & 0x0080)
-							tmp += "OOB_AVAIL ";
-						if(data & 0x0040)
-							tmp += "VWIRE_AVAIL ";
-						pack->m_headers["Status"] = tmp;
+						char tmp[32];
+						snprintf(tmp, sizeof(tmp), "%08lx", data);
+						pack->m_headers["Address"] = tmp;
 
-						txn_state = TXN_STATE_RESPONSE_CRC8;
+						count = 0;
+						data = 0;
+
+						//TODO: flash writes
+						if(flash_type == ESPISymbol::FLASH_WRITE)
+							txn_state = TXN_STATE_IDLE;
+
+						//Reads and erases are done after the address
+						else
+							txn_state = TXN_STATE_STATUS;
 					}
 
-					break;	//end TXN_STATE_STATUS
-
-				case TXN_STATE_RESPONSE_CRC8:
-
-					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(timestamp - bytestart);
-					if(current_byte == crc)
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_GOOD, current_byte));
-					else
-					{
-						LogDebug("Invalid response CRC (got %02x, expected %02x)\n", current_byte, crc);
-						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_CRC_BAD, current_byte));
-						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-					}
-
-					//Done with the packet
-					txn_state = TXN_STATE_IDLE;
-					break;	//end TXN_STATE_COMMAND_CRC8
+					break;	//end TXN_STATE_FLASH_ADDR
 			}
 
 			//Checksum this byte
@@ -942,14 +1071,15 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_COMMAND_TYPE:
 			case ESPISymbol::TYPE_RESPONSE_OP:
 			case ESPISymbol::TYPE_RESPONSE_STATUS:
+			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
+			case ESPISymbol::TYPE_FLASH_REQUEST_LEN:
 				return m_standardColors[COLOR_CONTROL];
 
 			case ESPISymbol::TYPE_CAPS_ADDR:
 			case ESPISymbol::TYPE_VWIRE_COUNT:
 			case ESPISymbol::TYPE_VWIRE_INDEX:
-			/*case ESPISymbol::TYPE_COMMAND_ADDR_16:
-			case ESPISymbol::TYPE_COMMAND_ADDR_32:
-			case ESPISymbol::TYPE_COMMAND_ADDR_64:*/
+			case ESPISymbol::TYPE_FLASH_REQUEST_TAG:
+			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 				return m_standardColors[COLOR_ADDRESS];
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
@@ -1343,17 +1473,27 @@ string ESPIDecoder::GetText(int i)
 					stmp += "PC_FREE";
 				return stmp;
 
-			/*case ESPISymbol::TYPE_COMMAND_ADDR_16:
-				snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
-				return tmp;
+			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
+				switch(s.m_data)
+				{
+					case ESPISymbol::FLASH_READ:
+						return "Read";
+					case ESPISymbol::FLASH_WRITE:
+						return "Write";
+					case ESPISymbol::FLASH_ERASE:
+						return "Erase";
+				}
+				break;
 
-			case ESPISymbol::TYPE_COMMAND_ADDR_32:
+			case ESPISymbol::TYPE_FLASH_REQUEST_TAG:
+				return string("Tag: ") + to_string(s.m_data);
+
+			case ESPISymbol::TYPE_FLASH_REQUEST_LEN:
+				return string("Len: ") + to_string(s.m_data);
+
+			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
 				return tmp;
-
-			case ESPISymbol::TYPE_COMMAND_ADDR_64:
-				snprintf(tmp, sizeof(tmp), "Addr: %016lx", s.m_data);
-				return tmp;*/
 
 			case ESPISymbol::TYPE_ERROR:
 			default:

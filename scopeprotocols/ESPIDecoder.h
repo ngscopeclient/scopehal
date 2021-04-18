@@ -47,10 +47,6 @@ public:
 
 		TYPE_CAPS_ADDR,
 
-		/*TYPE_COMMAND_ADDR_16,
-		TYPE_COMMAND_ADDR_32,
-		TYPE_COMMAND_ADDR_64,*/
-
 		TYPE_COMMAND_DATA_8,
 		TYPE_COMMAND_DATA_32,
 		TYPE_COMMAND_CRC_GOOD,
@@ -71,6 +67,11 @@ public:
 		TYPE_CH1_CAPS_WR,
 		TYPE_CH2_CAPS_RD,
 		TYPE_CH2_CAPS_WR,
+
+		TYPE_FLASH_REQUEST_TYPE,
+		TYPE_FLASH_REQUEST_TAG,
+		TYPE_FLASH_REQUEST_LEN,
+		TYPE_FLASH_REQUEST_ADDR,
 
 		TYPE_ERROR
 	} m_type;
@@ -134,6 +135,19 @@ public:
 		COMPLETION_PERIPHERAL	= 1,
 		COMPLETION_VWIRE		= 2,
 		COMPLETION_FLASH		= 3
+	};
+
+	//Table 6
+	enum ESpiFlashType
+	{
+		FLASH_READ				= 0,
+		FLASH_WRITE				= 1,
+		FLASH_ERASE				= 2,
+
+		//completion types
+		FLASH_SUCCESS_NODATA	= 6,
+		FLASH_SUCCESS_DATA		= 9,	//bits 1/2 are split transaction flags
+		FLASH_FAIL				= 8
 	};
 
 	uint64_t m_data;
