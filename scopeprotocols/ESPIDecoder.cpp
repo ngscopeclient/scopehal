@@ -185,7 +185,8 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_FLASH_TYPE,
 		TXN_STATE_FLASH_TAG_LENHI,
 		TXN_STATE_FLASH_LENLO,
-		TXN_STATE_FLASH_ADDR
+		TXN_STATE_FLASH_ADDR,
+		TXN_STATE_FLASH_DATA
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -205,6 +206,7 @@ void ESPIDecoder::Refresh()
 	uint8_t crc = 0;
 	uint64_t data = 0;
 	uint64_t addr = 0;
+	size_t flash_len = 0;
 
 	int skip_bits			= 0;
 	bool skip_next_falling	= false;
@@ -398,12 +400,19 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_CONFIG_ADDRESS;
 							break;
 
+						//Expect a full flash completion TODO
+						case ESPISymbol::COMMAND_PUT_FLASH_C:
+							txn_state = TXN_STATE_FLASH_TYPE;
+							break;
+
 						//No arguments
 						case ESPISymbol::COMMAND_GET_STATUS:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
 						case ESPISymbol::COMMAND_GET_FLASH_NP:
+							txn_state = TXN_STATE_COMMAND_CRC8;
+							break;
 						case ESPISymbol::COMMAND_GET_VWIRE:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							txn_state = TXN_STATE_COMMAND_CRC8;
@@ -458,10 +467,6 @@ void ESPIDecoder::Refresh()
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							txn_state = TXN_STATE_IDLE;
 							break;
-						case ESPISymbol::COMMAND_PUT_FLASH_C:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
 
 						case ESPISymbol::COMMAND_GET_OOB:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
@@ -493,23 +498,9 @@ void ESPIDecoder::Refresh()
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					}
 
-					switch(current_cmd)
-					{
-						//Expect a response after a 2-cycle bus turnaround
-						case ESPISymbol::COMMAND_GET_CONFIGURATION:
-						case ESPISymbol::COMMAND_SET_CONFIGURATION:
-						case ESPISymbol::COMMAND_GET_STATUS:
-						case ESPISymbol::COMMAND_GET_FLASH_NP:
-						case ESPISymbol::COMMAND_GET_VWIRE:
-							txn_state = TXN_STATE_RESPONSE;
-							skip_bits = 2;
-							break;
-
-						//don't know what to do
-						default:
-							txn_state = TXN_STATE_IDLE;
-							break;
-					}
+					//Expect a response after a 2-cycle bus turnaround
+					txn_state = TXN_STATE_RESPONSE;
+					skip_bits = 2;
 
 					//Switch read polarity
 					if(read_mode == READ_SI)
@@ -615,7 +606,10 @@ void ESPIDecoder::Refresh()
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_OP, current_byte));
 
+					//TODO: support appended completions
 					completion_type = static_cast<ESPISymbol::ESpiCompletion>(current_byte >> 6);
+					if(completion_type != ESPISymbol::COMPLETION_NONE)
+						LogWarning("Appended completions not implemented yet\n");
 
 					pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
 
@@ -628,10 +622,6 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_RESPONSE_DATA;
 							break;
 
-						case ESPISymbol::COMMAND_GET_STATUS:
-							txn_state = TXN_STATE_STATUS;
-							break;
-
 						case ESPISymbol::COMMAND_GET_VWIRE:
 							txn_state = TXN_STATE_VWIRE_COUNT;
 							break;
@@ -640,8 +630,10 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_FLASH_TYPE;
 							break;
 
+						case ESPISymbol::COMMAND_GET_STATUS:
 						default:
-							txn_state = TXN_STATE_IDLE;
+							txn_state = TXN_STATE_STATUS;
+							break;
 					}
 
 					break;	//end TXN_STATE_RESPONSE
@@ -926,14 +918,25 @@ void ESPIDecoder::Refresh()
 					{
 						case ESPISymbol::FLASH_ERASE:
 							pack->m_headers["Info"] = "Erase";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							break;
 
 						case ESPISymbol::FLASH_READ:
 							pack->m_headers["Info"] = "Read";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						case ESPISymbol::FLASH_WRITE:
 							pack->m_headers["Info"] = "Write";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							break;
+
+						case ESPISymbol::FLASH_SUCCESS_DATA_FIRST:
+						case ESPISymbol::FLASH_SUCCESS_DATA_MIDDLE:
+						case ESPISymbol::FLASH_SUCCESS_DATA_LAST:
+						case ESPISymbol::FLASH_SUCCESS_DATA_ONLY:
+							pack->m_headers["Info"] = "Read Data";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
 						default:
@@ -964,14 +967,22 @@ void ESPIDecoder::Refresh()
 					//Save the rest of the length
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_LEN, current_byte | data));
+					flash_len = current_byte | data;
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_LEN, flash_len));
 
-					pack->m_headers["Len"] = to_string(current_byte | data);
+					pack->m_headers["Len"] = to_string(flash_len);
 
-					//Get ready to read the address
+					//Get ready to read the address or data
 					count = 0;
 					data = 0;
-					txn_state = TXN_STATE_FLASH_ADDR;
+
+					if(flash_type >= ESPISymbol::FLASH_SUCCESS_NODATA)
+					{
+						pack->m_data.clear();
+						txn_state = TXN_STATE_FLASH_DATA;
+					}
+					else
+						txn_state = TXN_STATE_FLASH_ADDR;
 
 					break;	//end TXN_STATE_FLASH_LENLO
 
@@ -1003,9 +1014,12 @@ void ESPIDecoder::Refresh()
 						count = 0;
 						data = 0;
 
-						//TODO: flash writes
+						//Write requests are followed by data
 						if(flash_type == ESPISymbol::FLASH_WRITE)
-							txn_state = TXN_STATE_IDLE;
+						{
+							pack->m_data.clear();
+							txn_state = TXN_STATE_FLASH_DATA;
+						}
 
 						//Reads and erases are done after the address
 						else
@@ -1013,6 +1027,34 @@ void ESPIDecoder::Refresh()
 					}
 
 					break;	//end TXN_STATE_FLASH_ADDR
+
+				case TXN_STATE_FLASH_DATA:
+
+					pack->m_data.push_back(current_byte);
+
+					//Save the data byte
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_DATA, current_byte));
+
+					//See if we're done
+					count ++;
+					if(count >= flash_len)
+					{
+						count = 0;
+						data = 0;
+
+						//Completion? Done with command
+						if(current_cmd == ESPISymbol::COMMAND_PUT_FLASH_C)
+							txn_state = TXN_STATE_COMMAND_CRC8;
+
+						//Request? Done with response
+						else
+							txn_state = TXN_STATE_STATUS;
+					}
+
+					break;	//end TXN_STATE_FLASH_DATA
+
 			}
 
 			//Checksum this byte
@@ -1097,6 +1139,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_VWIRE_DATA:
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
+			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 				return m_standardColors[COLOR_DATA];
 
 			default:
@@ -1236,6 +1279,7 @@ string ESPIDecoder::GetText(int i)
 						stmp += "x1 mode\n";
 						break;
 					case 1:
+
 						stmp += "x2 mode\n";
 						break;
 					case 2:
@@ -1442,11 +1486,12 @@ string ESPIDecoder::GetText(int i)
 
 				return stmp;	//end TYPE_CH2_CAPS_WR
 
-			case ESPISymbol::TYPE_COMMAND_DATA_32:
-				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
+			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
 
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
+			case ESPISymbol::TYPE_COMMAND_DATA_32:
 				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
 				return tmp;
 
@@ -1482,6 +1527,13 @@ string ESPIDecoder::GetText(int i)
 						return "Write";
 					case ESPISymbol::FLASH_ERASE:
 						return "Erase";
+
+					case ESPISymbol::FLASH_SUCCESS_NODATA:
+					case ESPISymbol::FLASH_SUCCESS_DATA_FIRST:
+					case ESPISymbol::FLASH_SUCCESS_DATA_MIDDLE:
+					case ESPISymbol::FLASH_SUCCESS_DATA_LAST:
+					case ESPISymbol::FLASH_SUCCESS_DATA_ONLY:
+						return "Success";
 				}
 				break;
 
@@ -1513,6 +1565,15 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge a "Get Status" with subsequent "Put Flash Completion"
+	//TODO: Only if the tags match!
+	if( (first->m_headers["Command"] == "Get Status") &&
+		(first->m_headers["Status"].find("FLASH_NP_AVAIL") != string::npos) &&
+		(next->m_headers["Command"] == "Put Flash Completion") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -1526,7 +1587,7 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 	if(first->m_headers["Command"] == "Get Status")
 	{
-		//Look up the second packet in the string
+		//Look up the second packet in the string (the flash request)
 		if(i+1 < m_packets.size())
 		{
 			Packet* second = m_packets[i+1];
@@ -1552,6 +1613,20 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 				{
 					ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 					ret->m_headers["Command"] = "Flash Erase";
+				}
+
+				//Append any flash completions we find
+				//TODO: handle out-of-order here
+				for(size_t j=i+2; j<m_packets.size(); j++)
+				{
+					Packet* p = m_packets[j];
+					if(p->m_headers["Command"] != "Put Flash Completion")
+						break;
+					if(p->m_headers["Tag"] != second->m_headers["Tag"])
+						break;
+
+					for(auto b : p->m_data)
+						ret->m_data.push_back(b);
 				}
 			}
 		}

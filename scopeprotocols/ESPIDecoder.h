@@ -72,6 +72,7 @@ public:
 		TYPE_FLASH_REQUEST_TAG,
 		TYPE_FLASH_REQUEST_LEN,
 		TYPE_FLASH_REQUEST_ADDR,
+		TYPE_FLASH_REQUEST_DATA,
 
 		TYPE_ERROR
 	} m_type;
@@ -145,9 +146,14 @@ public:
 		FLASH_ERASE				= 2,
 
 		//completion types
-		FLASH_SUCCESS_NODATA	= 6,
-		FLASH_SUCCESS_DATA		= 9,	//bits 1/2 are split transaction flags
-		FLASH_FAIL				= 8
+		FLASH_SUCCESS_NODATA		= 0x06,
+		FLASH_SUCCESS_DATA_MIDDLE	= 0x09,
+		FLASH_SUCCESS_DATA_FIRST	= 0x0b,
+		FLASH_SUCCESS_DATA_LAST		= 0x0d,
+		FLASH_SUCCESS_DATA_ONLY		= 0x0f,
+
+		FLASH_FAIL_LAST				= 0x08,
+		FLASH_FAIL_ONLY				= 0x0e
 	};
 
 	uint64_t m_data;
