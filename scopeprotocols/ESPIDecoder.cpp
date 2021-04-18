@@ -1503,12 +1503,59 @@ string ESPIDecoder::GetText(int i)
 	return "";
 }
 
-bool ESPIDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)
+bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 {
+	//Merge a "Get Status" with subsequent "Get Flash Non-Posted"
+	if( (first->m_headers["Command"] == "Get Status") &&
+		(first->m_headers["Status"].find("FLASH_NP_AVAIL") != string::npos) &&
+		(next->m_headers["Command"] == "Get Flash Non-Posted") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
-Packet* ESPIDecoder::CreateMergedHeader(Packet* /*pack*/, size_t /*i*/)
+Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 {
-	return NULL;
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;			//TODO: extend?
+
+	Packet* first = m_packets[i];
+
+	if(first->m_headers["Command"] == "Get Status")
+	{
+		//Look up the second packet in the string
+		if(i+1 < m_packets.size())
+		{
+			Packet* second = m_packets[i+1];
+
+			//It's a flash transaction
+			if(second->m_headers["Command"] == "Get Flash Non-Posted")
+			{
+				ret->m_headers["Address"] = second->m_headers["Address"];
+				ret->m_headers["Len"] = second->m_headers["Len"];
+				ret->m_headers["Tag"] = second->m_headers["Tag"];
+
+				if(second->m_headers["Info"] == "Read")
+				{
+					ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					ret->m_headers["Command"] = "Flash Read";
+				}
+				else if(second->m_headers["Info"] == "Write")
+				{
+					ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+					ret->m_headers["Command"] = "Flash Write";
+				}
+				else if(second->m_headers["Info"] == "Erase")
+				{
+					ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+					ret->m_headers["Command"] = "Flash Erase";
+				}
+			}
+		}
+	}
+
+	return ret;
 }
