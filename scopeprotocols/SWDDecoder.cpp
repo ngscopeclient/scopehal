@@ -42,8 +42,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SWDDecoder::SWDDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+SWDDecoder::SWDDecoder(const string& color) : Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	CreateInput("SWCLK");
 	CreateInput("SWDIO");
@@ -62,11 +61,8 @@ bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if(
-		(i < 2) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
+	if((i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1))
 	{
 		return true;
 	}
@@ -82,7 +78,7 @@ string SWDDecoder::GetProtocolName()
 void SWDDecoder::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SWD(%s)",	GetInputDisplayName(1).c_str());
+	snprintf(hwname, sizeof(hwname), "SWD(%s)", GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -131,18 +127,18 @@ void SWDDecoder::Refresh()
 		STATE_READ_TURNAROUND
 	} state = STATE_IDLE;
 
-	uint32_t	current_word	= 0;
-	uint8_t		bitcount 		= 0;
-	int64_t		tstart			= 0;
-	bool		writing			= 0;
+	uint32_t current_word = 0;
+	uint8_t bitcount = 0;
+	int64_t tstart = 0;
+	bool writing = 0;
 
 	size_t len = samples.m_samples.size();
 	int64_t last_dur = 0;
-	for(size_t i=0; i<len; i++)
+	for(size_t i = 0; i < len; i++)
 	{
 		//Offset sample from the clock so it's aligned to the data
 		int64_t dur = samples.m_durations[i];
-		int64_t off = samples.m_offsets[i];// - dur/2;
+		int64_t off = samples.m_offsets[i];	   // - dur/2;
 
 		switch(state)
 		{
@@ -154,7 +150,7 @@ void SWDDecoder::Refresh()
 
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
-					tstart = off+dur;
+					tstart = off + dur;
 					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_START, 0));
 				}
 
@@ -192,17 +188,17 @@ void SWDDecoder::Refresh()
 				current_word >>= 1;
 				if(samples.m_samples[i])
 					current_word |= 0x80000000;
-				bitcount ++;
+				bitcount++;
 
 				if(bitcount == 2)
 				{
 					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back((off+dur)-tstart);
+					cap->m_durations.push_back((off + dur) - tstart);
 					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_ADDRESS, current_word >> 28));
 
 					state = STATE_ADDR_PARITY;
 
-					tstart = off+dur;
+					tstart = off + dur;
 				}
 
 				break;
@@ -255,20 +251,24 @@ void SWDDecoder::Refresh()
 				current_word >>= 1;
 				if(samples.m_samples[i])
 					current_word |= 0x80000000;
-				bitcount ++;
+				bitcount++;
 
 				if(bitcount == 3)
 				{
 					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back((off+dur)-tstart);
+					cap->m_durations.push_back((off + dur) - tstart);
 					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_ACK, current_word >> 29));
 
-					if(writing)
+					// Only proceed to reading or writing phase if we got an 'OK' response
+					// Otherwise line gets turned around for writing again
+					if((current_word >> 29) != 1)
+						state = STATE_READ_TURNAROUND;
+					else if(writing)
 						state = STATE_WRITE_TURNAROUND;
 					else
 						state = STATE_DATA;
 
-					tstart = off+dur;
+					tstart = off + dur;
 					bitcount = 0;
 				}
 				break;
@@ -290,24 +290,24 @@ void SWDDecoder::Refresh()
 				current_word >>= 1;
 				if(samples.m_samples[i])
 					current_word |= 0x80000000;
-				bitcount ++;
+				bitcount++;
 
 				if(bitcount == 32)
 				{
 					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back((off+dur)-tstart);
+					cap->m_durations.push_back((off + dur) - tstart);
 					cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_DATA, current_word));
 
 					state = STATE_DATA_PARITY;
 
-					tstart = off+dur;
+					tstart = off + dur;
 				}
 				break;
 
 			case STATE_DATA_PARITY:
 				//TODO: test parity
 				cap->m_offsets.push_back(tstart);
-				cap->m_durations.push_back(min(dur, last_dur));	//clock may stop between packets, don't extend sample
+				cap->m_durations.push_back(min(dur, last_dur));	   //clock may stop between packets, don't extend sample
 				cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_PARITY_OK, samples.m_samples[i]));
 				tstart += dur;
 
