@@ -195,7 +195,12 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_SMBUS_DATA,
 
 		TXN_STATE_IOWR_ADDR,
-		TXN_STATE_IOWR_DATA
+		TXN_STATE_IOWR_DATA,
+
+		TXN_STATE_COMPLETION_TYPE,
+		TXN_STATE_COMPLETION_TAG_LENHI,
+		TXN_STATE_COMPLETION_LENLO,
+		TXN_STATE_COMPLETION_DATA
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -224,7 +229,7 @@ void ESPIDecoder::Refresh()
 	uint8_t current_byte	= 0;
 	bool byte_valid_next	= false;
 	ESPISymbol::ESpiCompletion completion_type	= ESPISymbol::COMPLETION_NONE;
-	ESPISymbol::ESpiFlashType flash_type = ESPISymbol::FLASH_READ;
+	ESPISymbol::ESpiCycleType cycle_type = ESPISymbol::CYCLE_READ;
 
 	while(true)
 	{
@@ -446,6 +451,7 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
 						case ESPISymbol::COMMAND_GET_FLASH_NP:
+						case ESPISymbol::COMMAND_GET_PC:
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
 						case ESPISymbol::COMMAND_GET_VWIRE:
@@ -478,10 +484,6 @@ void ESPIDecoder::Refresh()
 						//TODO
 						case ESPISymbol::COMMAND_PUT_PC:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-						case ESPISymbol::COMMAND_GET_PC:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							txn_state = TXN_STATE_IDLE;
 							break;
 
@@ -662,6 +664,10 @@ void ESPIDecoder::Refresh()
 
 							case ESPISymbol::COMMAND_GET_OOB:
 								txn_state = TXN_STATE_SMBUS_TYPE;
+								break;
+
+							case ESPISymbol::COMMAND_GET_PC:
+								txn_state = TXN_STATE_COMPLETION_TYPE;
 								break;
 
 							case ESPISymbol::COMMAND_GET_STATUS:
@@ -949,29 +955,29 @@ void ESPIDecoder::Refresh()
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_TYPE, current_byte));
 					txn_state = TXN_STATE_FLASH_TAG_LENHI;
 
-					flash_type = (ESPISymbol::ESpiFlashType)current_byte;
+					cycle_type = (ESPISymbol::ESpiCycleType)current_byte;
 
-					switch(flash_type)
+					switch(cycle_type)
 					{
-						case ESPISymbol::FLASH_ERASE:
+						case ESPISymbol::CYCLE_ERASE:
 							pack->m_headers["Info"] = "Erase";
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							break;
 
-						case ESPISymbol::FLASH_READ:
+						case ESPISymbol::CYCLE_READ:
 							pack->m_headers["Info"] = "Read";
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
 
-						case ESPISymbol::FLASH_WRITE:
+						case ESPISymbol::CYCLE_WRITE:
 							pack->m_headers["Info"] = "Write";
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							break;
 
-						case ESPISymbol::FLASH_SUCCESS_DATA_FIRST:
-						case ESPISymbol::FLASH_SUCCESS_DATA_MIDDLE:
-						case ESPISymbol::FLASH_SUCCESS_DATA_LAST:
-						case ESPISymbol::FLASH_SUCCESS_DATA_ONLY:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
 							pack->m_headers["Info"] = "Read Data";
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							break;
@@ -1013,7 +1019,7 @@ void ESPIDecoder::Refresh()
 					count = 0;
 					data = 0;
 
-					if(flash_type >= ESPISymbol::FLASH_SUCCESS_NODATA)
+					if(cycle_type >= ESPISymbol::CYCLE_SUCCESS_NODATA)
 					{
 						pack->m_data.clear();
 						txn_state = TXN_STATE_FLASH_DATA;
@@ -1051,7 +1057,7 @@ void ESPIDecoder::Refresh()
 						data = 0;
 
 						//Write requests are followed by data
-						if(flash_type == ESPISymbol::FLASH_WRITE)
+						if(cycle_type == ESPISymbol::CYCLE_WRITE)
 						{
 							pack->m_data.clear();
 							txn_state = TXN_STATE_FLASH_DATA;
@@ -1100,7 +1106,7 @@ void ESPIDecoder::Refresh()
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_TYPE, current_byte));
 					txn_state = TXN_STATE_SMBUS_TAG_LENHI;
 
-					//should always be 0x21
+					//should always be CYCLE_SMBUS
 					break;	//end TXN_STATE_SMBUS_TYPE
 
 				case TXN_STATE_SMBUS_TAG_LENHI:
@@ -1231,6 +1237,89 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_IOWR_DATA
 
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Completions
+
+				case TXN_STATE_COMPLETION_TYPE:
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMPLETION_TYPE, current_byte));
+
+					switch(current_byte)
+					{
+						case ESPISymbol::CYCLE_SUCCESS_NODATA:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+							break;
+
+						case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+						case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							break;
+
+						case ESPISymbol::CYCLE_FAIL_LAST:
+						case ESPISymbol::CYCLE_FAIL_ONLY:
+						default:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+							break;
+					}
+
+					txn_state = TXN_STATE_COMPLETION_TAG_LENHI;
+
+					break;	//end TXN_STATE_COMPLETION_TYPE
+
+				case TXN_STATE_COMPLETION_TAG_LENHI:
+
+					//Tag is high 4 bits
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_TAG, current_byte >> 4));
+					pack->m_headers["Tag"] = to_string(current_byte >> 4);
+
+					//Low 4 bits of this byte are the high length bits
+					data = current_byte & 0xf;
+
+					txn_state = TXN_STATE_COMPLETION_LENLO;
+					break;	//end TXN_STATE_COMPLETION_TAG_LENHI
+
+				case TXN_STATE_COMPLETION_LENLO:
+
+					//Save the rest of the length
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					payload_len = current_byte | data;
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, payload_len));
+
+					pack->m_headers["Len"] = to_string(payload_len);
+
+					if(payload_len == 0)
+						txn_state = TXN_STATE_STATUS;
+					else
+						txn_state = TXN_STATE_COMPLETION_DATA;
+
+					break;	//end TXN_STATE_COMPLETION_LENLO
+
+				case TXN_STATE_COMPLETION_DATA:
+
+					//Save the data byte
+					pack->m_data.push_back(current_byte);
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMPLETION_DATA, current_byte));
+
+					//See if we're done
+					count ++;
+					if(count >= payload_len)
+					{
+						count = 0;
+						data = 0;
+						txn_state = TXN_STATE_STATUS;
+					}
+
+					break;	//end TXN_STATE_COMPLETION_DATA
+
 			}
 
 			//Checksum this byte
@@ -1323,13 +1412,31 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
 			case ESPISymbol::TYPE_IO_DATA:
+			case ESPISymbol::TYPE_COMPLETION_DATA:
 				return m_standardColors[COLOR_DATA];
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
-				if(s.m_data == 0x21)
+				if(s.m_data == ESPISymbol::CYCLE_SMBUS)
 					return m_standardColors[COLOR_CONTROL];
 				else
 					return m_standardColors[COLOR_ERROR];
+
+			case ESPISymbol::TYPE_COMPLETION_TYPE:
+				switch(s.m_data)
+				{
+					case ESPISymbol::CYCLE_SUCCESS_NODATA:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+						return m_standardColors[COLOR_CONTROL];
+
+					case ESPISymbol::CYCLE_FAIL_LAST:
+					case ESPISymbol::CYCLE_FAIL_ONLY:
+					default:
+						return m_standardColors[COLOR_ERROR];
+				};
+				break;
 
 			default:
 				return m_standardColors[COLOR_ERROR];
@@ -1364,7 +1471,7 @@ string ESPIDecoder::GetText(int i)
 						return "Put OOB";
 
 					case ESPISymbol::COMMAND_GET_PC:
-						return "Get PC";
+						return "Get Posted Completion";
 					case ESPISymbol::COMMAND_PUT_PC:
 						return "Put PC";
 
@@ -1706,18 +1813,18 @@ string ESPIDecoder::GetText(int i)
 			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
 				switch(s.m_data)
 				{
-					case ESPISymbol::FLASH_READ:
+					case ESPISymbol::CYCLE_READ:
 						return "Read";
-					case ESPISymbol::FLASH_WRITE:
+					case ESPISymbol::CYCLE_WRITE:
 						return "Write";
-					case ESPISymbol::FLASH_ERASE:
+					case ESPISymbol::CYCLE_ERASE:
 						return "Erase";
 
-					case ESPISymbol::FLASH_SUCCESS_NODATA:
-					case ESPISymbol::FLASH_SUCCESS_DATA_FIRST:
-					case ESPISymbol::FLASH_SUCCESS_DATA_MIDDLE:
-					case ESPISymbol::FLASH_SUCCESS_DATA_LAST:
-					case ESPISymbol::FLASH_SUCCESS_DATA_ONLY:
+					case ESPISymbol::CYCLE_SUCCESS_NODATA:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
 						return "Success";
 				}
 				break;
@@ -1728,20 +1835,18 @@ string ESPIDecoder::GetText(int i)
 			case ESPISymbol::TYPE_REQUEST_LEN:
 				return string("Len: ") + to_string(s.m_data);
 
+			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+			case ESPISymbol::TYPE_IO_DATA:
+			case ESPISymbol::TYPE_COMPLETION_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+				return tmp;
+
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
 				return tmp;
 
-			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
-				return tmp;
-
 			case ESPISymbol::TYPE_IO_ADDR:
 				snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_IO_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
@@ -1749,7 +1854,7 @@ string ESPIDecoder::GetText(int i)
 				return tmp;
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
-				if(s.m_data == 0x21)
+				if(s.m_data == ESPISymbol::CYCLE_SMBUS)
 					return "SMBus Msg";
 				else
 					return "Invalid";
@@ -1757,6 +1862,25 @@ string ESPIDecoder::GetText(int i)
 			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
 				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
+
+			case ESPISymbol::TYPE_COMPLETION_TYPE:
+				switch(s.m_data)
+				{
+					case ESPISymbol::CYCLE_SUCCESS_NODATA:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+						return "Success";
+
+					case ESPISymbol::CYCLE_FAIL_LAST:
+					case ESPISymbol::CYCLE_FAIL_ONLY:
+						return "Fail";
+
+					default:
+						return "ERROR";
+				};
+				break;
 
 			case ESPISymbol::TYPE_WAIT:
 				return "Wait";
@@ -1796,7 +1920,6 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 	{
 		return true;
 	}
-
 	if( (first->m_headers["Command"] == "Get Status") &&
 		(first->m_headers["Status"].find("OOB_AVAIL") != string::npos) &&
 		(next->m_headers["Command"] == "Put OOB") )
@@ -1812,6 +1935,19 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge a "Put I/O Write" with subsequent "Get Status" and "Get Posted Completion"
+	if( (first->m_headers["Command"] == "Put I/O Write") &&
+		(next->m_headers["Command"] == "Get Status") &&
+		(next->m_headers["Status"].find("PC_AVAIL") != string::npos) )
+	{
+		return true;
+	}
+	if( (first->m_headers["Command"] == "Put I/O Write") &&
+		(next->m_headers["Command"] == "Get Posted Completion") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -1823,6 +1959,7 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 	Packet* first = m_packets[i];
 
+	//Fetching commands requested by the peripheral
 	if(first->m_headers["Command"] == "Get Status")
 	{
 		//Look up the second packet in the string
@@ -1882,6 +2019,27 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 				ret->m_headers["Info"] = second->m_headers["Info"];
 				ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 			}
+		}
+	}
+
+	//Split transactions
+	else if(first->m_headers["Command"] == "Put I/O Write")
+	{
+		ret->m_headers["Command"] = "I/O Write";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+		ret->m_headers["Address"] = first->m_headers["Address"];
+		ret->m_headers["Len"] = first->m_headers["Len"];
+
+		//Get data from the write packet
+		for(auto b : first->m_data)
+			ret->m_data.push_back(b);
+
+		//Get status from completions
+		for(size_t j=i+1; j<m_packets.size(); j++)
+		{
+			Packet* p = m_packets[j];
+			if(p->m_headers["Command"] == "Get Posted Completion")
+				ret->m_headers["Response"] = p->m_headers["Response"];
 		}
 	}
 

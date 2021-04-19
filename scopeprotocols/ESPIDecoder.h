@@ -84,6 +84,9 @@ public:
 
 		TYPE_WAIT,
 
+		TYPE_COMPLETION_TYPE,
+		TYPE_COMPLETION_DATA,
+
 		TYPE_ERROR
 	} m_type;
 
@@ -123,10 +126,6 @@ public:
 		COMMAND_GET_CONFIGURATION		= 0x21,
 		COMMAND_RESET					= 0xff,
 
-		LEN_1							= 0x00,
-		LEN_2							= 0x01,
-		LEN_4							= 0x03,
-
 		COMMAND_NONE					= 0x100
 	};
 
@@ -149,21 +148,23 @@ public:
 	};
 
 	//Table 6
-	enum ESpiFlashType
+	enum ESpiCycleType
 	{
-		FLASH_READ				= 0,
-		FLASH_WRITE				= 1,
-		FLASH_ERASE				= 2,
+		CYCLE_READ				= 0,
+		CYCLE_WRITE				= 1,
+		CYCLE_ERASE				= 2,
 
-		//completion types
-		FLASH_SUCCESS_NODATA		= 0x06,
-		FLASH_SUCCESS_DATA_MIDDLE	= 0x09,
-		FLASH_SUCCESS_DATA_FIRST	= 0x0b,
-		FLASH_SUCCESS_DATA_LAST		= 0x0d,
-		FLASH_SUCCESS_DATA_ONLY		= 0x0f,
+		CYCLE_SMBUS				= 0x21,
 
-		FLASH_FAIL_LAST				= 0x08,
-		FLASH_FAIL_ONLY				= 0x0e
+		// completion types
+		CYCLE_SUCCESS_NODATA		= 0x06,
+		CYCLE_SUCCESS_DATA_MIDDLE	= 0x09,
+		CYCLE_SUCCESS_DATA_FIRST	= 0x0b,
+		CYCLE_SUCCESS_DATA_LAST		= 0x0d,
+		CYCLE_SUCCESS_DATA_ONLY		= 0x0f,
+
+		CYCLE_FAIL_LAST				= 0x08,
+		CYCLE_FAIL_ONLY				= 0x0e
 	};
 
 	uint64_t m_data;
