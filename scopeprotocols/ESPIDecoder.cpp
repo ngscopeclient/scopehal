@@ -186,7 +186,12 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_FLASH_TAG_LENHI,
 		TXN_STATE_FLASH_LENLO,
 		TXN_STATE_FLASH_ADDR,
-		TXN_STATE_FLASH_DATA
+		TXN_STATE_FLASH_DATA,
+
+		TXN_STATE_SMBUS_TYPE,
+		TXN_STATE_SMBUS_TAG_LENHI,
+		TXN_STATE_SMBUS_LENLO,
+		TXN_STATE_SMBUS_DATA
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -418,6 +423,11 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
 
+						case ESPISymbol::COMMAND_GET_OOB:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_COMMAND_CRC8;
+							break;
+
 						//TODO
 						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
@@ -468,10 +478,6 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_IDLE;
 							break;
 
-						case ESPISymbol::COMMAND_GET_OOB:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							txn_state = TXN_STATE_IDLE;
-							break;
 						case ESPISymbol::COMMAND_PUT_OOB:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							txn_state = TXN_STATE_IDLE;
@@ -628,6 +634,10 @@ void ESPIDecoder::Refresh()
 
 						case ESPISymbol::COMMAND_GET_FLASH_NP:
 							txn_state = TXN_STATE_FLASH_TYPE;
+							break;
+
+						case ESPISymbol::COMMAND_GET_OOB:
+							txn_state = TXN_STATE_SMBUS_TYPE;
 							break;
 
 						case ESPISymbol::COMMAND_GET_STATUS:
@@ -952,7 +962,7 @@ void ESPIDecoder::Refresh()
 					//Tag is high 4 bits
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_TAG, current_byte >> 4));
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_TAG, current_byte >> 4));
 					pack->m_headers["Tag"] = to_string(current_byte >> 4);
 
 					//Low 4 bits of this byte are the high length bits
@@ -968,7 +978,7 @@ void ESPIDecoder::Refresh()
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					flash_len = current_byte | data;
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_FLASH_REQUEST_LEN, flash_len));
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, flash_len));
 
 					pack->m_headers["Len"] = to_string(flash_len);
 
@@ -1055,6 +1065,81 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_FLASH_DATA
 
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// OOB (tunneled SMBus) channel
+
+				case TXN_STATE_SMBUS_TYPE:
+					pack->m_data.push_back(current_byte);
+
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_TYPE, current_byte));
+					txn_state = TXN_STATE_SMBUS_TAG_LENHI;
+
+					//should always be 0x21
+					break;	//end TXN_STATE_SMBUS_TYPE
+
+				case TXN_STATE_SMBUS_TAG_LENHI:
+					pack->m_data.push_back(current_byte);
+
+					//Tag is high 4 bits
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_TAG, current_byte >> 4));
+					pack->m_headers["Tag"] = to_string(current_byte >> 4);
+
+					//Low 4 bits of this byte are the high length bits
+					data = current_byte & 0xf;
+
+					txn_state = TXN_STATE_SMBUS_LENLO;
+					break;	//end TXN_STATE_SMBUS_TAG_LENHI
+
+				case TXN_STATE_SMBUS_LENLO:
+					pack->m_data.push_back(current_byte);
+
+					//Save the rest of the length
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					flash_len = current_byte | data;
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, flash_len));
+
+					pack->m_headers["Len"] = to_string(flash_len);
+
+					//Get ready to read the packet data
+					count = 0;
+					data = 0;
+
+					pack->m_data.clear();
+					txn_state = TXN_STATE_SMBUS_DATA;
+
+					break;	//end TXN_STATE_SMBUS_LENLO
+
+				case TXN_STATE_SMBUS_DATA:
+
+					pack->m_data.push_back(current_byte);
+
+					//Save the data byte
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_DATA, current_byte));
+
+					//See if we're done
+					count ++;
+					if(count >= flash_len)
+					{
+						count = 0;
+						data = 0;
+
+						//Completion? Done with command
+						if(current_cmd == ESPISymbol::COMMAND_PUT_OOB)
+							txn_state = TXN_STATE_COMMAND_CRC8;
+
+						//Request? Done with response
+						else
+							txn_state = TXN_STATE_STATUS;
+					}
+
+					break;	//end TXN_STATE_FLASH_DATA
 			}
 
 			//Checksum this byte
@@ -1114,13 +1199,13 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_RESPONSE_OP:
 			case ESPISymbol::TYPE_RESPONSE_STATUS:
 			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
-			case ESPISymbol::TYPE_FLASH_REQUEST_LEN:
+			case ESPISymbol::TYPE_REQUEST_LEN:
 				return m_standardColors[COLOR_CONTROL];
 
 			case ESPISymbol::TYPE_CAPS_ADDR:
 			case ESPISymbol::TYPE_VWIRE_COUNT:
 			case ESPISymbol::TYPE_VWIRE_INDEX:
-			case ESPISymbol::TYPE_FLASH_REQUEST_TAG:
+			case ESPISymbol::TYPE_REQUEST_TAG:
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 				return m_standardColors[COLOR_ADDRESS];
 
@@ -1140,7 +1225,14 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
 				return m_standardColors[COLOR_DATA];
+
+			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
+				if(s.m_data == 0x21)
+					return m_standardColors[COLOR_CONTROL];
+				else
+					return m_standardColors[COLOR_ERROR];
 
 			default:
 				return m_standardColors[COLOR_ERROR];
@@ -1486,10 +1578,6 @@ string ESPIDecoder::GetText(int i)
 
 				return stmp;	//end TYPE_CH2_CAPS_WR
 
-			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
-				return tmp;
-
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 			case ESPISymbol::TYPE_COMMAND_DATA_32:
 				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
@@ -1537,14 +1625,28 @@ string ESPIDecoder::GetText(int i)
 				}
 				break;
 
-			case ESPISymbol::TYPE_FLASH_REQUEST_TAG:
+			case ESPISymbol::TYPE_REQUEST_TAG:
 				return string("Tag: ") + to_string(s.m_data);
 
-			case ESPISymbol::TYPE_FLASH_REQUEST_LEN:
+			case ESPISymbol::TYPE_REQUEST_LEN:
 				return string("Len: ") + to_string(s.m_data);
 
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
+				if(s.m_data == 0x21)
+					return "SMBus Msg";
+				else
+					return "Invalid";
+
+			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
 
 			case ESPISymbol::TYPE_ERROR:
