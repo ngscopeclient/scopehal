@@ -192,7 +192,10 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_SMBUS_TAG_LENHI,
 		TXN_STATE_SMBUS_LENLO,
 		TXN_STATE_SMBUS_ADDR,
-		TXN_STATE_SMBUS_DATA
+		TXN_STATE_SMBUS_DATA,
+
+		TXN_STATE_IOWR_ADDR,
+		TXN_STATE_IOWR_DATA
 
 	} txn_state = TXN_STATE_IDLE;
 
@@ -212,7 +215,7 @@ void ESPIDecoder::Refresh()
 	uint8_t crc = 0;
 	uint64_t data = 0;
 	uint64_t addr = 0;
-	size_t flash_len = 0;
+	size_t payload_len = 0;
 
 	int skip_bits			= 0;
 	bool skip_next_falling	= false;
@@ -420,6 +423,23 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_SMBUS_TYPE;
 							break;
 
+						//Expect a 16-bit address followed by 1-4 bytes of data
+						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
+							payload_len = 1;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_IOWR_ADDR;
+							break;
+						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x2:
+							payload_len = 2;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_IOWR_ADDR;
+							break;
+						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x4:
+							payload_len = 4;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_IOWR_ADDR;
+							break;
+
 						//No arguments
 						case ESPISymbol::COMMAND_GET_STATUS:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
@@ -432,9 +452,12 @@ void ESPIDecoder::Refresh()
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
-
 						case ESPISymbol::COMMAND_GET_OOB:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_COMMAND_CRC8;
+							break;
+						case ESPISymbol::COMMAND_RESET:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							txn_state = TXN_STATE_COMMAND_CRC8;
 							break;
 
@@ -453,20 +476,6 @@ void ESPIDecoder::Refresh()
 							break;
 
 						//TODO
-						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x2:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x4:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						//TODO
 						case ESPISymbol::COMMAND_PUT_PC:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							txn_state = TXN_STATE_IDLE;
@@ -479,12 +488,6 @@ void ESPIDecoder::Refresh()
 						//TODO
 						case ESPISymbol::COMMAND_PUT_VWIRE:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						//TODO
-						case ESPISymbol::COMMAND_RESET:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							txn_state = TXN_STATE_IDLE;
 							break;
 
@@ -610,45 +613,62 @@ void ESPIDecoder::Refresh()
 
 				case TXN_STATE_RESPONSE:
 
-					//Start with a fresh CRC for the response phase
-					crc = 0;
-
-					cap->m_offsets.push_back(bytestart);
-					cap->m_durations.push_back(timestamp - bytestart);
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_OP, current_byte));
-
-					//TODO: support appended completions
-					completion_type = static_cast<ESPISymbol::ESpiCompletion>(current_byte >> 6);
-					if(completion_type != ESPISymbol::COMPLETION_NONE)
-						LogWarning("Appended completions not implemented yet\n");
-
-					pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
-
-					count = 0;
-					data = 0;
-
-					switch(current_cmd)
+					//Handle wait states
+					if( (current_byte & 0xcf) == 0x0f)
 					{
-						case ESPISymbol::COMMAND_GET_CONFIGURATION:
-							txn_state = TXN_STATE_RESPONSE_DATA;
-							break;
+						//Merge consecutive wait states
+						size_t last = cap->m_samples.size() - 1;
+						if(cap->m_samples[last].m_type == ESPISymbol::TYPE_WAIT)
+							cap->m_durations[last] = timestamp - cap->m_offsets[last];
+						else
+						{
+							cap->m_offsets.push_back(bytestart);
+							cap->m_durations.push_back(timestamp - bytestart);
+							cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_WAIT));
+						}
+					}
+					else
+					{
+						//Start with a fresh CRC for the response phase
+						crc = 0;
 
-						case ESPISymbol::COMMAND_GET_VWIRE:
-							txn_state = TXN_STATE_VWIRE_COUNT;
-							break;
+						cap->m_offsets.push_back(bytestart);
+						cap->m_durations.push_back(timestamp - bytestart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_RESPONSE_OP, current_byte));
 
-						case ESPISymbol::COMMAND_GET_FLASH_NP:
-							txn_state = TXN_STATE_FLASH_TYPE;
-							break;
+						//TODO: support appended completions
+						completion_type = static_cast<ESPISymbol::ESpiCompletion>(current_byte >> 6);
+						if(completion_type != ESPISymbol::COMPLETION_NONE)
+							LogWarning("Appended completions not implemented yet\n");
 
-						case ESPISymbol::COMMAND_GET_OOB:
-							txn_state = TXN_STATE_SMBUS_TYPE;
-							break;
+						pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
 
-						case ESPISymbol::COMMAND_GET_STATUS:
-						default:
-							txn_state = TXN_STATE_STATUS;
-							break;
+						count = 0;
+						data = 0;
+
+						switch(current_cmd)
+						{
+							case ESPISymbol::COMMAND_GET_CONFIGURATION:
+								txn_state = TXN_STATE_RESPONSE_DATA;
+								break;
+
+							case ESPISymbol::COMMAND_GET_VWIRE:
+								txn_state = TXN_STATE_VWIRE_COUNT;
+								break;
+
+							case ESPISymbol::COMMAND_GET_FLASH_NP:
+								txn_state = TXN_STATE_FLASH_TYPE;
+								break;
+
+							case ESPISymbol::COMMAND_GET_OOB:
+								txn_state = TXN_STATE_SMBUS_TYPE;
+								break;
+
+							case ESPISymbol::COMMAND_GET_STATUS:
+							default:
+								txn_state = TXN_STATE_STATUS;
+								break;
+						}
 					}
 
 					break;	//end TXN_STATE_RESPONSE
@@ -984,10 +1004,10 @@ void ESPIDecoder::Refresh()
 					//Save the rest of the length
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
-					flash_len = current_byte | data;
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, flash_len));
+					payload_len = current_byte | data;
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, payload_len));
 
-					pack->m_headers["Len"] = to_string(flash_len);
+					pack->m_headers["Len"] = to_string(payload_len);
 
 					//Get ready to read the address or data
 					count = 0;
@@ -1055,7 +1075,7 @@ void ESPIDecoder::Refresh()
 
 					//See if we're done
 					count ++;
-					if(count >= flash_len)
+					if(count >= payload_len)
 					{
 						count = 0;
 						data = 0;
@@ -1102,10 +1122,10 @@ void ESPIDecoder::Refresh()
 					//Save the rest of the length
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
-					flash_len = current_byte | data;
-					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, flash_len));
+					payload_len = current_byte | data;
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_REQUEST_LEN, payload_len));
 
-					pack->m_headers["Len"] = to_string(flash_len);
+					pack->m_headers["Len"] = to_string(payload_len);
 
 					txn_state = TXN_STATE_SMBUS_ADDR;
 
@@ -1135,16 +1155,15 @@ void ESPIDecoder::Refresh()
 
 				case TXN_STATE_SMBUS_DATA:
 
-					pack->m_data.push_back(current_byte);
-
 					//Save the data byte
+					pack->m_data.push_back(current_byte);
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_DATA, current_byte));
 
 					//See if we're done
 					count ++;
-					if(count >= flash_len)
+					if(count >= payload_len)
 					{
 						count = 0;
 						data = 0;
@@ -1159,6 +1178,59 @@ void ESPIDecoder::Refresh()
 					}
 
 					break;	//end TXN_STATE_FLASH_DATA
+
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// I/O channel
+
+				case TXN_STATE_IOWR_ADDR:
+
+					//Save start time
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//Save address (MSB to LSB)
+					addr = (data << 8) | current_byte;
+					count ++;
+
+					//Add data
+					if(count == 2)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_IO_ADDR, addr));
+
+						snprintf(tmp, sizeof(tmp), "%04lx", addr);
+						pack->m_headers["Address"] = tmp;
+
+						pack->m_headers["Len"] = to_string(payload_len);
+
+						count = 0;
+						txn_state = TXN_STATE_IOWR_DATA;
+					}
+
+					break;	//end TXN_STATE_IOWR_ADDR
+
+				case TXN_STATE_IOWR_DATA:
+
+					//Save the data byte
+					pack->m_data.push_back(current_byte);
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_DATA, current_byte));
+
+					//See if we're done
+					count ++;
+					if(count >= payload_len)
+					{
+						count = 0;
+						data = 0;
+						txn_state = TXN_STATE_COMMAND_CRC8;
+					}
+
+					break;	//end TXN_STATE_IOWR_DATA
+
 			}
 
 			//Checksum this byte
@@ -1221,12 +1293,16 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_REQUEST_LEN:
 				return m_standardColors[COLOR_CONTROL];
 
+			case ESPISymbol::TYPE_WAIT:
+				return m_standardColors[COLOR_PREAMBLE];
+
 			case ESPISymbol::TYPE_CAPS_ADDR:
 			case ESPISymbol::TYPE_VWIRE_COUNT:
 			case ESPISymbol::TYPE_VWIRE_INDEX:
 			case ESPISymbol::TYPE_REQUEST_TAG:
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
+			case ESPISymbol::TYPE_IO_ADDR:
 				return m_standardColors[COLOR_ADDRESS];
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
@@ -1246,6 +1322,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_RESPONSE_DATA_32:
 			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
+			case ESPISymbol::TYPE_IO_DATA:
 				return m_standardColors[COLOR_DATA];
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
@@ -1655,12 +1732,20 @@ string ESPIDecoder::GetText(int i)
 				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
 				return tmp;
 
-			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
-				snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
-				return tmp;
-
 			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_IO_ADDR:
+				snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_IO_DATA:
+				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+				return tmp;
+
+			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
+				snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
 				return tmp;
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
@@ -1672,6 +1757,9 @@ string ESPIDecoder::GetText(int i)
 			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
 				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
+
+			case ESPISymbol::TYPE_WAIT:
+				return "Wait";
 
 			case ESPISymbol::TYPE_ERROR:
 			default:
