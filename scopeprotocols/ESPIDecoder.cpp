@@ -741,6 +741,10 @@ void ESPIDecoder::Refresh()
 							stmp += "OOB_AVAIL ";
 						if(data & 0x0040)
 							stmp += "VWIRE_AVAIL ";
+						if(data & 0x0020)
+							stmp += "NP_AVAIL ";
+						if(data & 0x0010)
+							stmp += "PC_AVAIL ";
 						pack->m_headers["Status"] = stmp;
 
 						txn_state = TXN_STATE_RESPONSE_CRC8;
