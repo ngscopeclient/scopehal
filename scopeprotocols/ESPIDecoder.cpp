@@ -191,6 +191,7 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_SMBUS_TYPE,
 		TXN_STATE_SMBUS_TAG_LENHI,
 		TXN_STATE_SMBUS_LENLO,
+		TXN_STATE_SMBUS_ADDR,
 		TXN_STATE_SMBUS_DATA
 
 	} txn_state = TXN_STATE_IDLE;
@@ -233,6 +234,9 @@ void ESPIDecoder::Refresh()
 			(data0->m_samples[idata[0]] ? 0x1 : 0);
 
 		bool byte_valid = false;
+
+		string stmp;
+		char tmp[128];
 
 		switch(link_state)
 		{
@@ -405,9 +409,15 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_CONFIG_ADDRESS;
 							break;
 
-						//Expect a full flash completion TODO
+						//Expect a full flash completion
 						case ESPISymbol::COMMAND_PUT_FLASH_C:
 							txn_state = TXN_STATE_FLASH_TYPE;
+							break;
+
+						//Expect an OOB message
+						case ESPISymbol::COMMAND_PUT_OOB:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							txn_state = TXN_STATE_SMBUS_TYPE;
 							break;
 
 						//No arguments
@@ -475,11 +485,6 @@ void ESPIDecoder::Refresh()
 						//TODO
 						case ESPISymbol::COMMAND_RESET:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						case ESPISymbol::COMMAND_PUT_OOB:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							txn_state = TXN_STATE_IDLE;
 							break;
 
@@ -726,18 +731,17 @@ void ESPIDecoder::Refresh()
 
 						//Don't report free space in the protocol analyzer
 						//to save column space
-						string tmp;
 						if(data & 0x2000)
-							tmp += "FLASH_NP_AVAIL ";
+							stmp += "FLASH_NP_AVAIL ";
 						if(data & 0x1000)
-							tmp += "FLASH_C_AVAIL ";
+							stmp += "FLASH_C_AVAIL ";
 						if(data & 0x0200)
-							tmp += "FLASH_NP_FREE ";
+							stmp += "FLASH_NP_FREE ";
 						if(data & 0x0080)
-							tmp += "OOB_AVAIL ";
+							stmp += "OOB_AVAIL ";
 						if(data & 0x0040)
-							tmp += "VWIRE_AVAIL ";
-						pack->m_headers["Status"] = tmp;
+							stmp += "VWIRE_AVAIL ";
+						pack->m_headers["Status"] = stmp;
 
 						txn_state = TXN_STATE_RESPONSE_CRC8;
 					}
@@ -794,92 +798,91 @@ void ESPIDecoder::Refresh()
 					//Virtual wire indexes 0/1 are IRQs
 					if(addr <= 1)
 					{
-						string tmp = "IRQ";
+						stmp = "IRQ";
 						if(addr == 0)
-							tmp += to_string(current_byte & 0x7f);
+							stmp += to_string(current_byte & 0x7f);
 						else
-							tmp += to_string( (current_byte & 0x7f) + 128 );
+							stmp += to_string( (current_byte & 0x7f) + 128 );
 						if(current_byte & 0x80)
-							tmp += " high\n";
+							stmp += " high\n";
 						else
-							tmp += " low\n";
+							stmp += " low\n";
 
-						pack->m_headers["Info"] += tmp;
+						pack->m_headers["Info"] += stmp;
 					}
 
 					//Indexes 2-7 are "system events".
 					//See table 10-15
 					else if(addr <= 7)
 					{
-						string tmp;
 						switch(addr)
 						{
 							//Table 10
 							case 2:
 								if(current_byte & 0x40)
-									tmp += string("SLP_S5#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("SLP_S5#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x20)
-									tmp += string("SLP_S4#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+									stmp += string("SLP_S4#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("SLP_S3#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("SLP_S3#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 
 							//Table 11
 							case 3:
 								if(current_byte & 0x40)
-									tmp += string("OOB_RST_WARN: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("OOB_RST_WARN: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x20)
-									tmp += string("PLTRST#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+									stmp += string("PLTRST#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("SUS_STAT#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("SUS_STAT#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 
 							//Table 12
 							case 4:
 								if(current_byte & 0x80)
-									tmp += string("PME#: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+									stmp += string("PME#: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
 								if(current_byte & 0x40)
-									tmp += string("WAKE#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("WAKE#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("OOB_RST_ACK: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("OOB_RST_ACK: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 
 							//Table 13
 							case 5:
 								if(current_byte & 0x80)
-									tmp += string("SLAVE_BOOT_LOAD_STATUS: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+									stmp += string("SLAVE_BOOT_LOAD_STATUS: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
 								if(current_byte & 0x40)
-									tmp += string("ERROR_NONFATAL: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("ERROR_NONFATAL: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x20)
-									tmp += string("ERROR_FATAL: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+									stmp += string("ERROR_FATAL: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("SLAVE_BOOT_LOAD_DONE: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("SLAVE_BOOT_LOAD_DONE: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 
 							//Table 14
 							case 6:
 								if(current_byte & 0x80)
-									tmp += string("HOST_RST_ACK: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
+									stmp += string("HOST_RST_ACK: ") + ((current_byte & 0x8)? "1" : "0") + "\n";
 								if(current_byte & 0x40)
-									tmp += string("RCIN#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("RCIN#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x20)
-									tmp += string("SMI#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+									stmp += string("SMI#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("SCI#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("SCI#: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 
 							//Table 15
 							case 7:
 								if(current_byte & 0x40)
-									tmp += string("NMIOUT#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
+									stmp += string("NMIOUT#: ") + ((current_byte & 0x4)? "1" : "0") + "\n";
 								if(current_byte & 0x20)
-									tmp += string("SMIOUT#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
+									stmp += string("SMIOUT#: ") + ((current_byte & 0x2)? "1" : "0") + "\n";
 								if(current_byte & 0x10)
-									tmp += string("HOST_RST_WARN: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
+									stmp += string("HOST_RST_WARN: ") + ((current_byte & 0x1)? "1" : "0") + "\n";
 								break;
 						}
 
-						pack->m_headers["Info"] += tmp;
+						pack->m_headers["Info"] += stmp;
 					}
 
 					//Indexes 8-73 are reserved
@@ -1017,7 +1020,6 @@ void ESPIDecoder::Refresh()
 
 						//Don't report free space in the protocol analyzer
 						//to save column space
-						char tmp[32];
 						snprintf(tmp, sizeof(tmp), "%08lx", data);
 						pack->m_headers["Address"] = tmp;
 
@@ -1069,8 +1071,6 @@ void ESPIDecoder::Refresh()
 				// OOB (tunneled SMBus) channel
 
 				case TXN_STATE_SMBUS_TYPE:
-					pack->m_data.push_back(current_byte);
-
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_TYPE, current_byte));
@@ -1080,7 +1080,6 @@ void ESPIDecoder::Refresh()
 					break;	//end TXN_STATE_SMBUS_TYPE
 
 				case TXN_STATE_SMBUS_TAG_LENHI:
-					pack->m_data.push_back(current_byte);
 
 					//Tag is high 4 bits
 					cap->m_offsets.push_back(bytestart);
@@ -1095,7 +1094,6 @@ void ESPIDecoder::Refresh()
 					break;	//end TXN_STATE_SMBUS_TAG_LENHI
 
 				case TXN_STATE_SMBUS_LENLO:
-					pack->m_data.push_back(current_byte);
 
 					//Save the rest of the length
 					cap->m_offsets.push_back(bytestart);
@@ -1105,14 +1103,31 @@ void ESPIDecoder::Refresh()
 
 					pack->m_headers["Len"] = to_string(flash_len);
 
-					//Get ready to read the packet data
-					count = 0;
-					data = 0;
-
-					pack->m_data.clear();
-					txn_state = TXN_STATE_SMBUS_DATA;
+					txn_state = TXN_STATE_SMBUS_ADDR;
 
 					break;	//end TXN_STATE_SMBUS_LENLO
+
+				case TXN_STATE_SMBUS_ADDR:
+
+					pack->m_data.clear();
+
+					//Save the SMBus address
+					cap->m_offsets.push_back(bytestart);
+					cap->m_durations.push_back(timestamp - bytestart);
+					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_SMBUS_REQUEST_ADDR, current_byte));
+
+					snprintf(tmp, sizeof(tmp), "%02x", current_byte);
+					pack->m_headers["Address"] = tmp;
+
+					//Get ready to read the packet data
+					//We already read the first byte of the SMBus packet (the slave address)
+					//so start count at 1.
+					count = 1;
+					data = 0;
+
+					txn_state = TXN_STATE_SMBUS_DATA;
+
+					break;	//end TXN_STATE_SMBUS_ADDR
 
 				case TXN_STATE_SMBUS_DATA:
 
@@ -1207,6 +1222,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 			case ESPISymbol::TYPE_VWIRE_INDEX:
 			case ESPISymbol::TYPE_REQUEST_TAG:
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
+			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
 				return m_standardColors[COLOR_ADDRESS];
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
@@ -1635,6 +1651,10 @@ string ESPIDecoder::GetText(int i)
 				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
 				return tmp;
 
+			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
+				snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
+				return tmp;
+
 			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
 				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
 				return tmp;
@@ -1676,6 +1696,22 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge a "Get Status" with subsequent "Get OOB" or "Put OOB"
+	//TODO: Only if the tags match!
+	if( (first->m_headers["Command"] == "Get Status") &&
+		(first->m_headers["Status"].find("OOB_AVAIL") != string::npos) &&
+		(next->m_headers["Command"] == "Get OOB") )
+	{
+		return true;
+	}
+
+	if( (first->m_headers["Command"] == "Get Status") &&
+		(first->m_headers["Status"].find("OOB_AVAIL") != string::npos) &&
+		(next->m_headers["Command"] == "Put OOB") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -1689,18 +1725,18 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 	if(first->m_headers["Command"] == "Get Status")
 	{
-		//Look up the second packet in the string (the flash request)
+		//Look up the second packet in the string
 		if(i+1 < m_packets.size())
 		{
 			Packet* second = m_packets[i+1];
 
-			//It's a flash transaction
+			ret->m_headers["Address"] = second->m_headers["Address"];
+			ret->m_headers["Len"] = second->m_headers["Len"];
+			ret->m_headers["Tag"] = second->m_headers["Tag"];
+
+			//Flash transaction?
 			if(second->m_headers["Command"] == "Get Flash Non-Posted")
 			{
-				ret->m_headers["Address"] = second->m_headers["Address"];
-				ret->m_headers["Len"] = second->m_headers["Len"];
-				ret->m_headers["Tag"] = second->m_headers["Tag"];
-
 				if(second->m_headers["Info"] == "Read")
 				{
 					ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
@@ -1730,6 +1766,13 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 					for(auto b : p->m_data)
 						ret->m_data.push_back(b);
 				}
+			}
+
+			//SMBus transaction?
+			else if(second->m_headers["Command"] == "Get OOB")
+			{
+				ret->m_headers["Command"] = "SMBus Access";
+				ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 			}
 		}
 	}
