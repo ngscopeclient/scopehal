@@ -1712,6 +1712,14 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge a "Get Status" with subsequent "Get Virtual Wire"
+	if( (first->m_headers["Command"] == "Get Status") &&
+		(first->m_headers["Status"].find("VWIRE_AVAIL") != string::npos) &&
+		(next->m_headers["Command"] == "Get Virtual Wire") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -1773,6 +1781,14 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			{
 				ret->m_headers["Command"] = "SMBus Access";
 				ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+			}
+
+			//Virtual Wire transaction?
+			else if(second->m_headers["Command"] == "Get Virtual Wire")
+			{
+				ret->m_headers["Command"] = "Get Virtual Wire";
+				ret->m_headers["Info"] = second->m_headers["Info"];
+				ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 			}
 		}
 	}
