@@ -126,9 +126,6 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
-#ifdef SHOW_TRANSACTIONS
-	printf("[%s] NoReturn\n", opString);
-#endif
 }
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
@@ -213,7 +210,7 @@ void SiglentSCPIOscilloscope::DetectOptions()
 /**
 	@brief Creates digital channels for the oscilloscope
  */
-void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int /*count*/)
+void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int /* count */)
 {
   LogWarning("Digital channels not implemented\n");
   // Old code from LeCroy implementation
@@ -902,7 +899,7 @@ bool SiglentSCPIOscilloscope::ReadWavedescs(
 	return true;
 }
 
-void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences, bool /*denabled*/)
+void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences, bool /* denabled */)
 {
 	//Ask for all analog waveforms
 	// This routine does the asking, but doesn't catch the data as it comes back
@@ -1041,6 +1038,9 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	// SDS2000X+ and SDS5000X have 30 codes per div. Todo; SDS6000X has 425.
 	// We also need to accomodate probe attenuation here.
 	v_gain = v_gain * v_probefactor / 30;
+
+        // Vertical offset is also scaled by the probefactor
+        v_off  = v_off * v_probefactor;
 
 	for(size_t j = 0; j < num_sequences; j++)
 	{
