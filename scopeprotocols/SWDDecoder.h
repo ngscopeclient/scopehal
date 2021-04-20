@@ -42,6 +42,7 @@ public:
 	enum stype
 	{
 		TYPE_START,
+		TYPE_LINERESET,
 		TYPE_AP_NDP,
 		TYPE_R_NW,
 		TYPE_ADDRESS,
@@ -52,30 +53,37 @@ public:
 		TYPE_TURNAROUND,
 		TYPE_ACK,
 		TYPE_DATA,
+		TYPE_SWDTOJTAG,
+		TYPE_JTAGTOSWD,
+		TYPE_SWDTODORMANT,
+		TYPE_LEAVEDORMANT,
 		TYPE_ERROR
 	};
 
-	SWDSymbol()
-	{}
+	SWDSymbol() {}
 
-	SWDSymbol(stype t, uint32_t d)
-	 : m_stype(t)
-	 , m_data(d)
-	{}
+	SWDSymbol(stype t, uint32_t d) : m_stype(t), m_data(d) {}
 
 	stype m_stype;
 	uint32_t m_data;
 
-	bool operator== (const SWDSymbol& s) const
-	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
-	}
+	bool operator==(const SWDSymbol& s) const { return (m_stype == s.m_stype) && (m_data == s.m_data); }
 };
 
 typedef Waveform<SWDSymbol> SWDWaveform;
 
 class SWDDecoder : public Filter
 {
+private:
+	// Magic numbers for the SWD protocol
+	static const uint16_t c_JTAG_TO_SWD_SEQ;
+	static const uint16_t c_SWD_TO_JTAG_SEQ;
+	static const uint16_t c_SWD_TO_DORMANT_SEQ;
+	static const uint32_t c_magic_seqlen;
+	static const uint32_t c_reset_minseqlen;
+	static const uint32_t c_magic_wakeuplen;
+	static const uint8_t c_wakeup[16];
+
 public:
 	SWDDecoder(const std::string& color);
 
