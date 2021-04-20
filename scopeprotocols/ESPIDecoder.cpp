@@ -197,6 +197,8 @@ void ESPIDecoder::Refresh()
 		TXN_STATE_IOWR_ADDR,
 		TXN_STATE_IOWR_DATA,
 
+		TXN_STATE_IORD_ADDR,
+
 		TXN_STATE_COMPLETION_TYPE,
 		TXN_STATE_COMPLETION_TAG_LENHI,
 		TXN_STATE_COMPLETION_LENLO,
@@ -445,6 +447,25 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_IOWR_ADDR;
 							break;
 
+						//Expect a 16 bit address
+						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
+							pack->m_headers["Len"] = "1";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							txn_state = TXN_STATE_IORD_ADDR;
+							break;
+
+						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x2:
+							pack->m_headers["Len"] = "2";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							txn_state = TXN_STATE_IORD_ADDR;
+							break;
+
+						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x4:
+							pack->m_headers["Len"] = "4";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							txn_state = TXN_STATE_IORD_ADDR;
+							break;
+
 						//No arguments
 						case ESPISymbol::COMMAND_GET_STATUS:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
@@ -465,20 +486,6 @@ void ESPIDecoder::Refresh()
 						case ESPISymbol::COMMAND_RESET:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							txn_state = TXN_STATE_COMMAND_CRC8;
-							break;
-
-						//TODO
-						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							txn_state = TXN_STATE_IDLE;
-							break;
-						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x2:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							txn_state = TXN_STATE_IDLE;
-							break;
-						case ESPISymbol::COMMAND_PUT_IORD_SHORT_x4:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
-							txn_state = TXN_STATE_IDLE;
 							break;
 
 						//TODO
@@ -1237,6 +1244,34 @@ void ESPIDecoder::Refresh()
 
 					break;	//end TXN_STATE_IOWR_DATA
 
+				case TXN_STATE_IORD_ADDR:
+
+					//Save start time
+					if(count == 0)
+					{
+						tstart = bytestart;
+						cap->m_offsets.push_back(tstart);
+					}
+
+					//Save address (MSB to LSB)
+					addr = (data << 8) | current_byte;
+					count ++;
+
+					//Add data
+					if(count == 2)
+					{
+						cap->m_durations.push_back(timestamp - tstart);
+						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_IO_ADDR, addr));
+
+						snprintf(tmp, sizeof(tmp), "%04lx", addr);
+						pack->m_headers["Address"] = tmp;
+
+						count = 0;
+						txn_state = TXN_STATE_COMMAND_CRC8;
+					}
+
+					break;	//end TXN_STATE_IORD_ADDR
+
 				////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Completions
 
@@ -1948,6 +1983,19 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge a "Put I/O Read" with subsequent "Get Status" and "Get Posted Completion"
+	if( (first->m_headers["Command"] == "Put I/O Read") &&
+		(next->m_headers["Command"] == "Get Status") &&
+		(next->m_headers["Status"].find("PC_AVAIL") != string::npos) )
+	{
+		return true;
+	}
+	if( (first->m_headers["Command"] == "Put I/O Read") &&
+		(next->m_headers["Command"] == "Get Posted Completion") )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -2038,6 +2086,26 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		for(size_t j=i+1; j<m_packets.size(); j++)
 		{
 			Packet* p = m_packets[j];
+			if(p->m_headers["Command"] == "Get Posted Completion")
+				ret->m_headers["Response"] = p->m_headers["Response"];
+		}
+	}
+
+	else if(first->m_headers["Command"] == "Put I/O Read")
+	{
+		ret->m_headers["Command"] = "I/O Read";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+		ret->m_headers["Address"] = first->m_headers["Address"];
+		ret->m_headers["Len"] = first->m_headers["Len"];
+
+		//Get status and data from completions
+		for(size_t j=i+1; j<m_packets.size(); j++)
+		{
+			Packet* p = m_packets[j];
+
+			for(auto b : p->m_data)
+				ret->m_data.push_back(b);
+
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
 		}
