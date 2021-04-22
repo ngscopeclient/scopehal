@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,6 +79,8 @@ public:
 		CMD_PAGE_PROGRAM,
 		CMD_QUAD_PAGE_PROGRAM,
 		CMD_READ_SFDP,		//read serial flash discovery parameters
+		CMD_ADDR_32BIT,
+		CMD_ADDR_24BIT,
 
 		//Winbond W25N specific
 		CMD_W25N_READ_PAGE,
@@ -136,6 +138,7 @@ public:
 	enum FlashType
 	{
 		FLASH_TYPE_GENERIC_3BYTE_ADDRESS,
+		FLASH_TYPE_GENERIC_4BYTE_ADDRESS,
 		FLASH_TYPE_WINBOND_W25N
 	};
 

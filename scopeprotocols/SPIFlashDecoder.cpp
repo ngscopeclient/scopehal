@@ -46,6 +46,7 @@ SPIFlashDecoder::SPIFlashDecoder(const string& color)
 	m_typename = "Flash Type";
 	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_typename].AddEnumValue("Generic (3-byte address)", FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
+	m_parameters[m_typename].AddEnumValue("Generic (4-byte address)", FLASH_TYPE_GENERIC_4BYTE_ADDRESS);
 	m_parameters[m_typename].AddEnumValue("Winbond W25N", FLASH_TYPE_WINBOND_W25N);
 	m_parameters[m_typename].SetIntVal(FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
 }
@@ -142,6 +143,11 @@ void SPIFlashDecoder::Refresh()
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
 
+	//Number of address bytes used (for generic flash only, not W25N)
+	int num_address_bytes = 3;
+	if(flashtype == FLASH_TYPE_GENERIC_4BYTE_ADDRESS)
+		num_address_bytes = 4;
+
 	//Loop over the SPI events and process stuff
 	//For now, assume the MISO/MOSI SPI captures are synchronized (sample N is at the same point in time)
 	SPIFlashSymbol samp;
@@ -233,8 +239,9 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -255,8 +262,9 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -294,9 +302,10 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
 									state = STATE_DUMMY_BEFORE_ADDRESS;
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -338,8 +347,9 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -372,8 +382,9 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -392,6 +403,7 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
 									state = STATE_READ_DATA;
 									break;
@@ -402,6 +414,13 @@ void SPIFlashDecoder::Refresh()
 							break;
 
 						//0xbb 1-2-2 fast read
+
+						//Enter 4-byte address mode
+						case 0xb7:
+							current_cmd = SPIFlashSymbol::CMD_ADDR_32BIT;
+							state = STATE_IDLE;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+							break;
 
 						//Erase a block (size is device dependent)
 						//Commonly 64 or 128 Kbytes
@@ -418,11 +437,19 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+							break;
+
+						//Enter 3-byte address mode
+						case 0xe9:
+							current_cmd = SPIFlashSymbol::CMD_ADDR_24BIT;
+							state = STATE_IDLE;
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
@@ -440,8 +467,9 @@ void SPIFlashDecoder::Refresh()
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									address_bytes_left = 3;
+									address_bytes_left = num_address_bytes;
 									break;
 							}
 
@@ -587,7 +615,7 @@ void SPIFlashDecoder::Refresh()
 
 				//Add the address
 				cap->m_offsets.push_back(addr_start);
-				cap->m_durations.push_back(dquad->m_offsets[iquad] + dquad->m_durations[iquad] - addr_start);
+				cap->m_durations.push_back(dquad->m_offsets[iquad-1] + dquad->m_durations[iquad-1] - addr_start);
 				cap->m_samples.push_back(SPIFlashSymbol(
 					SPIFlashSymbol::TYPE_ADDRESS, SPIFlashSymbol::CMD_UNKNOWN, addr));
 
@@ -595,6 +623,34 @@ void SPIFlashDecoder::Refresh()
 					char tmp[128] = "";
 					snprintf(tmp, sizeof(tmp), "%x", addr);
 					pack->m_headers["Address"] = tmp;
+				}
+
+				//Dummy clocks before read data
+				switch(flashtype)
+				{
+					case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
+					case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
+
+						//TODO: implement continuous read mode
+						//For now, just throw away the mode bits and call it a wait state
+						cap->m_offsets.push_back(dquad->m_offsets[iquad]);
+						cap->m_durations.push_back(dquad->m_durations[iquad]);
+						cap->m_samples.push_back(SPIFlashSymbol(
+							SPIFlashSymbol::TYPE_DUMMY, SPIFlashSymbol::CMD_UNKNOWN, 0));
+						iquad ++;
+
+						//fall through
+
+					default:
+						for(int j=0; j<2; j++)
+						{
+							cap->m_offsets.push_back(dquad->m_offsets[iquad]);
+							cap->m_durations.push_back(dquad->m_durations[iquad]);
+							cap->m_samples.push_back(SPIFlashSymbol(
+								SPIFlashSymbol::TYPE_DUMMY, SPIFlashSymbol::CMD_UNKNOWN, 0));
+							iquad ++;
+						}
+						break;
 				}
 
 				state = STATE_QUAD_DATA;
@@ -944,6 +1000,10 @@ string SPIFlashDecoder::GetText(int i)
 						return "Block Erase";
 					case SPIFlashSymbol::CMD_PAGE_PROGRAM:
 						return "Page Program";
+					case SPIFlashSymbol::CMD_ADDR_24BIT:
+						return "Select 24-Bit Address";
+					case SPIFlashSymbol::CMD_ADDR_32BIT:
+						return "Select 32-Bit Address";
 
 					//W25N specific
 					case SPIFlashSymbol::CMD_W25N_PROGRAM_EXECUTE:
