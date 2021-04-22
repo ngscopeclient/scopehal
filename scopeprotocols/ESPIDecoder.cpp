@@ -153,6 +153,7 @@ void ESPIDecoder::Refresh()
 	cap->m_timescale = clk->m_timescale;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
+	cap->m_triggerPhase = clk->m_triggerPhase;
 	SetData(cap, 0);
 
 	ESPISymbol samp;
@@ -399,7 +400,7 @@ void ESPIDecoder::Refresh()
 
 					//Add symbol for packet type
 					tstart = timestamp;
-					pack->m_offset = bytestart * clk->m_timescale;
+					pack->m_offset = bytestart * clk->m_timescale + clk->m_triggerPhase;
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, current_byte));

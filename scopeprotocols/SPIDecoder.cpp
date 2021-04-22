@@ -110,6 +110,7 @@ void SPIDecoder::Refresh()
 	cap->m_timescale = clk->m_timescale;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
+	cap->m_triggerPhase = clk->m_triggerPhase;
 
 	//TODO: different cpha/cpol modes
 

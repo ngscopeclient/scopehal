@@ -141,6 +141,7 @@ void SPIFlashDecoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
 	SetData(cap, 0);
 
 	//Number of address bytes used (for generic flash only, not W25N)
@@ -194,7 +195,7 @@ void SPIFlashDecoder::Refresh()
 				{
 					//Create the packet
 					pack = new Packet;
-					pack->m_offset = din->m_offsets[iin] * din->m_timescale;
+					pack->m_offset = din->m_offsets[iin] * din->m_timescale + din->m_triggerPhase;
 					pack->m_len = 0;
 					m_packets.push_back(pack);
 
