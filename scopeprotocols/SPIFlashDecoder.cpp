@@ -293,18 +293,17 @@ void SPIFlashDecoder::Refresh()
 
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
+							state = STATE_ADDRESS;
 
 							switch(flashtype)
 							{
 								case FLASH_TYPE_WINBOND_W25N:
 									address_bytes_left = 2;
-									state = STATE_ADDRESS;
 									break;
 
 								case FLASH_TYPE_GENERIC_3BYTE_ADDRESS:
 								case FLASH_TYPE_GENERIC_4BYTE_ADDRESS:
 								default:
-									state = STATE_DUMMY_BEFORE_ADDRESS;
 									address_bytes_left = num_address_bytes;
 									break;
 							}
