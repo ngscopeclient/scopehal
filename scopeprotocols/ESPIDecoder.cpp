@@ -2162,6 +2162,8 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 					for(auto b : p->m_data)
 						ret->m_data.push_back(b);
+
+					ret->m_len = p->m_offset + p->m_len - ret->m_offset;
 				}
 			}
 
@@ -2200,6 +2202,8 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			Packet* p = m_packets[j];
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
+
+			ret->m_len = p->m_offset + p->m_len - ret->m_offset;
 		}
 	}
 	else if(first->m_headers["Command"] == "Put I/O Read")
@@ -2219,6 +2223,8 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
+
+			ret->m_len = p->m_offset + p->m_len - ret->m_offset;
 		}
 	}
 
@@ -2250,6 +2256,7 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		ret->m_headers["Response"] = last->m_headers["Response"];
 		for(auto b : last->m_data)
 			ret->m_data.push_back(b);
+		ret->m_len = last->m_offset + last->m_len - last->m_offset;
 	}
 
 	return ret;
