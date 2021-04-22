@@ -149,7 +149,7 @@ void SWDDecoder::Refresh()
 	int64_t last_dur = 0;
 	int64_t dur;
 	int64_t off;
-	int32_t parity;
+	int32_t parity = 0;
 
 	for(size_t i = 0; i < len; i++)
 	{
@@ -160,14 +160,18 @@ void SWDDecoder::Refresh()
 		// Scan forward through data looking for a line reset
 		if(!ticks_to_zero)
 		{
+			uint64_t stateLen = 0;
 			while((samples.m_samples[i + ticks_to_zero]) && (i + ticks_to_zero < len))
+			{
+				stateLen += samples.m_durations[i + ticks_to_zero];
 				ticks_to_zero++;
+			}
 
 			if(ticks_to_zero >= c_reset_minseqlen)
 			{
 				// Yep, this is a line reset, label it as such
 				cap->m_offsets.push_back(off);
-				cap->m_durations.push_back(dur * ticks_to_zero);
+				cap->m_durations.push_back(stateLen);
 				tstart = off + dur;
 				cap->m_samples.push_back(SWDSymbol(SWDSymbol::TYPE_LINERESET, 0));
 				state = STATE_IDLE;
@@ -178,15 +182,19 @@ void SWDDecoder::Refresh()
 				dur = samples.m_durations[i];
 				off = samples.m_offsets[i] - dur / 2;
 				current_word = 0;
+				stateLen = 0;
 				for(uint32_t it = 0; it < c_magic_seqlen; it++)
+				{
 					current_word = (current_word >> 1) | (samples.m_samples[i + it] ? (1 << (c_magic_seqlen - 1)) : 0);
+					stateLen += samples.m_durations[i + it];
+				}
 
 				if((current_word == c_JTAG_TO_SWD_SEQ) || (current_word == c_SWD_TO_JTAG_SEQ) ||
 					(current_word == c_SWD_TO_DORMANT_SEQ))
 				{
 					// This is a line state change
 					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur * c_magic_seqlen);
+					cap->m_durations.push_back(stateLen);
 					tstart = off + dur;
 					i += c_magic_seqlen - 1;
 					dur = samples.m_durations[i];
