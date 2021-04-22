@@ -430,6 +430,12 @@ void ESPIDecoder::Refresh()
 							txn_state = TXN_STATE_SMBUS_TYPE;
 							break;
 
+						//Expect a virtual wire write packet
+						case ESPISymbol::COMMAND_PUT_VWIRE:
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							txn_state = TXN_STATE_VWIRE_COUNT;
+							break;
+
 						//Expect a 16-bit address followed by 1-4 bytes of data
 						case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
 							payload_len = 1;
@@ -490,12 +496,6 @@ void ESPIDecoder::Refresh()
 
 						//TODO
 						case ESPISymbol::COMMAND_PUT_PC:
-							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
-							txn_state = TXN_STATE_IDLE;
-							break;
-
-						//TODO
-						case ESPISymbol::COMMAND_PUT_VWIRE:
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
 							txn_state = TXN_STATE_IDLE;
 							break;
@@ -592,6 +592,11 @@ void ESPIDecoder::Refresh()
 							case ESPISymbol::COMMAND_SET_CONFIGURATION:
 								switch(addr)
 								{
+									case 0x10:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_WR, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
 									case 0x20:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_WR, data));
 										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
@@ -712,6 +717,11 @@ void ESPIDecoder::Refresh()
 								{
 									case 0x8:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										break;
+
+									case 0x10:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_RD, data));
 										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
 										break;
 
@@ -928,19 +938,24 @@ void ESPIDecoder::Refresh()
 
 					//64-127 platform specific
 					else if(addr <= 127)
-						pack->m_headers["Info"] += "Platform specific\n";
+					{
+						snprintf(tmp, sizeof(tmp), "Platform specific %02lx:%02x\n", addr, current_byte);
+						pack->m_headers["Info"] += tmp;
+					}
 
 					//128-255 GPIO expander TODO
 					else
 						pack->m_headers["Info"] += "GPIO expander decode not implemented\n";
 
-					//TODO: handle PUT_VWIRE here
 					if(count == 0)
 					{
 						//Remove trailing newline
 						pack->m_headers["Info"] = Trim(pack->m_headers["Info"]);
 
-						txn_state = TXN_STATE_STATUS;
+						if(current_cmd == ESPISymbol::COMMAND_PUT_VWIRE)
+							txn_state = TXN_STATE_COMMAND_CRC8;
+						else
+							txn_state = TXN_STATE_STATUS;
 						data = 0;
 					}
 					else
@@ -1437,6 +1452,8 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 				return m_standardColors[COLOR_CHECKSUM_BAD];
 
 			case ESPISymbol::TYPE_GENERAL_CAPS:
+			case ESPISymbol::TYPE_CH0_CAPS_RD:
+			case ESPISymbol::TYPE_CH0_CAPS_WR:
 			case ESPISymbol::TYPE_CH1_CAPS_RD:
 			case ESPISymbol::TYPE_CH1_CAPS_WR:
 			case ESPISymbol::TYPE_CH2_CAPS_RD:
@@ -1565,7 +1582,7 @@ string ESPIDecoder::GetText(int i)
 				return string("Count: ") + to_string(s.m_data + 1);
 
 			case ESPISymbol::TYPE_VWIRE_INDEX:
-				return string("Index: ") + to_string(s.m_data);
+				return string("Index: ") + to_string_hex(s.m_data);
 
 			case ESPISymbol::TYPE_VWIRE_DATA:
 				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
@@ -1712,6 +1729,93 @@ string ESPIDecoder::GetText(int i)
 				if(s.m_data & 0x01)
 					stmp += "Peripheral channel present\n";
 				return stmp;	//end TYPE_GENERAL_CAPS
+
+			case ESPISymbol::TYPE_CH0_CAPS_RD:
+
+				if(s.m_data & 2)
+					stmp += "Ready\n";
+				else
+					stmp += "Not ready\n";
+
+				switch( (s.m_data >> 4) & 0x7)
+				{
+					case 1:
+						stmp += "Max periph payload supported: 64\n";
+						break;
+					case 2:
+						stmp += "Max periph payload supported: 128\n";
+						break;
+					case 3:
+						stmp += "Max periph payload supported: 256\n";
+						break;
+
+					default:
+						stmp += "Max periph payload supported: reserved\n";
+						break;
+				}
+
+				//end CH0_CAPS_RD
+				//fall through
+
+			case ESPISymbol::TYPE_CH0_CAPS_WR:
+
+				switch( (s.m_data >> 8) & 0x7)
+				{
+					case 1:
+						stmp += "Max periph payload size: 64\n";
+						break;
+					case 2:
+						stmp += "Max periph payload size: 128\n";
+						break;
+					case 3:
+						stmp += "Max periph payload size: 256\n";
+						break;
+
+					default:
+						stmp += "Max periph payload size: reserved\n";
+						break;
+				}
+
+				switch( (s.m_data >> 12) & 0x7)
+				{
+					case 0:
+						stmp += "Max periph read size: reserved\n";
+						break;
+
+					case 1:
+						stmp += "Max periph read size: 64\n";
+						break;
+					case 2:
+						stmp += "Max periph read size: 128\n";
+						break;
+					case 3:
+						stmp += "Max periph read size: 256\n";
+						break;
+					case 4:
+						stmp += "Max periph read size: 512\n";
+						break;
+					case 5:
+						stmp += "Max periph read size: 1024\n";
+						break;
+					case 6:
+						stmp += "Max periph read size: 2048\n";
+						break;
+					case 7:
+						stmp += "Max periph read size: 4096\n";
+						break;
+				}
+
+				if(s.m_data & 4)
+					stmp += "Bus mastering enabled\n";
+				else
+					stmp += "Bus mastering disabled\n";
+
+				if(s.m_data & 1)
+					stmp += "Enabled\n";
+				else
+					stmp += "Disabled\n";
+
+				return stmp;	//end TYPE_CH0_CAPS_WR
 
 			case ESPISymbol::TYPE_CH1_CAPS_RD:
 				stmp += "Operating max vwires: ";
@@ -1996,6 +2100,14 @@ bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
 		return true;
 	}
 
+	//Merge consecutive status register polls
+	if( (first->m_headers["Command"] == "Get Configuration") &&
+		(next->m_headers["Command"] == "Get Configuration") &&
+		(first->m_headers["Address"] == next->m_headers["Address"]) )
+	{
+		return true;
+	}
+
 	return false;
 }
 
@@ -2090,7 +2202,6 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 				ret->m_headers["Response"] = p->m_headers["Response"];
 		}
 	}
-
 	else if(first->m_headers["Command"] == "Put I/O Read")
 	{
 		ret->m_headers["Command"] = "I/O Read";
@@ -2109,6 +2220,36 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
 		}
+	}
+
+	//Status register polling
+	else if(first->m_headers["Command"] == "Get Configuration")
+	{
+		ret->m_headers["Command"] = "Poll Configuration";
+		ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+		ret->m_headers["Address"] = first->m_headers["Address"];
+
+		//Get status and data from completions
+		size_t ilast = i;
+		for(size_t j=i+1; j<m_packets.size(); j++)
+		{
+			Packet* p = m_packets[j];
+
+			if( (p->m_headers["Command"] == "Get Configuration") &&
+				(p->m_headers["Address"] == first->m_headers["Address"]) )
+			{
+				ilast = j;
+			}
+			else
+				break;
+		}
+
+		Packet* last = m_packets[ilast];
+		ret->m_headers["Len"] = to_string(ilast - i);
+		ret->m_headers["Info"] = last->m_headers["Info"];
+		ret->m_headers["Response"] = last->m_headers["Response"];
+		for(auto b : last->m_data)
+			ret->m_data.push_back(b);
 	}
 
 	return ret;
