@@ -119,10 +119,11 @@ void SPIDecoder::Refresh()
 	//Loop over the data and look for transactions
 	enum
 	{
+		STATE_IDLE,
 		STATE_DESELECTED,
 		STATE_SELECTED_CLKLO,
 		STATE_SELECTED_CLKHI
-	} state = STATE_DESELECTED;
+	} state = STATE_IDLE;
 
 	uint8_t	current_byte	= 0;
 	uint8_t	bitcount 		= 0;
@@ -148,6 +149,12 @@ void SPIDecoder::Refresh()
 
 		switch(state)
 		{
+			//Just started the decode, wait for CS# to go high (and don't attempt to decode a partial packet)
+			case STATE_IDLE:
+				if(cur_cs)
+					state = STATE_DESELECTED;
+				break;
+
 			//wait for falling edge of CS#
 			case STATE_DESELECTED:
 				if(!cur_cs)

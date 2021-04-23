@@ -127,10 +127,11 @@ void QSPIDecoder::Refresh()
 	//Loop over the data and look for transactions
 	enum
 	{
+		STATE_IDLE,
 		STATE_DESELECTED,
 		STATE_SELECTED_CLKLO,
 		STATE_SELECTED_CLKHI
-	} state = STATE_DESELECTED;
+	} state = STATE_IDLE;
 
 	bool high_nibble		= true;
 	int64_t bytestart		= 0;
@@ -166,6 +167,12 @@ void QSPIDecoder::Refresh()
 
 		switch(state)
 		{
+			//Just started the decode, wait for CS# to go high (and don't attempt to decode a partial packet)
+			case STATE_IDLE:
+				if(cur_cs)
+					state = STATE_DESELECTED;
+				break;
+
 			//wait for falling edge of CS#
 			case STATE_DESELECTED:
 				if(!cur_cs)
