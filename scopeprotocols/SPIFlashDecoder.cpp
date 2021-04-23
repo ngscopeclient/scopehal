@@ -444,10 +444,10 @@ void SPIFlashDecoder::Refresh()
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
 							break;
 
-						//1-4-4 fast read with 32-bit address regardless of mode register
+						//1-1-4 fast read with 32-bit address regardless of mode register
 						case 0x6c:
-							current_cmd = SPIFlashSymbol::CMD_READ_1_4_4;
-							state = STATE_QUAD_ADDRESS;
+							current_cmd = SPIFlashSymbol::CMD_READ_1_1_4;
+							state = STATE_ADDRESS;
 							addr = 0;
 							addr_start = din->m_offsets[iin+1];
 							address_bytes_left = 4;
