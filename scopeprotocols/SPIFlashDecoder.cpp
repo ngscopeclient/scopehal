@@ -49,6 +49,23 @@ SPIFlashDecoder::SPIFlashDecoder(const string& color)
 	m_parameters[m_typename].AddEnumValue("Generic (4-byte address)", FLASH_TYPE_GENERIC_4BYTE_ADDRESS);
 	m_parameters[m_typename].AddEnumValue("Winbond W25N", FLASH_TYPE_WINBOND_W25N);
 	m_parameters[m_typename].SetIntVal(FLASH_TYPE_GENERIC_3BYTE_ADDRESS);
+
+	m_outfile = "Dump File";
+	m_parameters[m_outfile] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_outfile].m_fileFilterMask = "*.bin";
+	m_parameters[m_outfile].m_fileFilterName = "Binary files (*.bin)";
+	m_parameters[m_outfile].m_fileIsOutput = true;
+
+	m_fpOut = NULL;
+}
+
+SPIFlashDecoder::~SPIFlashDecoder()
+{
+	if(m_fpOut)
+	{
+		fclose(m_fpOut);
+		m_fpOut = NULL;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,6 +130,16 @@ void SPIFlashDecoder::Refresh()
 	ClearPackets();
 
 	FlashType flashtype = (FlashType)m_parameters[m_typename].GetIntVal();
+
+	//Open dump file, if applicable
+	auto fname = m_parameters[m_outfile].GetFileName();
+	if(m_cachedfname != fname)
+	{
+		m_cachedfname = fname;
+		if(m_fpOut)
+			fclose(m_fpOut);
+		m_fpOut = fopen(fname.c_str(), "w+b");
+	}
 
 	//Input/output x1 inputs are required
 	if( (m_inputs[0].m_channel == NULL) || (m_inputs[1].m_channel == NULL) )
@@ -680,6 +707,8 @@ void SPIFlashDecoder::Refresh()
 
 					iquad ++;
 				}
+				if(m_fpOut)
+					fseek(m_fpOut, addr, SEEK_SET);
 
 				//Add the address
 				cap->m_offsets.push_back(addr_start);
@@ -739,6 +768,9 @@ void SPIFlashDecoder::Refresh()
 					//If this is the last address byte, generate a block sample for the whole thing
 					if(address_bytes_left == 0)
 					{
+						if(m_fpOut)
+							fseek(m_fpOut, addr, SEEK_SET);
+
 						//Default setup
 						data_type = SPIFlashSymbol::TYPE_DATA;
 						addr_type = SPIFlashSymbol::TYPE_ADDRESS;
@@ -844,6 +876,14 @@ void SPIFlashDecoder::Refresh()
 							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
 					}
 
+					//Only write to the output for actual flash data!
+					//We don't want to save descriptors.
+					if(current_cmd != SPIFlashSymbol::CMD_READ_SFDP)
+					{
+						if(m_fpOut)
+							fwrite(&pack->m_data[0], 1, pack->m_data.size(), m_fpOut);
+					}
+
 					state = STATE_IDLE;
 				}
 				else
@@ -939,6 +979,9 @@ void SPIFlashDecoder::Refresh()
 					iin ++;
 				}
 				iin --;
+
+				if(m_fpOut)
+					fwrite(&pack->m_data[0], 1, pack->m_data.size(), m_fpOut);
 
 				state = STATE_IDLE;
 				break;

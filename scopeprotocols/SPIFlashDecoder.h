@@ -117,6 +117,7 @@ class SPIFlashDecoder : public PacketDecoder
 {
 public:
 	SPIFlashDecoder(const std::string& color);
+	virtual ~SPIFlashDecoder();
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
@@ -156,6 +157,10 @@ protected:
 	std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
 
 	std::string m_typename;
+	std::string m_outfile;
+
+	std::string m_cachedfname;
+	FILE* m_fpOut;
 };
 
 #endif
