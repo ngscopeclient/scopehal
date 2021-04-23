@@ -368,7 +368,7 @@ void ESPIDecoder::Refresh()
 		{
 			if(pack)
 			{
-				pack->m_len = (timestamp * clk->m_timescale) - pack->m_offset;
+				pack->m_len = (timestamp * clk->m_timescale) + clk->m_triggerPhase - pack->m_offset;
 				pack = NULL;
 			}
 
