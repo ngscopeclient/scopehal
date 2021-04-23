@@ -66,6 +66,9 @@ public:
 	enum FlashCommand
 	{
 		CMD_READ_STATUS_REGISTER,
+		CMD_READ_STATUS_REGISTER_1,
+		CMD_READ_STATUS_REGISTER_2,
+		CMD_READ_STATUS_REGISTER_3,
 		CMD_WRITE_STATUS_REGISTER,
 		CMD_READ_JEDEC_ID,
 		CMD_READ,			//Read, SPI address, SPI data
@@ -81,6 +84,8 @@ public:
 		CMD_READ_SFDP,		//read serial flash discovery parameters
 		CMD_ADDR_32BIT,
 		CMD_ADDR_24BIT,
+		CMD_RELEASE_PD,
+		CMD_ENABLE_RESET,
 
 		//Winbond W25N specific
 		CMD_W25N_READ_PAGE,
