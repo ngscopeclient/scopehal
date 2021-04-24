@@ -173,6 +173,8 @@ protected:
 	std::map<size_t, double> m_channelVoltageRange;
 	std::map<size_t, double> m_channelOffset;
 
+	void NormalizeTimebases();
+
 public:
 	static std::string GetDriverNameInternal();
 
