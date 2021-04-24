@@ -101,6 +101,12 @@ protected:
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
 
+	enum ProbeType {
+		None,
+		AutoProbe,
+		SmartProbe,
+	};
+
 	//config cache
 	std::map<size_t, double> m_channelOffsets;
 	std::map<size_t, double> m_channelVoltageRanges;
@@ -108,6 +114,7 @@ protected:
 	std::map<size_t, double> m_channelAttenuations;
 	std::map<size_t, int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
+	std::map<size_t, ProbeType> m_probeTypes;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
@@ -119,6 +126,7 @@ protected:
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	void GetTriggerSlope(NthEdgeBurstTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
+	void GetProbeType(size_t i);
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
@@ -127,6 +135,7 @@ protected:
 	void PushFloat(std::string path, float f);
 	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
 	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
+
 
 public:
 	static std::string GetDriverNameInternal();
