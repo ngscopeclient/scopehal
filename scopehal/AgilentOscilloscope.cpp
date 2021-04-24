@@ -329,9 +329,20 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 	return atten;
 }
 
-void AgilentOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	//FIXME
+	// If there's a SmartProbe or AutoProbe on this channel, the attenuation is fixed so bail out.
+	GetProbeType(i);
+	if (m_probeTypes[i] != None)
+		return;
+
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		PushFloat(m_channels[i]->GetHwname() + ":PROB", atten);
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelAttenuations[i] = atten;
 }
 
 int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
