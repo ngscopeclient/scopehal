@@ -431,7 +431,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 			bool numeric = true;
 			for(size_t i=0; (i<sizeof(line)) && (line[i] != '\0'); i++)
 			{
-				if(!isdigit(line[i]) && !isspace(line[i]) && (line[i] != ',') && (line[i] != '.') )
+				if(!isdigit(line[i]) && !isspace(line[i]) && (line[i] != ',') && (line[i] != '.') && (line[i] != '-') )
 				{
 					numeric = false;
 					break;
