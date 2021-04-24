@@ -175,6 +175,7 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_channelAttenuations.clear();
 	m_channelBandwidthLimits.clear();
 	m_channelsEnabled.clear();
+	m_probeTypes.clear();
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -274,6 +275,11 @@ OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t
 
 void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
+	// If there's a smart probe on this channel, the coupling is fixed to 50ohm so bail out.
+	GetProbeType(i);
+	if (m_probeTypes[i] == SmartProbe)
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(type)
@@ -893,6 +899,30 @@ Trigger::Condition AgilentOscilloscope::GetCondition(string reply)
 	return Trigger::CONDITION_LESS;
 }
 
+void AgilentOscilloscope::GetProbeType(size_t i)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeTypes.find(i) != m_probeTypes.end())
+			return;
+	}
+
+	string reply;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBE:ID?");
+		reply = m_transport->ReadReply();
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	if (reply == "AutoProbe")
+		m_probeTypes[i] = AutoProbe;
+	else if (reply == "NONE" || reply == "Unknown")
+		m_probeTypes[i] = None;
+	else
+		m_probeTypes[i] = SmartProbe;
+}
+
 void AgilentOscilloscope::PushTrigger()
 {
 	auto bt = dynamic_cast<NthEdgeBurstTrigger*>(m_trigger);
@@ -1046,4 +1076,3 @@ vector<string> AgilentOscilloscope::GetTriggerTypes()
 	ret.push_back(NthEdgeBurstTrigger::GetTriggerName());
 	return ret;
 }
-
