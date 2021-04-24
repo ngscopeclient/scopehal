@@ -172,6 +172,8 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
 	m_channelCouplings.clear();
+	m_channelAttenuations.clear();
+	m_channelBandwidthLimits.clear();
 	m_channelsEnabled.clear();
 
 	delete m_trigger;
