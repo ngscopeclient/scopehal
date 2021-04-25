@@ -116,6 +116,11 @@ protected:
 	std::map<int, bool> m_channelsEnabled;
 	std::map<size_t, ProbeType> m_probeTypes;
 
+	bool m_sampleDepthValid;
+	uint64_t m_sampleDepth;
+	bool m_sampleRateValid;
+	uint64_t m_sampleRate;
+
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
@@ -135,6 +140,11 @@ protected:
 	void PushFloat(std::string path, float f);
 	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
 	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
+
+private:
+	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
+
+	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 
 public:
