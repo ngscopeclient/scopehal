@@ -516,6 +516,8 @@ bool MockOscilloscope::LoadCSV(const string& path)
 		//If we don't have any channels, create them
 		if(GetChannelCount() == 0)
 		{
+			LogTrace("Creating channels\n");
+
 			//Create the columns
 			for(size_t i=0; i<ncols; i++)
 			{
@@ -536,6 +538,8 @@ bool MockOscilloscope::LoadCSV(const string& path)
 		//Create waveforms if needed
 		if(waveforms.empty())
 		{
+			LogTrace("Creating waveforms\n");
+
 			for(size_t i=0; i<ncols; i++)
 			{
 				//Create the waveform for the channel
@@ -636,8 +640,13 @@ void MockOscilloscope::NormalizeTimebases()
 	//If we get here, assume uniform sampling.
 	//Use time zero as the trigger phase.
 	//TODO: is sign correct here or do we need to invert?
-	LogTrace("Waveform appears to be uniform sampling rate, converting to dense packed\n");
 	int64_t phase = wfm->m_offsets[0];
+	LogTrace("Waveform appears to be uniform sampling rate, converting to dense packed (phase=%s)\n",
+		fs.PrettyPrint(phase).c_str());
+
+	//For now, throw away the phase and have all dense packed imports start at time zero
+	phase = 0;
+
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		auto w = GetChannel(i)->GetData(0);
