@@ -494,7 +494,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 						else
 							tmp = "";
 					}
-					else
+					else if(line[i] != '\n')
 						tmp += line[i];
 				}
 
