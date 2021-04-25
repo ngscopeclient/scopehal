@@ -100,6 +100,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MagnitudeFilter);
 	AddDecoderClass(MDIODecoder);
+	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
 	AddDecoderClass(OFDMDemodulator);

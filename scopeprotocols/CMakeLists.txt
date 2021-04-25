@@ -64,6 +64,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	JtagDecoder.cpp
 	MagnitudeFilter.cpp
 	MDIODecoder.cpp
+	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
 	OFDMDemodulator.cpp

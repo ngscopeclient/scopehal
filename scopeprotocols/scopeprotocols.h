@@ -100,6 +100,7 @@
 #include "JtagDecoder.h"
 #include "MagnitudeFilter.h"
 #include "MDIODecoder.h"
+#include "MilStd1553Decoder.h"
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
 #include "OFDMDemodulator.h"
