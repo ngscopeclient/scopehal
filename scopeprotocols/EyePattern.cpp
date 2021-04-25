@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -447,7 +447,7 @@ void EyePattern::Refresh()
 	if(cap->m_uiWidth < FLT_EPSILON)
 		RecalculateUIWidth();
 
-	//Shift the clock leby half a UI if it's edge aligned
+	//Shift the clock by half a UI if it's edge aligned
 	//All of the eye creation logic assumes a center aligned clock.
 	if(clock_align == ALIGN_EDGE)
 	{
@@ -477,9 +477,9 @@ void EyePattern::Refresh()
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
 		if(waveform->m_densePacked)
 		{
-			/*if(g_hasAvx2)
+			if(g_hasAvx2)
 				DensePackedInnerLoopAVX2(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
-			else*/
+			else
 				DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 		}
 
