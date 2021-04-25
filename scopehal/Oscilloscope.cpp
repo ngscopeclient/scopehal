@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,6 +60,7 @@ Oscilloscope::~Oscilloscope()
 {
 	if(m_trigger)
 	{
+		m_trigger->DetachInputs();
 		delete m_trigger;
 		m_trigger = NULL;
 	}

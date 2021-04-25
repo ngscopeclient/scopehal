@@ -92,6 +92,8 @@ public:
 	FlowGraphNode();
 	virtual ~FlowGraphNode();
 
+	void DetachInputs();
+
 	//Inputs
 public:
 	size_t GetInputCount();
