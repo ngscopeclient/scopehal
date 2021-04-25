@@ -363,6 +363,9 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 	bool digilentFormat = false;
 
+	time_t timestamp = 0;
+	int64_t fs = 0;
+
 	char line[1024];
 	size_t nrow = 0;
 	size_t ncols = 0;
@@ -392,7 +395,43 @@ bool MockOscilloscope::LoadCSV(const string& path)
 					m_name = s.substr(14);
 				if(s.find("#Serial Number: ") == 0)
 					m_serial = s.substr(16);
-				//TODO: parse date/time
+				if(s.find("#Date Time: ") == 0)
+				{
+					//yyyy-mm-dd hh:mm:ss.ms.us.ns
+					//No time zone information provided. For now, assume current time zone.
+					string stimestamp = s.substr(12);
+
+					tm now;
+					time_t tnow;
+					time(&tnow);
+					localtime_r(&tnow, &now);
+
+					tm stamp;
+					int ms;
+					int us;
+					int ns;
+					if(9 == sscanf(stimestamp.c_str(), "%d-%d-%d %d:%d:%d.%d.%d.%d",
+						&stamp.tm_year, &stamp.tm_mon, &stamp.tm_mday,
+						&stamp.tm_hour, &stamp.tm_min, &stamp.tm_sec,
+						&ms, &us, &ns))
+					{
+						//tm_year isn't absolute year, it's offset from 1900
+						stamp.tm_year -= 1900;
+
+						//TODO: figure out if this day/month/year was DST or not.
+						//For now, assume same as current. This is going to be off by an hour for half the year!
+						stamp.tm_isdst = now.tm_isdst;
+
+						//We can finally get the actual time_t
+						timestamp = mktime(&stamp);
+
+						//Convert to femtoseconds for internal scopehal format
+						fs = ms * 1000;
+						fs = (fs + us) * 1000;
+						fs = (fs + ns) * 1000;
+						fs *= 1000;
+					}
+				}
 			}
 			continue;
 		}
@@ -502,29 +541,29 @@ bool MockOscilloscope::LoadCSV(const string& path)
 				//Create the waveform for the channel
 				auto wfm = new AnalogWaveform;
 				wfm->m_timescale = 1;
-				wfm->m_startTimestamp = 0;
-				wfm->m_startFemtoseconds = 0;
+				wfm->m_startTimestamp = timestamp;
+				wfm->m_startFemtoseconds = fs;
 				wfm->m_triggerPhase = 0;
 				waveforms.push_back(wfm);
 				GetChannel(i)->SetData(wfm, 0);
 			}
 		}
 
-		int64_t timestamp = row[0] * FS_PER_SECOND;
+		int64_t offset = row[0] * FS_PER_SECOND;
 		for(size_t i=0; i<ncols; i++)
 		{
 			if(i+1 >= row.size())
 				break;
 
 			auto w = waveforms[i];
-			w->m_offsets.push_back(timestamp);
+			w->m_offsets.push_back(offset);
 			w->m_samples.push_back(row[i+1]);
 
 			//Extend last sample
 			if(!w->m_durations.empty())
 			{
 				size_t last = w->m_durations.size() - 1;
-				w->m_durations[last] = timestamp - w->m_offsets[last];
+				w->m_durations[last] = offset - w->m_offsets[last];
 			}
 
 			//Add duration for this sample
