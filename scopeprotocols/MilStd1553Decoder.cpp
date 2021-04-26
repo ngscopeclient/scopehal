@@ -118,18 +118,14 @@ void MilStd1553Decoder::Refresh()
 		STATE_DATA_1_HIGH,
 		STATE_DATA_1_LOW,
 
-		STATE_TURNAROUND,
-
-		//TODO
-		STATE_HANG
-
+		STATE_TURNAROUND
 	} state = STATE_IDLE;
 
 	enum
 	{
 		FRAME_STATE_IDLE,
-
-		FRAME_STATE_HANG
+		FRAME_STATE_STATUS,
+		FRAME_STATE_DATA
 	} frame_state = FRAME_STATE_IDLE;
 
 	//Logic high/low thresholds (anything between is considered undefined)
@@ -147,14 +143,14 @@ void MilStd1553Decoder::Refresh()
 	int64_t data_len_samples	= data_len_fs / din->m_timescale;
 	int64_t ifg_len_samples		= ifg_len_fs / din->m_timescale;
 
-	LogDebug("Start decode\n");
-	LogIndenter li;
-
 	bool last_bit = false;
 	int64_t tbitstart = 0;
 	vector<int64_t> bitstarts;
 	int bitcount = 0;
 	uint16_t word = 0;
+	int data_word_count = 0;
+	int data_words_expected = 0;
+	bool ctrl_direction = false;
 	for(size_t i=0; i<len; i++)
 	{
 		int64_t timestamp = din->m_offsets[i];
@@ -218,31 +214,12 @@ void MilStd1553Decoder::Refresh()
 
 				//First half of command pulse
 				case STATE_SYNC_COMMAND_HIGH:
-
-					//Look for falling edge
 					if(!current_bit)
-					{
-						//Complain if start bit isn't reasonably close to the nominal duration
-						float fdur = duration * 1.0 / sync_len_samples;
-						if( (fdur > 1.05) || (fdur < 0.95) )
-						{
-							cap->m_offsets.push_back(tbitstart);
-							cap->m_durations.push_back(duration);
-							cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_ERROR, 0));
-							state = STATE_IDLE;
-						}
-
-						//All good, wait for second half
-						else
-							state = STATE_SYNC_COMMAND_LOW;
-					}
-
+						state = STATE_SYNC_COMMAND_LOW;
 					break;	//end STATE_SYNC_COMMAND_HIGH
 
 				//Second half of command pulse
 				case STATE_SYNC_COMMAND_LOW:
-
-					//Look for rising edge
 					if(current_bit)
 					{
 						//Command pulse is 1-0.
@@ -277,15 +254,54 @@ void MilStd1553Decoder::Refresh()
 						bitcount = 0;
 						word = 0;
 
-					}	//end STATE_SYNC_COMMAND_LOW
-
-					break;
+					}
+					break;	//end STATE_SYNC_COMMAND_LOW
 
 				////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Start of a data word
 
 				case STATE_SYNC_DATA_LOW:
+					if(current_bit)
+						state = STATE_SYNC_DATA_HIGH;
 					break;	//end STATE_SYNC_DATA_LOW
+
+				case STATE_SYNC_DATA_HIGH:
+					if(!current_bit)
+					{
+						//Command pulse is 0-1
+						//If the first data bit is a logic 1, it's a 1-0 sequence so we should see a longer-than-normal
+						//low period.
+						if(duration > sync_data_threshold)
+						{
+							//Save the sync pulse
+							cap->m_offsets.push_back(tbitstart);
+							cap->m_durations.push_back(sync_len_samples*2);
+							cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_SYNC_DATA, 0));
+
+							//New data bit starts right when the sync pulse ends
+							tbitstart += sync_len_samples*2;
+
+							//We're now in the second half of a logic-1 bit
+							state = STATE_DATA_1_LOW;
+						}
+
+						//First data bit is a logic 0 (0-1 sequence)
+						else
+						{
+							cap->m_offsets.push_back(tbitstart);
+							cap->m_durations.push_back(duration);
+							cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_SYNC_DATA, 0));
+
+							tbitstart = timestamp;
+							state = STATE_DATA_0_LOW;
+						}
+
+						//Begin the data word
+						bitcount = 0;
+						word = 0;
+
+					}
+					break;	//end STATE_SYNC_DATA_HIGH
 
 				////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Data bits
@@ -401,6 +417,7 @@ void MilStd1553Decoder::Refresh()
 		{
 			bool parity = (word & 1);
 			word >>= 1;
+			tbitstart = timestamp;
 
 			bool expected_parity = true;
 			for(int j=0; j<16; j++)
@@ -411,6 +428,9 @@ void MilStd1553Decoder::Refresh()
 
 			switch(frame_state)
 			{
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Wait for a transaction to start
+
 				case FRAME_STATE_IDLE:
 
 					//First 5 bits are RT address
@@ -419,9 +439,10 @@ void MilStd1553Decoder::Refresh()
 					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_RT_ADDR, (word >> 11) & 0x1f ));
 
 					//6th bit is 1 for RT->BC and 0 for BC->RT
+					ctrl_direction = (word >> 10) & 0x1;
 					cap->m_offsets.push_back(bitstarts[6]);
 					cap->m_durations.push_back(bitstarts[7] - bitstarts[6]);
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_DIRECTION, (word >> 10) & 0x1 ));
+					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_DIRECTION, ctrl_direction ));
 
 					//Next 5 bits are sub-address
 					cap->m_offsets.push_back(bitstarts[7]);
@@ -431,7 +452,10 @@ void MilStd1553Decoder::Refresh()
 					//Last 5 are data length
 					cap->m_offsets.push_back(bitstarts[11]);
 					cap->m_durations.push_back(bitstarts[16] - bitstarts[11]);
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_LENGTH, word & 0x1f));
+					data_words_expected = word & 0x1f;
+					if(data_words_expected == 0)
+						data_words_expected = 32;
+					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_LENGTH, data_words_expected));
 
 					//Parity bit
 					cap->m_offsets.push_back(bitstarts[16]);
@@ -441,12 +465,143 @@ void MilStd1553Decoder::Refresh()
 					else
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
 
-					frame_state = FRAME_STATE_HANG;
+					//If this is a RT->BC frame, we're in the turnaround period now
+					if(ctrl_direction)
+					{
+						state = STATE_TURNAROUND;
+						frame_state = FRAME_STATE_STATUS;
+					}
 
+					//Otherwise, expect data words right away
+					else
+					{
+						state = STATE_IDLE;
+						frame_state = FRAME_STATE_DATA;
+					}
+
+					data_word_count = 0;
 					break;	//end FRAME_STATE_IDLE
 
-				case FRAME_STATE_HANG:
-					break;
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Process a status word
+
+				case FRAME_STATE_STATUS:
+
+					//First 5 bits are RT address
+					cap->m_offsets.push_back(bitstarts[0]);
+					cap->m_durations.push_back(bitstarts[6] - bitstarts[0]);
+					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_RT_ADDR, (word >> 11) & 0x1f ));
+
+					//6 - Message error bit
+					cap->m_offsets.push_back(bitstarts[6]);
+					cap->m_durations.push_back(bitstarts[7] - bitstarts[6]);
+					if(word & 0x40)
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_MSG_ERR, 0));
+					else
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_MSG_OK, 0));
+
+					{
+						int status = 0;
+
+						//7 - instrumentation bit, always zero
+						if(status & 0x0200)
+							status |= MilStd1553Symbol::STATUS_MALFORMED;
+
+						//8 - service request
+						if(status & 0x0100)
+							status |= MilStd1553Symbol::STATUS_SERVICE_REQUEST;
+
+						//9-11 = reserved, always zero
+						if(status & 0x00e0)
+							status |= MilStd1553Symbol::STATUS_MALFORMED;
+
+						//12 = acknowledge receipt of a broadcast
+						if(status & 0x0010)
+							status |= MilStd1553Symbol::STATUS_BROADCAST_ACK;
+
+						//13 = busy
+						if(status & 0x0008)
+							status |= MilStd1553Symbol::STATUS_BUSY;
+
+						//14 = subsystem fault
+						if(status & 0x0004)
+							status |= MilStd1553Symbol::STATUS_SUBSYS_FAULT;
+
+						//15 = dynamic bus accept
+						if(status & 0x0002)
+							status |= MilStd1553Symbol::STATUS_DYN_ACCEPT;
+
+						//16 = terminal
+						if(status & 0x0001)
+							status |= MilStd1553Symbol::STATUS_RT_FAULT;
+
+						cap->m_offsets.push_back(bitstarts[7]);
+						cap->m_durations.push_back(bitstarts[16] - bitstarts[7]);
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_STATUS, status ));
+					}
+
+					//Parity bit
+					cap->m_offsets.push_back(bitstarts[16]);
+					cap->m_durations.push_back(timestamp - bitstarts[16]);
+					if(expected_parity == parity)
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
+					else
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
+
+					//If this is a RT->BC frame, now expect data
+					if(ctrl_direction)
+						frame_state = FRAME_STATE_DATA;
+
+					//BC->RT, status was the last thing sent so now we're done
+					else
+						frame_state = FRAME_STATE_IDLE;
+
+					state = STATE_IDLE;
+
+					break;	//end FRAME_STATE_STATUS
+
+				////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Process a data word
+
+				case FRAME_STATE_DATA:
+					data_word_count ++;
+
+					//Add the data sample
+					cap->m_offsets.push_back(bitstarts[0]);
+					cap->m_durations.push_back(bitstarts[16] - bitstarts[0]);
+					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_DATA, word));
+
+					//Parity bit
+					cap->m_offsets.push_back(bitstarts[16]);
+					cap->m_durations.push_back(timestamp - bitstarts[16]);
+					if(expected_parity == parity)
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
+					else
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
+
+					//Last word?
+					if(data_word_count >= data_words_expected)
+					{
+						//If BC->RT, expect status
+						if(!ctrl_direction)
+						{
+							frame_state = FRAME_STATE_STATUS;
+							state = STATE_TURNAROUND;
+						}
+
+						//RT->BC, done after data
+						else
+						{
+							frame_state = FRAME_STATE_IDLE;
+							state = STATE_IDLE;
+						}
+					}
+
+					//Expecting more data. No turnaround required.
+					else
+						state = STATE_IDLE;
+
+					break;	//end FRAME_STATE_DATA
 			}
 
 			//Clear out word state
@@ -480,13 +635,21 @@ Gdk::Color MilStd1553Decoder::GetColor(int i)
 			case MilStd1553Symbol::TYPE_LENGTH:
 				return m_standardColors[COLOR_CONTROL];
 
-			//case MilStd1553Symbol::TYPE_DATA:
-			//	return m_standardColors[COLOR_DATA];
+			case MilStd1553Symbol::TYPE_DATA:
+				return m_standardColors[COLOR_DATA];
 
 			case MilStd1553Symbol::TYPE_PARITY_OK:
+			case MilStd1553Symbol::TYPE_MSG_OK:
 				return m_standardColors[COLOR_CHECKSUM_OK];
 
+			case MilStd1553Symbol::TYPE_STATUS:
+				if(s.m_data & MilStd1553Symbol::STATUS_ANY_FAULT)
+					return m_standardColors[COLOR_ERROR];
+				else
+					return m_standardColors[COLOR_CONTROL];
+
 			case MilStd1553Symbol::TYPE_PARITY_BAD:
+			case MilStd1553Symbol::TYPE_MSG_ERR:
 			case MilStd1553Symbol::TYPE_ERROR:
 			default:
 				return m_standardColors[COLOR_ERROR];
@@ -526,24 +689,48 @@ string MilStd1553Decoder::GetText(int i)
 					return "BC to RT";
 
 			case MilStd1553Symbol::TYPE_LENGTH:
-				if(s.m_data == 0)
-					return "Len: 32";
-				else
-					return string("Len: ") + to_string(s.m_data);
+				return string("Len: ") + to_string(s.m_data);
 
 			case MilStd1553Symbol::TYPE_PARITY_BAD:
 			case MilStd1553Symbol::TYPE_PARITY_OK:
 				return string("Parity: ") + to_string(s.m_data);
 
+			case MilStd1553Symbol::TYPE_MSG_OK:
+				return "Msg OK";
+			case MilStd1553Symbol::TYPE_MSG_ERR:
+				return "Msg error";
+
 			case MilStd1553Symbol::TYPE_TURNAROUND:
 				return "Turnaround";
 
+			case MilStd1553Symbol::TYPE_STATUS:
+				{
+					string stmp;
 
-			/*
+					if(s.m_data & MilStd1553Symbol::STATUS_SERVICE_REQUEST)
+						stmp += "ServiceReq ";
+					if(s.m_data & MilStd1553Symbol::STATUS_MALFORMED)
+						stmp += "(MALFORMED) ";
+					if(s.m_data & MilStd1553Symbol::STATUS_BROADCAST_ACK)
+						stmp += "BroadcastAck ";
+					if(s.m_data & MilStd1553Symbol::STATUS_BUSY)
+						stmp += "Busy ";
+					if(s.m_data & MilStd1553Symbol::STATUS_SUBSYS_FAULT)
+						stmp += "SubsystemFault ";
+					if(s.m_data & MilStd1553Symbol::STATUS_DYN_ACCEPT)
+						stmp += "DynAccept ";
+					if(s.m_data & MilStd1553Symbol::STATUS_RT_FAULT)
+						stmp += "RtFault ";
+
+					if(stmp.empty())
+						return "NoStatus";
+
+					return stmp;
+				}
+
 			case MilStd1553Symbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
 				return tmp;
-			*/
 
 			case MilStd1553Symbol::TYPE_ERROR:
 			default:
