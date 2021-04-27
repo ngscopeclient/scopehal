@@ -87,6 +87,9 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_parameters[m_windowName].SetIntVal(FFTFilter::WINDOW_BLACKMAN_HARRIS);
 
 	m_parameters[m_fftLengthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_parameters[m_fftLengthName].AddEnumValue("64", 64);
+	m_parameters[m_fftLengthName].AddEnumValue("128", 128);
+	m_parameters[m_fftLengthName].AddEnumValue("256", 256);
 	m_parameters[m_fftLengthName].AddEnumValue("512", 512);
 	m_parameters[m_fftLengthName].AddEnumValue("1024", 1024);
 	m_parameters[m_fftLengthName].AddEnumValue("2048", 2048);
