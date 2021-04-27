@@ -65,6 +65,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM, color, CAT_RF)
 	, m_windowName("Window")
 	, m_fftLengthName("FFT length")
+	, m_noisefloorName("Noise Floor")
 {
 	m_yAxisUnit = Unit(Unit::UNIT_HZ);
 
@@ -90,6 +91,9 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_parameters[m_fftLengthName].AddEnumValue("2048", 2048);
 	m_parameters[m_fftLengthName].AddEnumValue("4096", 4096);
 	m_parameters[m_fftLengthName].SetIntVal(512);
+
+	m_parameters[m_noisefloorName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
+	m_parameters[m_noisefloorName].SetFloatVal(-50);
 }
 
 SpectrogramFilter::~SpectrogramFilter()
@@ -169,7 +173,7 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
 	m_plan = ffts_init_1d_real(fftlen, FFTS_FORWARD);
 
 	m_rdinbuf.resize(fftlen);
-	m_rdoutbuf.resize(2*fftlen);
+	m_rdoutbuf.resize(fftlen + 2);
 }
 
 void SpectrogramFilter::Refresh()
@@ -204,379 +208,62 @@ void SpectrogramFilter::Refresh()
 	LogDebug("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
 
 	//Create the output
-	auto spec = new SpectrogramWaveform(
+	size_t nouts = fftlen/2 + 1;
+	auto cap = new SpectrogramWaveform(
 		nblocks,
-		fftlen,
+		nouts,
 		fmax,
 		din->m_offsets[0] * din->m_timescale,
 		fs_per_sample * nblocks * fftlen
 		);
-	SetData(spec, 0);
-
-	//Fill the dummy output with a checkerboard pattern
-	auto data = spec->GetData();
-	for(size_t x=0; x<nblocks; x++)
-	{
-		for(size_t y=0; y<fftlen; y++)
-		{
-			if( (y ^ x) & 1)
-				data[y*nblocks + x] = 0.75;
-			else
-				data[y*nblocks + x] = 0.25;
-		}
-	}
-
-	/*
-
-	//Round size up to next power of two
-	const size_t npoints_raw = din->m_samples.size();
-	const size_t npoints = next_pow2(npoints_raw);
-	LogTrace("SpectrogramFilter: processing %zu raw points\n", npoints_raw);
-	LogTrace("Rounded to %zu\n", npoints);
-
-	//Reallocate buffers if size has changed
-	const size_t nouts = npoints/2 + 1;
-	if(m_cachedNumPoints != npoints_raw)
-		ReallocateBuffers(npoints_raw, npoints, nouts);
-	LogTrace("Output: %zu\n", nouts);
-
-	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	DoRefresh(din, din->m_samples, fs, npoints, nouts, true);
-	*/
-}
-
-/*
-void SpectrogramFilter::DoRefresh(
-	AnalogWaveform* din,
-	vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
-	double fs_per_sample,
-	size_t npoints,
-	size_t nouts,
-	bool log_output)
-{
-	//Look up some parameters
-	float scale = 2.0 / npoints;
-	double sample_ghz = 1e6 / fs_per_sample;
-	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
-	LogTrace("bin_hz: %f\n", bin_hz);
-
-	//Set up output and copy time scales / configuration
-	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(0));
-	if(cap == NULL)
-	{
-		cap = new AnalogWaveform;
-		SetData(cap, 0);
-	}
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = bin_hz;
 	cap->m_densePacked = true;
+	SetData(cap, 0);
 
-	//Update output timestamps if capture depth grew
-	size_t oldlen = cap->m_offsets.size();
-	cap->Resize(nouts);
-	if(nouts > oldlen)
+	//Run the FFTs
+	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
+	auto data = cap->GetData();
+	const float impedance = 50;
+	float minscale = m_parameters[m_noisefloorName].GetFloatVal();
+	float fullscale = minscale + 0.1;
+	for(size_t block=0; block<nblocks; block++)
 	{
-		for(size_t i = oldlen; i < nouts; i++)
-		{
-			cap->m_offsets[i] = i;
-			cap->m_durations[i] = 1;
-		}
-	}
+		//Grab the input and apply the window function
+		FFTFilter::ApplyWindow((float*)&din->m_samples[block*fftlen], fftlen, &m_rdinbuf[0], window);
 
-	#ifdef HAVE_CLSpectrogram
-		if(g_clContext && m_windowProgram && m_normalizeProgram)
-		{
-			try
-			{
-				//Make buffers
-				cl::Buffer inbuf(*m_queue, data.begin(), data.end(), true, true, NULL);
-				cl::Buffer windowoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-				cl::Buffer fftoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
-				cl::Buffer outbuf(*m_queue, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
-
-				//Apply the window function
-				cl::Kernel* windowKernel = NULL;
-				float windowscale = 2 * M_PI / m_cachedNumPoints;
-				switch(window)
-				{
-					case WINDOW_RECTANGULAR:
-						windowKernel = m_rectangularWindowKernel;
-						break;
-
-					case WINDOW_HAMMING:
-						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(4, 25.0f / 46.0f);
-						windowKernel->setArg(5, 1.0f - (25.0f / 46.0f));
-						break;
-
-					case WINDOW_HANN:
-						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(4, 0.5);
-						windowKernel->setArg(5, 0.5);
-						break;
-
-					case WINDOW_BLACKMAN_HARRIS:
-					default:
-						windowKernel = m_blackmanHarrisWindowKernel;
-						break;
-				}
-				windowKernel->setArg(0, inbuf);
-				windowKernel->setArg(1, windowoutbuf);
-				windowKernel->setArg(2, m_cachedNumPoints);
-				if(window != WINDOW_RECTANGULAR)
-					windowKernel->setArg(3, windowscale);
-				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
-
-				//Run the Spectrogram
-				cl_command_queue q = (*m_queue)();
-				cl_mem inbufs[1] = { windowoutbuf() };
-				cl_mem outbufs[1] = { fftoutbuf() };
-				if(CLSpectrogram_SUCCESS != clfftEnqueueTransform(
-					m_clfftPlan, CLSpectrogram_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
-				{
-					LogError("clfftEnqueueTransform failed\n");
-					abort();
-				}
-
-				//Normalize output
-				cl::Kernel* normalizeKernel = NULL;
-				if(log_output)
-					normalizeKernel = m_normalizeLogMagnitudeKernel;
-				else
-					normalizeKernel = m_normalizeMagnitudeKernel;
-				normalizeKernel->setArg(0, fftoutbuf);
-				normalizeKernel->setArg(1, outbuf);
-				normalizeKernel->setArg(2, scale);
-				m_queue->enqueueNDRangeKernel(
-					*normalizeKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
-
-				//Map/unmap the buffer to synchronize output with the CPU
-				void* ptr = m_queue->enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, nouts * sizeof(float));
-				m_queue->enqueueUnmapMemObject(outbuf, ptr);
-			}
-			catch(const cl::Error& e)
-			{
-				LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
-			}
-		}
-		else
-		{
-	#endif
-
-		//Copy the input with windowing, then zero pad to the desired input length
-		ApplyWindow(
-			(float*)&data[0],
-			m_cachedNumPoints,
-			&m_rdinbuf[0],
-			window);
-		memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
-
-		//Calculate the Spectrogram
+		//Do the actual FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
 
-		//Normalize magnitudes
-		if(log_output)
+		//TODO: figure out if there's any way to vectorize this
+		for(size_t i=0; i<nouts; i++)
 		{
-			if(g_hasAvx2)
-				NormalizeOutputLogAVX2(cap, nouts, scale);
-			else
-				NormalizeOutputLog(cap, nouts, scale);
+			float real = m_rdoutbuf[i*2 + 0];
+			float imag = m_rdoutbuf[i*2 + 1];
+
+			float voltage = sqrtf(real*real + imag*imag) * scale;
+
+			//Convert to logarithmic
+			float dbm = (10 * log10(voltage*voltage / impedance) + 30);
+			fullscale = max(dbm, fullscale);
+			data[i*nblocks + block] = dbm;
 		}
-		else
-		{
-			if(g_hasAvx2)
-				NormalizeOutputLinearAVX2(cap, nouts, scale);
-			else
-				NormalizeOutputLinear(cap, nouts, scale);
-		}
+	}
 
-	#ifdef HAVE_CLSpectrogram
-		}
-	#endif
-
-	//Peak search
-	FindPeaks(cap);
-}
-*/
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Normalization
-
-/**
-	@brief Normalize Spectrogram output and convert to dBm (unoptimized C++ implementation)
- */
- /*
-void SpectrogramFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale)
-{
-	//assume constant 50 ohms for now
-	const float impedance = 50;
+	//Normalize outputs
+	float range = fullscale - minscale;
 	for(size_t i=0; i<nouts; i++)
 	{
-		float real = m_rdoutbuf[i*2];
-		float imag = m_rdoutbuf[i*2 + 1];
-
-		float voltage = sqrtf(real*real + imag*imag) * scale;
-
-		//Convert to dBm
-		cap->m_samples[i] = (10 * log10(voltage*voltage / impedance) + 30);
+		for(size_t block=0; block<nblocks; block++)
+		{
+			float f = data[i*nblocks + block];
+			if(f < minscale)
+				data[i*nblocks + block] = 0;
+			else
+				data[i*nblocks + block] = (f - minscale) / range;
+		}
 	}
+
 }
-*/
-
-/**
-	@brief Normalize Spectrogram output and output in native Y-axis units (unoptimized C++ implementation)
- */
- /*
-void SpectrogramFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale)
-{
-	for(size_t i=0; i<nouts; i++)
-	{
-		float real = m_rdoutbuf[i*2];
-		float imag = m_rdoutbuf[i*2 + 1];
-
-		cap->m_samples[i] = sqrtf(real*real + imag*imag) * scale;
-	}
-}*/
-
-/**
-	@brief Normalize Spectrogram output and convert to dBm (optimized AVX2 implementation)
- */
- /*
-__attribute__((target("avx2")))
-void SpectrogramFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale)
-{
-	size_t end = nouts - (nouts % 8);
-
-	//double since we only look at positive half
-	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
-
-	//1 / nominal line impedance
-	float impedance = 50;
-	__m256 inv_imp =
-	{
-		1/impedance, 1/impedance, 1/impedance, 1/impedance,
-		1/impedance, 1/impedance, 1/impedance, 1/impedance
-	};
-
-	//Constant values for dBm conversion
-	__m256 const_10 = {10, 10, 10, 10, 10, 10, 10, 10 };
-	__m256 const_30 = {30, 30, 30, 30, 30, 30, 30, 30 };
-
-	float* pout = (float*)&cap->m_samples[0];
-	float* pin = &m_rdoutbuf[0];
-
-	//Vectorized processing (8 samples per iteration)
-	for(size_t k=0; k<end; k += 8)
-	{
-		//Read interleaved real/imaginary Spectrogram output (riririri riririri)
-		__m256 din0 = _mm256_load_ps(pin + k*2);
-		__m256 din1 = _mm256_load_ps(pin + k*2 + 8);
-
-		//Step 1: Shuffle 32-bit values within 128-bit lanes to get rriirrii rriirrii.
-		din0 = _mm256_permute_ps(din0, 0xd8);
-		din1 = _mm256_permute_ps(din1, 0xd8);
-
-		//Step 2: Shuffle 64-bit values to get rrrriiii rrrriiii.
-		__m256i block0 = _mm256_permute4x64_epi64(_mm256_castps_si256(din0), 0xd8);
-		__m256i block1 = _mm256_permute4x64_epi64(_mm256_castps_si256(din1), 0xd8);
-
-		//Step 3: Shuffle 128-bit values to get rrrrrrrr iiiiiiii.
-		__m256 real = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x20));
-		__m256 imag = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x31));
-
-		//Actual vector normalization
-		real = _mm256_mul_ps(real, real);
-		imag = _mm256_mul_ps(imag, imag);
-		__m256 sum = _mm256_add_ps(real, imag);
-		__m256 mag = _mm256_sqrt_ps(sum);
-		mag = _mm256_mul_ps(mag, norm_f);
-
-		//Convert to watts
-		__m256 vsq = _mm256_mul_ps(mag, mag);
-		__m256 watts = _mm256_mul_ps(vsq, inv_imp);
-
-		//TODO: figure out better way to do efficient logarithm
-		_mm256_store_ps(pout + k, watts);
-		for(size_t i=k; i<k+8; i++)
-			pout[i] = log10(pout[i]);
-		__m256 logpwr = _mm256_load_ps(pout + k);
-
-		//Final scaling
-		logpwr = _mm256_mul_ps(logpwr, const_10);
-		logpwr = _mm256_add_ps(logpwr, const_30);
-
-		//and store the actual
-		_mm256_store_ps(pout + k, logpwr);
-	}
-
-	//Get any extras we didn't get in the SIMD loop
-	for(size_t k=end; k<nouts; k++)
-	{
-		float real = m_rdoutbuf[k*2];
-		float imag = m_rdoutbuf[k*2 + 1];
-
-		float voltage = sqrtf(real*real + imag*imag) * scale;
-
-		//Convert to dBm
-		pout[k] = (10 * log10(voltage*voltage / impedance) + 30);
-	}
-}*/
-
-/**
-	@brief Normalize Spectrogram output and keep in native units (optimized AVX2 implementation)
- */
- /*
-__attribute__((target("avx2")))
-void SpectrogramFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale)
-{
-	size_t end = nouts - (nouts % 8);
-
-	//double since we only look at positive half
-	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
-
-	float* pout = (float*)&cap->m_samples[0];
-	float* pin = &m_rdoutbuf[0];
-
-	//Vectorized processing (8 samples per iteration)
-	for(size_t k=0; k<end; k += 8)
-	{
-		//Read interleaved real/imaginary Spectrogram output (riririri riririri)
-		__m256 din0 = _mm256_load_ps(pin + k*2);
-		__m256 din1 = _mm256_load_ps(pin + k*2 + 8);
-
-		//Step 1: Shuffle 32-bit values within 128-bit lanes to get rriirrii rriirrii.
-		din0 = _mm256_permute_ps(din0, 0xd8);
-		din1 = _mm256_permute_ps(din1, 0xd8);
-
-		//Step 2: Shuffle 64-bit values to get rrrriiii rrrriiii.
-		__m256i block0 = _mm256_permute4x64_epi64(_mm256_castps_si256(din0), 0xd8);
-		__m256i block1 = _mm256_permute4x64_epi64(_mm256_castps_si256(din1), 0xd8);
-
-		//Step 3: Shuffle 128-bit values to get rrrrrrrr iiiiiiii.
-		__m256 real = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x20));
-		__m256 imag = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x31));
-
-		//Actual vector normalization
-		real = _mm256_mul_ps(real, real);
-		imag = _mm256_mul_ps(imag, imag);
-		__m256 sum = _mm256_add_ps(real, imag);
-		__m256 mag = _mm256_sqrt_ps(sum);
-		mag = _mm256_mul_ps(mag, norm_f);
-
-		//and store the result
-		_mm256_store_ps(pout + k, mag);
-	}
-
-	//Get any extras we didn't get in the SIMD loop
-	for(size_t k=end; k<nouts; k++)
-	{
-		float real = m_rdoutbuf[k*2];
-		float imag = m_rdoutbuf[k*2 + 1];
-
-		pout[k] = sqrtf(real*real + imag*imag) * scale;
-	}
-}
-*/

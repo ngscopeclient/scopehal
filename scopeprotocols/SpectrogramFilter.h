@@ -99,19 +99,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
 
 protected:
-	/*
-	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
-	*/
 	void ReallocateBuffers(size_t fftlen);
-	/*
-	void DoRefresh(
-		AnalogWaveform* din,
-		std::vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
-		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
-	*/
+
 	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
 	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
 
@@ -123,6 +112,7 @@ protected:
 
 	std::string m_windowName;
 	std::string m_fftLengthName;
+	std::string m_noisefloorName;
 };
 
 #endif
