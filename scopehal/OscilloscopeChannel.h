@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,10 +50,15 @@ class OscilloscopeChannel
 public:
 	enum ChannelType
 	{
+		//Conventional time-series waveforms (or similar graphs like a FFT)
 		CHANNEL_TYPE_ANALOG,
 		CHANNEL_TYPE_DIGITAL,
-		CHANNEL_TYPE_EYE,
 
+		//2D density plots
+		CHANNEL_TYPE_EYE,
+		CHANNEL_TYPE_SPECTROGRAM,
+
+		//Special channels not used for display
 		CHANNEL_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
 
 		//Complex datatype from a protocol decoder
