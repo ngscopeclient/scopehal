@@ -35,6 +35,7 @@ endif()
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
+	avx_mathfun.cpp
 
 	Unit.cpp
 

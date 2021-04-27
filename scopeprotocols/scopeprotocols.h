@@ -119,6 +119,7 @@
 #include "RiseMeasurement.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
+#include "SpectrogramFilter.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"
 #include "SubtractFilter.h"

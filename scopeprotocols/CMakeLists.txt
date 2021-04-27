@@ -84,6 +84,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
+	SpectrogramFilter.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
 	SubtractFilter.cpp

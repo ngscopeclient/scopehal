@@ -119,6 +119,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(RiseMeasurement);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
+	AddDecoderClass(SpectrogramFilter);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
 	AddDecoderClass(SubtractFilter);
