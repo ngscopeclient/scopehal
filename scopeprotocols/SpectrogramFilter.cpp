@@ -65,7 +65,8 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM, color, CAT_RF)
 	, m_windowName("Window")
 	, m_fftLengthName("FFT length")
-	, m_noisefloorName("Noise Floor")
+	, m_rangeMinName("Range Min")
+	, m_rangeMaxName("Range Max")
 {
 	m_yAxisUnit = Unit(Unit::UNIT_HZ);
 
@@ -90,10 +91,15 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_parameters[m_fftLengthName].AddEnumValue("1024", 1024);
 	m_parameters[m_fftLengthName].AddEnumValue("2048", 2048);
 	m_parameters[m_fftLengthName].AddEnumValue("4096", 4096);
+	m_parameters[m_fftLengthName].AddEnumValue("8192", 8192);
+	m_parameters[m_fftLengthName].AddEnumValue("16384", 16384);
 	m_parameters[m_fftLengthName].SetIntVal(512);
 
-	m_parameters[m_noisefloorName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
-	m_parameters[m_noisefloorName].SetFloatVal(-50);
+	m_parameters[m_rangeMaxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
+	m_parameters[m_rangeMaxName].SetFloatVal(-10);
+
+	m_parameters[m_rangeMinName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
+	m_parameters[m_rangeMinName].SetFloatVal(-50);
 }
 
 SpectrogramFilter::~SpectrogramFilter()
@@ -227,8 +233,9 @@ void SpectrogramFilter::Refresh()
 	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	auto data = cap->GetData();
 	const float impedance = 50;
-	float minscale = m_parameters[m_noisefloorName].GetFloatVal();
-	float fullscale = minscale + 0.1;
+	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
+	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
+	float range = fullscale - minscale;
 	for(size_t block=0; block<nblocks; block++)
 	{
 		//Grab the input and apply the window function
@@ -242,28 +249,12 @@ void SpectrogramFilter::Refresh()
 		{
 			float real = m_rdoutbuf[i*2 + 0];
 			float imag = m_rdoutbuf[i*2 + 1];
-
 			float voltage = sqrtf(real*real + imag*imag) * scale;
-
-			//Convert to logarithmic
 			float dbm = (10 * log10(voltage*voltage / impedance) + 30);
-			fullscale = max(dbm, fullscale);
-			data[i*nblocks + block] = dbm;
-		}
-	}
-
-	//Normalize outputs
-	float range = fullscale - minscale;
-	for(size_t i=0; i<nouts; i++)
-	{
-		for(size_t block=0; block<nblocks; block++)
-		{
-			float f = data[i*nblocks + block];
-			if(f < minscale)
+			if(dbm < minscale)
 				data[i*nblocks + block] = 0;
 			else
-				data[i*nblocks + block] = (f - minscale) / range;
+				data[i*nblocks + block] = (dbm - minscale) / range;
 		}
 	}
-
 }

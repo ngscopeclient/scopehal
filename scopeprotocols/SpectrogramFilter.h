@@ -112,7 +112,8 @@ protected:
 
 	std::string m_windowName;
 	std::string m_fftLengthName;
-	std::string m_noisefloorName;
+	std::string m_rangeMinName;
+	std::string m_rangeMaxName;
 };
 
 #endif
