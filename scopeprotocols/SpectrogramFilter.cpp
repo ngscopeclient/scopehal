@@ -202,10 +202,10 @@ void SpectrogramFilter::Refresh()
 	double fmax = bin_hz * fftlen;
 
 	Unit hz(Unit::UNIT_HZ);
-	LogDebug("SpectrogramFilter: %zu input points, %zu %zu-point FFTs\n", inlen, nblocks, fftlen);
+	LogTrace("SpectrogramFilter: %zu input points, %zu %zu-point FFTs\n", inlen, nblocks, fftlen);
 	LogIndenter li;
-	LogDebug("FFT range is DC to %s\n", hz.PrettyPrint(fmax).c_str());
-	LogDebug("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
+	LogTrace("FFT range is DC to %s\n", hz.PrettyPrint(fmax).c_str());
+	LogTrace("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
 
 	//Create the output
 	size_t nouts = fftlen/2 + 1;
