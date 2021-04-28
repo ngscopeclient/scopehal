@@ -131,13 +131,23 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 			}
 		}
 
+		/*
+			It's critical to ref the new input *before* dereffing the current one (#432).
+
+			Consider a 3-node filter chain A -> B -> C, A and B offscreen.
+			If we set C's input to A's output, B now has no loads and will get GC'd.
+			... but now A has no loads!
+
+			This causes A to get GC'd right before we hook up C's input to it, and Bad Things(tm) happen.
+		 */
+		stream.m_channel->AddRef();
+
 		//Deref whatever was there (if anything)
 		if(m_inputs[i].m_channel != NULL)
 			m_inputs[i].m_channel->Release();
 
 		//All good, we can save the new input
 		m_inputs[i] = stream;
-		stream.m_channel->AddRef();
 	}
 	else
 	{
