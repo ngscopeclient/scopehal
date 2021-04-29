@@ -172,6 +172,7 @@ void RohdeSchwarzOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
+	m_channelCouplings.clear();
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -222,51 +223,68 @@ void RohdeSchwarzOscilloscope::DisableChannel(size_t i)
 
 OscilloscopeChannel::CouplingType RohdeSchwarzOscilloscope::GetChannelCoupling(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelCouplings.find(i) != m_channelCouplings.end())
+			return m_channelCouplings[i];
+	}
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
-	string reply = m_transport->ReadReply();
+	string reply;
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
 
-	if(reply == "ACLimit")
-		return OscilloscopeChannel::COUPLE_AC_1M;
-	else if(reply == "DCLimit")
-		return OscilloscopeChannel::COUPLE_DC_1M;
+		m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+		reply = m_transport->ReadReply();
+	}
+	OscilloscopeChannel::CouplingType coupling;
+
+	if(reply == "ACLimit" || reply == "ACL")
+		coupling = OscilloscopeChannel::COUPLE_AC_1M;
+	else if(reply == "DCLimit" || reply == "DCL")
+		coupling = OscilloscopeChannel::COUPLE_DC_1M;
 	else if(reply == "GND")
-		return OscilloscopeChannel::COUPLE_GND;
+		coupling = OscilloscopeChannel::COUPLE_GND;
 	else if(reply == "DC")
-		return OscilloscopeChannel::COUPLE_DC_50;
-
+		coupling = OscilloscopeChannel::COUPLE_DC_50;
 	else
 	{
 		LogWarning("invalid coupling value\n");
-		return OscilloscopeChannel::COUPLE_DC_50;
+		coupling = OscilloscopeChannel::COUPLE_DC_50;
 	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelCouplings[i] = coupling;
+	return coupling;
 }
 
 void RohdeSchwarzOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	switch(type)
 	{
-		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
-			break;
+		lock_guard<recursive_mutex> lock(m_mutex);
+		switch(type)
+		{
+			case OscilloscopeChannel::COUPLE_DC_50:
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+				break;
 
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP ACLimit");
-			break;
+			case OscilloscopeChannel::COUPLE_AC_1M:
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP ACLimit");
+				break;
 
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DCLimit");
-			break;
+			case OscilloscopeChannel::COUPLE_DC_1M:
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DCLimit");
+				break;
 
-		case OscilloscopeChannel::COUPLE_GND:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP GND");
-			break;
+			case OscilloscopeChannel::COUPLE_GND:
+				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP GND");
+				break;
 
-		default:
-			LogError("Invalid coupling for channel\n");
+			default:
+				LogError("Invalid coupling for channel\n");
+		}
 	}
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelCouplings[i] = type;
 }
 
 double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t /*i*/)
