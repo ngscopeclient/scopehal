@@ -100,7 +100,6 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 
 		//Request all points when we download
 		m_transport->SendCommand(":WAV:POIN:MODE RAW");
-		m_transport->SendCommand(":WAV:POIN 4000000");
 	}
 	m_analogChannelCount = nchans;
 
@@ -176,6 +175,9 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_channelBandwidthLimits.clear();
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
+
+	m_sampleRateValid = false;
+	m_sampleDepthValid = false;
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -625,10 +627,33 @@ bool AgilentOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
+std::map<uint64_t, double> sampleRateToDuration {
+	// Map sample rates to corresponding maximum on-screen time duration setting
+	{8000      , 500},
+	{20000     , 200},
+	{40000     , 100},
+	{80000     , 50},
+	{200000    , 20},
+	{400000    , 10},
+	{800000    , 5},
+	{2000000   , 2},
+	{4000000   , 1},
+	{8000000   , 500e-3},
+	{20000000  , 200e-3},
+	{40000000  , 100e-3},
+	{80000000  , 50e-3},
+	{200000000 , 20e-3},
+	{400000000 , 10e-3},
+	{500000000 , 5e-3},
+	{2000000000, 2e-3},
+};
+
 vector<uint64_t> AgilentOscilloscope::GetSampleRatesNonInterleaved()
 {
-	//FIXME
 	vector<uint64_t> ret;
+	for (auto x: sampleRateToDuration)
+		ret.push_back(x.first);
+
 	return ret;
 }
 
@@ -648,9 +673,24 @@ set<Oscilloscope::InterleaveConflict> AgilentOscilloscope::GetInterleaveConflict
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsNonInterleaved()
 {
-	//FIXME
-	vector<uint64_t> ret;
-	return ret;
+	return {
+		100,
+		250,
+		500,
+		1000,
+		2000,
+		5000,
+		10000,
+		20000,
+		50000,
+		100000,
+		200000,
+		500000,
+		1000000,
+		2000000,
+		4000000,
+		8000000,
+	};
 }
 
 vector<uint64_t> AgilentOscilloscope::GetSampleDepthsInterleaved()
@@ -662,24 +702,70 @@ vector<uint64_t> AgilentOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t AgilentOscilloscope::GetSampleRate()
 {
-	//FIXME
-	return 1;
+	if (m_sampleRateValid)
+		return m_sampleRate;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ACQUIRE:SRATE?");
+	uint64_t rate = stof(m_transport->ReadReply());
+	m_sampleRate = rate;
+	m_sampleRateValid = true;
+	return rate;
 }
 
 uint64_t AgilentOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	if (m_sampleDepthValid)
+		return m_sampleDepth;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ACQUIRE:POINTS?");
+	uint64_t depth = stof(m_transport->ReadReply());
+	m_sampleDepth = depth;
+	m_sampleDepthValid = true;
+	return depth;
 }
 
-void AgilentOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 {
-	//FIXME
+	// Look up the maximum capture duration for the requested sample rate
+	auto d = sampleRateToDuration.find(rate);
+	if (d == sampleRateToDuration.end())
+		return;
+	auto max_duration = d->second;
+
+	// Calculate the duration of the requested capture in seconds
+	auto duration = (double)depth / (double)rate;
+
+	// Clamp the duration to make sure we achieve at least the requested sample rate
+	duration = min(duration, max_duration);
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	PushFloat("TIMEBASE:RANGE", duration);
+	for (auto chan: m_channels) {
+		if (chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) {
+			m_transport->SendCommand(":WAV:SOUR " + chan->GetHwname());
+
+			// This will downsample the capture in case we ended up with a sample rate much higher than requested
+			m_transport->SendCommand(":WAV:POINTS " + to_string(depth));
+		}
+	}
 }
 
-void AgilentOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void AgilentOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//FIXME
+	auto rate = GetSampleRate();
+	SetSampleRateAndDepth(rate, depth);
+	m_sampleDepth = depth;
+	m_sampleDepthValid = true;
+}
+
+void AgilentOscilloscope::SetSampleRate(uint64_t rate)
+{
+	auto depth = GetSampleDepth();
+	SetSampleRateAndDepth(rate, depth);
+	m_sampleRate = rate;
+	m_sampleRateValid = true;
 }
 
 void AgilentOscilloscope::SetTriggerOffset(int64_t /*offset*/)
