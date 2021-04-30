@@ -163,6 +163,8 @@ public:
 	virtual CouplingType GetCoupling();
 	virtual void SetCoupling(CouplingType type);
 
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings();
+
 	virtual double GetAttenuation();
 	virtual void SetAttenuation(double atten);
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -180,6 +180,18 @@ OscilloscopeChannel::CouplingType OscilloscopeChannel::GetCoupling()
 		return m_scope->GetChannelCoupling(m_index);
 	else
 		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+}
+
+vector<OscilloscopeChannel::CouplingType> OscilloscopeChannel::GetAvailableCouplings()
+{
+	if(m_scope)
+		return m_scope->GetAvailableCouplings(m_index);
+	else
+	{
+		vector<OscilloscopeChannel::CouplingType> ret;
+		ret.push_back(COUPLE_SYNTHETIC);
+		return ret;
+	}
 }
 
 void OscilloscopeChannel::SetCoupling(CouplingType type)
