@@ -470,8 +470,14 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//This is basically the same function as a LeCroy WAVEDESC, but much less detailed
 		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DATA:HEAD?");
 		string reply = m_transport->ReadReply();
-		sscanf(reply.c_str(), "%lf,%lf,%zu,%d", &xstart, &xstop, &length, &ignored);
-
+		int rc = sscanf(reply.c_str(), "%lf,%lf,%zu,%d", &xstart, &xstop, &length, &ignored);
+		if (rc != 4 || length == 0) {
+			/* No data - Skip query the scope and move on */
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->Resize(0);
+			pending_waveforms[i].push_back(cap);
+			continue;
+		}
 		//Figure out the sample rate
 		double capture_len_sec = xstop - xstart;
 		double sec_per_sample = capture_len_sec / length;
