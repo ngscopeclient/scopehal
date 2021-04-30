@@ -2830,24 +2830,39 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 	const int64_t m = k*k;
 	const int64_t g = k*m;
 
-	//These rates are supported by all known scopes
-	ret.push_back(2 * k);
-	ret.push_back(5 * k);
-	ret.push_back(10 * k);
-	ret.push_back(20 * k);
-	ret.push_back(50 * k);
-	ret.push_back(100 * k);
+	bool wm8 =
+		(m_modelid == MODEL_WAVEMASTER_8ZI_B) ||
+		(m_modelid == MODEL_SDA_8ZI) ||
+		(m_modelid == MODEL_SDA_8ZI_A) ||
+		(m_modelid == MODEL_SDA_8ZI_B);
+	bool hdo9 = (m_modelid == MODEL_HDO_9K);
+
+	//WaveMaster 8Zi can't go below 200 ksps in realtime mode?
+	if(!wm8)
+	{
+		ret.push_back(2 * k);
+		ret.push_back(5 * k);
+		ret.push_back(10 * k);
+		ret.push_back(20 * k);
+		ret.push_back(50 * k);
+		ret.push_back(100 * k);
+	}
 	ret.push_back(200 * k);
+	if(wm8)
+		ret.push_back(250 * k);
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
-	if(m_modelid == MODEL_HDO_9K)		//... with one exception
+	if(hdo9 || wm8)
 		ret.push_back(2500 * k);
 	else
 		ret.push_back(2 * m);
 	ret.push_back(5 * m);
 	ret.push_back(10 * m);
-	ret.push_back(20 * m);
+	if(wm8)
+		ret.push_back(25 * m);
+	else
+		ret.push_back(20 * m);
 	ret.push_back(50 * m);
 	ret.push_back(100 * m);
 
@@ -2915,6 +2930,9 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			ret.push_back(10 * g);
 			break;
 
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
 		case MODEL_WAVEMASTER_8ZI_B:
 			ret.push_back(250 * m);
 			ret.push_back(500 * m);
@@ -3008,12 +3026,14 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	//The front panel allows going as low as 2 samples on some instruments, but don't allow that here.
 	ret.push_back(500);
 	ret.push_back(1 * k);
+	ret.push_back(2500);
 	ret.push_back(2 * k);
 	ret.push_back(5 * k);
 	ret.push_back(10 * k);
+	ret.push_back(25 * k);
 	ret.push_back(20 * k);
 	ret.push_back(40 * k);			//20/40 Gsps scopes can use values other than 1/2/5.
-									//TODO: figure out which models allow this
+									//TODO: avajlable rates seems to depend on the selected sample rate??
 	ret.push_back(50 * k);
 	ret.push_back(80 * k);
 	ret.push_back(100 * k);
@@ -3023,6 +3043,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(500 * k);
 
 	ret.push_back(1 * m);
+	ret.push_back(2500 * k);
 	ret.push_back(2 * m);
 	ret.push_back(5 * m);
 	ret.push_back(10 * m);
@@ -3071,8 +3092,23 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			break;
 
 		//standard memory
+		//TODO: extended options
 		case MODEL_WAVEMASTER_8ZI_B:
 			break;
+
+		//extended memory
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
+			ret.push_back(20 * m);
+			ret.push_back(25 * m);
+			ret.push_back(40 * m);
+			ret.push_back(50 * m);
+			ret.push_back(80 * m);
+			ret.push_back(100 * m);
+			ret.push_back(128 * m);
+			break;
+
 
 		case MODEL_WAVEPRO_HD:
 			ret.push_back(25 * m);
