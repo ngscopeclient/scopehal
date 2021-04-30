@@ -202,6 +202,16 @@ OscilloscopeChannel::CouplingType PicoOscilloscope::GetChannelCoupling(size_t i)
 	return m_channelCouplings[i];
 }
 
+vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	return ret;
+}
+
 void PicoOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);

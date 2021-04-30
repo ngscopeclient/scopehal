@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -197,6 +197,17 @@ void MockOscilloscope::EnableChannel(size_t i)
 void MockOscilloscope::DisableChannel(size_t i)
 {
 	m_channelsEnabled[i] = false;
+}
+
+vector<OscilloscopeChannel::CouplingType> MockOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	//TODO: other options? or none?
+	return ret;
 }
 
 OscilloscopeChannel::CouplingType MockOscilloscope::GetChannelCoupling(size_t i)

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -212,6 +212,17 @@ void RigolOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":DISP OFF");
+}
+
+vector<OscilloscopeChannel::CouplingType> RigolOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	//TODO: some higher end models do have 50 ohm inputs... which?
+	//ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	return ret;
 }
 
 OscilloscopeChannel::CouplingType RigolOscilloscope::GetChannelCoupling(size_t i)

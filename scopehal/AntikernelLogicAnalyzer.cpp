@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -475,6 +475,13 @@ void AntikernelLogicAnalyzer::EnableChannel(size_t /*i*/)
 void AntikernelLogicAnalyzer::DisableChannel(size_t /*i*/)
 {
 	//no-op, all channels are always on
+}
+
+vector<OscilloscopeChannel::CouplingType> AntikernelLogicAnalyzer::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_SYNTHETIC);
+	return ret;
 }
 
 OscilloscopeChannel::CouplingType AntikernelLogicAnalyzer::GetChannelCoupling(size_t /*i*/)

@@ -492,6 +492,17 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 	// }
 }
 
+vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	return ret;
+}
+
 OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(size_t i)
 {
 	if(i >= m_analogChannelCount)

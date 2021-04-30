@@ -192,6 +192,13 @@ void SignalGeneratorOscilloscope::DisableChannel(size_t i)
 	m_channelsEnabled[i] = false;
 }
 
+vector<OscilloscopeChannel::CouplingType> SignalGeneratorOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	return ret;
+}
+
 OscilloscopeChannel::CouplingType SignalGeneratorOscilloscope::GetChannelCoupling(size_t i)
 {
 	return m_channelCoupling[i];

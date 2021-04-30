@@ -221,6 +221,16 @@ void RohdeSchwarzOscilloscope::DisableChannel(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":STAT OFF");
 }
 
+vector<OscilloscopeChannel::CouplingType> RohdeSchwarzOscilloscope::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	return ret;
+}
+
 OscilloscopeChannel::CouplingType RohdeSchwarzOscilloscope::GetChannelCoupling(size_t i)
 {
 	{
