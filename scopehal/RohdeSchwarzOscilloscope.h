@@ -103,12 +103,14 @@ protected:
 	std::map<size_t, double> m_channelVoltageRanges;
 	std::map<int, bool> m_channelsEnabled;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+	std::map<size_t, double> m_channelAttenuations;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
 	void PullEdgeTrigger();
 	void PushEdgeTrigger(EdgeTrigger* trig);
+	void PushFloat(std::string path, float f);
 
 public:
 	static std::string GetDriverNameInternal();

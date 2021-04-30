@@ -138,10 +138,39 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 		LogDebug("* None\n");
 	for(auto sopt : options)
 	{
+		LogDebug(" * %s ",sopt.c_str());
 		if(opt == "B243")
-			LogDebug("* 350 MHz bandwidth upgrade for RTM3004\n");
+			LogDebug("(350 MHz bandwidth upgrade for RTM3004)\n");
+		else if(sopt == "K1")
+			LogDebug("(SPI Bus)\n");
+		else if(sopt == "K2")
+			LogDebug("(UART / RS232)\n");
+		else if(sopt == "K3")
+			LogDebug("(CAN)\n");
+		else if(sopt == "K5")
+			LogDebug("(Audio signals)\n");
+		else if(sopt == "B1") {
+			// TODO add digital channels
+			LogDebug("(Mixed signal, 16 channels)\n");
+		}
+		else if(sopt == "K31")
+			LogDebug("(Power analysis)\n");
+		else if(sopt == "K6")
+			LogDebug("(MIL-1553)\n");
+		else if(sopt == "K7")
+			LogDebug("(ARINC 429)\n");
+		else if(sopt == "K15")
+			LogDebug("(History)\n");
+		else if(sopt == "K18")
+			LogDebug("(Spectrum analysis and spectrogram)\n");
+		else if(sopt == "B6")
+			LogDebug("(Signal generation)\n");
+		else if(sopt == "B2410")
+			LogDebug("(Bandwidth 1 GHz)\n");
+		else if(sopt == "K36")
+			LogDebug("(Frequency response analysis)\n");
 		else
-			LogDebug("* %s (unknown)\n", sopt.c_str());
+			LogDebug("(unknown)\n");
 	}
 }
 
@@ -173,6 +202,7 @@ void RohdeSchwarzOscilloscope::FlushConfigCache()
 	m_channelVoltageRanges.clear();
 	m_channelsEnabled.clear();
 	m_channelCouplings.clear();
+	m_channelAttenuations.clear();
 
 	delete m_trigger;
 	m_trigger = NULL;
@@ -287,28 +317,29 @@ void RohdeSchwarzOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel:
 	m_channelCouplings[i] = type;
 }
 
-double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t /*i*/)
+double RohdeSchwarzOscilloscope::GetChannelAttenuation(size_t i)
 {
-	/*
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
-
-	string reply = m_transport->ReadReply();
-	double atten;
-	sscanf(reply.c_str(), "%lf", &atten);
-	return atten;
-	*/
-
-	LogWarning("RohdeSchwarzOscilloscope::GetChannelAttenuation unimplemented\n");
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelAttenuations.find(i) != m_channelAttenuations.end())
+			return m_channelAttenuations[i];
+	}
+	// FIXME Don't know SCPI to get this, relying on cache
 	return 1;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	//FIXME
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+	}
+ 
+	lock_guard<recursive_mutex> lock(m_mutex);
 
-	LogWarning("RohdeSchwarzOscilloscope::SetChannelAttenuation unimplemented\n");
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "PROB%ld:SET:ATT:MAN ", m_channels[i]->GetIndex()+1);
+	PushFloat(cmd, atten);
 }
 
 int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
@@ -388,10 +419,17 @@ double RohdeSchwarzOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void RohdeSchwarzOscilloscope::SetChannelOffset(size_t i, double offset)
 {
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::SetChannelOffset unimplemented\n");
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelOffsets[i] = offset;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:OFFS %.4f", m_channels[i]->GetHwname().c_str(), -offset);
+	m_transport->SendCommand(cmd);
 }
 
 Oscilloscope::TriggerMode RohdeSchwarzOscilloscope::PollTrigger()
@@ -699,3 +737,13 @@ void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* /*trig*/ )
 
 	//TODO unimplemented
 }
+
+/**
+	@brief Sends float, assumes transport is already mutexed
+ */
+
+void RohdeSchwarzOscilloscope::PushFloat(string path, float f)
+{
+	m_transport->SendCommand(path + " " + to_string_sci(f));
+}
+
