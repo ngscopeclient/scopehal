@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* ANTIKERNEL v0.1                                                                                                      *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -344,7 +344,7 @@ void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelAttenuations[i] = atten;
 	}
- 
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char cmd[128];
