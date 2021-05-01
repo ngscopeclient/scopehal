@@ -3,12 +3,6 @@
 * ANTIKERNEL v0.1                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
-* SDS2000/5000/6000 port (c) 2021 Dave Marples. Note that this is only tested on SDS2000X+. If someone wants to loan   *
-*                                               an SDS5000/6000 for testing that can be integrated. This file is       *
-*                                               derrived from the LeCroy driver.                                       *
-*                                                                                                                      *
-* Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git     *
-* archive if needed.                                                                                                   *
 *                                                                                                                      *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
@@ -34,16 +28,22 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/* Current State
+/*
+ * Current State
  * =============
  *
  * - Basic functionality for analog channels works.
- * - There is no feature detection because the scope does not support *IDN? (Request made)
+ * - There is no feature detection because the scope does not support *OPT? (Request made)
  * - Digital channels are not implemented (code in here is leftover from LeCroy)
  * - Triggers are untested.
- * - Sampling lengths up to 10KSamples are supported. 50K and 100K need to be batched and will be
+ * - Sampling lengths up to 10MSamples are supported. 50M and 100M need to be batched and will be
  *   horribly slow.
  *
+ * SDS2000/5000/6000 port (c) 2021 Dave Marples. Note that this is only tested on SDS2000X+. If someone wants
+ * to loan an SDS5000/6000 for testing that can be integrated. This file is derrived from the LeCroy driver.
+ *
+ * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
+ * archive if needed.
  */
 
 #include "scopehal.h"
@@ -63,6 +63,16 @@
 #include "WindowTrigger.h"
 
 using namespace std;
+
+static const struct
+{
+	const char* name;
+	float val;
+} c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 2.5F}, {"LVCMOS33", 3.3F}, {"LVCMOS25", 1.5F}, {NULL, 0}};
+
+static const int c_setting_delay = 50000;		   // Delay in uS required when setting parameters via SCPI
+static const char* c_custom_thresh = "CUSTOM,";	   // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;		   // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -180,6 +190,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 350;
 			if(m_model.compare(4, 1, "5") == 0)
 				m_maxBandwidth = 500;
+			return;
 		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
@@ -190,13 +201,11 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 500;
 			if(m_model.compare(5, 1, "0") == 0)
 				m_maxBandwidth = 1000;
+			return;
 		}
 	}
-	else
-	{
-		LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
-			m_model.c_str());
-	}
+	LogWarning("Model \"%s\" is unknown, available sample rates/memory depths may not be properly detected\n",
+		m_model.c_str());
 }
 
 void SiglentSCPIOscilloscope::DetectOptions()
@@ -210,30 +219,26 @@ void SiglentSCPIOscilloscope::DetectOptions()
 /**
 	@brief Creates digital channels for the oscilloscope
  */
-void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int /* count */)
+
+void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int count)
 {
-  LogWarning("Digital channels not implemented\n");
-  // Old code from LeCroy implementation
-	// m_hasLA = true;
-	// LogIndenter li;
+	m_digitalChannelCount = count;
+	m_digitalChannelBase = m_channels.size();
 
-	// m_digitalChannelCount = count;
-	// m_digitalChannelBase = m_channels.size();
-
-	// char chn[32];
-	// for(unsigned int i = 0; i < count; i++)
-	// {
-	// 	snprintf(chn, sizeof(chn), "D%u", i);
-	// 	auto chan = new OscilloscopeChannel(this,
-	// 		chn,
-	// 		OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-	// 		GetDefaultChannelColor(m_channels.size()),
-	// 		1,
-	// 		m_channels.size(),
-	// 		true);
-	// 	m_channels.push_back(chan);
-	// 	m_digitalChannels.push_back(chan);
-	// }
+	char chn[32];
+	for(unsigned int i = 0; i < count; i++)
+	{
+		snprintf(chn, sizeof(chn), "D%u", i);
+		auto chan = new OscilloscopeChannel(this,
+			chn,
+			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			GetDefaultChannelColor(m_channels.size()),
+			1,
+			m_channels.size(),
+			true);
+		m_channels.push_back(chan);
+		m_digitalChannels.push_back(chan);
+	}
 }
 
 /**
@@ -346,8 +351,6 @@ unsigned int SiglentSCPIOscilloscope::GetMeasurementTypes()
 unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes()
 {
 	unsigned int type = INST_OSCILLOSCOPE;
-	if(m_hasDVM)
-		type |= INST_DMM;
 	if(m_hasFunctionGen)
 		type |= INST_FUNCTION;
 	return type;
@@ -397,16 +400,13 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 	}
 
 	//Digital
-	// else
-	// {
-	// 	//See if the channel is on
-	// 	size_t nchan = i - (m_analogChannelCount + 1);
-	// 	string str = converse(":DIG:D%d?", nchan);
-	// 	if(str == "OFF")
-	// 		m_channelsEnabled[i] = false;
-	// 	else
-	// 		m_channelsEnabled[i] = true;
-	// }
+	else
+	{
+		//See if the channel is on
+		size_t nchan = i - (m_analogChannelCount + 1);
+		string str = converse(":DIGITAL:D%d?", nchan);
+		m_channelsEnabled[i] = (str == "OFF") ? false : true;
+	}
 
 	return m_channelsEnabled[i];
 }
@@ -427,33 +427,18 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 	}
 
 	//Digital channel
-	// else
-	// {
-	// 	//If we have NO digital channels enabled, enable the first digital bus
-	// 	bool anyDigitalEnabled = false;
-	// 	for(auto c : m_digitalChannels)
-	// 	{
-	// 		if(m_channelsEnabled[c->GetIndex()])
-	// 		{
-	// 			anyDigitalEnabled = true;
-	// 			break;
-	// 		}
-	// 	}
-
-	// 	if(!anyDigitalEnabled)
-	// 		sendOnly(":DIGITAL:BUS1:DISP ON");
-
-	// 	//Enable this channel on the hardware
-	// 	//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
-	// 	sendOnly(":DIGD%d ON", i - (m_analogChannelCount + 1));
-	// }
+	else
+	{
+		sendOnly(":DIGITAL:D%d ON", i - (m_analogChannelCount + 1));
+	}
 
 	m_channelsEnabled[i] = true;
 }
 
-bool SiglentSCPIOscilloscope::CanEnableChannel(size_t /* i */)
+bool SiglentSCPIOscilloscope::CanEnableChannel(size_t i)
 {
-	return true;
+	// Can enable all channels except trigger
+	return !(i == m_extTrigChannel->GetIndex());
 }
 
 void SiglentSCPIOscilloscope::DisableChannel(size_t i)
@@ -472,24 +457,20 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 	}
 
 	//Digital channel
-	// else
-	// {
-	// 	//If we have NO digital channels enabled, disable the first digital bus
-	// 	bool anyDigitalEnabled = false;
-	// 	for(auto c : m_digitalChannels)
-	// 	{
-	// 		if(m_channelsEnabled[c->GetIndex()])
-	// 		{
-	// 			anyDigitalEnabled = true;
-	// 			break;
-	// 		}
-	// 	}
-	// 	if(!anyDigitalEnabled)
-	// 		sendOnly(":DIGITAL:BUS1:DISP OFF");
+	else
+	{
+		//Disable this channel
+		sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
 
-	// 	//Disable this channel
-	// 	sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
-	// }
+		//If we have NO digital channels enabled, disable the appropriate digital bus
+
+		//bool anyDigitalEnabled = false;
+		//        for (uint32_t c=m_analogChannelCount+1+((chNum/8)*8); c<(m_analogChannelCount+1+((chNum/8)*8)+c_digiChannelsPerBus); c++)
+		//          anyDigitalEnabled |= m_channelsEnabled[c];
+
+		//        if(!anyDigitalEnabled)
+		//sendOnly(":DIGITAL:BUS%d:DISP OFF",chNum/8);
+	}
 }
 
 vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableCouplings(size_t /*i*/)
@@ -720,7 +701,7 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 	}
 	else
 	{
-		sendOnly(":DIGITAL%ld:LABEL \"%s\"", i, name.c_str());
+		sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
 	}
 }
 
@@ -755,7 +736,10 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 	}
 	else
 	{
-		name = converse(":DIGITAL%d:LABEL?", i - m_analogChannelCount);
+		name = converse(":DIGITAL:LABEL%d?", i - (m_analogChannelCount + 1));
+		// Remove "'s around the name
+		if(name.length() > 2)
+			name = name.substr(1, name.length() - 2);
 	}
 
 	//Default to using hwname if no alias defined
@@ -845,60 +829,48 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 		string reply = converse(":CHANNEL%d:SWITCH?", i + 1);
 		if(reply == "OFF")
 			m_channelsEnabled[i] = false;
-		else
+		else if(reply == "ON")
 			m_channelsEnabled[i] = true;
+		else
+			LogWarning("BulkCheckChannelEnableState: Unrecognised reply [%s]\n", reply.c_str());
 	}
 
 	//Check digital status
-	//TODO: better per-lane queries
-	// m_transport->SendCommand("Digital1:TRACE?");
-
-	// string reply = m_transport->ReadReply();
-	// if(reply == "OFF")
-	// {
-	// 	for(size_t i=0; i<m_digitalChannelCount; i++)
-	// 		m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
-	// }
-	// else
-	// {
-	// 	for(size_t i=0; i<m_digitalChannelCount; i++)
-	// 		m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
-	// }
+	for(unsigned int i = 0; i < m_digitalChannelCount; i++)
+	{
+		string reply = converse(":DIGITAL:D%d?", i);
+		if(reply == "ON")
+		{
+			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = true;
+		}
+		else if(reply == "OFF")
+		{
+			m_channelsEnabled[m_digitalChannels[i]->GetIndex()] = false;
+		}
+		else
+			LogWarning("BulkCheckChannelEnableState: Unrecognised reply [%s]\n", reply.c_str());
+	}
 }
 
 bool SiglentSCPIOscilloscope::ReadWavedescs(
 	char wavedescs[MAX_ANALOG][WAVEDESC_SIZE], bool* enabled, unsigned int& firstEnabledChannel, bool& any_enabled)
 {
-	//(Note: with VICP framing we cannot use semicolons to separate commands)
 	BulkCheckChannelEnableState();
 	for(unsigned int i = 0; i < m_analogChannelCount; i++)
 	{
 		enabled[i] = IsChannelEnabled(i);
-		if(enabled[i])
-			any_enabled = true;
+		any_enabled |= enabled[i];
 	}
 
-	//#if 0
 	for(unsigned int i = 0; i < m_analogChannelCount; i++)
 	{
-		//If NO channels are enabled, query channel 1's WAVEDESC.
-		//Per phone conversation w/ Honam @ LeCroy apps, this will be updated even if channel is turned off
 		if(enabled[i] || (!any_enabled && i == 0))
 		{
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
-		}
-		sendOnly(":WAVEFORM:SOURCE C%d", i + 1);
-		sendOnly(":WAVEFORM:PREAMBLE?");
-	}
-	//#endif
 
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(enabled[i] || (!any_enabled && i == 0))
-		{
-			//sendOnly(":WAVEFORM:SOURCE C%d",i+1);
-			//sendOnly(":WAVEFORM:PREAMBLE?");
+			sendOnly(":WAVEFORM:SOURCE C%d", i + 1);
+			sendOnly(":WAVEFORM:PREAMBLE?");
 			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE, wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
 
@@ -935,7 +907,7 @@ void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_seque
 	}
 
 	//Ask for the digital waveforms
-	// if(denabled)
+	//if(denabled)
 	// 	sendOnly("Digital1:WF?");
 }
 
@@ -1000,15 +972,13 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	uint32_t num_sequences,
 	time_t ttime,
 	double basetime,
-	double* wavetime)
+	double* wavetime,
+                                                                     int /* ch */)
 {
 	vector<WaveformBase*> ret;
 
 	//Parse the wavedesc headers
-	auto pdesc = wavedesc;	  //(unsigned char*)(&wavedesc[-1]);
-
-	//uint32_t wavedesc_len = *reinterpret_cast<uint32_t*>(pdesc + 36);
-	//uint32_t usertext_len = *reinterpret_cast<uint32_t*>(pdesc + 40);
+	auto pdesc = wavedesc;
 
 	//cppcheck-suppress invalidPointerCast
 	float v_gain = *reinterpret_cast<float*>(pdesc + 156);
@@ -1026,16 +996,12 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	double h_off = *reinterpret_cast<double*>(pdesc + 180) * FS_PER_SECOND;	   //fs from start of waveform to trigger
 
 	double h_off_frac = fmodf(h_off, interval);	   //fractional sample position, in fs
-	if(h_off_frac < 0)
-		h_off_frac = interval + h_off_frac;	   //double h_unit = *reinterpret_cast<double*>(pdesc + 244);
 
-	LogTrace("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%ld\n",
-		v_gain,
-		v_off,
-		interval,
-		h_off,
-		h_off_frac,
-		datalen);
+	//double h_off_frac = 0;//((interval*datalen)/2)+h_off;
+
+	if(h_off_frac < 0)
+		h_off_frac = h_off;	   //interval + h_off_frac;	   //double h_unit = *reinterpret_cast<double*>(pdesc + 244);
+
 	//Raw waveform data
 	size_t num_samples;
 	if(m_highDefinition)
@@ -1050,8 +1016,22 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	// We also need to accomodate probe attenuation here.
 	v_gain = v_gain * v_probefactor / 30;
 
-        // Vertical offset is also scaled by the probefactor
-        v_off  = v_off * v_probefactor;
+	// Vertical offset is also scaled by the probefactor
+	v_off = v_off * v_probefactor;
+
+	// Update channel voltages and offsets based on what is in this wavedesc
+	// m_channelVoltageRanges[ch] = v_gain * v_probefactor * 30 * 8;
+	// m_channelOffsets[ch] = v_off;
+	// m_triggerOffset = ((interval * datalen) / 2) + h_off;
+	// m_triggerOffsetValid = true;
+
+	LogTrace("\nV_Gain=%f, V_Off=%f, interval=%f, h_off=%f, h_off_frac=%f, datalen=%ld\n",
+		v_gain,
+		v_off,
+		interval,
+		h_off,
+		h_off_frac,
+		datalen);
 
 	for(size_t j = 0; j < num_sequences; j++)
 	{
@@ -1269,9 +1249,8 @@ map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(strin
 {
 	map<int, DigitalWaveform*> ret;
 
-        // Digital channels not yet implemented
-        return ret;
-
+	// Digital channels not yet implemented
+	return ret;
 
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
@@ -1432,7 +1411,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	//Acquire the data (but don't parse it)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-
+		start = GetTime();
 		//Get the wavedescs for all channels
 		unsigned int firstEnabledChannel = UINT_MAX;
 		bool any_enabled = true;
@@ -1547,7 +1526,8 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				num_sequences,
 				ttime,
 				basetime,
-				pwtime);
+				pwtime,
+				i);
 		}
 	}
 
@@ -1561,7 +1541,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 		for(size_t j = 0; j < num_sequences; j++)
 			pending_waveforms[i].push_back(waveforms[i][j]);
 	}
-
 	//TODO: proper support for sequenced capture when digital channels are active
 	// if(denabled)
 	// {
@@ -1589,7 +1568,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 	double dt = GetTime() - start;
 	LogTrace("Waveform download and processing took %.3f ms\n", dt * 1000);
-
 	return true;
 }
 
@@ -1756,11 +1734,13 @@ set<SiglentSCPIOscilloscope::InterleaveConflict> SiglentSCPIOscilloscope::GetInt
 
 uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 {
+	double f;
 	if(!m_sampleRateValid)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
 		string reply = converse(":ACQUIRE:SRATE?");
-		sscanf(reply.c_str(), "%ld", &m_sampleRate);
+		sscanf(reply.c_str(), "%lf", &f);
+		m_sampleRate = static_cast<int64_t>(f);
 		m_sampleRateValid = true;
 	}
 
@@ -1769,18 +1749,17 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 
 uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 {
+	double f;
 	if(!m_memoryDepthValid)
 	{
 		//:AQUIRE:MDEPTH can sometimes return incorrect values! It returns the *cap* on memory depth,
-		//not the *actual* memory depth.
+		// not the *actual* memory depth....we don't know that until we've collected samples
 
-		//What you see below is the only observed method that seems to reliably get the *actual* memory depth.
+		// What you see below is the only observed method that seems to reliably get the *actual* memory depth.
 		lock_guard<recursive_mutex> lock(m_mutex);
 		string reply = converse(":ACQUIRE:MDEPTH?");
-		double capture_len_fs = Unit(Unit::UNIT_FS).ParseString(reply);
-		int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate();
-
-		m_memoryDepth = (capture_len_fs + (fs_per_sample / 2)) / fs_per_sample;
+		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
+		m_memoryDepth = static_cast<int64_t>(f);
 		m_memoryDepthValid = true;
 	}
 
@@ -2050,7 +2029,25 @@ float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	return atof(converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str());
+	channel -= m_analogChannelCount + 1;
+
+	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
+
+	// Look through the threshold table to see if theres a string match, return it if so
+	uint32_t i = 0;
+	while((c_threshold_table[i].name) &&
+		  (strncmp(c_threshold_table[i].name, r.c_str(), strlen(c_threshold_table[i].name))))
+		i++;
+
+	if(c_threshold_table[i].name)
+		return c_threshold_table[i].val;
+
+	// Didn't match a standard, check for custom
+	if(!strncmp(r.c_str(), c_custom_thresh, strlen(c_custom_thresh)))
+		return strtof(&(r.c_str()[strlen(c_custom_thresh)]), NULL);
+
+	LogWarning("GetDigitalThreshold unrecognised value [%s]\n", r.c_str());
+	return 0.0f;
 }
 
 void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
@@ -2061,7 +2058,25 @@ void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*l
 void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	sendOnly(":DIGITAL:THRESHOLD%d %e", (channel / 8) + 1, level);
+	channel -= m_analogChannelCount + 1;
+
+	// Search through standard thresholds to see if one matches
+	uint32_t i = 0;
+	while(((c_threshold_table[i].name) && (fabsf(level - c_threshold_table[i].val)) > c_thresh_thresh))
+		i++;
+
+	if(c_threshold_table[i].name)
+		sendOnly(":DIGITAL:THRESHOLD%d %s", (channel / 8) + 1, (c_threshold_table[i].name));
+	else
+	{
+		do
+		{
+			sendOnly(":DIGITAL:THRESHOLD%d CUSTOM,%1.2E", (channel / 8) + 1, level);
+
+			// This is a kludge to get the custom threshold to stick.
+			usleep(c_setting_delay);
+		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount + 1) - level)) > 0.1f);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2505,9 +2520,6 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
-	//Level
-	sendOnly(":TRIGGER:%s:LEVEL %e", trigType.c_str(), trig->GetLevel());
-
 	//Slope
 	switch(trig->GetType())
 	{
@@ -2525,8 +2537,11 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 
 		default:
 			LogWarning("Invalid trigger type %d\n", trig->GetType());
-			return;
+			break;
 	}
+	//Level
+	sendOnly(":TRIGGER:%s:LEVEL %e", trigType.c_str(), trig->GetLevel());
+	usleep(c_setting_delay);
 }
 
 /**
