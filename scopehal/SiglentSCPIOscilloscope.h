@@ -53,7 +53,9 @@ class WindowTrigger;
 
 // These scopes will actually sample 200MPoints, but the maxiumum it can transfer in one
 // chunk is 10MPoints
-#define WAVEFORM_SIZE (20 * 1000 * 1000)
+#define WAVEFORM_SIZE (10 * 1000 * 1000)
+
+#define c_digiChannelsPerBus 8
 
 class SiglentSCPIOscilloscope : public SCPIOscilloscope
 {
@@ -222,7 +224,8 @@ protected:
 		uint32_t num_sequences,
 		time_t ttime,
 		double basetime,
-		double* wavetime);
+		double* wavetime,
+		int i);
 	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
 
 	void Convert8BitSamples(
