@@ -52,6 +52,8 @@
 #include <immintrin.h>
 #include <stdarg.h>
 #include <omp.h>
+#include <thread>
+#include <chrono>
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
@@ -69,9 +71,9 @@ static const struct
 	float val;
 } c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 2.5F}, {"LVCMOS33", 3.3F}, {"LVCMOS25", 1.5F}, {NULL, 0}};
 
-static const int c_setting_delay = 50000;		   // Delay in uS required when setting parameters via SCPI
-static const char* c_custom_thresh = "CUSTOM,";	   // Prepend string for custom digital threshold
-static const float c_thresh_thresh = 0.01f;		   // Zero equivalence threshold for fp comparisons
+static const std::chrono::milliseconds c_setting_delay(50);	   // Delay required when setting parameters via SCPI
+static const char* c_custom_thresh = "CUSTOM,";				   // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;					   // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -972,7 +974,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	time_t ttime,
 	double basetime,
 	double* wavetime,
-                                                                     int /* ch */)
+	int /* ch */)
 {
 	vector<WaveformBase*> ret;
 
@@ -2073,7 +2075,7 @@ void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 			sendOnly(":DIGITAL:THRESHOLD%d CUSTOM,%1.2E", (channel / 8) + 1, level);
 
 			// This is a kludge to get the custom threshold to stick.
-			usleep(c_setting_delay);
+			this_thread::sleep_for(c_setting_delay);
 		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount + 1) - level)) > 0.1f);
 	}
 }
@@ -2540,7 +2542,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 	}
 	//Level
 	sendOnly(":TRIGGER:%s:LEVEL %e", trigType.c_str(), trig->GetLevel());
-	usleep(c_setting_delay);
+	this_thread::sleep_for(c_setting_delay);
 }
 
 /**
