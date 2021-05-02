@@ -135,7 +135,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	//For now, assume control plane port is data plane +1
 	LogDebug("Connecting to data plane socket\n");
-	m_dataSocket = new SCPISocketTransport(csock->GetHostname(), csock->GetPort() + 1);
+	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	m_dataSocket->Connect(csock->GetHostname(), csock->GetPort() + 1);
+	m_dataSocket->DisableNagle();
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -324,13 +326,13 @@ bool PicoOscilloscope::AcquireData()
 {
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_dataSocket->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_dataSocket->RecvLooped((uint8_t*)&numChannels, sizeof(numChannels)))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_dataSocket->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
 		return false;
 
 	//Acquire data for each channel
@@ -341,11 +343,11 @@ bool PicoOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_dataSocket->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
 			return false;
-		if(!m_dataSocket->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
-		if(!m_dataSocket->ReadRawData(sizeof(scale), (uint8_t*)&scale))
+		if(!m_dataSocket->RecvLooped((uint8_t*)&scale, sizeof(scale)))
 			return false;
 		scale *= GetChannelAttenuation(chnum);
 
@@ -353,7 +355,7 @@ bool PicoOscilloscope::AcquireData()
 
 		//Allocate the buffer
 		int16_t* buf = new int16_t[memdepth];
-		if(!m_dataSocket->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+		if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
 			return false;
 
 		auto offset = GetChannelOffset(chnum);

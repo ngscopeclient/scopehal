@@ -119,7 +119,7 @@ protected:
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
-	SCPITransport* m_dataSocket;
+	Socket* m_dataSocket;
 
 public:
 
