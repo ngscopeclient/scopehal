@@ -324,50 +324,69 @@ void EthernetProtocolDecoder::BytesToFrames(
 						Format the content for display
 						Colors from ColorBrewer 11-class Paired.
 
-						#33a02c
 						#e31a1c
-						#fdbf6f
 						#ff7f00
 						#cab2d6
 						#6a3d9a
 					 */
 					uint16_t ethertype = (segment.m_data[0] << 8) | segment.m_data[1];
-					char tmp[64];
-					switch(ethertype)
+					if(ethertype < 1500)
 					{
-						case 0x0800:
-							pack->m_headers["Ethertype"] = "IPv4";
-							pack->m_displayBackgroundColor = Gdk::Color("#a6cee3");
-							pack->m_displayForegroundColor = Gdk::Color("#000000");
-							break;
+						//Default to unknown LLC
+						pack->m_headers["Ethertype"] = "LLC";
+						pack->m_displayBackgroundColor = Gdk::Color("#33a02c");
+						pack->m_displayForegroundColor = Gdk::Color("#000000");
 
-						case 0x0806:
-							pack->m_headers["Ethertype"] = "ARP";
-							pack->m_displayBackgroundColor = Gdk::Color("#ffff99");
-							pack->m_displayForegroundColor = Gdk::Color("#000000");
-							break;
+						//Look up the LLC LSAP address to see what it is
+						if( (i+1) < bytes.size() )
+						{
+							if(bytes[i+1] == 0x42)
+							{
+								pack->m_headers["Ethertype"] = "STP";
+								pack->m_displayBackgroundColor = Gdk::Color("#fdbf6f");
+								pack->m_displayForegroundColor = Gdk::Color("#000000");
+							}
+						}
+					}
+					else
+					{
+						char tmp[64];
+						switch(ethertype)
+						{
+							case 0x0800:
+								pack->m_headers["Ethertype"] = "IPv4";
+								pack->m_displayBackgroundColor = Gdk::Color("#a6cee3");
+								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								break;
 
-						//TODO: decoder inner ethertype too?
-						case 0x8100:
-							pack->m_headers["Ethertype"] = "802.1q";
-							pack->m_displayBackgroundColor = Gdk::Color("#b2df8a");
-							pack->m_displayForegroundColor = Gdk::Color("#000000");
-							break;
+							case 0x0806:
+								pack->m_headers["Ethertype"] = "ARP";
+								pack->m_displayBackgroundColor = Gdk::Color("#ffff99");
+								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								break;
 
-						case 0x86DD:
-							pack->m_headers["Ethertype"] = "IPv6";
-							pack->m_displayBackgroundColor = Gdk::Color("#1f78b4");
-							pack->m_displayForegroundColor = Gdk::Color("#ffffff");
-							break;
+							//TODO: decoder inner ethertype too?
+							case 0x8100:
+								pack->m_headers["Ethertype"] = "802.1q";
+								pack->m_displayBackgroundColor = Gdk::Color("#b2df8a");
+								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								break;
 
-						default:
-							snprintf(tmp, sizeof(tmp), "%02x%02x",
-							segment.m_data[0],
-							segment.m_data[1]);
-							pack->m_headers["Ethertype"] = tmp;
-							pack->m_displayBackgroundColor = Gdk::Color("#fb9a99");
-							pack->m_displayForegroundColor = Gdk::Color("#000000");
-							break;
+							case 0x86DD:
+								pack->m_headers["Ethertype"] = "IPv6";
+								pack->m_displayBackgroundColor = Gdk::Color("#1f78b4");
+								pack->m_displayForegroundColor = Gdk::Color("#ffffff");
+								break;
+
+							default:
+								snprintf(tmp, sizeof(tmp), "%02x%02x",
+								segment.m_data[0],
+								segment.m_data[1]);
+								pack->m_headers["Ethertype"] = tmp;
+								pack->m_displayBackgroundColor = Gdk::Color("#fb9a99");
+								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								break;
+						}
 					}
 
 					//Reset for next block of the frame
@@ -583,36 +602,56 @@ string EthernetProtocolDecoder::GetText(int i)
 				string type = "Type: ";
 
 				uint16_t ethertype = (sample.m_data[0] << 8) | sample.m_data[1];
-				switch(ethertype)
+
+				//It's not actually an ethertype, it's a LLC frame.
+				if(ethertype < 1500)
 				{
-					case 0x0800:
-						type += "IPv4";
-						break;
+					//Look at the next segment to get the payload
+					if((size_t)i+1 < data->m_samples.size())
+					{
+						auto& next = data->m_samples[i+1];
+						if(next.m_data[0] == 0x42)
+							type += "STP";
+						else
+							type += "LLC";
+					}
+					else
+						type += "LLC";
+				}
 
-					case 0x0806:
-						type += "ARP";
-						break;
+				else
+				{
+					switch(ethertype)
+					{
+						case 0x0800:
+							type += "IPv4";
+							break;
 
-					case 0x8100:
-						type += "802.1q";
-						break;
+						case 0x0806:
+							type += "ARP";
+							break;
 
-					case 0x86dd:
-						type += "IPv6";
-						break;
+						case 0x8100:
+							type += "802.1q";
+							break;
 
-					case 0x88cc:
-						type += "LLDP";
-						break;
+						case 0x86dd:
+							type += "IPv6";
+							break;
 
-					case 0x88f7:
-						type += "PTP";
-						break;
+						case 0x88cc:
+							type += "LLDP";
+							break;
 
-					default:
-						snprintf(tmp, sizeof(tmp), "0x%04x", ethertype);
-						type += tmp;
-						break;
+						case 0x88f7:
+							type += "PTP";
+							break;
+
+						default:
+							snprintf(tmp, sizeof(tmp), "0x%04x", ethertype);
+							type += tmp;
+							break;
+					}
 				}
 
 				return type;
