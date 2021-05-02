@@ -348,7 +348,7 @@ void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "PROB%ld:SET:ATT:MAN ", m_channels[i]->GetIndex()+1);
+	snprintf(cmd, sizeof(cmd), "PROB%zd:SET:ATT:MAN ", m_channels[i]->GetIndex()+1);
 	PushFloat(cmd, atten);
 }
 
