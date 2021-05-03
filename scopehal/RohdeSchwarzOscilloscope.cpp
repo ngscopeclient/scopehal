@@ -394,10 +394,17 @@ double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
-	//FIXME
-	LogWarning("RohdeSchwarzOscilloscope::SetChannelVoltageRange unimplemented\n");
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelVoltageRanges[i] = range;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "%s:RANGE %.4f", m_channels[i]->GetHwname().c_str(), range);
+	m_transport->SendCommand(cmd);
 }
 
 OscilloscopeChannel* RohdeSchwarzOscilloscope::GetExternalTrigger()
