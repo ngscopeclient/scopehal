@@ -339,15 +339,19 @@ bool PicoOscilloscope::AcquireData()
 	size_t chnum;
 	size_t memdepth;
 	float scale;
+	float offset;
 	SequenceSet s;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
+		//Scale and offset are sent in the header since they might have changed since the capture began
 		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&scale, sizeof(scale)))
+			return false;
+		if(!m_dataSocket->RecvLooped((uint8_t*)&offset, sizeof(offset)))
 			return false;
 		scale *= GetChannelAttenuation(chnum);
 
@@ -357,8 +361,6 @@ bool PicoOscilloscope::AcquireData()
 		int16_t* buf = new int16_t[memdepth];
 		if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
 			return false;
-
-		auto offset = GetChannelOffset(chnum);
 
 		//Create our waveform
 		AnalogWaveform* cap = new AnalogWaveform;
