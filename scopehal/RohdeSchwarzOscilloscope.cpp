@@ -394,7 +394,7 @@ double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, double range)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
