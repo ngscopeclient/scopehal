@@ -516,6 +516,9 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 
 		//Read the actual data
 		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)temp_buf);
+		//Discard trailing newline
+		m_transport->ReadRawData(1, (unsigned char*)tmp);
+
 
 		//Format the capture
 		cap->Resize(length);
