@@ -130,7 +130,6 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	trig->SetLevel(0);
 	trig->SetInput(0, StreamDescriptor(m_channels[0]));
 	SetTrigger(trig);
-	m_triggerOffset = 0;
 	PushTrigger();
 
 	//For now, assume control plane port is data plane +1
@@ -338,8 +337,7 @@ bool PicoOscilloscope::AcquireData()
 	//Acquire data for each channel
 	size_t chnum;
 	size_t memdepth;
-	float scale;
-	float offset;
+	float config[3];
 	SequenceSet s;
 	for(size_t i=0; i<numChannels; i++)
 	{
@@ -349,10 +347,11 @@ bool PicoOscilloscope::AcquireData()
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&scale, sizeof(scale)))
+		if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&offset, sizeof(offset)))
-			return false;
+		float scale = config[0];
+		float offset = config[1];
+		float trigphase = -config[2] * fs_per_sample;
 		scale *= GetChannelAttenuation(chnum);
 
 		//TODO: stream timestamp from the server
@@ -365,7 +364,7 @@ bool PicoOscilloscope::AcquireData()
 		//Create our waveform
 		AnalogWaveform* cap = new AnalogWaveform;
 		cap->m_timescale = fs_per_sample;
-		cap->m_triggerPhase = 0;
+		cap->m_triggerPhase = trigphase;
 		cap->m_startTimestamp = time(NULL);
 		cap->m_densePacked = true;
 		double t = GetTime();
@@ -519,6 +518,10 @@ void PicoOscilloscope::SetSampleDepth(uint64_t depth)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(string("DEPTH ") + to_string(depth));
 	m_mdepth = depth;
+
+	//FIXME: set trigger delay
+	int64_t fs_per_sample = FS_PER_SECOND / m_srate;
+	m_triggerOffset = fs_per_sample * m_mdepth/2;
 }
 
 void PicoOscilloscope::SetSampleRate(uint64_t rate)
@@ -527,6 +530,10 @@ void PicoOscilloscope::SetSampleRate(uint64_t rate)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand( string("RATE ") + to_string(rate));
+
+	//FIXME: set trigger delay
+	int64_t fs_per_sample = FS_PER_SECOND / m_srate;
+	m_triggerOffset = fs_per_sample * m_mdepth/2;
 }
 
 void PicoOscilloscope::SetTriggerOffset(int64_t offset)
@@ -534,6 +541,10 @@ void PicoOscilloscope::SetTriggerOffset(int64_t offset)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_triggerOffset = offset;
 	PushTrigger();
+
+	//FIXME: set trigger delay
+	int64_t fs_per_sample = FS_PER_SECOND / m_srate;
+	m_triggerOffset = fs_per_sample * m_mdepth/2;
 }
 
 int64_t PicoOscilloscope::GetTriggerOffset()
