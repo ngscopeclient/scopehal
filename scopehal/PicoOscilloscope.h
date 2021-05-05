@@ -94,7 +94,24 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
+	//ADC configuration
+	virtual std::vector<AnalogBank> GetAnalogBanks();
+	virtual AnalogBank GetAnalogBank(size_t channel);
+	virtual bool IsADCModeConfigurable();
+	virtual std::vector<std::string> GetADCModeNames(size_t channel);
+	virtual size_t GetADCMode(size_t channel);
+	virtual void SetADCMode(size_t channel, size_t mode);
+
+	enum Series
+	{
+		SERIES_6x0xE,	//6000 series with 8 bit resolution only
+		SERIES_6x2xE,	//6000 series with FlexRes
+
+		SERIES_UNKNOWN	//unknown or invalid model name
+	};
+
 protected:
+	void IdentifyHardware();
 
 	//hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
@@ -120,6 +137,8 @@ protected:
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
 	Socket* m_dataSocket;
+
+	Series m_series;
 
 public:
 

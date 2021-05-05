@@ -47,11 +47,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 
-	//Ask the scope how many channels it has
-	m_transport->SendCommand("CHANS?");
-	m_analogChannelCount = stoi(m_transport->ReadReply());
-
-	//TODO: Check digital channels
+	IdentifyHardware();
 
 	//Add channel objects
 	for(size_t i = 0; i < m_analogChannelCount; i++)
@@ -137,6 +133,45 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	m_dataSocket->Connect(csock->GetHostname(), csock->GetPort() + 1);
 	m_dataSocket->DisableNagle();
+}
+
+void PicoOscilloscope::IdentifyHardware()
+{
+	//Figure out device family
+	if(m_model.length() < 5)
+	{
+		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
+		m_series = SERIES_UNKNOWN;
+	}
+	else if(m_model[0] == '6')
+	{
+		switch(m_model[2])
+		{
+			case '2':
+				m_series = SERIES_6x2xE;
+				break;
+
+			case '0':
+				m_series = SERIES_6x0xE;
+				break;
+
+			default:
+				LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
+				m_series = SERIES_UNKNOWN;
+				break;
+		}
+	}
+	else
+	{
+		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
+		m_series = SERIES_UNKNOWN;
+	}
+
+	//Ask the scope how many channels it has
+	m_transport->SendCommand("CHANS?");
+	m_analogChannelCount = stoi(m_transport->ReadReply());
+
+	//TODO: Check digital channels
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -616,4 +651,52 @@ void PicoOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			LogWarning("Unknown edge type\n");
 			return;
 	}
+}
+
+vector<Oscilloscope::AnalogBank> PicoOscilloscope::GetAnalogBanks()
+{
+	vector<AnalogBank> banks;
+	banks.push_back(GetAnalogBank(0));
+	return banks;
+}
+
+Oscilloscope::AnalogBank PicoOscilloscope::GetAnalogBank(size_t /*channel*/)
+{
+	AnalogBank bank;
+	return bank;
+}
+
+bool PicoOscilloscope::IsADCModeConfigurable()
+{
+	switch(m_series)
+	{
+		case SERIES_6x0xE:
+			return false;
+
+		case SERIES_6x2xE:
+			return true;
+
+		default:
+			LogWarning("PicoOscilloscope::IsADCModeConfigurable: unknown series\n");
+			return false;
+	}
+}
+
+vector<string> PicoOscilloscope::GetADCModeNames(size_t /*channel*/)
+{
+	//This is for 6x2xE. Do any others have variable resolution?
+	vector<string> ret;
+	ret.push_back("8 Bit");
+	ret.push_back("10 Bit");
+	ret.push_back("12 Bit");
+	return ret;
+}
+
+size_t PicoOscilloscope::GetADCMode(size_t /*channel*/)
+{
+	return 0;
+}
+
+void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
+{
 }
