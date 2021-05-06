@@ -49,6 +49,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	IdentifyHardware();
 
+	//Set resolution
+	SetADCMode(0, ADC_MODE_8BIT);
+
 	//Add channel objects
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
@@ -694,9 +697,29 @@ vector<string> PicoOscilloscope::GetADCModeNames(size_t /*channel*/)
 
 size_t PicoOscilloscope::GetADCMode(size_t /*channel*/)
 {
-	return 0;
+	return m_adcMode;
 }
 
 void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 {
+	m_adcMode = (ADCMode)mode;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(mode)
+	{
+		case ADC_MODE_8BIT:
+			m_transport->SendCommand("BITS 8");
+			break;
+
+		case ADC_MODE_10BIT:
+			m_transport->SendCommand("BITS 10");
+			break;
+
+		case ADC_MODE_12BIT:
+			m_transport->SendCommand("BITS 12");
+			break;
+
+		default:
+			break;
+	}
 }

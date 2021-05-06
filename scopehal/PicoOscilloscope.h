@@ -110,6 +110,13 @@ public:
 		SERIES_UNKNOWN	//unknown or invalid model name
 	};
 
+	enum ADCMode
+	{
+		ADC_MODE_8BIT	= 0,
+		ADC_MODE_10BIT	= 1,
+		ADC_MODE_12BIT	= 2
+	};
+
 protected:
 	void IdentifyHardware();
 
@@ -133,6 +140,7 @@ protected:
 	uint64_t m_mdepth;
 	int64_t m_triggerOffset;
 	std::map<size_t, double> m_channelAttenuations;
+	ADCMode m_adcMode;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
