@@ -781,6 +781,10 @@ size_t PicoOscilloscope::GetEnabledAnalogChannelCountRange(size_t start, size_t 
 
 bool PicoOscilloscope::CanEnableChannel(size_t i)
 {
+	//If channel is already on, of course it can stay on
+	if(IsChannelEnabled(i))
+		return true;
+
 	//TODO: digital channels
 	//TODO: No penalty for enabling more channels in an already-active digital pod
 	if(i >= m_analogChannelCount)
