@@ -40,7 +40,9 @@ using namespace std;
 
 #define RATE_5GSPS		(5000L * 1000L * 1000L)
 #define RATE_2P5GSPS	(2500L * 1000L * 1000L)
-#define RATE_1P25GSPS	(2500L * 1000L * 1000L)
+#define RATE_1P25GSPS	(1250L * 1000L * 1000L)
+#define RATE_625MSPS	(625L * 1000L * 1000L)
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
@@ -949,6 +951,10 @@ bool PicoOscilloscope::CanEnableChannel6000Series10Bit(size_t i)
 	else if(rate >= RATE_1P25GSPS)
 		return (EnabledChannelCount <= 3);
 
+	//625 Msps allowed up to 8 total channels/pods with no banking restrictions
+	else if(rate >= RATE_625MSPS)
+		return (EnabledChannelCount <= 7);
+
 	//Slow enough that there's no capacity limits
 	else
 		return true;
@@ -995,15 +1001,46 @@ bool PicoOscilloscope::Is10BitModeAvailable()
 	if(m_series != SERIES_6x2xE)
 		return false;
 
-	if(m_analogChannelCount == 8)
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//5 Gsps is easy, just a bandwidth cap
+	if(rate >= RATE_5GSPS)
+		return (EnabledChannelCount <= 1);
+
+	//2.5 Gsps has banking restrictions on 8 channel scopes
+	else if(rate >= RATE_2P5GSPS)
 	{
+		if(EnabledChannelCount > 2)
+			return false;
+
+		else if(m_analogChannelCount == 8)
+		{
+			if(GetEnabledAnalogChannelCountAToB() > 1)
+				return false;
+			else if(GetEnabledAnalogChannelCountCToD() > 1)
+				return false;
+			else if(GetEnabledAnalogChannelCountEToF() > 1)
+				return false;
+			else if(GetEnabledAnalogChannelCountGToH() > 1)
+				return false;
+			else
+				return true;
+		}
+
+		else
+			return true;
 	}
 
+	//1.25 Gsps and 625 Msps are just bandwidth caps
+	else if(rate >= RATE_1P25GSPS)
+		return (EnabledChannelCount <= 4);
+	else if(rate >= RATE_625MSPS)
+		return (EnabledChannelCount <= 8);
+
+	//No capacity limits
 	else
-	{
-	}
-
-	return true;
+		return true;
 }
 
 bool PicoOscilloscope::Is12BitModeAvailable()
@@ -1012,13 +1049,18 @@ bool PicoOscilloscope::Is12BitModeAvailable()
 	if(m_series != SERIES_6x2xE)
 		return false;
 
-	if(m_analogChannelCount == 8)
-	{
-	}
+	int64_t rate = GetSampleRate();
 
+	//12 bit mode only available at 1.25 Gsps and below
+	if(rate > RATE_1P25GSPS)
+		return false;
+
+	//1.25 Gsps and below have the same banking restrictions: at most one channel from the left and right half
 	else
 	{
+		if(m_analogChannelCount == 8)
+			return (GetEnabledAnalogChannelCountAToD() <= 1) && (GetEnabledAnalogChannelCountEToH() <= 1);
+		else
+			return (GetEnabledAnalogChannelCountAToB() <= 1) && (GetEnabledAnalogChannelCountCToD() <= 1);
 	}
-
-	return true;
 }
