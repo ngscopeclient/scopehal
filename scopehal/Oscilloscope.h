@@ -124,7 +124,7 @@ public:
 		@return False if the channel cannot currently be used
 				(due to interleave conflicts or other hardware limitations).
 
-				True if the channel is available.
+				True if the channel is available or is already enabled.
 
 		@param i Zero-based index of channel
 
