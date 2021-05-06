@@ -2731,9 +2731,6 @@ void LeCroyOscilloscope::Stop()
 
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
-
-	//Clear out any pending data (the user doesn't want it, and we don't want stale stuff hanging around)
-	ClearPendingWaveforms();
 }
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
