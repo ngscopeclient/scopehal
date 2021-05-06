@@ -38,6 +38,10 @@
 
 using namespace std;
 
+#define RATE_5GSPS		(5000L * 1000L * 1000L)
+#define RATE_2P5GSPS	(2500L * 1000L * 1000L)
+#define RATE_1P25GSPS	(2500L * 1000L * 1000L)
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
@@ -155,7 +159,10 @@ void PicoOscilloscope::IdentifyHardware()
 				break;
 
 			case '0':
-				m_series = SERIES_6x0xE;
+				if(m_model == "6403E")
+					m_series = SERIES_6403E;
+				else
+					m_series = SERIES_6x0xE;
 				break;
 
 			default:
@@ -674,6 +681,7 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 	switch(m_series)
 	{
 		case SERIES_6x0xE:
+		case SERIES_6403E:
 			return false;
 
 		case SERIES_6x2xE:
@@ -687,11 +695,15 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 
 vector<string> PicoOscilloscope::GetADCModeNames(size_t /*channel*/)
 {
-	//This is for 6x2xE. Do any others have variable resolution?
+	//All scopes with variable resolution start at 8 bit and go up from there
 	vector<string> ret;
 	ret.push_back("8 Bit");
-	ret.push_back("10 Bit");
-	ret.push_back("12 Bit");
+	if(Is10BitModeAvailable())
+	{
+		ret.push_back("10 Bit");
+		if(Is12BitModeAvailable())
+			ret.push_back("12 Bit");
+	}
 	return ret;
 }
 
@@ -722,4 +734,287 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 		default:
 			break;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Checking for validity of configurations
+
+/**
+	@brief Returns the total number of analog channels which are currently enabled
+ */
+size_t PicoOscilloscope::GetEnabledAnalogChannelCount()
+{
+	size_t ret = 0;
+	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
+		if(IsChannelEnabled(i))
+			ret ++;
+	}
+	return ret;
+}
+
+/**
+	@brief Returns the total number of 8-bit MSO pods which are currently enabled
+ */
+size_t PicoOscilloscope::GetEnabledDigitalPodCount()
+{
+	//MSO pods not implemented yet
+	return false;
+}
+
+/**
+	@brief Returns the total number of analog channels in the requested range which are currently enabled
+ */
+size_t PicoOscilloscope::GetEnabledAnalogChannelCountRange(size_t start, size_t end)
+{
+	if(end >= m_analogChannelCount)
+		end = m_analogChannelCount - 1;
+
+	size_t n = 0;
+	for(size_t i = start; i <= end; i++)
+	{
+		if(IsChannelEnabled(i))
+			n ++;
+	}
+	return n;
+}
+
+bool PicoOscilloscope::CanEnableChannel(size_t i)
+{
+	//TODO: digital channels
+	//TODO: No penalty for enabling more channels in an already-active digital pod
+	if(i >= m_analogChannelCount)
+		return false;
+
+	switch(m_series)
+	{
+		//6000 series
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+			switch(GetADCMode(0))
+			{
+				case ADC_MODE_8BIT:
+					return CanEnableChannel6000Series8Bit(i);
+
+				case ADC_MODE_10BIT:
+					return CanEnableChannel6000Series10Bit(i);
+
+				case ADC_MODE_12BIT:
+					return CanEnableChannel6000Series12Bit(i);
+
+				default:
+					break;
+			}
+		default:
+			break;
+	}
+
+	//When in doubt, assume all channels are available
+	LogWarning("PicoOscilloscope::CanEnableChannel: Unknown ADC mode\n");
+	return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 6000 series scope configured for 8-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//5 Gsps is the most restrictive configuration.
+	if(rate >= RATE_5GSPS)
+	{
+		//If we already have too many channels/MSO pods active, we're out of RAM bandwidth.
+		if(EnabledChannelCount >= 2)
+			return false;
+
+		//6403E only allows *one* 5 Gsps channel
+		else if(m_series == SERIES_6403E)
+			return (EnabledChannelCount == 0);
+
+		//On 8 channel scopes, we can use one channel from the left bank (ABCD) and one from the right (EFGH).
+		else if(m_analogChannelCount == 8)
+		{
+			//Can enable a left bank channel if there's none in use
+			if(i < 4)
+				return (GetEnabledAnalogChannelCountAToD() == 0);
+
+			//Can enable a right bank channel if there's none in use
+			else
+				return (GetEnabledAnalogChannelCountEToH() == 0);
+		}
+
+		//On 4 channel scopes, we can use one channel from the left bank (AB) and one from the right (CD)
+		else
+		{
+			//Can enable a left bank channel if there's none in use
+			if(i < 2)
+				return (GetEnabledAnalogChannelCountAToB() == 0);
+
+			//Can enable a right bank channel if there's none in use
+			else
+				return (GetEnabledAnalogChannelCountCToD() == 0);
+		}
+	}
+
+	//2.5 Gsps allows more stuff
+	else if(rate >= RATE_2P5GSPS)
+	{
+		//If we already have too many channels/MSO pods active, we're out of RAM bandwidth.
+		if(EnabledChannelCount >= 4)
+			return false;
+
+		//6403E allows up to 2 channels, one AB and one CD
+		else if(m_series == SERIES_6403E)
+		{
+			//Can enable a left bank channel if there's none in use
+			if(i < 2)
+				return (GetEnabledAnalogChannelCountAToB() == 0);
+
+			//Can enable a right bank channel if there's none in use
+			else
+				return (GetEnabledAnalogChannelCountCToD() == 0);
+		}
+
+		//8 channel scopes allow up to 4 channels but only one from A/B, C/D, E/F, G/H
+		else if(m_analogChannelCount == 8)
+		{
+			if(i < 2)
+				return (GetEnabledAnalogChannelCountAToB() == 0);
+			else if(i < 4)
+				return (GetEnabledAnalogChannelCountCToD() == 0);
+			else if(i < 6)
+				return (GetEnabledAnalogChannelCountEToF() == 0);
+			else
+				return (GetEnabledAnalogChannelCountGToH() == 0);
+		}
+
+		//On 4 channel scopes, we can run everything at 2.5 Gsps
+		else
+			return true;
+	}
+
+	//1.25 Gsps - just RAM bandwidth check
+	else if( (rate >= RATE_1P25GSPS) && (EnabledChannelCount >= 8) )
+		return true;
+
+	//Slow enough that there's no capacity limits
+	else
+		return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 6000 series scope configured for 10-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel6000Series10Bit(size_t i)
+{
+	int64_t rate = GetSampleRate();
+	size_t EnabledChannelCount = GetEnabledAnalogChannelCount() + GetEnabledDigitalPodCount();
+
+	//5 Gsps is only allowed on a single channel/pod
+	if(rate >= RATE_5GSPS)
+		return (EnabledChannelCount == 0);
+
+	//2.5 Gsps is allowed up to two channels/pods
+	else if(rate >= RATE_2P5GSPS)
+	{
+		//Out of bandwidth
+		if(EnabledChannelCount >= 2)
+			return false;
+
+		//8 channel scopes require the two channels to be in separate banks
+		else if(m_analogChannelCount == 8)
+		{
+			//Can enable a left bank channel if there's none in use
+			if(i < 4)
+				return (GetEnabledAnalogChannelCountAToD() == 0);
+
+			//Can enable a right bank channel if there's none in use
+			else
+				return (GetEnabledAnalogChannelCountEToH() == 0);
+		}
+
+		//No banking restrictions on 4 channel scopes
+		else
+			return true;
+	}
+
+	//1.25 Gsps is allowed up to 4 total channels/pods with no banking restrictions
+	else if(rate >= RATE_1P25GSPS)
+		return (EnabledChannelCount <= 3);
+
+	//Slow enough that there's no capacity limits
+	else
+		return true;
+}
+
+/**
+	@brief Checks if we can enable a channel on a 6000 series scope configured for 12-bit ADC resolution
+ */
+bool PicoOscilloscope::CanEnableChannel6000Series12Bit(size_t i)
+{
+	//Too many channels enabled?
+	if(GetEnabledAnalogChannelCount() >= 2)
+		return false;
+
+	int64_t rate = GetSampleRate();
+	if(rate > RATE_1P25GSPS)
+		return false;
+	else if(m_analogChannelCount == 8)
+	{
+		//Can enable a left bank channel if there's none in use
+		if(i < 4)
+			return (GetEnabledAnalogChannelCountAToD() == 0);
+
+		//Can enable a right bank channel if there's none in use
+		else
+			return (GetEnabledAnalogChannelCountEToH() == 0);
+	}
+
+	else
+	{
+		//Can enable a left bank channel if there's none in use
+		if(i < 2)
+			return (GetEnabledAnalogChannelCountAToB() == 0);
+
+		//Can enable a right bank channel if there's none in use
+		else
+			return (GetEnabledAnalogChannelCountCToD() == 0);
+	}
+}
+
+bool PicoOscilloscope::Is10BitModeAvailable()
+{
+	//FlexRes only available on one series at the moment
+	if(m_series != SERIES_6x2xE)
+		return false;
+
+	if(m_analogChannelCount == 8)
+	{
+	}
+
+	else
+	{
+	}
+
+	return true;
+}
+
+bool PicoOscilloscope::Is12BitModeAvailable()
+{
+	//FlexRes only available on one series at the moment
+	if(m_series != SERIES_6x2xE)
+		return false;
+
+	if(m_analogChannelCount == 8)
+	{
+	}
+
+	else
+	{
+	}
+
+	return true;
 }

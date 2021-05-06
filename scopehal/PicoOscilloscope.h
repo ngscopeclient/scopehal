@@ -68,6 +68,7 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger();
 	virtual double GetChannelOffset(size_t i);
 	virtual void SetChannelOffset(size_t i, double offset);
+	virtual bool CanEnableChannel(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -104,6 +105,7 @@ public:
 
 	enum Series
 	{
+		SERIES_6403E,	//Lowest end 6000E model has less ADCs
 		SERIES_6x0xE,	//6000 series with 8 bit resolution only
 		SERIES_6x2xE,	//6000 series with FlexRes
 
@@ -119,6 +121,31 @@ public:
 
 protected:
 	void IdentifyHardware();
+
+	//Helpers for determining legal configurations
+	bool Is10BitModeAvailable();
+	bool Is12BitModeAvailable();
+	size_t GetEnabledAnalogChannelCount();
+	size_t GetEnabledDigitalPodCount();
+
+	size_t GetEnabledAnalogChannelCountRange(size_t start, size_t end);
+
+	size_t GetEnabledAnalogChannelCountAToD()
+	{ return GetEnabledAnalogChannelCountRange(0, 3); }
+	size_t GetEnabledAnalogChannelCountEToH()
+	{ return GetEnabledAnalogChannelCountRange(4, 7); }
+	size_t GetEnabledAnalogChannelCountAToB()
+	{ return GetEnabledAnalogChannelCountRange(0, 1); }
+	size_t GetEnabledAnalogChannelCountCToD()
+	{ return GetEnabledAnalogChannelCountRange(2, 3); }
+	size_t GetEnabledAnalogChannelCountEToF()
+	{ return GetEnabledAnalogChannelCountRange(4, 5); }
+	size_t GetEnabledAnalogChannelCountGToH()
+	{ return GetEnabledAnalogChannelCountRange(6, 7); }
+
+	bool CanEnableChannel6000Series8Bit(size_t i);
+	bool CanEnableChannel6000Series10Bit(size_t i);
+	bool CanEnableChannel6000Series12Bit(size_t i);
 
 	//hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
