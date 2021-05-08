@@ -485,6 +485,7 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 	size_t length;
 	int ignored;
 	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	bool any_data = false;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
@@ -496,11 +497,10 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		int rc = sscanf(reply.c_str(), "%lf,%lf,%zu,%d", &xstart, &xstop, &length, &ignored);
 		if (rc != 4 || length == 0) {
 			/* No data - Skip query the scope and move on */
-			AnalogWaveform* cap = new AnalogWaveform;
-			cap->Resize(0);
-			pending_waveforms[i].push_back(cap);
+			pending_waveforms[i].push_back(NULL);
 			continue;
 		}
+		any_data = true;
 		//Figure out the sample rate
 		double capture_len_sec = xstop - xstart;
 		double sec_per_sample = capture_len_sec / length;
@@ -548,7 +548,17 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Clean up
 		delete[] temp_buf;
 	}
+	if (!any_data) {
+		LogDebug("Skip update, no data from scope\n");
+		//Re-arm the trigger if not in one-shot mode
+		if(!m_triggerOneShot)
+		{
+			m_transport->SendCommand("SING");
+			m_triggerArmed = true;
+		}
 
+		return false;
+	}
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
 	size_t num_pending = 1;	//TODO: segmented capture support
