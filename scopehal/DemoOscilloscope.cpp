@@ -486,6 +486,7 @@ bool DemoOscilloscope::AcquireData()
 		wfm->m_startTimestamp = start;
 		wfm->m_startFemtoseconds = fs;
 		wfm->m_triggerPhase = 0;
+		wfm->m_densePacked = true;
 	}
 
 	m_pendingWaveformsMutex.lock();
