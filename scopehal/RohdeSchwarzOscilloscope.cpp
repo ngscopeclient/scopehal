@@ -558,6 +558,7 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Clean up
 		delete[] temp_buf;
 	}
+
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
 	size_t num_pending = 1;	//TODO: segmented capture support
