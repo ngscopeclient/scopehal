@@ -119,6 +119,14 @@ public:
 		ADC_MODE_12BIT	= 2
 	};
 
+	bool IsDigitalPodPresent(size_t npod);
+	bool IsDigitalPodActive(size_t npod);
+	bool IsChannelIndexDigital(size_t i);
+	size_t GetDigitalPodIndex(size_t i)
+	{ return (i - m_digitalChannelBase) / 8; }
+	size_t GetDigitalLaneIndex(size_t i)
+	{ return (i - m_digitalChannelBase) % 8; }
+
 protected:
 	void IdentifyHardware();
 
@@ -147,8 +155,12 @@ protected:
 	bool CanEnableChannel6000Series10Bit(size_t i);
 	bool CanEnableChannel6000Series12Bit(size_t i);
 
+	std::string GetChannelColor(size_t i);
+
 	//hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
+	size_t m_digitalChannelBase;
+	size_t m_digitalChannelCount;
 
 	OscilloscopeChannel* m_extTrigChannel;
 
@@ -168,6 +180,7 @@ protected:
 	int64_t m_triggerOffset;
 	std::map<size_t, double> m_channelAttenuations;
 	ADCMode m_adcMode;
+	std::map<int, bool> m_digitalBankPresent;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 

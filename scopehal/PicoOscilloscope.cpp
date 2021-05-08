@@ -58,52 +58,22 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	//Set resolution
 	SetADCMode(0, ADC_MODE_8BIT);
 
-	//Add channel objects
+	//Add analog channel objects
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		//Hardware name of the channel
 		string chname = "A";
 		chname[0] += i;
 
-		//Color the channels based on Pico's standard color sequence (blue-red-green-yellow-purple-gray-cyan-magenta)
-		string color = "#ffffff";
-		switch(i)
-		{
-			case 0:
-				color = "#4040ff";
-				break;
-
-			case 1:
-				color = "#ff4040";
-				break;
-
-			case 2:
-				color = "#208020";
-				break;
-
-			case 3:
-				color = "#ffff00";
-				break;
-
-			case 4:
-				color = "#600080";
-				break;
-
-			case 5:
-				color = "#808080";
-				break;
-
-			case 6:
-				color = "#40a0a0";
-				break;
-
-			case 7:
-				color = "#e040e0";
-				break;
-		}
-
 		//Create the channel
-		auto chan = new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, 1, i, true);
+		auto chan = new OscilloscopeChannel(
+			this,
+			chname,
+			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+			GetChannelColor(i),
+			1,
+			i,
+			true);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -114,8 +84,36 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		SetChannelVoltageRange(i, 5);
 	}
 
-	//Set initial memory configuration
-	SetSampleRate(1250000000L);
+	//Add digital channels (named 1D0...7 and 2D0...7)
+	m_digitalChannelBase = m_analogChannelCount;
+	for(size_t i=0; i<m_digitalChannelCount; i++)
+	{
+		//Hardware name of the channel
+		size_t ibank = i / 8;
+		size_t ichan = i % 8;
+		string chname = "1D0";
+		chname[0] += ibank;
+		chname[2] += ichan;
+
+		//Create the channel
+		auto chan = new OscilloscopeChannel(
+			this,
+			chname,
+			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			GetChannelColor(ichan),
+			1,
+			i + m_digitalChannelBase,
+			true);
+		m_channels.push_back(chan);
+		chan->SetDefaultDisplayName();
+
+		//TODO: set up threshold/hysteresis
+	}
+
+	//Set initial memory configuration.
+	//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
+	//TODO: pick reasonable default for other families
+	SetSampleRate(625000000L);
 	SetSampleDepth(1000000);
 
 	//Add the external trigger input
@@ -144,8 +142,45 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	m_dataSocket->DisableNagle();
 }
 
+/**
+	@brief Color the channels based on Pico's standard color sequence (blue-red-green-yellow-purple-gray-cyan-magenta)
+ */
+string PicoOscilloscope::GetChannelColor(size_t i)
+{
+	switch(i % 8)
+	{
+		case 0:
+			return "#4040ff";
+
+		case 1:
+			return "#ff4040";
+
+		case 2:
+			return "#208020";
+
+		case 3:
+			return "#ffff00";
+
+		case 4:
+			return "#600080";
+
+		case 5:
+			return "#808080";
+
+		case 6:
+			return "#40a0a0";
+
+		case 7:
+		default:
+			return "#e040e0";
+	}
+}
+
 void PicoOscilloscope::IdentifyHardware()
 {
+	//Assume no MSO channels to start
+	m_digitalChannelCount = 0;
+
 	//Figure out device family
 	if(m_model.length() < 5)
 	{
@@ -154,6 +189,9 @@ void PicoOscilloscope::IdentifyHardware()
 	}
 	else if(m_model[0] == '6')
 	{
+		//We have two MSO pod connectors
+		m_digitalChannelCount = 16;
+
 		switch(m_model[2])
 		{
 			case '2':
@@ -182,8 +220,6 @@ void PicoOscilloscope::IdentifyHardware()
 	//Ask the scope how many channels it has
 	m_transport->SendCommand("CHANS?");
 	m_analogChannelCount = stoi(m_transport->ReadReply());
-
-	//TODO: Check digital channels
 }
 
 PicoOscilloscope::~PicoOscilloscope()
@@ -209,7 +245,10 @@ string PicoOscilloscope::GetDriverNameInternal()
 
 void PicoOscilloscope::FlushConfigCache()
 {
-	//no-op
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+	//clear probe presence flags as those can change without our knowledge
+	m_digitalBankPresent.clear();
 }
 
 bool PicoOscilloscope::IsChannelEnabled(size_t i)
@@ -224,6 +263,19 @@ bool PicoOscilloscope::IsChannelEnabled(size_t i)
 
 void PicoOscilloscope::EnableChannel(size_t i)
 {
+	//If the pod is already active we don't have to touch anything scope side.
+	//Update the cache and we're done.
+	if(IsChannelIndexDigital(i))
+	{
+		size_t npod = GetDigitalPodIndex(i);
+		if(IsDigitalPodActive(npod))
+		{
+			lock_guard<recursive_mutex> lock(m_cacheMutex);
+			m_channelsEnabled[i] = true;
+			return;
+		}
+	}
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelsEnabled[i] = true;
@@ -238,6 +290,14 @@ void PicoOscilloscope::DisableChannel(size_t i)
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelsEnabled[i] = false;
+	}
+
+	//If the pod still has active channels after turning this one off, we don't have to touch anything scope side.
+	if(IsChannelIndexDigital(i))
+	{
+		size_t npod = GetDigitalPodIndex(i);
+		if(IsDigitalPodActive(npod))
+			return;
 	}
 
 	lock_guard<recursive_mutex> lock(m_mutex);
@@ -760,8 +820,12 @@ size_t PicoOscilloscope::GetEnabledAnalogChannelCount()
  */
 size_t PicoOscilloscope::GetEnabledDigitalPodCount()
 {
-	//MSO pods not implemented yet
-	return false;
+	size_t n = 0;
+	if(IsDigitalPodActive(0))
+		n++;
+	if(IsDigitalPodActive(1))
+		n++;
+	return n;
 }
 
 /**
@@ -781,17 +845,77 @@ size_t PicoOscilloscope::GetEnabledAnalogChannelCountRange(size_t start, size_t 
 	return n;
 }
 
+/**
+	@brief Check if a MSO pod is present
+ */
+bool PicoOscilloscope::IsDigitalPodPresent(size_t npod)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_digitalBankPresent.find(npod) != m_digitalBankPresent.end())
+			return m_digitalBankPresent[npod];
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(to_string(npod + 1) + "D:PRESENT?");
+	int present = stoi(m_transport->ReadReply());
+
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
+	if(present)
+	{
+		m_digitalBankPresent[npod] = true;
+		return true;
+	}
+	else
+	{
+		m_digitalBankPresent[npod] = false;
+		return false;
+	}
+}
+
+/**
+	@brief Check if any channels in an MSO pod are enabled
+ */
+bool PicoOscilloscope::IsDigitalPodActive(size_t npod)
+{
+	size_t base = m_digitalChannelBase + 8*npod;
+	for(size_t i=0; i<8; i++)
+	{
+		if(IsChannelEnabled(base+i))
+			return true;
+	}
+	return false;
+}
+
+/**
+	@brief Checks if a channel index refers to a MSO channel
+ */
+bool PicoOscilloscope::IsChannelIndexDigital(size_t i)
+{
+	return (i >= m_digitalChannelBase) && (i < m_digitalChannelBase + m_digitalChannelCount);
+}
+
 bool PicoOscilloscope::CanEnableChannel(size_t i)
 {
 	//If channel is already on, of course it can stay on
 	if(IsChannelEnabled(i))
 		return true;
 
-	//TODO: digital channels
-	//TODO: No penalty for enabling more channels in an already-active digital pod
-	if(i >= m_analogChannelCount)
-		return false;
+	//Digital channels
+	if(IsChannelIndexDigital(i))
+	{
+		size_t npod = GetDigitalPodIndex(i);
 
+		//If the pod isn't here, we can't enable it
+		if(!IsDigitalPodPresent(npod))
+			return false;
+
+		//If other channels in the pod are already active, we can enable them
+		if(IsDigitalPodActive(npod))
+			return true;
+	}
+
+	//Fall back to the main path if we get here
 	switch(m_series)
 	{
 		//6000 series
@@ -840,6 +964,10 @@ bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
 		else if(m_series == SERIES_6403E)
 			return (EnabledChannelCount == 0);
 
+		//No banking restrictions for MSO pods if we have enough memory bandwidth
+		else if(IsChannelIndexDigital(i))
+			return true;
+
 		//On 8 channel scopes, we can use one channel from the left bank (ABCD) and one from the right (EFGH).
 		else if(m_analogChannelCount == 8)
 		{
@@ -872,6 +1000,10 @@ bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
 		if(EnabledChannelCount >= 4)
 			return false;
 
+		//No banking restrictions for MSO pods if we have enough memory bandwidth
+		else if(IsChannelIndexDigital(i))
+			return true;
+
 		//6403E allows up to 2 channels, one AB and one CD
 		else if(m_series == SERIES_6403E)
 		{
@@ -903,7 +1035,7 @@ bool PicoOscilloscope::CanEnableChannel6000Series8Bit(size_t i)
 	}
 
 	//1.25 Gsps - just RAM bandwidth check
-	else if( (rate >= RATE_1P25GSPS) && (EnabledChannelCount >= 8) )
+	else if( (rate >= RATE_1P25GSPS) && (EnabledChannelCount <= 7) )
 		return true;
 
 	//Slow enough that there's no capacity limits
@@ -929,6 +1061,10 @@ bool PicoOscilloscope::CanEnableChannel6000Series10Bit(size_t i)
 		//Out of bandwidth
 		if(EnabledChannelCount >= 2)
 			return false;
+
+		//No banking restrictions on MSO pods
+		else if(IsChannelIndexDigital(i))
+			return true;
 
 		//8 channel scopes require the two channels to be in separate banks
 		else if(m_analogChannelCount == 8)
@@ -965,13 +1101,19 @@ bool PicoOscilloscope::CanEnableChannel6000Series10Bit(size_t i)
  */
 bool PicoOscilloscope::CanEnableChannel6000Series12Bit(size_t i)
 {
+	int64_t rate = GetSampleRate();
+
 	//Too many channels enabled?
 	if(GetEnabledAnalogChannelCount() >= 2)
 		return false;
 
-	int64_t rate = GetSampleRate();
-	if(rate > RATE_1P25GSPS)
+	else if(rate > RATE_1P25GSPS)
 		return false;
+
+	//No banking restrictions on MSO pods
+	else if(IsChannelIndexDigital(i))
+		return true;
+
 	else if(m_analogChannelCount == 8)
 	{
 		//Can enable a left bank channel if there's none in use
