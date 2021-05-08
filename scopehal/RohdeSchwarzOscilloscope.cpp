@@ -27,6 +27,16 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+/*
+ * Current State
+ * =============
+ * - Digital channels not implemented
+ * - Only basic edge trigger supported. Coupling, hysteresis, B trigger not implemented
+ * 
+ * RS Oscilloscope driver parts (c) 2021 Francisco Sedano, tested on RTM3004 
+ */
+
+
 #include "scopehal.h"
 #include "RohdeSchwarzOscilloscope.h"
 #include "EdgeTrigger.h"
@@ -548,7 +558,6 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Clean up
 		delete[] temp_buf;
 	}
-
 	//Now that we have all of the pending waveforms, save them in sets across all channels
 	m_pendingWaveformsMutex.lock();
 	size_t num_pending = 1;	//TODO: segmented capture support
@@ -763,11 +772,36 @@ void RohdeSchwarzOscilloscope::PushTrigger()
 /**
 	@brief Pushes settings for an edge trigger to the instrument
  */
-void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* /*trig*/ )
+void RohdeSchwarzOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
+	char tmp[81];
 
-	//TODO unimplemented
+	// They use CH1, CH2 and so on here :-(
+
+	snprintf(tmp, sizeof(tmp), "TRIG:A:SOUR CH%zd", trig->GetInput(0).m_channel->GetIndex()+1);
+	m_transport->SendCommand(tmp);
+
+	snprintf(tmp, sizeof(tmp), "TRIG:A:LEV%zd %f", trig->GetInput(0).m_channel->GetIndex()+1, trig->GetLevel());
+	m_transport->SendCommand(tmp);
+
+	string slope_str;
+	switch(trig->GetType())
+	{
+		case EdgeTrigger::EDGE_RISING:
+			slope_str = "POS";
+			break;
+		case EdgeTrigger::EDGE_FALLING:
+			slope_str = "NEG";
+			break;
+		case EdgeTrigger::EDGE_ANY:
+			slope_str = "EITH";
+			break;
+		default:
+			LogDebug("Unsupported edge type: %d\n", trig->GetType());
+			return;
+	}
+	m_transport->SendCommand("TRIG:A:EDGE:SLOP " + slope_str);
 }
 
 /**
