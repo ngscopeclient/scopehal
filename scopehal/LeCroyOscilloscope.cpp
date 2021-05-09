@@ -2155,25 +2155,24 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		cap->Resize(num_per_segment);
 
 		//Convert raw ADC samples to volts
-		//TODO: Optimized AVX conversion for 16-bit samples
-		float* samps = reinterpret_cast<float*>(&cap->m_samples[0]);
 		if(m_highDefinition)
 		{
-			int16_t* base = wdata + j*num_per_segment;
-
-			for(unsigned int k=0; k<num_per_segment; k++)
-			{
-				cap->m_offsets[k] = k;
-				cap->m_durations[k] = 1;
-				samps[k] = base[k] * v_gain - v_off;
-			}
+			Convert16BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				wdata + j*num_per_segment,
+				v_gain,
+				v_off,
+				num_per_segment,
+				0);
 		}
 		else
 		{
 			Convert8BitSamples(
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
-				samps,
+				(float*)&cap->m_samples[0],
 				bdata + j*num_per_segment,
 				v_gain,
 				v_off,
