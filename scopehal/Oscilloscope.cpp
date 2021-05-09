@@ -41,7 +41,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <dirent.h>
+
 #include <immintrin.h>
+#include <omp.h>
 
 #include "EdgeTrigger.h"
 
@@ -580,13 +582,68 @@ bool Oscilloscope::HasFrequencyControls()
 void Oscilloscope::Convert8BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
-	//Switch to faster AVX version if available
-	if(g_hasAvx2)
+	//Divide large waveforms (>1M points) into blocks and multithread them
+	//TODO: tune split
+	if(count > 1000000)
 	{
-		Convert8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
-		return;
+		//Round blocks to multiples of 32 samples for clean vectorization
+		size_t numblocks = omp_get_max_threads();
+		size_t lastblock = numblocks - 1;
+		size_t blocksize = count / numblocks;
+		blocksize = blocksize - (blocksize % 32);
+
+		#pragma omp parallel for
+		for(size_t i=0; i<numblocks; i++)
+		{
+			//Last block gets any extra that didn't divide evenly
+			size_t nsamp = blocksize;
+			if(i == lastblock)
+				nsamp = count - i*blocksize;
+
+			size_t off = i*blocksize;
+			if(g_hasAvx2)
+			{
+				Convert8BitSamplesAVX2(
+					offs + off,
+					durs + off,
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp,
+					ibase + off);
+			}
+			else
+			{
+				Convert8BitSamplesGeneric(
+					offs + off,
+					durs + off,
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp,
+					ibase + off);
+			}
+		}
 	}
 
+	//Small waveforms get done single threaded to avoid overhead
+	else
+	{
+		if(g_hasAvx2)
+			Convert8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+		else
+			Convert8BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
+	}
+}
+
+/**
+	@brief Generic backend for Convert8BitSamples()
+ */
+void Oscilloscope::Convert8BitSamplesGeneric(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
 	for(unsigned int k=0; k<count; k++)
 	{
 		offs[k] = ibase + k;
