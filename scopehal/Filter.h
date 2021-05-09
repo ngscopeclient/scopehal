@@ -246,6 +246,9 @@ public:
 
 	static void ClearAnalysisCache();
 
+	//Checksum helpers
+	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
+
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i, size_t stream);

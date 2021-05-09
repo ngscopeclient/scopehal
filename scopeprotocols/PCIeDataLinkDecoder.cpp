@@ -637,26 +637,11 @@ uint16_t PCIeDataLinkDecoder::CalculateDllpCRC(uint8_t type, uint8_t* data)
  */
 uint32_t PCIeDataLinkDecoder::CalculateTlpCRC(Packet* pack)
 {
-	uint32_t poly = 0xedb88320;
-
-	size_t len = pack->m_data.size();
-	uint32_t crc = 0xffffffff;
-	for(size_t n=0; n<len; n++)
-	{
-		uint8_t d = pack->m_data[n];
-		for(int i=0; i<8; i++)
-		{
-			bool b = ( crc ^ (d >> i) ) & 1;
-			crc >>= 1;
-			if(b)
-				crc ^= poly;
-		}
-	}
-
-	return ~(	((crc & 0x000000ff) << 24) |
-				((crc & 0x0000ff00) << 8) |
-				((crc & 0x00ff0000) >> 8) |
-				 (crc >> 24) );
+	auto len = pack->m_data.size();
+	if(len == 0)
+		return 0xffffffff;
+	else
+		return CRC32(pack->m_data, 0, len - 1);
 }
 
 Gdk::Color PCIeDataLinkDecoder::GetColor(int i)

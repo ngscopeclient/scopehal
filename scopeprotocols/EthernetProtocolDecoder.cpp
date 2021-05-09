@@ -140,6 +140,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 	segment.m_type = EthernetFrameSegment::TYPE_INVALID;
 	size_t start = 0;
 	size_t len = bytes.size();
+	size_t crcstart = 0;
+	uint32_t crc_expected = 0;
+	uint32_t crc_actual = 0;
 	for(size_t i=0; i<len; i++)
 	{
 		switch(segment.m_type)
@@ -187,6 +190,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 					//Set up for data
 					segment.m_type = EthernetFrameSegment::TYPE_DST_MAC;
 					segment.m_data.clear();
+
+					crcstart = i+1;
 
 					//Save to the PCAP file, if open
 					if(m_fpOut)
@@ -448,27 +453,38 @@ void EthernetProtocolDecoder::BytesToFrames(
 				if(i == bytes.size() - 5)
 				{
 					segment.m_data.clear();
-					segment.m_type = EthernetFrameSegment::TYPE_FCS;
+					segment.m_type = EthernetFrameSegment::TYPE_FCS_GOOD;
 				}
 				else
 					pack->m_data.push_back(bytes[i]);
 				break;
 
-			case EthernetFrameSegment::TYPE_FCS:
+			case EthernetFrameSegment::TYPE_FCS_GOOD:
 
 				//Start of FCS? Record start time
 				if(segment.m_data.empty())
 				{
+					crc_expected = CRC32(bytes, crcstart, i-1);
+
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
 				}
 
 				//Add the data
 				segment.m_data.push_back(bytes[i]);
+				crc_actual = (crc_actual << 8) | bytes[i];
 
 				//Are we done? Add it
 				if(segment.m_data.size() == 4)
 				{
+					//Validate CRC
+					if(crc_actual != crc_expected)
+					{
+						segment.m_type = EthernetFrameSegment::TYPE_FCS_BAD;
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						pack->m_displayForegroundColor = Gdk::Color("#ffffff");
+					}
+
 					cap->m_durations.push_back( (ends[i] - start)/ cap->m_timescale);
 					cap->m_samples.push_back(segment);
 
@@ -514,9 +530,10 @@ Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
 			return m_standardColors[COLOR_CONTROL];
 
-		//TODO: verify checksum
-		case EthernetFrameSegment::TYPE_FCS:
+		case EthernetFrameSegment::TYPE_FCS_GOOD:
 			return m_standardColors[COLOR_CHECKSUM_OK];
+		case EthernetFrameSegment::TYPE_FCS_BAD:
+			return m_standardColors[COLOR_CHECKSUM_BAD];
 
 		//Signal has entirely disappeared
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
@@ -690,7 +707,8 @@ string EthernetProtocolDecoder::GetText(int i)
 				return tmp;
 			}
 
-		case EthernetFrameSegment::TYPE_FCS:
+		case EthernetFrameSegment::TYPE_FCS_GOOD:
+		case EthernetFrameSegment::TYPE_FCS_BAD:
 			{
 				if(sample.m_data.size() != 4)
 					return "[invalid FCS length]";

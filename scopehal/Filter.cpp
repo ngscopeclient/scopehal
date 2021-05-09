@@ -1174,3 +1174,29 @@ DigitalWaveform* Filter::SetupDigitalOutputWaveform(WaveformBase* din, size_t st
 
 	return cap;
 }
+
+/**
+	@brief Calculates a CRC32 checksum using the standard Ethernet polynomial
+ */
+uint32_t Filter::CRC32(vector<uint8_t>& bytes, size_t start, size_t end)
+{
+	uint32_t poly = 0xedb88320;
+
+	uint32_t crc = 0xffffffff;
+	for(size_t n=start; n <= end; n++)
+	{
+		uint8_t d = bytes[n];
+		for(int i=0; i<8; i++)
+		{
+			bool b = ( crc ^ (d >> i) ) & 1;
+			crc >>= 1;
+			if(b)
+				crc ^= poly;
+		}
+	}
+
+	return ~(	((crc & 0x000000ff) << 24) |
+				((crc & 0x0000ff00) << 8) |
+				((crc & 0x00ff0000) >> 8) |
+				 (crc >> 24) );
+}
