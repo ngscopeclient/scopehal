@@ -898,7 +898,7 @@ void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_seque
 			//If a multi-segment capture, ask for the trigger time data
 			if((num_sequences > 1) && !sent_wavetime)
 			{
-				sendOnly("%s:HISTORY TIME?", m_channels[i]->GetHwname());
+				sendOnly("%s:HISTORY TIME?", m_channels[i]->GetHwname().c_str());
 				sent_wavetime = true;
 			}
 
@@ -2684,19 +2684,19 @@ void SiglentSCPIOscilloscope::PushCondition(const string& path, Trigger::Conditi
 	switch(cond)
 	{
 		case Trigger::CONDITION_LESS:
-			sendOnly("%s:LIMIT LESSTHAN", path);
+			sendOnly("%s:LIMIT LESSTHAN", path.c_str());
 			break;
 
 		case Trigger::CONDITION_GREATER:
-			sendOnly("%s:LIMIT GREATERTHAN", path);
+			sendOnly("%s:LIMIT GREATERTHAN", path.c_str());
 			break;
 
 		case Trigger::CONDITION_BETWEEN:
-			sendOnly("%s:LIMIT INNER", path);
+			sendOnly("%s:LIMIT INNER", path.c_str());
 			break;
 
 		case Trigger::CONDITION_NOT_BETWEEN:
-			sendOnly("%s:LIMIT OUTER", path);
+			sendOnly("%s:LIMIT OUTER", path.c_str());
 			break;
 
 		//Other values are not legal here, it seems
