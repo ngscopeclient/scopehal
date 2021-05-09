@@ -715,6 +715,14 @@ public:
 	 */
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sample format conversion
+protected:
+	void Convert8BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void Convert8BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+
 public:
 	bool HasPendingWaveforms();
 	void ClearPendingWaveforms();

@@ -41,6 +41,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <immintrin.h>
 
 #include "EdgeTrigger.h"
 
@@ -568,4 +569,130 @@ int64_t Oscilloscope::GetResolutionBandwidth()
 bool Oscilloscope::HasFrequencyControls()
 {
 	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers for converting raw ADC samples to fp32 waveforms
+
+/**
+	@brief Converts 8-bit ADC samples to floating point
+ */
+void Oscilloscope::Convert8BitSamples(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	for(unsigned int k=0; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
+}
+
+/**
+	@brief Optimized version of Convert8BitSamples()
+ */
+__attribute__((target("avx2")))
+void Oscilloscope::Convert8BitSamplesAVX2(
+	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	unsigned int end = count - (count % 32);
+
+	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
+	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
+	int64_t __attribute__ ((aligned(32))) count_x4[] =
+	{
+		ibase + 0,
+		ibase + 1,
+		ibase + 2,
+		ibase + 3
+	};
+
+	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
+	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
+	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(unsigned int k=0; k<end; k += 32)
+	{
+		//Load all 32 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
+
+		//Extract the low and high 16 samples from the block
+		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
+		__m128i block23_x8 = _mm256_extracti128_si256(raw_samples, 1);
+
+		//Swap the low and high halves of these vectors
+		//Ugly casting needed because all permute instrinsics expect float/double datatypes
+		__m128i block10_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block01_x8), 1));
+		__m128i block32_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block23_x8), 1));
+
+		//Divide into blocks of 8 samples and sign extend to 32 bit
+		__m256i block0_int = _mm256_cvtepi8_epi32(block01_x8);
+		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
+		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
+		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+
+		//Convert the 32-bit int blocks to float.
+		//Apparently there's no direct epi8 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_int);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_int);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_int);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_int);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
+
+		block0_float = _mm256_sub_ps(block0_float, offsets);
+		block1_float = _mm256_sub_ps(block1_float, offsets);
+		block2_float = _mm256_sub_ps(block2_float, offsets);
+		block3_float = _mm256_sub_ps(block3_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(unsigned int k=end; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
 }
