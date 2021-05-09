@@ -580,6 +580,13 @@ bool Oscilloscope::HasFrequencyControls()
 void Oscilloscope::Convert8BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
+	//Switch to faster AVX version if available
+	if(g_hasAvx2)
+	{
+		Convert8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+		return;
+	}
+
 	for(unsigned int k=0; k<count; k++)
 	{
 		offs[k] = ibase + k;

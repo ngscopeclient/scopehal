@@ -2170,52 +2170,37 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		}
 		else
 		{
-			if(g_hasAvx2)
+			//Divide large waveforms (>1M points) into blocks and multithread them
+			//TODO: tune split
+			if(num_per_segment > 1000000)
 			{
-				//Divide large waveforms (>1M points) into blocks and multithread them
-				//TODO: tune split
-				if(num_per_segment > 1000000)
+				//Round blocks to multiples of 32 samples for clean vectorization
+				size_t numblocks = omp_get_max_threads();
+				size_t lastblock = numblocks - 1;
+				size_t blocksize = num_per_segment / numblocks;
+				blocksize = blocksize - (blocksize % 32);
+
+				#pragma omp parallel for
+				for(size_t i=0; i<numblocks; i++)
 				{
-					//Round blocks to multiples of 32 samples for clean vectorization
-					size_t numblocks = omp_get_max_threads();
-					size_t lastblock = numblocks - 1;
-					size_t blocksize = num_per_segment / numblocks;
-					blocksize = blocksize - (blocksize % 32);
+					//Last block gets any extra that didn't divide evenly
+					size_t nsamp = blocksize;
+					if(i == lastblock)
+						nsamp = num_per_segment - i*blocksize;
 
-					#pragma omp parallel for
-					for(size_t i=0; i<numblocks; i++)
-					{
-						//Last block gets any extra that didn't divide evenly
-						size_t nsamp = blocksize;
-						if(i == lastblock)
-							nsamp = num_per_segment - i*blocksize;
-
-						Convert8BitSamplesAVX2(
-							(int64_t*)&cap->m_offsets[i*blocksize],
-							(int64_t*)&cap->m_durations[i*blocksize],
-							samps + i*blocksize,
-							bdata + j*num_per_segment + i*blocksize,
-							v_gain,
-							v_off,
-							nsamp,
-							i*blocksize);
-					}
-				}
-
-				//Small waveforms get done single threaded to avoid overhead
-				else
-				{
-					Convert8BitSamplesAVX2(
-						(int64_t*)&cap->m_offsets[0],
-						(int64_t*)&cap->m_durations[0],
-						samps,
-						bdata + j*num_per_segment,
+					Convert8BitSamples(
+						(int64_t*)&cap->m_offsets[i*blocksize],
+						(int64_t*)&cap->m_durations[i*blocksize],
+						samps + i*blocksize,
+						bdata + j*num_per_segment + i*blocksize,
 						v_gain,
 						v_off,
-						num_per_segment,
-						0);
+						nsamp,
+						i*blocksize);
 				}
 			}
+
+			//Small waveforms get done single threaded to avoid overhead
 			else
 			{
 				Convert8BitSamples(

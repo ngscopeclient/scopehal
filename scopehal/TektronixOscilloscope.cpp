@@ -1684,30 +1684,15 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(nsamples);
 
-		if(g_hasAvx2)
-		{
-			Convert8BitSamplesAVX2(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
-				samples,
-				ymult,
-				-yoff,
-				nsamples,
-				0);
-		}
-		else
-		{
-			Convert8BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
-				samples,
-				ymult,
-				-yoff,
-				nsamples,
-				0);
-		}
+		Convert8BitSamples(
+			(int64_t*)&cap->m_offsets[0],
+			(int64_t*)&cap->m_durations[0],
+			(float*)&cap->m_samples[0],
+			samples,
+			ymult,
+			-yoff,
+			nsamples,
+			0);
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
