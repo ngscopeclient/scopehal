@@ -477,12 +477,16 @@ bool PicoOscilloscope::AcquireData()
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 		cap->Resize(memdepth);
-		for(size_t j=0; j<memdepth; j++)
-		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = (buf[j] * scale) + offset;
-		}
+
+		Convert16BitSamples(
+			(int64_t*)&cap->m_offsets[0],
+			(int64_t*)&cap->m_durations[0],
+			(float*)&cap->m_samples[0],
+			buf,
+			scale,
+			-offset,
+			memdepth,
+			0);
 
 		s[m_channels[chnum]] = cap;
 
