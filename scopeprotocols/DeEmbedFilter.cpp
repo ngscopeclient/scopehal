@@ -81,13 +81,13 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 			if(g_clContext)
 			{
 				//Load window function kernel
-				string kernelSource = ReadFile("kernels/WindowFunctions.cl");
+				string kernelSource = ReadDataFile("kernels/WindowFunctions.cl");
 				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
 				m_windowProgram = new cl::Program(*g_clContext, sources);
 				m_windowProgram->build(g_contextDevices);
 				m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
 
-				kernelSource = ReadFile("kernels/DeEmbedFilter.cl");
+				kernelSource = ReadDataFile("kernels/DeEmbedFilter.cl");
 				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
 				m_deembedProgram = new cl::Program(*g_clContext, sources2);
 				m_deembedProgram->build(g_contextDevices);

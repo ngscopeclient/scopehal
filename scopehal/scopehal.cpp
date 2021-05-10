@@ -77,6 +77,8 @@ bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 bool g_disableOpenCL = false;
 
+vector<string> g_searchPaths;
+
 #ifdef HAVE_OPENCL
 cl::Context* g_clContext = NULL;
 vector<cl::Device> g_contextDevices;
@@ -267,6 +269,7 @@ void ScopehalStaticCleanup()
  */
 void DriverStaticInit()
 {
+	InitializeSearchPaths();
 	DetectCPUFeatures();
 	DetectGPUFeatures();
 
@@ -636,4 +639,91 @@ string ReadFile(const string& path)
 	delete[] buf;
 
 	return ret;
+}
+
+void InitializeSearchPaths()
+{
+	//Source dir takes precedence so dev builds use the local copy and not the system copy
+	g_searchPaths.push_back(SRC_DIR "/src/glscopeclient");
+	g_searchPaths.push_back(SRC_DIR "/lib/scopeprotocols");
+
+	//Local directories preferred over system ones
+#ifndef _WIN32
+	string home = getenv("HOME");
+	g_searchPaths.push_back(home + "/.glscopeclient");
+	g_searchPaths.push_back(home + "/.scopehal");
+	g_searchPaths.push_back("/usr/local/share/glscopeclient");
+	g_searchPaths.push_back("/usr/local/share/scopehal");
+	g_searchPaths.push_back("/usr/share/glscopeclient");
+	g_searchPaths.push_back("/usr/share/scopehal");
+
+	//for macports
+	g_searchPaths.push_back("/opt/local/share/glscopeclient");
+	g_searchPaths.push_back("/opt/local/share/scopehal");
+#endif
+
+	//TODO: add system directories for Windows
+
+	LogDebug("Search paths:\n");
+	LogIndenter li;
+	for(auto g : g_searchPaths)
+		LogDebug("%s\n", g.c_str());
+}
+
+/**
+	@brief Locates and returns the contents of a data file
+ */
+string ReadDataFile(const string& relpath)
+{
+	FILE* fp = NULL;
+	for(auto dir : g_searchPaths)
+	{
+		string path = dir + "/" + relpath;
+		fp = fopen(path.c_str(), "rb");
+		if(fp)
+			break;
+	}
+
+	if(!fp)
+	{
+		LogWarning("ReadDataFile: Could not open file \"%s\"\n", relpath.c_str());
+		return "";
+	}
+	fseek(fp, 0, SEEK_END);
+	size_t fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	char* buf = new char[fsize + 1];
+	if(fsize != fread(buf, 1, fsize, fp))
+	{
+		LogWarning("ReadDataFile: Could not read file \"%s\"\n", relpath.c_str());
+		delete[] buf;
+		fclose(fp);
+		return "";
+	}
+	buf[fsize] = 0;
+	fclose(fp);
+
+	string ret(buf, fsize);
+	delete[] buf;
+
+	return ret;
+}
+
+/**
+	@brief Locates a data file
+ */
+string FindDataFile(const string& relpath)
+{
+	for(auto dir : g_searchPaths)
+	{
+		string path = dir + "/" + relpath;
+		FILE* fp = fopen(path.c_str(), "rb");
+		if(fp)
+		{
+			fclose(fp);
+			return path;
+		}
+	}
+
+	return "";
 }

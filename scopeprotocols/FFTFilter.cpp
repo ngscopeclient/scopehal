@@ -87,7 +87,7 @@ FFTFilter::FFTFilter(const string& color)
 				m_queue = new cl::CommandQueue(*g_clContext, g_contextDevices[0], 0);
 
 				//Compile window functions
-				string kernelSource = ReadFile("kernels/WindowFunctions.cl");
+				string kernelSource = ReadDataFile("kernels/WindowFunctions.cl");
 				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
 				m_windowProgram = new cl::Program(*g_clContext, sources);
 				m_windowProgram->build(g_contextDevices);
@@ -98,7 +98,7 @@ FFTFilter::FFTFilter(const string& color)
 				m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
 
 				//Compile normalization kernels
-				kernelSource = ReadFile("kernels/FFTNormalization.cl");
+				kernelSource = ReadDataFile("kernels/FFTNormalization.cl");
 				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
 				m_normalizeProgram = new cl::Program(*g_clContext, sources2);
 				m_normalizeProgram->build(g_contextDevices);

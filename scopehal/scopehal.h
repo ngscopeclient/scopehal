@@ -106,6 +106,8 @@ std::string TrimQuotes(const std::string& str);
 std::string BaseName(const std::string& path);
 
 std::string ReadFile(const std::string& path);
+std::string ReadDataFile(const std::string& relpath);
+std::string FindDataFile(const std::string& relpath);
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
@@ -113,6 +115,7 @@ std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
 void TransportStaticInit();
 void DriverStaticInit();
 
+void InitializeSearchPaths();
 void InitializePlugins();
 void DetectCPUFeatures();
 void DetectGPUFeatures();
@@ -137,6 +140,8 @@ extern bool g_hasAvx2;
 #else
 #define stos(str) static_cast<size_t>(stol(str))
 #endif
+
+extern std::vector<std::string> g_searchPaths;
 
 //Set true prior to calling DetectGPUFeatures() to force OpenCL to not be used
 extern bool g_disableOpenCL;

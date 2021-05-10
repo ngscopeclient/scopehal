@@ -85,7 +85,7 @@ Filter::Filter(
 		{
 			try
 			{
-				string kernelSource = ReadFile(kernelPath);
+				string kernelSource = ReadDataFile(kernelPath);
 				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
 				m_program = new cl::Program(*g_clContext, sources);
 				m_program->build(g_contextDevices);
