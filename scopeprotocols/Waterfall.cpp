@@ -156,31 +156,34 @@ void Waterfall::Refresh()
 			data[y*m_width + x] = data[(y+1)*m_width + x];
 	}
 
+	//Zero the new row
+	float* prow = data + (m_height-1)*m_width;
+	for(size_t x=0; x<m_width; x++)
+		prow[x] = 0;
+
 	//Add the new data
 	double hz_per_bin = din->m_timescale;
 	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
 	double bin_offset = m_offsetHz / hz_per_bin;
-	double vmin = 1.0 / 255.0;
+	float vmin = 1.0 / 255.0;
 	float vrange = m_inputs[0].m_channel->GetVoltageRange();	//db from min to max scale
 	float vfs = vrange/2 - m_inputs[0].m_channel->GetOffset();
 	for(size_t x=0; x<m_width; x++)
 	{
-		//Look up the frequency bin for this position
-		//For now, just do nearest neighbor interpolation
-		size_t nbin = static_cast<size_t>(round(bins_per_pixel*x + bin_offset));
+		//Look up the frequency bin(s) for this position
+		size_t leftbin = static_cast<size_t>(floor(bins_per_pixel*x + bin_offset));
+		size_t rightbin = static_cast<size_t>(floor(bins_per_pixel*(x+1) + bin_offset));
 
-		float value = 0;
-		if(nbin < inlen)
+		for(size_t nbin=leftbin; (nbin <= rightbin) && (nbin < inlen); nbin ++)
 		{
-			float db = din->m_samples[nbin];
-			value = 1 - ( (db - vfs) / -vrange );
+			//Brightness is normalized amplitude, scaled by bins per pixel
+			float v = 1 - ( (din->m_samples[nbin] - vfs) / -vrange);
+			float vscale = v / bins_per_pixel;
+
+			prow[x] += vscale;
 		}
 
-		//Cap values to prevent going off-scale-low with our color ramps
-		if(value < vmin)
-			value = vmin;
-
-		data[(m_height-1)*m_width + x] = value;
+		prow[x] = max(prow[x], vmin);
 	}
 
 	SetData(cap, 0);
