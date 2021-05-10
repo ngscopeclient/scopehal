@@ -643,9 +643,25 @@ string ReadFile(const string& path)
 
 void InitializeSearchPaths()
 {
-	//Source dir takes precedence so dev builds use the local copy and not the system copy
-	g_searchPaths.push_back(SRC_DIR "/src/glscopeclient");
-	g_searchPaths.push_back(SRC_DIR "/lib/scopeprotocols");
+	//Search in the directory of the glscopeclient binary first
+#ifdef _WIN32
+	TCHAR binPath[MAX_PATH];
+	if(GetModuleFileName(NULL, binPath, MAX_PATH) == 0)
+		LogError("Error: GetModuleFileName() failed.\n");
+	else if(!PathRemoveFileSpec(binPath) )
+		LogError("Error: PathRemoveFileSpec() failed.\n");
+	else
+		g_searchPaths.push_back(binPath);
+#else
+	char binDir[1024] = {0};
+	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
+	if ( readlinkReturn <= 0 )
+		LogError("Error: readlink() failed.\n");
+	else if ( (unsigned) readlinkReturn > (sizeof(binDir) - 1) )
+		LogError("Error: readlink() returned a path larger than our buffer.\n");
+	else
+		g_searchPaths.push_back(dirname(binDir));
+#endif
 
 	//Local directories preferred over system ones
 #ifndef _WIN32
@@ -662,7 +678,9 @@ void InitializeSearchPaths()
 	g_searchPaths.push_back("/opt/local/share/scopehal");
 #endif
 
-	//TODO: add system directories for Windows
+	//TODO: add system directories for Windows (%appdata% etc)?
+	//The current strategy of searching the binary directory should work fine in the common case
+	//of installing binaries and data files all in one directory under Program Files.
 
 	LogDebug("Search paths:\n");
 	LogIndenter li;

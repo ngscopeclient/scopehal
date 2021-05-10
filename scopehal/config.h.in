@@ -7,5 +7,3 @@
 #if @HAVE_CLFFT@
 #define HAVE_CLFFT
 #endif
-
-#define SRC_DIR "@CMAKE_SOURCE_DIR@"
