@@ -843,3 +843,213 @@ bool MockOscilloscope::LoadBIN(const string& path)
 
 	return true;
 }
+
+/**
+	@brief Imports a waveform from a Microsoft WAV file
+ */
+bool MockOscilloscope::LoadWAV(const string& path)
+{
+	FILE* fp = fopen(path.c_str(), "rb");
+	if(!fp)
+	{
+		LogError("Couldn't open WAV file \"%s\"\n", path.c_str());
+		return false;
+	}
+
+	//Read the RIFF tag, should be "RIFF", uint32 len, "WAVE", then data
+	uint32_t header[3];
+	if(3 != fread(header, sizeof(uint32_t), 3, fp))
+	{
+		LogError("Failed to read RIFF header\n");
+		fclose(fp);
+		return false;
+	}
+	if(header[0] != 0x46464952)	// "RIFF"
+	{
+		LogError("Bad top level chunk type (not a RIFF file)\n");
+		fclose(fp);
+		return false;
+	}
+	if(header[2] != 0x45564157)	// "WAVE"
+	{
+		LogError("Bad WAVE data type (not a WAV file)\n");
+		fclose(fp);
+		return false;
+	}
+	//Ignore RIFF length, it should encompass the entire file
+
+	//Read the format chunk header
+	if(2 != fread(header, sizeof(uint32_t), 2, fp))
+	{
+		LogError("Failed to read format header\n");
+		fclose(fp);
+		return false;
+	}
+	if(header[0] != 0x20746d66)	// "FMT "
+	{
+		LogError("Bad WAV format chunk type (not FMT)\n");
+		fclose(fp);
+		return false;
+	}
+	if( (header[1] < 16) || (header[1] > 128) )
+	{
+		LogError("Bad WAV format length (expected >= 16 and <= 128)\n");
+		fclose(fp);
+		return false;
+	}
+
+	//Read the format
+	uint8_t format[128];
+	if(header[1] != fread(format, 1, header[1], fp))
+	{
+		LogError("Failed to read format\n");
+		fclose(fp);
+		return false;
+	}
+	uint16_t afmt = *(uint16_t*)(format);
+	uint16_t nchans = *(uint16_t*)(format + 2);
+	uint32_t srate = *(uint32_t*)(format + 4);
+	uint16_t nbits = *(uint16_t*)(format + 14);
+	//Ignore any extensions to the format header
+
+	//1 = integer PCM, 3 = ieee754 float
+	if(afmt == 1)
+	{
+		//TODO: support int24?
+		if( (nbits != 8) && (nbits != 16) )
+		{
+			LogError(
+				"Integer PCM (fmt=1) must be 8 or 16 bit resolution, got %d instead\n",
+				nbits);
+			fclose(fp);
+			return false;
+		}
+	}
+	else if(afmt == 3)
+	{
+		//TODO: support fp64?
+		if(nbits != 32)
+		{
+			LogError(
+				"Floating point PCM (fmt=3) must be 32 bit resolution, got %d instead\n",
+				nbits);
+			fclose(fp);
+			return false;
+		}
+	}
+	else
+	{
+		LogError(
+			"Importing compressed WAVs (format %d) is not supported. "
+			"Try re-encoding as uncompressed integer or floating point PCM\n",
+			afmt);
+		fclose(fp);
+		return false;
+	}
+
+	//Read and discard chunks until we see the data header
+	while(true)
+	{
+		if(2 != fread(header, sizeof(uint32_t), 2, fp))
+		{
+			LogError("Failed to read chunk header\n");
+			fclose(fp);
+			return false;
+		}
+		if(header[0] == 0x61746164)	//"data"
+			break;
+		fseek(fp, header[1], SEEK_CUR);
+	}
+
+	//Create our channels
+	size_t datalen = header[1];
+	size_t bytes_per_sample = nbits / 8;
+	size_t bytes_per_row = bytes_per_sample * nchans;
+	size_t nsamples = datalen / bytes_per_row;
+	int64_t interval = FS_PER_SECOND / srate;
+	vector<AnalogWaveform*> wfms;
+	for(size_t i=0; i<nchans; i++)
+	{
+		auto chan = new OscilloscopeChannel(
+			this,			//Parent scope
+			string("CH") + to_string(i+1),		//Channel name
+			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+			GetDefaultChannelColor(i),
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			1,				//Bus width
+			i,				//Channel index
+			true			//Is physical channel
+		);
+		AddChannel(chan);
+		chan->SetDefaultDisplayName();
+		chan->SetVoltageRange(2);
+		chan->SetOffset(0);
+
+		//Create new waveform for channel
+		auto wfm = new AnalogWaveform;
+		wfm->m_timescale = interval;
+		wfm->m_startTimestamp = 0;					//TODO: use WAV file mod time
+		wfm->m_startFemtoseconds = 0;
+		wfm->m_triggerPhase = 0;
+		wfm->m_densePacked = true;
+		wfm->Resize(nsamples);
+		wfms.push_back(wfm);
+		chan->SetData(wfm, 0);
+	}
+
+	//Read the entire file into a buffer rather than doing a whole bunch of tiny fread's
+	uint8_t* buf = new uint8_t[datalen];
+	if(datalen != fread(buf, 1, datalen, fp))
+	{
+		LogError("Failed to read WAV data\n");
+		fclose(fp);
+		return false;
+	}
+	fclose(fp);
+	fp = NULL;
+
+	//TODO: vectorized offset/duration fill if possible
+	//TODO: vectorized shuffling for the common case of 2 channel?
+
+	//Crunch the samples
+	size_t off = 0;
+	for(size_t i=0; i<nsamples; i++)
+	{
+		for(size_t j=0; j<nchans; j++)
+		{
+			auto wfm = wfms[j];
+			wfm->m_offsets[i] = i;
+			wfm->m_durations[i] = 0;
+
+			//Floating point samples can be read as is
+			if(afmt == 3)
+			{
+				wfm->m_samples[i] = *(float*)(buf + off);
+				off += 4;
+			}
+
+			//Integer samples get normalized
+			else
+			{
+				//16 bit is signed
+				if(nbits == 16)
+				{
+					wfm->m_samples[i] = *(int16_t*)(buf + off) / 32768.0f;
+					off += 2;
+				}
+
+				//8 bit is unsigned
+				else
+				{
+					wfm->m_samples[i] = (*(uint8_t*)(buf + off) - 127) / 127.0f;
+					off ++;
+				}
+			}
+		}
+	}
+
+	//Done, clean up
+	delete[] buf;
+	return true;
+}
