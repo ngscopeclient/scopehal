@@ -57,6 +57,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
+	, m_hasSerdesTrigger(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -380,6 +381,36 @@ void LeCroyOscilloscope::DetectOptions()
 				action = "Enabled";
 			}
 
+			//Memory capacity options for WaveMaster/SDA/DDA 8Zi/Zi-A/Zi-B family
+			else if(o == "-S")
+			{
+				type = "Hardware";
+				desc = "Small (32M point) memory";
+				m_memoryDepthOption = 32;
+				action = "Enabled";
+			}
+			else if(o == "-S")
+			{
+				type = "Hardware";
+				desc = "Medium (64M point) memory";
+				m_memoryDepthOption = 64;
+				action = "Enabled";
+			}
+			else if(o == "-L")
+			{
+				type = "Hardware";
+				desc = "Large (128M point) memory";
+				m_memoryDepthOption = 128;
+				action = "Enabled";
+			}
+			else if(o == "-V")
+			{
+				type = "Hardware";
+				desc = "Very large (256M point) memory";
+				m_memoryDepthOption = 256;
+				action = "Enabled";
+			}
+
 			//Print out full names for protocol trigger options and enable trigger mode.
 			//Note that many of these options don't have _TD in the base (non-TDME) option code!
 			else if(o.find("I2C") == 0)
@@ -470,6 +501,13 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Trigger";		//FIXME: Is this just 1080p analog trigger support?
 				desc = "HD analog TV";
+			}
+
+			//High speed serial trigger
+			else if(o == "SERIALPAT_T")
+			{
+				type = "Trigger";
+				desc = "Serial Pattern (8b10b/64b66b/NRZ)";
 			}
 
 			//Protocol decodes without trigger capability
@@ -631,7 +669,7 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "Power Analysis";
 			}
-			else if( (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") )
+			else if( (o == "SDA") || (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") )
 			{
 				type = "Signal Integrity";
 				desc = "Serial Data Analysis";
@@ -1541,6 +1579,82 @@ void LeCroyOscilloscope::AutoZero(size_t i)
 	string name = Trim(m_transport->ReadReply());
 
 	m_transport->SendCommand(string("VBS? '") + prefix + "." + mux + "." + name + ".AutoZero'");
+}
+
+bool LeCroyOscilloscope::HasInputMux(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return false;
+
+	switch(m_modelid)
+	{
+		//Add other models with muxes here
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_B:
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+size_t LeCroyOscilloscope::GetInputMuxSetting(size_t i)
+{
+	//If no mux, always report 0
+	if(!HasInputMux(i))
+		return 0;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Get the active input and probe name
+	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
+	string mux = Trim(m_transport->ReadReply());
+	if(mux == "InputA")
+		return 0;
+	else if(mux == "InputB")
+		return 1;
+	else
+	{
+		LogWarning("Unknown input mux setting %zu\n", i);
+		return 0;
+	}
+}
+
+vector<string> LeCroyOscilloscope::GetInputMuxNames(size_t i)
+{
+	//All currently supported scopes have this combination
+	vector<string> ret;
+	if(HasInputMux(i))
+	{
+		ret.push_back("A (ProLink, upper)");
+		ret.push_back("B (ProBus, lower)");
+	}
+	return ret;
+}
+
+void LeCroyOscilloscope::SetInputMux(size_t i, size_t select)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	if(!HasInputMux(i))
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(select == 0)
+	{
+		m_transport->SendCommand(
+			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputA\"'");
+	}
+	else
+	{
+		m_transport->SendCommand(
+			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputB\"'");
+	}
 }
 
 void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)

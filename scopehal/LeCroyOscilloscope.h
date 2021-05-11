@@ -102,6 +102,10 @@ public:
 	virtual bool CanAutoZero(size_t i);
 	virtual void AutoZero(size_t i);
 	virtual std::string GetProbeName(size_t i);
+	virtual bool HasInputMux(size_t i);
+	virtual size_t GetInputMuxSetting(size_t i);
+	virtual std::vector<std::string> GetInputMuxNames(size_t i);
+	virtual void SetInputMux(size_t i, size_t select);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -291,6 +295,7 @@ protected:
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
+	bool m_hasSerdesTrigger;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
