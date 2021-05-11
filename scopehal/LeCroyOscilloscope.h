@@ -99,6 +99,9 @@ public:
 	virtual bool CanInvert(size_t i);
 	virtual void Invert(size_t i, bool invert);
 	virtual bool IsInverted(size_t i);
+	virtual bool CanAutoZero(size_t i);
+	virtual void AutoZero(size_t i);
+	virtual std::string GetProbeName(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();

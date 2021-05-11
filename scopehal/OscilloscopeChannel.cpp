@@ -311,6 +311,28 @@ bool OscilloscopeChannel::IsInverted()
 		return false;
 }
 
+void OscilloscopeChannel::AutoZero()
+{
+	if(m_scope)
+		m_scope->AutoZero(m_index);
+}
+
+bool OscilloscopeChannel::CanAutoZero()
+{
+	if(m_scope)
+		return m_scope->CanAutoZero(m_index);
+	else
+		return false;
+}
+
+string OscilloscopeChannel::GetProbeName()
+{
+	if(m_scope)
+		return m_scope->GetProbeName(m_index);
+	else
+		return "";
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

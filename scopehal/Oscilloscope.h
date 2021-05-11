@@ -267,6 +267,32 @@ public:
 	virtual void SetChannelVoltageRange(size_t i, double range) =0;
 
 	/**
+		@brief Determines if a channel has a probe connected which supports the "auto zero" feature.
+
+		This is typically true for power rail and differential probes and false for most others.
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool CanAutoZero(size_t i);
+
+	/**
+		@brief Performs an "auto zero" cycle on the attached active probe, if supported by the hardware
+
+		@param i			Zero-based index of channel
+	 */
+	virtual void AutoZero(size_t i);
+
+	/**
+		@brief Returns the name of the probe connected to the scope, if possible.
+
+		If a passive or no probe is connected, or the instrument driver does not support probe identification,
+		an empty string may be returned.
+
+		@param i			Zero-based index of channel
+	 */
+	virtual std::string GetProbeName(size_t i);
+
+	/**
 		@brief Gets the offset, in volts, for a given channel
 
 		@param i			Zero-based index of channel

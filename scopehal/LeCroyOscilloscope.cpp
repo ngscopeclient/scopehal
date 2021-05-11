@@ -1459,9 +1459,88 @@ bool LeCroyOscilloscope::IsInverted(size_t i)
 	if(i >= m_analogChannelCount)
 		return false;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(string("VBS? 'return = app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert'");
 	auto reply = Trim(m_transport->ReadReply());
 	return (reply == "-1");
+}
+
+string LeCroyOscilloscope::GetProbeName(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return "";
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Step 1: Determine which input is active.
+	//There's always a mux selector in software, even if only one is present on the physical acquisition board
+	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
+	string mux = Trim(m_transport->ReadReply());
+
+	//Step 2: Identify the probe connected to this mux channel
+	m_transport->SendCommand(string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'");
+	string name = Trim(m_transport->ReadReply());
+
+	//API requires empty string if no probe
+	if(name == "None")
+		return "";
+	else
+		return name;
+}
+
+bool LeCroyOscilloscope::CanAutoZero(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return false;
+
+	auto probe = GetProbeName(i);
+
+	//Per email w/ Honam at Lecroy Apps (TLC#00291415) there is no command to check for autozero capability
+	//So we need to just use heuristics based on known probe names
+
+	//Passive or no probe
+	if(probe.empty())
+		return false;
+
+	//All differential, current, and power rail probes should support auto zeroing
+	else if(probe.find("D") == 0)
+		return true;
+	else if(probe.find("RP") == 0)
+		return true;
+	else if(probe.find("CP") == 0)
+		return true;
+
+	//ZS series single ended probes do not
+	else if(probe.find("ZS") == 0)
+		return false;
+
+	//When in doubt, show the option
+	else
+	{
+		LogWarning(
+			"Probe model \"%s\" is unknown. Guessing auto zero might be available.\n"
+			"Please contact the glscopeclient developers to add your probe to the database and "
+			"eliminate this warning.\n", probe.c_str());
+		return true;
+	}
+}
+
+void LeCroyOscilloscope::AutoZero(size_t i)
+{
+	if(i >= m_analogChannelCount)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Get the active input and probe name
+	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
+	string mux = Trim(m_transport->ReadReply());
+	m_transport->SendCommand(string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'");
+	string name = Trim(m_transport->ReadReply());
+
+	m_transport->SendCommand(string("VBS? '") + prefix + "." + mux + "." + name + ".AutoZero'");
 }
 
 void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)

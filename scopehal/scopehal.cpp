@@ -681,11 +681,6 @@ void InitializeSearchPaths()
 	//TODO: add system directories for Windows (%appdata% etc)?
 	//The current strategy of searching the binary directory should work fine in the common case
 	//of installing binaries and data files all in one directory under Program Files.
-
-	LogDebug("Search paths:\n");
-	LogIndenter li;
-	for(auto g : g_searchPaths)
-		LogDebug("%s\n", g.c_str());
 }
 
 /**

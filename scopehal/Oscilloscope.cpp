@@ -465,6 +465,20 @@ void Oscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
 {
 }
 
+bool Oscilloscope::CanAutoZero(size_t /*i*/)
+{
+	return false;
+}
+
+void Oscilloscope::AutoZero(size_t /*i*/)
+{
+}
+
+string Oscilloscope::GetProbeName(size_t /*i*/)
+{
+	return "";
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Analog channel configuration
 

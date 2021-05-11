@@ -194,6 +194,10 @@ public:
 
 	void SetCenterFrequency(int64_t freq);
 
+	bool CanAutoZero();
+	void AutoZero();
+	std::string GetProbeName();
+
 	virtual bool CanInvert();
 	virtual void Invert(bool invert);
 	virtual bool IsInverted();
