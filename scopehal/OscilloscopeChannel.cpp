@@ -333,6 +333,12 @@ string OscilloscopeChannel::GetProbeName()
 		return "";
 }
 
+void OscilloscopeChannel::SetInputMux(size_t select)
+{
+	if(m_scope)
+		m_scope->SetInputMux(m_index, select);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 

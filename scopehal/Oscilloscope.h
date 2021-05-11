@@ -293,6 +293,35 @@ public:
 	virtual std::string GetProbeName(size_t i);
 
 	/**
+		@brief Checks if a channel has an input multiplexer
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool HasInputMux(size_t i);
+
+	/**
+		@brief Gets the setting for a channel's input mux (if it has one)
+
+		@param i			Zero-based index of channel
+	 */
+	virtual size_t GetInputMuxSetting(size_t i);
+
+	/**
+		@brief Gets names for the input mux ports of a channel
+
+		@param i			Zero-based index of channel
+	 */
+	virtual std::vector<std::string> GetInputMuxNames(size_t i);
+
+	/**
+		@brief Sets the input mux for a channel
+
+		@param i			Zero-based index of channel
+		@param select		Selector for the mux
+	 */
+	virtual void SetInputMux(size_t i, size_t select);
+
+	/**
 		@brief Gets the offset, in volts, for a given channel
 
 		@param i			Zero-based index of channel

@@ -479,6 +479,26 @@ string Oscilloscope::GetProbeName(size_t /*i*/)
 	return "";
 }
 
+bool Oscilloscope::HasInputMux(size_t /*i*/)
+{
+	return false;
+}
+
+size_t Oscilloscope::GetInputMuxSetting(size_t /*i*/)
+{
+	return 0;
+}
+
+vector<string> Oscilloscope::GetInputMuxNames(size_t /*i*/)
+{
+	vector<string> ret;
+	return ret;
+}
+
+void Oscilloscope::SetInputMux(size_t /*i*/, size_t /*select*/)
+{
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Analog channel configuration
 

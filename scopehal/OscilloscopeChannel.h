@@ -202,6 +202,8 @@ public:
 	virtual void Invert(bool invert);
 	virtual bool IsInverted();
 
+	virtual void SetInputMux(size_t select);
+
 	void SetDefaultDisplayName();
 protected:
 	void SharedCtorInit();
