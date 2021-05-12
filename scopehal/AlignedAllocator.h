@@ -116,11 +116,11 @@ public:
 			throw std::length_error("AlignedAllocator<T>::allocate(): requested size is too large, integer overflow?");
 
 		//Do the actual allocation
-		#ifdef _WIN32
-			T* ret = static_cast<T*>(_aligned_malloc(n*sizeof(T), alignment));
-		#else
-			T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
-		#endif
+#ifdef _WIN32
+		T* ret = static_cast<T*>(_aligned_malloc(n*sizeof(T), alignment));
+#else
+		T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
+#endif
 
 		//Error check
 		if(ret == NULL)
@@ -131,11 +131,11 @@ public:
 
 	void deallocate(T* const p, const size_t /*unused*/) const
 	{
-		#ifdef _WIN32
-			_aligned_free(p);
-		#else
-			free(p);
-		#endif
+#ifdef _WIN32
+		_aligned_free(p);
+#else
+		free(p);
+#endif
 	}
 
 	//convenience wrapper
