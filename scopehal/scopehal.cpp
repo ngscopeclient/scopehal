@@ -666,6 +666,7 @@ void InitializeSearchPaths()
 	//Local directories preferred over system ones
 #ifndef _WIN32
 	string home = getenv("HOME");
+	g_searchPaths.push_back(".");
 	g_searchPaths.push_back(home + "/.glscopeclient");
 	g_searchPaths.push_back(home + "/.scopehal");
 	g_searchPaths.push_back("/usr/local/share/glscopeclient");
