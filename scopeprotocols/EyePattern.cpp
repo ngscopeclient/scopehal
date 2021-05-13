@@ -476,12 +476,7 @@ void EyePattern::Refresh()
 		//Optimized inner loop for dense packed waveforms
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
 		if(waveform->m_densePacked)
-		{
-			if(g_hasAvx2)
-				DensePackedInnerLoopAVX2(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
-			else
-				DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
-		}
+			DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 
 		//Normal main loop
 		else
@@ -515,7 +510,7 @@ void EyePattern::Refresh()
 }
 
 __attribute__((target("avx2")))
-void EyePattern::DensePackedInnerLoopAVX2(
+void EyePattern::DensePackedInnerLoop(
 	AnalogWaveform* waveform,
 	vector<int64_t>& clock_edges,
 	int64_t* data,
@@ -696,6 +691,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	}
 }
 
+__attribute__((target("default")))
 void EyePattern::DensePackedInnerLoop(
 	AnalogWaveform* waveform,
 	vector<int64_t>& clock_edges,

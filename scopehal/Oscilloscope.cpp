@@ -635,47 +635,28 @@ void Oscilloscope::Convert8BitSamples(
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
-			if(g_hasAvx2)
-			{
-				Convert8BitSamplesAVX2(
-					offs + off,
-					durs + off,
-					pout + off,
-					pin + off,
-					gain,
-					offset,
-					nsamp,
-					ibase + off);
-			}
-			else
-			{
-				Convert8BitSamplesGeneric(
-					offs + off,
-					durs + off,
-					pout + off,
-					pin + off,
-					gain,
-					offset,
-					nsamp,
-					ibase + off);
-			}
+			DoConvert8BitSamples(
+				offs + off,
+				durs + off,
+				pout + off,
+				pin + off,
+				gain,
+				offset,
+				nsamp,
+				ibase + off);
 		}
 	}
 
 	//Small waveforms get done single threaded to avoid overhead
 	else
-	{
-		if(g_hasAvx2)
-			Convert8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
-		else
-			Convert8BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
-	}
+		DoConvert8BitSamples(offs, durs, pout, pin, gain, offset, count, ibase);
 }
 
 /**
 	@brief Generic backend for Convert8BitSamples()
  */
-void Oscilloscope::Convert8BitSamplesGeneric(
+__attribute__((target("default")))
+void Oscilloscope::DoConvert8BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	for(unsigned int k=0; k<count; k++)
@@ -690,7 +671,7 @@ void Oscilloscope::Convert8BitSamplesGeneric(
 	@brief Optimized version of Convert8BitSamples()
  */
 __attribute__((target("avx2")))
-void Oscilloscope::Convert8BitSamplesAVX2(
+void Oscilloscope::DoConvert8BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	unsigned int end = count - (count % 32);
@@ -799,7 +780,7 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 // Helpers for converting raw 16-bit ADC samples to fp32 waveforms
 
 /**
-	@brief Converts 8-bit ADC samples to floating point
+	@brief Converts 16-bit ADC samples to floating point
  */
 void Oscilloscope::Convert16BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
@@ -823,47 +804,28 @@ void Oscilloscope::Convert16BitSamples(
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
-			if(g_hasAvx2)
-			{
-				Convert16BitSamplesAVX2(
-					offs + off,
-					durs + off,
-					pout + off,
-					pin + off,
-					gain,
-					offset,
-					nsamp,
-					ibase + off);
-			}
-			else
-			{
-				Convert16BitSamplesGeneric(
-					offs + off,
-					durs + off,
-					pout + off,
-					pin + off,
-					gain,
-					offset,
-					nsamp,
-					ibase + off);
-			}
+			DoConvert16BitSamples(
+				offs + off,
+				durs + off,
+				pout + off,
+				pin + off,
+				gain,
+				offset,
+				nsamp,
+				ibase + off);
 		}
 	}
 
 	//Small waveforms get done single threaded to avoid overhead
 	else
-	{
-		if(g_hasAvx2)
-			Convert16BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
-		else
-			Convert16BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
-	}
+		DoConvert16BitSamples(offs, durs, pout, pin, gain, offset, count, ibase);
 }
 
 /**
 	@brief Converts raw ADC samples to floating point
  */
-void Oscilloscope::Convert16BitSamplesGeneric(
+__attribute__((target("default")))
+void Oscilloscope::DoConvert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	for(size_t j=0; j<count; j++)
@@ -875,7 +837,7 @@ void Oscilloscope::Convert16BitSamplesGeneric(
 }
 
 __attribute__((target("avx2")))
-void Oscilloscope::Convert16BitSamplesAVX2(
+void Oscilloscope::DoConvert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
 	size_t end = count - (count % 32);

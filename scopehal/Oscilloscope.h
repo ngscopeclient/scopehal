@@ -775,16 +775,24 @@ public:
 protected:
 	void Convert8BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	void Convert8BitSamplesGeneric(
+
+	__attribute__((target("default")))
+	void DoConvert8BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	void Convert8BitSamplesAVX2(
+
+	__attribute__((target("avx2")))
+	void DoConvert8BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
 	void Convert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	void Convert16BitSamplesGeneric(
+
+	__attribute__((target("default")))
+	void DoConvert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	void Convert16BitSamplesAVX2(
+
+	__attribute__((target("avx2")))
+	void DoConvert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
 public:

@@ -195,21 +195,8 @@ void TappedDelayLineFilter::Refresh()
 	m_offset = -( (m_max - m_min)/2 + m_min );
 }
 
+__attribute__((target("default")))
 void TappedDelayLineFilter::DoFilterKernel(
-	int64_t tap_delay,
-	float* taps,
-	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
-{
-	if(g_hasAvx2)
-		DoFilterKernelAVX2(tap_delay, taps, din, cap, vmin, vmax);
-	else
-		DoFilterKernelGeneric(tap_delay, taps, din, cap, vmin, vmax);
-}
-
-void TappedDelayLineFilter::DoFilterKernelGeneric(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,
@@ -242,7 +229,7 @@ void TappedDelayLineFilter::DoFilterKernelGeneric(
 }
 
 __attribute__((target("avx2")))
-void TappedDelayLineFilter::DoFilterKernelAVX2(
+void TappedDelayLineFilter::DoFilterKernel(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,

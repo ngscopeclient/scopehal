@@ -60,13 +60,6 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(FIRFilter)
 
-	void DoFilterKernel(
-		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
-
 	enum FilterType
 	{
 		FILTER_TYPE_LOWPASS,
@@ -86,7 +79,8 @@ protected:
 
 	static float Bessel(float x);
 
-	void DoFilterKernelGeneric(
+	__attribute__((target("default")))
+	void DoFilterKernel(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,
@@ -102,14 +96,16 @@ protected:
 		float& vmax);
 #endif
 
-	void DoFilterKernelAVX2(
+	__attribute__((target("avx2")))
+	void DoFilterKernel(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,
 		float& vmin,
 		float& vmax);
 
-	void DoFilterKernelAVX512F(
+	__attribute__((target("avx512f")))
+	void DoFilterKernel(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
 		AnalogWaveform* cap,

@@ -74,20 +74,36 @@ public:
 
 	//Window function helpers
 	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
-	static void HannWindow(const float* data, size_t len, float* out);
-	static void HammingWindow(const float* data, size_t len, float* out);
+	static void HannWindow(const float* data, size_t len, float* out)
+	{ CosineSumWindow(data, len, out, 0.5); }
+
+	static void HammingWindow(const float* data, size_t len, float* out)
+	{ CosineSumWindow(data, len, out, 25.0f / 46); }
+
+	__attribute__((target("default")))
 	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
-	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
+	__attribute__((target("avx2")))
+	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
+
+	__attribute__((target("default")))
 	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
-	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
+	__attribute__((target("avx2")))
+	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
 
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
+	__attribute__((target("default")))
 	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+
+	__attribute__((target("avx2")))
+	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
+
+	__attribute__((target("default")))
 	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+
+	__attribute__((target("avx2")))
+	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 

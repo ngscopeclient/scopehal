@@ -448,19 +448,9 @@ void FFTFilter::DoRefresh(
 
 		//Normalize magnitudes
 		if(log_output)
-		{
-			if(g_hasAvx2)
-				NormalizeOutputLogAVX2(cap, nouts, scale);
-			else
-				NormalizeOutputLog(cap, nouts, scale);
-		}
+			NormalizeOutputLog(cap, nouts, scale);
 		else
-		{
-			if(g_hasAvx2)
-				NormalizeOutputLinearAVX2(cap, nouts, scale);
-			else
-				NormalizeOutputLinear(cap, nouts, scale);
-		}
+			NormalizeOutputLinear(cap, nouts, scale);
 
 	#ifdef HAVE_CLFFT
 		}
@@ -485,6 +475,7 @@ bool FFTFilter::UsesCLFFT()
 /**
 	@brief Normalize FFT output and convert to dBm (unoptimized C++ implementation)
  */
+__attribute__((target("default")))
 void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale)
 {
 	//assume constant 50 ohms for now
@@ -504,6 +495,7 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
 /**
 	@brief Normalize FFT output and output in native Y-axis units (unoptimized C++ implementation)
  */
+__attribute__((target("default")))
 void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale)
 {
 	for(size_t i=0; i<nouts; i++)
@@ -519,7 +511,7 @@ void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float s
 	@brief Normalize FFT output and convert to dBm (optimized AVX2 implementation)
  */
 __attribute__((target("avx2")))
-void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale)
 {
 	size_t end = nouts - (nouts % 8);
 
@@ -602,7 +594,7 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 	@brief Normalize FFT output and keep in native units (optimized AVX2 implementation)
  */
 __attribute__((target("avx2")))
-void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale)
 {
 	size_t end = nouts - (nouts % 8);
 
@@ -660,10 +652,7 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 	switch(func)
 	{
 		case WINDOW_BLACKMAN_HARRIS:
-			if(g_hasAvx2)
-				return BlackmanHarrisWindowAVX2(data, len, out);
-			else
-				return BlackmanHarrisWindow(data, len, out);
+			return BlackmanHarrisWindow(data, len, out);
 
 		case WINDOW_HANN:
 			return HannWindow(data, len, out);
@@ -677,6 +666,7 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 	}
 }
 
+__attribute__((target("default")))
 void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
 {
 	float alpha1 = 1 - alpha0;
@@ -692,7 +682,7 @@ void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float
 }
 
 __attribute__((target("avx2")))
-void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0)
+void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float alpha0)
 {
 	float alpha1 = 1 - alpha0;
 	float scale = 2.0f * (float)M_PI / len;
@@ -730,6 +720,7 @@ void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, f
 	}
 }
 
+__attribute__((target("default")))
 void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 {
 	float alpha0 = 0.35875;
@@ -751,7 +742,7 @@ void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 }
 
 __attribute__((target("avx2")))
-void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out)
+void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 {
 	float alpha0 = 0.35875;
 	float alpha1 = 0.48829;
@@ -806,20 +797,4 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 			alpha3 * cosf(3*num);
 		out[i] = w * data[i];
 	}
-}
-
-void FFTFilter::HannWindow(const float* data, size_t len, float* out)
-{
-	if(g_hasAvx2)
-		CosineSumWindowAVX2(data, len, out, 0.5);
-	else
-		CosineSumWindow(data, len, out, 0.5);
-}
-
-void FFTFilter::HammingWindow(const float* data, size_t len, float* out)
-{
-	if(g_hasAvx2)
-		CosineSumWindowAVX2(data, len, out, 25.0f / 46);
-	else
-		CosineSumWindow(data, len, out, 25.0f / 46);
 }

@@ -190,6 +190,7 @@ protected:
 		float yoff
 		);
 
+	__attribute__((target("default")))
 	void DensePackedInnerLoop(
 		AnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
@@ -203,7 +204,8 @@ protected:
 		float yoff
 		);
 
-	void DensePackedInnerLoopAVX2(
+	__attribute__((target("avx2")))
+	void DensePackedInnerLoop(
 		AnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
 		int64_t* data,
