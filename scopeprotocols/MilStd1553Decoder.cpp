@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 MilStd1553Decoder::MilStd1553Decoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
 {
 	CreateInput("in");
 }
@@ -79,12 +79,23 @@ bool MilStd1553Decoder::NeedsConfig()
 	return false;
 }
 
+vector<string> MilStd1553Decoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Direction");
+	ret.push_back("RT");
+	ret.push_back("SA");
+	ret.push_back("Status");
+	ret.push_back("Len");
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void MilStd1553Decoder::Refresh()
 {
-	Unit fs(Unit::UNIT_FS);
+	ClearPackets();
 
 	//Get the input data
 	if(!VerifyAllInputsOKAndAnalog())
@@ -151,6 +162,7 @@ void MilStd1553Decoder::Refresh()
 	int data_word_count = 0;
 	int data_words_expected = 0;
 	bool ctrl_direction = false;
+	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
 	{
 		int64_t timestamp = din->m_offsets[i];
@@ -432,51 +444,75 @@ void MilStd1553Decoder::Refresh()
 				// Wait for a transaction to start
 
 				case FRAME_STATE_IDLE:
-
-					//First 5 bits are RT address
-					cap->m_offsets.push_back(bitstarts[0]);
-					cap->m_durations.push_back(bitstarts[6] - bitstarts[0]);
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_RT_ADDR, (word >> 11) & 0x1f ));
-
-					//6th bit is 1 for RT->BC and 0 for BC->RT
-					ctrl_direction = (word >> 10) & 0x1;
-					cap->m_offsets.push_back(bitstarts[6]);
-					cap->m_durations.push_back(bitstarts[7] - bitstarts[6]);
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_DIRECTION, ctrl_direction ));
-
-					//Next 5 bits are sub-address
-					cap->m_offsets.push_back(bitstarts[7]);
-					cap->m_durations.push_back(bitstarts[11] - bitstarts[7]);
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_SUB_ADDR, (word >> 5) & 0x1f ));
-
-					//Last 5 are data length
-					cap->m_offsets.push_back(bitstarts[11]);
-					cap->m_durations.push_back(bitstarts[16] - bitstarts[11]);
-					data_words_expected = word & 0x1f;
-					if(data_words_expected == 0)
-						data_words_expected = 32;
-					cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_LENGTH, data_words_expected));
-
-					//Parity bit
-					cap->m_offsets.push_back(bitstarts[16]);
-					cap->m_durations.push_back(timestamp - bitstarts[16]);
-					if(expected_parity == parity)
-						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
-					else
-						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
-
-					//If this is a RT->BC frame, we're in the turnaround period now
-					if(ctrl_direction)
 					{
-						state = STATE_TURNAROUND;
-						frame_state = FRAME_STATE_STATUS;
-					}
+						//Start a packet
+						pack = new Packet;
+						pack->m_offset = bitstarts[0] * din->m_timescale;
+						m_packets.push_back(pack);
 
-					//Otherwise, expect data words right away
-					else
-					{
-						state = STATE_IDLE;
-						frame_state = FRAME_STATE_DATA;
+						//First 5 bits are RT address
+						cap->m_offsets.push_back(bitstarts[0]);
+						cap->m_durations.push_back(bitstarts[6] - bitstarts[0]);
+						uint8_t rtaddr = (word >> 11) & 0x1f;
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_RT_ADDR, rtaddr ));
+						pack->m_headers["RT"] = to_string(rtaddr);
+
+						//6th bit is 1 for RT->BC and 0 for BC->RT
+						ctrl_direction = (word >> 10) & 0x1;
+						cap->m_offsets.push_back(bitstarts[6]);
+						cap->m_durations.push_back(bitstarts[7] - bitstarts[6]);
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_DIRECTION, ctrl_direction ));
+						if(ctrl_direction)
+						{
+							pack->m_headers["Direction"] = "RT -> BC";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+						}
+						else
+						{
+							pack->m_headers["Direction"] = "BC -> RT";
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+						}
+
+						//Next 5 bits are sub-address
+						cap->m_offsets.push_back(bitstarts[7]);
+						uint8_t saaddr = (word >> 5) & 0x1f ;
+						cap->m_durations.push_back(bitstarts[11] - bitstarts[7]);
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_SUB_ADDR, saaddr));
+						pack->m_headers["SA"] = to_string(saaddr);
+
+						//Last 5 are data length
+						cap->m_offsets.push_back(bitstarts[11]);
+						cap->m_durations.push_back(bitstarts[16] - bitstarts[11]);
+						data_words_expected = word & 0x1f;
+						if(data_words_expected == 0)
+							data_words_expected = 32;
+						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_LENGTH, data_words_expected));
+						pack->m_headers["Len"] = to_string(data_words_expected * 2);	//in bytes
+
+						//Parity bit
+						cap->m_offsets.push_back(bitstarts[16]);
+						cap->m_durations.push_back(timestamp - bitstarts[16]);
+						if(expected_parity == parity)
+							cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
+						else
+						{
+							cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						}
+
+						//If this is a RT->BC frame, we're in the turnaround period now
+						if(ctrl_direction)
+						{
+							state = STATE_TURNAROUND;
+							frame_state = FRAME_STATE_STATUS;
+						}
+
+						//Otherwise, expect data words right away
+						else
+						{
+							state = STATE_IDLE;
+							frame_state = FRAME_STATE_DATA;
+						}
 					}
 
 					data_word_count = 0;
@@ -502,18 +538,28 @@ void MilStd1553Decoder::Refresh()
 
 					{
 						int status = 0;
+						string sstat = "";
 
 						//7 - instrumentation bit, always zero
 						if(status & 0x0200)
+						{
 							status |= MilStd1553Symbol::STATUS_MALFORMED;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						}
 
 						//8 - service request
 						if(status & 0x0100)
+						{
 							status |= MilStd1553Symbol::STATUS_SERVICE_REQUEST;
+							sstat += "SrvReq ";
+						}
 
 						//9-11 = reserved, always zero
 						if(status & 0x00e0)
+						{
 							status |= MilStd1553Symbol::STATUS_MALFORMED;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+						}
 
 						//12 = acknowledge receipt of a broadcast
 						if(status & 0x0010)
@@ -521,11 +567,18 @@ void MilStd1553Decoder::Refresh()
 
 						//13 = busy
 						if(status & 0x0008)
+						{
 							status |= MilStd1553Symbol::STATUS_BUSY;
+							sstat += "Busy ";
+						}
 
 						//14 = subsystem fault
 						if(status & 0x0004)
+						{
 							status |= MilStd1553Symbol::STATUS_SUBSYS_FAULT;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+							sstat += "SubsysFault ";
+						}
 
 						//15 = dynamic bus accept
 						if(status & 0x0002)
@@ -533,11 +586,17 @@ void MilStd1553Decoder::Refresh()
 
 						//16 = terminal
 						if(status & 0x0001)
+						{
 							status |= MilStd1553Symbol::STATUS_RT_FAULT;
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+							sstat += "RtFault ";
+						}
 
 						cap->m_offsets.push_back(bitstarts[7]);
 						cap->m_durations.push_back(bitstarts[16] - bitstarts[7]);
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_STATUS, status ));
+
+						pack->m_headers["Status"] = sstat;
 					}
 
 					//Parity bit
@@ -546,7 +605,10 @@ void MilStd1553Decoder::Refresh()
 					if(expected_parity == parity)
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
 					else
+					{
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					}
 
 					//If this is a RT->BC frame, now expect data
 					if(ctrl_direction)
@@ -554,7 +616,10 @@ void MilStd1553Decoder::Refresh()
 
 					//BC->RT, status was the last thing sent so now we're done
 					else
+					{
+						pack->m_len = bitstarts[16] * din->m_timescale - pack->m_offset;
 						frame_state = FRAME_STATE_IDLE;
+					}
 
 					state = STATE_IDLE;
 
@@ -577,7 +642,14 @@ void MilStd1553Decoder::Refresh()
 					if(expected_parity == parity)
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_OK, parity));
 					else
+					{
 						cap->m_samples.push_back(MilStd1553Symbol(MilStd1553Symbol::TYPE_PARITY_BAD, parity));
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
+					}
+
+					//Save the data bytes
+					pack->m_data.push_back(word >> 8);
+					pack->m_data.push_back(word & 0xff);
 
 					//Last word?
 					if(data_word_count >= data_words_expected)
@@ -593,6 +665,7 @@ void MilStd1553Decoder::Refresh()
 						else
 						{
 							frame_state = FRAME_STATE_IDLE;
+							pack->m_len = bitstarts[16] * din->m_timescale - pack->m_offset;
 							state = STATE_IDLE;
 						}
 					}

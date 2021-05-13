@@ -94,7 +94,7 @@ public:
 
 typedef Waveform<MilStd1553Symbol> MilStd1553Waveform;
 
-class MilStd1553Decoder : public Filter
+class MilStd1553Decoder : public PacketDecoder
 {
 public:
 	MilStd1553Decoder(const std::string& color);
@@ -110,6 +110,8 @@ public:
 	virtual bool NeedsConfig();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	std::vector<std::string> GetHeaders();
 
 	PROTOCOL_DECODER_INITPROC(MilStd1553Decoder)
 };
