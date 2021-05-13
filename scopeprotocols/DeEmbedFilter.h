@@ -96,11 +96,8 @@ protected:
 	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
 	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
 
-	__attribute__((target("default")))
 	void MainLoop(size_t nouts);
-
-	__attribute__((target("avx2")))
-	void MainLoop(size_t nouts);
+	void MainLoopAVX2(size_t nouts);
 
 	#ifdef HAVE_CLFFT
 	clfftPlanHandle m_clfftForwardPlan;

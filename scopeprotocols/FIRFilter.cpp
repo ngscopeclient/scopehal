@@ -232,10 +232,7 @@ void FIRFilter::Refresh()
 	//Run the actual filter
 	float vmin;
 	float vmax;
-	if(g_clContext && m_kernel)
-		DoFilterKernelOpenCL(coeffs, din, cap, vmin, vmax);
-	else
-		DoFilterKernel(coeffs, din, cap, vmin, vmax);
+	DoFilterKernel(coeffs, din, cap, vmin, vmax);
 
 	//Shift output to compensate for filter group delay
 	cap->m_triggerPhase = (radius * fs_per_sample) + din->m_triggerPhase;
@@ -245,6 +242,27 @@ void FIRFilter::Refresh()
 	m_min = min(m_min, vmin);
 	m_range = (m_max - m_min) * 1.05;
 	m_offset = -( (m_max - m_min)/2 + m_min );
+}
+
+void FIRFilter::DoFilterKernel(
+	vector<float>& coefficients,
+	AnalogWaveform* din,
+	AnalogWaveform* cap,
+	float& vmin,
+	float& vmax)
+{
+	#ifdef HAVE_OPENCL
+	if(g_clContext && m_kernel)
+		DoFilterKernelOpenCL(coefficients, din, cap, vmin, vmax);
+	else
+	#endif
+
+	if(g_hasAvx512F)
+		DoFilterKernelAVX512F(coefficients, din, cap, vmin, vmax);
+	else if(g_hasAvx2)
+		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
+	else
+		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
 }
 
 #ifdef HAVE_OPENCL
@@ -316,8 +334,7 @@ void FIRFilter::DoFilterKernelOpenCL(
 /**
 	@brief Performs a FIR filter (does not assume symmetric)
  */
-__attribute__((target("default")))
-void FIRFilter::DoFilterKernel(
+void FIRFilter::DoFilterKernelGeneric(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
 	AnalogWaveform* cap,
@@ -351,7 +368,7 @@ void FIRFilter::DoFilterKernel(
 	Uses AVX2, but not AVX512 or FMA.
  */
 __attribute__((target("avx2")))
-void FIRFilter::DoFilterKernel(
+void FIRFilter::DoFilterKernelAVX2(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
 	AnalogWaveform* cap,
@@ -494,7 +511,7 @@ void FIRFilter::DoFilterKernel(
 	@brief Optimized AVX512F implementation
  */
 __attribute__((target("avx512f")))
-void FIRFilter::DoFilterKernel(
+void FIRFilter::DoFilterKernelAVX512F(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
 	AnalogWaveform* cap,

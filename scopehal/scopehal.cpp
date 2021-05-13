@@ -71,6 +71,10 @@
 
 using namespace std;
 
+bool g_hasAvx512F = false;
+bool g_hasAvx512DQ = false;
+bool g_hasAvx512VL = false;
+bool g_hasAvx2 = false;
 bool g_disableOpenCL = false;
 
 vector<string> g_searchPaths;
@@ -106,11 +110,20 @@ void DetectCPUFeatures()
 	LogDebug("Detecting CPU features...\n");
 	LogIndenter li;
 
-	if(__builtin_cpu_supports("avx2"))
-		LogDebug("* AVX2\n");
-	if(__builtin_cpu_supports("avx512f"))
-		LogDebug("* AVX512F\n");
+	//Check CPU features
+	g_hasAvx512F = __builtin_cpu_supports("avx512f");
+	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
+	g_hasAvx512DQ = __builtin_cpu_supports("avx512dq");
+	g_hasAvx2 = __builtin_cpu_supports("avx2");
 
+	if(g_hasAvx2)
+		LogDebug("* AVX2\n");
+	if(g_hasAvx512F)
+		LogDebug("* AVX512F\n");
+	if(g_hasAvx512DQ)
+		LogDebug("* AVX512DQ\n");
+	if(g_hasAvx512VL)
+		LogDebug("* AVX512VL\n");
 	LogDebug("\n");
 }
 

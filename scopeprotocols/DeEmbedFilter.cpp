@@ -499,9 +499,16 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		for(size_t i=npoints_raw; i<npoints; i++)
 			m_forwardInBuf[i] = 0;
 
-		//Actual transformation
+		//Do the forward FFT
 		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
-		MainLoop(nouts);
+
+		//Do the actual filter operation
+		if(g_hasAvx2)
+			MainLoopAVX2(nouts);
+		else
+			MainLoop(nouts);
+
+		//Calculate the inverse FFT
 		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
 	#ifdef HAVE_CLFFT
@@ -596,7 +603,6 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 	}
 }
 
-__attribute__((target("default")))
 void DeEmbedFilter::MainLoop(size_t nouts)
 {
 	for(size_t i=0; i<nouts; i++)
@@ -615,7 +621,7 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 }
 
 __attribute__((target("avx2")))
-void DeEmbedFilter::MainLoop(size_t nouts)
+void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 {
 	unsigned int end = nouts - (nouts % 8);
 

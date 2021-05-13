@@ -62,16 +62,6 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(TappedDelayLineFilter)
 
-	__attribute__((target("default")))
-	static void DoFilterKernel(
-		int64_t tap_delay,
-		float* taps,
-		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
-
-	__attribute__((target("avx2")))
 	static void DoFilterKernel(
 		int64_t tap_delay,
 		float* taps,
@@ -81,6 +71,22 @@ public:
 		float& vmax);
 
 protected:
+
+	static void DoFilterKernelGeneric(
+		int64_t tap_delay,
+		float* taps,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
+
+	static void DoFilterKernelAVX2(
+		int64_t tap_delay,
+		float* taps,
+		AnalogWaveform* din,
+		AnalogWaveform* cap,
+		float& vmin,
+		float& vmax);
 
 	float m_min;
 	float m_max;

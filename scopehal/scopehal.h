@@ -126,6 +126,11 @@ float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);
 
+extern bool g_hasAvx512F;
+extern bool g_hasAvx512VL;
+extern bool g_hasAvx512DQ;
+extern bool g_hasAvx2;
+
 #define FS_PER_SECOND 1e15
 #define SECONDS_PER_FS 1e-15
 

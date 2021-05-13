@@ -163,11 +163,13 @@ void SubtractFilter::Refresh()
 	float* b = (float*)&din_n->m_samples[0];
 
 	//Do the actual subtraction
-	InnerLoop(out, a, b, len);
+	if(g_hasAvx2)
+		InnerLoopAVX2(out, a, b, len);
+	else
+		InnerLoop(out, a, b, len);
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
-__attribute__((target("default")))
 void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
 {
 	out = (float*)__builtin_assume_aligned(out, 64);
@@ -179,7 +181,7 @@ void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
 }
 
 __attribute__((target("avx2")))
-void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
+void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 {
 	size_t end = len - (len % 8);
 

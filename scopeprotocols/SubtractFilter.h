@@ -56,11 +56,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(SubtractFilter)
 
 protected:
-	__attribute__((target("default")))
 	void InnerLoop(float* out, float* a, float* b, size_t len);
-
-	__attribute__((target("avx2")))
-	void InnerLoop(float* out, float* a, float* b, size_t len);
+	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
 };
 
 #endif
