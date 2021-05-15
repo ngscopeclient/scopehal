@@ -68,7 +68,7 @@ static const struct
 {
 	const char* name;
 	float val;
-} c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 2.5F}, {"LVCMOS33", 3.3F}, {"LVCMOS25", 1.5F}, {NULL, 0}};
+} c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
 static const std::chrono::milliseconds c_setting_delay(50);	   // Delay required when setting parameters via SCPI
 static const char* c_custom_thresh = "CUSTOM,";				   // Prepend string for custom digital threshold
@@ -995,9 +995,9 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	//cppcheck-suppress invalidPointerCast
 	double h_off = *reinterpret_cast<double*>(pdesc + 180) * FS_PER_SECOND;	   //fs from start of waveform to trigger
 
-	double h_off_frac = fmodf(h_off, interval);	   //fractional sample position, in fs
+	//double h_off_frac = fmodf(h_off, interval);	   //fractional sample position, in fs
 
-	//double h_off_frac = 0;//((interval*datalen)/2)+h_off;
+	double h_off_frac = 0;//((interval*datalen)/2)+h_off;
 
 	if(h_off_frac < 0)
 		h_off_frac = h_off;	   //interval + h_off_frac;	   //double h_unit = *reinterpret_cast<double*>(pdesc + 244);
