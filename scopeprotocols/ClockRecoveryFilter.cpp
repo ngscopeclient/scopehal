@@ -65,7 +65,9 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		case 0:
 			if(stream.m_channel == NULL)
 				return false;
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+			return
+				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) ||
+				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL);
 
 		case 1:
 			if(stream.m_channel == NULL)	//null is legal for gate
@@ -124,12 +126,16 @@ void ClockRecoveryFilter::Refresh()
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
+	auto adin = GetAnalogInputWaveform(0);
+	auto ddin = GetDigitalInputWaveform(0);
 	auto gate = GetDigitalInputWaveform(1);
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	FindZeroCrossings(din, m_parameters[m_threshname].GetFloatVal(), edges);
+	if(adin)
+		FindZeroCrossings(adin, m_parameters[m_threshname].GetFloatVal(), edges);
+	else
+		FindZeroCrossings(ddin, edges);
 	if(edges.empty())
 	{
 		SetData(NULL, 0);
@@ -141,14 +147,26 @@ void ClockRecoveryFilter::Refresh()
 
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	if(adin)
+	{
+		cap->m_startTimestamp = adin->m_startTimestamp;
+		cap->m_startFemtoseconds = adin->m_startFemtoseconds;
+	}
+	else
+	{
+		cap->m_startTimestamp = ddin->m_startTimestamp;
+		cap->m_startFemtoseconds = ddin->m_startFemtoseconds;
+	}
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	int64_t tend = din->m_offsets[din->m_offsets.size() - 1] * din->m_timescale;
+	int64_t tend;
+	if(adin)
+		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale;
+	else
+		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale;
 	size_t nedge = 1;
 	//LogDebug("n, delta, period, freq_ghz\n");
 	int64_t edgepos = edges[0];
