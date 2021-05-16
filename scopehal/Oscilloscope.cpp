@@ -238,6 +238,12 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	snprintf(tmp, sizeof(tmp), "        driver:         \"%s\"\n", GetDriverName().c_str());
 	config += tmp;
 
+	//Save timebase info
+	snprintf(tmp, sizeof(tmp), "        rate:           %ld\n", GetSampleRate());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        depth:          %ld\n", GetSampleDepth());
+	config += tmp;
+
 	//Save channels
 	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
@@ -383,6 +389,12 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 				break;
 		}
 	}
+
+	//Set sample rate/depth only after channels are in their final state
+	if(node["rate"])
+		SetSampleRate(node["rate"].as<unsigned long>());
+	if(node["depth"])
+		SetSampleDepth(node["depth"].as<unsigned long>());
 }
 
 void Oscilloscope::EnableTriggerOutput()
