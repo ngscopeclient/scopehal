@@ -243,6 +243,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        depth:          %ld\n", GetSampleDepth());
 	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        interleave:     %d\n", IsInterleaving());
+	config += tmp;
+
+	//TODO: triggers
 
 	//Save channels
 	config += "        channels:\n";
@@ -269,6 +273,11 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		{
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
 				config += "                type:        analog\n";
+				if(IsADCModeConfigurable())
+				{
+					snprintf(tmp, sizeof(tmp), "                adcmode:     %ld\n", GetADCMode(i));
+					config += tmp;
+				}
 				break;
 			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
 				config += "                type:        digital\n";
@@ -328,8 +337,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		}
 	}
 
-	//TODO: Serialize trigger and timebase configuration
-
 	return config;
 }
 
@@ -376,6 +383,8 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 					else if(coupling == "gnd")
 						chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
 				}
+				if(cnode["adcmode"])
+					SetADCMode(chan->GetIndex(), cnode["adcmode"].as<int>());
 				break;
 
 			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
@@ -390,7 +399,13 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		}
 	}
 
-	//Set sample rate/depth only after channels are in their final state
+	//Set sample rate/depth only after channels are in their final state.
+	//Interleaving has to be done first, since some rates/depths are only available when interleaved.
+	if(CanInterleave())
+	{
+		if(node["interleave"])
+			SetInterleaving(node["interleave"].as<int>());
+	}
 	if(node["rate"])
 		SetSampleRate(node["rate"].as<unsigned long>());
 	if(node["depth"])
