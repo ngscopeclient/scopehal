@@ -508,8 +508,6 @@ bool PicoOscilloscope::AcquireData()
 				return false;
 
 			size_t podnum = chnum - m_analogChannelCount;
-			LogDebug("Receiving digital data for pod %zu (chnum=%zu)\n", podnum, chnum);
-			LogDebug("trigphase=%f, memdepth=%zu\n", trigphase, memdepth);
 
 			//Now that we have the waveform data, unpack it into individual channels
 			for(size_t j=0; j<8; j++)
@@ -782,11 +780,12 @@ void PicoOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
 
 	//Source
-	m_transport->SendCommand("TRIG:SOU " + trig->GetInput(0).m_channel->GetHwname());
+	auto chan = trig->GetInput(0).m_channel;
+	m_transport->SendCommand("TRIG:SOU " + chan->GetHwname());
 
 	//Level
 	char buf[128];
-	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel());
+	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel() / chan->GetAttenuation());
 	m_transport->SendCommand(buf);
 
 	//Slope
