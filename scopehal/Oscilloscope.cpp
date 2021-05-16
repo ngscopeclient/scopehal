@@ -268,6 +268,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				config += "                type:        digital\n";
 				snprintf(tmp, sizeof(tmp), "                width:       %d\n", chan->GetWidth());
 				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                thresh:      %f\n", GetDigitalThreshold(i));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                hys:         %f\n", GetDigitalHysteresis(i));
+				config += tmp;
 				break;
 			case OscilloscopeChannel::CHANNEL_TYPE_TRIGGER:
 				config += "                type:        trigger\n";
@@ -346,26 +350,37 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
-		//only load AFE config for analog inputs
-		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		switch(chan->GetType())
 		{
-			chan->SetAttenuation(cnode["attenuation"].as<float>());
-			chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
-			chan->SetVoltageRange(cnode["vrange"].as<float>());
-			chan->SetOffset(cnode["offset"].as<float>());
+			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+				chan->SetAttenuation(cnode["attenuation"].as<float>());
+				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
+				chan->SetVoltageRange(cnode["vrange"].as<float>());
+				chan->SetOffset(cnode["offset"].as<float>());
 
-			if(cnode["coupling"])
-			{
-				string coupling = cnode["coupling"].as<string>();
-				if(coupling == "dc_50")
-					chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
-				else if(coupling == "dc_1M")
-					chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
-				else if(coupling == "ac_1M")
-					chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
-				else if(coupling == "gnd")
-					chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
-			}
+				if(cnode["coupling"])
+				{
+					string coupling = cnode["coupling"].as<string>();
+					if(coupling == "dc_50")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
+					else if(coupling == "dc_1M")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
+					else if(coupling == "ac_1M")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
+					else if(coupling == "gnd")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
+				}
+				break;
+
+			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+				if(cnode["thresh"])
+					chan->SetDigitalThreshold(cnode["thresh"].as<float>());
+				if(cnode["hys"])
+					chan->SetDigitalHysteresis(cnode["hys"].as<float>());
+				break;
+
+			default:
+				break;
 		}
 	}
 }
