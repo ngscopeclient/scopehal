@@ -96,18 +96,20 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		chname[2] += ichan;
 
 		//Create the channel
+		size_t chnum = i + m_digitalChannelBase;
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetChannelColor(ichan),
 			1,
-			i + m_digitalChannelBase,
+			chnum,
 			true);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
-		//TODO: set up threshold/hysteresis
+		SetDigitalHysteresis(chnum, 0.1);
+		SetDigitalThreshold(chnum, 0);
 	}
 
 	//Set initial memory configuration.
@@ -446,51 +448,127 @@ bool PicoOscilloscope::AcquireData()
 	size_t memdepth;
 	float config[3];
 	SequenceSet s;
+	double t = GetTime();
+	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		//Scale and offset are sent in the header since they might have changed since the capture began
 		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
-			return false;
-		float scale = config[0];
-		float offset = config[1];
-		float trigphase = -config[2] * fs_per_sample;
-		scale *= GetChannelAttenuation(chnum);
-
-		//TODO: stream timestamp from the server
-
-		//Allocate the buffer
 		int16_t* buf = new int16_t[memdepth];
-		if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
-			return false;
 
-		//Create our waveform
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = fs_per_sample;
-		cap->m_triggerPhase = trigphase;
-		cap->m_startTimestamp = time(NULL);
-		cap->m_densePacked = true;
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-		cap->Resize(memdepth);
+		//Analog channels
+		if(chnum < m_analogChannelCount)
+		{
+			//Scale and offset are sent in the header since they might have changed since the capture began
+			if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
+				return false;
+			float scale = config[0];
+			float offset = config[1];
+			float trigphase = -config[2] * fs_per_sample;
+			scale *= GetChannelAttenuation(chnum);
 
-		Convert16BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
-			buf,
-			scale,
-			-offset,
-			memdepth,
-			0);
+			//TODO: stream timestamp from the server
 
-		s[m_channels[chnum]] = cap;
+			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
+				return false;
 
-		//Clean up
+			//Create our waveform
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->m_timescale = fs_per_sample;
+			cap->m_triggerPhase = trigphase;
+			cap->m_startTimestamp = time(NULL);
+			cap->m_densePacked = true;
+			cap->m_startFemtoseconds = fs;
+			cap->Resize(memdepth);
+
+			Convert16BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				buf,
+				scale,
+				-offset,
+				memdepth,
+				0);
+
+			s[m_channels[chnum]] = cap;
+		}
+
+		//Digital pod
+		else
+		{
+			float trigphase;
+			if(!m_dataSocket->RecvLooped((uint8_t*)&trigphase, sizeof(trigphase)))
+				return false;
+			trigphase = -trigphase * fs_per_sample;
+			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
+				return false;
+
+			size_t podnum = chnum - m_analogChannelCount;
+			LogDebug("Receiving digital data for pod %zu (chnum=%zu)\n", podnum, chnum);
+			LogDebug("trigphase=%f, memdepth=%zu\n", trigphase, memdepth);
+
+			//Now that we have the waveform data, unpack it into individual channels
+			for(size_t j=0; j<8; j++)
+			{
+				//Bitmask for this digital channel
+				int16_t mask = (1 << j);
+
+				//Create the waveform
+				DigitalWaveform* cap = new DigitalWaveform;
+				cap->m_timescale = fs_per_sample;
+				cap->m_triggerPhase = trigphase;
+				cap->m_startTimestamp = time(NULL);
+				cap->m_densePacked = false;
+				cap->m_startFemtoseconds = fs;
+
+				//Preallocate memory assuming no deduplication possible
+				cap->Resize(memdepth);
+
+				//First sample never gets deduplicated
+				bool last = (buf[0] & mask) ? true : false;
+				size_t k = 0;
+				cap->m_offsets[0] = 0;
+				cap->m_durations[0] = 1;
+				cap->m_samples[0] = last;
+
+				//Read and de-duplicate the other samples
+				//TODO: can we vectorize this somehow?
+				for(size_t m=1; m<memdepth; m++)
+				{
+					bool sample = (buf[m] & mask) ? true : false;
+
+					//Deduplicate consecutive samples with same value
+					//FIXME: temporary workaround for rendering bugs
+					//if(last == sample)
+					if( (last == sample) && ((m+3) < memdepth) )
+						cap->m_durations[k] ++;
+
+					//Nope, it toggled - store the new value
+					else
+					{
+						k++;
+						cap->m_offsets[k] = m;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = sample;
+						last = sample;
+					}
+				}
+
+				//Free space reclaimed by deduplication
+				cap->Resize(k);
+				cap->m_offsets.shrink_to_fit();
+				cap->m_durations.shrink_to_fit();
+				cap->m_samples.shrink_to_fit();
+
+				//Done
+				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = cap;
+			}
+		}
+
 		delete[] buf;
 	}
 
@@ -800,6 +878,72 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 		default:
 			break;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Logic analyzer configuration
+
+vector<Oscilloscope::DigitalBank> PicoOscilloscope::GetDigitalBanks()
+{
+	vector<DigitalBank> banks;
+	for(size_t i=0; i<m_digitalChannelCount; i++)
+	{
+		DigitalBank bank;
+		bank.push_back(GetChannel(m_digitalChannelBase + i));
+		banks.push_back(bank);
+	}
+	return banks;
+}
+
+Oscilloscope::DigitalBank PicoOscilloscope::GetDigitalBank(size_t channel)
+{
+	DigitalBank ret;
+	ret.push_back(GetChannel(channel));
+	return ret;
+}
+
+bool PicoOscilloscope::IsDigitalHysteresisConfigurable()
+{
+	return true;
+}
+
+bool PicoOscilloscope::IsDigitalThresholdConfigurable()
+{
+	return true;
+}
+
+float PicoOscilloscope::GetDigitalHysteresis(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_digitalHysteresis[channel];
+}
+
+float PicoOscilloscope::GetDigitalThreshold(size_t channel)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_digitalThresholds[channel];
+}
+
+void PicoOscilloscope::SetDigitalHysteresis(size_t channel, float level)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_digitalHysteresis[channel] = level;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(GetChannel(channel)->GetHwname() + ":HYS " + to_string(level * 1000));
+}
+
+void PicoOscilloscope::SetDigitalThreshold(size_t channel, float level)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_digitalThresholds[channel] = level;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(GetChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

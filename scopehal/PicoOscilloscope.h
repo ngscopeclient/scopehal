@@ -103,6 +103,18 @@ public:
 	virtual size_t GetADCMode(size_t channel);
 	virtual void SetADCMode(size_t channel, size_t mode);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Logic analyzer configuration
+
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+	virtual DigitalBank GetDigitalBank(size_t channel);
+	virtual bool IsDigitalHysteresisConfigurable();
+	virtual bool IsDigitalThresholdConfigurable();
+	virtual float GetDigitalHysteresis(size_t channel);
+	virtual float GetDigitalThreshold(size_t channel);
+	virtual void SetDigitalHysteresis(size_t channel, float level);
+	virtual void SetDigitalThreshold(size_t channel, float level);
+
 	enum Series
 	{
 		SERIES_6403E,	//Lowest end 6000E model has less ADCs
@@ -181,6 +193,8 @@ protected:
 	std::map<size_t, double> m_channelAttenuations;
 	ADCMode m_adcMode;
 	std::map<int, bool> m_digitalBankPresent;
+	std::map<int, float> m_digitalThresholds;
+	std::map<int, float> m_digitalHysteresis;
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
