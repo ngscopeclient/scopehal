@@ -687,41 +687,6 @@ void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void Filter::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
-{
-	//id, protocol, color are already loaded
-	m_displayname = node["nick"].as<string>();
-	m_hwname = node["name"].as<string>();
-
-	auto parameters = node["parameters"];
-	for(auto it : parameters)
-		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
-}
-
-void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
-{
-	int index;
-	int stream;
-
-	auto inputs = node["inputs"];
-	for(auto it : inputs)
-	{
-		//Inputs are formatted as %d/%d. Stream index may be omitted.
-		auto sin = it.second.as<string>();
-		if(2 != sscanf(sin.c_str(), "%d/%d", &index, &stream))
-		{
-			index = atoi(sin.c_str());
-			stream = 0;
-		}
-
-		SetInput(
-			it.first.as<string>(),
-			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream),
-			true
-			);
-	}
-}
-
 string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
 	string config = "    : \n";
@@ -739,6 +704,15 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 	config += tmp;
 
 	return config;
+}
+
+void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
+{
+	FlowGraphNode::LoadParameters(node, table);
+
+	//id, protocol, color are already loaded
+	m_displayname = node["nick"].as<string>();
+	m_hwname = node["name"].as<string>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

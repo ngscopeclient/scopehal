@@ -123,6 +123,12 @@ public:
 	 */
 	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
+	/**
+		@brief Load configuration from a save file
+	 */
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
+
 	//Input handling helpers
 protected:
 

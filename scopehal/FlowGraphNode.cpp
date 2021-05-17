@@ -269,3 +269,34 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 
 	return config;
 }
+
+void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
+{
+	auto parameters = node["parameters"];
+	for(auto it : parameters)
+		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
+}
+
+void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
+{
+	int index;
+	int stream;
+
+	auto inputs = node["inputs"];
+	for(auto it : inputs)
+	{
+		//Inputs are formatted as %d/%d. Stream index may be omitted.
+		auto sin = it.second.as<string>();
+		if(2 != sscanf(sin.c_str(), "%d/%d", &index, &stream))
+		{
+			index = atoi(sin.c_str());
+			stream = 0;
+		}
+
+		SetInput(
+			it.first.as<string>(),
+			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream),
+			true
+			);
+	}
+}

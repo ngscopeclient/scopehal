@@ -412,6 +412,15 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		SetSampleRate(node["rate"].as<unsigned long>());
 	if(node["depth"])
 		SetSampleDepth(node["depth"].as<unsigned long>());
+
+	auto tnode = node["trigger"];
+	if(tnode)
+	{
+		auto trig = Trigger::CreateTrigger(tnode["type"].as<string>(), this);
+		trig->LoadParameters(tnode, table);
+		trig->LoadInputs(tnode, table);
+		SetTrigger(trig);
+	}
 }
 
 void Oscilloscope::EnableTriggerOutput()
