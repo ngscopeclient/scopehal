@@ -190,6 +190,15 @@ void PicoOscilloscope::IdentifyHardware()
 		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
 		m_series = SERIES_UNKNOWN;
 	}
+	else if(m_model[0] == '3')
+	{
+		if(m_model.find("MSO") > 0)
+		{
+			// PicoScope3000 support 16 Digital Channels for MSO (or nothing)
+			m_digitalChannelCount = 16;
+			m_series = SERIES_UNKNOWN;
+		}
+	}
 	else if(m_model[0] == '6')
 	{
 		//We have two MSO pod connectors
