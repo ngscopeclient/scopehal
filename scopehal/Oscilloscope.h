@@ -67,8 +67,10 @@ public:
 
 		In order to see updates made by the user at the front panel, the cache must be flushed.
 
-		Cache flushing is recommended every second or so during interactive operation.
-		In scripted/ATE environments where nobody should be touching the instrument, longer intervals may be used.
+		Cache flushing is recommended to be manually triggered during interactive operation if there is no way to
+		push updates from the scope to the driver.
+
+		In scripted/ATE environments where nobody should be touching the instrument, flushing is typically not needed.
 
 		The default implementation of this function does nothing since the base class provides no caching.
 		If a derived class caches configuration, it should override this function to clear any cached data.
