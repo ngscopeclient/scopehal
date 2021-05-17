@@ -117,4 +117,4 @@ if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
 endif()
 
-install(TARGETS scopehal LIBRARY DESTINATION /usr/lib)
+install(TARGETS scopehal LIBRARY)
