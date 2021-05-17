@@ -218,7 +218,11 @@ void DetectGPUFeatures()
 		}
 		catch(const cl::Error& e)
 		{
-			LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
+			//CL_PLATFORM_NOT_FOUND_KHR is an expected error if there's no GPU on the system
+			if( (string(e.what()) == "clGetPlatformIDs") && (e.err() == -1001) )
+				LogNotice("No platforms found, disabling OpenCL\n");
+			else
+				LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
 			delete g_clContext;
 			g_clContext = NULL;
 			return;
