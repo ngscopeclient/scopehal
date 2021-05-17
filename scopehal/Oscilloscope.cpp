@@ -246,8 +246,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	snprintf(tmp, sizeof(tmp), "        interleave:     %d\n", IsInterleaving());
 	config += tmp;
 
-	//TODO: triggers
-
 	//Save channels
 	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
@@ -336,6 +334,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			}
 		}
 	}
+
+	//Save trigger
+	auto trig = GetTrigger();
+	config += trig->SerializeConfiguration(table);
 
 	return config;
 }

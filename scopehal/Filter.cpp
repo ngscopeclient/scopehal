@@ -724,14 +724,11 @@ void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
 
 string Filter::SerializeConfiguration(IDTable& table)
 {
-	//Save basic decode info
-	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : \n");
-	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:              %d\n", table.emplace(this));
-	config += tmp;
+	string config = "    : \n";
+	config += FlowGraphNode::SerializeConfiguration(table, 8);
 
 	//Channel info
+	char tmp[1024];
 	snprintf(tmp, sizeof(tmp), "        protocol:        \"%s\"\n", GetProtocolDisplayName().c_str());
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        color:           \"%s\"\n", m_displaycolor.c_str());
@@ -740,54 +737,6 @@ string Filter::SerializeConfiguration(IDTable& table)
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        name:            \"%s\"\n", GetHwname().c_str());
 	config += tmp;
-
-	//Inputs
-	snprintf(tmp, sizeof(tmp), "        inputs: \n");
-	config += tmp;
-	for(size_t i=0; i<m_inputs.size(); i++)
-	{
-		auto desc = m_inputs[i];
-		if(desc.m_channel == NULL)
-			snprintf(tmp, sizeof(tmp), "            %-20s 0\n", (m_signalNames[i] + ":").c_str());
-		else
-		{
-			snprintf(tmp, sizeof(tmp), "            %-20s %d/%zu\n",
-				(m_signalNames[i] + ":").c_str(),
-				table.emplace(desc.m_channel),
-				desc.m_stream
-			);
-		}
-		config += tmp;
-	}
-
-	//Parameters
-	snprintf(tmp, sizeof(tmp), "        parameters: \n");
-	config += tmp;
-	for(auto it : m_parameters)
-	{
-		switch(it.second.GetType())
-		{
-			case FilterParameter::TYPE_FLOAT:
-			case FilterParameter::TYPE_INT:
-			case FilterParameter::TYPE_BOOL:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
-				break;
-
-			case FilterParameter::TYPE_FILENAME:
-			case FilterParameter::TYPE_FILENAMES:
-			default:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"            %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
-				break;
-		}
-
-		config += tmp;
-	}
 
 	return config;
 }

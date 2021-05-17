@@ -206,3 +206,66 @@ string FlowGraphNode::GetInputDisplayName(size_t i)
 	else
 		return in.m_channel->GetDisplayName();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
+{
+	string sindent = "";
+	for(size_t i=0; i<indent; i++)
+		sindent += ' ';
+
+	//Basic header
+	char tmp[1024];
+	snprintf(tmp, sizeof(tmp), "id:              %d\n", table.emplace(this));
+	string config = sindent + tmp;
+
+	//Inputs
+	config += sindent + "inputs:\n";
+	for(size_t i=0; i<m_inputs.size(); i++)
+	{
+		auto desc = m_inputs[i];
+		if(desc.m_channel == NULL)
+			snprintf(tmp, sizeof(tmp), "    %-20s 0\n", (m_signalNames[i] + ":").c_str());
+		else
+		{
+			snprintf(tmp, sizeof(tmp), "    %-20s %d/%zu\n",
+				(m_signalNames[i] + ":").c_str(),
+				table.emplace(desc.m_channel),
+				desc.m_stream
+			);
+		}
+		config += sindent + tmp;
+	}
+
+	//Parameters
+	config += sindent + "parameters:\n";
+	for(auto it : m_parameters)
+	{
+		switch(it.second.GetType())
+		{
+			case FilterParameter::TYPE_FLOAT:
+			case FilterParameter::TYPE_INT:
+			case FilterParameter::TYPE_BOOL:
+				snprintf(
+					tmp,
+					sizeof(tmp),
+					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+				break;
+
+			case FilterParameter::TYPE_FILENAME:
+			case FilterParameter::TYPE_FILENAMES:
+			default:
+				snprintf(
+					tmp,
+					sizeof(tmp),
+					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
+				break;
+		}
+
+		config += sindent + tmp;
+	}
+
+	return config;
+}
