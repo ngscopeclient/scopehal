@@ -722,7 +722,7 @@ void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
 	}
 }
 
-string Filter::SerializeConfiguration(IDTable& table)
+string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
 	string config = "    : \n";
 	config += FlowGraphNode::SerializeConfiguration(table, 8);

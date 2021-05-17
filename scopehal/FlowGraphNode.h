@@ -121,7 +121,7 @@ public:
 
 		@return YAML block with this trigger's configuration
 	 */
-	std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
+	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
 	//Input handling helpers
 protected:

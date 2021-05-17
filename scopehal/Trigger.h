@@ -84,7 +84,7 @@ public:
 
 		@return YAML block with this trigger's configuration
 	 */
-	virtual std::string SerializeConfiguration(IDTable& table);
+	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
 protected:
 	//Class enumeration

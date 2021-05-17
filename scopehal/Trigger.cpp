@@ -74,7 +74,7 @@ Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Trigger::SerializeConfiguration(IDTable& table)
+string Trigger::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
 	string config = "        trigger:\n";
 	config += FlowGraphNode::SerializeConfiguration(table, 12);

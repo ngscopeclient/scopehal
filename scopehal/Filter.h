@@ -139,7 +139,7 @@ public:
 	/**
 		@brief Serialize this decoder's configuration to a string
 	 */
-	virtual std::string SerializeConfiguration(IDTable& table);
+	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
 	/**
 		@brief Load configuration from a save file
