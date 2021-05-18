@@ -219,9 +219,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 {
 	//Save basic scope info
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : \n");
+	int iscope = table.emplace(this);
+	snprintf(tmp, sizeof(tmp), "    scope%d:\n", iscope);
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:             %d\n", table.emplace(this));
+	snprintf(tmp, sizeof(tmp), "        id:             %d\n", iscope);
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        nick:           \"%s\"\n", m_nickname.c_str());
 	config += tmp;
@@ -255,7 +256,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			continue;	//skip any kind of math functions etc
 
 		//Basic channel info
-		snprintf(tmp, sizeof(tmp), "            : \n");
+		snprintf(tmp, sizeof(tmp), "            ch%zu:\n", i);
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
 		config += tmp;

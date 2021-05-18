@@ -689,11 +689,15 @@ void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 
 string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
-	string config = "    : \n";
-	config += FlowGraphNode::SerializeConfiguration(table, 8);
+	string base = FlowGraphNode::SerializeConfiguration(table, 8);
+
+	string config;
+	char tmp[1024];
+	snprintf(tmp, sizeof(tmp), "    filter%d:\n", table[static_cast<FlowGraphNode*>(this)]);
+	config += tmp;
+	config += base;
 
 	//Channel info
-	char tmp[1024];
 	snprintf(tmp, sizeof(tmp), "        protocol:        \"%s\"\n", GetProtocolDisplayName().c_str());
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        color:           \"%s\"\n", m_displaycolor.c_str());
