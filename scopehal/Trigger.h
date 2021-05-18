@@ -79,6 +79,13 @@ public:
 	static void EnumTriggers(std::vector<std::string>& names);
 	static Trigger* CreateTrigger(std::string name, Oscilloscope* scope);
 
+	/**
+		@brief Serializes this trigger's configuration to a YAML string.
+
+		@return YAML block with this trigger's configuration
+	 */
+	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
+
 protected:
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;

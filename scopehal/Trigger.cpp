@@ -70,3 +70,14 @@ Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
 	LogError("Invalid trigger name: %s\n", name.c_str());
 	return NULL;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+string Trigger::SerializeConfiguration(IDTable& table, size_t /*indent*/)
+{
+	string config = "        trigger:\n";
+	config += FlowGraphNode::SerializeConfiguration(table, 12);
+	config += string("            type:            ") + GetTriggerDisplayName() + "\n";
+	return config;
+}

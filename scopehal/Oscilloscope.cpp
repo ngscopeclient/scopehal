@@ -219,9 +219,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 {
 	//Save basic scope info
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : \n");
+	int iscope = table.emplace(this);
+	snprintf(tmp, sizeof(tmp), "    scope%d:\n", iscope);
 	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:             %d\n", table.emplace(this));
+	snprintf(tmp, sizeof(tmp), "        id:             %d\n", iscope);
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        nick:           \"%s\"\n", m_nickname.c_str());
 	config += tmp;
@@ -246,8 +247,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	snprintf(tmp, sizeof(tmp), "        interleave:     %d\n", IsInterleaving());
 	config += tmp;
 
-	//TODO: triggers
-
 	//Save channels
 	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
@@ -257,7 +256,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			continue;	//skip any kind of math functions etc
 
 		//Basic channel info
-		snprintf(tmp, sizeof(tmp), "            : \n");
+		snprintf(tmp, sizeof(tmp), "            ch%zu:\n", i);
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
 		config += tmp;
@@ -337,6 +336,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		}
 	}
 
+	//Save trigger
+	auto trig = GetTrigger();
+	config += trig->SerializeConfiguration(table);
+
 	return config;
 }
 
@@ -410,6 +413,15 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		SetSampleRate(node["rate"].as<unsigned long>());
 	if(node["depth"])
 		SetSampleDepth(node["depth"].as<unsigned long>());
+
+	auto tnode = node["trigger"];
+	if(tnode)
+	{
+		auto trig = Trigger::CreateTrigger(tnode["type"].as<string>(), this);
+		trig->LoadParameters(tnode, table);
+		trig->LoadInputs(tnode, table);
+		SetTrigger(trig);
+	}
 }
 
 void Oscilloscope::EnableTriggerOutput()

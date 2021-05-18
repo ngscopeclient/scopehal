@@ -116,6 +116,19 @@ public:
 	ParameterMapType::iterator GetParamEnd()
 	{ return m_parameters.end(); }
 
+	/**
+		@brief Serializes this trigger's configuration to a YAML string.
+
+		@return YAML block with this trigger's configuration
+	 */
+	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
+
+	/**
+		@brief Load configuration from a save file
+	 */
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
+
 	//Input handling helpers
 protected:
 

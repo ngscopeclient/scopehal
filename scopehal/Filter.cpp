@@ -687,49 +687,15 @@ void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void Filter::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
+string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
-	//id, protocol, color are already loaded
-	m_displayname = node["nick"].as<string>();
-	m_hwname = node["name"].as<string>();
+	string base = FlowGraphNode::SerializeConfiguration(table, 8);
 
-	auto parameters = node["parameters"];
-	for(auto it : parameters)
-		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
-}
-
-void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
-{
-	int index;
-	int stream;
-
-	auto inputs = node["inputs"];
-	for(auto it : inputs)
-	{
-		//Inputs are formatted as %d/%d. Stream index may be omitted.
-		auto sin = it.second.as<string>();
-		if(2 != sscanf(sin.c_str(), "%d/%d", &index, &stream))
-		{
-			index = atoi(sin.c_str());
-			stream = 0;
-		}
-
-		SetInput(
-			it.first.as<string>(),
-			StreamDescriptor(static_cast<OscilloscopeChannel*>(table[index]), stream),
-			true
-			);
-	}
-}
-
-string Filter::SerializeConfiguration(IDTable& table)
-{
-	//Save basic decode info
+	string config;
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    : \n");
-	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:              %d\n", table.emplace(this));
+	snprintf(tmp, sizeof(tmp), "    filter%d:\n", table[static_cast<FlowGraphNode*>(this)]);
 	config += tmp;
+	config += base;
 
 	//Channel info
 	snprintf(tmp, sizeof(tmp), "        protocol:        \"%s\"\n", GetProtocolDisplayName().c_str());
@@ -741,55 +707,16 @@ string Filter::SerializeConfiguration(IDTable& table)
 	snprintf(tmp, sizeof(tmp), "        name:            \"%s\"\n", GetHwname().c_str());
 	config += tmp;
 
-	//Inputs
-	snprintf(tmp, sizeof(tmp), "        inputs: \n");
-	config += tmp;
-	for(size_t i=0; i<m_inputs.size(); i++)
-	{
-		auto desc = m_inputs[i];
-		if(desc.m_channel == NULL)
-			snprintf(tmp, sizeof(tmp), "            %-20s 0\n", (m_signalNames[i] + ":").c_str());
-		else
-		{
-			snprintf(tmp, sizeof(tmp), "            %-20s %d/%zu\n",
-				(m_signalNames[i] + ":").c_str(),
-				table.emplace(desc.m_channel),
-				desc.m_stream
-			);
-		}
-		config += tmp;
-	}
-
-	//Parameters
-	snprintf(tmp, sizeof(tmp), "        parameters: \n");
-	config += tmp;
-	for(auto it : m_parameters)
-	{
-		switch(it.second.GetType())
-		{
-			case FilterParameter::TYPE_FLOAT:
-			case FilterParameter::TYPE_INT:
-			case FilterParameter::TYPE_BOOL:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"            %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
-				break;
-
-			case FilterParameter::TYPE_FILENAME:
-			case FilterParameter::TYPE_FILENAMES:
-			default:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"            %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
-				break;
-		}
-
-		config += tmp;
-	}
-
 	return config;
+}
+
+void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
+{
+	FlowGraphNode::LoadParameters(node, table);
+
+	//id, protocol, color are already loaded
+	m_displayname = node["nick"].as<string>();
+	m_hwname = node["name"].as<string>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
