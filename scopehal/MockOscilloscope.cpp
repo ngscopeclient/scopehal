@@ -377,6 +377,17 @@ bool MockOscilloscope::LoadCSV(const string& path)
 	time_t timestamp = 0;
 	int64_t fs = 0;
 
+	//Get timestamp of the file if no header timestamp
+	//TODO: Add Windows equivalent
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
+
 	char line[1024];
 	size_t nrow = 0;
 	size_t ncols = 0;
@@ -961,6 +972,19 @@ bool MockOscilloscope::LoadWAV(const string& path)
 		fseek(fp, header[1], SEEK_CUR);
 	}
 
+	//Get timestamp of the file if no header timestamp
+	//TODO: Add Windows equivalent
+	int64_t timestamp = 0;
+	int64_t fs = 0;
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
+
 	//Create our channels
 	size_t datalen = header[1];
 	size_t bytes_per_sample = nbits / 8;
@@ -989,8 +1013,8 @@ bool MockOscilloscope::LoadWAV(const string& path)
 		//Create new waveform for channel
 		auto wfm = new AnalogWaveform;
 		wfm->m_timescale = interval;
-		wfm->m_startTimestamp = 0;					//TODO: use WAV file mod time
-		wfm->m_startFemtoseconds = 0;
+		wfm->m_startTimestamp = timestamp;
+		wfm->m_startFemtoseconds = fs;
 		wfm->m_triggerPhase = 0;
 		wfm->m_densePacked = true;
 		wfm->Resize(nsamples);
