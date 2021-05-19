@@ -416,13 +416,17 @@ public:
 	 */
 	void SetTrigger(Trigger* trigger)
 	{
-		//If we have an old trigger that's not the same, free it
-		if(m_trigger != trigger)
-			delete m_trigger;
+		Trigger* old_trig = m_trigger;
 
 		//Set the new trigger and sync to hardware
 		m_trigger = trigger;
 		PushTrigger();
+
+		//Delete old trigger *after* pushing the new one.
+		//This prevents possible race conditions where we disable the current trigger channel before the new
+		//trigger is set.
+		if(old_trig != trigger)
+			delete old_trig;
 	}
 
 	/**
