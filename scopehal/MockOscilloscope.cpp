@@ -887,6 +887,10 @@ bool MockOscilloscope::LoadVCD(const string& path)
 	//Current scope prefix for signals
 	vector<string> scope;
 
+	//Map of signal IDs to signals
+	map<string, WaveformBase*> waveforms;
+	map<string, size_t> widths;
+
 	//VCD is a line based format, so process everything in lines
 	char buf[2048];
 	while(NULL != fgets(buf, sizeof(buf), fp))
@@ -1021,12 +1025,14 @@ bool MockOscilloscope::LoadVCD(const string& path)
 					if(4 != sscanf(buf, "$var %15[^ ] %d %15[^ ] %127[^ ]", vtype, &width, symbol, name))
 						continue;
 
-					//Format the full name of the variable
-					string vname = sscope + name;
-					LogDebug("Symbol %s is %d bits long, denoted by %s\n", vname.c_str(), width, symbol);
+					//If the symbol is already in use, skip it.
+					//We don't support one symbol with more than one name for now
+					if(waveforms.find(symbol) != waveforms.end())
+						continue;
 
 					//Create the channel
 					size_t ichan = m_channels.size();
+					string vname = sscope + name;
 					auto chan = new OscilloscopeChannel(
 						this,
 						vname,
@@ -1036,14 +1042,97 @@ bool MockOscilloscope::LoadVCD(const string& path)
 						ichan,
 						true);
 					m_channels.push_back(chan);
+
+					//Create the waveform
+					WaveformBase* wfm;
+					if(width == 1)
+						wfm = new DigitalWaveform;
+					else
+						wfm = new DigitalBusWaveform;
+
+					wfm->m_timescale = timescale;
+					wfm->m_startTimestamp = timestamp;
+					wfm->m_startFemtoseconds = fs;
+					wfm->m_triggerPhase = 0;
+					wfm->m_densePacked = false;
+					waveforms[symbol] = wfm;
+					widths[symbol] = width;
+					chan->SetData(wfm, 0);
 				}
 				break;	//end STATE_VARS
 
 			case STATE_INITIAL:
-				break;	//end STATE_INITIAL
-
 			case STATE_DUMP:
-				break;	//end STATE_DUMP
+
+				//Parse the current line
+				if(s[0] != '$')
+				{
+					//Vector: first char is 'b', then data, space, symbol name
+					if(s[0] == 'b')
+					{
+						auto ispace = s.find(' ');
+						auto symbol = s.substr(ispace + 1);
+						auto wfm = dynamic_cast<DigitalBusWaveform*>(waveforms[symbol]);
+						if(wfm)
+						{
+							//Parse the sample data (skipping the leading 'b')
+							vector<bool> sample;
+							for(size_t i = ispace-1; i > 0; i--)
+							{
+								if(s[i] == '1')
+									sample.push_back(true);
+								else
+									sample.push_back(false);
+							}
+
+							//Zero-pad the sample out to full width
+							auto width = widths[symbol];
+							while(sample.size() < width)
+								sample.push_back(false);
+
+							//Extend the previous sample, if there is one
+							auto len = wfm->m_samples.size();
+							if(len)
+							{
+								auto last = len-1;
+								wfm->m_durations[last] = current_time - wfm->m_offsets[last];
+							}
+
+							//Add the new sample
+							wfm->m_offsets.push_back(current_time);
+							wfm->m_durations.push_back(1);
+							wfm->m_samples.push_back(sample);
+						}
+						else
+							LogError("Symbol \"%s\" is not a valid digital bus waveform\n", symbol.c_str());
+					}
+
+					//Scalar: first char is boolean value, rest is symbol name
+					else
+					{
+						auto symbol = s.substr(1);
+						auto wfm = dynamic_cast<DigitalWaveform*>(waveforms[symbol]);
+						if(wfm)
+						{
+							//Extend the previous sample, if there is one
+							auto len = wfm->m_samples.size();
+							if(len)
+							{
+								auto last = len-1;
+								wfm->m_durations[last] = current_time - wfm->m_offsets[last];
+							}
+
+							//Add the new sample
+							wfm->m_offsets.push_back(current_time);
+							wfm->m_durations.push_back(1);
+							wfm->m_samples.push_back(s[0] == '1');
+						}
+						else
+							LogError("Symbol \"%s\" is not a valid digital waveform\n", symbol.c_str());
+					}
+				}
+
+				break;	//end STATE_INITIAL / STATE_DUMP
 		}
 
 		//Reset at the end of a block
