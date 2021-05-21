@@ -338,7 +338,8 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 
 	//Save trigger
 	auto trig = GetTrigger();
-	config += trig->SerializeConfiguration(table);
+	if(trig)
+		config += trig->SerializeConfiguration(table);
 
 	return config;
 }
