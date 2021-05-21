@@ -45,6 +45,7 @@ public:
 	//Capture file importing
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
+	bool LoadVCD(const std::string& path);
 	bool LoadWAV(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
