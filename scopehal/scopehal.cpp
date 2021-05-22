@@ -114,9 +114,7 @@ void DetectCPUFeatures()
 	g_hasAvx512F = __builtin_cpu_supports("avx512f");
 	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
 	g_hasAvx512DQ = __builtin_cpu_supports("avx512dq");
-#ifndef _WIN32 // AVX2 is temporarily disabled on MingW64 until this in resolved: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54412 https://github.com/azonenberg/scopehal-apps/issues/295
 	g_hasAvx2 = __builtin_cpu_supports("avx2");
-#endif // _WIN32
 
 	if(g_hasAvx2)
 		LogDebug("* AVX2\n");
@@ -127,6 +125,13 @@ void DetectCPUFeatures()
 	if(g_hasAvx512VL)
 		LogDebug("* AVX512VL\n");
 	LogDebug("\n");
+#if defined(_WIN32) && defined(__GNUC__) // AVX2 is temporarily disabled on MingW64/GCC until this in resolved: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54412
+	if (g_hasAvx2 || g_hasAvx512F || g_hasAvx512DQ || g_hasAvx512VL)
+	{
+		g_hasAvx2 = g_hasAvx512F = g_hasAvx512DQ = g_hasAvx512VL = false;
+		LogWarning("AVX2/AVX512 detected but disabled on MinGW64/GCC (see https://github.com/azonenberg/scopehal-apps/issues/295)\n");
+	}
+#endif
 }
 
 /**
