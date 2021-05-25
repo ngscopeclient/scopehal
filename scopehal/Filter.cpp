@@ -691,9 +691,12 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
 	string base = FlowGraphNode::SerializeConfiguration(table, 8);
 
+	int id = table.emplace(this);
 	string config;
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    filter%d:\n", table[static_cast<FlowGraphNode*>(this)]);
+	snprintf(tmp, sizeof(tmp), "    filter%d:\n", id);
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        id:              %d\n", id);
 	config += tmp;
 	config += base;
 

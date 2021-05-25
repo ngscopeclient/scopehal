@@ -216,13 +216,9 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 	for(size_t i=0; i<indent; i++)
 		sindent += ' ';
 
-	//Basic header
-	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "id:              %d\n", table.emplace(this));
-	string config = sindent + tmp;
-
 	//Inputs
-	config += sindent + "inputs:\n";
+	char tmp[1024];
+	string config = sindent + "inputs:\n";
 	for(size_t i=0; i<m_inputs.size(); i++)
 	{
 		auto desc = m_inputs[i];
