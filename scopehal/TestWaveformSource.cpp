@@ -40,7 +40,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TestWaveformSource::TestWaveformSource(mt19937& rng)
+TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
 {
 	m_forwardPlan = NULL;

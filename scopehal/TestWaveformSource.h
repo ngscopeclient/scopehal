@@ -48,7 +48,7 @@
 class TestWaveformSource
 {
 public:
-	TestWaveformSource(std::mt19937& rng);
+	TestWaveformSource(std::minstd_rand& rng);
 	virtual ~TestWaveformSource();
 
 	TestWaveformSource(const TestWaveformSource&) =delete;
@@ -97,7 +97,7 @@ public:
 	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth, bool lpf, float noise_amplitude);
 
 protected:
-	std::mt19937& m_rng;
+	std::minstd_rand& m_rng;
 
 	//FFT stuff
 	AlignedAllocator<float, 32> m_allocator;

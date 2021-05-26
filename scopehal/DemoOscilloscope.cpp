@@ -47,9 +47,13 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	, m_extTrigger(NULL)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
-	, m_rng(m_rd())
-	, m_source(m_rng)
 {
+	for(int i=0; i<5; i++)
+	{
+		m_rng[i] = new minstd_rand(m_rd());
+		m_source[i] = new TestWaveformSource(*m_rng[i]);
+	}
+
 	m_model = "Oscilloscope Simulator";
 	m_vendor = "Antikernel Labs";
 	m_serial = "12345";
@@ -97,7 +101,11 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 
 DemoOscilloscope::~DemoOscilloscope()
 {
-
+	for(int i=0; i<5; i++)
+	{
+		delete m_source[i];
+		delete m_rng[i];
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -465,14 +473,43 @@ bool DemoOscilloscope::AcquireData()
 	}
 
 	//Generate waveforms
-	SequenceSet s;
+
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	s[m_channels[0]] = m_source.GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
-	s[m_channels[1]] = m_source.GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
-	s[m_channels[2]] = m_source.GeneratePRBS31(0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
-	s[m_channels[3]] = m_source.Generate8b10b(0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
-	s[m_channels[4]] = m_source.GenerateStep(0, 1, sampleperiod, depth);
+	WaveformBase* waveforms[5];
+	#pragma omp parallel for
+	for(int i=0; i<5; i++)
+	{
+		switch(i)
+		{
+			case 0:
+				waveforms[i] = m_source[i]->GenerateNoisySinewave(0.9, 0.0, 1e6, sampleperiod, depth, noise[0]);
+				break;
+
+			case 1:
+				waveforms[i] = m_source[i]->GenerateNoisySinewaveMix(0.9, 0.0, M_PI_4, 1e6, sweepPeriod, sampleperiod, depth, noise[1]);
+				break;
+
+			case 2:
+				waveforms[i] = m_source[i]->GeneratePRBS31(0.9, 96969.6, sampleperiod, depth, lpf2, noise[2]);
+				break;
+
+			case 3:
+				waveforms[i] = m_source[i]->Generate8b10b(0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
+				break;
+
+			case 4:
+				waveforms[i] = m_source[i]->GenerateStep(0, 1, sampleperiod, depth);
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	SequenceSet s;
+	for(int i=0; i<5; i++)
+		s[m_channels[i]] = waveforms[i];
 
 	//Timestamp the waveform(s)
 	float now = GetTime();
