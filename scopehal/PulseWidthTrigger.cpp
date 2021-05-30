@@ -31,6 +31,7 @@
 #include "PulseWidthTrigger.h"
 #include "LeCroyOscilloscope.h"
 #include "TektronixOscilloscope.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
@@ -38,10 +39,7 @@ using namespace std;
 // Construction / destruction
 
 PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
-	: EdgeTrigger(scope)
-	, m_conditionname("Condition")
-	, m_lowername("Lower Bound")
-	, m_uppername("Upper Bound")
+	: EdgeTrigger(scope), m_conditionname("Condition"), m_lowername("Lower Bound"), m_uppername("Upper Bound")
 {
 	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
@@ -53,7 +51,7 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
 
 	//Some modes are only supported by certain vendors
-	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
+	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
 		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
 	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
 	{
@@ -65,7 +63,6 @@ PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
 
 PulseWidthTrigger::~PulseWidthTrigger()
 {
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
