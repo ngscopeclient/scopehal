@@ -31,6 +31,7 @@
 #include "SlewRateTrigger.h"
 #include "LeCroyOscilloscope.h"
 #include "TektronixOscilloscope.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
@@ -55,7 +56,7 @@ SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
 
 	//Make/model specific options
-	if(dynamic_cast<LeCroyOscilloscope*>(scope) != NULL)
+	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
 	{
 		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
 		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
@@ -80,7 +81,6 @@ SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
 
 SlewRateTrigger::~SlewRateTrigger()
 {
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,8 +109,8 @@ bool SlewRateTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//It has to be analog or external trigger, digital inputs make no sense
-	if( (stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER) )
+	if((stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER))
 	{
 		return false;
 	}

@@ -31,14 +31,14 @@
 #include "DropoutTrigger.h"
 #include "LeCroyOscilloscope.h"
 #include "TektronixOscilloscope.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
-	: Trigger(scope)
+DropoutTrigger::DropoutTrigger(Oscilloscope* scope) : Trigger(scope)
 {
 	CreateInput("din");
 
@@ -53,7 +53,7 @@ DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
 	m_parameters[m_timename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
 	m_resetname = "Reset Mode";
-	if(dynamic_cast<LeCroyOscilloscope*>(scope))
+	if((dynamic_cast<LeCroyOscilloscope*>(scope)) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope)))
 	{
 		m_parameters[m_resetname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 		m_parameters[m_resetname].AddEnumValue("Opposite Edge", RESET_OPPOSITE);
@@ -63,7 +63,6 @@ DropoutTrigger::DropoutTrigger(Oscilloscope* scope)
 
 DropoutTrigger::~DropoutTrigger()
 {
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
