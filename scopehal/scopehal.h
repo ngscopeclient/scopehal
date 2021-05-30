@@ -60,7 +60,7 @@
 #define CL_HPP_TARGET_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
 #define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY
 #define CL_HPP_ENABLE_EXCEPTIONS
-#include <CL/cl2.hpp>
+#include "../OpenCL-CLHPP/include/CL/opencl.hpp"
 #endif
 
 #include "Unit.h"
