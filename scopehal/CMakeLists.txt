@@ -114,13 +114,18 @@ target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools lo
 	${LXI_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} ${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
 
 target_include_directories(scopehal
-PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
 	${LIBFFTS_INCLUDE_DIR}
 	${OpenCL_INCLUDE_DIR}
 	${CLFFT_INCLUDE_DIR}
 	${YAML_INCLUDES}
 	)
+
+target_include_directories(scopehal
+PUBLIC SYSTEM
+	${CMAKE_CURRENT_SOURCE_DIR}/../OpenCL-CLHPP/include)
 
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
