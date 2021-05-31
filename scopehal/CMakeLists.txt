@@ -11,8 +11,8 @@ else()
 	set(LIN_LIBS dl)
 endif()
 
-# adapt for BSD pthreads API
-if((CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") OR (CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+# Apple has their own idea about stat structs
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Dst_mtim=st_mtimespec")
 endif()
 
