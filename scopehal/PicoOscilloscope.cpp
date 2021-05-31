@@ -451,6 +451,13 @@ bool PicoOscilloscope::AcquireData()
 	SequenceSet s;
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+
+	//Analog channels get processed separately
+	vector<int16_t*> abufs;
+	vector<AnalogWaveform*> awfms;
+	vector<float> scales;
+	vector<float> offsets;
+
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
@@ -463,6 +470,8 @@ bool PicoOscilloscope::AcquireData()
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
+			abufs.push_back(buf);
+
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
 				return false;
@@ -484,16 +493,9 @@ bool PicoOscilloscope::AcquireData()
 			cap->m_densePacked = true;
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
-
-			Convert16BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
-				buf,
-				scale,
-				-offset,
-				memdepth,
-				0);
+			awfms.push_back(cap);
+			scales.push_back(scale);
+			offsets.push_back(offset);
 
 			s[m_channels[chnum]] = cap;
 		}
@@ -566,9 +568,26 @@ bool PicoOscilloscope::AcquireData()
 				//Done
 				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = cap;
 			}
-		}
 
-		delete[] buf;
+			delete[] buf;
+		}
+	}
+
+	//Process analog captures in parallel
+	#pragma omp parallel for
+	for(size_t i=0; i<awfms.size(); i++)
+	{
+		auto cap = awfms[i];
+		Convert16BitSamples(
+			(int64_t*)&cap->m_offsets[0],
+			(int64_t*)&cap->m_durations[0],
+			(float*)&cap->m_samples[0],
+			abufs[i],
+			scales[i],
+			-offsets[i],
+			cap->m_offsets.size(),
+			0);
+		delete[] abufs[i];
 	}
 
 	//Save the waveforms to our queue
