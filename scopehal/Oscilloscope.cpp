@@ -1076,12 +1076,13 @@ void Oscilloscope::Convert16BitSamplesFMA(
 	{
 		//Load all 64 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		//Skylake: 7 cycle latency, 0.5 CPI so 2 cycles
 		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
 		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
 		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 32));
 		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 48));
 
-		//Fill offset
+		//First sample data will be ready in 6 cycles. Stores take 1 cycle each
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts2);
@@ -1094,94 +1095,114 @@ void Oscilloscope::Convert16BitSamplesFMA(
 		counts1 = _mm256_add_epi64(counts1, all_eights);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		//Extract low and high halves of the input
+		//Skylake: 3 cycle latency, 1 CPI, executes on port 5
+		//Should be able to issue these concurrently with a store on port 5
+		//and an add on port 0
+		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
+
+		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples1, 1);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
 
+		__m128i block2_i16 = _mm256_extracti128_si256(raw_samples2, 0);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 32), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
+
+		__m128i block3_i16 = _mm256_extracti128_si256(raw_samples2, 1);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 36), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		__m128i block4_i16 = _mm256_extracti128_si256(raw_samples3, 0);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 40), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
+
+		__m128i block5_i16 = _mm256_extracti128_si256(raw_samples3, 1);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 44), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		__m128i block6_i16 = _mm256_extracti128_si256(raw_samples4, 0);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 48), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
+
+		__m128i block7_i16 = _mm256_extracti128_si256(raw_samples4, 1);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 52), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		//Conversion is 3 cycle latency, 1 CPI.
+		//Issue concurrently with more stores
+		__m256i block0_i32 = _mm256_cvtepi16_epi32(block0_i16);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 56), counts1);
 		counts1 = _mm256_add_epi64(counts1, all_eights);
+
+		__m256i block1_i32 = _mm256_cvtepi16_epi32(block1_i16);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 60), counts2);
 		counts2 = _mm256_add_epi64(counts2, all_eights);
 
-		//Extract the low and high halves (8 samples each) from the input blocks
-		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
-		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples1, 1);
-		__m128i block2_i16 = _mm256_extracti128_si256(raw_samples2, 0);
-		__m128i block3_i16 = _mm256_extracti128_si256(raw_samples2, 1);
-		__m128i block4_i16 = _mm256_extracti128_si256(raw_samples3, 0);
-		__m128i block5_i16 = _mm256_extracti128_si256(raw_samples3, 1);
-		__m128i block6_i16 = _mm256_extracti128_si256(raw_samples4, 0);
-		__m128i block7_i16 = _mm256_extracti128_si256(raw_samples4, 1);
-
-		//Convert the blocks from 16 to 32 bit, giving us a pair of 8x int32 vectors
-		__m256i block0_i32 = _mm256_cvtepi16_epi32(block0_i16);
-		__m256i block1_i32 = _mm256_cvtepi16_epi32(block1_i16);
 		__m256i block2_i32 = _mm256_cvtepi16_epi32(block2_i16);
-		__m256i block3_i32 = _mm256_cvtepi16_epi32(block3_i16);
-		__m256i block4_i32 = _mm256_cvtepi16_epi32(block4_i16);
-		__m256i block5_i32 = _mm256_cvtepi16_epi32(block5_i16);
-		__m256i block6_i32 = _mm256_cvtepi16_epi32(block6_i16);
-		__m256i block7_i32 = _mm256_cvtepi16_epi32(block7_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
 
-		//Convert the 32-bit int blocks to fp32
-		//Sadly there's no direct epi16 to ps conversion instruction.
+		__m256i block3_i32 = _mm256_cvtepi16_epi32(block3_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+
+		__m256i block4_i32 = _mm256_cvtepi16_epi32(block4_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+
+		__m256i block5_i32 = _mm256_cvtepi16_epi32(block5_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+
+		__m256i block6_i32 = _mm256_cvtepi16_epi32(block6_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+
+		__m256i block7_i32 = _mm256_cvtepi16_epi32(block7_i16);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+
+		//Next pass of conversion, interleaved with more stores
 		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+
 		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
+
 		__m256 block2_float = _mm256_cvtepi32_ps(block2_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 32), all_ones);
+
 		__m256 block3_float = _mm256_cvtepi32_ps(block3_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 36), all_ones);
+
 		__m256 block4_float = _mm256_cvtepi32_ps(block4_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 40), all_ones);
+
 		__m256 block5_float = _mm256_cvtepi32_ps(block5_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 44), all_ones);
+
 		__m256 block6_float = _mm256_cvtepi32_ps(block6_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 48), all_ones);
+
 		__m256 block7_float = _mm256_cvtepi32_ps(block7_i32);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 52), all_ones);
 
 		//Woo! We've finally got floating point data. Now we can do the fun part.
+		//Should be able to dual issue two fmsubs per clock on Skylake/Icelake on ports 0/1, plus a store on 4.
 		block0_float = _mm256_fmsub_ps(block0_float, gains, offsets);
 		block1_float = _mm256_fmsub_ps(block1_float, gains, offsets);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 56), all_ones);
 		block2_float = _mm256_fmsub_ps(block2_float, gains, offsets);
 		block3_float = _mm256_fmsub_ps(block3_float, gains, offsets);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 60), all_ones);
 		block4_float = _mm256_fmsub_ps(block4_float, gains, offsets);
 		block5_float = _mm256_fmsub_ps(block5_float, gains, offsets);
 		block6_float = _mm256_fmsub_ps(block6_float, gains, offsets);
 		block7_float = _mm256_fmsub_ps(block7_float, gains, offsets);
-
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
-
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 32), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 36), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 40), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 44), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 48), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 52), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 56), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 60), all_ones);
 
 		//All done, store back to the output buffer
 		_mm256_store_ps(pout + k, 		block0_float);
 		_mm256_store_ps(pout + k + 8,	block1_float);
 		_mm256_store_ps(pout + k + 16,	block2_float);
 		_mm256_store_ps(pout + k + 24,	block3_float);
-
 		_mm256_store_ps(pout + k + 32,	block4_float);
 		_mm256_store_ps(pout + k + 40,	block5_float);
 		_mm256_store_ps(pout + k + 48,	block6_float);
