@@ -75,6 +75,7 @@ bool g_hasAvx512F = false;
 bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
+bool g_hasFMA = false;
 bool g_disableOpenCL = false;
 
 vector<string> g_searchPaths;
@@ -115,9 +116,12 @@ void DetectCPUFeatures()
 	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
 	g_hasAvx512DQ = __builtin_cpu_supports("avx512dq");
 	g_hasAvx2 = __builtin_cpu_supports("avx2");
+	g_hasFMA = __builtin_cpu_supports("fma");
 
 	if(g_hasAvx2)
 		LogDebug("* AVX2\n");
+	if(g_hasFMA)
+		LogDebug("* FMA\n");
 	if(g_hasAvx512F)
 		LogDebug("* AVX512F\n");
 	if(g_hasAvx512DQ)
