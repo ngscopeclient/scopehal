@@ -776,6 +776,8 @@ void PicoOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+
+	ClearPendingWaveforms();
 }
 
 /**
