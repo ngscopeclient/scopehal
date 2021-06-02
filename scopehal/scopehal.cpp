@@ -675,7 +675,12 @@ void InitializeSearchPaths()
 	else if ( (unsigned) readlinkReturn > (sizeof(binDir) - 1) )
 		LogError("Error: readlink() returned a path larger than our buffer.\n");
 	else
+	{
 		g_searchPaths.push_back(dirname(binDir));
+		string binRootDir = dirname(binDir);
+		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
+		g_searchPaths.push_back(binRootDir + "/share/scopehal");
+	}
 #endif
 
 	//Local directories preferred over system ones
