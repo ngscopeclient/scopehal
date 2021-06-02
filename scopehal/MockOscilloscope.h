@@ -43,6 +43,7 @@ public:
 	virtual ~MockOscilloscope();
 
 	//Capture file importing
+	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
 	bool LoadVCD(const std::string& path);
@@ -159,6 +160,8 @@ public:
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
+	static void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+
 	void ArmTrigger();
 
 	//standard *IDN? fields

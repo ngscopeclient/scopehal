@@ -355,6 +355,112 @@ void MockOscilloscope::PullTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Import a waveform from file
 
+void MockOscilloscope::GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
+{
+	//TODO: Add Windows equivalent
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
+}
+
+/**
+	@brief Imports a waveform from a complex file containing signed 16-bit samples in IQIQ order.
+ */
+bool MockOscilloscope::LoadComplexInt16(const string& path, int64_t samplerate)
+{
+	LogTrace("Importing complex file \"%s\"\n", path.c_str());
+	LogIndenter li;
+
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+
+	//Figure out length of the file in complex samples (2x int16 per sample)
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	size_t numSamples = len/4;
+
+	//Find sample period
+	int64_t fs_per_sample = FS_PER_SECOND / samplerate;
+
+	//Get timestamp
+	time_t timestamp = 0;
+	int64_t fs = 0;
+	GetTimestampOfFile(path, timestamp, fs);
+
+	//Read sample data
+	int16_t* temp = new int16_t[numSamples * 2];
+	if(numSamples*2 != fread(temp, sizeof(int16_t), numSamples*2, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+
+	//Create the channel
+	auto chan = new OscilloscopeChannel(
+		this,
+		"RF",
+		OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+		GetDefaultChannelColor(0),
+		1,
+		0,
+		true);
+	AddChannel(chan);
+	chan->SetDefaultDisplayName();
+	chan->ClearStreams();
+	chan->AddStream("I");
+	chan->AddStream("Q");
+	chan->SetVoltageRange(2);
+	chan->SetOffset(0);
+
+	//Create the waveforms for each of the two complex streams
+	auto iwfm = new AnalogWaveform;
+	iwfm->m_timescale = fs_per_sample;
+	iwfm->m_startTimestamp = timestamp;
+	iwfm->m_startFemtoseconds = fs;
+	iwfm->m_triggerPhase = 0;
+	iwfm->Resize(numSamples);
+	iwfm->m_densePacked = true;
+	chan->SetData(iwfm, 0);
+
+	auto qwfm = new AnalogWaveform;
+	qwfm->m_timescale = fs_per_sample;
+	qwfm->m_startTimestamp = timestamp;
+	qwfm->m_startFemtoseconds = fs;
+	qwfm->m_triggerPhase = 0;
+	qwfm->Resize(numSamples);
+	qwfm->m_densePacked = true;
+	chan->SetData(qwfm, 1);
+
+	//Copy sample data
+	//TODO: vectorize
+	float scale = 1.0f / 32767.0f;
+	for(size_t i=0; i<numSamples; i++)
+	{
+		iwfm->m_offsets[i] = i;
+		qwfm->m_offsets[i] = i;
+
+		iwfm->m_durations[i] = 1;
+		qwfm->m_durations[i] = 1;
+
+		iwfm->m_samples[i] = temp[i*2] * scale;
+		qwfm->m_samples[i] = temp[i*2 + 1] * scale;
+	}
+
+	delete[] temp;
+	fclose(fp);
+	return true;
+}
+
 /**
 	@brief Imports waveforms from Comma Separated Value files
  */
@@ -376,17 +482,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 	time_t timestamp = 0;
 	int64_t fs = 0;
-
-	//Get timestamp of the file if no header timestamp
-	//TODO: Add Windows equivalent
-	#ifndef _WIN32
-		struct stat st;
-		if(0 == stat(path.c_str(), &st))
-		{
-			timestamp = st.st_mtim.tv_sec;
-			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
-		}
-	#endif
+	GetTimestampOfFile(path, timestamp, fs);
 
 	char line[1024];
 	size_t nrow = 0;
