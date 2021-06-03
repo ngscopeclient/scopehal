@@ -334,6 +334,25 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 					break;
 			}
 		}
+
+		//Save streams if there's more than one
+		size_t nstreams = chan->GetStreamCount();
+		if(nstreams > 1)
+		{
+			snprintf(tmp, sizeof(tmp), "                nstreams:     %zu\n", nstreams);
+			config += tmp;
+			snprintf(tmp, sizeof(tmp), "                streams:\n");
+			config += tmp;
+			for(size_t j=0; j<nstreams; j++)
+			{
+				snprintf(tmp, sizeof(tmp), "                    stream%zu:\n", j);
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        index: %zu\n", j);
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        name: \"%s\"\n", chan->GetStreamName(j).c_str());
+				config += tmp;
+			}
+		}
 	}
 
 	//Save trigger
@@ -400,6 +419,28 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 
 			default:
 				break;
+		}
+
+		//Add multiple streams if present
+		auto snode = cnode["nstreams"];
+		if(snode)
+		{
+			size_t nstreams = snode.as<size_t>();
+			if(nstreams > 1)
+			{
+				chan->ClearStreams();
+
+				//We have to keep track of indexes because streams might show up out of order
+				//but right now OscilloscopeChannel only lets us add them in order
+				map<int, string> names;
+
+				auto streams = cnode["streams"];
+				for(auto st : streams)
+					names[st.second["index"].as<size_t>()] = st.second["name"].as<string>();
+
+				for(size_t j=0; j<nstreams; j++)
+					chan->AddStream(names[j]);
+			}
 		}
 	}
 

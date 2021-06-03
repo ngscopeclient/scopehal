@@ -48,7 +48,8 @@ class Oscilloscope;
 class OscilloscopeChannel
 {
 public:
-	//MockOscilloscope has to be able to call AddStream()
+	//Oscilloscope has to be able to call AddStream()
+	friend class Oscilloscope;
 	friend class MockOscilloscope;
 
 	enum ChannelType
