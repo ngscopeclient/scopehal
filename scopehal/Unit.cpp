@@ -366,7 +366,8 @@ void Unit::SetLocale(const char* locale)
 	m_locale = duplocale(LC_GLOBAL_LOCALE);
 	m_locale = newlocale(LC_NUMERIC, locale, m_locale);
 
-	m_defaultLocale = newlocale(LC_NUMERIC, "C", 0);
+	m_defaultLocale = newlocale(LC_ALL, locale, 0);
+	m_defaultLocale = newlocale(LC_NUMERIC, "C", m_defaultLocale);
 #endif
 }
 
