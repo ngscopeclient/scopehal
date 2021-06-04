@@ -709,6 +709,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 		float vrange = vmax - vmin;
 		float vavg = vmin + vrange/2;
+		vrange = max(vrange, 0.001f);
 
 		auto chan = GetChannel(i);
 		chan->SetVoltageRange(vrange);
