@@ -43,6 +43,10 @@ public:
 	virtual ~MockOscilloscope();
 
 	//Capture file importing
+	bool LoadComplexUnknownFormat(const std::string& path, int64_t samplerate);
+	bool LoadComplexFloat32(const std::string& path, int64_t samplerate);
+	bool LoadComplexFloat64(const std::string& path, int64_t samplerate);
+	bool LoadComplexInt8(const std::string& path, int64_t samplerate);
 	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
@@ -161,6 +165,13 @@ public:
 
 protected:
 	static void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+
+	void LoadComplexCommon(
+		const std::string& path,
+		AnalogWaveform*& iwfm,
+		AnalogWaveform*& qwfm,
+		int64_t samplerate,
+		size_t numSamples);
 
 	void ArmTrigger();
 
