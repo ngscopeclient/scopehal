@@ -70,9 +70,10 @@ static const struct
 	float val;
 } c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
-static const std::chrono::milliseconds c_setting_delay(50);	   // Delay required when setting parameters via SCPI
-static const char* c_custom_thresh = "CUSTOM,";				   // Prepend string for custom digital threshold
-static const float c_thresh_thresh = 0.01f;					   // Zero equivalence threshold for fp comparisons
+static const std::chrono::milliseconds c_setting_delay(50);	 // Delay required when setting parameters via SCPI
+static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
+static const char* c_custom_thresh = "CUSTOM,";			 // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;			 // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -772,6 +773,15 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	//Read the Internal State Change Register
 	string sinr;
 	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(m_triggerForced)
+	{
+		// The force trigger completed, return the sample set
+		m_triggerForced = false;
+		m_triggerArmed = false;
+		return TRIGGER_MODE_TRIGGERED;
+	}
+
 	sinr = converse(":TRIGGER:STATUS?");
 
 	//No waveform, but ready for one?
@@ -802,10 +812,26 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
 	uint32_t getLength;
 
 	// Get size of this sequence
-	m_transport->ReadRawData(16, (unsigned char*)packetSizeSequence);
-	packetSizeSequence[16] = 0;
+	m_transport->ReadRawData(7, (unsigned char*)packetSizeSequence);
+
+	// This is an aweful cludge, but the response can be in different formats depending on
+	// if this was a direct trigger or a forced trigger. This is the report format for a direct trigger
+	if((!strncmp(packetSizeSequence, "DESC,#9", 7)) || (!strncmp(packetSizeSequence, "DAT2,#9", 7)))
+	{
+		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
+	}
+
+	// This is the report format for a forced trigger
+	if(!strncmp(&packetSizeSequence[2], ":WF D", 5))
+	{
+		// Read the front end junk, then the actually number we're looking for
+		m_transport->ReadRawData(6, (unsigned char*)packetSizeSequence);
+		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
+	}
+
+	packetSizeSequence[9] = 0;
 	LogTrace("INITIAL PACKET [%s]\n", packetSizeSequence);
-	getLength = atoi(&packetSizeSequence[7]);
+	getLength = atoi(packetSizeSequence);
 
 	// Now get the data
 	m_transport->ReadRawData((getLength > maxsize) ? maxsize : getLength, (unsigned char*)data);
@@ -1414,7 +1440,18 @@ void SiglentSCPIOscilloscope::Stop()
 
 void SiglentSCPIOscilloscope::ForceTrigger()
 {
-	LogError("SiglentSCPIOscilloscope::ForceTrigger not implemented\n");
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+        // Don't allow more than one force at a time
+        if (m_triggerForced)
+          return;
+
+	m_triggerForced = true;
+	sendOnly(":TRIGGER:MODE SINGLE");
+	if(!m_triggerArmed)
+		sendOnly(":TRIGGER:MODE SINGLE");
+
+	this_thread::sleep_for(c_trigger_delay);
 }
 
 double SiglentSCPIOscilloscope::GetChannelOffset(size_t i)
