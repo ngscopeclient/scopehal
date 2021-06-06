@@ -169,6 +169,11 @@ void SignalGeneratorOscilloscope::Stop()
 	m_triggerOneShot = false;
 }
 
+void SignalGeneratorOscilloscope::ForceTrigger()
+{
+	StartSingleTrigger();
+}
+
 bool SignalGeneratorOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

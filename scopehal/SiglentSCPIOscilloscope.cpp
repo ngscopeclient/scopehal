@@ -1412,6 +1412,11 @@ void SiglentSCPIOscilloscope::Stop()
 	ClearPendingWaveforms();
 }
 
+void SiglentSCPIOscilloscope::ForceTrigger()
+{
+	LogError("SiglentSCPIOscilloscope::ForceTrigger not implemented\n");
+}
+
 double SiglentSCPIOscilloscope::GetChannelOffset(size_t i)
 {
 	//not meaningful for trigger or digital channels

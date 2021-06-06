@@ -80,6 +80,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();

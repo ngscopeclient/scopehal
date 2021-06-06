@@ -165,6 +165,11 @@ void DemoOscilloscope::Stop()
 	m_triggerOneShot = false;
 }
 
+void DemoOscilloscope::ForceTrigger()
+{
+	StartSingleTrigger();
+}
+
 bool DemoOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

@@ -625,6 +625,14 @@ void PicoOscilloscope::Stop()
 	m_triggerArmed = false;
 }
 
+void PicoOscilloscope::ForceTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("FORCE");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+}
+
 bool PicoOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

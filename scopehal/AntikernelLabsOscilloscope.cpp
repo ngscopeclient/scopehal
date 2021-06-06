@@ -459,6 +459,11 @@ void AntikernelLabsOscilloscope::Stop()
 	*/
 }
 
+void AntikernelLabsOscilloscope::ForceTrigger()
+{
+	//TODO
+}
+
 bool AntikernelLabsOscilloscope::IsTriggerArmed()
 {
 	//return m_triggerArmed;

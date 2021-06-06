@@ -32,8 +32,8 @@
  * =============
  * - Digital channels not implemented
  * - Only basic edge trigger supported. Coupling, hysteresis, B trigger not implemented
- * 
- * RS Oscilloscope driver parts (c) 2021 Francisco Sedano, tested on RTM3004 
+ *
+ * RS Oscilloscope driver parts (c) 2021 Francisco Sedano, tested on RTM3004
  */
 
 
@@ -619,6 +619,11 @@ void RohdeSchwarzOscilloscope::Stop()
 	m_transport->SendCommand("STOP");
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
+}
+
+void RohdeSchwarzOscilloscope::ForceTrigger()
+{
+	LogError("RohdeSchwarzOscilloscope::ForceTrigger not implemented\n");
 }
 
 bool RohdeSchwarzOscilloscope::IsTriggerArmed()

@@ -2743,13 +2743,21 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("TRIG_MODE STOP");
-	}
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("TRIG_MODE STOP");
 
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
+}
+
+void LeCroyOscilloscope::ForceTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+
+	m_transport->SendCommand("FRTR");
 }
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)

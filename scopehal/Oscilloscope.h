@@ -481,6 +481,13 @@ public:
 	virtual void Stop() =0;
 
 	/**
+		@brief Forces a single acquisition as soon as possible.
+
+		Note that PollTrigger() may not return 'triggered' immediately, due to command processing latency.
+	 */
+	virtual void ForceTrigger() =0;
+
+	/**
 		@brief Checks if the trigger is currently armed
 	 */
 	virtual bool IsTriggerArmed() =0;

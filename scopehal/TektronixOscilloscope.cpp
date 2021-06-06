@@ -1843,6 +1843,13 @@ void TektronixOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void TektronixOscilloscope::ForceTrigger()
+{
+	m_triggerArmed = true;
+	m_transport->SendCommandQueued("TRIG FORC");
+	m_triggerOneShot = true;
+}
+
 bool TektronixOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
