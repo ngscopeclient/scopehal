@@ -669,7 +669,7 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "Power Analysis";
 			}
-			else if( (o == "SDA") || (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") )
+			else if( (o == "SDA") || (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") || (o == "ASDA") )
 			{
 				type = "Signal Integrity";
 				desc = "Serial Data Analysis";
