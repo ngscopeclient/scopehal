@@ -252,6 +252,7 @@ protected:
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+	bool m_triggerForced;
 
 	// Transfer buffer. This is a bit hacky
 	char m_analogWaveformData[MAX_ANALOG][WAVEFORM_SIZE];
