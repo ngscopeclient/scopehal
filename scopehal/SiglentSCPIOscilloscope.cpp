@@ -70,10 +70,10 @@ static const struct
 	float val;
 } c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
-static const std::chrono::milliseconds c_setting_delay(50);	 // Delay required when setting parameters via SCPI
+static const std::chrono::milliseconds c_setting_delay(50);		 // Delay required when setting parameters via SCPI
 static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
-static const char* c_custom_thresh = "CUSTOM,";			 // Prepend string for custom digital threshold
-static const float c_thresh_thresh = 0.01f;			 // Zero equivalence threshold for fp comparisons
+static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -1442,15 +1442,16 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-        // Don't allow more than one force at a time
-        if (m_triggerForced)
-          return;
+	// Don't allow more than one force at a time
+	if(m_triggerForced)
+		return;
 
 	m_triggerForced = true;
 	sendOnly(":TRIGGER:MODE SINGLE");
 	if(!m_triggerArmed)
 		sendOnly(":TRIGGER:MODE SINGLE");
 
+	m_triggerArmed = true;
 	this_thread::sleep_for(c_trigger_delay);
 }
 
