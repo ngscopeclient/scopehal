@@ -70,6 +70,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	char line[256];
 	double unit_scale = 1;
 	bool mag_is_db = false;
+	bool polar = true;			//mag/angle
 	while(!feof(fp))
 	{
 		fgets(line, sizeof(line), fp);
@@ -81,7 +82,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 		//Header line with metadata starts with a #
 		if(line[0] == '#')
 		{
-			//Format: # [freq unit] S [MA|DB] R [impedance]
+			//Format: # [freq unit] S [MA|DB|RI] R [impedance]
 			char freq_unit[32];
 			char volt_unit[32];
 			int impedance;
@@ -95,11 +96,11 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 			string funit(freq_unit);
 			if( (funit == "MHZ") ||  (funit == "MHz") )
 				unit_scale = 1e6;
-			else if(funit == "GHZ")
+			else if( (funit == "GHZ") || (funit == "GHz") )
 				unit_scale = 1e9;
-			else if(funit == "KHZ")
+			else if( (funit == "KHZ") || (funit == "kHz") )
 				unit_scale = 1e3;
-			else if(funit == "HZ")
+			else if( (funit == "HZ") || (funit == "Hz") )
 				unit_scale = 1;
 			else
 			{
@@ -112,9 +113,11 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 			}
 			else if( (0 == strcmp(volt_unit, "DB")) || (0 == strcmp(volt_unit, "dB")) )
 				mag_is_db = true;
+			else if(0 == strcmp(volt_unit, "RI"))
+				polar = false;
 			else
 			{
-				LogError("S2P units other than magnitude and dB not supported (got %s)\n", volt_unit);
+				LogError("S2P units other than magnitude, real/imaginary, and dB not supported (got %s)\n", volt_unit);
 				return false;
 			}
 
@@ -142,10 +145,22 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 		hz *= unit_scale;
 
 		//Convert angles from degrees to radians
-		s11p *= (M_PI / 180);
-		s21p *= (M_PI / 180);
-		s12p *= (M_PI / 180);
-		s22p *= (M_PI / 180);
+		if(polar)
+		{
+			s11p *= (M_PI / 180);
+			s21p *= (M_PI / 180);
+			s12p *= (M_PI / 180);
+			s22p *= (M_PI / 180);
+		}
+
+		//Convert real/imaginary to mag/angle if needed
+		else
+		{
+			ComplexToPolar(s11m, s11p);
+			ComplexToPolar(s21m, s21p);
+			ComplexToPolar(s12m, s12p);
+			ComplexToPolar(s22m, s22p);
+		}
 
 		//Save everything
 		params.m_params[SPair(1,1)]->m_points.push_back(SParameterPoint(hz, s11m, s11p));
@@ -160,4 +175,19 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	LogTrace("Loaded %zu S-parameter points\n", params.m_params[SPair(2,1)]->m_points.size());
 
 	return true;
+}
+
+/**
+	@brief Converts a complex number in (real, imaginary) form to (magnitude, angle)
+ */
+void TouchstoneParser::ComplexToPolar(float& f1, float& f2)
+{
+	float real = f1;
+	float imag = f2;
+
+	//Magnitude is easy
+	f1 = sqrtf(real*real + imag*imag);
+
+	//Angle needs some trig
+	f2 = atan2(imag, real);
 }

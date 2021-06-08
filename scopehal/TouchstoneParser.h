@@ -46,6 +46,9 @@ public:
 	virtual ~TouchstoneParser();
 
 	bool Load(std::string fname, SParameters& params);
+
+protected:
+	void ComplexToPolar(float& f1, float& f2);
 };
 
 #endif
