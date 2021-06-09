@@ -72,6 +72,14 @@ protected:
 	virtual bool LoadSparameters();
 	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
+	enum SParameterNames
+	{
+		S11,
+		S12,
+		S21,
+		S22
+	};
+	std::string m_pathName;
 	std::string m_fname;
 
 	std::vector<std::string> m_cachedFileNames;

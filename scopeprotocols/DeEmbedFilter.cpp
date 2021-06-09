@@ -47,6 +47,14 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
 	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
 
+	m_pathName = "Path";
+	m_parameters[m_pathName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_pathName].AddEnumValue("S11", S11);
+	m_parameters[m_pathName].AddEnumValue("S12", S12);
+	m_parameters[m_pathName].AddEnumValue("S21", S21);
+	m_parameters[m_pathName].AddEnumValue("S22", S22);
+	m_parameters[m_pathName].SetIntVal(S21);
+
 	m_range = 1;
 	m_offset = 0;
 	m_min = FLT_MAX;
@@ -227,9 +235,10 @@ void DeEmbedFilter::SetDefaultName()
 	snprintf(
 		hwname,
 		sizeof(hwname),
-		"DeEmbed(%s, %s)",
+		"DeEmbed(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
-		base.c_str()
+		base.c_str(),
+		m_parameters[m_pathName].ToString().c_str()
 		);
 
 	m_hwname = hwname;
@@ -579,9 +588,35 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 {
 	m_cachedBinSize = bin_hz;
 
+	//Figure out which parameter to use
+	int to, from;
+	switch(m_parameters[m_pathName].GetIntVal())
+	{
+		case S11:
+			to = 1;
+			from = 1;
+			break;
+
+		case S21:
+			to = 2;
+			from = 1;
+			break;
+
+		case S12:
+			to = 1;
+			from = 2;
+			break;
+
+		case S22:
+		default:
+			to = 2;
+			from = 2;
+			break;
+	}
+
 	for(size_t i=0; i<nouts; i++)
 	{
-		auto point = m_sparams.SamplePoint(2, 1, bin_hz * i);
+		auto point = m_sparams.SamplePoint(to, from, bin_hz * i);
 
 		//De-embedding
 		if(invert)
