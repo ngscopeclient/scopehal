@@ -311,6 +311,8 @@ vector<uint64_t> DemoOscilloscope::GetSampleRatesNonInterleaved()
 	ret.push_back(25 * g);
 	ret.push_back(50 * g);
 	ret.push_back(100 * g);
+	ret.push_back(200 * g);
+	ret.push_back(500 * g);
 	return ret;
 }
 
