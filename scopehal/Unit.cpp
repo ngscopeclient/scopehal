@@ -164,6 +164,10 @@ string Unit::PrettyPrint(double value, int sigfigs)
 			unit = "W";
 			break;
 
+		case UNIT_RHO:
+			unit = "ρ";
+			break;
+
 		case UNIT_BITRATE:
 			unit = "bps";
 			break;
