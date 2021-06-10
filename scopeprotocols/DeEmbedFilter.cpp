@@ -54,6 +54,7 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_parameters[m_pathName].AddEnumValue("S21", S21);
 	m_parameters[m_pathName].AddEnumValue("S22", S22);
 	m_parameters[m_pathName].SetIntVal(S21);
+	m_cachedPath = S21;
 
 	m_range = 1;
 	m_offset = 0;
@@ -421,9 +422,19 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Resample S21 to our FFT bin size if needed.
+	//Check if we're now computing a different S-parameter than before
+	bool paramchange = false;
+	auto path = static_cast<SParameterNames>(m_parameters[m_pathName].GetIntVal());
+	if(path != m_cachedPath)
+	{
+		m_cachedPath = path;
+		paramchange = true;
+		ClearSweeps();
+	}
+
+	//Resample our parameter to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
-	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange )
+	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || paramchange )
 	{
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();

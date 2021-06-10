@@ -82,6 +82,7 @@ protected:
 	std::string m_pathName;
 	std::string m_fname;
 
+	SParameterNames m_cachedPath;
 	std::vector<std::string> m_cachedFileNames;
 
 	float m_min;
