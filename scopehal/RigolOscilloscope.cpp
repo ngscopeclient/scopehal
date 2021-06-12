@@ -861,6 +861,11 @@ void RigolOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void RigolOscilloscope::ForceTrigger()
+{
+	LogError("RigolOscilloscope::ForceTrigger not implemented\n");
+}
+
 bool RigolOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

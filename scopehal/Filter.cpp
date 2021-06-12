@@ -691,9 +691,12 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 {
 	string base = FlowGraphNode::SerializeConfiguration(table, 8);
 
+	int id = table.emplace(this);
 	string config;
 	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    filter%d:\n", table[static_cast<FlowGraphNode*>(this)]);
+	snprintf(tmp, sizeof(tmp), "    filter%d:\n", id);
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        id:              %d\n", id);
 	config += tmp;
 	config += base;
 
@@ -707,6 +710,12 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 	snprintf(tmp, sizeof(tmp), "        name:            \"%s\"\n", GetHwname().c_str());
 	config += tmp;
 
+	//Save gain and offset (not applicable to all filters, but save it just in case)
+	snprintf(tmp, sizeof(tmp), "        vrange:          %f\n", GetVoltageRange());
+	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        offset:          %f\n", GetOffset());
+	config += tmp;
+
 	return config;
 }
 
@@ -717,6 +726,11 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	//id, protocol, color are already loaded
 	m_displayname = node["nick"].as<string>();
 	m_hwname = node["name"].as<string>();
+
+	if(node["vrange"])
+		SetVoltageRange(node["vrange"].as<double>());
+	if(node["offset"])
+		SetOffset(node["offset"].as<double>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

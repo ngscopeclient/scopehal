@@ -334,11 +334,31 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 					break;
 			}
 		}
+
+		//Save streams if there's more than one
+		size_t nstreams = chan->GetStreamCount();
+		if(nstreams > 1)
+		{
+			snprintf(tmp, sizeof(tmp), "                nstreams:     %zu\n", nstreams);
+			config += tmp;
+			snprintf(tmp, sizeof(tmp), "                streams:\n");
+			config += tmp;
+			for(size_t j=0; j<nstreams; j++)
+			{
+				snprintf(tmp, sizeof(tmp), "                    stream%zu:\n", j);
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        index: %zu\n", j);
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        name: \"%s\"\n", chan->GetStreamName(j).c_str());
+				config += tmp;
+			}
+		}
 	}
 
 	//Save trigger
 	auto trig = GetTrigger();
-	config += trig->SerializeConfiguration(table);
+	if(trig)
+		config += trig->SerializeConfiguration(table);
 
 	return config;
 }
@@ -400,6 +420,28 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			default:
 				break;
 		}
+
+		//Add multiple streams if present
+		auto snode = cnode["nstreams"];
+		if(snode)
+		{
+			size_t nstreams = snode.as<size_t>();
+			if(nstreams > 1)
+			{
+				chan->ClearStreams();
+
+				//We have to keep track of indexes because streams might show up out of order
+				//but right now OscilloscopeChannel only lets us add them in order
+				map<int, string> names;
+
+				auto streams = cnode["streams"];
+				for(auto st : streams)
+					names[st.second["index"].as<size_t>()] = st.second["name"].as<string>();
+
+				for(size_t j=0; j<nstreams; j++)
+					chan->AddStream(names[j]);
+			}
+		}
 	}
 
 	//Set sample rate/depth only after channels are in their final state.
@@ -427,6 +469,21 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 void Oscilloscope::EnableTriggerOutput()
 {
 	//do nothing, assuming the scope needs no config to enable trigger out
+}
+
+bool Oscilloscope::IsSamplingModeAvailable(SamplingMode mode)
+{
+	return (mode == REAL_TIME);
+}
+
+Oscilloscope::SamplingMode Oscilloscope::GetSamplingMode()
+{
+	return REAL_TIME;
+}
+
+void Oscilloscope::SetSamplingMode(SamplingMode /*mode*/)
+{
+	//default implementation is a no-op
 }
 
 void Oscilloscope::SetUseExternalRefclk(bool external)
@@ -879,15 +936,30 @@ void Oscilloscope::Convert16BitSamples(
 			size_t off = i*blocksize;
 			if(g_hasAvx2)
 			{
-				Convert16BitSamplesAVX2(
-					offs + off,
-					durs + off,
-					pout + off,
-					pin + off,
-					gain,
-					offset,
-					nsamp,
-					ibase + off);
+				if(g_hasFMA)
+				{
+					Convert16BitSamplesFMA(
+						offs + off,
+						durs + off,
+						pout + off,
+						pin + off,
+						gain,
+						offset,
+						nsamp,
+						ibase + off);
+				}
+				else
+				{
+					Convert16BitSamplesAVX2(
+						offs + off,
+						durs + off,
+						pout + off,
+						pin + off,
+						gain,
+						offset,
+						nsamp,
+						ibase + off);
+				}
 			}
 			else
 			{
@@ -908,7 +980,12 @@ void Oscilloscope::Convert16BitSamples(
 	else
 	{
 		if(g_hasAvx2)
-			Convert16BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+		{
+			if(g_hasFMA)
+				Convert16BitSamplesFMA(offs, durs, pout, pin, gain, offset, count, ibase);
+			else
+				Convert16BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+		}
 		else
 			Convert16BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
 	}
@@ -948,17 +1025,22 @@ void Oscilloscope::Convert16BitSamplesAVX2(
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
 
-	for(size_t k=0; k<end; k += 16)
+	for(size_t k=0; k<end; k += 32)
 	{
-		//Load all 16 raw ADC samples, without assuming alignment
+		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
-		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
 
 		//Fill duration
 		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
 
 		//Fill offset
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
@@ -969,30 +1051,197 @@ void Oscilloscope::Convert16BitSamplesAVX2(
 		counts = _mm256_add_epi64(counts, all_fours);
 		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
 		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
 
-		//Extract the low and high halves (8 samples each) from the input block
-		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples, 0);
-		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples, 1);
+		//Extract the low and high halves (8 samples each) from the input blocks
+		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
+		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples1, 1);
+		__m128i block2_i16 = _mm256_extracti128_si256(raw_samples2, 0);
+		__m128i block3_i16 = _mm256_extracti128_si256(raw_samples2, 1);
 
 		//Convert both blocks from 16 to 32 bit, giving us a pair of 8x int32 vectors
 		__m256i block0_i32 = _mm256_cvtepi16_epi32(block0_i16);
 		__m256i block1_i32 = _mm256_cvtepi16_epi32(block1_i16);
+		__m256i block2_i32 = _mm256_cvtepi16_epi32(block2_i16);
+		__m256i block3_i32 = _mm256_cvtepi16_epi32(block3_i16);
 
 		//Convert the 32-bit int blocks to fp32
-		//Sadly there's no direct epi32 to ps conversion instruction.
+		//Sadly there's no direct epi16 to ps conversion instruction.
 		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
 		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_i32);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_i32);
 
 		//Woo! We've finally got floating point data. Now we can do the fun part.
 		block0_float = _mm256_mul_ps(block0_float, gains);
 		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
 
 		block0_float = _mm256_sub_ps(block0_float, offsets);
 		block1_float = _mm256_sub_ps(block1_float, offsets);
+		block2_float = _mm256_sub_ps(block2_float, offsets);
+		block3_float = _mm256_sub_ps(block3_float, offsets);
 
 		//All done, store back to the output buffer
 		_mm256_store_ps(pout + k, 		block0_float);
 		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
+}
+
+__attribute__((target("avx2","fma")))
+void Oscilloscope::Convert16BitSamplesFMA(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	size_t end = count - (count % 64);
+
+	__m256i all_ones	= _mm256_set1_epi64x(1);
+	__m256i all_fours	= _mm256_set1_epi64x(4);
+	__m256i all_eights	= _mm256_set1_epi64x(8);
+	int64_t __attribute__ ((aligned(32))) count_x4[] =
+	{
+		ibase + 0,
+		ibase + 1,
+		ibase + 2,
+		ibase + 3
+	};
+	__m256i counts1 = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+	__m256i counts2 = _mm256_add_epi64(counts1, all_fours);
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(size_t k=0; k<end; k += 64)
+	{
+		//Load all 64 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
+		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 32));
+		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 48));
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 32), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 36), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 40), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 44), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 48), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 52), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 56), counts1);
+		counts1 = _mm256_add_epi64(counts1, all_eights);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 60), counts2);
+		counts2 = _mm256_add_epi64(counts2, all_eights);
+
+		//Extract the low and high halves (8 samples each) from the input blocks
+		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
+		__m128i block1_i16 = _mm256_extracti128_si256(raw_samples1, 1);
+		__m128i block2_i16 = _mm256_extracti128_si256(raw_samples2, 0);
+		__m128i block3_i16 = _mm256_extracti128_si256(raw_samples2, 1);
+		__m128i block4_i16 = _mm256_extracti128_si256(raw_samples3, 0);
+		__m128i block5_i16 = _mm256_extracti128_si256(raw_samples3, 1);
+		__m128i block6_i16 = _mm256_extracti128_si256(raw_samples4, 0);
+		__m128i block7_i16 = _mm256_extracti128_si256(raw_samples4, 1);
+
+		//Convert the blocks from 16 to 32 bit, giving us a pair of 8x int32 vectors
+		__m256i block0_i32 = _mm256_cvtepi16_epi32(block0_i16);
+		__m256i block1_i32 = _mm256_cvtepi16_epi32(block1_i16);
+		__m256i block2_i32 = _mm256_cvtepi16_epi32(block2_i16);
+		__m256i block3_i32 = _mm256_cvtepi16_epi32(block3_i16);
+		__m256i block4_i32 = _mm256_cvtepi16_epi32(block4_i16);
+		__m256i block5_i32 = _mm256_cvtepi16_epi32(block5_i16);
+		__m256i block6_i32 = _mm256_cvtepi16_epi32(block6_i16);
+		__m256i block7_i32 = _mm256_cvtepi16_epi32(block7_i16);
+
+		//Convert the 32-bit int blocks to fp32
+		//Sadly there's no direct epi16 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_i32);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_i32);
+		__m256 block4_float = _mm256_cvtepi32_ps(block4_i32);
+		__m256 block5_float = _mm256_cvtepi32_ps(block5_i32);
+		__m256 block6_float = _mm256_cvtepi32_ps(block6_i32);
+		__m256 block7_float = _mm256_cvtepi32_ps(block7_i32);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_fmsub_ps(block0_float, gains, offsets);
+		block1_float = _mm256_fmsub_ps(block1_float, gains, offsets);
+		block2_float = _mm256_fmsub_ps(block2_float, gains, offsets);
+		block3_float = _mm256_fmsub_ps(block3_float, gains, offsets);
+		block4_float = _mm256_fmsub_ps(block4_float, gains, offsets);
+		block5_float = _mm256_fmsub_ps(block5_float, gains, offsets);
+		block6_float = _mm256_fmsub_ps(block6_float, gains, offsets);
+		block7_float = _mm256_fmsub_ps(block7_float, gains, offsets);
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
+
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 32), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 36), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 40), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 44), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 48), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 52), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 56), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 60), all_ones);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+
+		_mm256_store_ps(pout + k + 32,	block4_float);
+		_mm256_store_ps(pout + k + 40,	block5_float);
+		_mm256_store_ps(pout + k + 48,	block6_float);
+		_mm256_store_ps(pout + k + 56,	block7_float);
 	}
 
 	//Get any extras we didn't get in the SIMD loop

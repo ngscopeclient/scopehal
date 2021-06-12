@@ -43,8 +43,14 @@ public:
 	virtual ~MockOscilloscope();
 
 	//Capture file importing
+	bool LoadComplexUnknownFormat(const std::string& path, int64_t samplerate);
+	bool LoadComplexFloat32(const std::string& path, int64_t samplerate);
+	bool LoadComplexFloat64(const std::string& path, int64_t samplerate);
+	bool LoadComplexInt8(const std::string& path, int64_t samplerate);
+	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
+	bool LoadVCD(const std::string& path);
 	bool LoadWAV(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
@@ -136,6 +142,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
@@ -158,6 +165,15 @@ public:
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
+	static void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+
+	void LoadComplexCommon(
+		const std::string& path,
+		AnalogWaveform*& iwfm,
+		AnalogWaveform*& qwfm,
+		int64_t samplerate,
+		size_t numSamples);
+
 	void ArmTrigger();
 
 	//standard *IDN? fields

@@ -31,6 +31,7 @@
 #include "RuntTrigger.h"
 #include "LeCroyOscilloscope.h"
 #include "TektronixOscilloscope.h"
+#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
@@ -56,8 +57,8 @@ RuntTrigger::RuntTrigger(Oscilloscope* scope)
 	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
 	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
 
-	//LeCroy scopes support both min and max limits, so we can specify range operators
-	if(dynamic_cast<LeCroyOscilloscope*>(scope))
+	//LeCroy and Siglent scopes support both min and max limits, so we can specify range operators
+	if((dynamic_cast<LeCroyOscilloscope*>(scope)) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope)))
 	{
 		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 
@@ -83,7 +84,6 @@ RuntTrigger::RuntTrigger(Oscilloscope* scope)
 
 RuntTrigger::~RuntTrigger()
 {
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +112,8 @@ bool RuntTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//It has to be analog or external trigger, digital inputs make no sense
-	if( (stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER) )
+	if((stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER))
 	{
 		return false;
 	}

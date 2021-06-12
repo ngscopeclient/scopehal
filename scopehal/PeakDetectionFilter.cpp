@@ -64,8 +64,9 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 		for(ssize_t i=minpeak; i<(ssize_t)nouts; i++)
 		{
 			//Locate the peak
-			ssize_t left = max((ssize_t)minpeak, i - search_rad);
-			ssize_t right = min(i + search_rad, (ssize_t)nend);
+			ssize_t left = max((ssize_t)minpeak, (ssize_t)(i - search_rad));
+			ssize_t right = min((ssize_t)(i + search_rad), (ssize_t)nend);
+
 			float target = cap->m_samples[i];
 			bool is_peak = true;
 			for(ssize_t j=left; j<=right; j++)

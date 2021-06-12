@@ -2201,8 +2201,13 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		for(size_t j=i+1; j<m_packets.size(); j++)
 		{
 			Packet* p = m_packets[j];
+
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
+			else if(p->m_headers["Command"] == "Get Status")
+			{}
+			else
+				break;
 
 			ret->m_len = p->m_offset + p->m_len - ret->m_offset;
 		}
@@ -2219,11 +2224,15 @@ Packet* ESPIDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		{
 			Packet* p = m_packets[j];
 
-			for(auto b : p->m_data)
-				ret->m_data.push_back(b);
-
 			if(p->m_headers["Command"] == "Get Posted Completion")
 				ret->m_headers["Response"] = p->m_headers["Response"];
+			else if(p->m_headers["Command"] == "Get Status")
+			{}
+			else
+				break;
+
+			for(auto b : p->m_data)
+				ret->m_data.push_back(b);
 
 			ret->m_len = p->m_offset + p->m_len - ret->m_offset;
 		}

@@ -622,6 +622,11 @@ void AgilentOscilloscope::Stop()
 	m_triggerOneShot = true;
 }
 
+void AgilentOscilloscope::ForceTrigger()
+{
+	LogError("AgilentOscilloscope::ForceTrigger not implemented\n");
+}
+
 bool AgilentOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;

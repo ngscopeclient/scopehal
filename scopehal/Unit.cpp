@@ -31,6 +31,13 @@
 
 using namespace std;
 
+#ifdef _WIN32
+string Unit::m_slocale;
+#else
+locale_t Unit::m_locale;
+locale_t Unit::m_defaultLocale;
+#endif
+
 /**
 	@brief Prints a value with SI scaling factors
 
@@ -39,6 +46,8 @@ using namespace std;
  */
 string Unit::PrettyPrint(double value, int sigfigs)
 {
+	SetPrintingLocale();
+
 	const char* scale = "";
 	const char* unit = "";
 
@@ -155,6 +164,10 @@ string Unit::PrettyPrint(double value, int sigfigs)
 			unit = "W";
 			break;
 
+		case UNIT_RHO:
+			unit = "ρ";
+			break;
+
 		case UNIT_BITRATE:
 			unit = "bps";
 			break;
@@ -267,6 +280,8 @@ string Unit::PrettyPrint(double value, int sigfigs)
 			}
 			break;
 	}
+
+	SetDefaultLocale();
 	return string(tmp);
 }
 
@@ -275,6 +290,8 @@ string Unit::PrettyPrint(double value, int sigfigs)
  */
 double Unit::ParseString(const string& str)
 {
+	SetPrintingLocale();
+
 	//Find the first non-numeric character in the strnig
 	double scale = 1;
 	for(size_t i=0; i<str.size(); i++)
@@ -323,6 +340,7 @@ double Unit::ParseString(const string& str)
 			break;
 	}
 
+	SetDefaultLocale();
 	return ret;
 }
 
@@ -342,4 +360,39 @@ Unit Unit::operator*(const Unit& rhs)
 	//For now, just return the first unit.
 	//TODO: how should we handle this
 	return Unit(m_type);
+}
+
+void Unit::SetLocale(const char* locale)
+{
+#ifdef _WIN32
+	m_slocale = locale;
+#else
+	m_locale = newlocale(LC_ALL, locale, 0);
+
+	m_defaultLocale = newlocale(LC_ALL, "C", 0);
+#endif
+}
+
+/**
+	@brief Sets the current locale to the user's selected LC_NUMERIC for printing numbers for display
+ */
+void Unit::SetPrintingLocale()
+{
+	#ifdef _WIN32
+		setlocale(LC_NUMERIC, m_slocale);
+	#else
+		uselocale(m_locale);
+	#endif
+}
+
+/**
+	@brief Sets the current locale to "C" for interchange
+ */
+void Unit::SetDefaultLocale()
+{
+	#ifdef _WIN32
+		setlocale(LC_NUMERIC, "C");
+	#else
+		uselocale(m_defaultLocale);
+	#endif
 }

@@ -75,6 +75,7 @@ bool g_hasAvx512F = false;
 bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
+bool g_hasFMA = false;
 bool g_disableOpenCL = false;
 
 vector<string> g_searchPaths;
@@ -115,9 +116,12 @@ void DetectCPUFeatures()
 	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
 	g_hasAvx512DQ = __builtin_cpu_supports("avx512dq");
 	g_hasAvx2 = __builtin_cpu_supports("avx2");
+	g_hasFMA = __builtin_cpu_supports("fma");
 
 	if(g_hasAvx2)
 		LogDebug("* AVX2\n");
+	if(g_hasFMA)
+		LogDebug("* FMA\n");
 	if(g_hasAvx512F)
 		LogDebug("* AVX512F\n");
 	if(g_hasAvx512DQ)
@@ -125,6 +129,13 @@ void DetectCPUFeatures()
 	if(g_hasAvx512VL)
 		LogDebug("* AVX512VL\n");
 	LogDebug("\n");
+#if defined(_WIN32) && defined(__GNUC__) // AVX2 is temporarily disabled on MingW64/GCC until this in resolved: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=54412
+	if (g_hasAvx2 || g_hasAvx512F || g_hasAvx512DQ || g_hasAvx512VL)
+	{
+		g_hasAvx2 = g_hasAvx512F = g_hasAvx512DQ = g_hasAvx512VL = false;
+		LogWarning("AVX2/AVX512 detected but disabled on MinGW64/GCC (see https://github.com/azonenberg/scopehal-apps/issues/295)\n");
+	}
+#endif
 }
 
 /**
@@ -664,7 +675,12 @@ void InitializeSearchPaths()
 	else if ( (unsigned) readlinkReturn > (sizeof(binDir) - 1) )
 		LogError("Error: readlink() returned a path larger than our buffer.\n");
 	else
+	{
 		g_searchPaths.push_back(dirname(binDir));
+		string binRootDir = dirname(binDir);
+		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
+		g_searchPaths.push_back(binRootDir + "/share/scopehal");
+	}
 #endif
 
 	//Local directories preferred over system ones

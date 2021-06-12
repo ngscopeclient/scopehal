@@ -70,9 +70,10 @@ static const struct
 	float val;
 } c_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
-static const std::chrono::milliseconds c_setting_delay(50);	   // Delay required when setting parameters via SCPI
-static const char* c_custom_thresh = "CUSTOM,";				   // Prepend string for custom digital threshold
-static const float c_thresh_thresh = 0.01f;					   // Zero equivalence threshold for fp comparisons
+static const std::chrono::milliseconds c_setting_delay(50);		 // Delay required when setting parameters via SCPI
+static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
+static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
+static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -100,6 +101,9 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_interleavingValid(false)
 	, m_highDefinition(false)
 {
+	// Set a base read time
+	next_tx = chrono::system_clock::now();
+
 	//standard initialization
 	FlushConfigCache();
 	IdentifyHardware();
@@ -118,6 +122,7 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
+	this_thread::sleep_until(next_tx);
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
 	ret = m_transport->ReadReply();
@@ -134,8 +139,10 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
+	this_thread::sleep_until(next_tx);
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
+	next_tx = chrono::system_clock::now() + c_setting_delay;
 }
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
@@ -766,6 +773,15 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	//Read the Internal State Change Register
 	string sinr;
 	lock_guard<recursive_mutex> lock(m_mutex);
+
+	if(m_triggerForced)
+	{
+		// The force trigger completed, return the sample set
+		m_triggerForced = false;
+		m_triggerArmed = false;
+		return TRIGGER_MODE_TRIGGERED;
+	}
+
 	sinr = converse(":TRIGGER:STATUS?");
 
 	//No waveform, but ready for one?
@@ -796,10 +812,26 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
 	uint32_t getLength;
 
 	// Get size of this sequence
-	m_transport->ReadRawData(16, (unsigned char*)packetSizeSequence);
-	packetSizeSequence[16] = 0;
+	m_transport->ReadRawData(7, (unsigned char*)packetSizeSequence);
+
+	// This is an aweful cludge, but the response can be in different formats depending on
+	// if this was a direct trigger or a forced trigger. This is the report format for a direct trigger
+	if((!strncmp(packetSizeSequence, "DESC,#9", 7)) || (!strncmp(packetSizeSequence, "DAT2,#9", 7)))
+	{
+		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
+	}
+
+	// This is the report format for a forced trigger
+	if(!strncmp(&packetSizeSequence[2], ":WF D", 5))
+	{
+		// Read the front end junk, then the actually number we're looking for
+		m_transport->ReadRawData(6, (unsigned char*)packetSizeSequence);
+		m_transport->ReadRawData(9, (unsigned char*)packetSizeSequence);
+	}
+
+	packetSizeSequence[9] = 0;
 	LogTrace("INITIAL PACKET [%s]\n", packetSizeSequence);
-	getLength = atoi(&packetSizeSequence[7]);
+	getLength = atoi(packetSizeSequence);
 
 	// Now get the data
 	m_transport->ReadRawData((getLength > maxsize) ? maxsize : getLength, (unsigned char*)data);
@@ -869,8 +901,7 @@ bool SiglentSCPIOscilloscope::ReadWavedescs(
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
 
-			sendOnly(":WAVEFORM:SOURCE C%d", i + 1);
-			sendOnly(":WAVEFORM:PREAMBLE?");
+			m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:PREAMBLE?");
 			if(WAVEDESC_SIZE != ReadWaveformBlock(WAVEDESC_SIZE, wavedescs[i]))
 				LogError("ReadWaveformBlock for wavedesc %u failed\n", i);
 
@@ -880,35 +911,6 @@ bool SiglentSCPIOscilloscope::ReadWavedescs(
 	}
 
 	return true;
-}
-
-void SiglentSCPIOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences, bool /* denabled */)
-{
-	//Ask for all analog waveforms
-	// This routine does the asking, but doesn't catch the data as it comes back
-	bool sent_wavetime = false;
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(enabled[i])
-		{
-			sendOnly(":WAVEFORM:SOURCE C%d", i + 1);
-			//If a multi-segment capture, ask for the trigger time data
-			if((num_sequences > 1) && !sent_wavetime)
-			{
-				sendOnly("%s:HISTORY TIME?", m_channels[i]->GetHwname().c_str());
-				sent_wavetime = true;
-			}
-
-			//Ask for the data
-			sendOnly(":WAVEFORM:DATA?");
-		}
-	}
-
-	//Ask for the digital waveforms
-	//if(denabled)
-	// 	sendOnly("Digital1:WF?");
 }
 
 time_t SiglentSCPIOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& basetime)
@@ -997,7 +999,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 
 	//double h_off_frac = fmodf(h_off, interval);	   //fractional sample position, in fs
 
-	double h_off_frac = 0;//((interval*datalen)/2)+h_off;
+	double h_off_frac = 0;	  //((interval*datalen)/2)+h_off;
 
 	if(h_off_frac < 0)
 		h_off_frac = h_off;	   //interval + h_off_frac;	   //double h_unit = *reinterpret_cast<double*>(pdesc + 244);
@@ -1054,11 +1056,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 		//Convert raw ADC samples to volts
 		if(m_highDefinition)
 		{
-			Convert16BitSamples(
-				(int64_t*)&cap->m_offsets[0],
+			Convert16BitSamples((int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
-				wdata + j*num_per_segment,
+				wdata + j * num_per_segment,
 				v_gain,
 				v_off,
 				num_per_segment,
@@ -1066,11 +1067,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 		}
 		else
 		{
-			Convert8BitSamples(
-				(int64_t*)&cap->m_offsets[0],
+			Convert8BitSamples((int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
-				bdata + j*num_per_segment,
+				bdata + j * num_per_segment,
 				v_gain,
 				v_off,
 				num_per_segment,
@@ -1304,9 +1304,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				return false;
 		}
 
-		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
-		RequestWaveforms(enabled, num_sequences, denabled);
-
 		if(pdesc)
 		{
 			// THIS SECTION IS UNTESTED
@@ -1320,8 +1317,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Read the data from each analog waveform
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				//                          m_transport->SendCommand(":WAVEFORM:SOURCE "+to_string(i+1));
-				//                          m_transport->SendCommand(":WAVEFORM:DATA?");
+				m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
 				if(enabled[i])
 				{
 					m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i]);
@@ -1442,6 +1438,23 @@ void SiglentSCPIOscilloscope::Stop()
 	ClearPendingWaveforms();
 }
 
+void SiglentSCPIOscilloscope::ForceTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	// Don't allow more than one force at a time
+	if(m_triggerForced)
+		return;
+
+	m_triggerForced = true;
+	sendOnly(":TRIGGER:MODE SINGLE");
+	if(!m_triggerArmed)
+		sendOnly(":TRIGGER:MODE SINGLE");
+
+	m_triggerArmed = true;
+	this_thread::sleep_for(c_trigger_delay);
+}
+
 double SiglentSCPIOscilloscope::GetChannelOffset(size_t i)
 {
 	//not meaningful for trigger or digital channels
@@ -1474,7 +1487,7 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, double offset)
 
 	{
 		lock_guard<recursive_mutex> lock2(m_mutex);
-		sendOnly(":CHANNEL%ld:OFFSET %e", i + 1, offset);
+		sendOnly(":CHANNEL%ld:OFFSET %1.2E", i + 1, offset);
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1660,7 +1673,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_memoryDepthValid = false;
 	double sampletime = GetSampleDepth() / (double)rate;
-	sendOnly(":TIMEBASE:SCALE %e", sampletime / 10);
+	sendOnly(":TIMEBASE:SCALE %1.2E", sampletime / 10);
 	m_memoryDepthValid = false;
 }
 
@@ -1684,7 +1697,7 @@ void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
-	sendOnly(":TIMEBASE:DELAY %e", (offset - halfwidth) * SECONDS_PER_FS);
+	sendOnly(":TIMEBASE:DELAY %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
@@ -1733,7 +1746,7 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	sendOnly(":CHANNEL%ld:SKEW %e", channel, skew * SECONDS_PER_FS);
+	sendOnly(":CHANNEL%ld:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
 
 	//Update cache
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -1911,8 +1924,6 @@ void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 		{
 			sendOnly(":DIGITAL:THRESHOLD%d CUSTOM,%1.2E", (channel / 8) + 1, level);
 
-			// This is a kludge to get the custom threshold to stick.
-			this_thread::sleep_for(c_setting_delay);
 		} while(fabsf((GetDigitalThreshold(channel + m_analogChannelCount + 1) - level)) > 0.1f);
 	}
 }
@@ -1926,19 +1937,19 @@ void SiglentSCPIOscilloscope::PullTrigger()
 
 	//Figure out what kind of trigger is active.
 	string reply = Trim(converse(":TRIGGER:TYPE?"));
-	if(reply == "DROPOUT")
+	if(reply == "DROPout")
 		PullDropoutTrigger();
 	else if(reply == "EDGE")
 		PullEdgeTrigger();
 	else if(reply == "RUNT")
 		PullRuntTrigger();
-	else if(reply == "SLOPE")
+	else if(reply == "SLOPe")
 		PullSlewRateTrigger();
 	else if(reply == "UART")
 		PullUartTrigger();
-	else if(reply == "INTERVAL")
+	else if(reply == "INTerval")
 		PullPulseWidthTrigger();
-	else if(reply == "WINDOW")
+	else if(reply == "WINDow")
 		PullWindowTrigger();
 
 	// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
@@ -1991,7 +2002,7 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 
 	//Dropout time
 	Unit fs(Unit::UNIT_FS);
-	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER_DROPOUT:TIME?")));
+	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
 
 	//Edge type
 	if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
@@ -2000,7 +2011,10 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 		dt->SetType(DropoutTrigger::EDGE_FALLING);
 
 	//Reset type
-	dt->SetResetType(DropoutTrigger::RESET_NONE);
+	if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
+		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+	else
+		dt->SetResetType(DropoutTrigger::RESET_NONE);
 }
 
 /**
@@ -2047,7 +2061,7 @@ void SiglentSCPIOscilloscope::PullPulseWidthTrigger()
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 
 	//Level
-	pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?'")));
+	pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
 
 	//Condition
 	pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
@@ -2102,7 +2116,7 @@ void SiglentSCPIOscilloscope::PullRuntTrigger()
 		rt->SetSlope(RuntTrigger::EDGE_FALLING);
 
 	//Condition
-	//	rt->SetCondition(GetCondition(m_transport->ReadReply()));
+	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:LIMIT?")));
 }
 
 /**
@@ -2124,7 +2138,7 @@ void SiglentSCPIOscilloscope::PullSlewRateTrigger()
 
 	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:TLEVEL?")));
+	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
 
 	//Upper bound
 	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPE:HLEVEL?")));
@@ -2138,13 +2152,15 @@ void SiglentSCPIOscilloscope::PullSlewRateTrigger()
 
 	//Slope
 	auto reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
-	if(reply == "POSitive")
+	if(reply == "RISing")
 		st->SetSlope(SlewRateTrigger::EDGE_RISING);
-	else if(reply == "NEGative")
+	else if(reply == "FALLing")
 		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
+	else if(reply == "ALTernate")
+		st->SetSlope(SlewRateTrigger::EDGE_ANY);
 
 	//Condition
-	//st->SetCondition(GetCondition(m_transport->ReadReply()));
+	st->SetCondition(GetCondition(converse("TRIGGER:SLOPE:LIMIT?")));
 }
 
 /**
@@ -2265,23 +2281,23 @@ Trigger::Condition SiglentSCPIOscilloscope::GetCondition(string reply)
 {
 	reply = Trim(reply);
 
-	if(reply == "LessThan")
+	if(reply == "LESSthan")
 		return Trigger::CONDITION_LESS;
-	else if(reply == "GreaterThan")
+	else if(reply == "GREATerthan")
 		return Trigger::CONDITION_GREATER;
-	else if(reply == "InRange")
+	else if(reply == "INNer")
 		return Trigger::CONDITION_BETWEEN;
-	else if(reply == "OutOfRange")
+	else if(reply == "OUTer")
 		return Trigger::CONDITION_NOT_BETWEEN;
 
 	//unknown
+	LogWarning("Unknown trigger condition [%s]\n", reply.c_str());
 	return Trigger::CONDITION_LESS;
 }
 
 void SiglentSCPIOscilloscope::PushTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
@@ -2289,7 +2305,6 @@ void SiglentSCPIOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-
 	if(dt)
 	{
 		sendOnly(":TRIGGER:TYPE DROPOUT");
@@ -2347,10 +2362,10 @@ void SiglentSCPIOscilloscope::PushTrigger()
  */
 void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
-	PushFloat(":TRIGGER:DROPOUT:LEVEL ", trig->GetLevel());
-	PushFloat(":TRIGGER_DROPOUT:TIME ", trig->GetDropoutTime() * SECONDS_PER_FS);
-
+	PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
+	PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
 	sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
+	sendOnly(":TRIGGER:DROPOUT:TYPE %s", (trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE) ? "EDGE" : "STATE");
 }
 
 /**
@@ -2378,8 +2393,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 			break;
 	}
 	//Level
-	sendOnly(":TRIGGER:%s:LEVEL %e", trigType.c_str(), trig->GetLevel());
-	this_thread::sleep_for(c_setting_delay);
+	sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
 }
 
 /**
@@ -2404,7 +2418,7 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetUpperBound());
 	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetLowerBound());
 
-	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "RISING" : "FALLING");
+	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
 }
 
 /**
@@ -2412,13 +2426,16 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 {
-	PushCondition(":TRIGGER:SLEW", trig->GetCondition());
-	PushFloat(":TRIGGER:SLEW:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:SLEW:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:SLEW:HLEVEL", trig->GetUpperBound());
-	PushFloat(":TRIGGER:SLEW:LLEVEL", trig->GetLowerBound());
+	PushCondition(":TRIGGER:SLOPE", trig->GetCondition());
+	PushFloat(":TRIGGER:SLOPE:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPE:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
+	PushFloat(":TRIGGER:SLOPE:HLEVEL", trig->GetUpperBound());
+	PushFloat(":TRIGGER:SLOPE:LLEVEL", trig->GetLowerBound());
 
-	sendOnly(":TRIGGER:SLEW:SLOPE %s", (trig->GetSlope() == SlewRateTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
+	sendOnly(":TRIGGER:SLOPE:SLOPE %s",
+		(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)	? "RISING" :
+		(trig->GetSlope() == SlewRateTrigger::EDGE_FALLING) ? "FALLING" :
+																"ALTERNATE");
 }
 
 /**
@@ -2544,7 +2561,7 @@ void SiglentSCPIOscilloscope::PushCondition(const string& path, Trigger::Conditi
 
 void SiglentSCPIOscilloscope::PushFloat(string path, float f)
 {
-	sendOnly("%s = %e", path.c_str(), f);
+	sendOnly("%s %1.2E", path.c_str(), f);
 }
 
 vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()

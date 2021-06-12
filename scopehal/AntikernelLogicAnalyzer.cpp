@@ -454,6 +454,11 @@ void AntikernelLogicAnalyzer::Stop()
 	m_triggerArmed = false;
 }
 
+void AntikernelLogicAnalyzer::ForceTrigger()
+{
+	LogError("AntikernelLogicAnalyzer::ForceTrigger() not implemented\n");
+}
+
 bool AntikernelLogicAnalyzer::IsTriggerArmed()
 {
 	return m_triggerArmed;

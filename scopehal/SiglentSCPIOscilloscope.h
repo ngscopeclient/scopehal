@@ -31,6 +31,7 @@
 #define SiglentSCPIOscilloscope_h
 
 #include <mutex>
+#include <chrono>
 
 class DropoutTrigger;
 class EdgeTrigger;
@@ -75,6 +76,7 @@ protected:
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
+	std::chrono::system_clock::time_point next_tx;
 
 public:
 	//Device information
@@ -116,6 +118,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
@@ -249,6 +252,7 @@ protected:
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+	bool m_triggerForced;
 
 	// Transfer buffer. This is a bit hacky
 	char m_analogWaveformData[MAX_ANALOG][WAVEFORM_SIZE];

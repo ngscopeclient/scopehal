@@ -416,13 +416,17 @@ public:
 	 */
 	void SetTrigger(Trigger* trigger)
 	{
-		//If we have an old trigger that's not the same, free it
-		if(m_trigger != trigger)
-			delete m_trigger;
+		Trigger* old_trig = m_trigger;
 
 		//Set the new trigger and sync to hardware
 		m_trigger = trigger;
 		PushTrigger();
+
+		//Delete old trigger *after* pushing the new one.
+		//This prevents possible race conditions where we disable the current trigger channel before the new
+		//trigger is set.
+		if(old_trig != trigger)
+			delete old_trig;
 	}
 
 	/**
@@ -475,6 +479,13 @@ public:
 		@brief Stops triggering
 	 */
 	virtual void Stop() =0;
+
+	/**
+		@brief Forces a single acquisition as soon as possible.
+
+		Note that PollTrigger() may not return 'triggered' immediately, due to command processing latency.
+	 */
+	virtual void ForceTrigger() =0;
 
 	/**
 		@brief Checks if the trigger is currently armed
@@ -569,6 +580,33 @@ public:
 		@brief Sets the sample rate of the scope, in Hz
 	 */
 	virtual void SetSampleRate(uint64_t rate) =0;
+
+	enum SamplingMode
+	{
+		REAL_TIME,
+		EQUIVALENT_TIME
+	};
+
+	/**
+		@brief Returns true if the requested sampling mode is available with the current instrument configuration.
+
+		The default implementation returns true for real-time only.
+	 */
+	virtual bool IsSamplingModeAvailable(SamplingMode mode);
+
+	/**
+		@brief Gets the current sampling mode of the instrument
+
+		The default implementation returns "real time"
+	 */
+	virtual SamplingMode GetSamplingMode();
+
+	/**
+		@brief Sets the current sampling mode of the instrument
+
+		The default implementation is a no-op.
+	 */
+	virtual void SetSamplingMode(SamplingMode mode);
 
 	/**
 		@brief Configures the instrument's clock source
@@ -787,6 +825,8 @@ protected:
 	void Convert16BitSamplesGeneric(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 	void Convert16BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void Convert16BitSamplesFMA(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
 public:

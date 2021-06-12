@@ -669,7 +669,7 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "Power Analysis";
 			}
-			else if( (o == "SDA") || (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") )
+			else if( (o == "SDA") || (o == "SDA2") || (o == "SDA3") || (o == "SDA3-LINQ") || (o == "ASDA") )
 			{
 				type = "Signal Integrity";
 				desc = "Serial Data Analysis";
@@ -2743,13 +2743,21 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("TRIG_MODE STOP");
-	}
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("TRIG_MODE STOP");
 
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
+}
+
+void LeCroyOscilloscope::ForceTrigger()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
+
+	m_transport->SendCommand("FRTR");
 }
 
 double LeCroyOscilloscope::GetChannelOffset(size_t i)
@@ -2837,171 +2845,180 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
 
-	//Not all scopes can go this slow
-	//TODO: complete list
-	if(m_modelid == MODEL_WAVERUNNER_8K)
-		ret.push_back(1000);
-
 	const int64_t k = 1000;
 	const int64_t m = k*k;
 	const int64_t g = k*m;
 
-	bool wm8 =
-		(m_modelid == MODEL_WAVEMASTER_8ZI_B) ||
-		(m_modelid == MODEL_SDA_8ZI) ||
-		(m_modelid == MODEL_SDA_8ZI_A) ||
-		(m_modelid == MODEL_SDA_8ZI_B);
-	bool hdo9 = (m_modelid == MODEL_HDO_9K);
-
-	//WaveMaster 8Zi can't go below 200 ksps in realtime mode?
-	if(!wm8)
+	if(GetSamplingMode() == EQUIVALENT_TIME)
 	{
-		ret.push_back(2 * k);
-		ret.push_back(5 * k);
-		ret.push_back(10 * k);
-		ret.push_back(20 * k);
-		ret.push_back(50 * k);
-		ret.push_back(100 * k);
+		//RIS is 200 Gsps on all known scopes
+		ret.push_back(200 * g);
 	}
-	ret.push_back(200 * k);
-	if(wm8)
-		ret.push_back(250 * k);
-	ret.push_back(500 * k);
 
-	ret.push_back(1 * m);
-	if(hdo9 || wm8)
-		ret.push_back(2500 * k);
 	else
-		ret.push_back(2 * m);
-	ret.push_back(5 * m);
-	ret.push_back(10 * m);
-	if(wm8)
-		ret.push_back(25 * m);
-	else
-		ret.push_back(20 * m);
-	ret.push_back(50 * m);
-	ret.push_back(100 * m);
-
-	//Some scopes can go faster
-	switch(m_modelid)
 	{
-		case MODEL_DDA_5K:
-			ret.push_back(200 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2 * g);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			break;
+		//Not all scopes can go this slow
+		//TODO: complete list
+		if(m_modelid == MODEL_WAVERUNNER_8K)
+			ret.push_back(1000);
 
-		case MODEL_HDO_4KA:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			//no 1 Gsps mode, we go straight from 2.5 Gsps to 500 Msps
-			ret.push_back(2500 * m);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			break;
+		bool wm8 =
+			(m_modelid == MODEL_WAVEMASTER_8ZI_B) ||
+			(m_modelid == MODEL_SDA_8ZI) ||
+			(m_modelid == MODEL_SDA_8ZI_A) ||
+			(m_modelid == MODEL_SDA_8ZI_B);
+		bool hdo9 = (m_modelid == MODEL_HDO_9K);
 
-		case MODEL_HDO_6KA:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1250 * m);
-			ret.push_back(2500 * m);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			break;
+		//WaveMaster 8Zi can't go below 200 ksps in realtime mode?
+		if(!wm8)
+		{
+			ret.push_back(2 * k);
+			ret.push_back(5 * k);
+			ret.push_back(10 * k);
+			ret.push_back(20 * k);
+			ret.push_back(50 * k);
+			ret.push_back(100 * k);
+		}
+		ret.push_back(200 * k);
+		if(wm8)
+			ret.push_back(250 * k);
+		ret.push_back(500 * k);
 
-		case MODEL_HDO_9K:
-			ret.push_back(200 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2 * g);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			ret.push_back(20 * g);
-			break;
+		ret.push_back(1 * m);
+		if(hdo9 || wm8)
+			ret.push_back(2500 * k);
+		else
+			ret.push_back(2 * m);
+		ret.push_back(5 * m);
+		ret.push_back(10 * m);
+		if(wm8)
+			ret.push_back(25 * m);
+		else
+			ret.push_back(20 * m);
+		ret.push_back(50 * m);
+		ret.push_back(100 * m);
 
-		case MODEL_LABMASTER_ZI_A:
-			ret.push_back(200 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2 * g);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			ret.push_back(20 * g);		//FIXME: 20 and 40 Gsps give garbage data in the MAUI Studio simulator.
-			ret.push_back(40 * g);		//Data looks wrong in MAUI as well as glscopeclient so doesn't seem to be something
-										//that we did. Looks like bits and pieces of waveform with gaps or overlap.
-										//Unclear if sim bug or actual issue, no testing on actual LabMaster hardware
-										//has been performed to date.
-			ret.push_back(80 * g);
-			//TODO: exact sample rates may depend on the acquisition module(s) connected
-			break;
+		//Some scopes can go faster
+		switch(m_modelid)
+		{
+			case MODEL_DDA_5K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
 
-		case MODEL_MDA_800:
-			ret.push_back(200 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1250 * m);
-			ret.push_back(2500 * m);
-			ret.push_back(10 * g);
-			break;
+			case MODEL_HDO_4KA:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				//no 1 Gsps mode, we go straight from 2.5 Gsps to 500 Msps
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
 
-		case MODEL_SDA_8ZI:
-		case MODEL_SDA_8ZI_A:
-		case MODEL_SDA_8ZI_B:
-		case MODEL_WAVEMASTER_8ZI_B:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2500 * m);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			ret.push_back(20 * g);
-			ret.push_back(40 * g);
-			break;
+			case MODEL_HDO_6KA:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1250 * m);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
 
-		case MODEL_WAVEPRO_HD:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2500 * m);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			break;
-
-		case MODEL_WAVERUNNER_8K:
-			ret.push_back(200 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2 * g);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			if(m_hasFastSampleRate)
+			case MODEL_HDO_9K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
 				ret.push_back(20 * g);
-			break;
+				break;
 
-		case MODEL_WAVERUNNER_8K_HD:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1250 * m);
-			ret.push_back(2500 * m);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			break;
+			case MODEL_LABMASTER_ZI_A:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				ret.push_back(20 * g);		//FIXME: 20 and 40 Gsps give garbage data in the MAUI Studio simulator.
+				ret.push_back(40 * g);		//Data looks wrong in MAUI as well as glscopeclient so doesn't seem to be something
+											//that we did. Looks like bits and pieces of waveform with gaps or overlap.
+											//Unclear if sim bug or actual issue, no testing on actual LabMaster hardware
+											//has been performed to date.
+				ret.push_back(80 * g);
+				//TODO: exact sample rates may depend on the acquisition module(s) connected
+				break;
 
-		case MODEL_WAVERUNNER_9K:
-			ret.push_back(250 * m);
-			ret.push_back(500 * m);
-			ret.push_back(1 * g);
-			ret.push_back(2 * g);
-			ret.push_back(5 * g);
-			ret.push_back(10 * g);
-			if(m_hasFastSampleRate)
+			case MODEL_MDA_800:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1250 * m);
+				ret.push_back(2500 * m);
+				ret.push_back(10 * g);
+				break;
+
+			case MODEL_SDA_8ZI:
+			case MODEL_SDA_8ZI_A:
+			case MODEL_SDA_8ZI_B:
+			case MODEL_WAVEMASTER_8ZI_B:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
 				ret.push_back(20 * g);
-			break;
+				ret.push_back(40 * g);
+				break;
 
-		default:
-			break;
+			case MODEL_WAVEPRO_HD:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
+
+			case MODEL_WAVERUNNER_8K:
+				ret.push_back(200 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				if(m_hasFastSampleRate)
+					ret.push_back(20 * g);
+				break;
+
+			case MODEL_WAVERUNNER_8K_HD:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1250 * m);
+				ret.push_back(2500 * m);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				break;
+
+			case MODEL_WAVERUNNER_9K:
+				ret.push_back(250 * m);
+				ret.push_back(500 * m);
+				ret.push_back(1 * g);
+				ret.push_back(2 * g);
+				ret.push_back(5 * g);
+				ret.push_back(10 * g);
+				if(m_hasFastSampleRate)
+					ret.push_back(20 * g);
+				break;
+
+			default:
+				break;
+		}
 	}
 
 	return ret;
@@ -3046,128 +3063,137 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 	ret.push_back(2 * k);
 	ret.push_back(5 * k);
 	ret.push_back(10 * k);
-	ret.push_back(25 * k);
-	ret.push_back(20 * k);
-	ret.push_back(40 * k);			//20/40 Gsps scopes can use values other than 1/2/5.
-									//TODO: avajlable rates seems to depend on the selected sample rate??
-	ret.push_back(50 * k);
-	ret.push_back(80 * k);
-	ret.push_back(100 * k);
-	ret.push_back(200 * k);
-	ret.push_back(250 * k);
-	ret.push_back(400 * k);
-	ret.push_back(500 * k);
 
-	ret.push_back(1 * m);
-	ret.push_back(2500 * k);
-	ret.push_back(2 * m);
-	ret.push_back(5 * m);
-	ret.push_back(10 * m);
+	if(GetSamplingMode() == EQUIVALENT_TIME)
+		ret.push_back(20 * k);
 
-	switch(m_modelid)
+	else
 	{
-		//TODO: are there any options between 10M and 24M? is there a 20M?
-		//TODO: XXL option gives 48M
-		case MODEL_DDA_5K:
-			ret.push_back(24 * m);
-			break;
+		ret.push_back(25 * k);
+		ret.push_back(20 * k);
+		ret.push_back(40 * k);			//20/40 Gsps scopes can use values other than 1/2/5.
+										//TODO: available rates seems to depend on the selected sample rate??
+		ret.push_back(50 * k);
+		ret.push_back(80 * k);
+		ret.push_back(100 * k);
+		ret.push_back(200 * k);
+		ret.push_back(250 * k);
+		ret.push_back(400 * k);
+		ret.push_back(500 * k);
 
-		//VERY limited range of depths here
-		case MODEL_HDO_4KA:
-			ret.clear();
-			ret.push_back(500);
-			ret.push_back(10 * k);
-			ret.push_back(100 * k);
-			ret.push_back(1 * m);
-			ret.push_back(2500 * k);
-			ret.push_back(5 * m);
-			ret.push_back(10 * m);
-			ret.push_back(12500 * k);
-			break;
+		ret.push_back(1 * m);
+		ret.push_back(2500 * k);
+		ret.push_back(2 * m);
+		ret.push_back(5 * m);
+		ret.push_back(10 * m);
 
-		case MODEL_HDO_6KA:
-			ret.push_back(25 * m);
-			ret.push_back(50 * m);
-			break;
+		switch(m_modelid)
+		{
+			//TODO: are there any options between 10M and 24M? is there a 20M?
+			//TODO: XXL option gives 48M
+			case MODEL_DDA_5K:
+				ret.push_back(24 * m);
+				break;
 
-		//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
-		case MODEL_HDO_9K:
-			ret.push_back(25 * m);
-			ret.push_back(50 * m);
-			ret.push_back(64 * m);
-			break;
+			//VERY limited range of depths here
+			case MODEL_HDO_4KA:
+				ret.clear();
+				ret.push_back(500);
+				ret.push_back(10 * k);
+				ret.push_back(100 * k);
+				ret.push_back(1 * m);
+				ret.push_back(2500 * k);
+				ret.push_back(5 * m);
+				ret.push_back(10 * m);
+				ret.push_back(12500 * k);
+				break;
 
-		//standard memory, are there options to increase this?
-		case MODEL_LABMASTER_ZI_A:
-			ret.push_back(20 * m);
-			break;
-
-		case MODEL_MDA_800:
-			ret.push_back(25 * m);
-			ret.push_back(50 * m);
-			break;
-
-		//standard memory
-		//TODO: extended options
-		case MODEL_WAVEMASTER_8ZI_B:
-			break;
-
-		//extended memory
-		case MODEL_SDA_8ZI:
-		case MODEL_SDA_8ZI_A:
-		case MODEL_SDA_8ZI_B:
-			ret.push_back(20 * m);
-			ret.push_back(25 * m);
-			ret.push_back(40 * m);
-			ret.push_back(50 * m);
-			ret.push_back(80 * m);
-			ret.push_back(100 * m);
-			ret.push_back(128 * m);
-			break;
-
-
-		case MODEL_WAVEPRO_HD:
-			ret.push_back(25 * m);
-
-			if(m_memoryDepthOption >= 100)
+			case MODEL_HDO_6KA:
+				ret.push_back(25 * m);
 				ret.push_back(50 * m);
-			break;
+				break;
 
-		case MODEL_WAVERUNNER_8K_HD:
-			ret.push_back(25 * m);
-			ret.push_back(50 * m);
-
-			//FIXME: largest depth is 2-channel mode only
-			//Second largest is 2/4 channel mode only
-			//All others can be used in 8 channel
-			ret.push_back(100 * m);
-
-			if(m_memoryDepthOption >= 200)
-				ret.push_back(200 * m);
-			if(m_memoryDepthOption >= 500)
-				ret.push_back(500 * m);
-			if(m_memoryDepthOption >= 1000)
-				ret.push_back(1000 * m);
-			if(m_memoryDepthOption >= 2000)
-				ret.push_back(2000 * m);
-			if(m_memoryDepthOption >= 5000)
-				ret.push_back(5000 * m);
-			break;
-
-		//deep memory option gives us 4x the capacity
-		case MODEL_WAVERUNNER_8K:
-		case MODEL_WAVERUNNER_9K:
-			ret.push_back(16 * m);
-			if(m_memoryDepthOption == 128)
-			{
-				ret.push_back(32 * m);
+			//TODO: seems like we can have multiples of 400 instead of 500 sometimes?
+			case MODEL_HDO_9K:
+				ret.push_back(25 * m);
+				ret.push_back(50 * m);
 				ret.push_back(64 * m);
-			}
-			break;
+				break;
 
-		//TODO: add more models here
-		default:
-			break;
+			//standard memory, are there options to increase this?
+			case MODEL_LABMASTER_ZI_A:
+				ret.push_back(20 * m);
+				break;
+
+			case MODEL_MDA_800:
+				ret.push_back(25 * m);
+				ret.push_back(50 * m);
+				break;
+
+			//standard memory
+			//TODO: extended options
+			case MODEL_WAVEMASTER_8ZI_B:
+				break;
+
+			//extended memory
+			case MODEL_SDA_8ZI:
+			case MODEL_SDA_8ZI_A:
+			case MODEL_SDA_8ZI_B:
+				ret.insert(ret.begin()+4, 4*k);
+
+				ret.push_back(20 * m);
+				ret.push_back(25 * m);
+				ret.push_back(40 * m);
+				ret.push_back(50 * m);
+				ret.push_back(80 * m);
+				ret.push_back(100 * m);
+				ret.push_back(128 * m);
+				break;
+
+
+			case MODEL_WAVEPRO_HD:
+				ret.push_back(25 * m);
+
+				if(m_memoryDepthOption >= 100)
+					ret.push_back(50 * m);
+				break;
+
+			case MODEL_WAVERUNNER_8K_HD:
+				ret.push_back(25 * m);
+				ret.push_back(50 * m);
+
+				//FIXME: largest depth is 2-channel mode only
+				//Second largest is 2/4 channel mode only
+				//All others can be used in 8 channel
+				ret.push_back(100 * m);
+
+				if(m_memoryDepthOption >= 200)
+					ret.push_back(200 * m);
+				if(m_memoryDepthOption >= 500)
+					ret.push_back(500 * m);
+				if(m_memoryDepthOption >= 1000)
+					ret.push_back(1000 * m);
+				if(m_memoryDepthOption >= 2000)
+					ret.push_back(2000 * m);
+				if(m_memoryDepthOption >= 5000)
+					ret.push_back(5000 * m);
+				break;
+
+			//deep memory option gives us 4x the capacity
+			case MODEL_WAVERUNNER_8K:
+			case MODEL_WAVERUNNER_9K:
+				ret.push_back(16 * m);
+				if(m_memoryDepthOption == 128)
+				{
+					ret.push_back(32 * m);
+					ret.push_back(64 * m);
+				}
+				break;
+
+			//TODO: add more models here
+			default:
+				break;
+		}
 	}
 
 	return ret;
@@ -3485,6 +3511,74 @@ bool LeCroyOscilloscope::SetInterleaving(bool combine)
 	}
 
 	return m_interleaving;
+}
+
+bool LeCroyOscilloscope::IsSamplingModeAvailable(SamplingMode mode)
+{
+	switch(mode)
+	{
+		case EQUIVALENT_TIME:
+
+			//RIS mode is only available with <20K point memory depth
+			if(GetSampleDepth() > 20000)
+				return false;
+
+			else
+				return true;
+
+		case REAL_TIME:
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+LeCroyOscilloscope::SamplingMode LeCroyOscilloscope::GetSamplingMode()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SampleMode'");
+	string reply = Trim(m_transport->ReadReply());
+
+	if(reply == "RealTime")
+		return REAL_TIME;
+	else if(reply == "RIS")
+		return EQUIVALENT_TIME;
+
+	//sequence mode is still real time
+	else
+		return REAL_TIME;
+}
+
+void LeCroyOscilloscope::SetSamplingMode(SamplingMode mode)
+{
+	//Send the command to the scope
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		switch(mode)
+		{
+			case REAL_TIME:
+
+				//Select 10ns/div
+				m_transport->SendCommand(
+					string("VBS? 'app.Acquisition.Horizontal.HorScale = ") + to_string_sci(1e-8) + "'");
+
+				//Select sample mode after changing scale
+				m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RealTime\"'");
+				break;
+
+			case EQUIVALENT_TIME:
+				m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RIS\"'");
+				break;
+		}
+	}
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_sampleRateValid = false;
+	m_memoryDepthValid = false;
+	m_interleaving = false;
+	m_interleavingValid = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

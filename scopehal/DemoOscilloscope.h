@@ -77,6 +77,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
@@ -133,9 +134,8 @@ protected:
 	size_t m_rate;
 
 	std::random_device m_rd;
-	std::mt19937 m_rng;
-
-	TestWaveformSource m_source;
+	std::minstd_rand* m_rng[5];
+	TestWaveformSource* m_source[5];
 
 public:
 	static std::string GetDriverNameInternal();

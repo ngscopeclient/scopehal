@@ -133,6 +133,11 @@ void MockOscilloscope::Stop()
 	//no-op, we never trigger
 }
 
+void MockOscilloscope::ForceTrigger()
+{
+	//no-op, we never trigger
+}
+
 bool MockOscilloscope::IsTriggerArmed()
 {
 	return false;
@@ -355,6 +360,439 @@ void MockOscilloscope::PullTrigger()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Import a waveform from file
 
+void MockOscilloscope::GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
+{
+	//TODO: Add Windows equivalent
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
+}
+
+/**
+	@brief Imports a waveform from a complex file containing samples of unknown format
+ */
+bool MockOscilloscope::LoadComplexUnknownFormat(const string& path, int64_t samplerate)
+{
+	LogDebug("Importing complex file \"%s\" (unknown format)\n", path.c_str());
+	LogIndenter li;
+
+	size_t numBytesToTest = 1024;
+
+	//Read test buffer
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	numBytesToTest = min(numBytesToTest, len);
+	uint8_t* buf = new uint8_t[numBytesToTest];
+	if(numBytesToTest != fread(buf, 1, numBytesToTest, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+	fclose(fp);
+
+	//Prepare to cast the buffer to each format and see what makes sense
+	float score_int8 = FLT_MAX;
+	float score_int16 = FLT_MAX;
+	float score_fp32 = FLT_MAX;
+	float score_fp64 = FLT_MAX;
+
+	LogDebug("Score (lower is better):\n");
+	{
+		LogIndenter li2;
+
+		size_t numSamples = numBytesToTest / 2;
+		int8_t* tbuf = reinterpret_cast<int8_t*>(buf);
+		float sum_i = 0;
+		float sum_q = 0;
+		float scale = 1.0f / 127;
+		for(size_t i=0; i<numSamples; i++)
+		{
+			sum_i += scale * tbuf[i*2];
+			sum_q += scale * tbuf[i*2 + 1];
+		}
+		sum_i /= numSamples;
+		sum_q /= numSamples;
+		score_int8 = sqrt(sum_i*sum_i + sum_q*sum_q);
+		LogDebug("int8:    %f\n", score_int8);
+	}
+
+	{
+		LogIndenter li2;
+
+		//Don't bother to test unless we have a round number of samples
+		if((len % 4) == 0)
+		{
+			size_t numSamples = numBytesToTest / 4;
+			int16_t* tbuf = reinterpret_cast<int16_t*>(buf);
+			float sum_i = 0;
+			float sum_q = 0;
+			float scale = 1.0f / 32767;
+			for(size_t i=0; i<numSamples; i++)
+			{
+				sum_i += scale * tbuf[i*2];
+				sum_q += scale * tbuf[i*2 + 1];
+			}
+			sum_i /= numSamples;
+			sum_q /= numSamples;
+			score_int16 = sqrt(sum_i*sum_i + sum_q*sum_q);
+			LogDebug("int16:   %f\n", score_int16);
+		}
+	}
+
+	{
+		LogIndenter li2;
+
+		//Don't bother to test unless we have a round number of samples
+		if((len % 8) == 0)
+		{
+			size_t numSamples = numBytesToTest / 8;
+			float* tbuf = reinterpret_cast<float*>(buf);
+			float sum_i = 0;
+			float sum_q = 0;
+			float max_i = 0;
+			float max_q = 0;
+			for(size_t i=0; i<numSamples; i++)
+			{
+				if(isnan(tbuf[i*2]))
+					sum_i = FLT_MAX;
+				if(isnan(tbuf[i*2+1]))
+					sum_q = FLT_MAX;
+
+				sum_i += tbuf[i*2];
+				sum_q += tbuf[i*2 + 1];
+
+				max_i = max(max_i, fabs(tbuf[i*2]));
+				max_q = max(max_q, fabs(tbuf[i*2]));
+			}
+			sum_i /= numSamples;
+			sum_q /= numSamples;
+			float avg_max = (max_i + max_q)/2;
+			if(avg_max > 1e-6)
+				score_fp32 = sqrt(sum_i*sum_i + sum_q*sum_q);
+			LogDebug("float32: %f\n", score_fp32);
+		}
+	}
+
+	{
+		LogIndenter li2;
+
+		//Don't bother to test unless we have a round number of samples
+		if((len % 16) == 0)
+		{
+			size_t numSamples = numBytesToTest / 16;
+			double* tbuf = reinterpret_cast<double*>(buf);
+			float sum_i = 0;
+			float sum_q = 0;
+			float max_i = 0;
+			float max_q = 0;
+			for(size_t i=0; i<numSamples; i++)
+			{
+				if(isnan(tbuf[i*2]))
+					sum_i = FLT_MAX;
+				if(isnan(tbuf[i*2+1]))
+					sum_q = FLT_MAX;
+
+				sum_i += tbuf[i*2];
+				sum_q += tbuf[i*2 + 1];
+
+				max_i = max(max_i, (float)fabs(tbuf[i*2]));
+				max_q = max(max_q, (float)fabs(tbuf[i*2]));
+			}
+			sum_i /= numSamples;
+			sum_q /= numSamples;
+			float avg_max = (max_i + max_q)/2;
+			if(avg_max > 1e-6)
+				score_fp64 = sqrt(sum_i*sum_i + sum_q*sum_q);
+			LogDebug("float64: %f\n", score_fp64);
+		}
+	}
+
+	//Clean up
+	delete[] buf;
+
+	//Find the minimum score of all
+	float minScore = min(score_int8, score_int16);
+	minScore = min(minScore, score_fp32);
+	minScore = min(minScore, score_fp64);
+	LogDebug("Best score: %f\n", minScore);
+	if(minScore > 0.05)
+		LogWarning("No candidate format seems plausible, trying best guess anyway\n");
+
+	if(minScore == score_int8)
+		return LoadComplexInt8(path, samplerate);
+	else if(minScore == score_int16)
+		return LoadComplexInt16(path, samplerate);
+	else if(minScore == score_fp32)
+		return LoadComplexFloat32(path, samplerate);
+	else
+		return LoadComplexFloat64(path, samplerate);
+}
+
+void MockOscilloscope::LoadComplexCommon(
+	const string& path,
+	AnalogWaveform*& iwfm,
+	AnalogWaveform*& qwfm,
+	int64_t samplerate,
+	size_t numSamples)
+{
+	LogTrace("Importing complex file \"%s\" (int16 format)\n", path.c_str());
+	LogIndenter li;
+
+	//Find sample period
+	int64_t fs_per_sample = FS_PER_SECOND / samplerate;
+
+	//Get timestamp
+	time_t timestamp = 0;
+	int64_t fs = 0;
+	GetTimestampOfFile(path, timestamp, fs);
+
+	//Create the channel
+	auto chan = new OscilloscopeChannel(
+		this,
+		"RF",
+		OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+		GetDefaultChannelColor(0),
+		1,
+		0,
+		true);
+	AddChannel(chan);
+	chan->SetDefaultDisplayName();
+	chan->ClearStreams();
+	chan->AddStream("I");
+	chan->AddStream("Q");
+	chan->SetVoltageRange(2);
+	chan->SetOffset(0);
+
+	//Create the waveforms for each of the two complex streams
+	iwfm = new AnalogWaveform;
+	iwfm->m_timescale = fs_per_sample;
+	iwfm->m_startTimestamp = timestamp;
+	iwfm->m_startFemtoseconds = fs;
+	iwfm->m_triggerPhase = 0;
+	iwfm->Resize(numSamples);
+	iwfm->m_densePacked = true;
+	chan->SetData(iwfm, 0);
+
+	qwfm = new AnalogWaveform;
+	qwfm->m_timescale = fs_per_sample;
+	qwfm->m_startTimestamp = timestamp;
+	qwfm->m_startFemtoseconds = fs;
+	qwfm->m_triggerPhase = 0;
+	qwfm->Resize(numSamples);
+	qwfm->m_densePacked = true;
+	chan->SetData(qwfm, 1);
+}
+
+/**
+	@brief Imports a waveform from a complex file containing signed 8-bit samples in IQIQ order.
+ */
+bool MockOscilloscope::LoadComplexInt8(const string& path, int64_t samplerate)
+{
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+
+	//Figure out length of the file in complex samples (2x int8 per sample)
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	size_t numSamples = len/2;
+
+	//Read sample data
+	int8_t* temp = new int8_t[numSamples * 2];
+	if(numSamples*2 != fread(temp, sizeof(int8_t), numSamples*2, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+
+	AnalogWaveform* iwfm;
+	AnalogWaveform* qwfm;
+	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
+
+	//Copy sample data
+	//TODO: vectorize
+	float scale = 1.0f / 127.0f;
+	for(size_t i=0; i<numSamples; i++)
+	{
+		iwfm->m_offsets[i] = i;
+		qwfm->m_offsets[i] = i;
+
+		iwfm->m_durations[i] = 1;
+		qwfm->m_durations[i] = 1;
+
+		iwfm->m_samples[i] = temp[i*2] * scale;
+		qwfm->m_samples[i] = temp[i*2 + 1] * scale;
+	}
+
+	delete[] temp;
+	fclose(fp);
+	return true;
+}
+
+/**
+	@brief Imports a waveform from a complex file containing signed 16-bit samples in IQIQ order.
+ */
+bool MockOscilloscope::LoadComplexInt16(const string& path, int64_t samplerate)
+{
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+
+	//Figure out length of the file in complex samples (2x int16 per sample)
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	size_t numSamples = len/4;
+
+	//Read sample data
+	int16_t* temp = new int16_t[numSamples * 2];
+	if(numSamples*2 != fread(temp, sizeof(int16_t), numSamples*2, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+
+	AnalogWaveform* iwfm;
+	AnalogWaveform* qwfm;
+	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
+
+	//Copy sample data
+	//TODO: vectorize
+	float scale = 1.0f / 32767.0f;
+	for(size_t i=0; i<numSamples; i++)
+	{
+		iwfm->m_offsets[i] = i;
+		qwfm->m_offsets[i] = i;
+
+		iwfm->m_durations[i] = 1;
+		qwfm->m_durations[i] = 1;
+
+		iwfm->m_samples[i] = temp[i*2] * scale;
+		qwfm->m_samples[i] = temp[i*2 + 1] * scale;
+	}
+
+	delete[] temp;
+	fclose(fp);
+	return true;
+}
+
+/**
+	@brief Imports a waveform from a complex file containing normalized 32-bit floating point samples in IQIQ order.
+ */
+bool MockOscilloscope::LoadComplexFloat32(const string& path, int64_t samplerate)
+{
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+
+	//Figure out length of the file in complex samples (2x float32 per sample)
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	size_t numSamples = len/8;
+
+	//Read sample data
+	float* temp = new float[numSamples * 2];
+	if(numSamples*2 != fread(temp, sizeof(float), numSamples*2, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+
+	AnalogWaveform* iwfm;
+	AnalogWaveform* qwfm;
+	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
+
+	//Copy sample data
+	//TODO: vectorize
+	for(size_t i=0; i<numSamples; i++)
+	{
+		iwfm->m_offsets[i] = i;
+		qwfm->m_offsets[i] = i;
+
+		iwfm->m_durations[i] = 1;
+		qwfm->m_durations[i] = 1;
+
+		iwfm->m_samples[i] = temp[i*2];
+		qwfm->m_samples[i] = temp[i*2 + 1];
+	}
+
+	delete[] temp;
+	fclose(fp);
+	return true;
+}
+
+/**
+	@brief Imports a waveform from a complex file containing normalized 64-bit floating point samples in IQIQ order.
+ */
+bool MockOscilloscope::LoadComplexFloat64(const string& path, int64_t samplerate)
+{
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Failed to open file\n");
+		return false;
+	}
+
+	//Figure out length of the file in complex samples (2x float64 per sample)
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	size_t numSamples = len/16;
+
+	//Read sample data
+	double* temp = new double[numSamples * 2];
+	if(numSamples*2 != fread(temp, sizeof(double), numSamples*2, fp))
+	{
+		LogError("Failed to read file\n");
+		return false;
+	}
+
+	AnalogWaveform* iwfm;
+	AnalogWaveform* qwfm;
+	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
+
+	//Copy sample data
+	//TODO: vectorize
+	for(size_t i=0; i<numSamples; i++)
+	{
+		iwfm->m_offsets[i] = i;
+		qwfm->m_offsets[i] = i;
+
+		iwfm->m_durations[i] = 1;
+		qwfm->m_durations[i] = 1;
+
+		iwfm->m_samples[i] = temp[i*2];
+		qwfm->m_samples[i] = temp[i*2 + 1];
+	}
+
+	delete[] temp;
+	fclose(fp);
+	return true;
+}
+
 /**
 	@brief Imports waveforms from Comma Separated Value files
  */
@@ -376,17 +814,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 	time_t timestamp = 0;
 	int64_t fs = 0;
-
-	//Get timestamp of the file if no header timestamp
-	//TODO: Add Windows equivalent
-	#ifndef _WIN32
-		struct stat st;
-		if(0 == stat(path.c_str(), &st))
-		{
-			timestamp = st.st_mtim.tv_sec;
-			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
-		}
-	#endif
+	GetTimestampOfFile(path, timestamp, fs);
 
 	char line[1024];
 	size_t nrow = 0;
@@ -613,6 +1041,7 @@ bool MockOscilloscope::LoadCSV(const string& path)
 
 		float vrange = vmax - vmin;
 		float vavg = vmin + vrange/2;
+		vrange = max(vrange, 0.001f);
 
 		auto chan = GetChannel(i);
 		chan->SetVoltageRange(vrange);
@@ -851,6 +1280,322 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		chan->SetVoltageRange((vmax-vmin) * 1.5);
 		chan->SetOffset(-((vmax-abs(vmin)) / 2));
 	}
+
+	return true;
+}
+
+/**
+	@brief Imports a waveform from a VCD file
+ */
+bool MockOscilloscope::LoadVCD(const string& path)
+{
+	FILE* fp = fopen(path.c_str(), "r");
+	if(!fp)
+	{
+		LogError("Couldn't open VCD file \"%s\"\n", path.c_str());
+		return false;
+	}
+
+	enum
+	{
+		STATE_IDLE,
+		STATE_DATE,
+		STATE_VERSION,
+		STATE_TIMESCALE,
+		STATE_VARS,
+		STATE_INITIAL,
+		STATE_DUMP
+	} state = STATE_IDLE;
+
+	time_t timestamp = 0;
+	int64_t fs = 0;
+	int64_t timescale = 1;
+
+	int64_t current_time = 0;
+
+	//Current scope prefix for signals
+	vector<string> scope;
+
+	//Map of signal IDs to signals
+	map<string, WaveformBase*> waveforms;
+	map<string, size_t> widths;
+
+	//VCD is a line based format, so process everything in lines
+	char buf[2048];
+	while(NULL != fgets(buf, sizeof(buf), fp))
+	{
+		string s = Trim(buf);
+
+		//Changing time is always legal, even before we get to the main variable dumping section.
+		//(Xilinx Vivado-generated VCDs include a #0 before the $dumpvars section.)
+		if(s[0] == '#')
+		{
+			current_time = stoll(buf+1);
+			continue;
+		}
+
+		//Scope is a bit special since it can nest. Handle that separately.
+		else if(s.find("$scope") != string::npos)
+		{
+			//Get the actual scope
+			char name[128];
+			if(1 == sscanf(buf, "$scope module %127s", name))
+				scope.push_back(name);
+			state = STATE_VARS;
+			continue;
+		}
+
+		//Main state machine
+		switch(state)
+		{
+			case STATE_IDLE:
+				if(s == "$date")
+					state = STATE_DATE;
+				else if(s == "$version")
+					state = STATE_VERSION;
+				else if(s == "$timescale")
+					state = STATE_TIMESCALE;
+				else if(s == "$dumpvars")
+					state = STATE_INITIAL;
+				else
+					LogWarning("Don't know what to do with line %s\n", s.c_str());
+				break;	//end STATE_IDLE
+
+			case STATE_DATE:
+				if(s[0] != '$')
+				{
+					tm now;
+					time_t tnow;
+					time(&tnow);
+					localtime_r(&tnow, &now);
+
+					tm stamp;
+
+					//Read the date
+					//Assume it's formatted "Fri May 21 07:16:38 2021" for now
+					char dow[16];
+					char month[16];
+					if(7 == sscanf(
+						buf,
+						"%3s %3s %d %d:%d:%d %d",
+						dow, month, &stamp.tm_mday, &stamp.tm_hour, &stamp.tm_min, &stamp.tm_sec, &stamp.tm_year))
+					{
+						string sm(month);
+						if(sm == "Jan")
+							stamp.tm_mon = 0;
+						else if(sm == "Feb")
+							stamp.tm_mon = 1;
+						else if(sm == "Mar")
+							stamp.tm_mon = 2;
+						else if(sm == "Apr")
+							stamp.tm_mon = 3;
+						else if(sm == "May")
+							stamp.tm_mon = 4;
+						else if(sm == "Jun")
+							stamp.tm_mon = 5;
+						else if(sm == "Jul")
+							stamp.tm_mon = 6;
+						else if(sm == "Aug")
+							stamp.tm_mon = 7;
+						else if(sm == "Sep")
+							stamp.tm_mon = 8;
+						else if(sm == "Oct")
+							stamp.tm_mon = 9;
+						else if(sm == "Nov")
+							stamp.tm_mon = 10;
+						else
+							stamp.tm_mon = 11;
+
+						//tm_year isn't absolute year, it's offset from 1900
+						stamp.tm_year -= 1900;
+
+						//TODO: figure out if this day/month/year was DST or not.
+						//For now, assume same as current. This is going to be off by an hour for half the year!
+						stamp.tm_isdst = now.tm_isdst;
+
+						//We can finally get the actual time_t
+						timestamp = mktime(&stamp);
+					}
+				}
+				break;	//end STATE_DATE;
+
+			case STATE_VERSION:
+				//ignore
+				break;	//end STATE_VERSION
+
+			case STATE_TIMESCALE:
+				if(s[0] != '$')
+				{
+					Unit ufs(Unit::UNIT_FS);
+					timescale = ufs.ParseString(s);
+				}
+				break;	//end STATE_VERSION
+
+			case STATE_VARS:
+				if(s.find("$upscope") != string::npos)
+				{
+					if(!scope.empty())
+						scope.pop_back();
+				}
+				else if(s.find("$enddefinitions") != string::npos)
+					state = STATE_IDLE;
+				else
+				{
+					//Format the current scope
+					string sscope;
+					for(auto level : scope)
+						sscope += level + "/";
+
+					//Parse the line
+					char vtype[16];	//"reg" or "wire", ignored
+					int width;
+					char symbol[16];
+					char name[128];
+					if(4 != sscanf(buf, "$var %15[^ ] %d %15[^ ] %127[^ ]", vtype, &width, symbol, name))
+						continue;
+
+					//If the symbol is already in use, skip it.
+					//We don't support one symbol with more than one name for now
+					if(waveforms.find(symbol) != waveforms.end())
+						continue;
+
+					//Create the channel
+					size_t ichan = m_channels.size();
+					string vname = sscope + name;
+					auto chan = new OscilloscopeChannel(
+						this,
+						vname,
+						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+						GetDefaultChannelColor(ichan),
+						width,
+						ichan,
+						true);
+					m_channels.push_back(chan);
+
+					//Create the waveform
+					WaveformBase* wfm;
+					if(width == 1)
+						wfm = new DigitalWaveform;
+					else
+						wfm = new DigitalBusWaveform;
+
+					wfm->m_timescale = timescale;
+					wfm->m_startTimestamp = timestamp;
+					wfm->m_startFemtoseconds = fs;
+					wfm->m_triggerPhase = 0;
+					wfm->m_densePacked = false;
+					waveforms[symbol] = wfm;
+					widths[symbol] = width;
+					chan->SetData(wfm, 0);
+				}
+				break;	//end STATE_VARS
+
+			case STATE_INITIAL:
+			case STATE_DUMP:
+
+				//Parse the current line
+				if(s[0] != '$')
+				{
+					//Vector: first char is 'b', then data, space, symbol name
+					if(s[0] == 'b')
+					{
+						auto ispace = s.find(' ');
+						auto symbol = s.substr(ispace + 1);
+						auto wfm = dynamic_cast<DigitalBusWaveform*>(waveforms[symbol]);
+						if(wfm)
+						{
+							//Parse the sample data (skipping the leading 'b')
+							vector<bool> sample;
+							for(size_t i = ispace-1; i > 0; i--)
+							{
+								if(s[i] == '1')
+									sample.push_back(true);
+								else
+									sample.push_back(false);
+							}
+
+							//Zero-pad the sample out to full width
+							auto width = widths[symbol];
+							while(sample.size() < width)
+								sample.push_back(false);
+
+							//Extend the previous sample, if there is one
+							auto len = wfm->m_samples.size();
+							if(len)
+							{
+								auto last = len-1;
+								wfm->m_durations[last] = current_time - wfm->m_offsets[last];
+							}
+
+							//Add the new sample
+							wfm->m_offsets.push_back(current_time);
+							wfm->m_durations.push_back(1);
+							wfm->m_samples.push_back(sample);
+						}
+						else
+							LogError("Symbol \"%s\" is not a valid digital bus waveform\n", symbol.c_str());
+					}
+
+					//Scalar: first char is boolean value, rest is symbol name
+					else
+					{
+						auto symbol = s.substr(1);
+						auto wfm = dynamic_cast<DigitalWaveform*>(waveforms[symbol]);
+						if(wfm)
+						{
+							//Extend the previous sample, if there is one
+							auto len = wfm->m_samples.size();
+							if(len)
+							{
+								auto last = len-1;
+								wfm->m_durations[last] = current_time - wfm->m_offsets[last];
+							}
+
+							//Add the new sample
+							wfm->m_offsets.push_back(current_time);
+							wfm->m_durations.push_back(1);
+							wfm->m_samples.push_back(s[0] == '1');
+						}
+						else
+							LogError("Symbol \"%s\" is not a valid digital waveform\n", symbol.c_str());
+					}
+				}
+
+				break;	//end STATE_INITIAL / STATE_DUMP
+		}
+
+		//Reset at the end of a block
+		if(s.find("$end") != string::npos)
+		{
+			if(state == STATE_INITIAL)
+				state = STATE_DUMP;
+			else if(state != STATE_VARS)
+				state = STATE_IDLE;
+		}
+	}
+	fclose(fp);
+
+	//Nothing to do if we didn't get any channels
+	if(m_channels.empty())
+		return false;
+
+	//Find the longest common prefix from all signal names
+	string prefix = m_channels[0]->GetHwname();
+	for(size_t i=1; i<m_channels.size(); i++)
+	{
+		string name = m_channels[i]->GetHwname();
+		size_t nlen = 1;
+		for(; (nlen < prefix.length()) && (nlen < name.length()); nlen ++)
+		{
+			if(name[nlen] != prefix[nlen])
+				break;
+		}
+		prefix.resize(nlen);
+	}
+
+	//Remove the prefix from all signal names
+	for(auto chan : m_channels)
+		chan->SetDisplayName(chan->GetHwname().substr(prefix.length()));
 
 	return true;
 }

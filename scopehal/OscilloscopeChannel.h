@@ -48,6 +48,10 @@ class Oscilloscope;
 class OscilloscopeChannel
 {
 public:
+	//Oscilloscope has to be able to call AddStream()
+	friend class Oscilloscope;
+	friend class MockOscilloscope;
+
 	enum ChannelType
 	{
 		//Conventional time-series waveforms (or similar graphs like a FFT)

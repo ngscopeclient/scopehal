@@ -60,7 +60,12 @@
 #define CL_HPP_TARGET_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
 #define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY
 #define CL_HPP_ENABLE_EXCEPTIONS
-#include <CL/cl2.hpp>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#pragma GCC diagnostic ignored "-Wignored-attributes"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include <CL/opencl.hpp>
+#pragma GCC diagnostic pop
 #endif
 
 #include "Unit.h"
@@ -126,6 +131,7 @@ float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);
 
+extern bool g_hasFMA;
 extern bool g_hasAvx512F;
 extern bool g_hasAvx512VL;
 extern bool g_hasAvx512DQ;

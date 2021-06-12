@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,48 +27,53 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "PulseWidthTrigger.h"
-#include "LeCroyOscilloscope.h"
-#include "TektronixOscilloscope.h"
-#include "SiglentSCPIOscilloscope.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of TDRFilter
+ */
+#ifndef TDRFilter_h
+#define TDRFilter_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-PulseWidthTrigger::PulseWidthTrigger(Oscilloscope* scope)
-	: EdgeTrigger(scope), m_conditionname("Condition"), m_lowername("Lower Bound"), m_uppername("Upper Bound")
+class TDRFilter : public Filter
 {
-	m_parameters[m_lowername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+public:
+	TDRFilter(const std::string& color);
 
-	m_parameters[m_uppername] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	virtual void Refresh();
 
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-	m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
 
-	//Some modes are only supported by certain vendors
-	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
-	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
+	virtual void SetVoltageRange(double range);
+	virtual void SetOffset(double offset);
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(TDRFilter)
+
+protected:
+	enum OutputMode
 	{
-		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
-	}
-}
+		MODE_RHO,
+		MODE_IMPEDANCE
+	};
 
-PulseWidthTrigger::~PulseWidthTrigger()
-{
-}
+	OutputMode m_oldMode;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	std::string m_modeName;
+	std::string m_portImpedanceName;
+	std::string m_stepStartVoltageName;
+	std::string m_stepEndVoltageName;
 
-string PulseWidthTrigger::GetTriggerName()
-{
-	return "Pulse Width";
-}
+	double m_range;
+	double m_offset;
+};
+
+#endif

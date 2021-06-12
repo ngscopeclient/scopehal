@@ -113,6 +113,7 @@ public:
 	virtual void Start();
 	virtual void StartSingleTrigger();
 	virtual void Stop();
+	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
@@ -201,6 +202,9 @@ public:
 	virtual void SetUseExternalRefclk(bool external);
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
+	virtual bool IsSamplingModeAvailable(SamplingMode mode);
+	virtual SamplingMode GetSamplingMode();
+	virtual void SetSamplingMode(SamplingMode mode);
 
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
