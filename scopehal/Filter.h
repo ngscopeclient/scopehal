@@ -202,6 +202,7 @@ protected:
 			i ++;
 	}
 
+	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream);
 	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
@@ -233,6 +234,7 @@ public:
 	static void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 
 	//Find interpolated zero crossings of a signal
+	static void FindRisingEdges(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 
 	//Find edges in a signal (discarding repeated samples)
