@@ -581,6 +581,33 @@ public:
 	 */
 	virtual void SetSampleRate(uint64_t rate) =0;
 
+	enum SamplingMode
+	{
+		REAL_TIME,
+		EQUIVALENT_TIME
+	};
+
+	/**
+		@brief Returns true if the requested sampling mode is available with the current instrument configuration.
+
+		The default implementation returns true for real-time only.
+	 */
+	virtual bool IsSamplingModeAvailable(SamplingMode mode);
+
+	/**
+		@brief Gets the current sampling mode of the instrument
+
+		The default implementation returns "real time"
+	 */
+	virtual SamplingMode GetSamplingMode();
+
+	/**
+		@brief Sets the current sampling mode of the instrument
+
+		The default implementation is a no-op.
+	 */
+	virtual void SetSamplingMode(SamplingMode mode);
+
 	/**
 		@brief Configures the instrument's clock source
 

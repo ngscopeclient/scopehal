@@ -471,6 +471,21 @@ void Oscilloscope::EnableTriggerOutput()
 	//do nothing, assuming the scope needs no config to enable trigger out
 }
 
+bool Oscilloscope::IsSamplingModeAvailable(SamplingMode mode)
+{
+	return (mode == REAL_TIME);
+}
+
+Oscilloscope::SamplingMode Oscilloscope::GetSamplingMode()
+{
+	return REAL_TIME;
+}
+
+void Oscilloscope::SetSamplingMode(SamplingMode /*mode*/)
+{
+	//default implementation is a no-op
+}
+
 void Oscilloscope::SetUseExternalRefclk(bool external)
 {
 	//override this function in the driver class if an external reference input is present
