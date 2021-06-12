@@ -3539,7 +3539,7 @@ LeCroyOscilloscope::SamplingMode LeCroyOscilloscope::GetSamplingMode()
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SampleMode'");
-	string reply = m_transport->ReadReply();
+	string reply = Trim(m_transport->ReadReply());
 
 	if(reply == "RealTime")
 		return REAL_TIME;
