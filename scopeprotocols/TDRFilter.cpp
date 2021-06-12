@@ -181,7 +181,7 @@ void TDRFilter::Refresh()
 	for(size_t i=0; i<len; i++)
 	{
 		//Reflection coefficient is trivial
-		float rho = din->m_samples[i] * pulseScale;
+		float rho = (din->m_samples[i] - vhi) * pulseScale;
 
 		//Impedance takes a bit more work to calculate
 		if(mode == MODE_IMPEDANCE)
