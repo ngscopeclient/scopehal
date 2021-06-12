@@ -93,6 +93,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TachometerFilter.cpp
 	TappedDelayLineFilter.cpp
 	TDRFilter.cpp
+	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	TMDSDecoder.cpp

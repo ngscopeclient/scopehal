@@ -128,6 +128,7 @@
 #include "TachometerFilter.h"
 #include "TappedDelayLineFilter.h"
 #include "TDRFilter.h"
+#include "TDRStepDeEmbedFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"
 #include "TMDSDecoder.h"
