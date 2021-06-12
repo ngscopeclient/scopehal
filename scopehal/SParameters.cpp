@@ -246,3 +246,37 @@ SParameters& SParameters::operator *=(const SParameters& rhs)
 
 	return *this;
 }
+
+/**
+	@brief Serializes a S-parameter model to a Touchstone file
+
+	For now, assumes full 2 port
+ */
+void SParameters::SaveToFile(const string& path)
+{
+	FILE* fp = fopen(path.c_str(), "w");
+	if(!fp)
+	{
+		LogError("Couldn't open %s for writing\n", path.c_str());
+		return;
+	}
+
+	//File header
+	fprintf(fp, "# GHz S MA R 50.000");
+
+	//Get the parameters
+	auto& s11 = (*this)[SPair(1, 1)];
+	auto& s12 = (*this)[SPair(1, 2)];
+	auto& s21 = (*this)[SPair(2, 1)];
+	auto& s22 = (*this)[SPair(2, 2)];
+
+	for(size_t i=0; i<s11.size(); i++)
+	{
+		float freq = s11[i].m_frequency;
+		fprintf(fp, "%f %f %f %f %f %f %f %f %f\n", freq * 1e-9,
+			s11[i].m_amplitude, s11[i].m_phase, s21[i].m_amplitude, s21[i].m_phase,
+			s12[i].m_amplitude, s12[i].m_phase, s22[i].m_amplitude, s22[i].m_phase);
+	}
+
+	fclose(fp);
+}

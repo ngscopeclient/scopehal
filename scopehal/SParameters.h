@@ -92,6 +92,7 @@ public:
 	virtual ~SParameters();
 
 	void Clear();
+	void Allocate();
 
 	bool empty() const
 	{ return m_params.empty(); }
@@ -109,9 +110,9 @@ public:
 
 	friend class TouchstoneParser;
 
-protected:
-	void Allocate();
+	void SaveToFile(const std::string& path);
 
+protected:
 	std::map< SPair , SParameterVector*> m_params;
 };
 
