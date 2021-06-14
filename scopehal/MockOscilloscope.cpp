@@ -1024,6 +1024,16 @@ bool MockOscilloscope::LoadCSV(const string& path)
 			{
 				size_t last = w->m_durations.size() - 1;
 				w->m_durations[last] = offset - w->m_offsets[last];
+
+				//Sanity check: duration must not be negative
+				if(w->m_durations[last] < 0)
+				{
+					Unit xunit(Unit::UNIT_FS);
+					LogError("Malformed file - sample %zu has a negative duration (%s)\n",
+						w->m_samples.size(),
+						xunit.PrettyPrint(w->m_durations[last]).c_str());
+					return false;
+				}
 			}
 
 			//Add duration for this sample
