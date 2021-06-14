@@ -83,6 +83,7 @@ vector<string> g_searchPaths;
 #ifdef HAVE_OPENCL
 cl::Context* g_clContext = NULL;
 vector<cl::Device> g_contextDevices;
+size_t g_maxClLocalSizeX = 0;
 #endif
 
 AlignedAllocator<float, 32> g_floatVectorAllocator;
@@ -276,17 +277,22 @@ void DetectGPUFeatures()
 							for(auto e : extensionlist)
 								LogDebug("%s\n", e.c_str());
 						}
-					}
 
-					//For now, create a context on the first device of the first detected platform and hope for the best
-					if(!g_clContext)
-					{
-						vector<cl::Device> devs;
-						devs.push_back(devices[0]);
+						//For now, create a context on the first device of the first detected platform
+						//and hope for the best.
+						//TODO: multi-device support?
+						if(!g_clContext)
+						{
+							vector<cl::Device> devs;
+							devs.push_back(devices[0]);
 
-						//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
-						g_clContext = new cl::Context(devs, NULL, NULL, NULL);
-						g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+							//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
+							g_clContext = new cl::Context(devs, NULL, NULL, NULL);
+							g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+
+							//Save some settings about the OpenCL implementation so that we can tune appropriately
+							g_maxClLocalSizeX = maxWorkItemSizes[0];
+						}
 					}
 				}
 			}

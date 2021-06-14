@@ -155,6 +155,7 @@ extern bool g_disableOpenCL;
 #ifdef HAVE_OPENCL
 extern cl::Context* g_clContext;
 extern std::vector<cl::Device> g_contextDevices;
+extern size_t g_maxClLocalSizeX;
 #endif
 
 #endif
