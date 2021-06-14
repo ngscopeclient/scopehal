@@ -199,19 +199,83 @@ void DetectGPUFeatures()
 						string dvendor;
 						string dversion;
 						string ddversion;
+						string extensions;
+						unsigned long globalCacheSize;
+						unsigned long globalCacheLineSize;
+						unsigned long globalMemSize;
+						unsigned long localMemSize;
+						unsigned int maxClock;
+						unsigned int maxComputeUnits;
+						unsigned int maxConstantArgs;
+						unsigned long maxConstantBuffer;
+						unsigned long maxMemAllocSize;
+						size_t maxParameterSize;
+						size_t maxWorkGroupSize;
+						size_t maxWorkItemSizes[3];
 						devices[j].getInfo(CL_DEVICE_NAME, &dname);
 						devices[j].getInfo(CL_DEVICE_OPENCL_C_VERSION, &dcvers);
 						devices[j].getInfo(CL_DEVICE_PROFILE, &dprof);
 						devices[j].getInfo(CL_DEVICE_VENDOR, &dvendor);
 						devices[j].getInfo(CL_DEVICE_VERSION, &dversion);
 						devices[j].getInfo(CL_DRIVER_VERSION, &ddversion);
+						devices[j].getInfo(CL_DEVICE_EXTENSIONS, &extensions);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, &globalCacheSize);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, &globalCacheLineSize);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &globalMemSize);
+						devices[j].getInfo(CL_DEVICE_LOCAL_MEM_SIZE, &localMemSize);
+						devices[j].getInfo(CL_DEVICE_MAX_CLOCK_FREQUENCY, &maxClock);
+						devices[j].getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &maxComputeUnits);
+						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_ARGS, &maxConstantArgs);
+						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, &maxConstantBuffer);
+						devices[j].getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &maxMemAllocSize);
+						devices[j].getInfo(CL_DEVICE_MAX_PARAMETER_SIZE, &maxParameterSize);
+						devices[j].getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &maxWorkGroupSize);
+						devices[j].getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &maxWorkItemSizes);
 
-						LogDebug("CL_DEVICE_NAME              = %s\n", dname.c_str());
-						LogDebug("CL_DEVICE_OPENCL_C_VERSION  = %s\n", dcvers.c_str());
-						LogDebug("CL_DEVICE_PROFILE           = %s\n", dprof.c_str());
-						LogDebug("CL_DEVICE_VENDOR            = %s\n", dvendor.c_str());
-						LogDebug("CL_DEVICE_VERSION           = %s\n", dversion.c_str());
-						LogDebug("CL_DRIVER_VERSION           = %s\n", ddversion.c_str());
+						float k = 1024;
+						float m = k*k;
+						float g = m*k;
+
+						LogDebug("CL_DRIVER_VERSION                   = %s\n", ddversion.c_str());
+						LogDebug("CL_DEVICE_NAME                      = %s\n", dname.c_str());
+						LogDebug("CL_DEVICE_OPENCL_C_VERSION          = %s\n", dcvers.c_str());
+						LogDebug("CL_DEVICE_PROFILE                   = %s\n", dprof.c_str());
+						LogDebug("CL_DEVICE_VENDOR                    = %s\n", dvendor.c_str());
+						LogDebug("CL_DEVICE_VERSION                   = %s\n", dversion.c_str());
+						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHE_SIZE     = %.3f MB\n", globalCacheSize / m);
+						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE = %lu\n", globalCacheLineSize);
+						LogDebug("CL_DEVICE_GLOBAL_MEM_SIZE           = %.2f GB\n", globalMemSize / g);
+						LogDebug("CL_DEVICE_LOCAL_MEM_SIZE            = %.2f kB\n", localMemSize / k);
+						LogDebug("CL_DEVICE_MAX_CLOCK_FREQUENCY       = %u MHz\n", maxClock);
+						LogDebug("CL_DEVICE_MAX_COMPUTE_UNITS         = %u\n", maxComputeUnits);
+						LogDebug("CL_DEVICE_MAX_CONSTANT_ARGS         = %u\n", maxConstantArgs);
+						LogDebug("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE  = %.2f kB\n", maxConstantBuffer / k);
+						LogDebug("CL_DEVICE_MAX_MEM_ALLOC_SIZE        = %.2f GB\n", maxMemAllocSize / g);
+						LogDebug("CL_DEVICE_MAX_PARAMETER_SIZE        = %zu\n", maxParameterSize);
+						LogDebug("CL_DEVICE_MAX_WORK_GROUP_SIZE       = %zu\n", maxWorkGroupSize);
+						LogDebug("CL_DEVICE_MAX_WORK_ITEM_SIZES       = %zu, %zu, %zu\n",
+							maxWorkItemSizes[0], maxWorkItemSizes[1], maxWorkItemSizes[2]);
+
+						vector<string> extensionlist;
+						string tmp;
+						for(size_t f=0; f<extensions.size(); f++)
+						{
+							if(isspace(extensions[f]))
+							{
+								if(tmp != "")
+									extensionlist.push_back(tmp);
+								tmp = "";
+							}
+							else
+								tmp += extensions[f];
+						}
+
+						{
+							LogDebug("CL_DEVICE_EXTENSIONS:\n");
+							LogIndenter li4;
+							for(auto e : extensionlist)
+								LogDebug("%s\n", e.c_str());
+						}
 					}
 
 					//For now, create a context on the first device of the first detected platform and hope for the best
