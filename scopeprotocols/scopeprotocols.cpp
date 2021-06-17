@@ -134,6 +134,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ThresholdFilter);
 	AddDecoderClass(TIEMeasurement);
 	AddDecoderClass(TMDSDecoder);
+	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);

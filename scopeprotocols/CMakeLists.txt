@@ -98,6 +98,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
+	ToneGeneratorFilter.cpp
 	TMDSDecoder.cpp
 	TopMeasurement.cpp
 	UARTDecoder.cpp

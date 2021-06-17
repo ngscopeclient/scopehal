@@ -134,6 +134,7 @@
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"
 #include "TMDSDecoder.h"
+#include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
