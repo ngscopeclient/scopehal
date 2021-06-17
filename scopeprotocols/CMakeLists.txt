@@ -69,6 +69,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
+	NoiseFilter.cpp
 	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp

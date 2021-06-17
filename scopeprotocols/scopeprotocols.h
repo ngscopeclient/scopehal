@@ -105,6 +105,7 @@
 #include "MilStd1553Decoder.h"
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
+#include "NoiseFilter.h"
 #include "OFDMDemodulator.h"
 #include "OneWireDecoder.h"
 #include "OvershootMeasurement.h"

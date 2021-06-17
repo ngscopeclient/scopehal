@@ -105,7 +105,8 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
+	AddDecoderClass(NoiseFilter);
+	//AddDecoderClass(OFDMDemodulator);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
 	AddDecoderClass(ParallelBus);
