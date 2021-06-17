@@ -30,32 +30,36 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DigitalToPAM4Filter
+	@brief Declaration of WaveformGenerationFilter
  */
-#ifndef DigitalToPAM4Filter_h
-#define DigitalToPAM4Filter_h
+#ifndef WaveformGenerationFilter_h
+#define WaveformGenerationFilter_h
 
-#include "WaveformGenerationFilter.h"
-
-class DigitalToPAM4Filter : public WaveformGenerationFilter
+class WaveformGenerationFilter : public Filter
 {
 public:
-	DigitalToPAM4Filter(const std::string& color);
+	WaveformGenerationFilter(const std::string& color);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	virtual void Refresh();
 
-	PROTOCOL_DECODER_INITPROC(DigitalToPAM4Filter)
+	virtual bool NeedsConfig();
+	virtual bool IsOverlay();
+
+	virtual double GetVoltageRange();
+	virtual double GetOffset();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 protected:
-	std::string m_level00;
-	std::string m_level01;
-	std::string m_level10;
-	std::string m_level11;
+	virtual size_t GetBitsPerSymbol() =0;
+	virtual std::vector<float> GetVoltageLevels() =0;
+	virtual size_t GetVoltageCode(size_t i, DigitalWaveform& samples) =0;
 
-	virtual size_t GetBitsPerSymbol();
-	virtual std::vector<float> GetVoltageLevels();
-	virtual size_t GetVoltageCode(size_t i, DigitalWaveform& samples) ;
+	virtual float GetMaxLevel();
+	virtual float GetMinLevel();
+
+	std::string m_sampleRate;
+	std::string m_edgeTime;
 };
 
 #endif

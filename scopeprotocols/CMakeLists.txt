@@ -19,6 +19,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp
 	DigitalToPAM4Filter.cpp
+	DigitalToNRZFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp
@@ -108,6 +109,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
 	VerticalBathtub.cpp
+	WaveformGenerationFilter.cpp
 	Waterfall.cpp
 	WindowedAutocorrelationFilter.cpp
 

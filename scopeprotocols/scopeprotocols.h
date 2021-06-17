@@ -56,6 +56,7 @@
 #include "DeEmbedFilter.h"
 #include "DeskewFilter.h"
 #include "DigitalToPAM4Filter.h"
+#include "DigitalToNRZFilter.h"
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
 #include "DPhyDataDecoder.h"

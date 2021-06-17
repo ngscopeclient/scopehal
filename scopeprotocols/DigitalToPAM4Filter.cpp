@@ -36,23 +36,12 @@ using namespace std;
 // Construction / destruction
 
 DigitalToPAM4Filter::DigitalToPAM4Filter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
-	, m_sampleRate("Sample Rate")
-	, m_edgeTime("Transition Time")
+	: WaveformGenerationFilter(color)
 	, m_level00("Level 00")
 	, m_level01("Level 01")
 	, m_level10("Level 10")
 	, m_level11("Level 11")
 {
-	CreateInput("data");
-	CreateInput("clk");
-
-	m_parameters[m_edgeTime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_edgeTime].SetIntVal(10 * 1000);
-
-	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
-
 	m_parameters[m_level00] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_level00].SetFloatVal(-0.3);
 
@@ -64,25 +53,6 @@ DigitalToPAM4Filter::DigitalToPAM4Filter(const string& color)
 
 	m_parameters[m_level11] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_level11].SetFloatVal(0.3);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DigitalToPAM4Filter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i < 2) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
-	{
-		return true;
-	}
-
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,157 +71,30 @@ void DigitalToPAM4Filter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-bool DigitalToPAM4Filter::NeedsConfig()
-{
-	return true;
-}
-
-bool DigitalToPAM4Filter::IsOverlay()
-{
-	return false;
-}
-
-float DigitalToPAM4Filter::GetMaxLevel()
-{
-	float levels[4] =
-	{
-		m_parameters[m_level00].GetFloatVal(),
-		m_parameters[m_level01].GetFloatVal(),
-		m_parameters[m_level10].GetFloatVal(),
-		m_parameters[m_level11].GetFloatVal()
-	};
-
-	float v = levels[0];
-	for(size_t i=1; i<4; i++)
-		v = max(v, levels[i]);
-	return v;
-}
-
-float DigitalToPAM4Filter::GetMinLevel()
-{
-	float levels[4] =
-	{
-		m_parameters[m_level00].GetFloatVal(),
-		m_parameters[m_level01].GetFloatVal(),
-		m_parameters[m_level10].GetFloatVal(),
-		m_parameters[m_level11].GetFloatVal()
-	};
-
-	float v = levels[0];
-	for(size_t i=1; i<4; i++)
-		v = min(v, levels[i]);
-	return v;
-}
-
-double DigitalToPAM4Filter::GetVoltageRange()
-{
-	return (GetMaxLevel() - GetMinLevel()) * 1.05;
-}
-
-double DigitalToPAM4Filter::GetOffset()
-{
-	float vmin = GetMinLevel();
-	float vmax = GetMaxLevel();
-	float vavg = (vmax + vmin)/2;
-	return -vavg;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DigitalToPAM4Filter::Refresh()
+size_t DigitalToPAM4Filter::GetBitsPerSymbol()
 {
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
+	return 2;
+}
 
-	//Get the input and sample it
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
-	DigitalWaveform samples;
-	SampleOnAnyEdges(din, clkin, samples);
+vector<float> DigitalToPAM4Filter::GetVoltageLevels()
+{
+	vector<float> ret;
+	ret.push_back(m_parameters[m_level00].GetFloatVal());
+	ret.push_back(m_parameters[m_level01].GetFloatVal());
+	ret.push_back(m_parameters[m_level10].GetFloatVal());
+	ret.push_back(m_parameters[m_level11].GetFloatVal());
+	return ret;
+}
 
-	size_t rate = m_parameters[m_sampleRate].GetIntVal();
-	size_t samplePeriod = FS_PER_SECOND / rate;
-	size_t edgeTime = m_parameters[m_edgeTime].GetIntVal();
-	size_t edgeSamples = floor(edgeTime / samplePeriod);
-
-	float levels[4] =
-	{
-		m_parameters[m_level00].GetFloatVal(),
-		m_parameters[m_level01].GetFloatVal(),
-		m_parameters[m_level10].GetFloatVal(),
-		m_parameters[m_level11].GetFloatVal()
-	};
-
-	//Configure output waveform
-	auto cap = SetupEmptyOutputWaveform(din, 0);
-	cap->m_timescale = samplePeriod;
-	cap->m_densePacked = true;
-
-	//Round length to integer number of complete samples
-	size_t len = samples.m_samples.size();
-	if(len & 1)
-		len --;
-
-	//Adjust for start time
-	int64_t capstart = samples.m_offsets[0];
-	cap->m_triggerPhase = capstart;
-
-	//Figure out how long the capture is going to be
-	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
-	cap->Resize(caplen);
-
-	//Process samples, two at a time
-	float vlast = levels[0];
-	size_t nsamp = 0;
-	for(size_t i=0; i<len; i+=2)
-	{
-		//Convert start/end times to our output timebase
-		size_t tstart = (samples.m_offsets[i] - capstart);
-		size_t tend = (samples.m_offsets[i+1] + samples.m_durations[i+1] - capstart);
-		size_t tend_rounded = tend / samplePeriod;
-
-		//Figure out the target voltage level
-		bool s1 = samples.m_samples[i];
-		bool s2 = samples.m_samples[i+1];
-		int code = 0;
-		if(s1)
-			code |= 2;
-		if(s2)
-			code |= 1;
-		float v = levels[code];
-
-		size_t tEdgeDone = nsamp + edgeSamples;
-
-		//Emit samples for the edge
-		float delta = v - vlast;
-		for(; nsamp < tEdgeDone; nsamp ++)
-		{
-			//Figure out how far along we are
-			float tnow = nsamp * samplePeriod;
-			float tdelta = tnow - tstart;
-			float frac = max(0.0f, tdelta / edgeTime);
-			float vcur = vlast + delta*frac;
-
-			cap->m_offsets[nsamp] = nsamp;
-			cap->m_durations[nsamp] = 1;
-			cap->m_samples[nsamp] = vcur;
-		}
-
-		//Emit samples for the rest of the UI
-		for(; nsamp < tend_rounded; nsamp ++)
-		{
-			cap->m_offsets[nsamp] = nsamp;
-			cap->m_durations[nsamp] = 1;
-			cap->m_samples[nsamp] = v;
-		}
-
-		vlast = v;
-	}
-
-	if(nsamp != caplen)
-		LogDebug("Length mismatch!!\n");
+size_t DigitalToPAM4Filter::GetVoltageCode(size_t i, DigitalWaveform& samples)
+{
+	size_t code = 0;
+	if(samples.m_samples[i])
+		code |= 2;
+	if(samples.m_samples[i+1])
+		code |= 1;
+	return code;
 }

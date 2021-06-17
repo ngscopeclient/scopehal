@@ -27,35 +27,59 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DigitalToPAM4Filter
- */
-#ifndef DigitalToPAM4Filter_h
-#define DigitalToPAM4Filter_h
+#include "../scopehal/scopehal.h"
+#include "DigitalToNRZFilter.h"
 
-#include "WaveformGenerationFilter.h"
+using namespace std;
 
-class DigitalToPAM4Filter : public WaveformGenerationFilter
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+DigitalToNRZFilter::DigitalToNRZFilter(const string& color)
+	: WaveformGenerationFilter(color)
+	, m_level0("Level 0")
+	, m_level1("Level 1")
 {
-public:
-	DigitalToPAM4Filter(const std::string& color);
+	m_parameters[m_level0] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_level0].SetFloatVal(0);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	m_parameters[m_level1] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_level1].SetFloatVal(1.8);
+}
 
-	PROTOCOL_DECODER_INITPROC(DigitalToPAM4Filter)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-protected:
-	std::string m_level00;
-	std::string m_level01;
-	std::string m_level10;
-	std::string m_level11;
+string DigitalToNRZFilter::GetProtocolName()
+{
+	return "Digital to NRZ";
+}
 
-	virtual size_t GetBitsPerSymbol();
-	virtual std::vector<float> GetVoltageLevels();
-	virtual size_t GetVoltageCode(size_t i, DigitalWaveform& samples) ;
-};
+void DigitalToNRZFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "DigitalToNRZ(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+size_t DigitalToNRZFilter::GetBitsPerSymbol()
+{
+	return 1;
+}
+
+vector<float> DigitalToNRZFilter::GetVoltageLevels()
+{
+	vector<float> ret;
+	ret.push_back(m_parameters[m_level0].GetFloatVal());
+	ret.push_back(m_parameters[m_level1].GetFloatVal());
+	return ret;
+}
+
+size_t DigitalToNRZFilter::GetVoltageCode(size_t i, DigitalWaveform& samples)
+{
+	return samples.m_samples[i];
+}

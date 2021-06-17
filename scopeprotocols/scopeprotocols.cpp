@@ -57,6 +57,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DeEmbedFilter);
 	AddDecoderClass(DeskewFilter);
 	AddDecoderClass(DigitalToPAM4Filter);
+	AddDecoderClass(DigitalToNRZFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
 	AddDecoderClass(DPhyDataDecoder);

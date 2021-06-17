@@ -30,28 +30,26 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DigitalToPAM4Filter
+	@brief Declaration of DigitalToNRZFilter
  */
-#ifndef DigitalToPAM4Filter_h
-#define DigitalToPAM4Filter_h
+#ifndef DigitalToNRZFilter_h
+#define DigitalToNRZFilter_h
 
 #include "WaveformGenerationFilter.h"
 
-class DigitalToPAM4Filter : public WaveformGenerationFilter
+class DigitalToNRZFilter : public WaveformGenerationFilter
 {
 public:
-	DigitalToPAM4Filter(const std::string& color);
+	DigitalToNRZFilter(const std::string& color);
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	PROTOCOL_DECODER_INITPROC(DigitalToPAM4Filter)
+	PROTOCOL_DECODER_INITPROC(DigitalToNRZFilter)
 
 protected:
-	std::string m_level00;
-	std::string m_level01;
-	std::string m_level10;
-	std::string m_level11;
+	std::string m_level0;
+	std::string m_level1;
 
 	virtual size_t GetBitsPerSymbol();
 	virtual std::vector<float> GetVoltageLevels();
