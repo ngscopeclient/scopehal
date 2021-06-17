@@ -79,6 +79,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
 	PkPkMeasurement.cpp
+	PRBSGeneratorFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp

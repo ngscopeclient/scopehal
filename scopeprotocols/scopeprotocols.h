@@ -115,6 +115,7 @@
 #include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
 #include "PkPkMeasurement.h"
+#include "PRBSGeneratorFilter.h"
 #include "RjBUjFilter.h"
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"

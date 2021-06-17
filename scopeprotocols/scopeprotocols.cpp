@@ -115,6 +115,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PeakHoldFilter);
 	AddDecoderClass(PeriodMeasurement);
 	AddDecoderClass(PkPkMeasurement);
+	AddDecoderClass(PRBSGeneratorFilter);
 	AddDecoderClass(RjBUjFilter);
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
