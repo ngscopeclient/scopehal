@@ -483,10 +483,13 @@ bool DemoOscilloscope::AcquireData()
 
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	WaveformBase* waveforms[5];
+	WaveformBase* waveforms[5] = {NULL};
 	#pragma omp parallel for
 	for(int i=0; i<5; i++)
 	{
+		if(!m_channelsEnabled[i])
+			continue;
+
 		switch(i)
 		{
 			case 0:
@@ -526,6 +529,8 @@ bool DemoOscilloscope::AcquireData()
 	for(auto it : s)
 	{
 		auto wfm = it.second;
+		if(!wfm)
+			continue;
 
 		wfm->m_startTimestamp = start;
 		wfm->m_startFemtoseconds = fs;
