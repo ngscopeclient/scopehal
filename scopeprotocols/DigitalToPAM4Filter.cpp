@@ -210,8 +210,9 @@ void DigitalToPAM4Filter::Refresh()
 	for(size_t i=0; i<len; i+=2)
 	{
 		//Convert start/end times to our output timebase
-		size_t tstart = (samples.m_offsets[i] - capstart) / samplePeriod;
-		size_t tend = (samples.m_offsets[i+1] + samples.m_durations[i+1] - capstart) / samplePeriod;
+		size_t tstart = (samples.m_offsets[i] - capstart);
+		size_t tend = (samples.m_offsets[i+1] + samples.m_durations[i+1] - capstart);
+		size_t tend_rounded = tend / samplePeriod;
 
 		//Figure out the target voltage level
 		bool s1 = samples.m_samples[i];
@@ -226,20 +227,22 @@ void DigitalToPAM4Filter::Refresh()
 		size_t tEdgeDone = nsamp + edgeSamples;
 
 		//Emit samples for the edge
-		size_t nsteps = tEdgeDone - nsamp;
 		float delta = v - vlast;
-		float vstep = delta / nsteps;
-		float vcur = vlast;
 		for(; nsamp < tEdgeDone; nsamp ++)
 		{
+			//Figure out how far along we are
+			float tnow = nsamp * samplePeriod;
+			float tdelta = tnow - tstart;
+			float frac = max(0.0f, tdelta / edgeTime);
+			float vcur = vlast + delta*frac;
+
 			cap->m_offsets[nsamp] = nsamp;
 			cap->m_durations[nsamp] = 1;
 			cap->m_samples[nsamp] = vcur;
-			vcur += vstep;
 		}
 
 		//Emit samples for the rest of the UI
-		for(; nsamp < tend; nsamp ++)
+		for(; nsamp < tend_rounded; nsamp ++)
 		{
 			cap->m_offsets[nsamp] = nsamp;
 			cap->m_durations[nsamp] = 1;
