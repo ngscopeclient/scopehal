@@ -18,6 +18,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DDR3Decoder.cpp
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp
+	DigitalToPAM4Filter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp

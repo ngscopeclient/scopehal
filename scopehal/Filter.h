@@ -59,7 +59,8 @@ public:
 		CAT_SERIAL,			//Serial communications
 		CAT_MISC,			//anything not otherwise categorized
 		CAT_POWER,			//Power analysis
-		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
+		CAT_RF,				//Frequency domain analysis (FFT etc) and other RF stuff
+		CAT_GENERATION		//Waveform generation and synthesis
 	};
 
 	Filter(
