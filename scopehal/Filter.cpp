@@ -150,6 +150,11 @@ void Filter::Release()
 
 bool Filter::IsOverlay()
 {
+	//If we have no inputs, we can't be an overlay
+	if(GetInputCount() == 0)
+		return false;
+
+	//otherwise, assume we are one
 	return true;
 }
 
