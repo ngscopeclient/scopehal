@@ -56,7 +56,6 @@ public:
 
 protected:
 	std::string m_stdevname;
-	std::string m_amplitudename;
 };
 
 #endif
