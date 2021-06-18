@@ -470,15 +470,6 @@ void FFTFilter::DoRefresh(
 	FindPeaks(cap);
 }
 
-bool FFTFilter::UsesCLFFT()
-{
-	#ifdef HAVE_CLFFT
-		return (m_clfftPlan != 0);
-	#else
-		return false;
-	#endif
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Normalization
 

@@ -294,15 +294,6 @@ bool DeEmbedFilter::LoadSparameters()
 	return true;
 }
 
-bool DeEmbedFilter::UsesCLFFT()
-{
-	#ifdef HAVE_CLFFT
-		return (m_clfftForwardPlan != 0);
-	#else
-		return false;
-	#endif
-}
-
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */

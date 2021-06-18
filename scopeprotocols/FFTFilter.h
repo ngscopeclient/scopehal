@@ -62,8 +62,6 @@ public:
 	virtual void SetVoltageRange(double range);
 	virtual void SetOffset(double offset);
 
-	virtual bool UsesCLFFT();
-
 	enum WindowFunction
 	{
 		WINDOW_RECTANGULAR,
