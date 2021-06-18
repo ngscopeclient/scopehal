@@ -740,7 +740,7 @@ void InitializeSearchPaths()
 	{
 		g_searchPaths.push_back(binPath);
 		// On mingw, binPath would typically be /mingw64/bin now
-		//and our data files in /mingw64/share. Strip back one more layer 
+		//and our data files in /mingw64/share. Strip back one more layer
 		// of hierarchy so we can start appending.
 		binRootDir = dirname(binPath);
 	}
@@ -758,7 +758,8 @@ void InitializeSearchPaths()
 	}
 #endif
 	// Add the share directories associated with the binary location
-	if(binRootDir.size() > 0) {
+	if(binRootDir.size() > 0)
+	{
 		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
 		g_searchPaths.push_back(binRootDir + "/share/scopehal");
 	}
