@@ -204,6 +204,7 @@ protected:
 	}
 
 	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream);
+	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
 	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 

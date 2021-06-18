@@ -1083,6 +1083,38 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 }
 
 /**
+	@brief Sets up an digital output waveform and copies basic metadata from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+
+	@param din			Input waveform
+	@param stream		Stream index
+
+	@return	The ready-to-use output waveform
+ */
+DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream)
+{
+	//Create the waveform, but only if necessary
+	DigitalWaveform* cap = dynamic_cast<DigitalWaveform*>(GetData(stream));
+	if(cap == NULL)
+	{
+		cap = new DigitalWaveform;
+		SetData(cap, stream);
+	}
+
+	//Copy configuration
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Clear output
+	cap->m_samples.clear();
+	cap->m_offsets.clear();
+	cap->m_durations.clear();
+
+	return cap;
+}
+
+/**
 	@brief Sets up an analog output waveform and copies timebase configuration from the input.
 
 	A new output waveform is created if necessary, but when possible the existing one is reused.
