@@ -98,6 +98,7 @@
 #include "I2CEepromDecoder.h"
 #include "IPv4Decoder.h"
 #include "ISIMeasurement.h"
+#include "JitterFilter.h"
 #include "JitterSpectrumFilter.h"
 #include "JtagDecoder.h"
 #include "MagnitudeFilter.h"
