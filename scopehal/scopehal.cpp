@@ -728,6 +728,7 @@ string ReadFile(const string& path)
 
 void InitializeSearchPaths()
 {
+	string binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
 	TCHAR binPath[MAX_PATH];
@@ -736,7 +737,13 @@ void InitializeSearchPaths()
 	else if(!PathRemoveFileSpec(binPath) )
 		LogError("Error: PathRemoveFileSpec() failed.\n");
 	else
+	{
 		g_searchPaths.push_back(binPath);
+		// On mingw, binPath would typically be /mingw64/bin now
+		//and our data files in /mingw64/share. Strip back one more layer 
+		// of hierarchy so we can start appending.
+		binRootDir = dirname(binPath);
+	}
 #else
 	char binDir[1024] = {0};
 	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
@@ -747,11 +754,14 @@ void InitializeSearchPaths()
 	else
 	{
 		g_searchPaths.push_back(dirname(binDir));
-		string binRootDir = dirname(binDir);
+		binRootDir = dirname(binDir);
+	}
+#endif
+	// Add the share directories associated with the binary location
+	if(binRootDir.size() > 0) {
 		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
 		g_searchPaths.push_back(binRootDir + "/share/scopehal");
 	}
-#endif
 
 	//Local directories preferred over system ones
 #ifndef _WIN32
