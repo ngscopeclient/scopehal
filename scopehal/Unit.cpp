@@ -379,7 +379,7 @@ void Unit::SetLocale(const char* locale)
 void Unit::SetPrintingLocale()
 {
 	#ifdef _WIN32
-		setlocale(LC_NUMERIC, m_slocale);
+		setlocale(LC_NUMERIC, m_slocale.c_str());
 	#else
 		uselocale(m_locale);
 	#endif
