@@ -1052,10 +1052,11 @@ void Filter::ClearAnalysisCache()
 
 	@param din			Input waveform
 	@param stream		Stream index
+	@param clear		True to clear an existing waveform, false to leave it as-is
 
 	@return	The ready-to-use output waveform
  */
-AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t stream)
+AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear)
 {
 	//Create the waveform, but only if necessary
 	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(stream));
@@ -1070,9 +1071,12 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 
 	//Clear output
-	cap->m_samples.clear();
-	cap->m_offsets.clear();
-	cap->m_durations.clear();
+	if(clear)
+	{
+		cap->m_samples.clear();
+		cap->m_offsets.clear();
+		cap->m_durations.clear();
+	}
 
 	return cap;
 }
@@ -1124,7 +1128,7 @@ DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size
  */
 AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
 {
-	auto cap = SetupEmptyOutputWaveform(din, stream);
+	auto cap = SetupEmptyOutputWaveform(din, stream, false);
 
 	cap->m_timescale 			= din->m_timescale;
 	cap->m_triggerPhase			= din->m_triggerPhase;
