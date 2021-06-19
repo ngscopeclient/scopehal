@@ -35,6 +35,8 @@
 #ifndef NoiseFilter_h
 #define NoiseFilter_h
 
+#include <random>
+
 class NoiseFilter : public Filter
 {
 public:
@@ -55,7 +57,12 @@ public:
 	PROTOCOL_DECODER_INITPROC(NoiseFilter)
 
 protected:
+	void CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma);
+	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
+
 	std::string m_stdevname;
+
+	std::mt19937 m_twister;
 };
 
 #endif
