@@ -97,7 +97,6 @@ protected:
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;
 	size_t m_cachedNumPoints;
-	size_t m_cachedRawSize;
 
 	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
 	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;

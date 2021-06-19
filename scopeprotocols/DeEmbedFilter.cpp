@@ -66,7 +66,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_reversePlan = NULL;
 
 	m_cachedNumPoints = 0;
-	m_cachedRawSize = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -326,7 +325,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
-	if( (m_cachedNumPoints != npoints) || (m_cachedRawSize != npoints_raw) )
+	if(m_cachedNumPoints != npoints)
 	{
 		if(m_forwardPlan)
 			ffts_free(m_forwardPlan);
@@ -341,7 +340,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
-		m_cachedRawSize = npoints_raw;
 		sizechange = true;
 
 		#ifdef HAVE_CLFFT
