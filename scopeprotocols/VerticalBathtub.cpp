@@ -126,11 +126,6 @@ void VerticalBathtub::Refresh()
 	double fs_per_pixel = fs_per_width / eye->GetWidth();
 	size_t xbin = round( (timestamp + eye->m_uiWidth) / fs_per_pixel );
 
-	/*
-	float ymid = din->GetHeight()/2;
-	float center = din->GetCenterVoltage();
-	*/
-
 	//Sanity check we're not off the eye
 	if(xbin >= eye->GetWidth())
 		return;
@@ -140,10 +135,11 @@ void VerticalBathtub::Refresh()
 	cap->m_timescale = eye->m_timescale;
 	cap->m_startTimestamp = eye->m_startTimestamp;
 	cap->m_startFemtoseconds = eye->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 
 	//Eye height config
 	double mv_per_pixel = 1000 * ein->GetVoltageRange() / eye->GetHeight();
-	double mv_off = 1000 * eye->GetCenterVoltage();
+	double mv_off = 1000 * (ein->GetVoltageRange()/2 - eye->GetCenterVoltage());
 
 	//Extract the single column we're interested in
 	//TODO: support a range of times around the midpoint
