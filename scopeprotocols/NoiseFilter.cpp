@@ -68,7 +68,8 @@ bool NoiseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 double NoiseFilter::GetVoltageRange()
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	//add 3 sigma above and below the mean
+	return m_inputs[0].m_channel->GetVoltageRange() + 6*m_parameters[m_stdevname].GetFloatVal();
 }
 
 double NoiseFilter::GetOffset()
