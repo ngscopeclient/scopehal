@@ -92,6 +92,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SpectrogramFilter.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
+	StepGeneratorFilter.cpp
 	SubtractFilter.cpp
 	SWDDecoder.cpp
 	SWDMemAPDecoder.cpp

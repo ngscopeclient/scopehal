@@ -127,6 +127,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SpectrogramFilter);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
+	AddDecoderClass(StepGeneratorFilter);
 	AddDecoderClass(SubtractFilter);
 	AddDecoderClass(SWDDecoder);
 	AddDecoderClass(SWDMemAPDecoder);

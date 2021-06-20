@@ -127,6 +127,7 @@
 #include "SpectrogramFilter.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"
+#include "StepGeneratorFilter.h"
 #include "SubtractFilter.h"
 #include "SWDDecoder.h"
 #include "SWDMemAPDecoder.h"
