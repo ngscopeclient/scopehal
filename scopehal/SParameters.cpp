@@ -91,47 +91,34 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 	else
 		frac = 0;
 
-	//Interpolate amplitude
+	//Output data point is always at the exact frequency we requested, by definition
 	SParameterPoint ret;
+	ret.m_frequency = frequency;
+
+	//Interpolate amplitude
 	float amp_lo = m_points[last_lo].m_amplitude;
 	float amp_hi = m_points[last_hi].m_amplitude;
 	ret.m_amplitude = amp_lo + (amp_hi - amp_lo)*frac;
 
-	//Interpolate phase (angles in radians)
+	//Normally phase angles are in the -pi to +pi range.
+	//Wrap so we have a well defined linear range to interpolate, with no wrapping.
 	float phase_lo = m_points[last_lo].m_phase;
 	float phase_hi = m_points[last_hi].m_phase;
-
-	//If both values have the same sign, no wrapping needed.
-	//If values have opposite signs, but are smallish, we cross at 0 vs +/- pi, so also no wrapping needed.
-	if(
-		( (phase_hi > 0) && (phase_lo > 0) ) ||
-		( (phase_hi < 0) && (phase_lo < 0) ) ||
-		( (fabs(phase_hi) < M_PI_4) && (fabs(phase_lo) < M_PI_4) )
-	  )
+	if(fabs(phase_lo - phase_hi) > M_PI)
 	{
-		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
-	}
-
-	//Wrapping needed.
-	//Shift everything by pi, then interpolate normally, then shift back.
-	else
-	{
-		//Shift the negative phase by a full circle
-		if(phase_lo < 0)
+		if(phase_lo < phase_hi)
 			phase_lo += 2*M_PI;
-		if(phase_hi < 0)
+		else
 			phase_hi += 2*M_PI;
-
-		//Normal interpolation
-		ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
-
-		//If we went out of range, rescale
-		if(ret.m_phase > 2*M_PI)
-			ret.m_phase -= 2*M_PI;
 	}
 
+	//Now we can interpolate normally
+	ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
 
-	ret.m_frequency = frequency;
+	//If we went out of range, rescale
+	if(ret.m_phase > 2*M_PI)
+		ret.m_phase -= 2*M_PI;
+
 	return ret;
 }
 
