@@ -72,8 +72,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 
 			string reply = Trim(m_transport->ReadReply());
 			m_opt200M = reply == "2.0000E+08" ?
-							true :
-							false;	  // Yes, it actually returns a stringified float, manual says "scientific notation"
+							  true :
+							  false;	  // Yes, it actually returns a stringified float, manual says "scientific notation"
 
 			// Reset memory depth
 			m_transport->SendCommand("ACQ:MDEP 1M\n");
@@ -451,8 +451,8 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t i)
 	vector<unsigned int> ret;
 
 	//Otherwise there will be warning during compilation
-	if (i > 4)
-				LogError("Invalid model bandwidth\n");
+	if(i > 4)
+		LogError("Invalid model bandwidth\n");
 
 	if(m_protocol == MSO5)
 	{

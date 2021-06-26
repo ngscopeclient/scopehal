@@ -39,8 +39,8 @@ public:
 	virtual ~RigolOscilloscope();
 
 	//not copyable or assignable
-	RigolOscilloscope(const RigolOscilloscope& rhs) =delete;
-	RigolOscilloscope& operator=(const RigolOscilloscope& rhs) =delete;
+	RigolOscilloscope(const RigolOscilloscope& rhs) = delete;
+	RigolOscilloscope& operator=(const RigolOscilloscope& rhs) = delete;
 
 public:
 	//Device information
