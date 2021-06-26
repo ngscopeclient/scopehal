@@ -116,6 +116,7 @@
 #include "PCIeTransportDecoder.h"
 #include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
+#include "PhaseMeasurement.h"
 #include "PkPkMeasurement.h"
 #include "PRBSGeneratorFilter.h"
 #include "RjBUjFilter.h"

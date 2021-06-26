@@ -80,6 +80,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
+	PhaseMeasurement.cpp
 	PkPkMeasurement.cpp
 	PRBSGeneratorFilter.cpp
 	RjBUjFilter.cpp
