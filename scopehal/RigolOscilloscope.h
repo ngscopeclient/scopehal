@@ -57,6 +57,7 @@ public:
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
 	virtual double GetChannelAttenuation(size_t i);
 	virtual void SetChannelAttenuation(size_t i, double atten);
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
 	virtual double GetChannelVoltageRange(size_t i);
