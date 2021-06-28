@@ -116,64 +116,48 @@ void PhaseMeasurement::Refresh()
 	float vmax = GetTopVoltage(din);
 	float vmin = GetBaseVoltage(din);
 	float vavg = (vmax + vmin) / 2;
-	float vpp2 = (vmax - vmin) / 2;
 	vector<int64_t> edges;
 	FindZeroCrossings(din, vavg, edges);
-	if(edges.size() < 2)
+	size_t edgelen = edges.size();
+	if(edgelen < 2)
 	{
 		SetData(NULL, 0);
 		return;
 	}
 	vector<int64_t> durations;
-	for(size_t i=0; i<edges.size()-2; i++)
+	for(size_t i=0; i<edgelen-2; i++)
 		durations.push_back(edges[i+2] - edges[i]);
 	std::sort(durations.begin(), durations.end());
 	int64_t period = durations[durations.size()/2];
 
 	//Create the output
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-	size_t len = din->m_samples.size();
-	for(size_t i=0; i<len; i++)
+	size_t outlen = edgelen/2;
+	auto cap = SetupEmptyOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 1;
+	cap->Resize(outlen);
+	cap->m_densePacked = false;
+
+	//Main measurement loop, update once per cycle at the zero crossing.
+	//This isn't quite as nice as the original implementation measuring instantaneous phase within a single cycle,
+	//but is MUCH more robust in the presence of amplitude noise or variation (e.g. pulse shaping as seen in PSK31)
+	for(size_t i=0; i<outlen; i++)
 	{
 		//Calculate normalized phase of the LO
-		int64_t tnow = din->m_offsets[i] * din->m_timescale + din->m_triggerPhase;
-		float lophase = fmodf(tnow, period) / period;
-
-		//Normalize signal amplitude to an ideal +/- 1V sinusoid
-		float vin = din->m_samples[i];
-		float vnorm = (vin - vavg) / vpp2;
-		vnorm = max(vnorm, -1.0f);
-		vnorm = min(vnorm, 1.0f);
-
-		//Calculate input signal phase. asinf returns -pi/2 to +pi/2, we need to disambiguate outside that range.
-		//To do that, figure out which half of the sine we're in: if the derivative of the input is positive,
-		//we're in the zero centered half of the wave. If negative, we're in the other half.
-		float theta = asinf(vnorm);
-		float delta;
-		if(i == 0)
-			delta = din->m_samples[1] - din->m_samples[0];
-		else
-			delta = vin - din->m_samples[i-1];
-
-		if(delta < 0)
-		{
-			if(theta < 0)
-				theta = -M_PI - theta;
-			else
-				theta = M_PI - theta;
-		}
-
-		//Convert LO phase from 0-1 to +/- pi
-		lophase = (lophase - 0.5) * 2 * M_PI;
-
-		//Convert absolute to relative phase and normalize.
-		theta -= lophase;
+		int64_t tnow = edges[i*2];
+		float theta = fmodf(tnow, period) / period;
+		theta = (theta - 0.5) * 2 * M_PI;
 		if(theta < -M_PI)
 			theta += 2*M_PI;
 		if(theta > M_PI)
 			theta -= 2*M_PI;
 
-		//Convert radians to degrees for final output
+		cap->m_offsets[i] = tnow;
+		cap->m_durations[i] = 1;
 		cap->m_samples[i] = 180 * theta / M_PI;
+
+		//Resize last sample
+		if(i > 0)
+			cap->m_durations[i-1] = tnow - cap->m_offsets[i-1];
 	}
 }
