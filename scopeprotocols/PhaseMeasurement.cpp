@@ -37,11 +37,21 @@ using namespace std;
 
 PhaseMeasurement::PhaseMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	, m_freqModeName("Frequency Mode")
+	, m_freqName("Center Frequency")
 {
 	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
 
 	//Set up channels
 	CreateInput("din");
+
+	m_parameters[m_freqName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_freqName].SetIntVal(100e6);
+
+	m_parameters[m_freqModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_freqModeName].AddEnumValue("Auto", MODE_AUTO);
+	m_parameters[m_freqModeName].AddEnumValue("Manual", MODE_MANUAL);
+	m_parameters[m_freqModeName].SetIntVal(MODE_AUTO);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,8 +95,7 @@ bool PhaseMeasurement::IsOverlay()
 
 bool PhaseMeasurement::NeedsConfig()
 {
-	//automatic configuration
-	return false;
+	return true;
 }
 
 double PhaseMeasurement::GetVoltageRange()
@@ -111,7 +120,6 @@ void PhaseMeasurement::Refresh()
 		return;
 	}
 
-	//Get the median period of the input signal to run our LO at
 	auto din = GetAnalogInputWaveform(0);
 	float vmax = GetTopVoltage(din);
 	float vmin = GetBaseVoltage(din);
@@ -119,16 +127,26 @@ void PhaseMeasurement::Refresh()
 	vector<int64_t> edges;
 	FindZeroCrossings(din, vavg, edges);
 	size_t edgelen = edges.size();
-	if(edgelen < 2)
+
+	//Auto: use median of interval between pairs of zero crossings
+	int64_t period = 0;
+	if(m_parameters[m_freqModeName].GetIntVal() == MODE_AUTO)
 	{
-		SetData(NULL, 0);
-		return;
+		if(edgelen < 2)
+		{
+			SetData(NULL, 0);
+			return;
+		}
+		vector<int64_t> durations;
+		for(size_t i=0; i<edgelen-2; i++)
+			durations.push_back(edges[i+2] - edges[i]);
+		std::sort(durations.begin(), durations.end());
+		period = durations[durations.size()/2];
 	}
-	vector<int64_t> durations;
-	for(size_t i=0; i<edgelen-2; i++)
-		durations.push_back(edges[i+2] - edges[i]);
-	std::sort(durations.begin(), durations.end());
-	int64_t period = durations[durations.size()/2];
+
+	//Manual: use user-selected frequency
+	else
+		period = FS_PER_SECOND / m_parameters[m_freqName].GetIntVal();
 
 	//Create the output
 	size_t outlen = edgelen/2;

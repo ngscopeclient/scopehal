@@ -54,6 +54,16 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(PhaseMeasurement)
+
+	enum FreqMode
+	{
+		MODE_AUTO,
+		MODE_MANUAL
+	};
+
+protected:
+	std::string m_freqModeName;
+	std::string m_freqName;
 };
 
 #endif
