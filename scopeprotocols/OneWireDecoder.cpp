@@ -148,7 +148,7 @@ void OneWireDecoder::Refresh()
 	for(size_t i=0; i<len; i++)
 	{
 		//Get the length of this pulse in us
-		float pulselen = lens[i] * 1e-9;
+		float pulselen = lens[i] * din->m_timescale * 1e-9;
 
 		int64_t tend = starts[i] + lens[i];
 
