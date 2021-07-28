@@ -28,166 +28,167 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "PRBSGeneratorFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_GENERATION)
+	, m_baudname("Data Rate")
+	, m_polyname("Polynomial")
+	, m_depthname("Depth")
 {
-	//Set up channels
-	CreateInput("voltage");
+	//Set up streams
+	ClearStreams();
+	AddStream("Data");
+	AddStream("Clock");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
+	m_parameters[m_baudname].SetIntVal(103125L * 100L * 1000L);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
+	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_polyname].AddEnumValue("PRBS-7", POLY_PRBS7);
+	m_parameters[m_polyname].AddEnumValue("PRBS-15", POLY_PRBS15);
+	m_parameters[m_polyname].AddEnumValue("PRBS-23", POLY_PRBS23);
+	m_parameters[m_polyname].AddEnumValue("PRBS-31", POLY_PRBS31);
+	m_parameters[m_polyname].SetIntVal(POLY_PRBS7);
 
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_parameters[m_depthname].SetIntVal(100 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool PRBSGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
 {
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-
+	//no inputs
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+string PRBSGeneratorFilter::GetProtocolName()
 {
-	return m_range;
+	return "PRBS";
 }
 
-double TDRFilter::GetOffset()
+void PRBSGeneratorFilter::SetDefaultName()
 {
-	return m_offset;
+	Unit rate(Unit::UNIT_BITRATE);
+
+	string prefix = "";
+	switch(m_parameters[m_polyname].GetIntVal())
+	{
+		case POLY_PRBS7:
+			prefix = "PRBS7";
+			break;
+
+		case POLY_PRBS15:
+			prefix = "PRBS15";
+			break;
+
+		case POLY_PRBS23:
+			prefix = "PRBS23";
+			break;
+
+		case POLY_PRBS31:
+		default:
+			prefix = "PRBS31";
+			break;
+	}
+
+	m_hwname = prefix + "(" + rate.PrettyPrint(m_parameters[m_baudname].GetIntVal()).c_str() + ")";
+	m_displayname = m_hwname;
 }
 
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool TDRFilter::NeedsConfig()
+bool PRBSGeneratorFilter::NeedsConfig()
 {
 	return true;
-}
-
-void TDRFilter::SetDefaultName()
-{
-	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void PRBSGeneratorFilter::Refresh()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	size_t depth = m_parameters[m_depthname].GetIntVal();
+	int64_t baudrate = m_parameters[m_baudname].GetIntVal();
+	int poly = m_parameters[m_polyname].GetIntVal();
+	size_t samplePeriod = FS_PER_SECOND / baudrate;
+
+	double t = GetTime();
+	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+
+	//Create the two output waveforms
+	DigitalWaveform* dat = dynamic_cast<DigitalWaveform*>(GetData(0));
+	if(!dat)
 	{
-		SetData(NULL, 0);
-		return;
+		dat = new DigitalWaveform;
+		SetData(dat, 0);
 	}
+	dat->m_timescale = samplePeriod;
+	dat->m_triggerPhase = 0;
+	dat->m_startTimestamp = floor(t);
+	dat->m_startFemtoseconds = fs;
+	dat->m_densePacked = true;
+	dat->Resize(depth);
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
-
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
-
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
-
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
+	DigitalWaveform* clk = dynamic_cast<DigitalWaveform*>(GetData(1));
+	if(!clk)
 	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
+		clk = new DigitalWaveform;
+		SetData(clk, 1);
 	}
+	clk->m_timescale = samplePeriod;
+	clk->m_triggerPhase = samplePeriod / 2;
+	clk->m_startTimestamp = floor(t);
+	clk->m_startFemtoseconds = fs;
+	clk->m_densePacked = true;
+	clk->Resize(depth);
 
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-
-	float pulseScale = 1.0 / pulseAmplitude;
-	for(size_t i=0; i<len; i++)
+	bool lastclk = false;
+	uint32_t prbs = rand();
+	for(size_t i=0; i<depth; i++)
 	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
+		//Fill clock
+		clk->m_offsets[i] = i;
+		clk->m_durations[i] = 1;
+		clk->m_samples[i] = lastclk;
+		lastclk = !lastclk;
 
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
+		//Generate data
+		bool value = false;
+		uint32_t next;
+		switch(poly)
+		{
+			case POLY_PRBS7:
+				next = ( (prbs >> 7) ^ (prbs >> 6) ) & 1;
+				break;
 
-		else
-			cap->m_samples[i] = rho;
+			case POLY_PRBS15:
+				next = ( (prbs >> 15) ^ (prbs >> 14) ) & 1;
+				break;
+
+			case POLY_PRBS23:
+				next = ( (prbs >> 23) ^ (prbs >> 18) ) & 1;
+				break;
+
+			case POLY_PRBS31:
+			default:
+				next = ( (prbs >> 31) ^ (prbs >> 28) ) & 1;
+				break;
+		}
+		prbs = (prbs << 1) | next;
+		value = (bool)next;
+
+		//Fill data
+		dat->m_offsets[i] = i;
+		dat->m_durations[i] = 1;
+		dat->m_samples[i] = value;
 	}
 }

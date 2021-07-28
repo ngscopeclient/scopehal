@@ -66,7 +66,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_reversePlan = NULL;
 
 	m_cachedNumPoints = 0;
-	m_cachedRawSize = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -294,15 +293,6 @@ bool DeEmbedFilter::LoadSparameters()
 	return true;
 }
 
-bool DeEmbedFilter::UsesCLFFT()
-{
-	#ifdef HAVE_CLFFT
-		return (m_clfftForwardPlan != 0);
-	#else
-		return false;
-	#endif
-}
-
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
@@ -335,7 +325,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
-	if( (m_cachedNumPoints != npoints) || (m_cachedRawSize != npoints_raw) )
+	if(m_cachedNumPoints != npoints)
 	{
 		if(m_forwardPlan)
 			ffts_free(m_forwardPlan);
@@ -350,7 +340,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		m_reverseOutBuf.resize(npoints);
 
 		m_cachedNumPoints = npoints;
-		m_cachedRawSize = npoints_raw;
 		sizechange = true;
 
 		#ifdef HAVE_CLFFT
@@ -467,7 +456,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
 				m_rectangularWindowKernel->setArg(0, inbuf);
 				m_rectangularWindowKernel->setArg(1, *m_windowbuf);
-				m_rectangularWindowKernel->setArg(2, m_cachedNumPoints);
+				m_rectangularWindowKernel->setArg(2, npoints_raw);
 				queue.enqueueNDRangeKernel(
 					*m_rectangularWindowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
 
@@ -483,11 +472,16 @@ void DeEmbedFilter::DoRefresh(bool invert)
 				}
 
 				//Do the de-embed
+				const size_t blocksize = 256;
+				size_t nouts_rounded = nouts;
+				if(nouts % blocksize)
+					nouts_rounded = (nouts_rounded - (nouts_rounded % blocksize) ) + blocksize;
 				m_deembedKernel->setArg(0, *m_fftoutbuf);
 				m_deembedKernel->setArg(1, *m_sinbuf);
 				m_deembedKernel->setArg(2, *m_cosbuf);
+				m_deembedKernel->setArg(3, nouts);
 				queue.enqueueNDRangeKernel(
-					*m_deembedKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
+					*m_deembedKernel, cl::NullRange, cl::NDRange(nouts_rounded, 1), cl::NDRange(blocksize, 1), NULL);
 
 				//Do the inverse FFT
 				inbufs[0] = (*m_fftoutbuf)();

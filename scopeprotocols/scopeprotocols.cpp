@@ -56,6 +56,8 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DDR3Decoder);
 	AddDecoderClass(DeEmbedFilter);
 	AddDecoderClass(DeskewFilter);
+	AddDecoderClass(DigitalToPAM4Filter);
+	AddDecoderClass(DigitalToNRZFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
 	AddDecoderClass(DPhyDataDecoder);
@@ -96,6 +98,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(ISIMeasurement);
+	AddDecoderClass(JitterFilter);
 	AddDecoderClass(JitterSpectrumFilter);
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MagnitudeFilter);
@@ -103,7 +106,8 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
-	AddDecoderClass(OFDMDemodulator);
+	AddDecoderClass(NoiseFilter);
+	//AddDecoderClass(OFDMDemodulator);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
 	AddDecoderClass(ParallelBus);
@@ -112,7 +116,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PCIeTransportDecoder);
 	AddDecoderClass(PeakHoldFilter);
 	AddDecoderClass(PeriodMeasurement);
+	AddDecoderClass(PhaseMeasurement);
 	AddDecoderClass(PkPkMeasurement);
+	AddDecoderClass(PRBSGeneratorFilter);
 	AddDecoderClass(RjBUjFilter);
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
@@ -122,15 +128,18 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SpectrogramFilter);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
+	AddDecoderClass(StepGeneratorFilter);
 	AddDecoderClass(SubtractFilter);
 	AddDecoderClass(SWDDecoder);
 	AddDecoderClass(SWDMemAPDecoder);
 	AddDecoderClass(TachometerFilter);
 	AddDecoderClass(TappedDelayLineFilter);
 	AddDecoderClass(TDRFilter);
+	//AddDecoderClass(TDRStepDeEmbedFilter);
 	AddDecoderClass(ThresholdFilter);
 	AddDecoderClass(TIEMeasurement);
 	AddDecoderClass(TMDSDecoder);
+	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);

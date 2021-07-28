@@ -30,23 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DeEmbedFilter
+	@brief Declaration of NoiseFilter
  */
-#ifndef DeEmbedFilter_h
-#define DeEmbedFilter_h
+#ifndef NoiseFilter_h
+#define NoiseFilter_h
 
-#include "../scopehal/AlignedAllocator.h"
-#include <ffts.h>
+#include <random>
 
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
-class DeEmbedFilter : public Filter
+class NoiseFilter : public Filter
 {
 public:
-	DeEmbedFilter(const std::string& color);
-	virtual ~DeEmbedFilter();
+	NoiseFilter(const std::string& color);
 
 	virtual void Refresh();
 
@@ -60,66 +54,15 @@ public:
 	virtual double GetOffset();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual void ClearSweeps();
-
-	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
+	PROTOCOL_DECODER_INITPROC(NoiseFilter)
 
 protected:
-	virtual int64_t GetGroupDelay();
-	void DoRefresh(bool invert = true);
-	virtual bool LoadSparameters();
-	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
+	void CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma);
+	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
 
-	enum SParameterNames
-	{
-		S11,
-		S12,
-		S21,
-		S22
-	};
-	std::string m_pathName;
-	std::string m_fname;
+	std::string m_stdevname;
 
-	SParameterNames m_cachedPath;
-	std::vector<std::string> m_cachedFileNames;
-
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
-
-	double m_cachedBinSize;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
-
-	SParameters m_sparams;
-
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
-	size_t m_cachedNumPoints;
-
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
-
-	void MainLoop(size_t nouts);
-	void MainLoopAVX2(size_t nouts);
-
-	#ifdef HAVE_CLFFT
-	clfftPlanHandle m_clfftForwardPlan;
-	clfftPlanHandle m_clfftReversePlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-
-	cl::Program* m_deembedProgram;
-	cl::Kernel* m_deembedKernel;
-
-	cl::Buffer* m_sinbuf;
-	cl::Buffer* m_cosbuf;
-	cl::Buffer* m_windowbuf;
-	cl::Buffer* m_fftoutbuf;
-	#endif
+	std::mt19937 m_twister;
 };
 
 #endif

@@ -33,10 +33,13 @@
 __kernel void DeEmbed(
 	__global float* data,
 	const __global float* sines,
-	const __global float* cosines
+	const __global float* cosines,
+	unsigned long len
 	)
 {
 	unsigned long i = get_global_id(0);
+	if(i >= len)
+		return;
 
 	float real = data[i*2];
 	float imag = data[i*2 + 1];

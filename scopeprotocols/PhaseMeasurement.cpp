@@ -27,53 +27,45 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "scopeprotocols.h"
+#include "PhaseMeasurement.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+PhaseMeasurement::PhaseMeasurement(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	, m_freqModeName("Frequency Mode")
+	, m_freqName("Center Frequency")
 {
+	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+
 	//Set up channels
-	CreateInput("voltage");
+	CreateInput("din");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_parameters[m_freqName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_freqName].SetIntVal(100e6);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
-
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_freqModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_freqModeName].AddEnumValue("Auto", MODE_AUTO);
+	m_parameters[m_freqModeName].AddEnumValue("Manual", MODE_MANUAL);
+	m_parameters[m_freqModeName].SetIntVal(MODE_AUTO);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool PhaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if(i > 0)
+		return false;
+
+	if(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		return true;
 
 	return false;
@@ -82,58 +74,44 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+void PhaseMeasurement::SetDefaultName()
 {
-	return m_range;
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Phase(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
-double TDRFilter::GetOffset()
+string PhaseMeasurement::GetProtocolName()
 {
-	return m_offset;
+	return "Phase";
 }
 
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
+bool PhaseMeasurement::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool TDRFilter::NeedsConfig()
+bool PhaseMeasurement::NeedsConfig()
 {
 	return true;
 }
 
-void TDRFilter::SetDefaultName()
+double PhaseMeasurement::GetVoltageRange()
 {
-	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
+	return 370;
+}
 
-	m_hwname = hwname;
-	m_displayname = m_hwname;
+double PhaseMeasurement::GetOffset()
+{
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void PhaseMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndAnalog())
@@ -143,51 +121,61 @@ void TDRFilter::Refresh()
 	}
 
 	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	float vmax = GetTopVoltage(din);
+	float vmin = GetBaseVoltage(din);
+	float vavg = (vmax + vmin) / 2;
+	vector<int64_t> edges;
+	FindZeroCrossings(din, vavg, edges);
+	size_t edgelen = edges.size();
 
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
-
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
-
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
+	//Auto: use median of interval between pairs of zero crossings
+	int64_t period = 0;
+	if(m_parameters[m_freqModeName].GetIntVal() == MODE_AUTO)
 	{
-		if(mode == MODE_IMPEDANCE)
+		if(edgelen < 2)
 		{
-			m_range = 20;
-			m_offset = -50;
+			SetData(NULL, 0);
+			return;
 		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
+		vector<int64_t> durations;
+		for(size_t i=0; i<edgelen-2; i++)
+			durations.push_back(edges[i+2] - edges[i]);
+		std::sort(durations.begin(), durations.end());
+		period = durations[durations.size()/2];
 	}
 
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	//Manual: use user-selected frequency
+	else
+		period = FS_PER_SECOND / m_parameters[m_freqName].GetIntVal();
 
-	float pulseScale = 1.0 / pulseAmplitude;
-	for(size_t i=0; i<len; i++)
+	//Create the output
+	size_t outlen = edgelen/2;
+	auto cap = SetupEmptyOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 1;
+	cap->Resize(outlen);
+	cap->m_densePacked = false;
+
+	//Main measurement loop, update once per cycle at the zero crossing.
+	//This isn't quite as nice as the original implementation measuring instantaneous phase within a single cycle,
+	//but is MUCH more robust in the presence of amplitude noise or variation (e.g. pulse shaping as seen in PSK31)
+	for(size_t i=0; i<outlen; i++)
 	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
+		//Calculate normalized phase of the LO
+		int64_t tnow = edges[i*2];
+		float theta = fmodf(tnow, period) / period;
+		theta = (theta - 0.5) * 2 * M_PI;
+		if(theta < -M_PI)
+			theta += 2*M_PI;
+		if(theta > M_PI)
+			theta -= 2*M_PI;
 
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
+		cap->m_offsets[i] = tnow;
+		cap->m_durations[i] = 1;
+		cap->m_samples[i] = 180 * theta / M_PI;
 
-		else
-			cap->m_samples[i] = rho;
+		//Resize last sample
+		if(i > 0)
+			cap->m_durations[i-1] = tnow - cap->m_offsets[i-1];
 	}
 }

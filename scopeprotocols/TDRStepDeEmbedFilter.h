@@ -30,23 +30,18 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DeEmbedFilter
+	@brief Declaration of TDRStepDeEmbedFilter
  */
-#ifndef DeEmbedFilter_h
-#define DeEmbedFilter_h
+#ifndef TDRStepDeEmbedFilter_h
+#define TDRStepDeEmbedFilter_h
 
-#include "../scopehal/AlignedAllocator.h"
 #include <ffts.h>
 
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
-class DeEmbedFilter : public Filter
+class TDRStepDeEmbedFilter : public Filter
 {
 public:
-	DeEmbedFilter(const std::string& color);
-	virtual ~DeEmbedFilter();
+	TDRStepDeEmbedFilter(const std::string& color);
+	virtual ~TDRStepDeEmbedFilter();
 
 	virtual void Refresh();
 
@@ -58,68 +53,33 @@ public:
 
 	virtual double GetVoltageRange();
 	virtual double GetOffset();
+
+	virtual void SetVoltageRange(double range);
+	virtual void SetOffset(double offset);
+
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	virtual void ClearSweeps();
 
-	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
+	PROTOCOL_DECODER_INITPROC(TDRStepDeEmbedFilter)
 
 protected:
-	virtual int64_t GetGroupDelay();
-	void DoRefresh(bool invert = true);
-	virtual bool LoadSparameters();
-	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
-	enum SParameterNames
-	{
-		S11,
-		S12,
-		S21,
-		S22
-	};
-	std::string m_pathName;
-	std::string m_fname;
+	//Input buffer for averaging
+	std::vector<float> m_inputSums;
+	size_t m_numAverages;
 
-	SParameterNames m_cachedPath;
-	std::vector<std::string> m_cachedFileNames;
+	ffts_plan_t* m_plan;
+	size_t m_cachedPlanSize;
 
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
+	std::vector<float, AlignedAllocator<float, 64> > m_signalinbuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_signaloutbuf;
 
-	double m_cachedBinSize;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
+	std::vector<float, AlignedAllocator<float, 64> > m_stepinbuf;
+	std::vector<float, AlignedAllocator<float, 64> > m_stepoutbuf;
 
-	SParameters m_sparams;
-
-	ffts_plan_t* m_forwardPlan;
-	ffts_plan_t* m_reversePlan;
-	size_t m_cachedNumPoints;
-
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
-
-	void MainLoop(size_t nouts);
-	void MainLoopAVX2(size_t nouts);
-
-	#ifdef HAVE_CLFFT
-	clfftPlanHandle m_clfftForwardPlan;
-	clfftPlanHandle m_clfftReversePlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-
-	cl::Program* m_deembedProgram;
-	cl::Kernel* m_deembedKernel;
-
-	cl::Buffer* m_sinbuf;
-	cl::Buffer* m_cosbuf;
-	cl::Buffer* m_windowbuf;
-	cl::Buffer* m_fftoutbuf;
-	#endif
+	double m_range;
+	double m_offset;
 };
 
 #endif

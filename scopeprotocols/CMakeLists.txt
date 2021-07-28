@@ -18,6 +18,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	DDR3Decoder.cpp
 	DeEmbedFilter.cpp
 	DeskewFilter.cpp
+	DigitalToPAM4Filter.cpp
+	DigitalToNRZFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp
@@ -60,6 +62,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	ISIMeasurement.cpp
+	JitterFilter.cpp
 	JitterSpectrumFilter.cpp
 	JtagDecoder.cpp
 	MagnitudeFilter.cpp
@@ -67,6 +70,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
+	NoiseFilter.cpp
 	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
@@ -76,7 +80,9 @@ set(SCOPEPROTOCOLS_SOURCES
 	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
+	PhaseMeasurement.cpp
 	PkPkMeasurement.cpp
+	PRBSGeneratorFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp
@@ -87,14 +93,17 @@ set(SCOPEPROTOCOLS_SOURCES
 	SpectrogramFilter.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
+	StepGeneratorFilter.cpp
 	SubtractFilter.cpp
 	SWDDecoder.cpp
 	SWDMemAPDecoder.cpp
 	TachometerFilter.cpp
 	TappedDelayLineFilter.cpp
 	TDRFilter.cpp
+	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
+	ToneGeneratorFilter.cpp
 	TMDSDecoder.cpp
 	TopMeasurement.cpp
 	UARTDecoder.cpp
@@ -106,6 +115,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
 	VerticalBathtub.cpp
+	WaveformGenerationFilter.cpp
 	Waterfall.cpp
 	WindowedAutocorrelationFilter.cpp
 

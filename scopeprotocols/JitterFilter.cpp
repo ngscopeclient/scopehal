@@ -28,52 +28,43 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "JitterFilter.h"
+#include <random>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+JitterFilter::JitterFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_GENERATION)
+	, m_stdevname("Rj Stdev")
+	, m_pjfreqname("Pj Frequency")
+	, m_pjamplitudename("Pj Amplitude")
+
 {
 	//Set up channels
-	CreateInput("voltage");
+	CreateInput("din");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_parameters[m_stdevname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_stdevname].SetFloatVal(5000);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
+	m_parameters[m_pjfreqname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_pjfreqname].SetFloatVal(10 * 1000 * 1000);
 
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_pjamplitudename] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_pjamplitudename].SetFloatVal(3000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool JitterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -82,50 +73,26 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+string JitterFilter::GetProtocolName()
 {
-	return m_range;
+	return "Jitter";
 }
 
-double TDRFilter::GetOffset()
-{
-	return m_offset;
-}
-
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
+bool JitterFilter::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool TDRFilter::NeedsConfig()
+bool JitterFilter::NeedsConfig()
 {
 	return true;
 }
 
-void TDRFilter::SetDefaultName()
+void JitterFilter::SetDefaultName()
 {
 	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
-
+	snprintf(hwname, sizeof(hwname), "Jitter(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -133,61 +100,55 @@ void TDRFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void JitterFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	auto din = GetDigitalInputWaveform(0);
+	size_t len = din->m_samples.size();
 
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
+	float pjfreq = m_parameters[m_pjfreqname].GetIntVal();
+	float stdev = m_parameters[m_stdevname].GetFloatVal();
+	float pjamp = m_parameters[m_pjamplitudename].GetFloatVal();
 
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
+	minstd_rand rng(rand());
+	normal_distribution<> noise(0, stdev);
 
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
-	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
-	}
+	//Copy the initial configuration over
+	auto cap = SetupEmptyDigitalOutputWaveform(din, 0);
+	cap->Resize(len);
+	cap->m_samples = din->m_samples;
+	cap->m_densePacked = false;
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
 
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	float startPhase = fmodf(rand(), M_PI);
+	float radians_per_fs = 2 * M_PI * pjfreq / FS_PER_SECOND;
 
-	float pulseScale = 1.0 / pulseAmplitude;
+	//Add the noise
+	//gcc 8.x / 9.x have false positive here (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99536)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 	for(size_t i=0; i<len; i++)
 	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
+		size_t tstart = din->m_offsets[i] * din->m_timescale + din->m_triggerPhase;
 
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
+		size_t rj = noise(rng);
+		size_t pj = sin(tstart * radians_per_fs + startPhase) * pjamp;
+		size_t tj = rj + pj;
 
-		else
-			cap->m_samples[i] = rho;
+		//Add jitter to the start time
+		cap->m_offsets[i] = tstart + tj;
+		cap->m_durations[i] = din->m_durations[i] * din->m_timescale;
+
+		//Update duration of previous sample
+		if(i > 0)
+			cap->m_durations[i-1] = cap->m_offsets[i] - cap->m_offsets[i-1];
 	}
+#pragma GCC diagnostic pop
 }

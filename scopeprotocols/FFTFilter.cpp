@@ -394,7 +394,7 @@ void FFTFilter::DoRefresh(
 				}
 				windowKernel->setArg(0, inbuf);
 				windowKernel->setArg(1, windowoutbuf);
-				windowKernel->setArg(2, m_cachedNumPoints);
+				windowKernel->setArg(2, data.size());
 				if(window != WINDOW_RECTANGULAR)
 					windowKernel->setArg(3, windowscale);
 				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
@@ -468,15 +468,6 @@ void FFTFilter::DoRefresh(
 
 	//Peak search
 	FindPeaks(cap);
-}
-
-bool FFTFilter::UsesCLFFT()
-{
-	#ifdef HAVE_CLFFT
-		return (m_clfftPlan != 0);
-	#else
-		return false;
-	#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

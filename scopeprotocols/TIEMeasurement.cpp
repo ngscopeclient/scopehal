@@ -64,6 +64,8 @@ bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
 		return true;
+	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )//allow digital clocks
+		return true;
 	if( (i == 1) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
 
@@ -130,16 +132,21 @@ void TIEMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetAnalogInputWaveform(0);
+	auto clk_analog = GetAnalogInputWaveform(0);
+	auto clk_digital = GetDigitalInputWaveform(0);
+	WaveformBase* clk = GetInputWaveform(0);
 	auto golden = GetDigitalInputWaveform(1);
-	size_t len = min(clk->m_samples.size(), golden->m_samples.size());
+	size_t len = min(clk->m_offsets.size(), golden->m_offsets.size());
 
 	//Create the output
 	auto cap = new AnalogWaveform;
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	FindZeroCrossings(clk, m_parameters[m_threshname].GetFloatVal(), edges);
+	if(clk_analog)
+		FindZeroCrossings(clk_analog, m_parameters[m_threshname].GetFloatVal(), edges);
+	else
+		FindZeroCrossings(clk_digital, edges);
 
 	//Ignore edges before things have stabilized
 	int64_t skip_time = m_parameters[m_skipname].GetIntVal();

@@ -27,9 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-//local size must equal this
-#define BLOCK_SIZE 1024
-
 __kernel void FIRFilter(
 	__global const float* din,
 	__constant const float* coefficients,
@@ -39,9 +36,12 @@ __kernel void FIRFilter(
 	__global float* minmaxbuf
 	)
 {
-	__local float temp[BLOCK_SIZE];
+	//local size must be <= this size
+	__local float temp[1024];
+
 	unsigned long i = get_global_id(0);
-	unsigned long nblock = i / BLOCK_SIZE;
+	size_t localsize = get_local_size(0);
+	unsigned long nblock = i / localsize;
 
 	//Make sure we're actually in the block before executing
 	if(i < end)
@@ -63,7 +63,7 @@ __kernel void FIRFilter(
 		float vmin = FLT_MAX;
 		float vmax = -FLT_MAX;
 
-		for(unsigned long j=0; j<BLOCK_SIZE; j++)
+		for(unsigned long j=0; j<localsize; j++)
 		{
 			unsigned long off = i+j;
 			if(off > end)

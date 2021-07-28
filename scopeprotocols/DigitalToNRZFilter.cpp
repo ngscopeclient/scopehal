@@ -28,104 +28,37 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "DigitalToNRZFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+DigitalToNRZFilter::DigitalToNRZFilter(const string& color)
+	: WaveformGenerationFilter(color)
+	, m_level0("Level 0")
+	, m_level1("Level 1")
 {
-	//Set up channels
-	CreateInput("voltage");
+	m_parameters[m_level0] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_level0].SetFloatVal(0);
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
-
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
-
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-
-	return false;
+	m_parameters[m_level1] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_level1].SetFloatVal(1.8);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+string DigitalToNRZFilter::GetProtocolName()
 {
-	return m_range;
+	return "Digital to NRZ";
 }
 
-double TDRFilter::GetOffset()
-{
-	return m_offset;
-}
-
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool TDRFilter::NeedsConfig()
-{
-	return true;
-}
-
-void TDRFilter::SetDefaultName()
+void DigitalToNRZFilter::SetDefaultName()
 {
 	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
-
+	snprintf(hwname, sizeof(hwname), "DigitalToNRZ(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -133,61 +66,20 @@ void TDRFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+size_t DigitalToNRZFilter::GetBitsPerSymbol()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
-	{
-		SetData(NULL, 0);
-		return;
-	}
+	return 1;
+}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+vector<float> DigitalToNRZFilter::GetVoltageLevels()
+{
+	vector<float> ret;
+	ret.push_back(m_parameters[m_level0].GetFloatVal());
+	ret.push_back(m_parameters[m_level1].GetFloatVal());
+	return ret;
+}
 
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
-
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
-
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
-	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
-	}
-
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-
-	float pulseScale = 1.0 / pulseAmplitude;
-	for(size_t i=0; i<len; i++)
-	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
-
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
-
-		else
-			cap->m_samples[i] = rho;
-	}
+size_t DigitalToNRZFilter::GetVoltageCode(size_t i, DigitalWaveform& samples)
+{
+	return samples.m_samples[i];
 }

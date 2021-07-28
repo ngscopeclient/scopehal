@@ -83,6 +83,7 @@ vector<string> g_searchPaths;
 #ifdef HAVE_OPENCL
 cl::Context* g_clContext = NULL;
 vector<cl::Device> g_contextDevices;
+size_t g_maxClLocalSizeX = 0;
 #endif
 
 AlignedAllocator<float, 32> g_floatVectorAllocator;
@@ -199,30 +200,99 @@ void DetectGPUFeatures()
 						string dvendor;
 						string dversion;
 						string ddversion;
+						string extensions;
+						unsigned long globalCacheSize;
+						unsigned long globalCacheLineSize;
+						unsigned long globalMemSize;
+						unsigned long localMemSize;
+						unsigned int maxClock;
+						unsigned int maxComputeUnits;
+						unsigned int maxConstantArgs;
+						unsigned long maxConstantBuffer;
+						unsigned long maxMemAllocSize;
+						size_t maxParameterSize;
+						size_t maxWorkGroupSize;
+						size_t maxWorkItemSizes[3];
 						devices[j].getInfo(CL_DEVICE_NAME, &dname);
 						devices[j].getInfo(CL_DEVICE_OPENCL_C_VERSION, &dcvers);
 						devices[j].getInfo(CL_DEVICE_PROFILE, &dprof);
 						devices[j].getInfo(CL_DEVICE_VENDOR, &dvendor);
 						devices[j].getInfo(CL_DEVICE_VERSION, &dversion);
 						devices[j].getInfo(CL_DRIVER_VERSION, &ddversion);
+						devices[j].getInfo(CL_DEVICE_EXTENSIONS, &extensions);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, &globalCacheSize);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, &globalCacheLineSize);
+						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &globalMemSize);
+						devices[j].getInfo(CL_DEVICE_LOCAL_MEM_SIZE, &localMemSize);
+						devices[j].getInfo(CL_DEVICE_MAX_CLOCK_FREQUENCY, &maxClock);
+						devices[j].getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &maxComputeUnits);
+						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_ARGS, &maxConstantArgs);
+						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, &maxConstantBuffer);
+						devices[j].getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &maxMemAllocSize);
+						devices[j].getInfo(CL_DEVICE_MAX_PARAMETER_SIZE, &maxParameterSize);
+						devices[j].getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &maxWorkGroupSize);
+						devices[j].getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &maxWorkItemSizes);
 
-						LogDebug("CL_DEVICE_NAME              = %s\n", dname.c_str());
-						LogDebug("CL_DEVICE_OPENCL_C_VERSION  = %s\n", dcvers.c_str());
-						LogDebug("CL_DEVICE_PROFILE           = %s\n", dprof.c_str());
-						LogDebug("CL_DEVICE_VENDOR            = %s\n", dvendor.c_str());
-						LogDebug("CL_DEVICE_VERSION           = %s\n", dversion.c_str());
-						LogDebug("CL_DRIVER_VERSION           = %s\n", ddversion.c_str());
-					}
+						float k = 1024;
+						float m = k*k;
+						float g = m*k;
 
-					//For now, create a context on the first device of the first detected platform and hope for the best
-					if(!g_clContext)
-					{
-						vector<cl::Device> devs;
-						devs.push_back(devices[0]);
+						LogDebug("CL_DRIVER_VERSION                   = %s\n", ddversion.c_str());
+						LogDebug("CL_DEVICE_NAME                      = %s\n", dname.c_str());
+						LogDebug("CL_DEVICE_OPENCL_C_VERSION          = %s\n", dcvers.c_str());
+						LogDebug("CL_DEVICE_PROFILE                   = %s\n", dprof.c_str());
+						LogDebug("CL_DEVICE_VENDOR                    = %s\n", dvendor.c_str());
+						LogDebug("CL_DEVICE_VERSION                   = %s\n", dversion.c_str());
+						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHE_SIZE     = %.3f MB\n", globalCacheSize / m);
+						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE = %lu\n", globalCacheLineSize);
+						LogDebug("CL_DEVICE_GLOBAL_MEM_SIZE           = %.2f GB\n", globalMemSize / g);
+						LogDebug("CL_DEVICE_LOCAL_MEM_SIZE            = %.2f kB\n", localMemSize / k);
+						LogDebug("CL_DEVICE_MAX_CLOCK_FREQUENCY       = %u MHz\n", maxClock);
+						LogDebug("CL_DEVICE_MAX_COMPUTE_UNITS         = %u\n", maxComputeUnits);
+						LogDebug("CL_DEVICE_MAX_CONSTANT_ARGS         = %u\n", maxConstantArgs);
+						LogDebug("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE  = %.2f kB\n", maxConstantBuffer / k);
+						LogDebug("CL_DEVICE_MAX_MEM_ALLOC_SIZE        = %.2f GB\n", maxMemAllocSize / g);
+						LogDebug("CL_DEVICE_MAX_PARAMETER_SIZE        = %zu\n", maxParameterSize);
+						LogDebug("CL_DEVICE_MAX_WORK_GROUP_SIZE       = %zu\n", maxWorkGroupSize);
+						LogDebug("CL_DEVICE_MAX_WORK_ITEM_SIZES       = %zu, %zu, %zu\n",
+							maxWorkItemSizes[0], maxWorkItemSizes[1], maxWorkItemSizes[2]);
 
-						//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
-						g_clContext = new cl::Context(devs, NULL, NULL, NULL);
-						g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+						vector<string> extensionlist;
+						string tmp;
+						for(size_t f=0; f<extensions.size(); f++)
+						{
+							if(isspace(extensions[f]))
+							{
+								if(tmp != "")
+									extensionlist.push_back(tmp);
+								tmp = "";
+							}
+							else
+								tmp += extensions[f];
+						}
+
+						{
+							LogDebug("CL_DEVICE_EXTENSIONS:\n");
+							LogIndenter li4;
+							for(auto e : extensionlist)
+								LogDebug("%s\n", e.c_str());
+						}
+
+						//For now, create a context on the first device of the first detected platform
+						//and hope for the best.
+						//TODO: multi-device support?
+						if(!g_clContext)
+						{
+							vector<cl::Device> devs;
+							devs.push_back(devices[0]);
+
+							//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
+							g_clContext = new cl::Context(devs, NULL, NULL, NULL);
+							g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
+
+							//Save some settings about the OpenCL implementation so that we can tune appropriately
+							g_maxClLocalSizeX = maxWorkItemSizes[0];
+						}
 					}
 				}
 			}
@@ -658,6 +728,7 @@ string ReadFile(const string& path)
 
 void InitializeSearchPaths()
 {
+	string binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
 	TCHAR binPath[MAX_PATH];
@@ -666,7 +737,13 @@ void InitializeSearchPaths()
 	else if(!PathRemoveFileSpec(binPath) )
 		LogError("Error: PathRemoveFileSpec() failed.\n");
 	else
+	{
 		g_searchPaths.push_back(binPath);
+		// On mingw, binPath would typically be /mingw64/bin now
+		//and our data files in /mingw64/share. Strip back one more layer
+		// of hierarchy so we can start appending.
+		binRootDir = dirname(binPath);
+	}
 #else
 	char binDir[1024] = {0};
 	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
@@ -677,11 +754,15 @@ void InitializeSearchPaths()
 	else
 	{
 		g_searchPaths.push_back(dirname(binDir));
-		string binRootDir = dirname(binDir);
+		binRootDir = dirname(binDir);
+	}
+#endif
+	// Add the share directories associated with the binary location
+	if(binRootDir.size() > 0)
+	{
 		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
 		g_searchPaths.push_back(binRootDir + "/share/scopehal");
 	}
-#endif
 
 	//Local directories preferred over system ones
 #ifndef _WIN32

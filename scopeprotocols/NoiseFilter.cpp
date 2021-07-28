@@ -28,47 +28,31 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "NoiseFilter.h"
+#include <immintrin.h>
+#include "avx_mathfun.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+NoiseFilter::NoiseFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	, m_stdevname("Deviation")
+	, m_twister(rand())
 {
 	//Set up channels
-	CreateInput("voltage");
+	CreateInput("din");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
-
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
-
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_stdevname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_stdevname].SetFloatVal(0.005);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool NoiseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -82,50 +66,37 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+double NoiseFilter::GetVoltageRange()
 {
-	return m_range;
+	//add 3 sigma above and below the mean
+	return m_inputs[0].m_channel->GetVoltageRange() + 6*m_parameters[m_stdevname].GetFloatVal();
 }
 
-double TDRFilter::GetOffset()
+double NoiseFilter::GetOffset()
 {
-	return m_offset;
+	return m_inputs[0].m_channel->GetOffset();
 }
 
-void TDRFilter::SetVoltageRange(double range)
+string NoiseFilter::GetProtocolName()
 {
-	m_range = range;
+	return "Noise";
 }
 
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
+bool NoiseFilter::IsOverlay()
 {
 	//we create a new analog channel
 	return false;
 }
 
-bool TDRFilter::NeedsConfig()
+bool NoiseFilter::NeedsConfig()
 {
 	return true;
 }
 
-void TDRFilter::SetDefaultName()
+void NoiseFilter::SetDefaultName()
 {
 	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
-
+	snprintf(hwname, sizeof(hwname), "Noise(%s)", GetInputDisplayName(0).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -133,7 +104,7 @@ void TDRFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void NoiseFilter::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndAnalog())
@@ -143,51 +114,104 @@ void TDRFilter::Refresh()
 	}
 
 	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	size_t len = din->m_samples.size();
 
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
-
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
-
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
-	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
-	}
-
-	//Set up the output waveform
+	float stdev = m_parameters[m_stdevname].GetFloatVal();
 	auto cap = SetupOutputWaveform(din, 0, 0, 0);
 
-	float pulseScale = 1.0 / pulseAmplitude;
+	if(g_hasAvx2)
+		CopyWithAwgnAVX2((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
+	else
+		CopyWithAwgnNative((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
+}
+
+void NoiseFilter::CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma)
+{
+	//Add the noise
+	//gcc 8.x / 9.x have false positive here (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99536)
+	minstd_rand rng(m_twister());
+	normal_distribution<> noise(0, sigma);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 	for(size_t i=0; i<len; i++)
+		dest[i] = src[i] + noise(rng);
+#pragma GCC diagnostic pop
+}
+
+__attribute__((target("avx2")))
+void NoiseFilter::CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma)
+{
+	size_t end = len - (len % 16);
+
+	//Box-Muller setup
+	__m256 vsigma		= _mm256_set1_ps(sigma);
+	__m256 vmtwo		= _mm256_set1_ps(-2.0f);
+	__m256 vtpi			= _mm256_set1_ps(M_PI * 2);
+	__m256 norm1;
+	__m256 norm2;
+
+	//Random number generator (xorshift32 LFSR)
+	__m256i rng_state1 = _mm256_set_epi32(
+		m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister());
+	__m256i rng_state2 = _mm256_set_epi32(
+		m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister(), m_twister());
+	__m256 rng_scale	= _mm256_set1_ps(1.0f / 0xffffffff);
+
+	//Create normally distributed output using Box-Muller
+	for(size_t i=0; i<end; i += 16)
 	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
+		//Load input samples
+		__m256 samples1		= _mm256_load_ps(src + i);
+		__m256 samples2		= _mm256_load_ps(src + i + 8);
 
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
+		//Generate two sets of eight random int32 values
+		__m256i tmp1		= _mm256_slli_epi32(rng_state1, 13);
+		__m256i tmp2		= _mm256_slli_epi32(rng_state2, 13);
+		rng_state1			= _mm256_xor_si256(rng_state1, tmp1);
+		rng_state2			= _mm256_xor_si256(rng_state2, tmp2);
+		tmp1				= _mm256_srli_epi32(rng_state1, 17);
+		tmp2				= _mm256_srli_epi32(rng_state2, 17);
+		rng_state1			= _mm256_xor_si256(rng_state1, tmp1);
+		rng_state2			= _mm256_xor_si256(rng_state2, tmp2);
+		tmp1				= _mm256_slli_epi32(rng_state1, 5);
+		tmp2				= _mm256_slli_epi32(rng_state2, 5);
+		rng_state1			= _mm256_xor_si256(rng_state1, tmp1);
+		rng_state2			= _mm256_xor_si256(rng_state2, tmp2);
 
-		else
-			cap->m_samples[i] = rho;
+		//Convert the random values to floating point in the range (0, 1)
+		tmp1				= _mm256_abs_epi32(rng_state1);
+		tmp2				= _mm256_abs_epi32(rng_state2);
+		__m256 random1		= _mm256_cvtepi32_ps(tmp1);
+		__m256 random2		= _mm256_cvtepi32_ps(tmp2);
+		random1				= _mm256_mul_ps(random1, rng_scale);
+		random2				= _mm256_mul_ps(random2, rng_scale);
+
+		//Apply Box-Muller transformation
+		__m256 mag			= _mm256_log_ps(random1);
+		mag					= _mm256_mul_ps(mag, vmtwo);
+		mag					= _mm256_sqrt_ps(mag);
+		mag					= _mm256_mul_ps(mag, vsigma);
+		__m256 rtpi			= _mm256_mul_ps(random2, vtpi);
+		_mm256_sincos_ps(rtpi, &norm1, &norm2);
+		norm1				= _mm256_mul_ps(mag, norm1);
+		norm2				= _mm256_mul_ps(mag, norm2);
+
+		//Add the noise
+		__m256 out1			= _mm256_add_ps(samples1, norm1);
+		__m256 out2			= _mm256_add_ps(samples2, norm2);
+
+		//Write output
+		_mm256_store_ps(dest + i, out1);
+		_mm256_store_ps(dest + i + 8, out2);
 	}
+
+	//Process the last few samples
+	//gcc 8.x / 9.x have false positive here (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99536)
+	minstd_rand rng(m_twister());
+	normal_distribution<> noise(0, sigma);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+	for(size_t i=end; i<len; i++)
+		dest[i] = src[i] + noise(rng);
+#pragma GCC diagnostic pop
 }

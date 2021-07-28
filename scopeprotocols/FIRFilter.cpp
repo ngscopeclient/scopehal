@@ -279,8 +279,8 @@ void FIRFilter::DoFilterKernelOpenCL(
 	size_t end = len - filterlen;
 
 	//Round size up to next multiple of block size
-	//(must equal BLOCK_SIZE in kernel)
-	const size_t blocksize = 1024;
+	//Max size of 1024 is set by buffer size in kernel, but go smaller if the implementation requires
+	size_t blocksize = min((size_t)1024, g_maxClLocalSizeX);
 	size_t globalsize = (end + blocksize);
 	globalsize -= (globalsize % blocksize);
 

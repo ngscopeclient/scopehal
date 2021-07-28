@@ -28,53 +28,43 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "WaveformGenerationFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	, m_sampleRate("Sample Rate")
+	, m_edgeTime("Transition Time")
 {
-	//Set up channels
-	CreateInput("voltage");
+	CreateInput("data");
+	CreateInput("clk");
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_parameters[m_edgeTime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_edgeTime].SetIntVal(10 * 1000);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
-
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
-
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
 		return true;
+	}
 
 	return false;
 }
@@ -82,112 +72,123 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
-{
-	return m_range;
-}
-
-double TDRFilter::GetOffset()
-{
-	return m_offset;
-}
-
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool TDRFilter::NeedsConfig()
+bool WaveformGenerationFilter::NeedsConfig()
 {
 	return true;
 }
 
-void TDRFilter::SetDefaultName()
+bool WaveformGenerationFilter::IsOverlay()
 {
-	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
+	return false;
+}
 
-	m_hwname = hwname;
-	m_displayname = m_hwname;
+double WaveformGenerationFilter::GetVoltageRange()
+{
+	return (GetMaxLevel() - GetMinLevel()) * 1.05;
+}
+
+double WaveformGenerationFilter::GetOffset()
+{
+	return -(GetMaxLevel() + GetMinLevel())/2;
+}
+
+float WaveformGenerationFilter::GetMaxLevel()
+{
+	auto levels = GetVoltageLevels();
+	float v = levels[0];
+	for(size_t i=1; i<levels.size(); i++)
+		v = max(v, levels[i]);
+	return v;
+}
+
+float WaveformGenerationFilter::GetMinLevel()
+{
+	auto levels = GetVoltageLevels();
+	float v = levels[0];
+	for(size_t i=1; i<levels.size(); i++)
+		v = min(v, levels[i]);
+	return v;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void WaveformGenerationFilter::Refresh()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	//Get the input and sample it
+	auto din = GetDigitalInputWaveform(0);
+	auto clkin = GetDigitalInputWaveform(1);
+	DigitalWaveform samples;
+	SampleOnAnyEdges(din, clkin, samples);
 
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
+	size_t rate = m_parameters[m_sampleRate].GetIntVal();
+	size_t samplePeriod = FS_PER_SECOND / rate;
+	size_t edgeTime = m_parameters[m_edgeTime].GetIntVal();
+	size_t edgeSamples = floor(edgeTime / samplePeriod);
 
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
+	//Configure output waveform
+	auto cap = SetupEmptyOutputWaveform(din, 0);
+	cap->m_timescale = samplePeriod;
+	cap->m_densePacked = true;
 
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
+	size_t bitsPerSymbol = GetBitsPerSymbol();
+	auto levels = GetVoltageLevels();
+
+	//Round length to integer number of complete samples
+	size_t len = samples.m_samples.size();
+	if(bitsPerSymbol > 1)
+		len -= (len % bitsPerSymbol);
+
+	//Adjust for start time
+	int64_t capstart = samples.m_offsets[0];
+	cap->m_triggerPhase = capstart;
+
+	//Figure out how long the capture is going to be
+	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
+	cap->Resize(caplen);
+
+	//Process samples, two at a time
+	float vlast = levels[0];
+	size_t nsamp = 0;
+	for(size_t i=0; i<len; i += bitsPerSymbol)
 	{
-		if(mode == MODE_IMPEDANCE)
+		//Convert start/end times to our output timebase
+		size_t tstart = (samples.m_offsets[i] - capstart);
+		size_t tend = (samples.m_offsets[i+bitsPerSymbol-1] + samples.m_durations[i+bitsPerSymbol-1] - capstart);
+		size_t tend_rounded = tend / samplePeriod;
+
+		float v = levels[GetVoltageCode(i, samples)];
+		size_t tEdgeDone = nsamp + edgeSamples;
+
+		//Emit samples for the edge
+		float delta = v - vlast;
+		for(; (nsamp < tEdgeDone) && (nsamp < caplen); nsamp ++)
 		{
-			m_range = 20;
-			m_offset = -50;
+			//Figure out how far along we are
+			float tnow = nsamp * samplePeriod;
+			float tdelta = tnow - tstart;
+			float frac = max(0.0f, tdelta / edgeTime);
+			float vcur = vlast + delta*frac;
+
+			cap->m_offsets[nsamp] = nsamp;
+			cap->m_durations[nsamp] = 1;
+			cap->m_samples[nsamp] = vcur;
 		}
-		else
+
+		//Emit samples for the rest of the UI
+		for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
 		{
-			m_range = 2;
-			m_offset = 0;
+			cap->m_offsets[nsamp] = nsamp;
+			cap->m_durations[nsamp] = 1;
+			cap->m_samples[nsamp] = v;
 		}
-		m_oldMode = mode;
-	}
 
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-
-	float pulseScale = 1.0 / pulseAmplitude;
-	for(size_t i=0; i<len; i++)
-	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
-
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
-
-		else
-			cap->m_samples[i] = rho;
+		vlast = v;
 	}
 }

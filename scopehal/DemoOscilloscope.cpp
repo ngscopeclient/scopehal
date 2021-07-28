@@ -63,7 +63,7 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	static const char* colors[8] =
 	{ "#ffff00", "#ff6abc", "#00ffff", "#00c100", "#d7ffd7", "#8482ff", "#ff0000", "#ff8000" };
 
-	for(size_t i=0; i<5; i++)
+	for(size_t i=0; i<4; i++)
 	{
 		m_channels.push_back(
 			new OscilloscopeChannel(
@@ -96,12 +96,11 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_channels[1]->SetDisplayName("Ramp");
 	m_channels[2]->SetDisplayName("PRBS31");
 	m_channels[3]->SetDisplayName("8B10B");
-	m_channels[4]->SetDisplayName("FastStep");
 }
 
 DemoOscilloscope::~DemoOscilloscope()
 {
-	for(int i=0; i<5; i++)
+	for(int i=0; i<4; i++)
 	{
 		delete m_source[i];
 		delete m_rng[i];
@@ -460,15 +459,15 @@ bool DemoOscilloscope::AcquireData()
 	float sweepPeriod = FS_PER_SECOND / m_sweepFreq;
 
 	//Signal degradations
-	float noise[5] =
+	float noise[4] =
 	{
-		0.01, 0.01, 0.01, 0.01, 0.01
+		0.01, 0.01, 0.01, 0.01
 	};
 	bool lpf2 = false;
 	bool lpf3 = false;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		for(size_t i=0; i<5; i++)
+		for(size_t i=0; i<4; i++)
 		{
 			if(m_channelModes[i] == CHANNEL_MODE_IDEAL)
 				noise[i] = 0;
@@ -483,10 +482,13 @@ bool DemoOscilloscope::AcquireData()
 
 	auto depth = GetSampleDepth();
 	int64_t sampleperiod = FS_PER_SECOND / m_rate;
-	WaveformBase* waveforms[5];
+	WaveformBase* waveforms[5] = {NULL};
 	#pragma omp parallel for
 	for(int i=0; i<5; i++)
 	{
+		if(!m_channelsEnabled[i])
+			continue;
+
 		switch(i)
 		{
 			case 0:
@@ -505,17 +507,13 @@ bool DemoOscilloscope::AcquireData()
 				waveforms[i] = m_source[i]->Generate8b10b(0.9, 800e3, sampleperiod, depth, lpf3, noise[3]);
 				break;
 
-			case 4:
-				waveforms[i] = m_source[i]->GenerateStep(0, 1, sampleperiod, depth);
-				break;
-
 			default:
 				break;
 		}
 	}
 
 	SequenceSet s;
-	for(int i=0; i<5; i++)
+	for(int i=0; i<4; i++)
 		s[m_channels[i]] = waveforms[i];
 
 	//Timestamp the waveform(s)
@@ -526,6 +524,8 @@ bool DemoOscilloscope::AcquireData()
 	for(auto it : s)
 	{
 		auto wfm = it.second;
+		if(!wfm)
+			continue;
 
 		wfm->m_startTimestamp = start;
 		wfm->m_startFemtoseconds = fs;

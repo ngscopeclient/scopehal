@@ -2,13 +2,18 @@ include_directories(SYSTEM ${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
-find_package(Yaml REQUIRED)
+
 
 # Additional Windows/Linux libraries
 if(WIN32)
 	set(WIN_LIBS shlwapi)
+	# The packaging for yaml-cpp on mingw64 seems to be broken, not providing a
+	# libyaml-cpp.dll.a to be found by find_library inside of find_package(YAML)
+	# when using FindYAML.cmake, just set the library directly
+	set(YAML_LIBRARIES yaml-cpp)
 else()
 	set(LIN_LIBS dl)
+	find_package(Yaml REQUIRED)
 endif()
 
 # Apple has their own idea about stat structs

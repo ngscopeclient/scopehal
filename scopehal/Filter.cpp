@@ -150,6 +150,11 @@ void Filter::Release()
 
 bool Filter::IsOverlay()
 {
+	//If we have no inputs, we can't be an overlay
+	if(GetInputCount() == 0)
+		return false;
+
+	//otherwise, assume we are one
 	return true;
 }
 
@@ -159,11 +164,6 @@ bool Filter::IsOverlay()
 	If scalar, the output is displayed with statistics rather than a waveform view.
  */
 bool Filter::IsScalarOutput()
-{
-	return false;
-}
-
-bool Filter::UsesCLFFT()
 {
 	return false;
 }
@@ -509,6 +509,75 @@ void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, 
 		samples.m_offsets.push_back(clkstart);
 		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
+	}
+}
+
+/**
+	@brief Find rising edges in a waveform, interpolating as necessary
+ */
+void Filter::FindRisingEdges(AnalogWaveform* data, float threshold, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	int64_t phoff = data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	float fscale = data->m_timescale;
+
+	if(data->m_densePacked)
+	{
+		for(size_t i=1; i<len; i++)
+		{
+			bool value = data->m_samples[i] > threshold;
+
+			//Save the last value
+			if(first)
+			{
+				last = value;
+				first = false;
+				continue;
+			}
+			if(!value)
+				last = false;
+
+			//Skip samples with no rising edge
+			if(!value || last)
+				continue;
+
+			//Midpoint of the sample, plus the zero crossing
+			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+			int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
+			edges.push_back(t);
+			last = true;
+		}
+	}
+	else
+	{
+		for(size_t i=1; i<len; i++)
+		{
+			bool value = data->m_samples[i] > threshold;
+
+			//Save the last value
+			if(first)
+			{
+				last = value;
+				first = false;
+				continue;
+			}
+
+			if(!value)
+				last = false;
+
+			//Skip samples with no rising edge
+			if(!value || last)
+				continue;
+
+			//Midpoint of the sample, plus the zero crossing
+			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+			int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
+			edges.push_back(t);
+			last = true;
+		}
 	}
 }
 
@@ -977,6 +1046,74 @@ void Filter::ClearAnalysisCache()
 // Helpers for various common boilerplate operations
 
 /**
+	@brief Sets up an analog output waveform and copies basic metadata from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+
+	@param din			Input waveform
+	@param stream		Stream index
+	@param clear		True to clear an existing waveform, false to leave it as-is
+
+	@return	The ready-to-use output waveform
+ */
+AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear)
+{
+	//Create the waveform, but only if necessary
+	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(stream));
+	if(cap == NULL)
+	{
+		cap = new AnalogWaveform;
+		SetData(cap, stream);
+	}
+
+	//Copy configuration
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Clear output
+	if(clear)
+	{
+		cap->m_samples.clear();
+		cap->m_offsets.clear();
+		cap->m_durations.clear();
+	}
+
+	return cap;
+}
+
+/**
+	@brief Sets up an digital output waveform and copies basic metadata from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+
+	@param din			Input waveform
+	@param stream		Stream index
+
+	@return	The ready-to-use output waveform
+ */
+DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream)
+{
+	//Create the waveform, but only if necessary
+	DigitalWaveform* cap = dynamic_cast<DigitalWaveform*>(GetData(stream));
+	if(cap == NULL)
+	{
+		cap = new DigitalWaveform;
+		SetData(cap, stream);
+	}
+
+	//Copy configuration
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Clear output
+	cap->m_samples.clear();
+	cap->m_offsets.clear();
+	cap->m_durations.clear();
+
+	return cap;
+}
+
+/**
 	@brief Sets up an analog output waveform and copies timebase configuration from the input.
 
 	A new output waveform is created if necessary, but when possible the existing one is reused.
@@ -991,18 +1128,9 @@ void Filter::ClearAnalysisCache()
  */
 AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
 {
-	//Create the waveform, but only if necessary
-	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(stream));
-	if(cap == NULL)
-	{
-		cap = new AnalogWaveform;
-		SetData(cap, stream);
-	}
+	auto cap = SetupEmptyOutputWaveform(din, stream, false);
 
-	//Copy configuration
 	cap->m_timescale 			= din->m_timescale;
-	cap->m_startTimestamp 		= din->m_startTimestamp;
-	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
 
 	size_t len = din->m_offsets.size() - (skipstart + skipend);

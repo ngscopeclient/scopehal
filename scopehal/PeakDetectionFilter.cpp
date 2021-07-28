@@ -55,6 +55,7 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 		//Get peak search width in bins
 		int64_t search_bins = ceil(search_hz / cap->m_timescale);
 		int64_t search_rad = search_bins/2;
+		search_rad = max(search_rad, (int64_t)1);
 
 		//Find peaks (TODO: can we vectorize/multithread this?)
 		//Start at index 1 so we don't waste a marker on the DC peak

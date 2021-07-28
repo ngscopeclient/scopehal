@@ -59,7 +59,8 @@ public:
 		CAT_SERIAL,			//Serial communications
 		CAT_MISC,			//anything not otherwise categorized
 		CAT_POWER,			//Power analysis
-		CAT_RF				//Frequency domain analysis (FFT etc) and other RF stuff
+		CAT_RF,				//Frequency domain analysis (FFT etc) and other RF stuff
+		CAT_GENERATION		//Waveform generation and synthesis
 	};
 
 	Filter(
@@ -164,13 +165,6 @@ public:
 
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
-	/**
-		@brief Returns true if this filter uses the clFFT library.
-
-		Needed to enable some workarounds for broken OpenCL stacks.
-	 */
-	virtual bool UsesCLFFT();
-
 protected:
 
 	///Group used for the display menu
@@ -202,6 +196,8 @@ protected:
 			i ++;
 	}
 
+	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
+	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
 	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
@@ -233,6 +229,7 @@ public:
 	static void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 
 	//Find interpolated zero crossings of a signal
+	static void FindRisingEdges(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
 
 	//Find edges in a signal (discarding repeated samples)

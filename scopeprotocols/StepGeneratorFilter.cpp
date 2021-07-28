@@ -28,166 +28,118 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "TDRFilter.h"
+#include "StepGeneratorFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-TDRFilter::TDRFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+StepGeneratorFilter::StepGeneratorFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	, m_lowname("Beginning Level")
+	, m_highname("Ending Level")
+	, m_ratename("Sample Rate")
+	, m_depthname("Memory Depth")
+	, m_steptimename("Step Position")
 {
-	//Set up channels
-	CreateInput("voltage");
+	m_parameters[m_lowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_lowname].SetFloatVal(0);
 
-	m_modeName = "Output Format";
-	m_parameters[m_modeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_modeName].AddEnumValue("Reflection coefficient", MODE_RHO);
-	m_parameters[m_modeName].AddEnumValue("Impedance", MODE_IMPEDANCE);
-	m_parameters[m_modeName].SetIntVal(MODE_IMPEDANCE);
+	m_parameters[m_highname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_highname].SetFloatVal(1);
 
-	m_portImpedanceName = "Port impedance";
-	m_parameters[m_portImpedanceName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_OHMS));
-	m_parameters[m_portImpedanceName].SetFloatVal(50);
+	m_parameters[m_ratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_parameters[m_ratename].SetIntVal(500 * 1000L * 1000L * 1000L);
 
-	m_stepStartVoltageName = "Step start";
-	m_parameters[m_stepStartVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepStartVoltageName].SetFloatVal(0);
+	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_parameters[m_depthname].SetIntVal(100 * 1000);
 
-	m_stepEndVoltageName = "Step end";
-	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
-
-	m_range = 20;
-	m_offset = -50;
-
-	m_oldMode = MODE_IMPEDANCE;
+	m_parameters[m_steptimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_parameters[m_steptimename].SetIntVal(50 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool StepGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
 {
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
-
+	//no inputs
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+string StepGeneratorFilter::GetProtocolName()
 {
-	return m_range;
+	return "Step";
 }
 
-double TDRFilter::GetOffset()
+void StepGeneratorFilter::SetDefaultName()
 {
-	return m_offset;
+	Unit volts(Unit::UNIT_VOLTS);
+
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "Step(%s - %s)",
+		volts.PrettyPrint(m_parameters[m_lowname].GetFloatVal()).c_str(),
+		volts.PrettyPrint(m_parameters[m_highname].GetFloatVal()).c_str()
+		);
+	m_hwname = hwname;
+	m_displayname = m_hwname;
 }
 
-void TDRFilter::SetVoltageRange(double range)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(double offset)
-{
-	m_offset = offset;
-}
-
-string TDRFilter::GetProtocolName()
-{
-	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
-bool TDRFilter::NeedsConfig()
+bool StepGeneratorFilter::NeedsConfig()
 {
 	return true;
 }
 
-void TDRFilter::SetDefaultName()
+double StepGeneratorFilter::GetVoltageRange()
 {
-	char hwname[256];
-	if(m_parameters[m_modeName].GetIntVal() == MODE_IMPEDANCE)
-		snprintf(hwname, sizeof(hwname), "TDRImpedance(%s)", GetInputDisplayName(0).c_str());
-	else
-		snprintf(hwname, sizeof(hwname), "TDRReflection(%s)", GetInputDisplayName(0).c_str());
+	return fabs(m_parameters[m_lowname].GetFloatVal() - m_parameters[m_highname].GetFloatVal()) * 1.05;
+}
 
-	m_hwname = hwname;
-	m_displayname = m_hwname;
+double StepGeneratorFilter::GetOffset()
+{
+	return -(m_parameters[m_lowname].GetFloatVal() + m_parameters[m_highname].GetFloatVal()) / 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TDRFilter::Refresh()
+void StepGeneratorFilter::Refresh()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	int64_t samplerate = m_parameters[m_ratename].GetIntVal();
+	size_t samplePeriod = FS_PER_SECOND / samplerate;
+	size_t depth = m_parameters[m_depthname].GetIntVal();
+	size_t mid = m_parameters[m_steptimename].GetIntVal();
+	float vstart = m_parameters[m_lowname].GetFloatVal();
+	float vend = m_parameters[m_highname].GetFloatVal();
+
+	double t = GetTime();
+	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
+
+	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	if(!cap)
 	{
-		SetData(NULL, 0);
-		return;
+		cap = new AnalogWaveform;
+		SetData(cap, 0);
 	}
+	cap->m_timescale = samplePeriod;
+	cap->m_triggerPhase = 0;
+	cap->m_startTimestamp = floor(t);
+	cap->m_startFemtoseconds = fs;
+	cap->m_densePacked = true;
+	cap->Resize(depth);
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
-
-	//Extract parameters
-	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
-	auto z0 = m_parameters[m_portImpedanceName].GetFloatVal();
-	auto vlo = m_parameters[m_stepStartVoltageName].GetFloatVal();
-	auto vhi = m_parameters[m_stepEndVoltageName].GetFloatVal();
-	auto pulseAmplitude = (vhi - vlo);
-
-	//Set up units
-	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
-	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
-
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
+	for(size_t i=0; i<depth; i++)
 	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
+		cap->m_offsets[i] = i;
+		cap->m_durations[i] = 1;
+
+		if(i < mid)
+			cap->m_samples[i] = vstart;
 		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
-	}
-
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-
-	float pulseScale = 1.0 / pulseAmplitude;
-	for(size_t i=0; i<len; i++)
-	{
-		//Reflection coefficient is trivial
-		float rho = (din->m_samples[i] - vhi) * pulseScale;
-
-		//Impedance takes a bit more work to calculate
-		if(mode == MODE_IMPEDANCE)
-			cap->m_samples[i] = z0 * (1 + rho)/(1 - rho);
-
-		else
-			cap->m_samples[i] = rho;
+			cap->m_samples[i] = vend;
 	}
 }
