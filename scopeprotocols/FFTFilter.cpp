@@ -117,13 +117,23 @@ FFTFilter::FFTFilter(const string& color)
 				LogError("Failed to build OpenCL program for FFT\n");
 
 				string log;
-				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Window program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_windowProgram)
+				{
+					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Window program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
+				else
+					LogDebug("Window program object not present\n");
 
-				m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Normalize program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_normalizeProgram)
+				{
+					m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Normalize program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
+				else
+					LogDebug("Normalize program object not present\n");
 			}
 
 			delete m_windowProgram;
