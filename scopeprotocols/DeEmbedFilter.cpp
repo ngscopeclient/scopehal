@@ -111,13 +111,19 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 				LogError("Failed to build OpenCL program for FFT\n");
 
 				string log;
-				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Window program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_windowProgram)
+				{
+					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Window program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
 
-				m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("De-embed program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_deembedProgram)
+				{
+					m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("De-embed program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
 			}
 
 			delete m_windowProgram;
