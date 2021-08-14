@@ -108,7 +108,7 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 			if(e.err() == CL_BUILD_PROGRAM_FAILURE)
 			{
-				LogError("Failed to build OpenCL program for FFT\n");
+				LogError("Failed to build OpenCL program for de-embed\n");
 
 				string log;
 				if(m_windowProgram)
