@@ -362,8 +362,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					//Set up the FFT object
 					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 					{
-						LogError("clfftCreateDefaultPlan failed\n");
-						abort();
+						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
 					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
@@ -372,8 +373,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftReversePlan, (*g_clContext)(), CLFFT_1D, &npoints))
 					{
-						LogError("clfftCreateDefaultPlan failed\n");
-						abort();
+						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
 					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
@@ -387,14 +389,16 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)\n", err);
-						abort();
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)\n", err);
-						abort();
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 
 					//Allocate buffers

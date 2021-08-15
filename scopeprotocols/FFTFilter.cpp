@@ -251,6 +251,9 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 {
 	m_cachedNumPoints = npoints_raw;
 
+	m_rdinbuf.resize(npoints);
+	m_rdoutbuf.resize(2*nouts);
+
 	if(m_cachedNumPointsFFT != npoints)
 	{
 		m_cachedNumPointsFFT = npoints;
@@ -267,6 +270,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 
 		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 
+		//This must be the last block since we return on error
 		#ifdef HAVE_CLFFT
 
 			if(g_clContext)
@@ -274,8 +278,10 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				//Set up the FFT object
 				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 				{
-					LogError("clfftCreateDefaultPlan failed\n");
-					abort();
+					LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+					delete m_windowProgram;
+					m_windowProgram = 0;
+					return;
 				}
 				clfftSetPlanBatchSize(m_clfftPlan, 1);
 				clfftSetPlanPrecision(m_clfftPlan, CLFFT_SINGLE);
@@ -287,16 +293,15 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
 				if(CLFFT_SUCCESS != err)
 				{
-					LogError("clfftBakePlan failed (%d)\n", err);
-					abort();
+					LogError("clfftBakePlan failed (%d) Disabling clFFT and falling back to ffts\n", err);
+					delete m_windowProgram;
+					m_windowProgram = 0;
+					return;
 				}
 			}
 
 		#endif
 	}
-
-	m_rdinbuf.resize(npoints);
-	m_rdoutbuf.resize(2*nouts);
 }
 
 void FFTFilter::Refresh()
