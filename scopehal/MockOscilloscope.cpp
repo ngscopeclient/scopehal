@@ -1939,7 +1939,7 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 	}
 
 	//Postprocess data
-	//NormalizeTimebases();
+	NormalizeTimebases();
 	AutoscaleVertical();
 
 	return true;
