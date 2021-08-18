@@ -50,6 +50,7 @@ public:
 	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
+	bool LoadTouchstone(const std::string& path);
 	bool LoadVCD(const std::string& path);
 	bool LoadWAV(const std::string& path);
 
@@ -192,6 +193,7 @@ protected:
 	std::map<size_t, double> m_channelOffset;
 
 	void NormalizeTimebases();
+	void AutoscaleVertical();
 
 public:
 	static std::string GetDriverNameInternal();

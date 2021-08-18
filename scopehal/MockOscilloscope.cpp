@@ -1100,9 +1100,12 @@ void MockOscilloscope::NormalizeTimebases()
 	uint64_t stdev = sqrt(stdev_sum / interval_count);
 	LogTrace("Stdev of intervals: %s\n", fs.PrettyPrint(stdev).c_str());
 
-	//If the standard deviation is more than 1% of the average sample period, assume the data is sampled irregularly.
-	if( (stdev * 100) > avg)
+	//If the standard deviation is more than 2% of the average sample period, assume the data is sampled irregularly.
+	if( (stdev * 50) > avg)
+	{
+		LogTrace("Deviation is too large, assuming non-uniform sample interval\n");
 		return;
+	}
 
 	//If we get here, assume uniform sampling.
 	//Use time zero as the trigger phase.
@@ -1733,18 +1736,10 @@ bool MockOscilloscope::LoadWAV(const string& path)
 		fseek(fp, header[1], SEEK_CUR);
 	}
 
-	//Get timestamp of the file if no header timestamp
-	//TODO: Add Windows equivalent
+	//Get timestamp of the file
 	int64_t timestamp = 0;
 	int64_t fs = 0;
-	#ifndef _WIN32
-		struct stat st;
-		if(0 == stat(path.c_str(), &st))
-		{
-			timestamp = st.st_mtim.tv_sec;
-			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
-		}
-	#endif
+	GetTimestampOfFile(path, timestamp, fs);
 
 	//Create our channels
 	size_t datalen = header[1];
@@ -1837,4 +1832,143 @@ bool MockOscilloscope::LoadWAV(const string& path)
 	//Done, clean up
 	delete[] buf;
 	return true;
+}
+
+
+
+/**
+	@brief Imports a waveform from a Touchstone file
+ */
+bool MockOscilloscope::LoadTouchstone(const string& path)
+{
+	TouchstoneParser parser;
+	SParameters params;
+	if(!parser.Load(path, params))
+		return false;
+
+	int64_t timestamp = 0;
+	int64_t fs = 0;
+	GetTimestampOfFile(path, timestamp, fs);
+
+	//Create and populate channels (port numbers are 1-based to align with engineering convention)
+	size_t nports = params.GetNumPorts();
+	for(size_t dest = 1; dest <= nports; dest ++)
+	{
+		for(size_t src = 1; src <= nports; src ++)
+		{
+			//Make the channels
+			auto mchan = new OscilloscopeChannel(
+				this,			//Parent scope
+				string("S") + to_string(dest) + to_string(src) + "m",
+				OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+				GetDefaultChannelColor(m_channels.size()),
+				Unit(Unit::UNIT_HZ),
+				Unit(Unit::UNIT_DB),
+				1,						//Bus width
+				m_channels.size(),		//Channel index
+				true					//Is physical channel
+			);
+			AddChannel(mchan);
+			mchan->SetDefaultDisplayName();
+			mchan->SetVoltageRange(80);
+			mchan->SetOffset(40);
+
+			auto pchan = new OscilloscopeChannel(
+				this,			//Parent scope
+				string("S") + to_string(dest) + to_string(src) + "p",
+				OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
+				GetDefaultChannelColor(m_channels.size()),
+				Unit(Unit::UNIT_HZ),
+				Unit(Unit::UNIT_DEGREES),
+				1,						//Bus width
+				m_channels.size(),		//Channel index
+				true					//Is physical channel
+			);
+			AddChannel(pchan);
+			pchan->SetDefaultDisplayName();
+			pchan->SetVoltageRange(370);
+			pchan->SetOffset(0);
+
+			//Get the S-parameters from the file
+			auto& vec = params[SPair(dest, src)];
+			size_t nsamples = vec.size();
+
+			//Create new waveform for magnitude and phase channels
+			auto mwfm = new AnalogWaveform;
+			mwfm->m_timescale = 1;
+			mwfm->m_startTimestamp = timestamp;
+			mwfm->m_startFemtoseconds = fs;
+			mwfm->m_triggerPhase = 0;
+			mwfm->m_densePacked = false;	//don't assume uniform frequency spacing
+			mwfm->Resize(nsamples);
+			mchan->SetData(mwfm, 0);
+
+			auto pwfm = new AnalogWaveform;
+			pwfm->m_timescale = 1;
+			pwfm->m_startTimestamp = timestamp;
+			pwfm->m_startFemtoseconds = fs;
+			pwfm->m_triggerPhase = 0;
+			pwfm->m_densePacked = false;	//don't assume uniform frequency spacing
+			pwfm->Resize(nsamples);
+			pchan->SetData(pwfm, 0);
+
+			//Populate them
+			float angscale = 180 / M_PI;	//we use degrees for display
+			for(size_t i=0; i<nsamples; i++)
+			{
+				auto& point = vec[i];
+
+				//Convert magnitude to dB
+				mwfm->m_offsets[i] = point.m_frequency;
+				mwfm->m_durations[i] = 1;
+				mwfm->m_samples[i] = 20 * log10(point.m_amplitude);
+
+				//Convert phase to degrees
+				pwfm->m_offsets[i] = point.m_frequency;
+				pwfm->m_durations[i] = 1;
+				pwfm->m_samples[i] = point.m_phase * angscale;
+
+				//Update previous sample's duration if possible
+				if(i > 0)
+				{
+					mwfm->m_durations[i-1] = mwfm->m_offsets[i] - mwfm->m_offsets[i-1];
+					pwfm->m_durations[i-1] = pwfm->m_offsets[i] - pwfm->m_offsets[i-1];
+				}
+			}
+		}
+	}
+
+	//Postprocess data
+	//NormalizeTimebases();
+	AutoscaleVertical();
+
+	return true;
+}
+
+/**
+	@brief Calculate min/max of each channel and adjust gain/offset accordingly
+ */
+void MockOscilloscope::AutoscaleVertical()
+{
+	for(auto c : m_channels)
+	{
+		auto wfm = dynamic_cast<AnalogWaveform*>(c->GetData(0));
+		if(!wfm)
+			continue;
+		if(wfm->m_samples.empty())
+			continue;
+
+		float vmin = wfm->m_samples[0];
+		float vmax = vmin;
+
+		for(auto s : wfm->m_samples)
+		{
+			vmin = min(vmin, (float)s);
+			vmax = max(vmax, (float)s);
+		}
+
+		//Calculate bounds
+		c->SetVoltageRange((vmax - vmin) * 1.05);
+		c->SetOffset( -( (vmax - vmin)/2 + vmin ));
+	}
 }
