@@ -112,6 +112,10 @@ public:
 
 	void SaveToFile(const std::string& path);
 
+	//TODO: support >2 ports
+	size_t GetNumPorts()
+	{ return 2; }
+
 protected:
 	std::map< SPair , SParameterVector*> m_params;
 };
