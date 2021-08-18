@@ -77,6 +77,14 @@ public:
 	 */
 	virtual void FlushConfigCache();
 
+	/**
+		@brief Checks if the instrument is currently online.
+
+		@return True if the Oscilloscope object is actively connected to a physical scope.
+				False if working offline, a file import, etc.
+	 */
+	virtual bool IsOffline();
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Channel information
 

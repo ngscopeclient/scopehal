@@ -42,6 +42,8 @@ public:
 	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
 	virtual ~MockOscilloscope();
 
+	virtual bool IsOffline();
+
 	//Capture file importing
 	bool LoadComplexUnknownFormat(const std::string& path, int64_t samplerate);
 	bool LoadComplexFloat32(const std::string& path, int64_t samplerate);

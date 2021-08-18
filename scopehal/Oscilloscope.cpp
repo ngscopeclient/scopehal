@@ -111,6 +111,11 @@ void Oscilloscope::FlushConfigCache()
 	//nothing to do, base class has no caching
 }
 
+bool Oscilloscope::IsOffline()
+{
+	return false;
+}
+
 size_t Oscilloscope::GetChannelCount()
 {
 	return m_channels.size();

@@ -58,6 +58,11 @@ MockOscilloscope::~MockOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
 
+bool MockOscilloscope::IsOffline()
+{
+	return true;
+}
+
 string MockOscilloscope::IDPing()
 {
 	return "";
