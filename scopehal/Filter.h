@@ -163,7 +163,7 @@ public:
 		STANDARD_COLOR_COUNT
 	};
 
-	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
+	static std::string m_standardColors[STANDARD_COLOR_COUNT];
 
 protected:
 
@@ -203,7 +203,7 @@ protected:
 
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
-	virtual Gdk::Color GetColor(int i);
+	virtual std::string GetColor(int i);
 	virtual std::string GetText(int i);
 
 	//Helpers for sub-sample interoplation

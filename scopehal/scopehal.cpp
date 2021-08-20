@@ -33,7 +33,6 @@
 	@brief Implementation of global functions
  */
 #include "scopehal.h"
-#include <gtkmm/drawingarea.h>
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
@@ -68,6 +67,12 @@
 #ifdef HAVE_CLFFT
 #include <clFFT.h>
 #endif
+
+int64_t GetTime() {
+	auto t = std::chrono::steady_clock::now();
+	auto ts = t.time_since_epoch();
+	return std::chrono::duration_cast<std::chrono::microseconds>(ts).count();
+}
 
 using namespace std;
 

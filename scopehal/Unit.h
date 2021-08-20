@@ -101,7 +101,7 @@ public:
 protected:
 	UnitType m_type;
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 	/**
 		@brief String form of m_locale for use on Windows
 	 */

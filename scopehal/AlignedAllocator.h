@@ -38,6 +38,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#elif __APPLE__
+#include <stdlib.h>
+#else
+#include <malloc.h>
 #endif
 
 /**
@@ -118,8 +122,13 @@ public:
 		//Do the actual allocation
 #ifdef _WIN32
 		T* ret = static_cast<T*>(_aligned_malloc(n*sizeof(T), alignment));
+#elif __APPLE__
+        void* p;
+		if (posix_memalign(&p, alignment, n*sizeof(T)))
+			p = NULL;
+		T* ret = static_cast<T*>(p);
 #else
-		T* ret = static_cast<T*>(aligned_alloc(alignment, n*sizeof(T)));
+		T* ret = static_cast<T*>(memalign(alignment, n*sizeof(T)));
 #endif
 
 		//Error check

@@ -31,7 +31,7 @@
 
 using namespace std;
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 string Unit::m_slocale;
 #else
 locale_t Unit::m_locale;
@@ -364,7 +364,7 @@ Unit Unit::operator*(const Unit& rhs)
 
 void Unit::SetLocale(const char* locale)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 	m_slocale = locale;
 #else
 	m_locale = newlocale(LC_ALL, locale, 0);
@@ -378,7 +378,7 @@ void Unit::SetLocale(const char* locale)
  */
 void Unit::SetPrintingLocale()
 {
-	#ifdef _WIN32
+	#if defined(_WIN32) || defined(__APPLE__)
 		setlocale(LC_NUMERIC, m_slocale.c_str());
 	#else
 		uselocale(m_locale);
@@ -390,7 +390,7 @@ void Unit::SetPrintingLocale()
  */
 void Unit::SetDefaultLocale()
 {
-	#ifdef _WIN32
+	#if defined(_WIN32) || defined(__APPLE__)
 		setlocale(LC_NUMERIC, "C");
 	#else
 		uselocale(m_defaultLocale);

@@ -44,16 +44,16 @@ set<Filter*> Filter::m_filters;
 mutex Filter::m_cacheMutex;
 map<pair<WaveformBase*, float>, vector<int64_t> > Filter::m_zeroCrossingCache;
 
-Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
+std::string Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 {
-	Gdk::Color("#336699"),	//COLOR_DATA
-	Gdk::Color("#c000a0"),	//COLOR_CONTROL
-	Gdk::Color("#ffff00"),	//COLOR_ADDRESS
-	Gdk::Color("#808080"),	//COLOR_PREAMBLE
-	Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
-	Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
-	Gdk::Color("#ff0000"),	//COLOR_ERROR
-	Gdk::Color("#404040")	//COLOR_IDLE
+	std::string("#336699"),	//COLOR_DATA
+	std::string("#c000a0"),	//COLOR_CONTROL
+	std::string("#ffff00"),	//COLOR_ADDRESS
+	std::string("#808080"),	//COLOR_PREAMBLE
+	std::string("#00ff00"),	//COLOR_CHECKSUM_OK
+	std::string("#ff0000"),	//COLOR_CHECKSUM_BAD
+	std::string("#ff0000"),	//COLOR_ERROR
+	std::string("#404040")	//COLOR_IDLE
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -805,7 +805,7 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Complex protocol decodes
 
-Gdk::Color Filter::GetColor(int /*i*/)
+std::string Filter::GetColor(int /*i*/)
 {
 	return m_standardColors[COLOR_ERROR];
 }

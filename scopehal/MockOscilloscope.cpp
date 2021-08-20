@@ -36,6 +36,7 @@
 #include "scopehal.h"
 #include "OscilloscopeChannel.h"
 #include "MockOscilloscope.h"
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -1742,7 +1743,7 @@ bool MockOscilloscope::LoadWAV(const string& path)
 	}
 
 	//Get timestamp of the file
-	int64_t timestamp = 0;
+	time_t timestamp = 0;
 	int64_t fs = 0;
 	GetTimestampOfFile(path, timestamp, fs);
 
@@ -1851,7 +1852,7 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 	if(!parser.Load(path, params))
 		return false;
 
-	int64_t timestamp = 0;
+	time_t timestamp = 0;
 	int64_t fs = 0;
 	GetTimestampOfFile(path, timestamp, fs);
 

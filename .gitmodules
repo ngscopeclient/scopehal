@@ -1,12 +1,12 @@
 [submodule "xptools"]
 	path = xptools
-	url = ../xptools.git
+	url = https://github.com/azonenberg/xptools.git
 [submodule "log"]
 	path = log
-	url = ../logtools.git
+	url = https://github.com/azonenberg/logtools.git
 [submodule "graphwidget"]
 	path = graphwidget
-	url = ../graphwidget.git
+	url = https://github.com/azonenberg/graphwidget.git
 [submodule "OpenCL-CLHPP"]
 	path = OpenCL-CLHPP
 	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git

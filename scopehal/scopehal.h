@@ -44,14 +44,14 @@
 #include <stdint.h>
 #include <chrono>
 #include <thread>
-
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+#include <cstring>
+#include <cfloat>
+#include <climits>
+#include <algorithm>
 
 #include <yaml-cpp/yaml.h>
 
 #include "../log/log.h"
-#include "../graphwidget/Graph.h"
 
 #include "config.h"
 #ifdef HAVE_OPENCL
@@ -67,6 +67,11 @@
 #include <CL/opencl.hpp>
 #pragma GCC diagnostic pop
 #endif
+
+#include <chrono>
+#include <dirent.h>
+
+int64_t GetTime();
 
 #include "Unit.h"
 #include "Bijection.h"
