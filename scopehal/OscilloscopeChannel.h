@@ -193,6 +193,12 @@ public:
 	virtual Unit GetYAxisUnits()
 	{ return m_yAxisUnit; }
 
+	virtual void SetXAxisUnits(const Unit& rhs)
+	{ m_xAxisUnit = rhs; }
+
+	virtual void SetYAxisUnits(const Unit& rhs)
+	{ m_yAxisUnit = rhs; }
+
 	void SetDigitalHysteresis(float level);
 	void SetDigitalThreshold(float level);
 

@@ -307,6 +307,9 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		else
 			config += "                enabled:     0\n";
 
+		snprintf(tmp, sizeof(tmp), "                xunit:       \"%s\"\n", chan->GetXAxisUnits().ToString().c_str());
+		config += tmp;
+
 		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		{
 			snprintf(tmp, sizeof(tmp), "                attenuation: %f\n", chan->GetAttenuation());
@@ -316,6 +319,9 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange());
 			config += tmp;
 			snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset());
+			config += tmp;
+
+			snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits().ToString().c_str());
 			config += tmp;
 
 			switch(chan->GetCoupling())
@@ -398,6 +404,11 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
 				chan->SetVoltageRange(cnode["vrange"].as<float>());
 				chan->SetOffset(cnode["offset"].as<float>());
+
+				if(cnode["xunit"])
+					chan->SetXAxisUnits(cnode["xunit"].as<string>());
+				if(cnode["yunit"])
+					chan->SetYAxisUnits(cnode["yunit"].as<string>());
 
 				if(cnode["coupling"])
 				{

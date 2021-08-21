@@ -39,6 +39,132 @@ locale_t Unit::m_defaultLocale;
 #endif
 
 /**
+	@brief Constructs a new unit from a string
+ */
+Unit::Unit(const string& rhs)
+{
+	if(rhs == "fs")
+		m_type = UNIT_FS;
+	else if(rhs == "Hz")
+		m_type = UNIT_HZ;
+	else if(rhs == "V")
+		m_type = UNIT_VOLTS;
+	else if(rhs == "A")
+		m_type = UNIT_AMPS;
+	else if(rhs == "Ω")
+		m_type = UNIT_OHMS;
+	else if(rhs == "b/s")
+		m_type = UNIT_BITRATE;
+	else if(rhs == "%")
+		m_type = UNIT_PERCENT;
+	else if(rhs == "dB")
+		m_type = UNIT_DB;
+	else if(rhs == "dBm")
+		m_type = UNIT_DBM;
+	else if(rhs == "unitless (linear)")
+		m_type = UNIT_COUNTS;
+	else if(rhs == "unitless (log)")
+		m_type = UNIT_COUNTS_SCI;
+	else if(rhs == "log BER")
+		m_type = UNIT_LOG_BER;
+	else if(rhs == "sa/s")
+		m_type = UNIT_SAMPLERATE;
+	else if(rhs == "sa")
+		m_type = UNIT_SAMPLEDEPTH;
+	else if(rhs == "W")
+		m_type = UNIT_WATTS;
+	else if(rhs == "UI")
+		m_type = UNIT_UI;
+	else if(rhs == "°")
+		m_type = UNIT_DEGREES;
+	else if(rhs == "RPM")
+		m_type = UNIT_RPM;
+	else if(rhs == "°C")
+		m_type = UNIT_CELSIUS;
+	else if(rhs == "ρ")
+		m_type = UNIT_RHO;
+	else if(rhs == "mV")
+		m_type = UNIT_MILLIVOLTS;
+	else
+		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
+}
+
+/**
+	@brief Converts this unit to a string
+ */
+string Unit::ToString()
+{
+	switch(m_type)
+	{
+		case UNIT_FS:
+			return "fs";
+
+		case UNIT_HZ:
+			return "Hz";
+
+		case UNIT_VOLTS:
+			return "V";
+
+		case UNIT_AMPS:
+			return "A";
+
+		case UNIT_OHMS:
+			return "Ω";
+
+		case UNIT_BITRATE:
+			return "b/s";
+
+		case UNIT_PERCENT:
+			return "%";
+
+		case UNIT_DB:
+			return "dB";
+
+		case UNIT_DBM:
+			return "dBm";
+
+		case UNIT_COUNTS:
+			return "unitless (linear)";
+
+		case UNIT_COUNTS_SCI:
+			return "unitless (log)";
+
+		case UNIT_LOG_BER:
+			return "log BER";
+
+		case UNIT_SAMPLERATE:
+			return "sa/s";
+
+		case UNIT_SAMPLEDEPTH:
+			return "sa";
+
+		case UNIT_WATTS:
+			return "W";
+
+		case UNIT_UI:
+			return "UI";
+
+		case UNIT_DEGREES:
+			return "°";
+
+		case UNIT_RPM:
+			return "RPM";
+
+		case UNIT_CELSIUS:
+			return "°C";
+
+		case UNIT_RHO:
+			return "ρ";
+
+		case UNIT_MILLIVOLTS:
+			return "mV";
+
+		default:
+			return "unknown";
+	}
+}
+
+/**
 	@brief Prints a value with SI scaling factors
 
 	@param value	The value

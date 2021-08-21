@@ -79,6 +79,9 @@ public:
 	: m_type(t)
 	{}
 
+	Unit(const std::string& rhs);
+	std::string ToString();
+
 	std::string PrettyPrint(double value, int sigfigs = -1);
 	double ParseString(const std::string& str);
 
