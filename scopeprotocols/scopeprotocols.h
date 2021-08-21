@@ -91,6 +91,7 @@
 #include "FFTFilter.h"
 #include "FIRFilter.h"
 #include "FrequencyMeasurement.h"
+#include "GroupDelayFilter.h"
 #include "HistogramFilter.h"
 #include "HorizontalBathtub.h"
 #include "IBM8b10bDecoder.h"
