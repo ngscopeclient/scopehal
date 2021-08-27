@@ -102,6 +102,12 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 						m_bandwidth = 70;
 				}
 			}
+			// test if function generator functionality is available
+			// TODO looking at the commands above, we probably need a more hacky detection method
+			// m_transport->SendCommand(":SYST:OPT:STAT? AWG\n");
+			// reply = Trim(m_transport->ReadReply());
+			// reply == "1" ? true : false;
+			m_hasFunctionGen = true; //reply == "1" ? true : false;
 		}
 	}
 	else
@@ -186,7 +192,10 @@ RigolOscilloscope::~RigolOscilloscope()
 
 unsigned int RigolOscilloscope::GetInstrumentTypes()
 {
-	return Instrument::INST_OSCILLOSCOPE;
+	unsigned int type = INST_OSCILLOSCOPE;
+	if(m_hasFunctionGen)
+		type |= INST_FUNCTION;
+	return type;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1256,4 +1265,224 @@ void RigolOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			LogWarning("Unknown edge type\n");
 			return;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator mode
+
+int RigolOscilloscope::GetFunctionChannelCount()
+{
+	if(m_hasFunctionGen)
+		return 2;
+	else
+		return 0;
+}
+
+string RigolOscilloscope::GetFunctionChannelName(int chan)
+{
+	return chan==0 ? "GI" : "GII";
+}
+
+bool RigolOscilloscope::GetFunctionChannelActive(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:OUTP:STAT?");
+	} else {
+		m_transport->SendCommand(":SOUR2:OUTP:STAT?");
+	}
+
+	auto reply = Trim(m_transport->ReadReply());
+	return reply=="1" ? true : false;
+}
+
+void RigolOscilloscope::SetFunctionChannelActive(int chan, bool on)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		if (on) {
+			m_transport->SendCommand(":SOUR1:OUTP:STAT ON");
+		} else {
+			m_transport->SendCommand(":SOUR1:OUTP:STAT OF");
+		}
+	} else {
+		if (on) {
+			m_transport->SendCommand(":SOUR2:OUTP:STAT ON");
+		} else {
+			m_transport->SendCommand(":SOUR2:OUTP:STAT OF");
+		}
+	}
+}
+
+float RigolOscilloscope::GetFunctionChannelDutyCycle(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:PULS:DCYC?");
+	} else {
+		m_transport->SendCommand(":SOUR2:PULS:DCYC?");
+	}
+	auto reply = Trim(m_transport->ReadReply());
+	double duty;
+	sscanf(reply.c_str(), "%lf", &duty);
+	return duty;
+}
+
+void RigolOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
+{
+	char buf[64];
+	snprintf(buf, 64, ":SOUR%d:PULS:DCYC %f", chan+1, duty);
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(buf);
+}
+
+float RigolOscilloscope::GetFunctionChannelAmplitude(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:VOLT:LEV:IMM:AMPL?");
+	} else {
+		m_transport->SendCommand(":SOUR2:VOLT:LEV:IMM:AMPL?");
+	}
+	auto reply = Trim(m_transport->ReadReply());
+	double duty;
+	sscanf(reply.c_str(), "%lf", &duty);
+	return duty;
+}
+
+void RigolOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
+{
+	char buf[64];
+	snprintf(buf, 64, ":SOUR%d:VOLT:LEV:IMM:AMPL %f", chan+1, amplitude);
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(buf);
+}
+
+float RigolOscilloscope::GetFunctionChannelOffset(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:VOLT:LEV:IMM:OFFS?");
+	} else {
+		m_transport->SendCommand(":SOUR2:VOLT:LEV:IMM:OFFS?");
+	}
+	auto reply = Trim(m_transport->ReadReply());
+	double duty;
+	sscanf(reply.c_str(), "%lf", &duty);
+	return duty;
+}
+
+void RigolOscilloscope::SetFunctionChannelOffset(int chan, float offset)
+{
+	char buf[64];
+	snprintf(buf, 64, ":SOUR%d:VOLT:LEV:IMM:OFFS %f", chan+1, offset);
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(buf);
+}
+
+float RigolOscilloscope::GetFunctionChannelFrequency(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:FREQ:FIX?");
+	} else {
+		m_transport->SendCommand(":SOUR2:FREQ:FIX?");
+	}
+	auto reply = Trim(m_transport->ReadReply());
+	double duty;
+	sscanf(reply.c_str(), "%lf", &duty);
+	return duty;
+}
+
+void RigolOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
+{
+	char buf[64];
+	snprintf(buf, 64, ":SOUR%d:FREQ:FIX %f", chan+1, hz);
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(buf);
+}
+
+FunctionGenerator::WaveShape RigolOscilloscope::GetFunctionChannelShape(int chan)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if (chan==0) {
+		m_transport->SendCommand(":SOUR1:FUNC:SHAP?");
+	} else {
+		m_transport->SendCommand(":SOUR2:FUNC:SHAP?");
+	}
+	auto reply = Trim(m_transport->ReadReply());
+	if (reply == "SIN")
+		return WaveShape::SHAPE_SINE;
+	else if (reply == "SQU")
+		return WaveShape::SHAPE_SQUARE;
+	else if (reply == "RAMP")
+		return WaveShape::SHAPE_TRIANGLE;
+	else if (reply == "PULS")
+		return WaveShape::SHAPE_PULSE;
+	else if (reply == "NOIS")
+		return WaveShape::SHAPE_NOISE;
+	else if (reply == "DC")
+		return WaveShape::SHAPE_DC;
+	else if (reply == "ARB")
+		return WaveShape::SHAPE_ARB;
+
+	LogWarning("RigolOscilloscope::GetFunctionChannelShape unsupported shape\n");
+	return WaveShape::SHAPE_SINE;
+}
+
+void RigolOscilloscope::SetFunctionChannelShape(int chan, WaveShape shape)
+{
+	std::string shape_str;
+	switch (shape)
+	{
+	case WaveShape::SHAPE_SINE:
+		shape_str = "SIN";
+		break;
+	case WaveShape::SHAPE_SQUARE:
+		shape_str = "SQU";
+		break;
+	case WaveShape::SHAPE_TRIANGLE:
+		shape_str = "RAMP";
+		break;
+	case WaveShape::SHAPE_PULSE:
+		shape_str = "PULS";
+		break;
+	case WaveShape::SHAPE_NOISE:
+		shape_str = "NOIS";
+		break;
+	case WaveShape::SHAPE_DC:
+		shape_str = "DC";
+		break;
+	case WaveShape::SHAPE_ARB:
+		shape_str = "ARB";
+		break;
+	}
+	char buf[64];
+	snprintf(buf, 64, ":SOUR%d:FUNC:SHAP %s", chan+1, shape_str.c_str());
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(buf);
+}
+
+float RigolOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//app.wavesource.risetime
+	LogWarning("RigolOscilloscope::GetFunctionChannelRiseTime unimplemented\n");
+	return 0;
+}
+
+void RigolOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
+{
+	LogWarning("RigolOscilloscope::SetFunctionChannelRiseTime unimplemented\n");
+}
+
+float RigolOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//app.wavesource.falltime
+	LogWarning("RigolOscilloscope::GetFunctionChannelFallTime unimplemented\n");
+	return 0;
+}
+
+void RigolOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
+{
+	LogWarning("RigolOscilloscope::SetFunctionChannelFallTime unimplemented\n");
 }
