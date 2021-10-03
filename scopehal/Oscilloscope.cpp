@@ -926,7 +926,7 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 // Helpers for converting raw 16-bit ADC samples to fp32 waveforms
 
 /**
-	@brief Converts 8-bit ADC samples to floating point
+	@brief Converts 16-bit ADC samples to floating point
  */
 void Oscilloscope::Convert16BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
