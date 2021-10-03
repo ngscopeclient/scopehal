@@ -383,6 +383,27 @@ void FFTFilter::DoRefresh(
 	size_t numActualSamples = min(data.size(), npoints);
 	float scale = sqrt(2.0) / numActualSamples;
 
+	//We also need to adjust the scale by the coherent power gain of the window function
+	switch(window)
+	{
+		case WINDOW_HAMMING:
+			scale *= 1.862;
+			break;
+
+		case WINDOW_HANN:
+			scale *= 2.013;
+			break;
+
+		case WINDOW_BLACKMAN_HARRIS:
+			scale *= 2.805;
+			break;
+
+		//unit
+		case WINDOW_RECTANGULAR:
+		default:
+			break;
+	}
+
 	#ifdef HAVE_CLFFT
 		if(g_clContext && m_windowProgram && m_normalizeProgram)
 		{
