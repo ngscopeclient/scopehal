@@ -695,6 +695,19 @@ uint64_t next_pow2(uint64_t v)
 }
 
 /**
+	@brief Rounds a 64-bit integer down to the next power of 2
+ */
+uint64_t prev_pow2(uint64_t v)
+{
+	uint64_t next = next_pow2(v);
+
+	if(next == v)
+		return v;
+	else
+		return next/2;
+}
+
+/**
 	@brief Returns the contents of a file
  */
 string ReadFile(const string& path)

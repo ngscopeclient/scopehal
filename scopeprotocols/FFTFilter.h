@@ -70,6 +70,12 @@ public:
 		WINDOW_BLACKMAN_HARRIS
 	};
 
+	enum RoundingMode
+	{
+		ROUND_TRUNCATE,
+		ROUND_ZERO_PAD
+	};
+
 	//Window function helpers
 	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
 	static void HannWindow(const float* data, size_t len, float* out);
@@ -104,6 +110,7 @@ protected:
 	float m_offset;
 
 	std::string m_windowName;
+	std::string m_roundingName;
 
 	#ifdef HAVE_CLFFT
 	cl::CommandQueue* m_queue;

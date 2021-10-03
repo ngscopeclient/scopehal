@@ -130,6 +130,7 @@ void ScopehalStaticCleanup();
 float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);
+uint64_t prev_pow2(uint64_t v);
 
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;

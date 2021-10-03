@@ -41,6 +41,7 @@ using namespace std;
 FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 	, m_windowName("Window")
+	, m_roundingName("Length Rounding")
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	m_yAxisUnit = Unit(Unit::UNIT_DBM);
@@ -62,6 +63,11 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_windowName].AddEnumValue("Hann", WINDOW_HANN);
 	m_parameters[m_windowName].AddEnumValue("Rectangular", WINDOW_RECTANGULAR);
 	m_parameters[m_windowName].SetIntVal(WINDOW_HAMMING);
+
+	m_parameters[m_roundingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_roundingName].AddEnumValue("Down (Truncate)", ROUND_TRUNCATE);
+	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
+	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
 
 	#ifdef HAVE_CLFFT
 
@@ -314,9 +320,12 @@ void FFTFilter::Refresh()
 	}
 	auto din = GetAnalogInputWaveform(0);
 
-	//Round size up to next power of two
 	const size_t npoints_raw = din->m_samples.size();
-	const size_t npoints = next_pow2(npoints_raw);
+	size_t npoints;
+	if(m_parameters[m_roundingName].GetIntVal() == ROUND_TRUNCATE)
+		npoints = prev_pow2(npoints_raw);
+	else
+		npoints = next_pow2(npoints_raw);
 	LogTrace("FFTFilter: processing %zu raw points\n", npoints_raw);
 	LogTrace("Rounded to %zu\n", npoints);
 
@@ -339,7 +348,6 @@ void FFTFilter::DoRefresh(
 	bool log_output)
 {
 	//Look up some parameters
-	float scale = 2.0 / npoints;
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
@@ -354,7 +362,7 @@ void FFTFilter::DoRefresh(
 	}
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
+	cap->m_triggerPhase = 1*bin_hz;
 	cap->m_timescale = bin_hz;
 	cap->m_densePacked = true;
 
@@ -370,6 +378,11 @@ void FFTFilter::DoRefresh(
 		}
 	}
 
+	//Output scale is based on the number of points we FFT that contain actual sample data.
+	//(If we're zero padding, the zeroes don't contribute any power)
+	size_t numActualSamples = min(data.size(), npoints);
+	float scale = sqrt(2.0) / numActualSamples;
+
 	#ifdef HAVE_CLFFT
 		if(g_clContext && m_windowProgram && m_normalizeProgram)
 		{
@@ -383,7 +396,7 @@ void FFTFilter::DoRefresh(
 
 				//Apply the window function
 				cl::Kernel* windowKernel = NULL;
-				float windowscale = 2 * M_PI / m_cachedNumPoints;
+				float windowscale = 2 * M_PI / numActualSamples;
 				switch(window)
 				{
 					case WINDOW_RECTANGULAR:
@@ -450,13 +463,14 @@ void FFTFilter::DoRefresh(
 		{
 	#endif
 
-		//Copy the input with windowing, then zero pad to the desired input length
+		//Copy the input with windowing, then zero pad to the desired input length if needed
 		ApplyWindow(
 			(float*)&data[0],
-			m_cachedNumPoints,
+			numActualSamples,
 			&m_rdinbuf[0],
 			window);
-		memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+		if(npoints > m_cachedNumPoints)
+			memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
 
 		//Calculate the FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);

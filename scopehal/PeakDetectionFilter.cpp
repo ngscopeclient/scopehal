@@ -101,9 +101,8 @@ void PeakDetector::FindPeaks(AnalogWaveform* cap, int64_t max_peaks, float searc
 				total += cap->m_samples[j] * cap->m_offsets[j];
 				count += cap->m_samples[j];
 			}
-			ssize_t peak_location = total / count;
+			ssize_t peak_location = round(total / count);
 			//LogDebug("Moved peak from %zu to %zd\n", (size_t)cap->m_offsets[i], peak_location);
-			//LogDebug("Final position: %s\n", Unit(Unit::UNIT_HZ).PrettyPrint(peak_location * cap->m_timescale).c_str());
 
 			peaks.push_back(Peak(peak_location, target));
 
