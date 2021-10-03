@@ -776,6 +776,7 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	__m256 alpha2_x8	= { alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2 };
 	__m256 alpha3_x8	= { alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3 };
 	__m256 two_x8		= { 2, 2, 2, 2, 2, 2, 2, 2 };
+	__m256 six_x8		= { 6, 6, 6, 6, 6, 6, 6, 6 };
 
 	size_t i;
 	size_t len_rounded = len - (len % 8);
@@ -783,11 +784,11 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	{
 		__m256 vscale		= _mm256_mul_ps(count_x8, scale_x8);
 		__m256 vscale_x2	= _mm256_mul_ps(vscale, two_x8);
-		__m256 vscale_x3	= _mm256_add_ps(vscale, vscale_x2);
+		__m256 vscale_x6	= _mm256_mul_ps(vscale, six_x8);
 
 		__m256 term1		= _mm256_cos_ps(vscale);
 		__m256 term2		= _mm256_cos_ps(vscale_x2);
-		__m256 term3		= _mm256_cos_ps(vscale_x3);
+		__m256 term3		= _mm256_cos_ps(vscale_x6);
 		term1 				= _mm256_mul_ps(term1, alpha1_x8);
 		term2 				= _mm256_mul_ps(term2, alpha2_x8);
 		term3 				= _mm256_mul_ps(term3, alpha3_x8);
