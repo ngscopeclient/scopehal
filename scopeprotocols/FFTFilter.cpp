@@ -443,7 +443,7 @@ void FFTFilter::DoRefresh(
 				}
 				windowKernel->setArg(0, inbuf);
 				windowKernel->setArg(1, windowoutbuf);
-				windowKernel->setArg(2, data.size());
+				windowKernel->setArg(2, numActualSamples);
 				if(window != WINDOW_RECTANGULAR)
 					windowKernel->setArg(3, windowscale);
 				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
