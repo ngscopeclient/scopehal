@@ -231,7 +231,12 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	//ascii packet contents
 	string s;
 	for(auto b : pack->m_data)
-		s += (char)b;
+	{
+		if(isprint(b))
+			s += (char)b;
+		else
+			s += ".";
+	}
 	pack->m_headers["ASCII"] = s;
 
 	m_packets.push_back(pack);
