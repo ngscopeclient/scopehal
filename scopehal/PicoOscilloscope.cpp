@@ -511,6 +511,12 @@ bool PicoOscilloscope::AcquireData()
 				return false;
 
 			size_t podnum = chnum - m_analogChannelCount;
+			if(podnum > 2)
+			{
+				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?",
+					chnum);
+				return false;
+			}
 
 			//Now that we have the waveform data, unpack it into individual channels
 			for(size_t j=0; j<8; j++)
