@@ -543,6 +543,14 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	int64_t groupdelay_fs = GetGroupDelay();
 	int64_t groupdelay_samples = ceil( groupdelay_fs / din->m_timescale );
 
+	//Sanity check: if we have noisy or poor quality S-parameter data, group delay might not make sense.
+	//Skip this correction pass in that case.
+	if(llabs(groupdelay_fs) >= npoints)
+	{
+		groupdelay_fs = 0;
+		groupdelay_samples = 0;
+	}
+
 	//Calculate bounds for the *meaningful* output data.
 	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
 	size_t istart = 0;
