@@ -513,7 +513,7 @@ bool PicoOscilloscope::AcquireData()
 			size_t podnum = chnum - m_analogChannelCount;
 			if(podnum > 2)
 			{
-				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?",
+				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
 					chnum);
 				return false;
 			}
