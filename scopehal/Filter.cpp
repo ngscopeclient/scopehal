@@ -279,6 +279,29 @@ bool Filter::VerifyAllInputsOKAndAnalog()
 	return true;
 }
 
+/**
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty digital waveform present
+ */
+bool Filter::VerifyAllInputsOKAndDigital()
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == NULL)
+			return false;
+
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == NULL)
+			return false;
+		if(data->m_offsets.size() == 0)
+			return false;
+
+		auto ddata = dynamic_cast<DigitalWaveform*>(data);
+		if(ddata == NULL)
+			return false;
+	}
+
+	return true;
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sampling helpers
 

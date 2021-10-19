@@ -179,6 +179,7 @@ protected:
 	bool VerifyAllInputsOK(bool allowEmpty = false);
 	bool VerifyInputOK(size_t i, bool allowEmpty = false);
 	bool VerifyAllInputsOKAndAnalog();
+	bool VerifyAllInputsOKAndDigital();
 
 	///Gets the timestamp of the next event (if any) on a waveform
 	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
