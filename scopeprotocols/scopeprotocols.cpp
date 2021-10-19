@@ -80,6 +80,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(Ethernet64b66bDecoder);
 	AddDecoderClass(EthernetGMIIDecoder);
 	AddDecoderClass(EthernetRGMIIDecoder);
+	AddDecoderClass(EthernetRMIIDecoder);
 	AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeBitRateMeasurement);
 	AddDecoderClass(EyePattern);

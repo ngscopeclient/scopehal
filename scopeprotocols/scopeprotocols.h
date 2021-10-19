@@ -76,6 +76,7 @@
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "EthernetRGMIIDecoder.h"
+#include "EthernetRMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
