@@ -122,8 +122,8 @@ void EthernetRMIIDecoder::Refresh()
 	//Create the output capture
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = dd0.m_startTimestamp;
-	cap->m_startFemtoseconds = dd0.m_startFemtoseconds;
+	cap->m_startTimestamp = clk->m_startTimestamp;
+	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//skip first 2 samples so we can get a full clock cycle before starting
 	for(size_t i=2; i < len; i++)
