@@ -146,6 +146,7 @@ protected:
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 
+	std::vector<uint8_t> GetWaveformData(std::string channel);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 

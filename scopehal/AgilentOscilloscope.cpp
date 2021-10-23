@@ -490,10 +490,33 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	}
 }
 
+vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:DATA?");
+
+	// Read the length header size
+	char tmp[16] = {0};
+	m_transport->ReadRawData(2, (unsigned char*)tmp);
+	auto header_len = atoi(tmp+1);
+
+	// Read data length
+	m_transport->ReadRawData(header_len, (unsigned char*)tmp);
+	auto data_len = atoi(tmp);
+
+	// Read the actual data
+	auto buf = vector<uint8_t>(data_len);
+	m_transport->ReadRawData(data_len, &buf[0]);
+
+	// Discard trailing newline
+	m_transport->ReadRawData(1, (unsigned char*)tmp);
+
+	return buf;
+}
+
 bool AgilentOscilloscope::AcquireData()
 {
-	//LogDebug("Acquiring data\n");
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
@@ -522,9 +545,6 @@ bool AgilentOscilloscope::AcquireData()
 
 		//Figure out the sample rate
 		int64_t fs_per_sample = round(xincrement * FS_PER_SECOND);
-		//LogDebug("%ld ps/sample\n", ps_per_sample);
-
-		//LogDebug("length = %d\n", length);
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
@@ -535,39 +555,20 @@ bool AgilentOscilloscope::AcquireData()
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
-		//Ask for the data
-		m_transport->SendCommand(":WAV:DATA?");
-
-		//Read the length header
-		char tmp[16] = {0};
-		m_transport->ReadRawData(2, (unsigned char*)tmp);
-		int num_digits = atoi(tmp+1);
-		//LogDebug("num_digits = %d", num_digits);
-		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		int actual_len = atoi(tmp);
-		//LogDebug("actual_len = %d", actual_len);
-
-		uint8_t* temp_buf = new uint8_t[actual_len / sizeof(uint8_t)];
-
-		//Read the actual data
-		m_transport->ReadRawData(actual_len, (unsigned char*)temp_buf);
-		//Discard trailing newline
-		m_transport->ReadRawData(1, (unsigned char*)tmp);
-
-		//Format the capture
-		cap->Resize(length);
-		for(size_t j=0; j<length; j++)
+		// Format the capture
+		auto buf = GetWaveformData(m_channels[i]->GetHwname());
+		if (length != buf.size())
+			LogError("Waveform preamble length (%lu) does not match data length (%lu)", length, buf.size());
+		cap->Resize(buf.size());
+		for(size_t j=0; j<buf.size(); j++)
 		{
 			cap->m_offsets[j] = j;
 			cap->m_durations[j] = 1;
-			cap->m_samples[j] = yincrement * (temp_buf[j] - yreference) + yorigin;
+			cap->m_samples[j] = yincrement * (buf[j] - yreference) + yorigin;
 		}
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
-
-		//Clean up
-		delete[] temp_buf;
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
@@ -594,7 +595,6 @@ bool AgilentOscilloscope::AcquireData()
 		m_triggerArmed = true;
 	}
 
-	//LogDebug("Acquisition done\n");
 	return true;
 }
 
