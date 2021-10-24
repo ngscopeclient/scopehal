@@ -159,6 +159,7 @@ private:
 		double yreference;
 	};
 
+	void ConfigureWaveform(std::string channel);
 	std::vector<uint8_t> GetWaveformData(std::string channel);
 	WaveformPreamble GetWaveformPreamble(std::string channel);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);

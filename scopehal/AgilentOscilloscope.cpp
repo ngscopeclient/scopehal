@@ -93,13 +93,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			true);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
-
-		//Configure transport format to raw 8-bit int
-		m_transport->SendCommand(":WAV:SOUR " + chname);
-		m_transport->SendCommand(":WAV:FORM BYTE");
-
-		//Request all points when we download
-		m_transport->SendCommand(":WAV:POIN:MODE RAW");
+		ConfigureWaveform(chname);
 	}
 	m_analogChannelCount = nchans;
 
@@ -146,6 +140,16 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 
 AgilentOscilloscope::~AgilentOscilloscope()
 {
+}
+
+void AgilentOscilloscope::ConfigureWaveform(string channel)
+{
+	//Configure transport format to raw 8-bit int
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:FORM BYTE");
+
+	//Request all points when we download
+	m_transport->SendCommand(":WAV:POIN:MODE RAW");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
