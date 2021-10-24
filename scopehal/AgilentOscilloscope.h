@@ -146,7 +146,21 @@ protected:
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 
+	struct WaveformPreamble {
+		unsigned int format;
+		unsigned int type;
+		size_t length;
+		unsigned int average_count;
+		double xincrement;
+		double xorigin;
+		double xreference;
+		double yincrement;
+		double yorigin;
+		double yreference;
+	};
+
 	std::vector<uint8_t> GetWaveformData(std::string channel);
+	WaveformPreamble GetWaveformPreamble(std::string channel);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 

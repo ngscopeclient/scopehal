@@ -515,36 +515,38 @@ vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
 	return buf;
 }
 
+AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
+{
+	WaveformPreamble ret;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:PRE?");
+	string reply = m_transport->ReadReply();
+	sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
+			&ret.format, &ret.type, &ret.length, &ret.average_count,
+			&ret.xincrement, &ret.xorigin, &ret.xreference,
+			&ret.yincrement, &ret.yorigin, &ret.yreference);
+
+	return ret;
+}
+
 bool AgilentOscilloscope::AcquireData()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
-	unsigned int format;
-	unsigned int type;
-	size_t length;
-	unsigned int average_count;
-	double xincrement;
-	double xorigin;
-	double xreference;
-	double yincrement;
-	double yorigin;
-	double yreference;
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	map<int, vector<WaveformBase*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
 			continue;
 
-		// Set source & get preamble
-		m_transport->SendCommand(":WAV:SOUR " + m_channels[i]->GetHwname());
-		m_transport->SendCommand(":WAV:PRE?");
-		string reply = m_transport->ReadReply();
-		sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
-				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
+		auto chname = m_channels[i]->GetHwname();
+		auto preamble = GetWaveformPreamble(chname);
 
 		//Figure out the sample rate
-		int64_t fs_per_sample = round(xincrement * FS_PER_SECOND);
+		int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
