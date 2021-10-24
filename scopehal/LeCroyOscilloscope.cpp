@@ -2471,7 +2471,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 		{
 			DigitalWaveform* cap = new DigitalWaveform;
 			cap->m_timescale = interval;
-			cap->m_densePacked = true;
+			cap->m_densePacked = false;
 
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
