@@ -59,6 +59,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	GroupDelayFilter.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp
+	HyperRAMDecoder.cpp
 	I2CDecoder.cpp
 	I2CEepromDecoder.cpp
 	IBM8b10bDecoder.cpp

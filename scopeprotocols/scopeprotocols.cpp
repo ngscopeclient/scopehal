@@ -95,6 +95,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(GroupDelayFilter);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
+	AddDecoderClass(HyperRAMDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(I2CEepromDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
