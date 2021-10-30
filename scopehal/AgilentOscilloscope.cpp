@@ -93,13 +93,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			true);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
-
-		//Configure transport format to raw 8-bit int
-		m_transport->SendCommand(":WAV:SOUR " + chname);
-		m_transport->SendCommand(":WAV:FORM BYTE");
-
-		//Request all points when we download
-		m_transport->SendCommand(":WAV:POIN:MODE RAW");
+		ConfigureWaveform(chname);
 	}
 	m_analogChannelCount = nchans;
 
@@ -119,7 +113,7 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	m_transport->SendCommand("*OPT?");
 	string reply = m_transport->ReadReply();
 
-	vector<string> options;
+	set<string> options;
 
 	for (std::string::size_type prev_pos=0, pos=0;
 	     (pos = reply.find(',', pos)) != std::string::npos;
@@ -128,10 +122,12 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		std::string opt( reply.substr(prev_pos, pos-prev_pos) );
 		if (opt == "0")
 			continue;
-		if (opt.substr(opt.length()-3, 3) == "(d)")
-			opt.erase(opt.length()-3);
+		if(opt.substr(opt.length() - 3, 3) == "(d)")
+			opt.erase(opt.length() - 3);
+		if(opt.substr(opt.length() - 1, 1) == "*")
+			opt.erase(opt.length() - 1);
 
-		options.push_back(opt);
+		options.insert(opt);
 	}
 
 	//Print out the option list and do processing for each
@@ -140,12 +136,45 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		LogDebug("* None\n");
 	for(auto opt : options)
 	{
-		LogDebug("* %s (unknown)\n", opt.c_str());
+		LogDebug("* %s\n", opt.c_str());
+	}
+
+	// If the MSO option is enabled, add digital channels
+	if (options.find("MSO") != options.end())
+	{
+		m_digitalChannelCount = 16;
+		m_digitalChannelBase = m_channels.size();
+		for(int i = 0; i < 16; i++)
+		{
+			//Create the channel
+			auto chan = new OscilloscopeChannel(
+				this,
+				"DIG" + to_string(i),
+				OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+				"#00ffff",
+				1,
+				m_channels.size(),
+				true);
+			m_channels.push_back(chan);
+			chan->SetDefaultDisplayName();
+		}
+		ConfigureWaveform("POD1");
+		ConfigureWaveform("POD2");
 	}
 }
 
 AgilentOscilloscope::~AgilentOscilloscope()
 {
+}
+
+void AgilentOscilloscope::ConfigureWaveform(string channel)
+{
+	//Configure transport format to raw 8-bit int
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:FORM BYTE");
+
+	//Request all points when we download
+	m_transport->SendCommand(":WAV:POIN:MODE RAW");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,14 +212,15 @@ void AgilentOscilloscope::FlushConfigCache()
 	m_trigger = NULL;
 }
 
+bool AgilentOscilloscope::IsAnalogChannel(size_t i)
+{
+	return m_channels[i]->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG;
+}
+
 bool AgilentOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
 	if(i == m_extTrigChannel->GetIndex())
-		return false;
-
-	//TODO: handle digital channels, for now just claim they're off
-	if(i >= m_analogChannelCount)
 		return false;
 
 	{
@@ -254,6 +284,9 @@ vector<OscilloscopeChannel::CouplingType> AgilentOscilloscope::GetAvailableCoupl
 
 OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t i)
 {
+	if(!IsAnalogChannel(i))
+		return OscilloscopeChannel::COUPLE_SYNTHETIC;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelCouplings.find(i) != m_channelCouplings.end())
@@ -391,6 +424,9 @@ void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*
 
 double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
 {
+	if(m_channels[i]->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		return 1;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelVoltageRanges.find(i) != m_channelVoltageRanges.end())
@@ -433,6 +469,9 @@ OscilloscopeChannel* AgilentOscilloscope::GetExternalTrigger()
 
 double AgilentOscilloscope::GetChannelOffset(size_t i)
 {
+	if(!IsAnalogChannel(i))
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -490,41 +529,124 @@ Oscilloscope::TriggerMode AgilentOscilloscope::PollTrigger()
 	}
 }
 
+vector<uint8_t> AgilentOscilloscope::GetWaveformData(string channel)
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:DATA?");
+
+	// Read the length header size
+	char tmp[16] = {0};
+	m_transport->ReadRawData(2, (unsigned char*)tmp);
+	auto header_len = atoi(tmp+1);
+
+	// Read data length
+	m_transport->ReadRawData(header_len, (unsigned char*)tmp);
+	auto data_len = atoi(tmp);
+
+	// Read the actual data
+	auto buf = vector<uint8_t>(data_len);
+	m_transport->ReadRawData(data_len, &buf[0]);
+
+	// Discard trailing newline
+	m_transport->ReadRawData(1, (unsigned char*)tmp);
+
+	return buf;
+}
+
+AgilentOscilloscope::WaveformPreamble AgilentOscilloscope::GetWaveformPreamble(string channel)
+{
+	WaveformPreamble ret;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(":WAV:SOUR " + channel);
+	m_transport->SendCommand(":WAV:PRE?");
+	string reply = m_transport->ReadReply();
+	sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
+			&ret.format, &ret.type, &ret.length, &ret.average_count,
+			&ret.xincrement, &ret.xorigin, &ret.xreference,
+			&ret.yincrement, &ret.yorigin, &ret.yreference);
+
+	return ret;
+}
+
+void AgilentOscilloscope::ProcessDigitalWaveforms(
+       map<int, vector<WaveformBase*>> &pending_waveforms,
+       vector<uint8_t> &data, AgilentOscilloscope::WaveformPreamble &preamble,
+       size_t chan_start)
+{
+	for (int i = 0; i < 8; i++)
+	{
+		auto channel = m_digitalChannelBase + chan_start + i;
+		if (IsChannelEnabled(channel))
+		{
+			auto cap = new DigitalWaveform;
+			int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
+			cap->m_timescale = fs_per_sample;
+			cap->m_startFemtoseconds = 0;
+			cap->m_triggerPhase = 0;
+
+			//Preallocate memory assuming no deduplication possible
+			cap->Resize(data.size());
+
+			//Save the first sample (can't merge with sample -1 because that doesn't exist)
+			size_t k = 0;
+			cap->m_offsets[0] = 0;
+			cap->m_durations[0] = 1;
+			cap->m_samples[0] = (data[0] >> i) & 1;
+
+			//Read and de-duplicate the other samples
+			//TODO: can we vectorize this somehow?
+			bool last = cap->m_samples[0];
+			for (size_t j = 1; j < data.size(); j++)
+			{
+				bool sample = (data[j] >> i) & 1;
+
+				//Deduplicate consecutive samples with same value
+				//FIXME: temporary workaround for rendering bugs
+				//if(last == sample)
+				if ((last == sample) && ((j+3) < data.size()))
+					cap->m_durations[k] ++;
+
+				//Nope, it toggled - store the new value
+				else
+				{
+					k++;
+					cap->m_offsets[k] = j;
+					cap->m_durations[k] = 1;
+					cap->m_samples[k] = sample;
+					last = sample;
+				}
+
+			}
+
+			//Done, shrink any unused space
+			cap->Resize(k);
+			cap->m_offsets.shrink_to_fit();
+			cap->m_durations.shrink_to_fit();
+			cap->m_samples.shrink_to_fit();
+
+			pending_waveforms[channel].push_back(cap);
+		}
+	}
+}
+
 bool AgilentOscilloscope::AcquireData()
 {
-	//LogDebug("Acquiring data\n");
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
-	unsigned int format;
-	unsigned int type;
-	size_t length;
-	unsigned int average_count;
-	double xincrement;
-	double xorigin;
-	double xreference;
-	double yincrement;
-	double yorigin;
-	double yreference;
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	map<int, vector<WaveformBase*> > pending_waveforms;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		if(!IsChannelEnabled(i))
 			continue;
 
-		// Set source & get preamble
-		m_transport->SendCommand(":WAV:SOUR " + m_channels[i]->GetHwname());
-		m_transport->SendCommand(":WAV:PRE?");
-		string reply = m_transport->ReadReply();
-		sscanf(reply.c_str(), "%u,%u,%zu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
-				&format, &type, &length, &average_count, &xincrement, &xorigin, &xreference, &yincrement, &yorigin, &yreference);
+		auto chname = m_channels[i]->GetHwname();
+		auto preamble = GetWaveformPreamble(chname);
 
 		//Figure out the sample rate
-		int64_t fs_per_sample = round(xincrement * FS_PER_SECOND);
-		//LogDebug("%ld ps/sample\n", ps_per_sample);
-
-		//LogDebug("length = %d\n", length);
+		int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
@@ -535,39 +657,49 @@ bool AgilentOscilloscope::AcquireData()
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
-		//Ask for the data
-		m_transport->SendCommand(":WAV:DATA?");
-
-		//Read the length header
-		char tmp[16] = {0};
-		m_transport->ReadRawData(2, (unsigned char*)tmp);
-		int num_digits = atoi(tmp+1);
-		//LogDebug("num_digits = %d", num_digits);
-		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
-		int actual_len = atoi(tmp);
-		//LogDebug("actual_len = %d", actual_len);
-
-		uint8_t* temp_buf = new uint8_t[actual_len / sizeof(uint8_t)];
-
-		//Read the actual data
-		m_transport->ReadRawData(actual_len, (unsigned char*)temp_buf);
-		//Discard trailing newline
-		m_transport->ReadRawData(1, (unsigned char*)tmp);
-
-		//Format the capture
-		cap->Resize(length);
-		for(size_t j=0; j<length; j++)
+		// Format the capture
+		auto buf = GetWaveformData(chname);
+		if(preamble.length != buf.size())
+			LogError("Waveform preamble length (%lu) does not match data length (%lu)", preamble.length, buf.size());
+		cap->Resize(buf.size());
+		for(size_t j = 0; j < buf.size(); j++)
 		{
 			cap->m_offsets[j] = j;
 			cap->m_durations[j] = 1;
-			cap->m_samples[j] = yincrement * (temp_buf[j] - yreference) + yorigin;
+			cap->m_samples[j] = preamble.yincrement * (buf[j] - preamble.yreference) + preamble.yorigin;
 		}
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
+	}
 
-		//Clean up
-		delete[] temp_buf;
+	if(m_digitalChannelCount > 0)
+	{
+		auto preamble = GetWaveformPreamble("POD1");
+
+		// Fetch waveform data for each pod containing enabled channels
+		map<string, vector<uint8_t>> raw_waveforms;
+		for(int i = 0; i < 8; i++)
+		{
+			if(IsChannelEnabled(i + m_digitalChannelBase))
+			{
+				raw_waveforms.insert({"POD1", GetWaveformData("POD1")});
+				break;
+			}
+		}
+		for(int i = 8; i < 16; i++)
+		{
+			if(IsChannelEnabled(i + m_digitalChannelBase))
+			{
+				raw_waveforms.insert({"POD2", GetWaveformData("POD2")});
+				break;
+			}
+		}
+
+		if (raw_waveforms.find("POD1") != raw_waveforms.end())
+			ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD1"), preamble, 0);
+		if (raw_waveforms.find("POD2") != raw_waveforms.end())
+			ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD2"), preamble, 8);
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
@@ -576,16 +708,12 @@ bool AgilentOscilloscope::AcquireData()
 	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;
-		for(size_t j=0; j<m_analogChannelCount; j++)
-		{
-			if(IsChannelEnabled(j))
+		for (size_t j = 0; j < m_channels.size(); j++)
+			if(IsChannelEnabled(j) && pending_waveforms.find(j) != pending_waveforms.end())
 				s[m_channels[j]] = pending_waveforms[j][i];
-		}
 		m_pendingWaveforms.push_back(s);
 	}
 	m_pendingWaveformsMutex.unlock();
-
-	//TODO: support digital channels
 
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
@@ -594,7 +722,6 @@ bool AgilentOscilloscope::AcquireData()
 		m_triggerArmed = true;
 	}
 
-	//LogDebug("Acquisition done\n");
 	return true;
 }
 

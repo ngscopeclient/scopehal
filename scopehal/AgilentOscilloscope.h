@@ -102,6 +102,8 @@ protected:
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
+	unsigned int m_digitalChannelCount;
+	unsigned int m_digitalChannelBase;
 
 	enum ProbeType {
 		None,
@@ -146,6 +148,27 @@ protected:
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 
+	struct WaveformPreamble {
+		unsigned int format;
+		unsigned int type;
+		size_t length;
+		unsigned int average_count;
+		double xincrement;
+		double xorigin;
+		double xreference;
+		double yincrement;
+		double yorigin;
+		double yreference;
+	};
+
+	void ConfigureWaveform(std::string channel);
+	bool IsAnalogChannel(size_t i);
+	std::vector<uint8_t> GetWaveformData(std::string channel);
+	WaveformPreamble GetWaveformPreamble(std::string channel);
+	void ProcessDigitalWaveforms(
+		std::map<int, std::vector<WaveformBase*>> &pending_waveforms,
+		std::vector<uint8_t> &data, WaveformPreamble &preamble,
+		size_t chan_start);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 
