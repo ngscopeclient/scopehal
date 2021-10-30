@@ -209,6 +209,7 @@ void UpsampleFilter::Refresh()
 	cap->m_timescale = din->m_timescale / upsample_factor;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
 
 	SetData(cap, 0);
 }

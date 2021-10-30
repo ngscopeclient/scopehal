@@ -120,6 +120,8 @@ void DownconvertFilter::Refresh()
 	double sample_freq = FS_PER_SECOND / din->m_timescale;
 	double lo_cycles_per_sample = lo_freq / sample_freq;
 	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
+	double lo_rad_per_fs = lo_rad_per_sample / din->m_timescale;
+	double trigger_phase_rad = din->m_triggerPhase * lo_rad_per_fs;
 
 	//Do the actual mixing
 	auto cap_i = new AnalogWaveform;
@@ -137,7 +139,7 @@ void DownconvertFilter::Refresh()
 		cap_q->m_durations[i]	= duration;
 
 		//Generate the LO and mix it in
-		float phase = lo_rad_per_sample * timestamp;
+		float phase = lo_rad_per_sample * timestamp + trigger_phase_rad;
 		float samp = din->m_samples[i];
 		cap_i->m_samples[i] 	= samp * sin(phase);
 		cap_q->m_samples[i] 	= samp * cos(phase);
