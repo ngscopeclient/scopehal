@@ -95,6 +95,7 @@
 #include "GroupDelayFilter.h"
 #include "HistogramFilter.h"
 #include "HorizontalBathtub.h"
+#include "HyperRAMDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "I2CEepromDecoder.h"
