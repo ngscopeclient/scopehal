@@ -41,8 +41,10 @@ PkPkMeasurement::PkPkMeasurement(const string& color)
 	//Set up channels
 	CreateInput("din");
 
-	m_midpoint = 0;
 	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,11 +96,19 @@ double PkPkMeasurement::GetVoltageRange()
 
 double PkPkMeasurement::GetOffset()
 {
-	return -m_midpoint;
+	return m_offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+void PkPkMeasurement::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
+}
 
 void PkPkMeasurement::Refresh()
 {
@@ -133,6 +143,7 @@ void PkPkMeasurement::Refresh()
 
 	//For each cycle, find the min and max
 	bool		last_was_low	= true;
+	bool		first			= true;
 	for(size_t i=0; i < len; i++)
 	{
 		//If we're above the midpoint, reset everything and add a new sample
@@ -151,13 +162,19 @@ void PkPkMeasurement::Refresh()
 
 				float value = last_max - vmin;
 
-				fmax = max(fmax, value);
-				fmin = min(fmin, value);
-
 				//Add the new sample
-				cap->m_offsets.push_back(tmin);
-				cap->m_durations.push_back(0);
-				cap->m_samples.push_back(value);
+				//Discard the first cycle as it might be incomplete
+				if(first)
+					first = false;
+				else
+				{
+					fmax = max(fmax, value);
+					fmin = min(fmin, value);
+
+					cap->m_offsets.push_back(tmin);
+					cap->m_durations.push_back(0);
+					cap->m_samples.push_back(value);
+				}
 			}
 
 			//Reset
@@ -187,10 +204,11 @@ void PkPkMeasurement::Refresh()
 		}
 	}
 
-	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
-	m_midpoint = (fmax + fmin) / 2;
+	//Calculate bounds
+	m_max = max(m_max, fmax);
+	m_min = min(m_min, fmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	SetData(cap, 0);
 

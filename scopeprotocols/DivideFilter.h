@@ -30,15 +30,15 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of PkPkMeasurement
+	@brief Declaration of DivideFilter
  */
-#ifndef PkPkMeasurement_h
-#define PkPkMeasurement_h
+#ifndef DivideFilter_h
+#define DivideFilter_h
 
-class PkPkMeasurement : public Filter
+class DivideFilter : public Filter
 {
 public:
-	PkPkMeasurement(const std::string& color);
+	DivideFilter(const std::string& color);
 
 	virtual void Refresh();
 
@@ -52,16 +52,23 @@ public:
 
 	virtual double GetVoltageRange();
 	virtual double GetOffset();
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(PkPkMeasurement)
+	PROTOCOL_DECODER_INITPROC(DivideFilter)
+
+	enum OutputFormat
+	{
+		FORMAT_RATIO,
+		FORMAT_DB
+	};
 
 protected:
 	float m_min;
 	float m_max;
 	float m_range;
 	float m_offset;
+
+	std::string m_formatName;
 };
 
 #endif

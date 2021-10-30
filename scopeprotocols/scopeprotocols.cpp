@@ -58,6 +58,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DeskewFilter);
 	AddDecoderClass(DigitalToPAM4Filter);
 	AddDecoderClass(DigitalToNRZFilter);
+	AddDecoderClass(DivideFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
 	AddDecoderClass(DPhyDataDecoder);
@@ -152,6 +153,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(USB2PMADecoder);
+	AddDecoderClass(VectorPhaseFilter);
 	AddDecoderClass(VerticalBathtub);
 	AddDecoderClass(Waterfall);
 	AddDecoderClass(WindowedAutocorrelationFilter);

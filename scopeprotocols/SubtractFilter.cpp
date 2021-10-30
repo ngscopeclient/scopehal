@@ -162,11 +162,28 @@ void SubtractFilter::Refresh()
 	float* a = (float*)&din_p->m_samples[0];
 	float* b = (float*)&din_n->m_samples[0];
 
-	//Do the actual subtraction
-	if(g_hasAvx2)
-		InnerLoopAVX2(out, a, b, len);
+	//Special case if input units are degrees: we want to do modular arithmetic
+	//TODO: vectorized version of this
+	if(m_yAxisUnit == Unit::UNIT_DEGREES)
+	{
+		for(size_t i=0; i<len; i++)
+		{
+			out[i] 		= a[i] - b[i];
+			if(out[i] < -180)
+				out[i] += 360;
+			if(out[i] > 180)
+				out[i] -= 360;
+		}
+	}
+
+	//Just regular subtraction
 	else
-		InnerLoop(out, a, b, len);
+	{
+		if(g_hasAvx2)
+			InnerLoopAVX2(out, a, b, len);
+		else
+			InnerLoop(out, a, b, len);
+	}
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization

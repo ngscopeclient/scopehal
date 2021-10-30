@@ -27,41 +27,146 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PkPkMeasurement
- */
-#ifndef PkPkMeasurement_h
-#define PkPkMeasurement_h
+#include "../scopehal/scopehal.h"
+#include "DivideFilter.h"
 
-class PkPkMeasurement : public Filter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+DivideFilter::DivideFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	, m_formatName("Output Format")
 {
-public:
-	PkPkMeasurement(const std::string& color);
+	//Set up channels
+	CreateInput("a");
+	CreateInput("b");
 
-	virtual void Refresh();
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+	m_parameters[m_formatName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_formatName].AddEnumValue("Ratio", FORMAT_RATIO);
+	m_parameters[m_formatName].AddEnumValue("dB", FORMAT_DB);
+	m_parameters[m_formatName].SetIntVal(FORMAT_RATIO);
+}
 
-	virtual void ClearSweeps();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+		return true;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	return false;
+}
 
-	PROTOCOL_DECODER_INITPROC(PkPkMeasurement)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-protected:
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
-};
+double DivideFilter::GetVoltageRange()
+{
+	return m_range;
+}
 
-#endif
+double DivideFilter::GetOffset()
+{
+	return m_offset;
+}
+
+string DivideFilter::GetProtocolName()
+{
+	return "Divide";
+}
+
+bool DivideFilter::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool DivideFilter::NeedsConfig()
+{
+	return true;
+}
+
+void DivideFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "(%s / %s)",
+		GetInputDisplayName(0).c_str(),
+		GetInputDisplayName(1).c_str());
+
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void DivideFilter::ClearSweeps()
+{
+	m_range = 1;
+	m_offset = 0;
+	m_min = FLT_MAX;
+	m_max = -FLT_MAX;
+}
+
+void DivideFilter::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Get the input data
+	auto a = GetAnalogInputWaveform(0);
+	auto b = GetAnalogInputWaveform(1);
+	auto len = min(a->m_samples.size(), b->m_samples.size());
+
+	//Set up the output waveform
+	auto cap = SetupOutputWaveform(a, 0, 0, 0);
+
+	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
+	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
+	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+
+	auto format = m_parameters[m_formatName].GetIntVal();
+
+	if(format == FORMAT_RATIO)
+	{
+		m_yAxisUnit = Unit(Unit::UNIT_COUNTS);
+
+		//Divide the units
+		//m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() / m_inputs[1].m_channel->GetYAxisUnits();
+
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fa[i] / fb[i];
+	}
+	else /*if(format == FORMAT_DB) */
+	{
+		m_yAxisUnit = Unit(Unit::UNIT_DB);
+
+		for(size_t i=0; i<len; i++)
+			fdst[i] = 20 * log10(fa[i] / fb[i]);
+	}
+
+	//Calculate range of the output waveform
+	float vmax = GetMaxVoltage(cap);
+	float vmin = GetMinVoltage(cap);
+
+	//Calculate bounds
+	m_max = max(m_max, vmax);
+	m_min = min(m_min, vmin);
+	m_range = (m_max - m_min) * 1.05;
+	m_offset = -( (m_max - m_min)/2 + m_min );
+}

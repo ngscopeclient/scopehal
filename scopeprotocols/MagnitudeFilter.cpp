@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 MagnitudeFilter::MagnitudeFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	//Set up channels
 	CreateInput("I");
@@ -75,7 +75,7 @@ double MagnitudeFilter::GetOffset()
 
 string MagnitudeFilter::GetProtocolName()
 {
-	return "Magnitude";
+	return "Vector Magnitude";
 }
 
 bool MagnitudeFilter::IsOverlay()

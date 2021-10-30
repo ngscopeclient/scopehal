@@ -30,22 +30,20 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of PkPkMeasurement
+	@brief Declaration of VectorPhaseFilter
  */
-#ifndef PkPkMeasurement_h
-#define PkPkMeasurement_h
+#ifndef VectorPhaseFilter_h
+#define VectorPhaseFilter_h
 
-class PkPkMeasurement : public Filter
+class VectorPhaseFilter : public Filter
 {
 public:
-	PkPkMeasurement(const std::string& color);
+	VectorPhaseFilter(const std::string& color);
 
 	virtual void Refresh();
 
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
-
-	virtual void ClearSweeps();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
@@ -55,13 +53,7 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(PkPkMeasurement)
-
-protected:
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
+	PROTOCOL_DECODER_INITPROC(VectorPhaseFilter)
 };
 
 #endif

@@ -27,41 +27,113 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of PkPkMeasurement
- */
-#ifndef PkPkMeasurement_h
-#define PkPkMeasurement_h
+#include "scopeprotocols.h"
+#include "VectorPhaseFilter.h"
 
-class PkPkMeasurement : public Filter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+VectorPhaseFilter::VectorPhaseFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
-public:
-	PkPkMeasurement(const std::string& color);
+	//Set up channels
+	CreateInput("I");
+	CreateInput("Q");
+}
 
-	virtual void Refresh();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+bool VectorPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	virtual void ClearSweeps();
+	if(i > 1)
+		return false;
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	if(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		return true;
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	return false;
+}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-	PROTOCOL_DECODER_INITPROC(PkPkMeasurement)
+void VectorPhaseFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "VectorPhase(%s,%s)", GetInputDisplayName(0).c_str(), GetInputDisplayName(1).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
 
-protected:
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
-};
+string VectorPhaseFilter::GetProtocolName()
+{
+	return "Vector Phase";
+}
 
-#endif
+bool VectorPhaseFilter::IsOverlay()
+{
+	//we create a new analog channel
+	return false;
+}
+
+bool VectorPhaseFilter::NeedsConfig()
+{
+	return true;
+}
+
+double VectorPhaseFilter::GetVoltageRange()
+{
+	return 370;
+}
+
+double VectorPhaseFilter::GetOffset()
+{
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void VectorPhaseFilter::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Get the input data
+	auto a = GetAnalogInputWaveform(0);
+	auto b = GetAnalogInputWaveform(1);
+	auto len = min(a->m_samples.size(), b->m_samples.size());
+
+	//Copy the units
+	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+
+	//Set up the output waveform
+	auto cap = new AnalogWaveform;
+	cap->Resize(len);
+	cap->CopyTimestamps(a);
+
+	float* fa = (float*)&a->m_samples[0];
+	float* fb = (float*)&b->m_samples[0];
+	float scale = 180 / M_PI;
+	for(size_t i=0; i<len; i++)
+		cap->m_samples[i] = atan2(fa[i], fb[i]) * scale;
+
+	//Copy our time scales from the input
+	cap->m_timescale 		= a->m_timescale;
+	cap->m_startTimestamp 	= a->m_startTimestamp;
+	cap->m_startFemtoseconds = a->m_startFemtoseconds;
+
+	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+
+	SetData(cap, 0);
+}
