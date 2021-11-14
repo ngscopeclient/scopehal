@@ -107,13 +107,20 @@ public:
 	{}
 
 	//Now for the fun part
-	T* allocate(const size_t n) const
+	T* allocate(size_t n) const
 	{
 		//Fail if we got an invalid size
 		if(n == 0)
 			return NULL;
 		if(n > max_size())
 			throw std::length_error("AlignedAllocator<T>::allocate(): requested size is too large, integer overflow?");
+
+		//Round size up to multiple of alignment
+		if( (n % alignment) != 0)
+		{
+			n |= (alignment - 1);
+			n ++;
+		}
 
 		//Do the actual allocation
 #ifdef _WIN32
