@@ -1125,11 +1125,11 @@ bool SDCmdDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 	auto& curcode = cur->m_headers["Code"];
 	auto& nextcode = next->m_headers["Code"];
 	auto& firstinfo = first->m_headers["Info"];
-	auto& curinfo = cur->m_headers["Info"];
+	//auto& curinfo = cur->m_headers["Info"];
 	auto& nextinfo = next->m_headers["Info"];
 	bool curcmd = cur->m_headers["Type"] == "Command";
 	bool curreply = !curcmd;
-	bool nextcmd = nextcmd;
+	bool nextcmd = next->m_headers["Type"] == "Command";
 	bool nextreply = !nextcmd;
 
 	//Merge reply with the preceding command
@@ -1160,6 +1160,10 @@ bool SDCmdDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 		else if(firstinfo == nextinfo)
 			return true;
 	}
+
+	//Merge CMD12 (STOP_TRANSMISSION) with the previous CMD18 (READ_MULTIPLE_BLOCK) or CMD25 (WRITE_MULTIPLE_BLOCK)
+	if( ( (curcode == "CMD18") || (curcode == "CMD25") ) && (nextcode == "CMD12") )
+		return true;
 
 	return false;
 }
