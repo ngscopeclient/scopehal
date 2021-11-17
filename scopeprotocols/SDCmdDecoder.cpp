@@ -459,7 +459,15 @@ string SDCmdDecoder::GetText(int i)
 					switch(s.m_data)
 					{
 						case 0:		return "GO_IDLE_STATE";
-						//CMD1 reserved
+
+						//CMD1 reserved for SDIO
+						//eMMC uses it for SEND_OP_COND
+						case 1:
+							if(cardtype == SD_EMMC)
+								return "SEND_OP_COND";
+							else
+								return ret;
+
 						case 2:		return "ALL_SEND_CID";
 						case 3:		return "SEND_RELATIVE_ADDR";
 						case 4:		return "SET_DSR";
@@ -596,6 +604,7 @@ string SDCmdDecoder::GetText(int i)
 					{
 						//No arguments
 						case 0:
+						case 1:
 						case 2:
 							return "";
 
@@ -773,6 +782,30 @@ string SDCmdDecoder::GetText(int i)
 
 					switch(type)
 					{
+						//R3 (OCR register)
+						//(only valid for eMMC)
+						case 1:
+
+							//Card ready
+							if(s.m_data & 0x80000000)
+							{
+								int access = (s.m_data >> 29) & 3;
+								if(access == 0)
+									ret = "ByteAcc ";
+								else if(access == 2)
+									ret = "SectorAcc ";
+								else
+									ret = "InvalidAcc ";
+								if(s.m_data & 0x80)
+									ret += "1V8 ";
+							}
+
+							//Card busy, still initializing
+							else
+								ret = "BUSY";
+
+							break;
+
 						//4.9.3 R2 (CID or CSD register)
 						case 2:
 							{
@@ -1086,25 +1119,46 @@ vector<string> SDCmdDecoder::GetHeaders()
 }
 
 
-bool SDCmdDecoder::CanMerge(Packet* /*first*/, Packet* cur, Packet* next)
+bool SDCmdDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 {
+	auto& firstcode = first->m_headers["Code"];
+	auto& curcode = cur->m_headers["Code"];
+	auto& nextcode = next->m_headers["Code"];
+	auto& firstinfo = first->m_headers["Info"];
+	auto& curinfo = cur->m_headers["Info"];
+	auto& nextinfo = next->m_headers["Info"];
+	bool curcmd = cur->m_headers["Type"] == "Command";
+	bool curreply = !curcmd;
+	bool nextcmd = nextcmd;
+	bool nextreply = !nextcmd;
+
 	//Merge reply with the preceding command
-	if( (cur->m_headers["Type"] == "Command") && (next->m_headers["Type"] == "Reply") )
+	if( curcmd && nextreply )
 		return true;
 
 	//If the previous is a CMD55 reply, we can merge the ACMD request with it
-	if( (cur->m_headers["Type"] == "Reply") && (cur->m_headers["Code"] == "CMD55") &&
-		(next->m_headers["Type"] == "Command") )
-	{
+	if(curreply && (curcode == "CMD55") && nextcmd)
 		return true;
-	}
 
 	//If the previous is an ACMD41 reply, and this is an ACMD request, merge the powerup polling
 	//FIXME: this will falsely merge other ACMDs after!!
-	if( (cur->m_headers["Type"] == "Reply") && (cur->m_headers["Code"] == "ACMD41") &&
-		(next->m_headers["Type"] == "Command") && (next->m_headers["Code"] == "CMD55") )
-	{
+	if( curreply && (curcode == "ACMD41") && nextcmd && (nextcode == "CMD55") )
 		return true;
+
+	//Merge all command/reply groups for CMD1 (SEND_OP_COND)
+	if( (curcode == "CMD1") && (nextcode == "CMD1") )
+		return true;
+
+	//Merge all command/reply groups for CMD13 (SEND_STATUS)
+	if( (firstcode == "CMD13") && (nextcode == "CMD13") )
+	{
+		//Always merge replies
+		if(nextreply)
+			return true;
+
+		//Commands must have same argument (polling same register)
+		else if(firstinfo == nextinfo)
+			return true;
 	}
 
 	return false;
@@ -1119,14 +1173,15 @@ Packet* SDCmdDecoder::CreateMergedHeader(Packet* pack, size_t i)
 		ret->m_len = pack->m_len;
 
 		//Default to copying everything
+		auto code = pack->m_headers["Code"];
 		ret->m_headers["Type"] = "Command";
-		ret->m_headers["Code"] = pack->m_headers["Code"];
+		ret->m_headers["Code"] = code;
 		ret->m_headers["Command"] = pack->m_headers["Command"];
 		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
 		ret->m_headers["Info"] = pack->m_headers["Info"];
 
 		//If the header is a CMD55 packet, check the actual ACMD and use that instead
-		if( (pack->m_headers["Code"] == "CMD55") && (i+2 < m_packets.size()) )
+		if( (code== "CMD55") && (i+2 < m_packets.size()) )
 		{
 			Packet* next = m_packets[i+2];
 
@@ -1155,11 +1210,24 @@ Packet* SDCmdDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			}
 		}
 
-		//Summarize CMD2 and CMD3 with reply data
-		if( (pack->m_headers["Code"] == "CMD2") && (i+1 < m_packets.size()) )
+		//Summarize CMD2, and CMD3 with reply data
+		if( (code == "CMD2") && (i+1 < m_packets.size()) )
 			ret->m_headers["Info"] = m_packets[i+1]->m_headers["Info"];
-		if( (pack->m_headers["Code"] == "CMD3") && (i+1 < m_packets.size()) )
+		if( (code== "CMD3") && (i+1 < m_packets.size()) )
 			ret->m_headers["Info"] = m_packets[i+1]->m_headers["Info"];
+
+		//For CMD1 and CMD13, use last reply
+		if( (code == "CMD1") || (code == "CMD13") )
+		{
+			for(; i < m_packets.size(); i++)
+			{
+				if(m_packets[i]->m_headers["Code"] != code)
+					break;
+				if(m_packets[i]->m_headers["Type"] != "Reply")
+					continue;
+				ret->m_headers["Info"] = m_packets[i]->m_headers["Info"];
+			}
+		}
 
 		return ret;
 	}
