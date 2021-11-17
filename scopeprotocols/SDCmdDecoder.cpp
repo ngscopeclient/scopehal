@@ -620,6 +620,197 @@ string SDCmdDecoder::GetText(int i)
 							}
 							break;
 
+						//CMD6 SWITCH
+						case 6:
+							if(cardtype == SD_EMMC)
+							{
+								int access = (s.m_data && 24) & 3;
+								int cmdset = s.m_data & 3;
+								int index = (s.m_data >> 16) & 0xff;
+								int value = (s.m_data >> 8) & 0xff;
+
+								//EXT_CSD registers (emmc spec section 7.4)
+								//TODO: binary vs linear search
+								const char* regname = NULL;
+								static const struct
+								{
+									int index;
+									const char* name;
+								} extregs[] =
+								{
+									{15, "CMDQ_MODE_EN"},
+									{16, "SECURE_REMOVAL_TYPE"},
+									{17, "PRODUCT_STATE_AWARENESS_ENABLEMENT"},
+									//18-21 MAX_PRE_LOADING_DATA_SIZE
+									//22-25 PRE_LOADING_DATA_SIZE
+									{26, "FFU_STATUS"},
+									{29, "MODE_OPERATION_CODES"},
+									{30, "MODE_CONIG"},
+									{31, "BARRIER_CTRL"},
+									{32, "FLUSH_CACHE"},
+									{33, "CACHE_CTRL"},
+									{34, "POWER_OFF_NOTIFICATION"},
+									{35, "PACKED_FAILURE_INDEX"},
+									{36, "PACKED_COMMAND_STATUS"},
+									//37-51 CONTEXT_CONF
+									{52, "EXT_PARTITIONS_ATTRIBUTE_0"},
+									{53, "EXT_PARTITIONS_ATTRIBUTE_1"},
+									{54, "EXCEPTION_EVENTS_STATUS_0"},
+									{55, "EXCEPTION_EVENTS_STATUS_1"},
+									{56, "EXCEPTION_EVENTS_CTRL_0"},
+									{57, "EXCEPTION_EVENTS_CTRL_1"},
+									{58, "DYNCAP_NEEDED"},
+									{59, "CLASS_6_CTRL"},
+									{60, "INI_TIMEOUT_EMU"},
+									{61, "DATA_SECTOR_SIZE"},
+									{62, "USE_NATIVE_SECTOR"},
+									{63, "NATIVE_SECTOR_SIZE"},
+									//64-127 vendor specific
+									{130, "PROGRAM_CID_CSD_DDR_SUPPORT"},
+									{131, "PERIODIC_WAKEUP"},
+									{132, "TCASE_SUPPORT"},
+									{133, "PRODUCTION_STATE_AWARENESS"},
+									{134, "SEC_BAD_BLK_MGMNT"},
+									{136, "ENH_START_ADDR_0"},
+									{137, "ENH_START_ADDR_1"},
+									{138, "ENH_START_ADDR_2"},
+									{139, "ENH_START_ADDR_3"},
+									//140-142 ENH_SIZE_MULT
+									//143-154 GP_SIZE_MULT_GP0-3
+									{155, "PARTITION_SETTING_COMPLETED"},
+									{156, "PARTITIONS_ATTRIBUTE"},
+									//157-159 MAX_ENH_SIZE_MULT
+									{160, "PARTITIONING_SUPPORT"},
+									{161, "HPI_MGMT"},
+									{162, "RST_N_FUNCTION"},
+									{163, "BKOPS_EN"},
+									{164, "BKOPS_START"},
+									{165, "SANITIZE_START"},
+									{166, "WR_REL_PARAM"},
+									{167, "WR_REL_SET"},
+									{168, "RPMB_SIZE_MULT"},
+									{169, "FW_CONFIG"},
+									{171, "USER_WP"},
+									{173, "BOOT_WP"},
+									{174, "BOOT_WP_STATUS"},
+									{175, "ERASE_GROUP_DEV"},
+									{177, "BOOT_BUS_CONDITIONS"},
+									{178, "BOOT_CONFIG_PROT"},
+									{179, "PARTITION_CONFIG"},
+									{181, "ERASED_MEM_CONT"},
+									{183, "BUS_WIDTH"},
+									{184, "STROBE_SUPPORT"},
+									{185, "HS_TIMING"},
+									{187, "POWER_CLASS"},
+									{189, "CMD_SET_REV"},
+									{191, "CMD_SET"},
+									{192, "EXT_CSD_REV"},
+									{194, "CSD_STRUCTURE"},
+									{196, "DEVICE_TYPE"},
+									{197, "DRIVER_STRENGTH"},
+									{198, "OUT_OF_INTERRUPT_TIME"},
+									{199, "PARTITION_SWITCH_TIME"},
+									//200-203 PWR_CL_ff_vvv
+									//205-210 MIN_PERF_a_b_ff
+									{211, "SEC_WP_SUPPORT"},
+									//212-215 SEC_COUNT
+									{216, "SLEEP_NOTIFICATION_TIME"},
+									{217, "S_A_TIMEOUT"},
+									{218, "PRODUCTION_STATE_AWARENESS_TIMEOUT"},
+									{219, "S_C_VCCQ"},
+									{220, "S_C_VCC"},
+									{221, "HC_WP_GRP_SIZE"},
+									{222, "REL_WR_SEC_C"},
+									{223, "ERASE_TIMEOUT_MULT"},
+									{224, "HC_ERASE_GRP_SIZE"},
+									{225, "ACC_SIZE"},
+									{226, "BOOT_SIZE_MULT"},
+									//227 reserved
+									{228, "BOOT_INFO"},
+									{229, "SEC_TRIM_MULT"},
+									{230, "SEC_ERASE_MULT"},
+									{231, "SEC_FEATURE_SUPPORT"},
+									{232, "TRIM_MULT"},
+									//234-235 MIN_PERF_DDR_a_b_ff
+									//236-237 PWR_CL_ff_vvv
+									//238-239 PWR_CL_DDR_ff_vvv
+									{240, "CACHE_FLUSH_POLICY"},
+									{241, "INI_TIMEOUT_AP"},
+									//242-245 CORRECTLY_PRG_SECTORS_NUM
+									{246, "BKOPS_STATUS"},
+									{247, "POWER_OFF_LONG_TIME"},
+									{248, "GENERIC_CMD6_TIME"},
+									//249-252 CACHE_SIZE
+									//253 PWR_CL_DDR_ff_vvv
+									//254-261 FIRMWARE_VERSION
+									//262-263 DEVICE_VERSION
+									{264, "OPTIMAL_TRIM_UNIT_SIZE"},
+									{265, "OPTIMAL_WRITE_SIZE"},
+									{266, "OPTIMAL_READ_SIZE"},
+									{267, "PRE_EOL_INFO"},
+									{268, "DEVICE_LIFE_TIME_EST_TYPE_A"},
+									{269, "DEVICE_LIFE_TIME_EST_TYPE_B"},
+									//270-301 VENDOR_PROPRIETARY_HEALTH_REPORT
+									//302-305 NUMBER_OF_FW_SECTORS_CORRECTLY_PROGRAMMED
+									{307, "CMDQ_DEPTH"},
+									{308, "CMDQ_SUPPORT"},
+									//309-485 reserved
+									{486, "BARRIER_SUPPORT"},
+									//487-490 FFU_ARG
+									{491, "OPERATION_CODES_TIMEOUT"},
+									{492, "FFU_FEATURES"},
+									{493, "SUPPORTED_MODES"},
+									{494, "EXT_SUPPORT"},
+									{495, "LARGE_UNIT_SIZE_M1"},
+									{496, "CONTEXT_CAPABILITIES"},
+									{497, "TAG_RES_SIZE"},
+									{498, "TAG_UNIT_SIZE"},
+									{499, "DATA_TAG_SUPPORT"},
+									{500, "MAX_PACKED_WRITES"},
+									{501, "MAX_PACKED_READS"},
+									{502, "BKOPS_SUPPORT"},
+									{503, "HPI_FEATURES"},
+									{504, "S_CMD_SET"},
+									{505, "EXT_SECURITY_ERR"}
+								};
+								for(size_t j=0; j<sizeof(extregs)/sizeof(extregs[0]); j++)
+								{
+									if(extregs[j].index == index)
+									{
+										regname = extregs[j].name;
+										break;
+									}
+								}
+
+								switch(access)
+								{
+									case 0:
+										snprintf(tmp, sizeof(tmp), "CommandSet %d", cmdset);
+										break;
+									case 1:
+										if(regname)
+											snprintf(tmp, sizeof(tmp), "%s |= 0x%02x", regname, value);
+										else
+											snprintf(tmp, sizeof(tmp), "EXT_CSD[%d] |= 0x%02x", index, value);
+										break;
+									case 2:
+										if(regname)
+											snprintf(tmp, sizeof(tmp), "%s &= ~0x%02x", regname, value);
+										else
+											snprintf(tmp, sizeof(tmp), "EXT_CSD[%d] &= ~0x%02x", index, value);
+										break;
+									case 3:
+										if(regname)
+											snprintf(tmp, sizeof(tmp), "%s = 0x%02x", regname, value);
+										else
+											snprintf(tmp, sizeof(tmp), "EXT_CSD[%d] = 0x%02x", index, value);
+										break;
+								}
+								ret = tmp;
+							}
+							//TODO SDIO decoding
+							break;
+
 						//CMD7 Select/Deselect Card
 						case 7:
 							snprintf(tmp, sizeof(tmp), "RCA=%04x", s.m_data >> 16);
@@ -646,6 +837,15 @@ string SDCmdDecoder::GetText(int i)
 									ret += " 3V3";
 								else
 									ret += " Vunknown";
+							}
+							break;
+
+						//CMD9 SEND_CSD
+						case 9:
+							if(cardtype == SD_EMMC)
+							{
+								snprintf(tmp, sizeof(tmp), "RCA=%04x", s.m_data >> 16);
+								ret = tmp;
 							}
 							break;
 
@@ -889,7 +1089,8 @@ string SDCmdDecoder::GetText(int i)
 							break;
 
 
-						//R7 Card Interface Condition (4.9.6)
+						//SD: R7 Card Interface Condition (4.9.6)
+						//eMMC: Extended CSD (reply is a block of data on the data pins)
 						case 8:
 							if(cardtype == SD_EMMC)
 								ret = "";
