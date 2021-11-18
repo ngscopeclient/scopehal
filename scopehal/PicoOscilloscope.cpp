@@ -909,6 +909,8 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 			break;
 
 		default:
+			LogWarning("PicoOscilloscope::SetADCMode requested invalid mode %zu, interpreting as 8 bit\n", mode);
+			m_adcMode = ADC_MODE_8BIT;
 			break;
 	}
 }
