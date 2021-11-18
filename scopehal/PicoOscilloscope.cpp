@@ -518,14 +518,23 @@ bool PicoOscilloscope::AcquireData()
 				return false;
 			}
 
+			//Create buffers for output waveforms
+			DigitalWaveform* caps[8];
+			for(size_t j=0; j<8; j++)
+			{
+				caps[j] = new DigitalWaveform;
+				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = caps[j];
+			}
+
 			//Now that we have the waveform data, unpack it into individual channels
+			#pragma omp parallel for
 			for(size_t j=0; j<8; j++)
 			{
 				//Bitmask for this digital channel
 				int16_t mask = (1 << j);
 
 				//Create the waveform
-				DigitalWaveform* cap = new DigitalWaveform;
+				auto cap = caps[j];
 				cap->m_timescale = fs_per_sample;
 				cap->m_triggerPhase = trigphase;
 				cap->m_startTimestamp = time(NULL);
@@ -570,9 +579,6 @@ bool PicoOscilloscope::AcquireData()
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
-
-				//Done
-				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = cap;
 			}
 
 			delete[] buf;
