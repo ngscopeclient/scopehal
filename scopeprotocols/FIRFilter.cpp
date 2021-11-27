@@ -212,6 +212,13 @@ void FIRFilter::Refresh()
 		filterlen = (atten / 22) * (sample_hz / (fhi - flo) );
 	filterlen |= 1;	//force length to be odd
 
+	//Don't choke if given an invalid filter configuration
+	if(flo == fhi)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the filter coefficients (TODO: cache this)
 	vector<float> coeffs;
 	coeffs.resize(filterlen);
