@@ -129,7 +129,7 @@ void MagnitudeFilter::Refresh()
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
-		fdst[i] = sqrtf(fa[i]*fa[i] * fb[i]*fb[i]);
+		fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
 
 	//Calculate range of the output waveform
 	float x = GetMaxVoltage(cap);
