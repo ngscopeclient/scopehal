@@ -1549,6 +1549,11 @@ bool LeCroyOscilloscope::CanAutoZero(size_t i)
 	else if(probe.find("CP") == 0)
 		return true;
 
+	//Recent firmware reports "ring" for passive probes detected via the resistive ID ring
+	//None of these have auto zero capability
+	else if(probe.find("Ring") == 0)
+		return false;
+
 	//ZS series single ended probes do not
 	else if(probe.find("ZS") == 0)
 		return false;
