@@ -2676,7 +2676,7 @@ bool LeCroyOscilloscope::AcquireData()
 
 			waveforms[i] = ProcessAnalogWaveform(
 				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
-				analogWaveformData[i].size() - 16,
+				analogWaveformData[i].size() - 17,	//skip header plus \n at end
 				wavedescs[i],
 				num_sequences,
 				ttime,
