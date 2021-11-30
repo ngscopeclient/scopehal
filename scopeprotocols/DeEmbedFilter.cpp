@@ -560,7 +560,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Sanity check: if we have noisy or poor quality S-parameter data, group delay might not make sense.
 	//Skip this correction pass in that case.
-	if(llabs(groupdelay_fs) >= npoints)
+	if(llabs(groupdelay_samples) >= npoints)
 	{
 		groupdelay_fs = 0;
 		groupdelay_samples = 0;
