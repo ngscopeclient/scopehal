@@ -56,6 +56,10 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_parameters[m_pathName].SetIntVal(S21);
 	m_cachedPath = S21;
 
+	m_maxGainName = "Max Gain";
+	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_parameters[m_maxGainName].SetFloatVal(20);
+
 	m_range = 1;
 	m_offset = 0;
 	m_min = FLT_MAX;
@@ -66,6 +70,7 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_reversePlan = NULL;
 
 	m_cachedNumPoints = 0;
+	m_cachedMaxGain = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -431,9 +436,19 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		ClearSweeps();
 	}
 
+	//Did we change the max gain?
+	bool clipchange = false;
+	float maxgain = m_parameters[m_maxGainName].GetFloatVal();
+	if(maxgain != m_cachedMaxGain)
+	{
+		m_cachedMaxGain = maxgain;
+		clipchange = true;
+		ClearSweeps();
+	}
+
 	//Resample our parameter to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
-	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || paramchange )
+	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || paramchange || clipchange)
 	{
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
@@ -603,13 +618,15 @@ int64_t DeEmbedFilter::GetGroupDelay()
 }
 
 /**
-	@brief Recalculate the cached S-parameters
+	@brief Recalculate the cached S-parameters (and clamp gain if requested)
 
 	Since there's no AVX sin/cos instructions, precompute sin(phase) and cos(phase)
  */
 void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nouts)
 {
 	m_cachedBinSize = bin_hz;
+
+	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
 	//Figure out which parameter to use
 	int to, from;
@@ -647,6 +664,7 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 			float amp = 0;
 			if(fabs(point.m_amplitude) > FLT_EPSILON)
 				amp = 1.0f / point.m_amplitude;
+			amp = min(amp, maxGain);
 
 			m_resampledSparamSines.push_back(sin(-point.m_phase) * amp);
 			m_resampledSparamCosines.push_back(cos(-point.m_phase) * amp);

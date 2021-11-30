@@ -79,6 +79,7 @@ protected:
 	};
 	std::string m_pathName;
 	std::string m_fname;
+	std::string m_maxGainName;
 
 	SParameterNames m_cachedPath;
 	std::vector<std::string> m_cachedFileNames;
@@ -87,6 +88,7 @@ protected:
 	float m_max;
 	float m_range;
 	float m_offset;
+	float m_cachedMaxGain;
 
 	double m_cachedBinSize;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
