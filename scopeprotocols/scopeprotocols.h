@@ -164,4 +164,6 @@
 
 void ScopeProtocolStaticInit();
 
+extern std::mutex g_clfftMutex;
+
 #endif

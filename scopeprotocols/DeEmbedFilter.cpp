@@ -31,6 +31,8 @@
 #include "DeEmbedFilter.h"
 #include <immintrin.h>
 
+extern std::mutex g_clfftMutex;
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -359,6 +361,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			{
 				try
 				{
+					lock_guard<mutex> lock(g_clfftMutex);
+
 					if(m_clfftForwardPlan != 0)
 						clfftDestroyPlan(&m_clfftForwardPlan);
 					if(m_clfftReversePlan != 0)
@@ -405,6 +409,10 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						delete m_windowProgram;
 						m_windowProgram = 0;
 					}
+
+					//Need to block while mutex is still locked
+					//to ensure we don't have two bake operations in progress at once
+					queue.finish();
 
 					//Allocate buffers
 					delete m_windowbuf;
