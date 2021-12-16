@@ -2386,11 +2386,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 
 map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data, int64_t analog_hoff)
 {
-	//DEBUG
-	FILE* fp = fopen("/tmp/waveform.xml", "w");
-	fwrite(data.c_str(), data.length(), 1, fp);
-	fclose(fp);
-
 	map<int, DigitalWaveform*> ret;
 
 	//See what channels are enabled
