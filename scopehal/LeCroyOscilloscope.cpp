@@ -294,7 +294,7 @@ void LeCroyOscilloscope::DetectOptions()
 			else if(o.find("_TD") != string::npos)
 				type = "Trig/decode";
 			else if( (o.find("_D") != string::npos) || (o.find("-DECODE") != string::npos) )
-				type = "Protocol decode";
+				type = "Protocol Decode";
 
 			//If we have an LA module installed, add the digital channels
 			if( (o == "MSXX") && !m_hasLA)
@@ -472,12 +472,14 @@ void LeCroyOscilloscope::DetectOptions()
 			//Has to be before USB2 to match properly.
 			else if(o == "USB2-HSIC-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "USB2 HSIC";
 			}
 
+			//What is DECODE_MEASURE? (with no protocol name)
+
 			//Currently unsupported trigger/decodes, to be added in the future
-			else if(o.find("CAN_FD") == 0)
+			else if(o.find("CAN_FD") == 0)		//CAN_FD_TD, CAN_FD_TDM, CAN_FD_TD_SYMB
 				desc = "CAN FD";
 			else if(o.find("FIBER_CH") == 0)
 				desc = "Fibre Channel";
@@ -503,6 +505,18 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "HD analog TV";
 			}
 
+			//QualiPHY
+			else if(o.find("QPHY-") == 0)
+			{
+				type = "Protocol Compliance";
+				desc = "QualiPHY";
+			}
+			else if(o == "HDMI")
+			{
+				type = "Protocol Compliance";
+				desc = "HDMI";
+			}
+
 			//High speed serial trigger
 			else if(o == "SERIALPAT_T")
 			{
@@ -514,34 +528,44 @@ void LeCroyOscilloscope::DetectOptions()
 			//Print out name but otherwise ignore
 			else if(o == "10-100M-ENET-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "10/100 Ethernet";
+			}
+			else if(o == "ENET")
+			{
+				type = "Protocol Decode";
+				desc = "Ethernet";			//TODO: What speed?
+			}
+			else if(o == "ENET100G")
+			{
+				type = "Protocol Decode";
+				desc = "100G Ethernet";
 			}
 			else if(o == "10G-ENET-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "10G Ethernet";
 			}
 			else if(o == "8B10B-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "8B/10B";
 			}
 			else if(o == "64B66B-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "64B/66B";
 			}
 			else if(
 				(o == "ARINC429") ||
 				(o == "ARINC429_DME_SYMB") )
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "ARINC 429";
 			}
 			else if(o == "AUTOENETDEBUG")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Automotive Ethernet";
 			}
 			else if(o == "DIGRF_3G_D")
@@ -552,32 +576,45 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "MIPI D-PHY";
 			else if(o == "ET")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Electrical Telecom";
 			}
 			else if(o == "MANCHESTER-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Manchester";
 			}
 			else if(o == "MDIO")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Ethernet MDIO";
 			}
 			else if(o == "MPHY-DECODE")
 				desc = "MIPI M-PHY";
+			else if(o == "PCIE")
+			{
+				desc = "PCIe";
+				type = "Protocol Decode";	//TODO: What's difference between PCIE and PCIE_D
+			}
 			else if(o == "PCIE_D")
-				desc = "PCIe gen 1";
+			{
+				desc = "PCIe";
+				type = "Protocol Decode";
+			}
+			else if( (o == "SAS") || (o == "SAS_TD" ) )
+			{
+				desc = "Serial Attached SCSI";
+				type = "Protocol Decode";	//TODO: What's difference between SAS and SAS_TD
+			}
 			else if(o == "SPACEWIRE")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "SpaceWire";
 			}
 			else if(o == "NRZ-BUS")
 			{
 				desc = "NRZ";
-				type = "Protocol decode";
+				type = "Protocol Decode";
 			}
 			else if(o == "UNIPRO-DECODE")
 				desc = "UniPro";
@@ -588,6 +625,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Math";
 				desc = "Cable De-Embedding";
+			}
+			else if(o == "DDA")
+			{
+				type = "Protocol Decode";
+				desc = "Disk Drive Analysis";
 			}
 			else if(o == "DDM2")
 			{
@@ -679,6 +721,21 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "3-Phase Power Analysis";
 			}
+			else if(o == "AORM")
+			{
+				type = "Measurement";
+				desc = "Advanced Optical Recording Measurements";
+			}
+			else if(o == "PMA2")
+			{
+				type = "Miscellaneous";
+				desc = "PowerMeasure Analysis";
+			}
+			else if(o == "CROSS-SYNC-PHY")
+			{
+				type = "Miscellaneous";
+				desc = "Protocol analyzer cross-trigger";
+			}
 
 			//UI etc options
 			else if(o == "SPECTRUM")
@@ -707,6 +764,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Informational";
 				desc = "Software licenses are demo/trial";
+			}
+			else if(o == "DEMOSCOPE")
+			{
+				type = "Informational";
+				desc = "Scope is a demo unit";
 			}
 			else if(o == "SIM")
 			{
