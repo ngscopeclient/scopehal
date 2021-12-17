@@ -46,8 +46,8 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_fname = "S-Parameters";
 	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAMES, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
-	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
+	m_parameters[m_fname].m_fileFilterMask = "*.s*p";
+	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
 
 	m_pathName = "Path";
 	m_parameters[m_pathName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));

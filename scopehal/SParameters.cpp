@@ -170,6 +170,7 @@ float SParameterVector::GetGroupDelay(size_t bin)
 // SParameters
 
 SParameters::SParameters()
+	: m_nports(0)
 {
 }
 
@@ -188,15 +189,16 @@ void SParameters::Clear()
 	m_params.clear();
 }
 
-void SParameters::Allocate()
+void SParameters::Allocate(int nports)
 {
 	//Allocate new arrays to hold the S-parameters.
-	//For now, assume full 2 port.
-	for(int d=1; d <= 2; d++)
+	for(int d=1; d <= nports; d++)
 	{
-		for(int s=1; s <= 2; s++)
+		for(int s=1; s <= nports; s++)
 			m_params[SPair(d, s)] = new SParameterVector;
 	}
+
+	m_nports = nports;
 }
 
 /**
@@ -204,6 +206,8 @@ void SParameters::Allocate()
  */
 SParameters& SParameters::operator *=(const SParameters& rhs)
 {
+	//TODO: verify we're the same number of ports
+
 	//Make sure we have parameters to work with
 	if(rhs.empty())
 	{
@@ -212,11 +216,11 @@ SParameters& SParameters::operator *=(const SParameters& rhs)
 	//If we have no parameters, just copy whatever is there
 	else if(m_params.empty())
 	{
-		Allocate();
+		Allocate(rhs.m_nports);
 
-		for(int d=1; d <= 2; d++)
+		for(size_t d=1; d <= m_nports; d++)
 		{
-			for(int s=1; s <= 2; s++)
+			for(size_t s=1; s <= m_nports; s++)
 				*m_params[SPair(d, s)] = *rhs.m_params.find(SPair(d,s))->second;
 		}
 	}
@@ -224,9 +228,9 @@ SParameters& SParameters::operator *=(const SParameters& rhs)
 	//If we have parameters, append the new ones
 	else
 	{
-		for(int d=1; d <= 2; d++)
+		for(size_t d=1; d <= m_nports; d++)
 		{
-			for(int s=1; s <= 2; s++)
+			for(size_t s=1; s <= m_nports; s++)
 				*m_params[SPair(d, s)] *= *rhs.m_params.find(SPair(d,s))->second;
 		}
 	}
@@ -241,6 +245,12 @@ SParameters& SParameters::operator *=(const SParameters& rhs)
  */
 void SParameters::SaveToFile(const string& path)
 {
+	if(m_nports != 2)
+	{
+		LogError("SParameters::SaveToFile() only supports 2-port for now\n");
+		return;
+	}
+
 	FILE* fp = fopen(path.c_str(), "w");
 	if(!fp)
 	{

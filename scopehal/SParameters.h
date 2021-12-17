@@ -92,7 +92,7 @@ public:
 	virtual ~SParameters();
 
 	void Clear();
-	void Allocate();
+	void Allocate(int nports = 2);
 
 	bool empty() const
 	{ return m_params.empty(); }
@@ -114,10 +114,12 @@ public:
 
 	//TODO: support >2 ports
 	size_t GetNumPorts()
-	{ return 2; }
+	{ return m_nports; }
 
 protected:
 	std::map< SPair , SParameterVector*> m_params;
+
+	size_t m_nports;
 };
 
 #endif
