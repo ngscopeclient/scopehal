@@ -519,12 +519,12 @@ void AntikernelLogicAnalyzer::SetChannelBandwidthLimit(size_t /*i*/, unsigned in
 	//no-op, all channels are digital
 }
 
-double AntikernelLogicAnalyzer::GetChannelVoltageRange(size_t /*i*/)
+float AntikernelLogicAnalyzer::GetChannelVoltageRange(size_t /*i*/, size_t /*stream*/)
 {
 	return 1;
 }
 
-void AntikernelLogicAnalyzer::SetChannelVoltageRange(size_t /*i*/, double /*range*/)
+void AntikernelLogicAnalyzer::SetChannelVoltageRange(size_t /*i*/, size_t /*stream*/, float /*range*/)
 {
 	//no-op, all channels are digital
 }
@@ -534,12 +534,12 @@ OscilloscopeChannel* AntikernelLogicAnalyzer::GetExternalTrigger()
 	return NULL;
 }
 
-double AntikernelLogicAnalyzer::GetChannelOffset(size_t /*i*/)
+float AntikernelLogicAnalyzer::GetChannelOffset(size_t /*i*/, size_t /*stream*/)
 {
 	return 0;
 }
 
-void AntikernelLogicAnalyzer::SetChannelOffset(size_t /*i*/, double /*offset*/)
+void AntikernelLogicAnalyzer::SetChannelOffset(size_t /*i*/, size_t /*stream*/, float /*offset*/)
 {
 	//no-op, all channels are digital
 }

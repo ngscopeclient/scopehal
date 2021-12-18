@@ -106,11 +106,6 @@ vector<string> I2CEepromDecoder::GetHeaders()
 	return ret;
 }
 
-double I2CEepromDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string I2CEepromDecoder::GetProtocolName()
 {
 	return "I2C EEPROM";

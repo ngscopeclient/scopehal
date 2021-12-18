@@ -86,12 +86,12 @@ bool BaseMeasurement::NeedsConfig()
 	return false;
 }
 
-double BaseMeasurement::GetVoltageRange()
+float BaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double BaseMeasurement::GetOffset()
+float BaseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

@@ -67,12 +67,12 @@ bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MovingAverageFilter::GetVoltageRange()
+float MovingAverageFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MovingAverageFilter::GetOffset()
+float MovingAverageFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

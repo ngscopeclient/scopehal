@@ -59,11 +59,6 @@ bool DSIPacketDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DSIPacketDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string DSIPacketDecoder::GetProtocolName()
 {
 	return "MIPI DSI Packet";

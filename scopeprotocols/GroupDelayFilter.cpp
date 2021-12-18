@@ -103,22 +103,22 @@ void GroupDelayFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-double GroupDelayFilter::GetOffset()
+float GroupDelayFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-double GroupDelayFilter::GetVoltageRange()
+float GroupDelayFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-void GroupDelayFilter::SetVoltageRange(double range)
+void GroupDelayFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void GroupDelayFilter::SetOffset(double offset)
+void GroupDelayFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }

@@ -202,12 +202,17 @@ bool EyePattern::NeedsConfig()
 	return true;
 }
 
-double EyePattern::GetVoltageRange()
+float EyePattern::GetVoltageRange(size_t /*stream*/)
 {
 	if(m_parameters[m_vmodeName].GetIntVal() == RANGE_AUTO)
-		return m_inputs[0].m_channel->GetVoltageRange();
+		return m_inputs[0].GetVoltageRange();
 	else
 		return m_parameters[m_rangeName].GetFloatVal();
+}
+
+float EyePattern::GetOffset(size_t /*stream*/)
+{
+	return -m_parameters[m_centerName].GetFloatVal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -366,11 +371,6 @@ void EyePattern::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-double EyePattern::GetOffset()
-{
-	return -m_parameters[m_centerName].GetFloatVal();
-}
-
 void EyePattern::Refresh()
 {
 	static double total_time = 0;
@@ -461,7 +461,7 @@ void EyePattern::Refresh()
 	m_xoff = -round(cap->m_uiWidth);
 
 	//Precompute some scaling factors
-	float yscale = m_height / GetVoltageRange();
+	float yscale = m_height / GetVoltageRange(0);
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	float xtimescale = waveform->m_timescale * m_xscale;
@@ -936,7 +936,7 @@ void EyePattern::DoMaskTest(EyeWaveform* cap)
 	cr->fill();
 
 	//Software rendering
-	float yscale = m_height / GetVoltageRange();
+	float yscale = m_height / GetVoltageRange(0);
 	m_mask.RenderForAnalysis(
 		cr,
 		cap,

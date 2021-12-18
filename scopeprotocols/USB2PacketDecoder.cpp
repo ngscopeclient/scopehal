@@ -83,11 +83,6 @@ bool USB2PacketDecoder::NeedsConfig()
 	return true;
 }
 
-double USB2PacketDecoder::GetVoltageRange()
-{
-	return 1;
-}
-
 bool USB2PacketDecoder::GetShowDataColumn()
 {
 	return false;

@@ -93,13 +93,13 @@ bool VerticalBathtub::NeedsConfig()
 	return true;
 }
 
-double VerticalBathtub::GetVoltageRange()
+float VerticalBathtub::GetVoltageRange(size_t /*stream*/)
 {
 	//1e12 total height
 	return 12;
 }
 
-double VerticalBathtub::GetOffset()
+float VerticalBathtub::GetOffset(size_t /*stream*/)
 {
 	//1e-6 is the midpoint
 	return 6;
@@ -138,8 +138,9 @@ void VerticalBathtub::Refresh()
 	cap->m_triggerPhase = 0;
 
 	//Eye height config
-	double mv_per_pixel = 1000 * ein->GetVoltageRange() / eye->GetHeight();
-	double mv_off = 1000 * (ein->GetVoltageRange()/2 - eye->GetCenterVoltage());
+	auto range = GetInput(0).GetVoltageRange();
+	double mv_per_pixel = 1000 * range / eye->GetHeight();
+	double mv_off = 1000 * (range/2 - eye->GetCenterVoltage());
 
 	//Extract the single column we're interested in
 	//TODO: support a range of times around the midpoint

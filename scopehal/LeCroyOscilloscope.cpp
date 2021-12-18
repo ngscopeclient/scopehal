@@ -2822,7 +2822,7 @@ void LeCroyOscilloscope::ForceTrigger()
 	m_transport->SendCommand("FRTR");
 }
 
-double LeCroyOscilloscope::GetChannelOffset(size_t i)
+float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2840,15 +2840,15 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
 
 	string reply = m_transport->ReadReply();
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
+void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2865,7 +2865,7 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_channelOffsets[i] = offset;
 }
 
-double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
+float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2891,7 +2891,7 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 	return v;
 }
 
-void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 

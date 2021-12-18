@@ -63,9 +63,14 @@ bool DownsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DownsampleFilter::GetVoltageRange()
+float DownsampleFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
+}
+
+float DownsampleFilter::GetOffset(size_t /*stream*/)
+{
+	return m_inputs[0].GetOffset();
 }
 
 string DownsampleFilter::GetProtocolName()

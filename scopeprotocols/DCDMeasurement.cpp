@@ -89,12 +89,12 @@ bool DCDMeasurement::NeedsConfig()
 	return false;
 }
 
-double DCDMeasurement::GetVoltageRange()
+float DCDMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;
 }
 
-double DCDMeasurement::GetOffset()
+float DCDMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

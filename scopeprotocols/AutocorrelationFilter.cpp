@@ -66,12 +66,12 @@ bool AutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double AutocorrelationFilter::GetVoltageRange()
+float AutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double AutocorrelationFilter::GetOffset()
+float AutocorrelationFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }

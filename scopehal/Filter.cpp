@@ -803,10 +803,20 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 	config += tmp;
 
 	//Save gain and offset (not applicable to all filters, but save it just in case)
-	snprintf(tmp, sizeof(tmp), "        vrange:          %f\n", GetVoltageRange());
+	snprintf(tmp, sizeof(tmp), "        streams:\n");
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        offset:          %f\n", GetOffset());
-	config += tmp;
+	for(size_t i=0; i<GetStreamCount(); i++)
+	{
+		snprintf(tmp, sizeof(tmp), "            stream%zu:\n", i);
+		config += tmp;
+
+		snprintf(tmp, sizeof(tmp), "                index:           %zu\n", i);
+		config += tmp;
+		snprintf(tmp, sizeof(tmp), "                vrange:          %f\n", GetVoltageRange(i));
+		config += tmp;
+		snprintf(tmp, sizeof(tmp), "                offset:          %f\n", GetOffset(i));
+		config += tmp;
+	}
 
 	return config;
 }
@@ -819,10 +829,28 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	m_displayname = node["nick"].as<string>();
 	m_hwname = node["name"].as<string>();
 
+	//Load legacy single-stream range/offset parameters
 	if(node["vrange"])
-		SetVoltageRange(node["vrange"].as<double>());
+		SetVoltageRange(node["vrange"].as<float>(), 0);
 	if(node["offset"])
-		SetOffset(node["offset"].as<double>());
+		SetOffset(node["offset"].as<float>(), 0);
+
+	//Load stream configuration
+	auto streams = node["streams"];
+	if(streams)
+	{
+		for(auto it : streams)
+		{
+			auto snode = it.second;
+			if(!snode["index"])
+				continue;
+			auto index = snode["index"].as<int>();
+			if(snode["vrange"])
+				SetVoltageRange(snode["vrange"].as<float>(), index);
+			if(snode["offset"])
+				SetOffset(snode["offset"].as<float>(), index);
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

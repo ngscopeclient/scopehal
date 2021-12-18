@@ -250,14 +250,14 @@ void MockOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz
 	m_channelBandwidth[i] = limit_mhz;
 }
 
-double MockOscilloscope::GetChannelVoltageRange(size_t i)
+float MockOscilloscope::GetChannelVoltageRange(size_t i, size_t stream)
 {
-	return m_channelVoltageRange[i];
+	return m_channelVoltageRange[pair<size_t, size_t>(i, stream)];
 }
 
-void MockOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void MockOscilloscope::SetChannelVoltageRange(size_t i, size_t stream, float range)
 {
-	m_channelVoltageRange[i] = range;
+	m_channelVoltageRange[pair<size_t, size_t>(i, stream)] = range;
 }
 
 OscilloscopeChannel* MockOscilloscope::GetExternalTrigger()
@@ -265,14 +265,14 @@ OscilloscopeChannel* MockOscilloscope::GetExternalTrigger()
 	return m_extTrigger;
 }
 
-double MockOscilloscope::GetChannelOffset(size_t i)
+float MockOscilloscope::GetChannelOffset(size_t i, size_t stream)
 {
-	return m_channelOffset[i];
+	return m_channelOffset[pair<size_t, size_t>(i, stream)];
 }
 
-void MockOscilloscope::SetChannelOffset(size_t i, double offset)
+void MockOscilloscope::SetChannelOffset(size_t i, size_t stream, float offset)
 {
-	m_channelOffset[i] = offset;
+	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
 }
 
 vector<uint64_t> MockOscilloscope::GetSampleRatesNonInterleaved()
@@ -577,8 +577,10 @@ void MockOscilloscope::LoadComplexCommon(
 	chan->ClearStreams();
 	chan->AddStream(Unit(Unit::UNIT_VOLTS), "I");
 	chan->AddStream(Unit(Unit::UNIT_VOLTS), "Q");
-	chan->SetVoltageRange(2);
-	chan->SetOffset(0);
+	chan->SetVoltageRange(2, 0);
+	chan->SetVoltageRange(2, 1);
+	chan->SetOffset(0, 0);
+	chan->SetOffset(0, 1);
 
 	//Create the waveforms for each of the two complex streams
 	iwfm = new AnalogWaveform;
@@ -1065,8 +1067,8 @@ bool MockOscilloscope::LoadCSV(const string& path)
 		vrange = max(vrange, 0.001f);
 
 		auto chan = GetChannel(i);
-		chan->SetVoltageRange(vrange);
-		chan->SetOffset(-vavg);
+		chan->SetVoltageRange(vrange, 0);
+		chan->SetOffset(-vavg, 0);
 	}
 
 	NormalizeTimebases();
@@ -1088,6 +1090,8 @@ void MockOscilloscope::NormalizeTimebases()
 	//Find the mean sample interval
 	//Use channel 0 since everything uses the same timebase
 	auto wfm = GetChannel(0)->GetData(0);
+	if(!wfm)
+		return;
 	uint64_t interval_sum = 0;
 	uint64_t interval_count = wfm->m_offsets.size();
 	for(size_t i=0; i<interval_count; i++)
@@ -1301,8 +1305,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		}
 
 		//Calculate offset and range
-		chan->SetVoltageRange((vmax-vmin) * 1.5);
-		chan->SetOffset(-((vmax-abs(vmin)) / 2));
+		chan->SetVoltageRange((vmax-vmin) * 1.5, 0);
+		chan->SetOffset(-((vmax-abs(vmin)) / 2), 0);
 	}
 
 	return true;
@@ -1768,8 +1772,8 @@ bool MockOscilloscope::LoadWAV(const string& path)
 		);
 		AddChannel(chan);
 		chan->SetDefaultDisplayName();
-		chan->SetVoltageRange(2);
-		chan->SetOffset(0);
+		chan->SetVoltageRange(2, 0);
+		chan->SetOffset(0, 0);
 
 		//Create new waveform for channel
 		auto wfm = new AnalogWaveform;
@@ -1862,9 +1866,9 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 		for(size_t src = 1; src <= nports; src ++)
 		{
 			//Make the channels
-			auto mchan = new OscilloscopeChannel(
+			auto chan = new OscilloscopeChannel(
 				this,			//Parent scope
-				string("S") + to_string(dest) + to_string(src) + "m",
+				string("S") + to_string(dest) + to_string(src),
 				OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 				GetDefaultChannelColor(m_channels.size()),
 				Unit(Unit::UNIT_HZ),
@@ -1873,26 +1877,18 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 				m_channels.size(),		//Channel index
 				true					//Is physical channel
 			);
-			AddChannel(mchan);
-			mchan->SetDefaultDisplayName();
-			mchan->SetVoltageRange(80);
-			mchan->SetOffset(40);
+			AddChannel(chan);
 
-			auto pchan = new OscilloscopeChannel(
-				this,			//Parent scope
-				string("S") + to_string(dest) + to_string(src) + "p",
-				OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-				GetDefaultChannelColor(m_channels.size()),
-				Unit(Unit::UNIT_HZ),
-				Unit(Unit::UNIT_DEGREES),
-				1,						//Bus width
-				m_channels.size(),		//Channel index
-				true					//Is physical channel
-			);
-			AddChannel(pchan);
-			pchan->SetDefaultDisplayName();
-			pchan->SetVoltageRange(370);
-			pchan->SetOffset(0);
+			chan->ClearStreams();
+			chan->AddStream(Unit(Unit::UNIT_DB), "mag");
+			chan->AddStream(Unit(Unit::UNIT_DEGREES), "angle");
+			chan->SetDefaultDisplayName();
+
+			chan->SetVoltageRange(80, 0);
+			chan->SetOffset(40, 0);
+
+			chan->SetVoltageRange(370, 1);
+			chan->SetOffset(0, 1);
 
 			//Get the S-parameters from the file
 			auto& vec = params[SPair(dest, src)];
@@ -1906,7 +1902,7 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 			mwfm->m_triggerPhase = 0;
 			mwfm->m_densePacked = false;	//don't assume uniform frequency spacing
 			mwfm->Resize(nsamples);
-			mchan->SetData(mwfm, 0);
+			chan->SetData(mwfm, 0);
 
 			auto pwfm = new AnalogWaveform;
 			pwfm->m_timescale = 1;
@@ -1915,7 +1911,7 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 			pwfm->m_triggerPhase = 0;
 			pwfm->m_densePacked = false;	//don't assume uniform frequency spacing
 			pwfm->Resize(nsamples);
-			pchan->SetData(pwfm, 0);
+			chan->SetData(pwfm, 1);
 
 			//Populate them
 			float angscale = 180 / M_PI;	//we use degrees for display
@@ -1973,7 +1969,7 @@ void MockOscilloscope::AutoscaleVertical()
 		}
 
 		//Calculate bounds
-		c->SetVoltageRange((vmax - vmin) * 1.05);
-		c->SetOffset( -( (vmax - vmin)/2 + vmin ));
+		c->SetVoltageRange((vmax - vmin) * 1.05, 0);
+		c->SetOffset( -( (vmax - vmin)/2 + vmin ), 0);
 	}
 }

@@ -98,12 +98,12 @@ bool PhaseMeasurement::NeedsConfig()
 	return true;
 }
 
-double PhaseMeasurement::GetVoltageRange()
+float PhaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 370;
 }
 
-double PhaseMeasurement::GetOffset()
+float PhaseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

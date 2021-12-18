@@ -63,12 +63,12 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MultiplyFilter::GetVoltageRange()
+float MultiplyFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MultiplyFilter::GetOffset()
+float MultiplyFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }

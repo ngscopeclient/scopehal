@@ -58,9 +58,9 @@ bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleFilter::GetVoltageRange()
+float ACCoupleFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
 }
 
 string ACCoupleFilter::GetProtocolName()

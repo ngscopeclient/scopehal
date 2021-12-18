@@ -89,12 +89,12 @@ bool ISIMeasurement::NeedsConfig()
 	return false;
 }
 
-double ISIMeasurement::GetVoltageRange()
+float ISIMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;
 }
 
-double ISIMeasurement::GetOffset()
+float ISIMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

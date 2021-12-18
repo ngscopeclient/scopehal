@@ -103,12 +103,12 @@ bool EyeWidthMeasurement::NeedsConfig()
 	return true;
 }
 
-double EyeWidthMeasurement::GetVoltageRange()
+float EyeWidthMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;
 }
 
-double EyeWidthMeasurement::GetOffset()
+float EyeWidthMeasurement::GetOffset(size_t /*stream*/)
 {
 	return - (m_min + m_max)/2;
 }
@@ -141,7 +141,7 @@ void EyeWidthMeasurement::Refresh()
 	}
 
 	//Figure out how many volts per eye bin and round everything to nearest eye bin
-	float vrange = m_inputs[0].m_channel->GetVoltageRange();
+	float vrange = m_inputs[0].GetVoltageRange();
 	float volts_per_row = vrange / din->GetHeight();
 	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;
 

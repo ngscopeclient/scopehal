@@ -95,12 +95,12 @@ bool EyePeriodMeasurement::NeedsConfig()
 	return false;
 }
 
-double EyePeriodMeasurement::GetVoltageRange()
+float EyePeriodMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 10;
 }
 
-double EyePeriodMeasurement::GetOffset()
+float EyePeriodMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_value;
 }

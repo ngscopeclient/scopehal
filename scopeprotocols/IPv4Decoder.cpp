@@ -60,11 +60,6 @@ bool IPv4Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double IPv4Decoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string IPv4Decoder::GetProtocolName()
 {
 	return "IPv4";

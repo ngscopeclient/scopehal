@@ -89,12 +89,12 @@ bool PkPkMeasurement::NeedsConfig()
 	return false;
 }
 
-double PkPkMeasurement::GetVoltageRange()
+float PkPkMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double PkPkMeasurement::GetOffset()
+float PkPkMeasurement::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

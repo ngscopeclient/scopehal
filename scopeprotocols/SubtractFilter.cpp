@@ -88,12 +88,12 @@ bool SubtractFilter::NeedsConfig()
 	return true;
 }
 
-double SubtractFilter::GetOffset()
+float SubtractFilter::GetOffset(size_t /*stream*/)
 {
-	double v1 = m_inputs[0].m_channel->GetVoltageRange();
-	double v2 = m_inputs[1].m_channel->GetVoltageRange();
-	double o1 = m_inputs[0].m_channel->GetOffset();
-	double o2 = m_inputs[1].m_channel->GetOffset();
+	double v1 = m_inputs[0].GetVoltageRange();
+	double v2 = m_inputs[1].GetVoltageRange();
+	double o1 = m_inputs[0].GetOffset();
+	double o2 = m_inputs[1].GetOffset();
 
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;
@@ -108,12 +108,12 @@ double SubtractFilter::GetOffset()
 	return -(vout_min + ((vout_max - vout_min) / 2));
 }
 
-double SubtractFilter::GetVoltageRange()
+float SubtractFilter::GetVoltageRange(size_t /*stream*/)
 {
-	double v1 = m_inputs[0].m_channel->GetVoltageRange();
-	double v2 = m_inputs[1].m_channel->GetVoltageRange();
-	double o1 = m_inputs[0].m_channel->GetOffset();
-	double o2 = m_inputs[1].m_channel->GetOffset();
+	double v1 = m_inputs[0].GetVoltageRange();
+	double v2 = m_inputs[1].GetVoltageRange();
+	double o1 = m_inputs[0].GetOffset();
+	double o2 = m_inputs[1].GetOffset();
 
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;

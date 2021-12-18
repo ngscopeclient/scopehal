@@ -112,12 +112,12 @@ bool EmphasisFilter::NeedsConfig()
 	return true;
 }
 
-double EmphasisFilter::GetVoltageRange()
+float EmphasisFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double EmphasisFilter::GetOffset()
+float EmphasisFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

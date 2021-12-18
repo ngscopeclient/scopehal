@@ -87,12 +87,12 @@ bool UndershootMeasurement::NeedsConfig()
 	return false;
 }
 
-double UndershootMeasurement::GetVoltageRange()
+float UndershootMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double UndershootMeasurement::GetOffset()
+float UndershootMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

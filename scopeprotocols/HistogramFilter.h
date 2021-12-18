@@ -48,8 +48,8 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -58,8 +58,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(HistogramFilter)
 
 protected:
-	double m_midpoint;
-	double m_range;
+	float m_midpoint;
+	float m_range;
 
 	float m_min;
 	float m_max;

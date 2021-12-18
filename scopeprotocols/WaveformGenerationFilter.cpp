@@ -82,12 +82,12 @@ bool WaveformGenerationFilter::IsOverlay()
 	return false;
 }
 
-double WaveformGenerationFilter::GetVoltageRange()
+float WaveformGenerationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return (GetMaxLevel() - GetMinLevel()) * 1.05;
 }
 
-double WaveformGenerationFilter::GetOffset()
+float WaveformGenerationFilter::GetOffset(size_t /*stream*/)
 {
 	return -(GetMaxLevel() + GetMinLevel())/2;
 }

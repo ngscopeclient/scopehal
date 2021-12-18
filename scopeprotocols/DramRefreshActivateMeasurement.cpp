@@ -88,12 +88,12 @@ bool DramRefreshActivateMeasurement::NeedsConfig()
 	return false;
 }
 
-double DramRefreshActivateMeasurement::GetVoltageRange()
+float DramRefreshActivateMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DramRefreshActivateMeasurement::GetOffset()
+float DramRefreshActivateMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

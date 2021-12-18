@@ -63,12 +63,12 @@ bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MagnitudeFilter::GetVoltageRange()
+float MagnitudeFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MagnitudeFilter::GetOffset()
+float MagnitudeFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }

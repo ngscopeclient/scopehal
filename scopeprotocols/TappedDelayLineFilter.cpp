@@ -132,12 +132,12 @@ bool TappedDelayLineFilter::NeedsConfig()
 	return true;
 }
 
-double TappedDelayLineFilter::GetVoltageRange()
+float TappedDelayLineFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TappedDelayLineFilter::GetOffset()
+float TappedDelayLineFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

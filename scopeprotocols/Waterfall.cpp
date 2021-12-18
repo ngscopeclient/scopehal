@@ -90,12 +90,12 @@ bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double Waterfall::GetOffset()
+float Waterfall::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }
 
-double Waterfall::GetVoltageRange()
+float Waterfall::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;
 }
@@ -166,8 +166,8 @@ void Waterfall::Refresh()
 	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
 	double bin_offset = m_offsetHz / hz_per_bin;
 	float vmin = 1.0 / 255.0;
-	float vrange = m_inputs[0].m_channel->GetVoltageRange();	//db from min to max scale
-	float vfs = vrange/2 - m_inputs[0].m_channel->GetOffset();
+	float vrange = m_inputs[0].GetVoltageRange();	//db from min to max scale
+	float vfs = vrange/2 - m_inputs[0].GetOffset();
 	for(size_t x=0; x<m_width; x++)
 	{
 		//Look up the frequency bin(s) for this position

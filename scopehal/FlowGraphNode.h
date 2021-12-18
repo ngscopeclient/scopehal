@@ -82,6 +82,18 @@ public:
 
 		return false;
 	}
+
+	float GetVoltageRange()
+	{ return m_channel->GetVoltageRange(m_stream); }
+
+	float GetOffset()
+	{ return m_channel->GetOffset(m_stream); }
+
+	void SetVoltageRange(float v)
+	{  m_channel->SetVoltageRange(v, m_stream); }
+
+	void SetOffset(float v)
+	{  m_channel->SetOffset(v, m_stream); }
 };
 
 /**

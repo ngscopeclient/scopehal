@@ -71,12 +71,12 @@ bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DivideFilter::GetVoltageRange()
+float DivideFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DivideFilter::GetOffset()
+float DivideFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

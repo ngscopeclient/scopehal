@@ -104,12 +104,12 @@ bool DDJMeasurement::NeedsConfig()
 	return true;
 }
 
-double DDJMeasurement::GetVoltageRange()
+float DDJMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 0;
 }
 
-double DDJMeasurement::GetOffset()
+float DDJMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

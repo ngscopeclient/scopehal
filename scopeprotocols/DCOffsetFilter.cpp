@@ -63,9 +63,14 @@ bool DCOffsetFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DCOffsetFilter::GetVoltageRange()
+float DCOffsetFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
+}
+
+float DCOffsetFilter::GetOffset(size_t /*stream*/)
+{
+	return m_inputs[0].GetOffset() + m_parameters[m_offsetname].GetFloatVal();
 }
 
 string DCOffsetFilter::GetProtocolName()

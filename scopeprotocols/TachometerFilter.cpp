@@ -92,12 +92,12 @@ bool TachometerFilter::NeedsConfig()
 	return true;
 }
 
-double TachometerFilter::GetVoltageRange()
+float TachometerFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TachometerFilter::GetOffset()
+float TachometerFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

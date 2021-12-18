@@ -128,22 +128,22 @@ bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double SpectrogramFilter::GetOffset()
+float SpectrogramFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-double SpectrogramFilter::GetVoltageRange()
+float SpectrogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-void SpectrogramFilter::SetVoltageRange(double range)
+void SpectrogramFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void SpectrogramFilter::SetOffset(double offset)
+void SpectrogramFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }

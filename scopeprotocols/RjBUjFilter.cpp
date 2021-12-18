@@ -96,12 +96,12 @@ bool RjBUjFilter::NeedsConfig()
 	return true;
 }
 
-double RjBUjFilter::GetVoltageRange()
+float RjBUjFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double RjBUjFilter::GetOffset()
+float RjBUjFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

@@ -92,12 +92,6 @@ bool UartClockRecoveryFilter::NeedsConfig()
 	return true;
 }
 
-double UartClockRecoveryFilter::GetVoltageRange()
-{
-	//ignored
-	return 1;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

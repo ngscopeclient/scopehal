@@ -95,12 +95,12 @@ bool EyeBitRateMeasurement::NeedsConfig()
 	return false;
 }
 
-double EyeBitRateMeasurement::GetVoltageRange()
+float EyeBitRateMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 10;
 }
 
-double EyeBitRateMeasurement::GetOffset()
+float EyeBitRateMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_value;
 }

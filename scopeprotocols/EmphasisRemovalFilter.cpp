@@ -112,12 +112,12 @@ bool EmphasisRemovalFilter::NeedsConfig()
 	return true;
 }
 
-double EmphasisRemovalFilter::GetVoltageRange()
+float EmphasisRemovalFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double EmphasisRemovalFilter::GetOffset()
+float EmphasisRemovalFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

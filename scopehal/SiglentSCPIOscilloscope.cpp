@@ -39,7 +39,7 @@
  *   horribly slow.
  *
  * SDS2000/5000/6000 port (c) 2021 Dave Marples. Note that this is only tested on SDS2000X+. If someone wants
- * to loan an SDS5000/6000 for testing that can be integrated. This file is derrived from the LeCroy driver.
+ * to loan an SDS5000/6000 for testing that can be integrated. This file is derived from the LeCroy driver.
  *
  * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
  * archive if needed.
@@ -1455,7 +1455,7 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 	this_thread::sleep_for(c_trigger_delay);
 }
 
-double SiglentSCPIOscilloscope::GetChannelOffset(size_t i)
+float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -1471,15 +1471,15 @@ double SiglentSCPIOscilloscope::GetChannelOffset(size_t i)
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	string reply = converse(":CHANNEL%ld:OFFSET?", i + 1);
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, double offset)
+void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -1494,7 +1494,7 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_channelOffsets[i] = offset;
 }
 
-double SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i)
+float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -1509,20 +1509,20 @@ double SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i)
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	string reply = converse(":CHANNEL%d:SCALE?", i + 1);
-	double volts_per_div;
-	sscanf(reply.c_str(), "%lf", &volts_per_div);
+	float volts_per_div;
+	sscanf(reply.c_str(), "%f", &volts_per_div);
 
-	double v = volts_per_div * 8;	 //plot is 8 divisions high
+	float v = volts_per_div * 8;	 //plot is 8 divisions high
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = v;
 	return v;
 }
 
-void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	double vdiv = range / 8;
+	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
 	sendOnly(":CHANNEL%ld:SCALE %.4f", i + 1, vdiv);

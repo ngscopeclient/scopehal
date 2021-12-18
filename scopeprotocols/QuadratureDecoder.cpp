@@ -91,12 +91,12 @@ void QuadratureDecoder::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-double QuadratureDecoder::GetVoltageRange()
+float QuadratureDecoder::GetVoltageRange(size_t /*stream*/)
 {
 	return (m_max - m_min) + 20;
 }
 
-double QuadratureDecoder::GetOffset()
+float QuadratureDecoder::GetOffset(size_t /*stream*/)
 {
 	return -( (m_max - m_min)/2 + m_min );
 }

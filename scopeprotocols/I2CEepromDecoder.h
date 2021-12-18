@@ -88,7 +88,6 @@ public:
 
 	std::vector<std::string> GetHeaders();
 
-	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	bool CanMerge(Packet* first, Packet* cur, Packet* next);

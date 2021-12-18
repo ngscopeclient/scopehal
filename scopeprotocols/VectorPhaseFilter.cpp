@@ -87,12 +87,12 @@ bool VectorPhaseFilter::NeedsConfig()
 	return true;
 }
 
-double VectorPhaseFilter::GetVoltageRange()
+float VectorPhaseFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return 370;
 }
 
-double VectorPhaseFilter::GetOffset()
+float VectorPhaseFilter::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

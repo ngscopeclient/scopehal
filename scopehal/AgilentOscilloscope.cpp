@@ -422,7 +422,7 @@ void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*
 	//FIXME
 }
 
-double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
+float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	if(m_channels[i]->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		return 1;
@@ -442,13 +442,13 @@ double AgilentOscilloscope::GetChannelVoltageRange(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	double range = stod(reply);
+	float range = stof(reply);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 	return range;
 }
 
-void AgilentOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void AgilentOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -467,7 +467,7 @@ OscilloscopeChannel* AgilentOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
-double AgilentOscilloscope::GetChannelOffset(size_t i)
+float AgilentOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	if(!IsAnalogChannel(i))
 		return 0;
@@ -486,7 +486,7 @@ double AgilentOscilloscope::GetChannelOffset(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	double offset = stod(reply);
+	float offset = stof(reply);
 	offset = -offset;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -494,7 +494,7 @@ double AgilentOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void AgilentOscilloscope::SetChannelOffset(size_t i, double offset)
+void AgilentOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);

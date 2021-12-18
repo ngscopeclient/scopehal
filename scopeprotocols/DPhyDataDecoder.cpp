@@ -60,11 +60,6 @@ bool DPhyDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DPhyDataDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string DPhyDataDecoder::GetProtocolName()
 {
 	return "MIPI D-PHY Data";

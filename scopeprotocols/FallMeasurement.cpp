@@ -100,12 +100,12 @@ bool FallMeasurement::NeedsConfig()
 	return true;
 }
 
-double FallMeasurement::GetVoltageRange()
+float FallMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double FallMeasurement::GetOffset()
+float FallMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

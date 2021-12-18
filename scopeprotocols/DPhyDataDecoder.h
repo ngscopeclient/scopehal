@@ -81,7 +81,6 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual double GetVoltageRange();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(DPhyDataDecoder)

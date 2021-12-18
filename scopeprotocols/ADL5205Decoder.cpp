@@ -59,11 +59,6 @@ bool ADL5205Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ADL5205Decoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string ADL5205Decoder::GetProtocolName()
 {
 	return "ADL5205";

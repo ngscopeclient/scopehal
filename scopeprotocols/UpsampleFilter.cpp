@@ -115,22 +115,22 @@ bool UpsampleFilter::NeedsConfig()
 	return true;
 }
 
-double UpsampleFilter::GetOffset()
+float UpsampleFilter::GetOffset(size_t /*stream*/)
 {
 	auto chan = m_inputs[0].m_channel;
 	if(chan == NULL)
 		return 0;
 	else
-		return chan->GetOffset();
+		return m_inputs[0].GetOffset();
 }
 
-double UpsampleFilter::GetVoltageRange()
+float UpsampleFilter::GetVoltageRange(size_t /*stream*/)
 {
 	auto chan = m_inputs[0].m_channel;
 	if(chan == NULL)
 		return 0;
 	else
-		return chan->GetVoltageRange();
+		return m_inputs[0].GetVoltageRange();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -257,7 +257,7 @@ void AntikernelLabsOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned
 	LogWarning("AntikernelLabsOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
-double AntikernelLabsOscilloscope::GetChannelVoltageRange(size_t i)
+float AntikernelLabsOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -288,7 +288,7 @@ double AntikernelLabsOscilloscope::GetChannelVoltageRange(size_t i)
 	return vfs;
 }
 
-void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	//Convert requested range to gain
 	float frac_gain = 2.0 / range;
@@ -324,7 +324,7 @@ OscilloscopeChannel* AntikernelLabsOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
-double AntikernelLabsOscilloscope::GetChannelOffset(size_t i)
+float AntikernelLabsOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -338,14 +338,14 @@ double AntikernelLabsOscilloscope::GetChannelOffset(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
 
 	string reply = m_transport->ReadReply();
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, double offset)
+void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -383,9 +383,9 @@ bool AntikernelLabsOscilloscope::AcquireData()
 	cap->m_startFemtoseconds = (t - cap->m_startTimestamp) * FS_PER_SECOND;
 
 	//Process the samples
-	float fullscale = GetChannelVoltageRange(0);
+	float fullscale = GetChannelVoltageRange(0, 0);
 	float scale = fullscale / 256.0f;
-	float offset = GetChannelOffset(0);
+	float offset = GetChannelOffset(0, 0);
 	cap->Resize(depth);
 	for(size_t i=0; i<depth; i++)
 	{

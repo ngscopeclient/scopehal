@@ -209,11 +209,11 @@ public:
 	bool IsPhysicalChannel()
 	{ return m_physical; }
 
-	virtual double GetVoltageRange();
-	virtual void SetVoltageRange(double range);
+	virtual float GetVoltageRange(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
 
-	virtual double GetOffset();
-	virtual void SetOffset(double offset);
+	virtual float GetOffset(size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
 
 	virtual Unit GetXAxisUnits()
 	{ return m_xAxisUnit; }

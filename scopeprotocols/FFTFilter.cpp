@@ -205,22 +205,22 @@ bool FFTFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double FFTFilter::GetOffset()
+float FFTFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-double FFTFilter::GetVoltageRange()
+float FFTFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-void FFTFilter::SetVoltageRange(double range)
+void FFTFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void FFTFilter::SetOffset(double offset)
+void FFTFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }

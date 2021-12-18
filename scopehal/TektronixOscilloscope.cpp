@@ -1056,7 +1056,7 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 	}
 }
 
-double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
+float TektronixOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//Check cache
 	{
@@ -1074,7 +1074,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 		return 1;
 
 	//We want total range, not per division
-	double range = 1;
+	float range = 1;
 	{
 		switch(m_family)
 		{
@@ -1102,7 +1102,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void TektronixOscilloscope::SetChannelVoltageRange(size_t i, size_t stream, float range)
 {
 	//Update cache
 	{
@@ -1124,8 +1124,8 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 		case FAMILY_MSO6:
 			if(IsSpectrum(i))
 			{
-				double divsize = range/10;
-				double offset_div = (GetChannelOffset(i) / divsize) - 5;
+				float divsize = range/10;
+				float offset_div = (GetChannelOffset(i, stream) / divsize) - 5;
 
 				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:SCA " + to_string(divsize));
@@ -1240,7 +1240,7 @@ void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
 	}
 }
 
-double TektronixOscilloscope::GetChannelOffset(size_t i)
+float TektronixOscilloscope::GetChannelOffset(size_t i, size_t stream)
 {
 	//Check cache
 	{
@@ -1270,7 +1270,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 					//It also seems to be negative, and reported from the top of the display rather than the middle.
 					float pos = stof(m_transport->SendCommandQueuedWithReply(
 						string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?"));
-					offset = (pos+5) * (GetChannelVoltageRange(i)/10);
+					offset = (pos+5) * (GetChannelVoltageRange(i, stream)/10);
 				}
 				else
 					offset = -stof(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
@@ -1287,7 +1287,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
+void TektronixOscilloscope::SetChannelOffset(size_t i, size_t stream, float offset)
 {
 	//Update cache
 	{
@@ -1309,8 +1309,8 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 		case FAMILY_MSO6:
 			if(IsSpectrum(i))
 			{
-				double divsize = GetChannelVoltageRange(i) / 10;
-				double offset_div = (offset / divsize) - 5;
+				float divsize = GetChannelVoltageRange(i, stream) / 10;
+				float offset_div = (offset / divsize) - 5;
 
 				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:POS " + to_string(offset_div));

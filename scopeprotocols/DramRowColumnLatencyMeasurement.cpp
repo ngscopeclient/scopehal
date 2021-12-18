@@ -88,12 +88,12 @@ bool DramRowColumnLatencyMeasurement::NeedsConfig()
 	return false;
 }
 
-double DramRowColumnLatencyMeasurement::GetVoltageRange()
+float DramRowColumnLatencyMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DramRowColumnLatencyMeasurement::GetOffset()
+float DramRowColumnLatencyMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

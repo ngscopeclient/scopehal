@@ -88,11 +88,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
 	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
@@ -308,8 +308,8 @@ protected:
 	bool m_triggerOneShot;
 
 	//Cached configuration
-	std::map<size_t, double> m_channelVoltageRanges;
-	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
+	std::map<size_t, float> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;

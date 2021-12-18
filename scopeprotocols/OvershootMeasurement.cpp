@@ -87,12 +87,12 @@ bool OvershootMeasurement::NeedsConfig()
 	return false;
 }
 
-double OvershootMeasurement::GetVoltageRange()
+float OvershootMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double OvershootMeasurement::GetOffset()
+float OvershootMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

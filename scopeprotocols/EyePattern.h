@@ -112,8 +112,8 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
 
 	virtual void ClearSweeps();
 

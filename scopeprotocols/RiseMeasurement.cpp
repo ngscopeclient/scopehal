@@ -100,12 +100,12 @@ bool RiseMeasurement::NeedsConfig()
 	return true;
 }
 
-double RiseMeasurement::GetVoltageRange()
+float RiseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double RiseMeasurement::GetOffset()
+float RiseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

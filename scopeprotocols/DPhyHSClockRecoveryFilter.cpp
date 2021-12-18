@@ -87,12 +87,6 @@ bool DPhyHSClockRecoveryFilter::NeedsConfig()
 	return true;
 }
 
-double DPhyHSClockRecoveryFilter::GetVoltageRange()
-{
-	//ignored
-	return 1;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -82,22 +82,22 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+float TDRFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TDRFilter::GetOffset()
+float TDRFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-void TDRFilter::SetVoltageRange(double range)
+void TDRFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void TDRFilter::SetOffset(double offset)
+void TDRFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }

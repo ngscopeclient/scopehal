@@ -137,18 +137,18 @@ void OscilloscopeChannel::Release()
 		Disable();
 }
 
-double OscilloscopeChannel::GetOffset()
+float OscilloscopeChannel::GetOffset(size_t stream)
 {
 	if(m_scope != NULL)
-		return m_scope->GetChannelOffset(m_index);
+		return m_scope->GetChannelOffset(m_index, stream);
 	else
 		return 0;
 }
 
-void OscilloscopeChannel::SetOffset(double offset)
+void OscilloscopeChannel::SetOffset(float offset, size_t stream)
 {
 	if(m_scope != NULL)
-		m_scope->SetChannelOffset(m_index, offset);
+		m_scope->SetChannelOffset(m_index, offset, stream);
 }
 
 bool OscilloscopeChannel::IsEnabled()
@@ -225,18 +225,18 @@ void OscilloscopeChannel::SetBandwidthLimit(int mhz)
 		m_scope->SetChannelBandwidthLimit(m_index, mhz);
 }
 
-double OscilloscopeChannel::GetVoltageRange()
+float OscilloscopeChannel::GetVoltageRange(size_t stream)
 {
 	if(m_scope)
-		return m_scope->GetChannelVoltageRange(m_index);
+		return m_scope->GetChannelVoltageRange(m_index, stream);
 	else
 		return 1;	//TODO: get from input
 }
 
-void OscilloscopeChannel::SetVoltageRange(double range)
+void OscilloscopeChannel::SetVoltageRange(float range, size_t stream)
 {
 	if(m_scope)
-		return m_scope->SetChannelVoltageRange(m_index, range);
+		return m_scope->SetChannelVoltageRange(m_index, range, stream);
 }
 
 void OscilloscopeChannel::SetDeskew(int64_t skew)

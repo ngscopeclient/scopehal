@@ -93,12 +93,12 @@ bool HistogramFilter::NeedsConfig()
 	return false;
 }
 
-double HistogramFilter::GetVoltageRange()
+float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double HistogramFilter::GetOffset()
+float HistogramFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

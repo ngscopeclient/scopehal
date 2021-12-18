@@ -75,12 +75,12 @@ bool WindowedAutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor s
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double WindowedAutocorrelationFilter::GetVoltageRange()
+float WindowedAutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double WindowedAutocorrelationFilter::GetOffset()
+float WindowedAutocorrelationFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }

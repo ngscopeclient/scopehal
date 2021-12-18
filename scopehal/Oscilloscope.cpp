@@ -317,16 +317,16 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			config += tmp;
 			snprintf(tmp, sizeof(tmp), "                bwlimit:     %d\n", chan->GetBandwidthLimit());
 			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange());
-			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset());
-			config += tmp;
 
 			//single stream unit goes here
 			//multi stream unit goes under streams heading
 			if(nstreams == 1)
 			{
 				snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits(0).ToString().c_str());
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange(0));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset(0));
 				config += tmp;
 			}
 
@@ -369,6 +369,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                        yunit:       \"%s\"\n", chan->GetYAxisUnits(j).ToString().c_str());
 				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        vrange:      %f\n", chan->GetVoltageRange(j));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        offset:      %f\n", chan->GetOffset(j));
+				config += tmp;
 			}
 		}
 	}
@@ -404,6 +408,13 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
+		if(cnode["yunit"])
+			chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
+		if(cnode["vrange"])
+			chan->SetVoltageRange(cnode["vrange"].as<float>(), 0);
+		if(cnode["offset"])
+			chan->SetOffset(cnode["offset"].as<float>(), 0);
+
 		//Add multiple streams if present
 		auto snode = cnode["nstreams"];
 		if(snode)
@@ -428,6 +439,11 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 						yunits[index] = st.second["yunit"].as<string>();
 					else
 						yunits[index] = "V";
+
+					if(st.second["vrange"])
+						chan->SetVoltageRange(st.second["vrange"].as<float>(), index);
+					if(st.second["offset"])
+						chan->SetOffset(st.second["offset"].as<float>(), index);
 				}
 
 				for(size_t j=0; j<nstreams; j++)
@@ -440,13 +456,9 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
 				chan->SetAttenuation(cnode["attenuation"].as<float>());
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
-				chan->SetVoltageRange(cnode["vrange"].as<float>());
-				chan->SetOffset(cnode["offset"].as<float>());
 
 				if(cnode["xunit"])
 					chan->SetXAxisUnits(cnode["xunit"].as<string>());
-				if(cnode["yunit"])
-					chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
 
 				if(cnode["coupling"])
 				{

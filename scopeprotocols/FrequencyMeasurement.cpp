@@ -95,12 +95,12 @@ bool FrequencyMeasurement::NeedsConfig()
 	return false;
 }
 
-double FrequencyMeasurement::GetVoltageRange()
+float FrequencyMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double FrequencyMeasurement::GetOffset()
+float FrequencyMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

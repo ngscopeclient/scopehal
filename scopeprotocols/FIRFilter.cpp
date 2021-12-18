@@ -154,12 +154,12 @@ bool FIRFilter::NeedsConfig()
 	return true;
 }
 
-double FIRFilter::GetVoltageRange()
+float FIRFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double FIRFilter::GetOffset()
+float FIRFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

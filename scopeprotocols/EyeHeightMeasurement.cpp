@@ -107,12 +107,12 @@ bool EyeHeightMeasurement::NeedsConfig()
 	return true;
 }
 
-double EyeHeightMeasurement::GetVoltageRange()
+float EyeHeightMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;
 }
 
-double EyeHeightMeasurement::GetOffset()
+float EyeHeightMeasurement::GetOffset(size_t /*stream*/)
 {
 	return - (m_min + m_max)/2;
 }
@@ -156,7 +156,7 @@ void EyeHeightMeasurement::Refresh()
 	end_bin = min(end_bin, din->GetWidth());
 
 	//Approximate center of the eye opening
-	float vrange = m_inputs[0].m_channel->GetVoltageRange();
+	float vrange = m_inputs[0].GetVoltageRange();
 	size_t height = din->GetHeight();
 	float volts_per_row = vrange / height;
 	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;

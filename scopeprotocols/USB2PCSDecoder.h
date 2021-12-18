@@ -85,8 +85,6 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual double GetVoltageRange();
-
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 

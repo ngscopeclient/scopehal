@@ -113,8 +113,6 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual double GetVoltageRange();
-
 	virtual std::vector<std::string> GetHeaders();
 	virtual bool GetShowDataColumn();
 

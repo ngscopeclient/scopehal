@@ -102,12 +102,12 @@ bool TIEMeasurement::NeedsConfig()
 	return true;
 }
 
-double TIEMeasurement::GetVoltageRange()
+float TIEMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TIEMeasurement::GetOffset()
+float TIEMeasurement::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

@@ -68,11 +68,6 @@ vector<string> SWDMemAPDecoder::GetHeaders()
 	return ret;
 }
 
-double SWDMemAPDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string SWDMemAPDecoder::GetProtocolName()
 {
 	return "SWD MEM-AP";

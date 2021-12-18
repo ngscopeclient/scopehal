@@ -78,22 +78,22 @@ bool TDRStepDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRStepDeEmbedFilter::GetVoltageRange()
+float TDRStepDeEmbedFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TDRStepDeEmbedFilter::GetOffset()
+float TDRStepDeEmbedFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-void TDRStepDeEmbedFilter::SetVoltageRange(double range)
+void TDRStepDeEmbedFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void TDRStepDeEmbedFilter::SetOffset(double offset)
+void TDRStepDeEmbedFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }

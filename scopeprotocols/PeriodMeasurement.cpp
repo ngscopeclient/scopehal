@@ -89,12 +89,12 @@ bool PeriodMeasurement::NeedsConfig()
 	return false;
 }
 
-double PeriodMeasurement::GetVoltageRange()
+float PeriodMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double PeriodMeasurement::GetOffset()
+float PeriodMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

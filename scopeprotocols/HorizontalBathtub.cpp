@@ -92,13 +92,13 @@ bool HorizontalBathtub::NeedsConfig()
 	return true;
 }
 
-double HorizontalBathtub::GetVoltageRange()
+float HorizontalBathtub::GetVoltageRange(size_t /*stream*/)
 {
 	//1e12 total height
 	return 12;
 }
 
-double HorizontalBathtub::GetOffset()
+float HorizontalBathtub::GetOffset(size_t /*stream*/)
 {
 	//1e-6 is the midpoint
 	return 6;
@@ -120,7 +120,7 @@ void HorizontalBathtub::Refresh()
 	float threshold = m_parameters[m_voltageName].GetFloatVal();
 
 	//Find the eye bin for this height
-	float yscale = din->GetHeight() / m_inputs[0].m_channel->GetVoltageRange();
+	float yscale = din->GetHeight() / m_inputs[0].GetVoltageRange();
 	float ymid = din->GetHeight()/2;
 	float center = din->GetCenterVoltage();
 

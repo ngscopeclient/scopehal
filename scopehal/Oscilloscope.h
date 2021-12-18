@@ -259,8 +259,9 @@ public:
 		The range does not depend on the offset.
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 	 */
-	virtual double GetChannelVoltageRange(size_t i) =0;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) =0;
 
 	/**
 		@brief Sets the range of the current channel configuration.
@@ -272,9 +273,10 @@ public:
 		The range does not depend on the offset.
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 		@param range		Voltage range
 	 */
-	virtual void SetChannelVoltageRange(size_t i, double range) =0;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) =0;
 
 	/**
 		@brief Determines if a channel has a probe connected which supports the "auto zero" feature.
@@ -335,16 +337,18 @@ public:
 		@brief Gets the offset, in volts, for a given channel
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 	 */
-	virtual double GetChannelOffset(size_t i) =0;
+	virtual float GetChannelOffset(size_t i, size_t stream) =0;
 
 	/**
 		@brief Sets the offset for a given channel
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 		@param offset		Offset, in volts
 	 */
-	virtual void SetChannelOffset(size_t i, double offset) =0;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) =0;
 
 	/**
 		@brief Checks if a channel is capable of hardware polarity inversion

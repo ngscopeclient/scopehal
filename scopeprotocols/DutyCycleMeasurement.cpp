@@ -101,12 +101,12 @@ bool DutyCycleMeasurement::NeedsConfig()
 	return false;
 }
 
-double DutyCycleMeasurement::GetVoltageRange()
+float DutyCycleMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DutyCycleMeasurement::GetOffset()
+float DutyCycleMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }
@@ -150,11 +150,11 @@ void DutyCycleMeasurement::Refresh()
 		int64_t mid = edges[i+1];
 		int64_t end = edges[i+2];
 
-		double t1 = mid-start;
-		double t2 = end-mid;
-		double total = t1+t2;
+		float t1 = mid-start;
+		float t2 = end-mid;
+		float total = t1+t2;
 
-		double duty;
+		float duty;
 
 		//T1 is high time
 		if(!initial_polarity)

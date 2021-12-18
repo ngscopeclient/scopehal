@@ -43,7 +43,6 @@ using namespace std;
 #define RATE_1P25GSPS	(1250L * 1000L * 1000L)
 #define RATE_625MSPS	(625L * 1000L * 1000L)
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
@@ -80,8 +79,8 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		//Set initial configuration so we have a well-defined instrument state
 		m_channelAttenuations[i] = 1;
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
-		SetChannelOffset(i, 0);
-		SetChannelVoltageRange(i, 5);
+		SetChannelOffset(i, 0,  0);
+		SetChannelVoltageRange(i, 0, 5);
 	}
 
 	//Add digital channels (named 1D0...7 and 2D0...7)
@@ -380,13 +379,13 @@ void PicoOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*lim
 {
 }
 
-double PicoOscilloscope::GetChannelVoltageRange(size_t i)
+float PicoOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelVoltageRanges[i];
 }
 
-void PicoOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void PicoOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -405,13 +404,13 @@ OscilloscopeChannel* PicoOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
-double PicoOscilloscope::GetChannelOffset(size_t i)
+float PicoOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelOffsets[i];
 }
 
-void PicoOscilloscope::SetChannelOffset(size_t i, double offset)
+void PicoOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);

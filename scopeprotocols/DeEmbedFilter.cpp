@@ -206,12 +206,12 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DeEmbedFilter::GetVoltageRange()
+float DeEmbedFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DeEmbedFilter::GetOffset()
+float DeEmbedFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

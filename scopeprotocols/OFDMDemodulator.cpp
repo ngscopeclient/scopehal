@@ -98,12 +98,12 @@ bool OFDMDemodulator::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double OFDMDemodulator::GetVoltageRange()
+float OFDMDemodulator::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double OFDMDemodulator::GetOffset()
+float OFDMDemodulator::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }
