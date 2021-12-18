@@ -148,7 +148,7 @@ float OscilloscopeChannel::GetOffset(size_t stream)
 void OscilloscopeChannel::SetOffset(float offset, size_t stream)
 {
 	if(m_scope != NULL)
-		m_scope->SetChannelOffset(m_index, offset, stream);
+		m_scope->SetChannelOffset(m_index, stream, offset);
 }
 
 bool OscilloscopeChannel::IsEnabled()
@@ -236,7 +236,7 @@ float OscilloscopeChannel::GetVoltageRange(size_t stream)
 void OscilloscopeChannel::SetVoltageRange(float range, size_t stream)
 {
 	if(m_scope)
-		return m_scope->SetChannelVoltageRange(m_index, range, stream);
+		return m_scope->SetChannelVoltageRange(m_index, stream, range);
 }
 
 void OscilloscopeChannel::SetDeskew(int64_t skew)
