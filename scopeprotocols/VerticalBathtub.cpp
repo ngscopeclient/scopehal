@@ -39,7 +39,7 @@ VerticalBathtub::VerticalBathtub(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	m_yAxisUnit = Unit(Unit::UNIT_LOG_BER);
+	SetYAxisUnits(Unit(Unit::UNIT_LOG_BER), 0);
 
 	//Set up channels
 	CreateInput("din");

@@ -142,7 +142,7 @@ void EmphasisFilter::Refresh()
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
 	const int64_t tap_count = 8;

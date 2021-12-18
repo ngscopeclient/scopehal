@@ -61,6 +61,9 @@ public:
 	OscilloscopeChannel* m_channel;
 	size_t m_stream;
 
+	Unit GetYAxisUnits()
+	{ return m_channel->GetYAxisUnits(m_stream); }
+
 	WaveformBase* GetData()
 	{ return m_channel->GetData(m_stream); }
 

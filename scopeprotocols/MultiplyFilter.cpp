@@ -118,7 +118,7 @@ void MultiplyFilter::Refresh()
 	auto len = min(a->m_samples.size(), b->m_samples.size());
 
 	//Multiply the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() * m_inputs[1].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
 
 	//Set up the output waveform
 	auto cap = SetupOutputWaveform(a, 0, 0, 0);

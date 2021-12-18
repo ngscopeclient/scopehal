@@ -59,9 +59,8 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_physical(physical)
 	, m_refcount(0)
 	, m_xAxisUnit(Unit::UNIT_FS)
-	, m_yAxisUnit(Unit::UNIT_VOLTS)
 {
-	SharedCtorInit();
+	SharedCtorInit(Unit::UNIT_VOLTS);
 }
 
 OscilloscopeChannel::OscilloscopeChannel(
@@ -84,17 +83,16 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_physical(physical)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
-	, m_yAxisUnit(yunit)
 {
-	SharedCtorInit();
+	SharedCtorInit(yunit);
 }
 
-void OscilloscopeChannel::SharedCtorInit()
+void OscilloscopeChannel::SharedCtorInit(Unit unit)
 {
 	//Create a stream for our output.
 	//Normal channels only have one stream.
 	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
-	AddStream("data");
+	AddStream(unit, "data");
 }
 
 /**
@@ -117,10 +115,9 @@ void OscilloscopeChannel::SetDefaultDisplayName()
 
 OscilloscopeChannel::~OscilloscopeChannel()
 {
-	for(auto p : m_streamData)
-		delete p;
-	m_streamData.clear();
-	m_streamNames.clear();
+	for(auto p : m_streams)
+		delete p.m_waveform;
+	m_streams.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -344,10 +341,10 @@ void OscilloscopeChannel::SetInputMux(size_t select)
 
 void OscilloscopeChannel::SetData(WaveformBase* pNew, size_t stream)
 {
-	if(m_streamData[stream] == pNew)
+	if(m_streams[stream].m_waveform == pNew)
 		return;
 
-	if(m_streamData[stream] != NULL)
-		delete m_streamData[stream];
-	m_streamData[stream] = pNew;
+	if(m_streams[stream].m_waveform != NULL)
+		delete m_streams[stream].m_waveform;
+	m_streams[stream].m_waveform = pNew;
 }

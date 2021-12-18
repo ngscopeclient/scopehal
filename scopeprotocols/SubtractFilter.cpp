@@ -145,9 +145,9 @@ void SubtractFilter::Refresh()
 
 	//Set up units and complain if they're inconsistent
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_yAxisUnit != m_inputs[1].m_channel->GetYAxisUnits()) )
+		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
 		SetData(NULL, 0);
 		return;
@@ -164,7 +164,7 @@ void SubtractFilter::Refresh()
 
 	//Special case if input units are degrees: we want to do modular arithmetic
 	//TODO: vectorized version of this
-	if(m_yAxisUnit == Unit::UNIT_DEGREES)
+	if(GetYAxisUnits(0) == Unit::UNIT_DEGREES)
 	{
 		for(size_t i=0; i<len; i++)
 		{

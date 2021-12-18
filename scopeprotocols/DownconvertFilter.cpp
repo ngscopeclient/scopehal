@@ -41,8 +41,8 @@ DownconvertFilter::DownconvertFilter(const string& color)
 	//Set up channels
 	ClearStreams();
 	CreateInput("RF");
-	AddStream("I");
-	AddStream("Q");
+	AddStream(Unit(Unit::UNIT_VOLTS), "I");
+	AddStream(Unit(Unit::UNIT_VOLTS), "Q");
 
 	m_freqname = "LO Frequency";
 	m_parameters[m_freqname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));

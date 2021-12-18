@@ -37,7 +37,7 @@ using namespace std;
 DDJMeasurement::DDJMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("TIE");
@@ -58,7 +58,7 @@ bool DDJMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) &&
 		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetYAxisUnits() == Unit::UNIT_FS)
+		(stream.GetYAxisUnits() == Unit::UNIT_FS)
 		)
 	{
 		return true;

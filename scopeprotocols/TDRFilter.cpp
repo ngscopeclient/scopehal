@@ -154,9 +154,9 @@ void TDRFilter::Refresh()
 
 	//Set up units
 	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
+		SetYAxisUnits(Unit(Unit::UNIT_OHMS), 0);
 	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
+		SetYAxisUnits(Unit(Unit::UNIT_RHO), 0);
 
 	//Reset gain/offset if output mode was changed
 	if(mode != m_oldMode)

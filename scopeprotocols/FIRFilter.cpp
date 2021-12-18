@@ -232,7 +232,7 @@ void FIRFilter::Refresh()
 
 	//Set up output
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	size_t radius = (filterlen - 1) / 2;
 	auto cap = SetupOutputWaveform(din, 0, 0, filterlen);
 

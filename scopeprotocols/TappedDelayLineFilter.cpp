@@ -162,7 +162,7 @@ void TappedDelayLineFilter::Refresh()
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
 	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();

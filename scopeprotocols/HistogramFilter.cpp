@@ -38,7 +38,7 @@ using namespace std;
 HistogramFilter::HistogramFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_COUNTS_SCI);
+	SetYAxisUnits(Unit(Unit::UNIT_COUNTS_SCI), 0);
 
 	//Set up channels
 	CreateInput("data");
@@ -124,7 +124,7 @@ void HistogramFilter::Refresh()
 	}
 
 	auto din = GetAnalogInputWaveform(0);
-	m_xAxisUnit = GetInput(0).m_channel->GetYAxisUnits();
+	m_xAxisUnit = GetInput(0).GetYAxisUnits();
 
 	//Calculate min/max of the input data
 	float nmin = FLT_MAX;

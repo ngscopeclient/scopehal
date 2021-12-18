@@ -46,9 +46,7 @@ public:
 	virtual void Clear() =0;
 
 	virtual std::string GetStatisticDisplayName() =0;
-	virtual bool Calculate(OscilloscopeChannel* channel, double& value) =0;
-
-	virtual Unit GetUnits(OscilloscopeChannel* channel);
+	virtual bool Calculate(StreamDescriptor stream, double& value) =0;
 
 	//Enumeration / factory
 public:

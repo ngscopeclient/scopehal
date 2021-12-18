@@ -38,7 +38,7 @@ using namespace std;
 CurrentShuntFilter::CurrentShuntFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_POWER)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_AMPS);
+	SetYAxisUnits(Unit(Unit::UNIT_AMPS), 0);
 
 	//Set up channels
 	CreateInput("din");

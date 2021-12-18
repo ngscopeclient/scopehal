@@ -43,8 +43,8 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 {
 	//Set up streams
 	ClearStreams();
-	AddStream("Data");
-	AddStream("Clock");
+	AddStream(Unit(Unit::UNIT_COUNTS), "Data");
+	AddStream(Unit(Unit::UNIT_COUNTS), "Clock");
 
 	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_baudname].SetIntVal(103125L * 100L * 1000L);

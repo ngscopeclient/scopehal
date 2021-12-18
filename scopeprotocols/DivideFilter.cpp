@@ -144,7 +144,7 @@ void DivideFilter::Refresh()
 
 	if(format == FORMAT_RATIO)
 	{
-		m_yAxisUnit = Unit(Unit::UNIT_COUNTS);
+		SetYAxisUnits(Unit(Unit::UNIT_COUNTS), 0);
 
 		//Divide the units
 		//m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() / m_inputs[1].m_channel->GetYAxisUnits();
@@ -154,7 +154,7 @@ void DivideFilter::Refresh()
 	}
 	else /*if(format == FORMAT_DB) */
 	{
-		m_yAxisUnit = Unit(Unit::UNIT_DB);
+		SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
 
 		for(size_t i=0; i<len; i++)
 			fdst[i] = 20 * log10(fa[i] / fb[i]);

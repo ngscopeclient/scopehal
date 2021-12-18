@@ -39,7 +39,7 @@ using namespace std;
 EyeBitRateMeasurement::EyeBitRateMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_BITRATE);
+	SetYAxisUnits(Unit(Unit::UNIT_BITRATE), 0);
 
 	//Set up channels
 	CreateInput("Eye");

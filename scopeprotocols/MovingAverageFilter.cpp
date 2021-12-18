@@ -134,7 +134,7 @@ void MovingAverageFilter::Refresh()
 	}
 
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Do the average
 	auto cap = new AnalogWaveform;

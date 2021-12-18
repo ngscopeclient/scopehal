@@ -139,7 +139,7 @@ void WindowedAutocorrelationFilter::Refresh()
 	auto din_q = GetAnalogInputWaveform(1);
 
 	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Convert window and period to samples
 	int window_ps = m_parameters[m_windowName].GetIntVal();

@@ -114,7 +114,7 @@ void PeakHoldFilter::Refresh()
 
 	//Copy units
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	auto din = GetAnalogInputWaveform(0);
 

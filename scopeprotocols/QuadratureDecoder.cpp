@@ -61,7 +61,7 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_debouncename].ParseString("1 ms");
 
-	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	m_max = 10;
 	m_min = -10;

@@ -114,9 +114,6 @@ void VectorPhaseFilter::Refresh()
 	auto b = GetAnalogInputWaveform(1);
 	auto len = min(a->m_samples.size(), b->m_samples.size());
 
-	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
-
 	//Set up the output waveform
 	auto cap = new AnalogWaveform;
 	cap->Resize(len);
@@ -133,7 +130,7 @@ void VectorPhaseFilter::Refresh()
 	cap->m_startTimestamp 	= a->m_startTimestamp;
 	cap->m_startFemtoseconds = a->m_startFemtoseconds;
 
-	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	SetData(cap, 0);
 }

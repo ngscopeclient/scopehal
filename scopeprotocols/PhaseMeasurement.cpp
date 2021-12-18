@@ -40,7 +40,7 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 	, m_freqModeName("Frequency Mode")
 	, m_freqName("Center Frequency")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	//Set up channels
 	CreateInput("din");

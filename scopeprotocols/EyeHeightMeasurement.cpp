@@ -41,7 +41,7 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_FS);
-	m_yAxisUnit = Unit(Unit::UNIT_VOLTS);
+	SetYAxisUnits(Unit(Unit::UNIT_VOLTS), 0);
 
 	//Set up channels
 	CreateInput("Eye");

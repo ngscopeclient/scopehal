@@ -38,7 +38,7 @@ using namespace std;
 DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PERCENT);
+	SetYAxisUnits(Unit(Unit::UNIT_PERCENT), 0);
 
 	//Set up channels
 	CreateInput("din");

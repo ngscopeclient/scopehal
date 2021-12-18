@@ -41,9 +41,37 @@
 class Oscilloscope;
 
 /**
+	@brief Information associated with a single stream
+
+	Each channel contains one or more streams, which represent a single element of a complex-valued waveform.
+	For example, the waveform from an RTSA might have a stream for I and a stream for Q within a single channel.
+	The waveform from a VNA might have a stream for magnitude and another for angle data on each path.
+ */
+class Stream
+{
+public:
+	Stream();
+
+	Stream(Unit yunit, std::string name)
+	: m_yAxisUnit(yunit)
+	, m_name(name)
+	, m_waveform(nullptr)
+	{}
+
+	///Unit of measurement for our vertical axis
+	Unit m_yAxisUnit;
+
+	///@brief Name of the stream
+	std::string m_name;
+
+	///@brief The current waveform (or null if nothing here)
+	WaveformBase* m_waveform;
+};
+
+/**
 	@brief A single channel on the oscilloscope.
 
-	Each time the scope is triggered a new CaptureChannel is created with the new capture's data.
+	Each time the scope is triggered a new Waveform is created with the new capture's data.
  */
 class OscilloscopeChannel
 {
@@ -101,25 +129,25 @@ public:
 
 	///Get the number of data streams
 	size_t GetStreamCount()
-	{ return m_streamNames.size(); }
+	{ return m_streams.size(); }
 
 	///Gets the name of a stream (for display in the UI)
 	std::string GetStreamName(size_t stream)
-	{ return m_streamNames[stream]; }
+	{ return m_streams[stream].m_name; }
 
 	///Get the contents of a data stream
 	WaveformBase* GetData(size_t stream)
 	{
-		if(stream >= m_streamData.size())
-			return NULL;
-		return m_streamData[stream];
+		if(stream >= m_streams.size())
+			return nullptr;
+		return m_streams[stream].m_waveform;
 	}
 
 	///Detach the capture data from this channel
 	WaveformBase* Detach(size_t stream)
 	{
-		WaveformBase* tmp = m_streamData[stream];
-		m_streamData[stream] = NULL;
+		WaveformBase* tmp = m_streams[stream].m_waveform;
+		m_streams[stream].m_waveform = NULL;
 		return tmp;
 	}
 
@@ -190,14 +218,14 @@ public:
 	virtual Unit GetXAxisUnits()
 	{ return m_xAxisUnit; }
 
-	virtual Unit GetYAxisUnits()
-	{ return m_yAxisUnit; }
+	virtual Unit GetYAxisUnits(size_t stream)
+	{ return m_streams[stream].m_yAxisUnit; }
 
 	virtual void SetXAxisUnits(const Unit& rhs)
 	{ m_xAxisUnit = rhs; }
 
-	virtual void SetYAxisUnits(const Unit& rhs)
-	{ m_yAxisUnit = rhs; }
+	virtual void SetYAxisUnits(const Unit& rhs, size_t stream)
+	{ m_streams[stream].m_yAxisUnit = rhs; }
 
 	void SetDigitalHysteresis(float level);
 	void SetDigitalThreshold(float level);
@@ -216,25 +244,19 @@ public:
 
 	void SetDefaultDisplayName();
 protected:
-	void SharedCtorInit();
+	void SharedCtorInit(Unit unit);
 
 	/**
 		@brief Clears out any existing streams
 	 */
 	void ClearStreams()
-	{
-		m_streamNames.clear();
-		m_streamData.clear();
-	}
+	{ m_streams.clear(); }
 
 	/**
 		@brief Adds a new data stream to the channel
 	 */
-	void AddStream(const std::string& name)
-	{
-		m_streamNames.push_back(name);
-		m_streamData.push_back(NULL);
-	}
+	void AddStream(Unit yunit, const std::string& name)
+	{ m_streams.push_back(Stream(yunit, name)); }
 
 	/**
 		@brief Display name (user defined, defaults to m_hwname)
@@ -271,14 +293,8 @@ protected:
 	///Unit of measurement for our horizontal axis
 	Unit m_xAxisUnit;
 
-	///Unit of measurement for our vertical axis
-	Unit m_yAxisUnit;
-
-	///Name of each output stream
-	std::vector<std::string> m_streamNames;
-
-	///Waveform data
-	std::vector<WaveformBase*> m_streamData;
+	///Stream configuration
+	std::vector<Stream> m_streams;
 };
 
 #endif

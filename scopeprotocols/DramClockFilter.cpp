@@ -40,8 +40,8 @@ DramClockFilter::DramClockFilter(const string& color)
 {
 	//Set up channels
 	ClearStreams();
-	AddStream("RD");
-	AddStream("WR");
+	AddStream(Unit(Unit::UNIT_COUNTS), "RD");
+	AddStream(Unit(Unit::UNIT_COUNTS), "WR");
 
 	//Set up channels
 	CreateInput("CMD");

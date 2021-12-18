@@ -310,6 +310,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		snprintf(tmp, sizeof(tmp), "                xunit:       \"%s\"\n", chan->GetXAxisUnits().ToString().c_str());
 		config += tmp;
 
+		size_t nstreams = chan->GetStreamCount();
 		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		{
 			snprintf(tmp, sizeof(tmp), "                attenuation: %f\n", chan->GetAttenuation());
@@ -321,8 +322,13 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset());
 			config += tmp;
 
-			snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits().ToString().c_str());
-			config += tmp;
+			//single stream unit goes here
+			//multi stream unit goes under streams heading
+			if(nstreams == 1)
+			{
+				snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits(0).ToString().c_str());
+				config += tmp;
+			}
 
 			switch(chan->GetCoupling())
 			{
@@ -347,7 +353,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		}
 
 		//Save streams if there's more than one
-		size_t nstreams = chan->GetStreamCount();
 		if(nstreams > 1)
 		{
 			snprintf(tmp, sizeof(tmp), "                nstreams:     %zu\n", nstreams);
@@ -361,6 +366,8 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				snprintf(tmp, sizeof(tmp), "                        index: %zu\n", j);
 				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                        name: \"%s\"\n", chan->GetStreamName(j).c_str());
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        yunit:       \"%s\"\n", chan->GetYAxisUnits(j).ToString().c_str());
 				config += tmp;
 			}
 		}
@@ -397,6 +404,37 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
+		//Add multiple streams if present
+		auto snode = cnode["nstreams"];
+		if(snode)
+		{
+			size_t nstreams = snode.as<size_t>();
+			if(nstreams > 1)
+			{
+				chan->ClearStreams();
+
+				//We have to keep track of indexes because streams might show up out of order
+				//but right now OscilloscopeChannel only lets us add them in order
+				map<int, string> names;
+				map<int, string> yunits;
+
+				auto streams = cnode["streams"];
+				for(auto st : streams)
+				{
+					auto index = st.second["index"].as<size_t>();
+					names[index] = st.second["name"].as<string>();
+
+					if(st.second["yunit"])
+						yunits[index] = st.second["yunit"].as<string>();
+					else
+						yunits[index] = "V";
+				}
+
+				for(size_t j=0; j<nstreams; j++)
+					chan->AddStream(Unit(yunits[j]), names[j]);
+			}
+		}
+
 		switch(chan->GetType())
 		{
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
@@ -408,7 +446,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 				if(cnode["xunit"])
 					chan->SetXAxisUnits(cnode["xunit"].as<string>());
 				if(cnode["yunit"])
-					chan->SetYAxisUnits(cnode["yunit"].as<string>());
+					chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
 
 				if(cnode["coupling"])
 				{
@@ -435,28 +473,6 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 
 			default:
 				break;
-		}
-
-		//Add multiple streams if present
-		auto snode = cnode["nstreams"];
-		if(snode)
-		{
-			size_t nstreams = snode.as<size_t>();
-			if(nstreams > 1)
-			{
-				chan->ClearStreams();
-
-				//We have to keep track of indexes because streams might show up out of order
-				//but right now OscilloscopeChannel only lets us add them in order
-				map<int, string> names;
-
-				auto streams = cnode["streams"];
-				for(auto st : streams)
-					names[st.second["index"].as<size_t>()] = st.second["name"].as<string>();
-
-				for(size_t j=0; j<nstreams; j++)
-					chan->AddStream(names[j]);
-			}
 		}
 	}
 

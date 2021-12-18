@@ -40,7 +40,7 @@ TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_DB);
+	SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
 
 	//Set up channels
 	CreateInput("step");

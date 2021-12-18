@@ -575,8 +575,8 @@ void MockOscilloscope::LoadComplexCommon(
 	AddChannel(chan);
 	chan->SetDefaultDisplayName();
 	chan->ClearStreams();
-	chan->AddStream("I");
-	chan->AddStream("Q");
+	chan->AddStream(Unit(Unit::UNIT_VOLTS), "I");
+	chan->AddStream(Unit(Unit::UNIT_VOLTS), "Q");
 	chan->SetVoltageRange(2);
 	chan->SetOffset(0);
 

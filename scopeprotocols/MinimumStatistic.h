@@ -41,12 +41,12 @@ class MinimumStatistic : public Statistic
 public:
 	virtual void Clear();
 	static std::string GetStatisticName();
-	virtual bool Calculate(OscilloscopeChannel* channel, double& value);
+	virtual bool Calculate(StreamDescriptor stream, double& value);
 
 	STATISTIC_INITPROC(MinimumStatistic)
 
 protected:
-	std::map<OscilloscopeChannel*, double> m_pastMinimums;
+	std::map<StreamDescriptor, double> m_pastMinimums;
 };
 
 #endif

@@ -49,7 +49,7 @@ RiseMeasurement::RiseMeasurement(const string& color)
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
 	m_parameters[m_endname].SetFloatVal(0.8);
 
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	m_midpoint = 0;
 	m_range = 1;

@@ -39,7 +39,7 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	, m_threshname("Threshold")
 	, m_skipname("Skip Start")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("Clock");

@@ -38,7 +38,7 @@ using namespace std;
 TachometerFilter::TachometerFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_RPM);
+	SetYAxisUnits(Unit(Unit::UNIT_RPM), 0);
 
 	//Set up channels
 	CreateInput("din");

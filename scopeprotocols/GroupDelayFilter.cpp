@@ -48,7 +48,7 @@ GroupDelayFilter::GroupDelayFilter(const string& color)
 	m_offset = 0;
 
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +63,7 @@ bool GroupDelayFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel->GetXAxisUnits().GetType() != Unit::UNIT_HZ)
 		return false;
 	if(i == 0)
-		return (stream.m_channel->GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
+		return (stream.GetYAxisUnits().GetType() == Unit::UNIT_DEGREES);
 
 	return false;
 }

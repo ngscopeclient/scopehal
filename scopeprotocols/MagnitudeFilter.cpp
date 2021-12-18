@@ -117,8 +117,8 @@ void MagnitudeFilter::Refresh()
 	auto b = GetAnalogInputWaveform(1);
 	auto len = min(a->m_samples.size(), b->m_samples.size());
 
-	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	//Copy Y axis units from input
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up the output waveform
 	auto cap = new AnalogWaveform;

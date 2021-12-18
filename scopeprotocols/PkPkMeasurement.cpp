@@ -123,7 +123,8 @@ void PkPkMeasurement::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
 
-	m_yAxisUnit = GetInput(0).m_channel->GetYAxisUnits();
+	//Copy Y axis units from input
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Figure out the nominal midpoint of the waveform
 	float top = GetTopVoltage(din);

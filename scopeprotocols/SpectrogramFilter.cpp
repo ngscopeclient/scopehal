@@ -68,7 +68,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	, m_rangeMinName("Range Min")
 	, m_rangeMaxName("Range Max")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_HZ);
+	SetYAxisUnits(Unit(Unit::UNIT_HZ), 0);
 
 	//Set up channels
 	CreateInput("din");

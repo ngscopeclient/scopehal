@@ -44,7 +44,7 @@ FFTFilter::FFTFilter(const string& color)
 	, m_roundingName("Length Rounding")
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_DBM);
+	SetYAxisUnits(Unit(Unit::UNIT_DBM), 0);
 
 	//Set up channels
 	CreateInput("din");

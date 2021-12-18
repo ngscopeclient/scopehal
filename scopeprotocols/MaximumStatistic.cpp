@@ -41,17 +41,17 @@ string MaximumStatistic::GetStatisticName()
 	return "Maximum";
 }
 
-bool MaximumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
+bool MaximumStatistic::Calculate(StreamDescriptor stream, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData(0));
+	auto data = dynamic_cast<AnalogWaveform*>(stream.GetData());
 	if(!data)
 		return false;
 
 	//Starting value is previous minimum, if we have one
 	value = -1e20;
-	if(m_pastMaximums.find(channel) != m_pastMaximums.end())
-		value = m_pastMaximums[channel];
+	if(m_pastMaximums.find(stream) != m_pastMaximums.end())
+		value = m_pastMaximums[stream];
 
 	for(auto sample : data->m_samples)
 	{
@@ -59,6 +59,6 @@ bool MaximumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 			value = sample;
 	}
 
-	m_pastMaximums[channel] = value;
+	m_pastMaximums[stream] = value;
 	return true;
 }

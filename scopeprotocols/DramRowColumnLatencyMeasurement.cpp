@@ -41,7 +41,7 @@ DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& c
 	//Set up channels
 	CreateInput("din");
 
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	m_midpoint = 0;
 	m_range = 1;
