@@ -44,7 +44,6 @@
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
-#include "SignalGeneratorOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
@@ -367,7 +366,6 @@ void DriverStaticInit()
 	AddDriverClass(RohdeSchwarzOscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
-	AddDriverClass(SignalGeneratorOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 
 	AddTriggerClass(DropoutTrigger);
