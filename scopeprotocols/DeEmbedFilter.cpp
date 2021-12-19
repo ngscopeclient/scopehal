@@ -30,6 +30,7 @@
 #include "../scopehal/scopehal.h"
 #include "DeEmbedFilter.h"
 #include <immintrin.h>
+#include "TouchstoneImportFilter.h"
 
 extern std::mutex g_clfftMutex;
 
@@ -42,21 +43,9 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	//Set up channels
-	CreateInput("din");
-
-	m_fname = "S-Parameters";
-	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAMES, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_fname].m_fileFilterMask = "*.s*p";
-	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
-
-	m_pathName = "Path";
-	m_parameters[m_pathName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_pathName].AddEnumValue("S11", S11);
-	m_parameters[m_pathName].AddEnumValue("S12", S12);
-	m_parameters[m_pathName].AddEnumValue("S21", S21);
-	m_parameters[m_pathName].AddEnumValue("S22", S22);
-	m_parameters[m_pathName].SetIntVal(S21);
-	m_cachedPath = S21;
+	CreateInput("signal");
+	CreateInput("mag");
+	CreateInput("angle");
 
 	m_maxGainName = "Max Gain";
 	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
@@ -197,8 +186,25 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
+	auto touch = dynamic_cast<TouchstoneImportFilter*>(stream.m_channel);
+
+	switch(i)
+	{
+		//signal
+		case 0:
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+
+		//mag
+		case 1:
+			return (touch && stream.m_stream == 0);
+
+		//angle
+		case 2:
+			return (touch && stream.m_stream == 1);
+
+		default:
+			return false;
+	}
 
 	return false;
 }
@@ -235,23 +241,14 @@ bool DeEmbedFilter::NeedsConfig()
 
 void DeEmbedFilter::SetDefaultName()
 {
-	vector<string> fnames = m_parameters[m_fname].GetFileNames();
-	string base;
-	for(auto f : fnames)
-	{
-		if(base != "")
-			base += ", ";
-		base += BaseName(f);
-	}
-
 	char hwname[256];
 	snprintf(
 		hwname,
 		sizeof(hwname),
 		"DeEmbed(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
-		base.c_str(),
-		m_parameters[m_pathName].ToString().c_str()
+		GetInputDisplayName(1).c_str(),
+		GetInputDisplayName(2).c_str()
 		);
 
 	m_hwname = hwname;
@@ -274,55 +271,23 @@ void DeEmbedFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-bool DeEmbedFilter::LoadSparameters()
-{
-	//Reload the S-parameters from the Touchstone file(s) if the filename has changed
-	vector<string> fnames = m_parameters[m_fname].GetFileNames();
-	if(fnames != m_cachedFileNames)
-	{
-		m_cachedFileNames = fnames;
-
-		m_sparams.Clear();
-		TouchstoneParser parser;
-		SParameters temp;
-		for(auto f : fnames)
-		{
-			if(!parser.Load(f, temp))
-				return false;
-
-			m_sparams *= temp;
-		}
-
-		//Clear out cached S-parameters
-		m_cachedBinSize = 0;
-		m_resampledSparamCosines.clear();
-		m_resampledSparamSines.clear();
-	}
-
-	//Don't die if the file couldn't be loaded
-	if(m_sparams.empty())
-		return false;
-
-	return true;
-}
-
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
 void DeEmbedFilter::DoRefresh(bool invert)
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	if(!LoadSparameters())
-	{
-		SetData(NULL, 0);
-		return;
-	}
+	//Clear S-param cache every cycle for now
+	//TODO: some kind of sync to determine when input has changed
+	m_cachedBinSize = 0;
+	m_resampledSparamCosines.clear();
+	m_resampledSparamSines.clear();
 
 	auto din = GetAnalogInputWaveform(0);
 	const size_t npoints_raw = din->m_samples.size();
@@ -436,6 +401,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Check if we're now computing a different S-parameter than before
 	bool paramchange = false;
+	/*
 	auto path = static_cast<SParameterNames>(m_parameters[m_pathName].GetIntVal());
 	if(path != m_cachedPath)
 	{
@@ -443,6 +409,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		paramchange = true;
 		ClearSweeps();
 	}
+	*/
 
 	//Did we change the max gain?
 	bool clipchange = false;
@@ -618,10 +585,12 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 int64_t DeEmbedFilter::GetGroupDelay()
 {
-	auto& s21 = m_sparams[SPair(2,1)];
+	auto pang = dynamic_cast<TouchstoneImportFilter*>(GetInput(2).m_channel);
+	auto& aparams = pang->GetParams();
+
 	float max_delay = 0;
-	for(size_t i=0; i<s21.size()-1 && i<50; i++)
-		max_delay = max(max_delay, s21.GetGroupDelay(i));
+	for(size_t i=0; i<aparams.size()-1 && i<50; i++)
+		max_delay = max(max_delay, aparams.GetGroupDelay(i));
 	return max_delay * FS_PER_SECOND;
 }
 
@@ -636,53 +605,38 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 
 	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
-	//Figure out which parameter to use
-	int to, from;
-	switch(m_parameters[m_pathName].GetIntVal())
-	{
-		case S11:
-			to = 1;
-			from = 1;
-			break;
+	auto pmag = dynamic_cast<TouchstoneImportFilter*>(GetInput(1).m_channel);
+	auto pang = dynamic_cast<TouchstoneImportFilter*>(GetInput(2).m_channel);
+	if(!pmag || !pang)
+		return;
 
-		case S21:
-			to = 2;
-			from = 1;
-			break;
-
-		case S12:
-			to = 1;
-			from = 2;
-			break;
-
-		case S22:
-		default:
-			to = 2;
-			from = 2;
-			break;
-	}
+	auto& mparams = pmag->GetParams();
+	auto& aparams = pang->GetParams();
 
 	for(size_t i=0; i<nouts; i++)
 	{
-		auto point = m_sparams.SamplePoint(to, from, bin_hz * i);
+		float freq = bin_hz * i;
+
+		float mag = mparams.InterpolateMagnitude(freq);
+		float ang = aparams.InterpolateAngle(freq);
 
 		//De-embedding
 		if(invert)
 		{
 			float amp = 0;
-			if(fabs(point.m_amplitude) > FLT_EPSILON)
-				amp = 1.0f / point.m_amplitude;
+			if(fabs(mag) > FLT_EPSILON)
+				amp = 1.0f / mag;
 			amp = min(amp, maxGain);
 
-			m_resampledSparamSines.push_back(sin(-point.m_phase) * amp);
-			m_resampledSparamCosines.push_back(cos(-point.m_phase) * amp);
+			m_resampledSparamSines.push_back(sin(-ang) * amp);
+			m_resampledSparamCosines.push_back(cos(-ang) * amp);
 		}
 
 		//Channel emulation
 		else
 		{
-			m_resampledSparamSines.push_back(sin(point.m_phase) * point.m_amplitude);
-			m_resampledSparamCosines.push_back(cos(point.m_phase) * point.m_amplitude);
+			m_resampledSparamSines.push_back(sin(ang) * mag);
+			m_resampledSparamCosines.push_back(cos(ang) * mag);
 		}
 	}
 }

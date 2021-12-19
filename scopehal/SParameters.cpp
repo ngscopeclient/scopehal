@@ -122,6 +122,16 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 	return ret;
 }
 
+float SParameterVector::InterpolateMagnitude(float frequency) const
+{
+	return InterpolatePoint(frequency).m_amplitude;
+}
+
+float SParameterVector::InterpolateAngle(float frequency) const
+{
+	return InterpolatePoint(frequency).m_phase;
+}
+
 /**
 	@brief Multiplies this vector by another set of S-parameters.
 
@@ -152,7 +162,7 @@ SParameterVector& SParameterVector::operator *=(const SParameterVector& rhs)
 /**
 	@brief Gets the group delay at a given bin
  */
-float SParameterVector::GetGroupDelay(size_t bin)
+float SParameterVector::GetGroupDelay(size_t bin) const
 {
 	if(bin+1 >= m_points.size())
 		return 0;

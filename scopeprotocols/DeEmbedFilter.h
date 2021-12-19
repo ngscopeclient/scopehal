@@ -67,22 +67,9 @@ public:
 protected:
 	virtual int64_t GetGroupDelay();
 	void DoRefresh(bool invert = true);
-	virtual bool LoadSparameters();
 	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
-	enum SParameterNames
-	{
-		S11,
-		S12,
-		S21,
-		S22
-	};
-	std::string m_pathName;
-	std::string m_fname;
 	std::string m_maxGainName;
-
-	SParameterNames m_cachedPath;
-	std::vector<std::string> m_cachedFileNames;
 
 	float m_min;
 	float m_max;
@@ -93,8 +80,6 @@ protected:
 	double m_cachedBinSize;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
-
-	SParameters m_sparams;
 
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;

@@ -64,12 +64,14 @@ class SParameterVector
 public:
 
 	SParameterPoint InterpolatePoint(float frequency) const;
+	float InterpolateMagnitude(float frequency) const;
+	float InterpolateAngle(float frequency) const;
 
 	std::vector<SParameterPoint> m_points;
 
-	float GetGroupDelay(size_t bin);
+	float GetGroupDelay(size_t bin) const;
 
-	size_t size()
+	size_t size() const
 	{ return m_points.size(); }
 
 	SParameterVector& operator *=(const SParameterVector& rhs);
@@ -107,6 +109,9 @@ public:
 
 	SParameterVector& operator[] (SPair pair)
 	{ return *m_params[pair]; }
+
+	const SParameterVector& operator[] (SPair pair) const
+	{ return *(m_params.find(pair)->second); }
 
 	friend class TouchstoneParser;
 

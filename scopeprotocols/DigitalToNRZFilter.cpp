@@ -71,12 +71,12 @@ float DigitalToNRZFilter::GetVoltageRange(size_t /*stream*/)
 	return fabs(v1 - v0) * 1.05;
 }
 
-float DigitalToNRZFilter::GetOffset(size_t /*stream*/)
+float DigitalToNRZFilter::GetOffset(size_t stream)
 {
 	float v0 = m_parameters[m_level0].GetFloatVal();
 	float v1 = m_parameters[m_level1].GetFloatVal();
 
-	return -fabs(v1 - v0);
+	return -GetVoltageRange(stream) + (v0+v1)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
