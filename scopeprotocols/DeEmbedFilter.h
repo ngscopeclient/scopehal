@@ -76,6 +76,8 @@ protected:
 	float m_range;
 	float m_offset;
 	float m_cachedMaxGain;
+	WaveformBase* m_cachedMag;
+	WaveformBase* m_cachedAngle;
 
 	double m_cachedBinSize;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;

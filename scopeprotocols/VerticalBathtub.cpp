@@ -117,7 +117,6 @@ void VerticalBathtub::Refresh()
 	}
 
 	//Get the input data
-	auto ein = GetInput(0).m_channel;
 	auto eye = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
 	int64_t timestamp = m_parameters[m_timeName].GetIntVal();
 

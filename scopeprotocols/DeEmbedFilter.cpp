@@ -62,6 +62,8 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
+	m_cachedMag = nullptr;
+	m_cachedAngle = nullptr;
 
 	#ifdef HAVE_CLFFT
 
@@ -283,12 +285,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		return;
 	}
 
-	//Clear S-param cache every cycle for now
-	//TODO: some kind of sync to determine when input has changed
-	m_cachedBinSize = 0;
-	m_resampledSparamCosines.clear();
-	m_resampledSparamSines.clear();
-
 	auto din = GetAnalogInputWaveform(0);
 	const size_t npoints_raw = din->m_samples.size();
 
@@ -399,17 +395,16 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Check if we're now computing a different S-parameter than before
-	bool paramchange = false;
-	/*
-	auto path = static_cast<SParameterNames>(m_parameters[m_pathName].GetIntVal());
-	if(path != m_cachedPath)
+	//Dirty hack for determining when input has changed
+	//(assumes TouchstoneImportFilter never writes to the same Waveform without changing the pointer)
+	bool inchange = false;
+
+	if( (GetInput(1).GetData() != m_cachedMag) ||
+		(GetInput(2).GetData() != m_cachedAngle) )
 	{
-		m_cachedPath = path;
-		paramchange = true;
-		ClearSweeps();
+		inchange = true;
 	}
-	*/
+
 
 	//Did we change the max gain?
 	bool clipchange = false;
@@ -423,8 +418,11 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Resample our parameter to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
-	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || paramchange || clipchange)
+	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || clipchange || inchange)
 	{
+		m_cachedMag = GetInput(1).GetData();
+		m_cachedAngle = GetInput(2).GetData();
+
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
 		InterpolateSparameters(bin_hz, invert, nouts);
