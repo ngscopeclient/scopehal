@@ -852,3 +852,16 @@ string FindDataFile(const string& relpath)
 
 	return "";
 }
+
+void GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
+{
+	//TODO: Add Windows equivalent
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
+}

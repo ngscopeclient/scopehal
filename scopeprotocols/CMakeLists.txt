@@ -108,6 +108,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	ToneGeneratorFilter.cpp
+	TouchstoneImportFilter.cpp
 	TMDSDecoder.cpp
 	TopMeasurement.cpp
 	UARTDecoder.cpp

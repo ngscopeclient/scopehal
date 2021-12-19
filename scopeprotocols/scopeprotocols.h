@@ -145,6 +145,7 @@
 #include "TMDSDecoder.h"
 #include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
+#include "TouchstoneImportFilter.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
 #include "UndershootMeasurement.h"

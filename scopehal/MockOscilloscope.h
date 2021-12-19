@@ -168,7 +168,6 @@ public:
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
-	static void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
 
 	void LoadComplexCommon(
 		const std::string& path,
