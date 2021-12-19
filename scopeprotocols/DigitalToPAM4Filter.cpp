@@ -87,7 +87,7 @@ float DigitalToPAM4Filter::GetVoltageRange(size_t /*stream*/)
 	return fabs(vmax - vmin) * 1.05;
 }
 
-float DigitalToPAM4Filter::GetOffset(size_t stream)
+float DigitalToPAM4Filter::GetOffset(size_t /*stream*/)
 {
 	float v0 = m_parameters[m_level00].GetFloatVal();
 	float v1 = m_parameters[m_level01].GetFloatVal();
@@ -100,7 +100,7 @@ float DigitalToPAM4Filter::GetOffset(size_t stream)
 	vmax = max(vmax, v2);
 	vmax = max(vmax, v3);
 
-	return -GetVoltageRange(stream) + (vmax-vmin)/2;
+	return (vmax-vmin)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
