@@ -173,9 +173,9 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 			//The actual S-matrix is nports * nports mag/angle or real/imaginary tuples
 			float mag;
 			float angle;
-			for(size_t dest=1; dest <= nports; dest ++)
+			for(size_t src=1; src <= nports; src ++)
 			{
-				for(size_t src=1; src <= nports; src ++)
+				for(size_t dest=1; dest <= nports; dest ++)
 				{
 					//Read the inputs
 					if(!ReadFloat(buf, i, len, mag) || !ReadFloat(buf, i, len, angle))
