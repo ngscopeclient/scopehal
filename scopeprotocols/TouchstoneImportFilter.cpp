@@ -139,8 +139,8 @@ void TouchstoneImportFilter::SetOffset(float offset, size_t stream)
 void TouchstoneImportFilter::Refresh()
 {
 	auto fname = m_parameters[m_fpname].ToString();
-	size_t src = m_parameters[m_srcportname].GetIntVal();
-	size_t dst = m_parameters[m_dstportname].GetIntVal();
+	int src = m_parameters[m_srcportname].GetIntVal();
+	int dst = m_parameters[m_dstportname].GetIntVal();
 
 	//If cached values are still good, don't do anything
 	if( (m_cachedDstPort == dst) &&
@@ -164,7 +164,7 @@ void TouchstoneImportFilter::Refresh()
 	GetTimestampOfFile(fname, timestamp, fs);
 
 	//Extract our parameters
-	size_t nports = m_params.GetNumPorts();
+	int nports = m_params.GetNumPorts();
 	if( (src > nports) || (dst > nports) )
 		return;
 	auto& vec = m_params[SPair(dst, src)];
