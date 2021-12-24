@@ -27,138 +27,82 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef RFSignalGenerator_h
+#define RFSignalGenerator_h
+
 /**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
+	@brief An RF waveform generator which creates a carrier and optionally modulates it
  */
+class RFSignalGenerator : public virtual Instrument
+{
+public:
+	RFSignalGenerator();
+	virtual ~RFSignalGenerator();
 
-#ifndef scopehal_h
-#define scopehal_h
+	/**
+		@brief Returns the number of output channels on the generator
+	 */
+	virtual int GetChannelCount() =0;
 
-#define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
+	/**
+		@brief Returns the name of a given output channel
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-#include <chrono>
-#include <thread>
+		@param chan	Zero-based channel index
+	 */
+	virtual std::string GetChannelName(int chan) =0;
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+	/**
+		@brief Check if a channel is currently enabled
 
-#include <yaml-cpp/yaml.h>
+		@param chan	Zero-based channel index
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+		@return True if output is enabled, false if disabled
+	 */
+	virtual bool GetChannelOutputEnable(int chan) =0;
 
-#include "config.h"
-#ifdef HAVE_OPENCL
-#define CL_TARGET_OPENCL_VERSION 120
-#define CL_HPP_MINIMUM_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_TARGET_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY
-#define CL_HPP_ENABLE_EXCEPTIONS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wignored-attributes"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <CL/opencl.hpp>
-#pragma GCC diagnostic pop
-#endif
+	/**
+		@brief Enable or disable a channel output
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+		@param chan	Zero-based channel index
+		@param on	True to enable the output, false to disable
+	 */
+	virtual void SetChannelOutputEnable(int chan, bool on) =0;
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+	/**
+		@brief Gets the power level of a channel
 
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
+		@param chan	Zero-based channel index
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
-#include "RFSignalGenerator.h"
-#include "SCPIOscilloscope.h"
+		@return Power level (in dBm)
+	 */
+	virtual float GetChannelOutputPower(int chan) =0;
 
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "PeakDetectionFilter.h"
-#include "SpectrumChannel.h"
+	/**
+		@brief Sets the power level of a channel
 
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+		@param chan		Zero-based channel index
+		@param power	Power level (in dBm)
+	 */
+	virtual void SetChannelOutputPower(int chan, float power) =0;
 
-uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
+	/**
+		@brief Gets the center frequency of a channel
 
-std::string GetDefaultChannelColor(int i);
+		@param chan	Zero-based channel index
 
-std::string Trim(const std::string& str);
-std::string TrimQuotes(const std::string& str);
-std::string BaseName(const std::string& path);
+		@return Center frequency, in Hz
+	 */
+	virtual float GetChannelCenterFrequency(int chan) =0;
 
-std::string ReadFile(const std::string& path);
-std::string ReadDataFile(const std::string& relpath);
-std::string FindDataFile(const std::string& relpath);
-void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+	/**
+		@brief Sets the power level of a channel
 
-std::string to_string_sci(double d);
-std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
+		@param chan		Zero-based channel index
+		@param freq		Center frequency, in Hz
+	 */
+	virtual void SetChannelCenterFrequency(int chan, float freq) =0;
 
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializeSearchPaths();
-void InitializePlugins();
-void DetectCPUFeatures();
-void DetectGPUFeatures();
-
-void ScopehalStaticCleanup();
-
-float FreqToPhase(float hz);
-
-uint64_t next_pow2(uint64_t v);
-uint64_t prev_pow2(uint64_t v);
-
-extern bool g_hasFMA;
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
-
-#define FS_PER_SECOND 1e15
-#define SECONDS_PER_FS 1e-15
-
-//string to size_t conversion
-#ifdef _WIN32
-#define stos(str) static_cast<size_t>(stoll(str))
-#else
-#define stos(str) static_cast<size_t>(stol(str))
-#endif
-
-extern std::vector<std::string> g_searchPaths;
-
-//Set true prior to calling DetectGPUFeatures() to force OpenCL to not be used
-extern bool g_disableOpenCL;
-
-#ifdef HAVE_OPENCL
-extern cl::Context* g_clContext;
-extern std::vector<cl::Device> g_contextDevices;
-extern size_t g_maxClLocalSizeX;
-#endif
+	//TODO: Modulation
+};
 
 #endif

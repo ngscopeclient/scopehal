@@ -27,138 +27,96 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Main library include file
- */
+#include "scopehal.h"
+#include "SiglentVectorSignalGenerator.h"
 
-#ifndef scopehal_h
-#define scopehal_h
+using namespace std;
 
-#define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
 
-#include <vector>
-#include <string>
-#include <map>
-#include <stdint.h>
-#include <chrono>
-#include <thread>
+SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transport)
+	: SCPIDevice(transport, true)
+{
+	//TODO: query options to figure out what we actually have
+	//m_transport->SendCommand("*OPT?");
+}
 
-#include <sigc++/sigc++.h>
-#include <cairomm/context.h>
+SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()
+{
+}
 
-#include <yaml-cpp/yaml.h>
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// System info / configuration
 
-#include "../log/log.h"
-#include "../graphwidget/Graph.h"
+int SiglentVectorSignalGenerator::GetChannelCount()
+{
+	return 1;
+}
 
-#include "config.h"
-#ifdef HAVE_OPENCL
-#define CL_TARGET_OPENCL_VERSION 120
-#define CL_HPP_MINIMUM_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_TARGET_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY
-#define CL_HPP_ENABLE_EXCEPTIONS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wignored-attributes"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <CL/opencl.hpp>
-#pragma GCC diagnostic pop
-#endif
+string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)
+{
+	return "RFOUT";
+}
 
-#include "Unit.h"
-#include "Bijection.h"
-#include "IDTable.h"
+unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes()
+{
+	return INST_RF_GEN;
+}
 
-#include "SCPITransport.h"
-#include "SCPISocketTransport.h"
-#include "SCPILxiTransport.h"
-#include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
-#include "SCPIUARTTransport.h"
-#include "VICPSocketTransport.h"
-#include "SCPIDevice.h"
+string SiglentVectorSignalGenerator::GetName()
+{
+	return m_model;
+}
 
-#include "OscilloscopeChannel.h"
-#include "FlowGraphNode.h"
-#include "Trigger.h"
+string SiglentVectorSignalGenerator::GetVendor()
+{
+	return m_vendor;
+}
 
-#include "Instrument.h"
-#include "FunctionGenerator.h"
-#include "Multimeter.h"
-#include "Oscilloscope.h"
-#include "PowerSupply.h"
-#include "RFSignalGenerator.h"
-#include "SCPIOscilloscope.h"
+string SiglentVectorSignalGenerator::GetSerial()
+{
+	return m_serial;
+}
 
-#include "Statistic.h"
-#include "FilterParameter.h"
-#include "Filter.h"
-#include "PeakDetectionFilter.h"
-#include "SpectrumChannel.h"
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Output stage
 
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+bool SiglentVectorSignalGenerator::GetChannelOutputEnable(int /*chan*/)
+{
+	m_transport->SendCommand("OUTP?");
+	return (stoi(m_transport->ReadReply()) == 1);
+}
 
-uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
+void SiglentVectorSignalGenerator::SetChannelOutputEnable(int /*chan*/, bool on)
+{
+	if(on)
+		m_transport->SendCommand("OUTP ON");
+	else
+		m_transport->SendCommand("OUTP OFF");
+}
 
-std::string GetDefaultChannelColor(int i);
+float SiglentVectorSignalGenerator::GetChannelOutputPower(int /*chan*/)
+{
+	m_transport->SendCommand("SOUR:POW?");
+	return stof(m_transport->ReadReply());
+}
 
-std::string Trim(const std::string& str);
-std::string TrimQuotes(const std::string& str);
-std::string BaseName(const std::string& path);
+void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float power)
+{
+	m_transport->SendCommand(string("SOUR:POW ") + to_string(power));
+}
 
-std::string ReadFile(const std::string& path);
-std::string ReadDataFile(const std::string& relpath);
-std::string FindDataFile(const std::string& relpath);
-void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Synthesizer
 
-std::string to_string_sci(double d);
-std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
+float SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
+{
+	m_transport->SendCommand("SOUR:FREQ?");
+	return stof(m_transport->ReadReply());
+}
 
-void TransportStaticInit();
-void DriverStaticInit();
-
-void InitializeSearchPaths();
-void InitializePlugins();
-void DetectCPUFeatures();
-void DetectGPUFeatures();
-
-void ScopehalStaticCleanup();
-
-float FreqToPhase(float hz);
-
-uint64_t next_pow2(uint64_t v);
-uint64_t prev_pow2(uint64_t v);
-
-extern bool g_hasFMA;
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
-
-#define FS_PER_SECOND 1e15
-#define SECONDS_PER_FS 1e-15
-
-//string to size_t conversion
-#ifdef _WIN32
-#define stos(str) static_cast<size_t>(stoll(str))
-#else
-#define stos(str) static_cast<size_t>(stol(str))
-#endif
-
-extern std::vector<std::string> g_searchPaths;
-
-//Set true prior to calling DetectGPUFeatures() to force OpenCL to not be used
-extern bool g_disableOpenCL;
-
-#ifdef HAVE_OPENCL
-extern cl::Context* g_clContext;
-extern std::vector<cl::Device> g_contextDevices;
-extern size_t g_maxClLocalSizeX;
-#endif
-
-#endif
+void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float freq)
+{
+	m_transport->SendCommand(string("SOUR:FREQ ") + to_string(freq));
+}

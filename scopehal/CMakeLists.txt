@@ -81,9 +81,13 @@ set(SCOPEHAL_SOURCES
 
 	Instrument.cpp
 	FunctionGenerator.cpp
+	Multimeter.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
+	PowerSupply.cpp
+	RFSignalGenerator.cpp
 	SCPIOscilloscope.cpp
+
 	AgilentOscilloscope.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
@@ -93,12 +97,11 @@ set(SCOPEHAL_SOURCES
 	PicoOscilloscope.cpp
 	RigolOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
+	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
-	Multimeter.cpp
-	PowerSupply.cpp
 
 	Filter.cpp
 	FilterParameter.cpp

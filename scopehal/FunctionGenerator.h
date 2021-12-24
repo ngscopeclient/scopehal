@@ -31,7 +31,7 @@
 #define FunctionGenerator_h
 
 /**
-	@brief A generic waveform generator
+	@brief A baseband waveform generator
  */
 class FunctionGenerator : public virtual Instrument
 {
