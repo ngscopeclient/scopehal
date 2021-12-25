@@ -201,7 +201,9 @@ StreamDescriptor FlowGraphNode::GetInput(size_t i)
 string FlowGraphNode::GetInputDisplayName(size_t i)
 {
 	auto in = m_inputs[i];
-	if(in.m_channel->GetStreamCount() > 1)
+	if(in.m_channel == NULL)
+		return "NULL";
+	else if(in.m_channel->GetStreamCount() > 1)
 		return in.m_channel->GetDisplayName() + "." + in.m_channel->GetStreamName(in.m_stream);
 	else
 		return in.m_channel->GetDisplayName();
