@@ -122,6 +122,9 @@ void MultiplyFilter::Refresh()
 
 	//Set up the output waveform
 	auto cap = SetupOutputWaveform(a, 0, 0, 0);
+	cap->m_samples.resize(len);
+	cap->m_offsets.resize(len);
+	cap->m_durations.resize(len);
 
 	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
