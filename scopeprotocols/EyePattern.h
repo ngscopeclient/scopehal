@@ -122,14 +122,20 @@ public:
 
 	void SetWidth(size_t width)
 	{
-		m_width = width;
-		SetData(NULL, 0);
+		if(m_width != width)
+		{
+			SetData(NULL, 0);
+			m_width = width;
+		}
 	}
 
 	void SetHeight(size_t height)
 	{
-		m_height = height;
-		SetData(NULL, 0);
+		if(m_height != height)
+		{
+			SetData(NULL, 0);
+			m_height = height;
+		}
 	}
 
 	int64_t GetXOffset()
