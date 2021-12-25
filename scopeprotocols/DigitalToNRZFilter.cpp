@@ -76,7 +76,7 @@ float DigitalToNRZFilter::GetOffset(size_t /*stream*/)
 	float v0 = m_parameters[m_level0].GetFloatVal();
 	float v1 = m_parameters[m_level1].GetFloatVal();
 
-	return (v0+v1)/2;
+	return -(v0+v1)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
