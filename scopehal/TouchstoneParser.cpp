@@ -57,7 +57,9 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	params.Clear();
 
 	//If file doesn't exist, bail early
-	FILE* fp = fopen(fname.c_str(), "r");
+	//Open in binary mode because we ignore \r characters for files with Windows line endings,
+	//but we need files with Unix line endings to open correctly on Windows even if no \r is present.
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
 		LogError("Unable to open S-parameter file %s\n", fname.c_str());
