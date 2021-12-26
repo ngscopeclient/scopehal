@@ -86,6 +86,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeriodMeasurement.cpp
 	PhaseMeasurement.cpp
 	PkPkMeasurement.cpp
+	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp

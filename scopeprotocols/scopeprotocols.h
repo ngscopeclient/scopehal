@@ -122,6 +122,7 @@
 #include "PeriodMeasurement.h"
 #include "PhaseMeasurement.h"
 #include "PkPkMeasurement.h"
+#include "PRBSCheckerFilter.h"
 #include "PRBSGeneratorFilter.h"
 #include "RjBUjFilter.h"
 #include "QSPIDecoder.h"
