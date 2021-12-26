@@ -51,6 +51,8 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 
 	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_polyname].AddEnumValue("PRBS-7", POLY_PRBS7);
+	m_parameters[m_polyname].AddEnumValue("PRBS-9", POLY_PRBS9);
+	m_parameters[m_polyname].AddEnumValue("PRBS-11", POLY_PRBS11);
 	m_parameters[m_polyname].AddEnumValue("PRBS-15", POLY_PRBS15);
 	m_parameters[m_polyname].AddEnumValue("PRBS-23", POLY_PRBS23);
 	m_parameters[m_polyname].AddEnumValue("PRBS-31", POLY_PRBS31);
@@ -86,6 +88,14 @@ void PRBSGeneratorFilter::SetDefaultName()
 	{
 		case POLY_PRBS7:
 			prefix = "PRBS7";
+			break;
+
+		case POLY_PRBS9:
+			prefix = "PRBS9";
+			break;
+
+		case POLY_PRBS11:
+			prefix = "PRBS11";
 			break;
 
 		case POLY_PRBS15:
@@ -168,6 +178,14 @@ void PRBSGeneratorFilter::Refresh()
 		{
 			case POLY_PRBS7:
 				next = ( (prbs >> 7) ^ (prbs >> 6) ) & 1;
+				break;
+
+			case POLY_PRBS9:
+				next = ( (prbs >> 9) ^ (prbs >> 5) ) & 1;
+				break;
+
+			case POLY_PRBS11:
+				next = ( (prbs >> 11) ^ (prbs >> 0) ) & 1;
 				break;
 
 			case POLY_PRBS15:

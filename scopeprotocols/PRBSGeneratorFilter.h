@@ -53,6 +53,8 @@ public:
 	enum Polynomials
 	{
 		POLY_PRBS7,
+		POLY_PRBS9,
+		POLY_PRBS11,
 		POLY_PRBS15,
 		POLY_PRBS23,
 		POLY_PRBS31
