@@ -160,7 +160,14 @@ string SCPILxiTransport::ReadReply(bool endOnSemicolon)
 		else
 			ret += tmp;
 	}
-	LogTrace("Got %s\n", ret.c_str());
+	if (ret.size() > 100) {
+		LogTrace("Got %.100s...\n", ret.c_str());
+	}
+	else
+	{
+		LogTrace("Got %s\n", ret.c_str());
+	}
+	
 	return ret;
 }
 

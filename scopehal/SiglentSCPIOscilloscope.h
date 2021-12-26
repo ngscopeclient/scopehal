@@ -50,9 +50,10 @@ class WindowTrigger;
 #define MAX_ANALOG 4
 #define WAVEDESC_SIZE 346
 
-// These scopes will actually sample 200MPoints, but the maximum it can transfer in one
+// These SDS2000/SDS5000 scopes will actually sample 200MPoints, but the maximum it can transfer in one
 // chunk is 10MPoints
-#define WAVEFORM_SIZE (10 * 1000 * 1000)
+// TODO(dannas): Can the Siglent SDS1104x-e really transfer 14MPoints? Update comment and constant
+#define WAVEFORM_SIZE (14 * 1000 * 1000)
 
 #define c_digiChannelsPerBus 8
 
@@ -129,6 +130,7 @@ public:
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
 	{
+		MODEL_SIGLENT_SDS1000,
 		MODEL_SIGLENT_SDS2000XP,
 		MODEL_SIGLENT_SDS5000X,
 		MODEL_UNKNOWN
