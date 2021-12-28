@@ -175,10 +175,27 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 			//The actual S-matrix is nports * nports mag/angle or real/imaginary tuples
 			float mag;
 			float angle;
-			for(size_t src=1; src <= nports; src ++)
+			for(size_t outer=1; outer <= nports; outer ++)
 			{
-				for(size_t dest=1; dest <= nports; dest ++)
+				for(size_t inner=1; inner <= nports; inner ++)
 				{
+					//NOTE! Parameter ordering is different for 2 vs 3+ port
+					//For 2 port, we loop destination inner and source outer (S11 S21 S12 S22)
+					//For 3+ port, we have source inner and destination outer (S11 S12 S13 S21 S22 S23 ...)
+					//See pages 6 and 8 of Touchstone File Specification rev 1.1
+					size_t src;
+					size_t dest;
+					if(nports <= 2)
+					{
+						dest = inner;
+						src = outer;
+					}
+					else
+					{
+						dest = outer;
+						src = inner;
+					}
+
 					//Read the inputs
 					if(!ReadFloat(buf, i, len, mag) || !ReadFloat(buf, i, len, angle))
 					{
