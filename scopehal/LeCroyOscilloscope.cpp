@@ -1175,6 +1175,19 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 
 bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 {
+	//In DBI models, additional checks are needed.
+	//Separate from normal interleaving
+	if(HasDBICapability())
+	{
+		//DBI active on channel 2 blocks channel 1 from being enabled
+		if(i == 0 && IsDBIEnabled(1))
+			return false;
+
+		//DBI active on channel 3 blocks channel 4 from being enabled
+		if(i == 3 && IsDBIEnabled(2))
+			return false;
+	}
+
 	//All channels are always legal if we're not interleaving
 	if(!m_interleaving)
 		return true;
@@ -1188,6 +1201,9 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_HDO_4KA:
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_8K_HD:		//TODO: seems like multiple levels of interleaving possible
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVEPRO_HD:
 		case MODEL_WAVERUNNER_9K:
@@ -3641,6 +3657,63 @@ void LeCroyOscilloscope::SetSamplingMode(SamplingMode mode)
 	m_memoryDepthValid = false;
 	m_interleaving = false;
 	m_interleavingValid = true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DBI mode
+
+bool LeCroyOscilloscope::HasDBICapability()
+{
+	switch(m_modelid)
+	{
+		//Base 8Zi: DBI added past 16 GHz
+		case MODEL_SDA_8ZI:
+		case MODEL_WAVEMASTER_8ZI:
+			return (m_maxBandwidth > 16000);
+
+		//8Zi-A: DBI added for 25/30/45 GHz models
+		case MODEL_SDA_8ZI_A:
+		case MODEL_WAVEMASTER_8ZI_A:
+			return (m_maxBandwidth > 20000);
+
+		//8Zi-B: DBI added for 25/30 GHz models
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_B:
+			return (m_maxBandwidth > 20000);
+
+		//LabMaster: DBI added for >36 GHz models
+		case MODEL_LABMASTER_ZI_A:
+			return (m_maxBandwidth > 36000);
+
+		//All other models lack DBI
+		default:
+			return false;
+	}
+}
+
+bool LeCroyOscilloscope::IsDBIEnabled(size_t channel)
+{
+	if(!HasDBICapability())
+		return false;
+
+	//TODO: LabMaster scopes can have >4 channels. How do we figure out what acquisition modules are present?
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Ask scope for the DBI mode
+	//For now, no caching since we don't expect to be touching this too often.
+	//We can add caching in the future if there's performance issues.
+	if(channel == 1)
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI2Mode'");
+	else if(channel == 2)
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI3Mode'");
+
+	//Can only enable DBI on center two channels
+	else
+		return false;
+
+	auto reply = Trim(m_transport->ReadReply().c_str());
+	return (reply == "DBION");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

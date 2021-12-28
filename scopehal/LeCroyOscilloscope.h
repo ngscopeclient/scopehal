@@ -173,6 +173,8 @@ public:
 		MODEL_SDA_8ZI,
 		MODEL_SDA_8ZI_A,
 		MODEL_SDA_8ZI_B,
+		MODEL_WAVEMASTER_8ZI,
+		MODEL_WAVEMASTER_8ZI_A,
 		MODEL_WAVEMASTER_8ZI_B,
 
 		MODEL_WAVEPRO_HD,
@@ -205,6 +207,10 @@ public:
 	virtual bool IsSamplingModeAvailable(SamplingMode mode);
 	virtual SamplingMode GetSamplingMode();
 	virtual void SetSamplingMode(SamplingMode mode);
+
+	//DBI mode
+	bool HasDBICapability();
+	bool IsDBIEnabled(size_t channel);
 
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
