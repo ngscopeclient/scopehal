@@ -280,7 +280,7 @@ void DetectGPUFeatures()
 						//For now, create a context on the first device of the first detected platform
 						//and hope for the best.
 						//TODO: multi-device support?
-						if(!g_clContext)
+						if(!g_clContext && !devices.empty())
 						{
 							vector<cl::Device> devs;
 							devs.push_back(devices[0]);
@@ -310,23 +310,28 @@ void DetectGPUFeatures()
 
 		#ifdef HAVE_CLFFT
 
-			clfftSetupData data;
-			clfftInitSetupData(&data);
-			if(CLFFT_SUCCESS != clfftSetup(&data))
+			if(g_clContext)
 			{
-				LogError("clFFT init failed, aborting\n");
-				abort();
-			}
+				clfftSetupData data;
+				clfftInitSetupData(&data);
+				if(CLFFT_SUCCESS != clfftSetup(&data))
+				{
+					LogError("clFFT init failed, aborting\n");
+					abort();
+				}
 
-			cl_uint major;
-			cl_uint minor;
-			cl_uint patch;
-			if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
-			{
-				LogError("clFFT version query failed, aborting\n");
-				abort();
+				cl_uint major;
+				cl_uint minor;
+				cl_uint patch;
+				if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
+				{
+					LogError("clFFT version query failed, aborting\n");
+					abort();
+				}
+				LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
 			}
-			LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
+			else
+				LogDebug("clFFT: present at compile time, but cannot use because no OpenCL devices found\n");
 
 		#else
 			LogNotice("clFFT support: not present at compile time\n");
