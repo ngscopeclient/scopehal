@@ -144,7 +144,7 @@ void DownconvertFilter::Refresh()
 		cap_q->m_durations[i]	= duration;
 
 		//Generate the LO and mix it in
-		float phase = lo_rad_per_sample * timestamp + trigger_phase_rad;
+		double phase = lo_rad_per_sample * timestamp + trigger_phase_rad;
 		float samp = din->m_samples[i];
 		cap_i->m_samples[i] 	= samp * sin(phase);
 		cap_q->m_samples[i] 	= samp * cos(phase);

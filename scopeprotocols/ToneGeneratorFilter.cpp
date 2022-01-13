@@ -125,8 +125,8 @@ void ToneGeneratorFilter::Refresh()
 	cap->m_densePacked = true;
 	cap->Resize(depth);
 
-	float samples_per_cycle = samplerate * 1.0 / freq;
-	float radians_per_sample = 2 * M_PI / samples_per_cycle;
+	double samples_per_cycle = samplerate * 1.0 / freq;
+	double radians_per_sample = 2 * M_PI / samples_per_cycle;
 
 	//sin is +/- 1, so need to divide amplitude by 2 to get scaling factor
 	float scale = amplitude / 2;
@@ -136,6 +136,6 @@ void ToneGeneratorFilter::Refresh()
 		cap->m_offsets[i] = i;
 		cap->m_durations[i] = 1;
 
-		cap->m_samples[i] = bias + (scale * sinf(i*radians_per_sample + startphase));
+		cap->m_samples[i] = bias + (scale * sin(i*radians_per_sample + startphase));
 	}
 }
