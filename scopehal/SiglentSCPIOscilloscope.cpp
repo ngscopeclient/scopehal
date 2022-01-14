@@ -122,10 +122,12 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
+	LogTrace("TX: %s\r\n", opString);
 	this_thread::sleep_until(next_tx);
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
 	ret = m_transport->ReadReply();
+        LogTrace("RX: %s\r\n\r\n",ret.c_str());
 	return ret;
 }
 
@@ -139,6 +141,7 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
+	LogTrace("TXO: %s\r\n", opString);
 	this_thread::sleep_until(next_tx);
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
@@ -1697,7 +1700,7 @@ void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
-	sendOnly(":TIMEBASE:DELAY %1.2E", (offset - halfwidth) * SECONDS_PER_FS);
+	sendOnly(":TIMEBASE:DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
@@ -1731,7 +1734,7 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 	int64_t rate = GetSampleRate();
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
-	m_triggerOffset += halfwidth;
+	m_triggerOffset = halfwidth - m_triggerOffset;
 
 	m_triggerOffsetValid = true;
 
