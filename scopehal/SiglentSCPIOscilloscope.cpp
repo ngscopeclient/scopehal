@@ -2418,8 +2418,8 @@ void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	PushCondition(":TRIGGER:RUNT", trig->GetCondition());
 	PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
 	PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetUpperBound());
-	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetLowerBound());
+	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetLowerBound());
+	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetUpperBound());
 
 	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
 }
