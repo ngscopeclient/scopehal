@@ -59,6 +59,20 @@ public:
 
 protected:
 	std::string m_freqname;
+
+	void DoFilterKernelGeneric(
+		AnalogWaveform* din,
+		AnalogWaveform* cap_i,
+		AnalogWaveform* cap_q,
+		float lo_rad_per_sample,
+		float trigger_phase_rad);
+
+	void DoFilterKernelAVX2(
+		AnalogWaveform* din,
+		AnalogWaveform* cap_i,
+		AnalogWaveform* cap_q,
+		float lo_rad_per_sample,
+		float trigger_phase_rad);
 };
 
 #endif

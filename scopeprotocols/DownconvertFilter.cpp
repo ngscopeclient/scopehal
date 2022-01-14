@@ -118,7 +118,6 @@ void DownconvertFilter::Refresh()
 
 	//Get the input data
 	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
 
 	//Calculate phase velocity
 	double lo_freq = m_parameters[m_freqname].GetFloatVal();
@@ -131,21 +130,72 @@ void DownconvertFilter::Refresh()
 	//Do the actual mixing
 	auto cap_i = SetupOutputWaveform(din, 0, 0, 0);
 	auto cap_q = SetupOutputWaveform(din, 1, 0, 0);
-	for(size_t i=0; i<len; i++)
-	{
-		//TODO: Figure out how to accumulate this in single precision so we can get more throughput
-		double phase = lo_rad_per_sample * din->m_offsets[i] + trigger_phase_rad;
 
+	/*if(g_hasAvx2)
+		DoFilterKernelAVX2(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
+	else*/
+		DoFilterKernelGeneric(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
+}
+
+void DownconvertFilter::DoFilterKernelGeneric(
+	AnalogWaveform* din,
+	AnalogWaveform* cap_i,
+	AnalogWaveform* cap_q,
+	float lo_rad_per_sample,
+	float trigger_phase_rad)
+{
+	size_t len = din->m_samples.size();
+
+	//Initial sample
+	float phase = lo_rad_per_sample * din->m_offsets[0] + trigger_phase_rad;
+	float samp = din->m_samples[0];
+	cap_i->m_samples[0] 	= samp * sin(phase);
+	cap_q->m_samples[0] 	= samp * cos(phase);
+
+	for(size_t i=1; i<len; i++)
+	{
+		auto dt = din->m_offsets[i] - din->m_offsets[i-1];
+		phase += (dt * lo_rad_per_sample);
+		if(phase > 1e5*M_PI)
+			phase -= 1e5*M_PI;
+
+		samp = din->m_samples[i];
+		cap_i->m_samples[i] 	= samp * sin(phase);
+		cap_q->m_samples[i] 	= samp * cos(phase);
+	}
+}
+
+__attribute__((target("avx2")))
+void DownconvertFilter::DoFilterKernelAVX2(
+	AnalogWaveform* din,
+	AnalogWaveform* cap_i,
+	AnalogWaveform* cap_q,
+	float lo_rad_per_sample,
+	float trigger_phase_rad)
+{
+	/*
+	size_t len = din->m_samples.size();
+
+	auto pvel = _mm256_set1_pd(lo_rad_per_sample);
+	auto prad = _mm256_set1_pd(trigger_phase_rad);
+
+	size_t i=0;
+	size_t len_rounded = len - (len % 8);
+	float* pin = &din->m_samples[0];
+	float* pout_i = &cap_i->m_samples[i];
+	float* pout_q = &cap_i->m_samples[i];
+	for(; i<len_rounded; i+= 8)
+	{
+		auto din = _mm256_load_ps(pin + i);
+	}
+
+	//Do last few samples
+	for(; i<len; i++)
+	{
+		double phase = lo_rad_per_sample * din->m_offsets[i] + trigger_phase_rad;
 		float samp = din->m_samples[i];
 		cap_i->m_samples[i] 	= samp * sin(phase);
 		cap_q->m_samples[i] 	= samp * cos(phase);
 	}
-
-	//Copy our time scales from the input
-	cap_i->m_timescale 			= din->m_timescale;
-	cap_q->m_timescale 			= din->m_timescale;
-	cap_i->m_startTimestamp 	= din->m_startTimestamp;
-	cap_q->m_startTimestamp 	= din->m_startTimestamp;
-	cap_i->m_startFemtoseconds	= din->m_startFemtoseconds;
-	cap_q->m_startFemtoseconds	= din->m_startFemtoseconds;
+	*/
 }
