@@ -59,6 +59,7 @@ public:
 
 protected:
 	std::string m_factorname;
+	std::string m_aaname;
 };
 
 #endif
