@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -129,28 +129,17 @@ void DownconvertFilter::Refresh()
 	double trigger_phase_rad = din->m_triggerPhase * lo_rad_per_fs;
 
 	//Do the actual mixing
-	auto cap_i = new AnalogWaveform;
-	auto cap_q = new AnalogWaveform;
-	cap_i->Resize(len);
-	cap_q->Resize(len);
+	auto cap_i = SetupOutputWaveform(din, 0, 0, 0);
+	auto cap_q = SetupOutputWaveform(din, 1, 0, 0);
 	for(size_t i=0; i<len; i++)
 	{
-		//Copy timestamp
-		int64_t timestamp		= din->m_offsets[i];
-		int64_t duration		= din->m_durations[i];
-		cap_i->m_offsets[i]		= timestamp;
-		cap_q->m_offsets[i]		= timestamp;
-		cap_i->m_durations[i]	= duration;
-		cap_q->m_durations[i]	= duration;
+		//TODO: Figure out how to accumulate this in single precision so we can get more throughput
+		double phase = lo_rad_per_sample * din->m_offsets[i] + trigger_phase_rad;
 
-		//Generate the LO and mix it in
-		double phase = lo_rad_per_sample * timestamp + trigger_phase_rad;
 		float samp = din->m_samples[i];
 		cap_i->m_samples[i] 	= samp * sin(phase);
 		cap_q->m_samples[i] 	= samp * cos(phase);
 	}
-	SetData(cap_i, 0);
-	SetData(cap_q, 1);
 
 	//Copy our time scales from the input
 	cap_i->m_timescale 			= din->m_timescale;
