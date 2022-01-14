@@ -67,7 +67,7 @@ protected:
 		float lo_rad_per_sample,
 		float trigger_phase_rad);
 
-	void DoFilterKernelAVX2(
+	void DoFilterKernelAVX2DensePacked(
 		AnalogWaveform* din,
 		AnalogWaveform* cap_i,
 		AnalogWaveform* cap_q,
