@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -133,6 +133,7 @@
 #include "SpectrogramFilter.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"
+#include "SquelchFilter.h"
 #include "StepGeneratorFilter.h"
 #include "SubtractFilter.h"
 #include "SWDDecoder.h"
