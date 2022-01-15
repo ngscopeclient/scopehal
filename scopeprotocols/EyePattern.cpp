@@ -380,7 +380,8 @@ void EyePattern::Refresh()
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		//if input goes momentarily bad, don't delete output - just stop updating
+		//SetData(NULL, 0);
 		return;
 	}
 
@@ -394,7 +395,7 @@ void EyePattern::Refresh()
 	double center = m_parameters[m_centerName].GetFloatVal();
 	if(cap)
 	{
-		if(abs(cap->GetCenterVoltage() - center) > 0.001)
+		if(fabs(cap->GetCenterVoltage() - center) > 0.001)
 		{
 			SetData(NULL, 0);
 			cap = NULL;
