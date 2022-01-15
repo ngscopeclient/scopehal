@@ -122,12 +122,13 @@ void DownsampleFilter::Refresh()
 	//Set up output waveform and get configuration
 	int64_t factor = m_parameters[m_factorname].GetIntVal();
 	size_t outlen = len / factor;
-	auto cap = new AnalogWaveform;
-	cap->Resize(outlen);
+	auto cap = SetupEmptyOutputWaveform(din, 0, false);
 
 	//Default path with antialiasing filter
 	if(m_parameters[m_aaname].GetBoolVal())
 	{
+		cap->Resize(outlen);
+
 		//Cut off all frequencies shorter than our decimation factor
 		float cutoff_period = factor;
 		float sigma = cutoff_period / sqrt(2 * log(2));
@@ -177,15 +178,55 @@ void DownsampleFilter::Refresh()
 	//Optimized path with no AA if the input is known to not contain any higher frequency content
 	else
 	{
-		for(size_t i=0; i<outlen; i++)
+		size_t oldlen = cap->m_samples.size();
+		cap->Resize(outlen);
+
+		//Dense packed, optimize a bit.
+		//Timestamp stuff based on Filter::SetupOutputWaveform()
+		if(din->m_densePacked)
 		{
-			cap->m_offsets[i]	= din->m_offsets[i*factor] / factor;
-			cap->m_durations[i]	= din->m_durations[i*factor] / factor;
-			cap->m_samples[i]	= din->m_samples[i*factor];
+			//Existing output is not dense packed. Need to fill from zero
+			if(!cap->m_densePacked)
+			{
+				cap->m_densePacked = true;
+				for(size_t i=0; i<outlen; i++)
+				{
+					cap->m_offsets[i]	= i;
+					cap->m_durations[i]	= 1;
+				}
+			}
+
+			//Both dense packed, but bigger? Fill extra spots
+			else if(outlen > oldlen)
+			{
+				for(size_t i=oldlen; i<outlen; i++)
+				{
+					cap->m_offsets[i]	= i;
+					cap->m_durations[i]	= 1;
+				}
+			}
+
+			//Same size or smaller than what we had before. Don't touch timestamps.
+			else
+			{
+			}
+
+			//Copy the output
+			for(size_t i=0; i<outlen; i++)
+				cap->m_samples[i]	= din->m_samples[i*factor];
+		}
+
+		//Not dense packed, just copy stuff
+		else
+		{
+			for(size_t i=0; i<outlen; i++)
+			{
+				cap->m_offsets[i]	= din->m_offsets[i*factor] / factor;
+				cap->m_durations[i]	= din->m_durations[i*factor] / factor;
+				cap->m_samples[i]	= din->m_samples[i*factor];
+			}
 		}
 	}
-
-	SetData(cap, 0);
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale * factor;
