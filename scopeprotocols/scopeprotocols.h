@@ -128,6 +128,7 @@
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"
+#include "ScaleFilter.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
 #include "SpectrogramFilter.h"

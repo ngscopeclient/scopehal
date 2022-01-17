@@ -92,6 +92,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
+    ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
