@@ -157,6 +157,7 @@
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
 #include "USB2PMADecoder.h"
+#include "VectorFrequencyFilter.h"
 #include "VectorPhaseFilter.h"
 #include "VerticalBathtub.h"
 #include "Waterfall.h"
