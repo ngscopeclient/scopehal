@@ -159,8 +159,8 @@ void DownconvertFilter::DoFilterKernelGeneric(
 		for(size_t i=1; i<len; i++)
 		{
 			phase += lo_rad_per_sample;
-			if(phase > 1e5*M_PI)
-				phase -= 1e5*M_PI;
+			if(phase > 2*M_PI)
+				phase -= 2*M_PI;
 
 			samp = din->m_samples[i];
 			cap_i->m_samples[i] 	= samp * sin(phase);
@@ -173,8 +173,8 @@ void DownconvertFilter::DoFilterKernelGeneric(
 		{
 			auto dt = din->m_offsets[i] - din->m_offsets[i-1];
 			phase += (dt * lo_rad_per_sample);
-			if(phase > 1e5*M_PI)
-				phase -= 1e5*M_PI;
+			if(phase > 2*M_PI)
+				phase -= 2*M_PI;
 
 			samp = din->m_samples[i];
 			cap_i->m_samples[i] 	= samp * sin(phase);
@@ -199,7 +199,7 @@ void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 	auto pout_i		= (float*)&cap_i->m_samples[0];
 	auto pout_q		= (float*)&cap_q->m_samples[0];
 	auto pvel		= _mm256_set1_ps(lo_rad_per_sample * 8);
-	float threshold = 1e5 * M_PI;
+	float threshold = 16 * M_PI;	//we can rotate up to once per sample, 8 samples per vector
 	auto vthreshold	= _mm256_set1_ps(threshold);
 
 	//Initial samples
