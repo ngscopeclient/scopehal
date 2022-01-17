@@ -41,6 +41,8 @@
  * SDS2000/5000/6000 port (c) 2021 Dave Marples. Note that this is only tested on SDS2000X+. If someone wants
  * to loan an SDS5000/6000 for testing that can be integrated. This file is derived from the LeCroy driver.
  *
+ * Starting SDS1104X-E port. Using Programming Guide  PG01-E02D an Firmware 6.1.37R8
+ *   
  * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
  * archive if needed.
  */
@@ -127,7 +129,7 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
 	ret = m_transport->ReadReply();
-        LogTrace("RX: %s\r\n\r\n",ret.c_str());
+	LogTrace("RX: %s\r\n\r\n", ret.c_str());
 	return ret;
 }
 
@@ -157,9 +159,22 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 		new OscilloscopeChannel(this, "Ext", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
 
-	//Desired format for waveform data
-	//Only use increased bit depth if the scope actually puts content there!
-	sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		// Omit header and units in numbers for responses to queries.
+		sendOnly("CHDR OFF");
+	}
+
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		;
+	}
+	else
+	{
+		//Desired format for waveform data
+		//Only use increased bit depth if the scope actually puts content there!
+		sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
+	}
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
@@ -189,7 +204,19 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 
 	if(m_vendor.compare("Siglent Technologies") == 0)
 	{
-		if(m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 's')
+		// TODO(dannas): Tighten this check
+		// The Programming Guide says that we support SDS1000CFL, SDS1000A,
+		// SDS10000CML+/CNL+/Dl+/E+/F+,  SDS2000/2000x, SDS1000x/1000x+,
+		// SDS1000X-E/X-C. But I only have a SDS1004X-E so we should only check for that
+		if(m_model.compare(0, 4, "SDS1") == 0)
+		{
+			m_modelid = MODEL_SIGLENT_SDS1000;
+			m_maxBandwidth = 100;
+			if(m_model.compare(4, 1, "2") == 0)
+				m_maxBandwidth = 200;
+			return;
+		}
+		else if(m_model.compare(0, 4, "SDS2") == 0 && m_model.back() == 's')
 		{
 			m_modelid = MODEL_SIGLENT_SDS2000XP;
 
@@ -405,8 +432,16 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 	if(i < m_analogChannelCount)
 	{
 		//See if the channel is enabled, hide it if not
-		string reply = converse(":CHANNEL%d:SWITCH?", i + 1);
-		m_channelsEnabled[i] = (reply.find("OFF") == 0);	//may have a trailing newline, ignore that
+		string reply;
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			reply = converse("C%d:TRACE?", i + 1);
+		}
+		else
+		{
+			reply = converse(":CHANNEL%d:SWITCH?", i + 1);
+		}
+		m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
 	}
 
 	//Digital
@@ -428,7 +463,14 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
 	{
-		sendOnly(":CHANNEL%d:SWITCH ON", i + 1);
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			sendOnly(":C%d:TRACE ON", i + 1);
+		}
+		else
+		{
+			sendOnly(":CHANNEL%d:SWITCH ON", i + 1);
+		}
 	}
 
 	//Trigger can't be enabled
@@ -457,40 +499,58 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 
 	m_channelsEnabled[i] = false;
 
-	//If this is an analog channel, just toggle it
-	if(i < m_analogChannelCount)
-		sendOnly(":CHANNEL%d:TRACE OFF", i + 1);
-
-	//Trigger can't be enabled
-	else if(i == m_extTrigChannel->GetIndex())
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
 	{
+		//If this is an analog channel, just toggle it
+		if(i < m_analogChannelCount)
+			sendOnly("C%d:TRACE OFF", i + 1);
 	}
-
-	//Digital channel
 	else
 	{
-		//Disable this channel
-		sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
+		//If this is an analog channel, just toggle it
+		if(i < m_analogChannelCount)
+			sendOnly(":CHANNEL%d:TRACE OFF", i + 1);
 
-		//If we have NO digital channels enabled, disable the appropriate digital bus
+		//Trigger can't be enabled
+		else if(i == m_extTrigChannel->GetIndex())
+		{
+		}
 
-		//bool anyDigitalEnabled = false;
-		//        for (uint32_t c=m_analogChannelCount+1+((chNum/8)*8); c<(m_analogChannelCount+1+((chNum/8)*8)+c_digiChannelsPerBus); c++)
-		//          anyDigitalEnabled |= m_channelsEnabled[c];
+		//Digital channel
+		else
+		{
+			//Disable this channel
+			sendOnly(":DIGITAL:D%d OFF", i - (m_analogChannelCount + 1));
 
-		//        if(!anyDigitalEnabled)
-		//sendOnly(":DIGITAL:BUS%d:DISP OFF",chNum/8);
+			//If we have NO digital channels enabled, disable the appropriate digital bus
+
+			//bool anyDigitalEnabled = false;
+			//        for (uint32_t c=m_analogChannelCount+1+((chNum/8)*8); c<(m_analogChannelCount+1+((chNum/8)*8)+c_digiChannelsPerBus); c++)
+			//          anyDigitalEnabled |= m_channelsEnabled[c];
+
+			//        if(!anyDigitalEnabled)
+			//sendOnly(":DIGITAL:BUS%d:DISP OFF",chNum/8);
+		}
 	}
 }
 
 vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+		ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+		ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	}
+	else
+	{
+		ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+		ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+		ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+		ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
+		ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	}
 	return ret;
 }
 
@@ -504,18 +564,38 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	replyType = Trim(converse(":CHANNEL%d:COUPLING?", i + 1).substr(0, 2));
-	replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		replyType = Trim(converse("C%d:COUPLING?", i + 1));
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_probeIsActive[i] = false;
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_probeIsActive[i] = false;
+		if(replyType == "A50")
+			return OscilloscopeChannel::COUPLE_AC_50;
+		else if(replyType == "D50")
+			return OscilloscopeChannel::COUPLE_DC_50;
+		else if(replyType == "A1M")
+			return OscilloscopeChannel::COUPLE_AC_1M;
+		else if(replyType == "D1M")
+			return OscilloscopeChannel::COUPLE_DC_1M;
+		else if(replyType == "GND")
+			return OscilloscopeChannel::COUPLE_GND;
+	}
+	else
+	{
+		replyType = Trim(converse(":CHANNEL%d:COUPLING?", i + 1).substr(0, 2));
+		replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
 
-	if(replyType == "AC")
-		return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
-	else if(replyType == "DC")
-		return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_DC_50 : OscilloscopeChannel::COUPLE_DC_1M;
-	else if(replyType == "GN")
-		return OscilloscopeChannel::COUPLE_GND;
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_probeIsActive[i] = false;
+
+		if(replyType == "AC")
+			return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
+		else if(replyType == "DC")
+			return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_DC_50 : OscilloscopeChannel::COUPLE_DC_1M;
+		else if(replyType == "GN")
+			return OscilloscopeChannel::COUPLE_GND;
+	}
 
 	//invalid
 	LogWarning("SiglentSCPIOscilloscope::GetChannelCoupling got invalid coupling [%s] [%s]\n",
@@ -578,8 +658,15 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 		return 1;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-
-	string reply = converse(":CHANNEL%d:PROBE?", i + 1);
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = converse("C%d:ATTENUATION?", i + 1);
+	}
+	else
+	{
+		reply = converse(":CHANNEL%d:PROBE?", i + 1);
+	}
 
 	double d;
 	sscanf(reply.c_str(), "%lf", &d);
@@ -603,21 +690,48 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	sendOnly(":CHANNEL%d:PROBE %lf", i + 1, atten);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		// Values larger than 1x should be sent as integers, and values smaller
+		// should be sent as floating point numbers with one decimal.
+		if(atten >= 1)
+		{
+			sendOnly("C%d:ATTENUATION %d", i + 1, (int)atten);
+		}
+		else
+		{
+			sendOnly("C%d:ATTENUATION %.1lf", i + 1, atten);
+		}
+	}
+	else
+	{
+		sendOnly(":CHANNEL%d:PROBE %lf", i + 1, atten);
+	}
 }
 
 vector<unsigned int> SiglentSCPIOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	vector<unsigned int> ret;
 
-	//"no limit"
-	ret.push_back(0);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		//"no limit"
+		ret.push_back(0);
 
-	//Supported by all models
-	ret.push_back(20);
+		//Supported by all models
+		ret.push_back(20);
+	}
+	else
+	{
+		//"no limit"
+		ret.push_back(0);
 
-	if(m_maxBandwidth > 200)
-		ret.push_back(200);
+		//Supported by all models
+		ret.push_back(20);
+
+		if(m_maxBandwidth > 200)
+			ret.push_back(200);
+	}
 
 	return ret;
 }
@@ -628,13 +742,25 @@ int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 0;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	string reply = converse(":CHANNEL%d:BWLIMIT?", i + 1);
-	if(reply == "FULL")
-		return 0;
-	else if(reply == "20M")
-		return 20;
-	else if(reply == "200M")
-		return 200;
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = converse("C%d:BANDWIDTH_LIMIT?", i + 1);
+		if(reply == "OFF")
+			return 0;
+		else if(reply == "ON")
+			return 20;
+	}
+	else
+	{
+		reply = converse(":CHANNEL%d:BWLIMIT?", i + 1);
+		if(reply == "FULL")
+			return 0;
+		else if(reply == "20M")
+			return 20;
+		else if(reply == "200M")
+			return 200;
+	}
 
 	LogWarning("SiglentSCPIOscilloscope::GetChannelCoupling got invalid bwlimit %s\n", reply.c_str());
 	return 0;
@@ -643,22 +769,41 @@ int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	switch(limit_mhz)
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
 	{
-		case 0:
-			sendOnly(":CHANNEL%d:BWLIMIT FULL", i + 1);
-			break;
+		switch(limit_mhz)
+		{
+			case 0:
+				sendOnly("BANDWIDTH_LIMIT C%d,OFF", i + 1);
+				break;
 
-		case 20:
-			sendOnly(":CHANNEL%d:BWLIMIT 20M", i + 1);
-			break;
+			case 20:
+				sendOnly("BANDWIDTH_LIMIT C%d,ON", i + 1);
+				break;
 
-		case 200:
-			sendOnly(":CHANNEL%d:BWLIMIT 200M", i + 1);
-			break;
+			default:
+				LogWarning("SiglentSCPIOscilloscope::invalid bwlimit set request (%dMhz)\n", limit_mhz);
+		}
+	}
+	else
+	{
+		switch(limit_mhz)
+		{
+			case 0:
+				sendOnly(":CHANNEL%d:BWLIMIT FULL", i + 1);
+				break;
 
-		default:
-			LogWarning("SiglentSCPIOscilloscope::invalid bwlimit set request (%dMhz)\n", limit_mhz);
+			case 20:
+				sendOnly(":CHANNEL%d:BWLIMIT 20M", i + 1);
+				break;
+
+			case 200:
+				sendOnly(":CHANNEL%d:BWLIMIT 200M", i + 1);
+				break;
+
+			default:
+				LogWarning("SiglentSCPIOscilloscope::invalid bwlimit set request (%dMhz)\n", limit_mhz);
+		}
 	}
 }
 
@@ -674,7 +819,14 @@ void SiglentSCPIOscilloscope::Invert(size_t i, bool invert)
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	sendOnly(":CHANNEL%d:INVERT %s", i + 1, invert ? "ON" : "OFF");
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("C%d:INVERTSET %s", i + 1, invert ? "ON" : "OFF");
+	}
+	else
+	{
+		sendOnly(":CHANNEL%d:INVERT %s", i + 1, invert ? "ON" : "OFF");
+	}
 }
 
 bool SiglentSCPIOscilloscope::IsInverted(size_t i)
@@ -683,7 +835,15 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 		return false;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	auto reply = Trim(converse(":CHANNEL%d:INVERT?", i + 1));
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = Trim(converse("C%d:INVERTSET?", i + 1));
+	}
+	else
+	{
+		reply = Trim(converse(":CHANNEL%d:INVERT?", i + 1));
+	}
 	return (reply == "ON");
 }
 
@@ -736,20 +896,24 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
 	string name;
-	if(i < m_analogChannelCount)
-	{
-		name = converse(":CHANNEL%d:LABEL:TEXT?", i + 1);
 
-		// Remove "'s around the name
-		if(name.length() > 2)
-			name = name.substr(1, name.length() - 2);
-	}
-	else
+	if(m_modelid != MODEL_SIGLENT_SDS1000)
 	{
-		name = converse(":DIGITAL:LABEL%d?", i - (m_analogChannelCount + 1));
-		// Remove "'s around the name
-		if(name.length() > 2)
-			name = name.substr(1, name.length() - 2);
+		if(i < m_analogChannelCount)
+		{
+			name = converse(":CHANNEL%d:LABEL:TEXT?", i + 1);
+
+			// Remove "'s around the name
+			if(name.length() > 2)
+				name = name.substr(1, name.length() - 2);
+		}
+		else
+		{
+			name = converse(":DIGITAL:LABEL%d?", i - (m_analogChannelCount + 1));
+			// Remove "'s around the name
+			if(name.length() > 2)
+				name = name.substr(1, name.length() - 2);
+		}
 	}
 
 	//Default to using hwname if no alias defined
@@ -785,8 +949,14 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
-	sinr = converse(":TRIGGER:STATUS?");
-
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sinr = converse("SAMPLE_STATUS?");
+	}
+	else
+	{
+		sinr = converse(":TRIGGER:STATUS?");
+	}
 	//No waveform, but ready for one?
 	if((sinr == "Arm") || (sinr == "Ready"))
 	{
@@ -1250,13 +1420,82 @@ bool SiglentSCPIOscilloscope::AcquireData()
 	char tmp[128];
 
 	//Acquire the data (but don't parse it)
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		start = GetTime();
-		//Get the wavedescs for all channels
-		unsigned int firstEnabledChannel = UINT_MAX;
-		bool any_enabled = true;
 
+	lock_guard<recursive_mutex> lock(m_mutex);
+	start = GetTime();
+	//Get the wavedescs for all channels
+	unsigned int firstEnabledChannel = UINT_MAX;
+	bool any_enabled = true;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		m_sampleRateValid=false;
+		GetSampleRate();
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			if(m_channelsEnabled[i])
+			{
+				m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
+				// length of data is current memory depth
+				m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i]);
+				// This is the 0x0a0a at the end
+				m_transport->ReadRawData(2, (unsigned char*)tmp);
+			}
+		}
+		//At this point all data has been read so the scope is free to go do
+		//its thing while we crunch the results.  Re-arm the trigger if not
+		//in one-shot mode
+		if(!m_triggerOneShot)
+		{
+			sendOnly("TRIG_MODE SINGLE");
+			m_triggerArmed = true;
+		}
+
+		//Process analog waveforms
+		vector<vector<WaveformBase*>> waveforms;
+		waveforms.resize(m_analogChannelCount);
+		double h_off_frac = 0;
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			std::vector<WaveformBase*> ret;
+			if(m_channelsEnabled[i])
+			{
+				AnalogWaveform* cap = new AnalogWaveform;
+				cap->m_timescale = FS_PER_SECOND / m_sampleRate;
+
+				cap->m_triggerPhase = h_off_frac;
+				cap->m_startTimestamp = ttime;
+				cap->m_densePacked = true;
+				cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
+
+				cap->Resize(m_analogWaveformDataSize[i]);
+
+				Convert8BitSamples((int64_t*)&cap->m_offsets[0],
+					(int64_t*)&cap->m_durations[0],
+					(float*)&cap->m_samples[0],
+					(int8_t*)m_analogWaveformData[i],
+					m_channelVoltageRanges[i] / (8 * 25),
+					m_channelOffsets[i],
+					m_analogWaveformDataSize[i],
+					0);
+				ret.push_back(cap);
+			}
+			waveforms[i] = ret;
+		}
+
+		//Save analog waveform data
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			if(!m_channelsEnabled[i])
+				continue;
+
+			//Done, update the data
+			for(size_t j = 0; j < num_sequences; j++)
+				pending_waveforms[i].push_back(waveforms[i][j]);
+		}
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
 		if(!ReadWavedescs(m_wavedescs, enabled, firstEnabledChannel, any_enabled))
 			return false;
 
@@ -1339,45 +1578,46 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				return false;
 			}
 		}
-	}
 
-	//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
-	//Re-arm the trigger if not in one-shot mode
-	if(!m_triggerOneShot)
-	{
-		//		lock_guard<recursive_mutex> lock(m_mutex);
-		sendOnly(":TRIGGER:MODE SINGLE");
-		m_triggerArmed = true;
-	}
-
-	//Process analog waveforms
-	vector<vector<WaveformBase*>> waveforms;
-	waveforms.resize(m_analogChannelCount);
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(enabled[i])
+		//At this point all data has been read so the scope is free to go do its thing while we crunch the results.
+		//Re-arm the trigger if not in one-shot mode
+		if(!m_triggerOneShot)
 		{
-			waveforms[i] = ProcessAnalogWaveform(&m_analogWaveformData[i][0],
-				m_analogWaveformDataSize[i],
-				&m_wavedescs[i][0],
-				num_sequences,
-				ttime,
-				basetime,
-				pwtime,
-				i);
+			//		lock_guard<recursive_mutex> lock(m_mutex);
+			sendOnly(":TRIGGER:MODE SINGLE");
+			m_triggerArmed = true;
+		}
+
+		//Process analog waveforms
+		vector<vector<WaveformBase*>> waveforms;
+		waveforms.resize(m_analogChannelCount);
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			if(enabled[i])
+			{
+				waveforms[i] = ProcessAnalogWaveform(&m_analogWaveformData[i][0],
+					m_analogWaveformDataSize[i],
+					&m_wavedescs[i][0],
+					num_sequences,
+					ttime,
+					basetime,
+					pwtime,
+					i);
+			}
+		}
+
+		//Save analog waveform data
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			if(!enabled[i])
+				continue;
+
+			//Done, update the data
+			for(size_t j = 0; j < num_sequences; j++)
+				pending_waveforms[i].push_back(waveforms[i][j]);
 		}
 	}
 
-	//Save analog waveform data
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
-	{
-		if(!enabled[i])
-			continue;
-
-		//Done, update the data
-		for(size_t j = 0; j < num_sequences; j++)
-			pending_waveforms[i].push_back(waveforms[i][j]);
-	}
 	//TODO: proper support for sequenced capture when digital channels are active
 	// if(denabled)
 	// {
@@ -1411,8 +1651,20 @@ bool SiglentSCPIOscilloscope::AcquireData()
 void SiglentSCPIOscilloscope::Start()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	sendOnly(":TRIGGER:MODE STOP");
-	sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		//sendOnly("START");
+		//sendOnly("MEMORY_SIZE 7K");
+		sendOnly("STOP");
+		sendOnly("TRIG_MODE SINGLE");
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		sendOnly(":TRIGGER:MODE STOP");
+		sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
+	}
+
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -1421,8 +1673,17 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("Start single trigger\n");
-	sendOnly(":TRIGGER:MODE STOP");
-	sendOnly(":TRIGGER:MODE SINGLE");
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("STOP");
+		sendOnly("TRIG_MODE SINGLE");
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		sendOnly(":TRIGGER:MODE STOP");
+		sendOnly(":TRIGGER:MODE SINGLE");
+	}
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -1431,7 +1692,14 @@ void SiglentSCPIOscilloscope::Stop()
 {
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		sendOnly(":TRIGGER:MODE STOP");
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			sendOnly("STOP");
+		}
+		else
+		{
+			sendOnly(":TRIGGER:MODE STOP");
+		}
 	}
 
 	m_triggerArmed = false;
@@ -1450,10 +1718,18 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 		return;
 
 	m_triggerForced = true;
-	sendOnly(":TRIGGER:MODE SINGLE");
-	if(!m_triggerArmed)
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("TRIG_MODE SINGLE");
+		if(!m_triggerArmed)
+			sendOnly("TRIG_MODE SINGLE");
+	}
+	else
+	{
 		sendOnly(":TRIGGER:MODE SINGLE");
-
+		if(!m_triggerArmed)
+			sendOnly(":TRIGGER:MODE SINGLE");
+	}
 	m_triggerArmed = true;
 	this_thread::sleep_for(c_trigger_delay);
 }
@@ -1473,7 +1749,16 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	string reply = converse(":CHANNEL%ld:OFFSET?", i + 1);
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = converse("C%ld:OFST?", i + 1);
+	}
+	else
+	{
+		reply = converse(":CHANNEL%ld:OFFSET?", i + 1);
+	}
+
 	float offset;
 	sscanf(reply.c_str(), "%f", &offset);
 
@@ -1510,12 +1795,20 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 	}
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = converse("C%d:VOLT_DIV?", i + 1);
+	}
+	else
+	{
+		reply = converse(":CHANNEL%d:SCALE?", i + 1);
+	}
 
-	string reply = converse(":CHANNEL%d:SCALE?", i + 1);
 	float volts_per_div;
 	sscanf(reply.c_str(), "%f", &volts_per_div);
 
-	float v = volts_per_div * 8;	 //plot is 8 divisions high
+	float v = volts_per_div * 8;	//plot is 8 divisions high
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = v;
 	return v;
@@ -1528,29 +1821,45 @@ void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/
 	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
-	sendOnly(":CHANNEL%ld:SCALE %.4f", i + 1, vdiv);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("C%ld:VOLT_DIV %.4f", i + 1, vdiv);
+	}
+	else
+	{
+		sendOnly(":CHANNEL%ld:SCALE %.4f", i + 1, vdiv);
+	}
 }
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
-	ret = {10 * 1000,
-		20 * 1000,
-		50 * 1000,
-		100 * 1000,
-		200 * 1000,
-		500 * 1000,
-		1 * 1000 * 1000,
-		2 * 1000 * 1000,
-		5 * 1000 * 1000,
-		10 * 1000 * 1000,
-		20 * 1000 * 1000,
-		50 * 1000 * 1000,
-		100 * 1000 * 1000,
-		200 * 1000 * 1000,
-		500 * 1000 * 1000,
-		1 * 1000 * 1000 * 1000,
-		2 * 1000 * 1000 * 1000};
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		;
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		ret = {10 * 1000,
+			20 * 1000,
+			50 * 1000,
+			100 * 1000,
+			200 * 1000,
+			500 * 1000,
+			1 * 1000 * 1000,
+			2 * 1000 * 1000,
+			5 * 1000 * 1000,
+			10 * 1000 * 1000,
+			20 * 1000 * 1000,
+			50 * 1000 * 1000,
+			100 * 1000 * 1000,
+			200 * 1000 * 1000,
+			500 * 1000 * 1000,
+			1 * 1000 * 1000 * 1000,
+			2 * 1000 * 1000 * 1000};
+	}
+
 	return ret;
 }
 
@@ -1564,12 +1873,30 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret = {};
+
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		ret = {7 * 1000, 70 * 1000, 700 * 1000, 7 * 1000 * 1000};
+	}
+	else
+	{
+		;
+	}
+
 	return ret;
 }
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 {
 	vector<uint64_t> ret = {};
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
+	}
+	else
+	{
+		;
+	}
 	return ret;
 }
 
@@ -1586,13 +1913,43 @@ set<SiglentSCPIOscilloscope::InterleaveConflict> SiglentSCPIOscilloscope::GetInt
 	return ret;
 }
 
+uint64_t SiglentSCPIOscilloscope::GetTimeDiv()
+{
+	double f;
+	//if(!m_sampleRateValid)
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		string reply;
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			reply = converse("TIME_DIV?");
+		}
+		else
+		{
+		}
+		sscanf(reply.c_str(), "%lf", &f);
+		m_timeDiv = static_cast<int64_t>(f);
+		//m_sampleRateValid = true;
+	}
+
+	return m_timeDiv;
+}
+
 uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 {
 	double f;
 	if(!m_sampleRateValid)
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		string reply = converse(":ACQUIRE:SRATE?");
+		string reply;
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			reply = converse("SAMPLE_RATE?");
+		}
+		else
+		{
+			reply = converse(":ACQUIRE:SRATE?");
+		}
 		sscanf(reply.c_str(), "%lf", &f);
 		m_sampleRate = static_cast<int64_t>(f);
 		m_sampleRateValid = true;
@@ -1611,7 +1968,16 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 
 		// What you see below is the only observed method that seems to reliably get the *actual* memory depth.
 		lock_guard<recursive_mutex> lock(m_mutex);
-		string reply = converse(":ACQUIRE:MDEPTH?");
+		string reply;
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			reply = converse("MEMORY_SIZE?");
+		}
+		else
+		{
+			reply = converse(":ACQUIRE:MDEPTH?");
+		}
+
 		f = Unit(Unit::UNIT_SAMPLEDEPTH).ParseString(reply);
 		m_memoryDepth = static_cast<int64_t>(f);
 		m_memoryDepthValid = true;
@@ -1624,45 +1990,83 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	switch(depth)
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
 	{
-		case 10000:
-			sendOnly("ACQUIRE:MDEPTH 10k");
-			break;
-		case 20000:
-			sendOnly("ACQUIRE:MDEPTH 20k");
-			break;
-		case 100000:
-			sendOnly("ACQUIRE:MDEPTH 100k");
-			break;
-		case 200000:
-			sendOnly("ACQUIRE:MDEPTH 200k");
-			break;
-		case 1000000:
-			sendOnly("ACQUIRE:MDEPTH 1M");
-			break;
-		case 2000000:
-			sendOnly("ACQUIRE:MDEPTH 2M");
-			break;
-		case 10000000:
-			sendOnly("ACQUIRE:MDEPTH 10M");
-			break;
+		
+		switch(depth)
+		{
+			case 7000:
+				sendOnly("MEMORY_SIZE 7K");
+				break;
+			case 14000:
+				sendOnly("MEMORY_SIZE 14K");
+				break;
+			case 70000:
+				sendOnly("MEMORY_SIZE 70K");
+				break;
+			case 140000:
+				sendOnly("MEMORY_SIZE 140K");
+				break;
+			case 700000:
+				sendOnly("MEMORY_SIZE 700K");
+				break;
+			case 1400000:
+				sendOnly("MEMORY_SIZE 1.4M");
+				break;
+			case 7000000:
+				sendOnly("MEMORY_SIZE 7M");
+				break;
+			case 14000000:
+				sendOnly("MEMORY_SIZE 14M");
+				break;
+			default:
+				LogError("Invalid memory depth for channel: %lu\n", depth);
+		}
+		m_sampleRateValid = false;
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		switch(depth)
+		{
+			case 10000:
+				sendOnly("ACQUIRE:MDEPTH 10k");
+				break;
+			case 20000:
+				sendOnly("ACQUIRE:MDEPTH 20k");
+				break;
+			case 100000:
+				sendOnly("ACQUIRE:MDEPTH 100k");
+				break;
+			case 200000:
+				sendOnly("ACQUIRE:MDEPTH 200k");
+				break;
+			case 1000000:
+				sendOnly("ACQUIRE:MDEPTH 1M");
+				break;
+			case 2000000:
+				sendOnly("ACQUIRE:MDEPTH 2M");
+				break;
+			case 10000000:
+				sendOnly("ACQUIRE:MDEPTH 10M");
+				break;
 
-			// We don't yet support memory depths that need to be transferred in chunks
-		case 20000000:
-			//sendOnly("ACQUIRE:MDEPTH 20M");
-			//	break;
-		case 50000000:
-			//	sendOnly("ACQUIRE:MDEPTH 50M");
-			//	break;
-		case 100000000:
-			//	sendOnly("ACQUIRE:MDEPTH 100M");
-			//	break;
-		case 200000000:
-			//	sendOnly("ACQUIRE:MDEPTH 200M");
-			//	break;
-		default:
-			LogError("Invalid memory depth for channel: %lu\n", depth);
+				// We don't yet support memory depths that need to be transferred in chunks
+			case 20000000:
+				//sendOnly("ACQUIRE:MDEPTH 20M");
+				//	break;
+			case 50000000:
+				//	sendOnly("ACQUIRE:MDEPTH 50M");
+				//	break;
+			case 100000000:
+				//	sendOnly("ACQUIRE:MDEPTH 100M");
+				//	break;
+			case 200000000:
+				//	sendOnly("ACQUIRE:MDEPTH 200M");
+				//	break;
+			default:
+				LogError("Invalid memory depth for channel: %lu\n", depth);
+		}
 	}
 
 	m_memoryDepthValid = false;
@@ -1676,7 +2080,16 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_memoryDepthValid = false;
 	double sampletime = GetSampleDepth() / (double)rate;
-	sendOnly(":TIMEBASE:SCALE %1.2E", sampletime / 10);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		;
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		sendOnly(":TIMEBASE:SCALE %1.2E", sampletime / 10);
+	}
+
 	m_memoryDepthValid = false;
 }
 
@@ -1700,7 +2113,14 @@ void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 	int64_t halfdepth = GetSampleDepth() / 2;
 	int64_t halfwidth = static_cast<int64_t>(round(FS_PER_SECOND * halfdepth / rate));
 
-	sendOnly(":TIMEBASE:DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("TRIG_DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
+	}
+	else
+	{
+		sendOnly(":TIMEBASE:DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
+	}
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
@@ -1720,7 +2140,14 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		reply = converse(":TIMEBASE:DELAY?");
+		if(m_modelid == MODEL_SIGLENT_SDS1000)
+		{
+			reply = converse("TRIG_DELAY?");
+		}
+		else
+		{
+			reply = converse(":TIMEBASE:DELAY?");
+		}
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -1749,7 +2176,14 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	sendOnly(":CHANNEL%ld:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		sendOnly("C%ld:SKEW %1.2E", channel + 1, skew * SECONDS_PER_FS);
+	}
+	else
+	{
+		sendOnly(":CHANNEL%ld:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
+	}
 
 	//Update cache
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -1771,7 +2205,15 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 
 	//Read the deskew
 	lock_guard<recursive_mutex> lock(m_mutex);
-	string reply = converse(":CHANNEL%ld:SKEW?", channel + 1);
+	string reply;
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		reply = converse("C%ld:SKEW?", channel + 1);
+	}
+	else
+	{
+		reply = converse(":CHANNEL%ld:SKEW?", channel + 1);
+	}
 
 	//Value comes back as floating point ps
 	float skew;
@@ -1786,7 +2228,31 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 
 bool SiglentSCPIOscilloscope::IsInterleaving()
 {
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{        
+	   // <size>:={7K,70K,700K,7M} for non-interleaved mode.
+       // Non-interleaved means a single channel is active per A/D
+       // converter. Most oscilloscopes feature two channels per A/D converter.
+       // <size>:={14K,140K,1.4M,14M}for interleave mode.
+       // Interleave mode means multiple active channels per A/Dconverter.
+	    
+		if((m_channelsEnabled[0]==true) && (m_channelsEnabled[1]==true))
+		{
+		   // Channel 1 and 2
+		   return false;
+		}
+		else if((m_channelsEnabled[3]== true) && (m_channelsEnabled[4]== true))
+		{
+		   // Channel 3 and 4
+		   return false;
+		}		
+		return true;	
+	}
+	else
+	{
+	
 	LogWarning("IsInterleaving is not implemented\n");
+	}
 	return false;
 }
 
@@ -1801,6 +2267,7 @@ bool SiglentSCPIOscilloscope::SetInterleaving(bool /* combine*/)
 
 bool SiglentSCPIOscilloscope::IsADCModeConfigurable()
 {
+	
 	return false;
 }
 
@@ -1938,37 +2405,68 @@ void SiglentSCPIOscilloscope::PullTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	//Figure out what kind of trigger is active.
-	string reply = Trim(converse(":TRIGGER:TYPE?"));
-	if(reply == "DROPout")
-		PullDropoutTrigger();
-	else if(reply == "EDGE")
-		PullEdgeTrigger();
-	else if(reply == "RUNT")
-		PullRuntTrigger();
-	else if(reply == "SLOPe")
-		PullSlewRateTrigger();
-	else if(reply == "UART")
-		PullUartTrigger();
-	else if(reply == "INTerval")
-		PullPulseWidthTrigger();
-	else if(reply == "WINDow")
-		PullWindowTrigger();
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		std::string reply = Trim(converse("TRIG_SELECT?"));
+		// <trig_type>,SR,<source>,HT,<hold_type>,HV,<hold_value1>[,HV2,<hold_value2>]
+		//EDGE,SR,C1,HT,OFF
+		vector<string> result;
+		stringstream s_stream(reply);	 //create string stream from the string
+		while(s_stream.good())
+		{
+			string substr;
+			getline(s_stream, substr, ',');	   //get first string delimited by comma
+			result.push_back(substr);
+		}
 
-	// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
-
-	//Unrecognized trigger type
+		if(result[0] == "EDGE")
+		{
+			PullEdgeTrigger();
+		}
+		else
+		{
+			LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+			m_trigger = NULL;
+			return;
+		}
+		auto chan = GetChannelByHwName(result[2]);
+		m_trigger->SetInput(0, StreamDescriptor(chan, 0), true);
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
 	else
 	{
-		LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
-		m_trigger = NULL;
-		return;
+		//Figure out what kind of trigger is active.
+		string reply = Trim(converse(":TRIGGER:TYPE?"));
+		if(reply == "DROPout")
+			PullDropoutTrigger();
+		else if(reply == "EDGE")
+			PullEdgeTrigger();
+		else if(reply == "RUNT")
+			PullRuntTrigger();
+		else if(reply == "SLOPe")
+			PullSlewRateTrigger();
+		else if(reply == "UART")
+			PullUartTrigger();
+		else if(reply == "INTerval")
+			PullPulseWidthTrigger();
+		else if(reply == "WINDow")
+			PullWindowTrigger();
+
+		// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
+
+		//Unrecognized trigger type
+		else
+		{
+			LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
+			m_trigger = NULL;
+			return;
+		}
+
+		//Pull the source (same for all types of trigger)
+		PullTriggerSource(m_trigger, reply);
+
+		//TODO: holdoff
 	}
-
-	//Pull the source (same for all types of trigger)
-	PullTriggerSource(m_trigger, reply);
-
-	//TODO: holdoff
 }
 
 /**
@@ -2037,13 +2535,27 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 		m_trigger = new EdgeTrigger(this);
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
-	//Level
-	et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		// Level
+		string level = converse("C1:TRIG_LEVEL?");
+		et->SetLevel(stof(level));
 
-	//TODO: OptimizeForHF (changes hysteresis for fast signals)
+		// Slope
+		GetTriggerSlope(et, Trim(converse("C1:TRIG_SLOPE?")));
+		// <trig_source>:TRIG_SLOPE <trig_slope>
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		//Level
+		et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
 
-	//Slope
-	GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
+		//TODO: OptimizeForHF (changes hysteresis for fast signals)
+
+		//Slope
+		GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
+	}
 }
 
 /**
@@ -2267,14 +2779,29 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 {
 	reply = Trim(reply);
 
-	if(reply == "RISing")
-		trig->SetType(EdgeTrigger::EDGE_RISING);
-	else if(reply == "FALLing")
-		trig->SetType(EdgeTrigger::EDGE_FALLING);
-	else if(reply == "ALTernate")
-		trig->SetType(EdgeTrigger::EDGE_ANY);
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		if(reply == "POS")
+			trig->SetType(EdgeTrigger::EDGE_RISING);
+		else if(reply == "NEG")
+			trig->SetType(EdgeTrigger::EDGE_FALLING);
+		else if(reply == "WINDOW")
+			trig->SetType(EdgeTrigger::EDGE_ANY);
+		else
+			LogWarning("Unknown trigger slope SDS1000 %s\n", reply.c_str());
+	}
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
 	else
-		LogWarning("Unknown trigger slope %s\n", reply.c_str());
+	{
+		if(reply == "RISing")
+			trig->SetType(EdgeTrigger::EDGE_RISING);
+		else if(reply == "FALLing")
+			trig->SetType(EdgeTrigger::EDGE_FALLING);
+		else if(reply == "ALTernate")
+			trig->SetType(EdgeTrigger::EDGE_ANY);
+		else
+			LogWarning("Unknown trigger slope %s\n", reply.c_str());
+	}
 }
 
 /**
@@ -2377,26 +2904,54 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
 	//Slope
-	switch(trig->GetType())
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
 	{
-		case EdgeTrigger::EDGE_RISING:
-			sendOnly(":TRIGGER:%s:SLOPE RISING", trigType.c_str());
-			break;
+		//trig
+		switch(trig->GetType())
+		{
+			case EdgeTrigger::EDGE_RISING:
+				sendOnly("C1:TRIG_SLOPE POS");
+				break;
 
-		case EdgeTrigger::EDGE_FALLING:
-			sendOnly(":TRIGGER:%s:SLOPE FALLING", trigType.c_str());
-			break;
+			case EdgeTrigger::EDGE_FALLING:
+				sendOnly("C1:TRIG_SLOPE NEG");
+				break;
 
-		case EdgeTrigger::EDGE_ANY:
-			sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
-			break;
+			case EdgeTrigger::EDGE_ANY:
+				sendOnly("C1:TRIG_SLOPE_WINDOW");
+				break;
 
-		default:
-			LogWarning("Invalid trigger type %d\n", trig->GetType());
-			break;
+			default:
+				LogWarning("Invalid trigger type %d\n", trig->GetType());
+				break;
+		}
+		//Level
+		sendOnly("C1:TRIG_LEVEL %1.2E", trig->GetLevel());
 	}
-	//Level
-	sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
+	// MODEL_SIGLENT_SDS2000XP MODEL_SIGLENT_SDS5000X
+	else
+	{
+		switch(trig->GetType())
+		{
+			case EdgeTrigger::EDGE_RISING:
+				sendOnly(":TRIGGER:%s:SLOPE RISING", trigType.c_str());
+				break;
+
+			case EdgeTrigger::EDGE_FALLING:
+				sendOnly(":TRIGGER:%s:SLOPE FALLING", trigType.c_str());
+				break;
+
+			case EdgeTrigger::EDGE_ANY:
+				sendOnly(":TRIGGER:%s:SLOPE ALTERNATE", trigType.c_str());
+				break;
+
+			default:
+				LogWarning("Invalid trigger type %d\n", trig->GetType());
+				break;
+		}
+		//Level
+		sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
+	}
 }
 
 /**
@@ -2570,15 +3125,22 @@ void SiglentSCPIOscilloscope::PushFloat(string path, float f)
 vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
-	ret.push_back(DropoutTrigger::GetTriggerName());
-	ret.push_back(EdgeTrigger::GetTriggerName());
-	ret.push_back(PulseWidthTrigger::GetTriggerName());
-	ret.push_back(RuntTrigger::GetTriggerName());
-	ret.push_back(SlewRateTrigger::GetTriggerName());
-	if(m_hasUartTrigger)
-		ret.push_back(UartTrigger::GetTriggerName());
-	ret.push_back(WindowTrigger::GetTriggerName());
-
+	if(m_modelid == MODEL_SIGLENT_SDS1000)
+	{
+		ret.push_back(EdgeTrigger::GetTriggerName());
+		// TODO add more
+	}
+	else
+	{
+		ret.push_back(DropoutTrigger::GetTriggerName());
+		ret.push_back(EdgeTrigger::GetTriggerName());
+		ret.push_back(PulseWidthTrigger::GetTriggerName());
+		ret.push_back(RuntTrigger::GetTriggerName());
+		ret.push_back(SlewRateTrigger::GetTriggerName());
+		if(m_hasUartTrigger)
+			ret.push_back(UartTrigger::GetTriggerName());
+		ret.push_back(WindowTrigger::GetTriggerName());
+	}
 	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
 }
