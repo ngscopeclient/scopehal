@@ -44,10 +44,8 @@ VectorFrequencyFilter::VectorFrequencyFilter(const string& color)
 
 	SetYAxisUnits(Unit(Unit::UNIT_HZ), 0);
 
-	m_midpoint = 0.5;
-	m_range = 1;
-	m_min = FLT_MAX;
-	m_max = FLT_MIN;
+	m_offset = 1e6;
+	m_range = 1e6;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +72,17 @@ float VectorFrequencyFilter::GetVoltageRange(size_t /*stream*/)
 
 float VectorFrequencyFilter::GetOffset(size_t /*stream*/)
 {
-	return -m_midpoint;
+	return m_offset;
+}
+
+void VectorFrequencyFilter::SetVoltageRange(float range, size_t /*stream*/)
+{
+	m_range = range;
+}
+
+void VectorFrequencyFilter::SetOffset(float offset, size_t /*stream*/)
+{
+	m_offset = offset;
 }
 
 string VectorFrequencyFilter::GetProtocolName()
@@ -100,12 +108,6 @@ void VectorFrequencyFilter::SetDefaultName()
 		hwname, sizeof(hwname), "Frequency(%s, %s)", GetInputDisplayName(0).c_str(), GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
-}
-
-void VectorFrequencyFilter::ClearSweeps()
-{
-	m_min = FLT_MAX;
-	m_max = FLT_MIN;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,16 +142,6 @@ void VectorFrequencyFilter::Refresh()
 		if(dphase > M_PI)
 			dphase -= 2*M_PI;
 
-		float freq = dphase * scale / (din_i->m_durations[i]);
-		dout->m_samples[i] = freq;
-		m_min = min(m_min, freq);
-		m_max = max(m_max, freq);
+		dout->m_samples[i] = dphase * scale / (din_i->m_durations[i]);;
 	}
-
-	m_range = m_max - m_min;
-	m_midpoint = m_min + m_range/2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
 }
