@@ -152,8 +152,6 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
-	uint64_t GetTimeDiv();
-
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
 	virtual void SetDeskewForChannel(size_t channel, int64_t skew);
