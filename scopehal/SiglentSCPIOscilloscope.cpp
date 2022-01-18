@@ -41,13 +41,21 @@
  * SDS2000/5000/6000 port (c) 2021 Dave Marples. Note that this is only tested on SDS2000X+. If someone wants
  * to loan an SDS5000/6000 for testing that can be integrated. This file is derived from the LeCroy driver.
  *
- * SDS1104X-E port. Using Programming Guide  PG01-E02D and Firmware 6.1.37R8
- *   receive  data from scope on c1 c2 c3 c4
- *   set EDGE Trigger on channel C1
+ * SDS1104X-E port. Using Programming Guide  PG01-E02D 
+ * 
+ *   with Uboot-OS 8.1 and Firmware 6.1.37R8
+ * 
+ *   receive  data from scope on C1 C2 C3 C4
+ *   set EDGE Trigger on channel 
+ * 
  *   using 4 Channels ( 70 kS  25 MS/s)        got 4,23 WFM/s
  *   using 4 Channels ( 700 kpts  100 MSa/s)   got 1,62 WFM/s
  *   using 1 Channels ( 1.75 Mpts  250 MSa/s)  got 2,38 WFM/s
  *   using 4 Channels ( 3.5 Mpts  500 MSa/s)   got 0,39 WFM/s
+ * 
+ *  TODO Click "Reload configuration from scope"   sometimes we loosing WAVE rendering ( threading issue ?)
+ *  TODO setting memory depth when scope is in run/stop ( workaround stop trigger -> press Auto on scope )
+ *  TODO sometimes socket timeout (Warning: Socket read failed errno=11 errno=4)
  * 
  * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
  * archive if needed.
@@ -884,14 +892,22 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 
 	//Update in hardware
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if(i < m_analogChannelCount)
+	switch(m_modelid)
 	{
-		sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
-		sendOnly(":CHANNEL%ld:LABEL ON", i + 1);
-	}
-	else
-	{
-		sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+		case MODEL_SIGLENT_SDS1000:
+			//TODO
+			break;
+		default:
+
+			if(i < m_analogChannelCount)
+			{
+				sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
+				sendOnly(":CHANNEL%ld:LABEL ON", i + 1);
+			}
+			else
+			{
+				sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+			}
 	}
 }
 
@@ -1454,9 +1470,17 @@ bool SiglentSCPIOscilloscope::AcquireData()
 		case MODEL_SIGLENT_SDS1000:
 			m_sampleRateValid = false;
 			GetSampleRate();
+
+			// get enabled channels
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(m_channelsEnabled[i])
+				enabled[i] = IsChannelEnabled(i);
+				any_enabled |= enabled[i];
+			}
+			start = GetTime();
+			for(unsigned int i = 0; i < m_analogChannelCount; i++)
+			{
+				if(enabled[i])
 				{
 					m_transport->SendCommand("C" + to_string(i + 1) + ":WAVEFORM? DAT2");
 					// length of data is current memory depth
@@ -1479,15 +1503,17 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
 				std::vector<WaveformBase*> ret;
-				if(m_channelsEnabled[i])
+				if(enabled[i])
 				{
 					AnalogWaveform* cap = new AnalogWaveform;
 					cap->m_timescale = FS_PER_SECOND / m_sampleRate;
-
+					// no high res timer on scope ?
 					cap->m_triggerPhase = h_off_frac;
-					cap->m_startTimestamp = ttime;
+					cap->m_startTimestamp = time(NULL);
+					;
 					cap->m_densePacked = true;
-					cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
+					// Fixme
+					cap->m_startFemtoseconds = (start - floor(start)) * FS_PER_SECOND;
 
 					cap->Resize(m_analogWaveformDataSize[i]);
 
@@ -1507,7 +1533,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Save analog waveform data
 			for(unsigned int i = 0; i < m_analogChannelCount; i++)
 			{
-				if(!m_channelsEnabled[i])
+				if(!enabled[i])
 					continue;
 
 				//Done, update the data
@@ -2404,10 +2430,21 @@ void SiglentSCPIOscilloscope::PullTrigger()
 			result.push_back(substr);
 		}
 
+		// if(result[0] == "DROP")
+		// 	PullDropoutTrigger();
 		if(result[0] == "EDGE")
-		{
 			PullEdgeTrigger();
-		}
+		// else if(result[0] == "RUNT")
+		// 	PullRuntTrigger();
+		// else if(result[0] == "SLEW")
+		// 	PullSlewRateTrigger();
+		// else if(result[0] == "GLIT")
+		// 	PullUartTrigger();
+		// else if(result[0] == "INTV")
+		// 	PullPulseWidthTrigger();
+		//else if(result[0] == "WINDow")
+		//	PullWindowTrigger();
+		//Unrecognized trigger type
 		else
 		{
 			LogWarning("Unknown trigger type \"%s\"\n", reply.c_str());
@@ -2483,24 +2520,32 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 
-	//Level
-	dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
+	switch(m_modelid)
+	{
+		case MODEL_SIGLENT_SDS1000:
+			// TODO
 
-	//Dropout time
-	Unit fs(Unit::UNIT_FS);
-	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
+			break;
+		default:
+			//Level
+			dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
 
-	//Edge type
-	if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
-		dt->SetType(DropoutTrigger::EDGE_RISING);
-	else
-		dt->SetType(DropoutTrigger::EDGE_FALLING);
+			//Dropout time
+			Unit fs(Unit::UNIT_FS);
+			dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
 
-	//Reset type
-	if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
-		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
-	else
-		dt->SetResetType(DropoutTrigger::RESET_NONE);
+			//Edge type
+			if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
+				dt->SetType(DropoutTrigger::EDGE_RISING);
+			else
+				dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+			//Reset type
+			if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
+				dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+			else
+				dt->SetResetType(DropoutTrigger::RESET_NONE);
+	}
 }
 
 /**
@@ -2819,56 +2864,96 @@ void SiglentSCPIOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-	if(dt)
+	switch(m_modelid)
 	{
-		sendOnly(":TRIGGER:TYPE DROPOUT");
-		sendOnly(":TRIGGER:DROPOUT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushDropoutTrigger(dt);
-	}
-	else if(pt)
-	{
-		sendOnly(":TRIGGER:TYPE INTERVAL");
-		sendOnly(":TRIGGER:INTERVAL:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushPulseWidthTrigger(pt);
-	}
-	else if(rt)
-	{
-		sendOnly(":TRIGGER:TYPE RUNT");
-		sendOnly(":TRIGGER:RUNT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushRuntTrigger(rt);
-	}
-	else if(st)
-	{
-		sendOnly(":TRIGGER:TYPE SLOPE");
-		sendOnly(":TRIGGER:SLOPE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushSlewRateTrigger(st);
-	}
-	else if(ut)
-	{
-		sendOnly(":TRIGGER:TYPE UART");
-		// TODO: Validate these trigger allocations
-		sendOnly(":TRIGGER:UART:RXSOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		sendOnly(":TRIGGER:UART:TXSOURCE C%d", m_trigger->GetInput(1).m_channel->GetIndex() + 1);
-		PushUartTrigger(ut);
-	}
-	else if(wt)
-	{
-		sendOnly(":TRIGGER:TYPE WINDOW");
-		sendOnly(":TRIGGER:WINDOW:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushWindowTrigger(wt);
-	}
+		case MODEL_SIGLENT_SDS1000:
+			if(dt)
+			{
+				PushDropoutTrigger(dt);
+			}
+			else if(pt)
+			{
+				PushPulseWidthTrigger(pt);
+			}
+			else if(rt)
+			{
+				PushRuntTrigger(rt);
+			}
+			else if(st)
+			{
+				PushSlewRateTrigger(st);
+			}
+			else if(ut)
+			{
+				PushUartTrigger(ut);
+			}
+			else if(wt)
+			{
+				PushWindowTrigger(wt);
+			}
 
-	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
-	else if(et)	   //must be last
-	{
-		sendOnly(":TRIGGER:TYPE EDGE");
-		sendOnly(":TRIGGER:EDGE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-		PushEdgeTrigger(et, "EDGE");
+			else if(et)	   //must be last
+			{
+				PushEdgeTrigger(et, "EDGE");
+			}
+			else
+				LogWarning("Unknown trigger type (not an edge)\n");
+			break;
+		default:
+
+			if(dt)
+			{
+				sendOnly(":TRIGGER:TYPE DROPOUT");
+				sendOnly(":TRIGGER:DROPOUT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushDropoutTrigger(dt);
+			}
+			else if(pt)
+			{
+				sendOnly(":TRIGGER:TYPE INTERVAL");
+				sendOnly(":TRIGGER:INTERVAL:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushPulseWidthTrigger(pt);
+			}
+			else if(rt)
+			{
+				sendOnly(":TRIGGER:TYPE RUNT");
+				sendOnly(":TRIGGER:RUNT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushRuntTrigger(rt);
+			}
+			else if(st)
+			{
+				sendOnly(":TRIGGER:TYPE SLOPE");
+				sendOnly(":TRIGGER:SLOPE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushSlewRateTrigger(st);
+			}
+			else if(ut)
+			{
+				sendOnly(":TRIGGER:TYPE UART");
+				// TODO: Validate these trigger allocations
+				sendOnly(":TRIGGER:UART:RXSOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:UART:TXSOURCE C%d", m_trigger->GetInput(1).m_channel->GetIndex() + 1);
+				PushUartTrigger(ut);
+			}
+			else if(wt)
+			{
+				sendOnly(":TRIGGER:TYPE WINDOW");
+				sendOnly(":TRIGGER:WINDOW:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushWindowTrigger(wt);
+			}
+
+			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+
+			else if(et)	   //must be last
+			{
+				sendOnly(":TRIGGER:TYPE EDGE");
+				sendOnly(":TRIGGER:EDGE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				PushEdgeTrigger(et, "EDGE");
+			}
+
+			else
+				LogWarning("Unknown trigger type (not an edge)\n");
 	}
-
-	else
-		LogWarning("Unknown trigger type (not an edge)\n");
 }
 
 /**
@@ -2888,22 +2973,25 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
 	//Slope
+	size_t nameChannel;
+
 	switch(m_modelid)
 	{
 		case MODEL_SIGLENT_SDS1000:
-			//trig
+
+			nameChannel = trig->GetInput(0).m_channel[0].GetIndex() + 1;
 			switch(trig->GetType())
 			{
 				case EdgeTrigger::EDGE_RISING:
-					sendOnly("C1:TRIG_SLOPE POS");
+					sendOnly("C%d:TRIG_SLOPE POS", nameChannel);
 					break;
 
 				case EdgeTrigger::EDGE_FALLING:
-					sendOnly("C1:TRIG_SLOPE NEG");
+					sendOnly("C%d:TRIG_SLOPE NEG", nameChannel);
 					break;
 
 				case EdgeTrigger::EDGE_ANY:
-					sendOnly("C1:TRIG_SLOPE_WINDOW");
+					sendOnly("C%d:TRIG_SLOPE WINDOW", nameChannel);
 					break;
 
 				default:
@@ -2911,7 +2999,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 					break;
 			}
 			//Level
-			sendOnly("C1:TRIG_LEVEL %1.2E", trig->GetLevel());
+			sendOnly("C%d:TRIG_LEVEL %1.2E", nameChannel,trig->GetLevel());
 			break;
 		default:
 
@@ -3109,7 +3197,7 @@ void SiglentSCPIOscilloscope::PushFloat(string path, float f)
 vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 {
 	vector<string> ret;
-	switch(m_modelid == MODEL_SIGLENT_SDS1000)
+	switch(m_modelid)
 	{
 		case MODEL_SIGLENT_SDS1000:
 			ret.push_back(EdgeTrigger::GetTriggerName());
