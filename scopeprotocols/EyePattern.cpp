@@ -390,6 +390,8 @@ void EyePattern::Refresh()
 	auto clock = GetDigitalInputWaveform(1);
 	double start = GetTime();
 
+	SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
+
 	//If center of the eye was changed, reset existing eye data
 	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	double center = m_parameters[m_centerName].GetFloatVal();
