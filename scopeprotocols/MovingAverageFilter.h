@@ -45,8 +45,6 @@ public:
 	virtual bool NeedsConfig();
 	virtual bool IsOverlay();
 
-	virtual void ClearSweeps();
-
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
