@@ -48,6 +48,7 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 	m_offset = 0;
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
+	m_rangeValid = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,6 +76,16 @@ float MovingAverageFilter::GetVoltageRange(size_t /*stream*/)
 float MovingAverageFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
+}
+
+void MovingAverageFilter::SetVoltageRange(float range, size_t /*stream*/)
+{
+	m_range = range;
+}
+
+void MovingAverageFilter::SetOffset(float offset, size_t /*stream*/)
+{
+	m_offset = offset;
 }
 
 string MovingAverageFilter::GetProtocolName()
@@ -109,8 +120,6 @@ void MovingAverageFilter::SetDefaultName()
 
 void MovingAverageFilter::ClearSweeps()
 {
-	m_range = 1;
-	m_offset = 0;
 	m_min = FLT_MAX;
 	m_max = -FLT_MAX;
 }
@@ -163,8 +172,12 @@ void MovingAverageFilter::Refresh()
 	//Calculate bounds
 	m_max = max(m_max, vmax);
 	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
+
+	if(!m_rangeValid)
+	{
+		m_range = (m_max - m_min) * 1.05;
+		m_offset = -( (m_max - m_min)/2 + m_min );
+	}
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;
