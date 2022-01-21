@@ -130,7 +130,7 @@ void SquelchFilter::Refresh()
 
 	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
 	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
-	auto holdtime_samples = holdtime_fs / din_i->m_timescale;
+	size_t holdtime_samples = holdtime_fs / din_i->m_timescale;
 
 	auto dout_i = SetupOutputWaveform(din_i, 0, 0, 0);
 	auto dout_q = SetupOutputWaveform(din_q, 1, 0, 0);
