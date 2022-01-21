@@ -1025,8 +1025,43 @@ vector<size_t> Filter::MakeHistogram(AnalogWaveform* cap, float low, float high,
 	{
 		float fbin = (v-low) / delta;
 		size_t bin = floor(fbin * bins);
-		bin = max(bin, (size_t)0);
-		bin = min(bin, bins-1);
+		if(fbin < 0)
+			bin = 0;
+		else
+			bin = min(bin, bins-1);
+		ret[bin] ++;
+	}
+
+	return ret;
+}
+
+/**
+	@brief Makes a histogram from a waveform with the specified number of bins.
+
+	Any values outside the range are discarded.
+
+	@param low	Low endpoint of the histogram (volts)
+	@param high High endpoint of the histogram (volts)
+	@param bins	Number of histogram bins
+ */
+vector<size_t> Filter::MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins)
+{
+	vector<size_t> ret;
+	for(size_t i=0; i<bins; i++)
+		ret.push_back(0);
+
+	//Early out if we have zero span
+	if(bins == 0)
+		return ret;
+
+	float delta = high-low;
+
+	for(float v : cap->m_samples)
+	{
+		float fbin = (v-low) / delta;
+		size_t bin = floor(fbin * bins);
+		if(bin >= bins)	//negative values wrap to huge positive and get caught here
+			continue;
 		ret[bin] ++;
 	}
 
