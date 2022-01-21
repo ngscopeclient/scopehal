@@ -549,6 +549,10 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 		}
 	}
 
+	//Special case: don't display negative zero
+	if(out == "-0")
+		out = "0";
+
 	//Final formatting
 	if(m_type != Unit::UNIT_UI)
 		out += " ";
