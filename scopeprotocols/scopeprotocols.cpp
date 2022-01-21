@@ -105,6 +105,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FFTFilter);
 	AddDecoderClass(FIRFilter);
 	AddDecoderClass(FrequencyMeasurement);
+	AddDecoderClass(FSKDecoder);
 	AddDecoderClass(GroupDelayFilter);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);

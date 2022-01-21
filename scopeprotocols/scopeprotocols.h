@@ -90,6 +90,7 @@
 #include "EyePeriodMeasurement.h"
 #include "EyeWidthMeasurement.h"
 #include "FallMeasurement.h"
+#include "FSKDecoder.h"
 #include "FFTFilter.h"
 #include "FIRFilter.h"
 #include "FrequencyMeasurement.h"
