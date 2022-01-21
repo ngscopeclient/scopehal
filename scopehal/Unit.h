@@ -83,6 +83,9 @@ public:
 	std::string ToString();
 
 	std::string PrettyPrint(double value, int sigfigs = -1);
+
+	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax);
+
 	double ParseString(const std::string& str);
 
 	UnitType GetType()
@@ -103,6 +106,9 @@ public:
 
 protected:
 	UnitType m_type;
+
+	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix);
+	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix);
 
 #ifdef _WIN32
 	/**
