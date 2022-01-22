@@ -76,7 +76,8 @@ public:
 class OscilloscopeChannel
 {
 public:
-	//Oscilloscope has to be able to call AddStream()
+
+	//Some drivers have to be able to call AddStream() for now (this will be refactored out eventually)
 	friend class Oscilloscope;
 	friend class MockOscilloscope;
 
