@@ -109,6 +109,11 @@ protected:
 	cl::Buffer* m_windowbuf;
 	cl::Buffer* m_fftoutbuf;
 	#endif
+
+	time_t	m_magStartTimestamp;
+	int64_t m_magStartFemtoseconds;
+	time_t	m_angleStartTimestamp;
+	int64_t m_angleStartFemtoseconds;
 };
 
 #endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,6 +64,11 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_cachedMaxGain = 0;
 	m_cachedMag = nullptr;
 	m_cachedAngle = nullptr;
+
+	m_magStartFemtoseconds = 0;
+	m_magStartTimestamp = 0;
+	m_angleStartFemtoseconds = 0;
+	m_angleStartTimestamp = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -188,8 +193,6 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	auto touch = dynamic_cast<TouchstoneImportFilter*>(stream.m_channel);
-
 	switch(i)
 	{
 		//signal
@@ -198,11 +201,13 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 		//mag
 		case 1:
-			return (touch && stream.m_stream == 0);
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+					(stream.GetYAxisUnits() == Unit::UNIT_DB);
 
 		//angle
 		case 2:
-			return (touch && stream.m_stream == 1);
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
 
 		default:
 			return false;
@@ -395,16 +400,24 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Dirty hack for determining when input has changed
-	//(assumes TouchstoneImportFilter never writes to the same Waveform without changing the pointer)
+	//Waveform object changed? Input parameters are no longer valid
 	bool inchange = false;
-
-	if( (GetInput(1).GetData() != m_cachedMag) ||
-		(GetInput(2).GetData() != m_cachedAngle) )
+	auto dmag = GetInput(1).GetData();
+	auto dang = GetInput(2).GetData();
+	if( (dmag != m_cachedMag) ||
+		(dang != m_cachedAngle) )
 	{
 		inchange = true;
 	}
 
+	//Timestamp changed? Input parameters are no longer valid
+	if( (dmag->m_startFemtoseconds != m_magStartFemtoseconds) ||
+		(dmag->m_startTimestamp != m_magStartTimestamp) ||
+		(dang->m_startFemtoseconds != m_angleStartFemtoseconds) ||
+		(dang->m_startTimestamp != m_angleStartTimestamp))
+	{
+		inchange = true;
+	}
 
 	//Did we change the max gain?
 	bool clipchange = false;
@@ -420,8 +433,13 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//Cache trig function output because there's no AVX instructions for this.
 	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || clipchange || inchange)
 	{
-		m_cachedMag = GetInput(1).GetData();
-		m_cachedAngle = GetInput(2).GetData();
+		m_cachedMag = dmag;
+		m_cachedAngle = dang;
+
+		m_magStartTimestamp = dmag->m_startTimestamp;
+		m_magStartFemtoseconds = dmag->m_startFemtoseconds;
+		m_angleStartTimestamp = dang->m_startTimestamp;
+		m_angleStartFemtoseconds = dang->m_startFemtoseconds;
 
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
@@ -603,20 +621,17 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 
 	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
-	auto pmag = dynamic_cast<TouchstoneImportFilter*>(GetInput(1).m_channel);
-	auto pang = dynamic_cast<TouchstoneImportFilter*>(GetInput(2).m_channel);
-	if(!pmag || !pang)
-		return;
-
-	auto& mparams = pmag->GetParams();
-	auto& aparams = pang->GetParams();
+	//Extract the S-parameters
+	SParameterVector vec(
+		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
+		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
 
 	for(size_t i=0; i<nouts; i++)
 	{
 		float freq = bin_hz * i;
 
-		float mag = mparams.InterpolateMagnitude(freq);
-		float ang = aparams.InterpolateAngle(freq);
+		float mag = vec.InterpolateMagnitude(freq);
+		float ang = vec.InterpolateAngle(freq);
 
 		//De-embedding
 		if(invert)
