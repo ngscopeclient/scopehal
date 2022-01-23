@@ -40,6 +40,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SParameterVector
 
+/**
+	@brief Creates an S-parameter vector from analog waveforms in dB / degree format
+ */
 SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang)
 {
 	m_points.clear();
