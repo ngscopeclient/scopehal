@@ -51,7 +51,7 @@ SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWavef
 	for(size_t i=0; i<len; i++)
 	{
 		m_points.push_back(SParameterPoint(
-			wmag->m_timescale*i + wmag->m_triggerPhase,
+			wmag->m_timescale*wmag->m_offsets[i].m_value + wmag->m_triggerPhase,
 			pow(10, wmag->m_samples[i].m_value / 20),
 			wang->m_samples[i].m_value * ascale));
 	}
