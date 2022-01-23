@@ -1862,7 +1862,7 @@ bool MockOscilloscope::LoadTouchstone(const string& path)
 				Unit(Unit::UNIT_DB),
 				1,						//Bus width
 				m_channels.size(),		//Channel index
-				true					//Is physical channel
+				false					//Is not physical channel
 			);
 			AddChannel(chan);
 
