@@ -30,7 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "DeEmbedFilter.h"
 #include <immintrin.h>
-#include "TouchstoneImportFilter.h"
 
 extern std::mutex g_clfftMutex;
 
@@ -601,12 +600,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 int64_t DeEmbedFilter::GetGroupDelay()
 {
-	auto pang = dynamic_cast<TouchstoneImportFilter*>(GetInput(2).m_channel);
-	auto& aparams = pang->GetParams();
-
 	float max_delay = 0;
-	for(size_t i=0; i<aparams.size()-1 && i<50; i++)
-		max_delay = max(max_delay, aparams.GetGroupDelay(i));
+	for(size_t i=0; i<m_cachedSparams.size()-1 && i<50; i++)
+		max_delay = max(max_delay, m_cachedSparams.GetGroupDelay(i));
 	return max_delay * FS_PER_SECOND;
 }
 
@@ -622,7 +618,7 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
 	//Extract the S-parameters
-	SParameterVector vec(
+	m_cachedSparams = SParameterVector(
 		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
 		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
 
@@ -630,8 +626,8 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 	{
 		float freq = bin_hz * i;
 
-		float mag = vec.InterpolateMagnitude(freq);
-		float ang = vec.InterpolateAngle(freq);
+		float mag = m_cachedSparams.InterpolateMagnitude(freq);
+		float ang = m_cachedSparams.InterpolateAngle(freq);
 
 		//De-embedding
 		if(invert)

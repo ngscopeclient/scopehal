@@ -114,6 +114,8 @@ protected:
 	int64_t m_magStartFemtoseconds;
 	time_t	m_angleStartTimestamp;
 	int64_t m_angleStartFemtoseconds;
+
+	SParameterVector m_cachedSparams;
 };
 
 #endif
