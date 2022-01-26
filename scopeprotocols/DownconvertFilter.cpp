@@ -149,7 +149,7 @@ void DownconvertFilter::DoFilterKernelGeneric(
 	size_t len = din->m_samples.size();
 
 	//Initial sample
-	float phase = lo_rad_per_sample * din->m_offsets[0] + trigger_phase_rad;
+	double phase = lo_rad_per_sample * din->m_offsets[0] + trigger_phase_rad;
 	float samp = din->m_samples[0];
 	cap_i->m_samples[0] 	= samp * sin(phase);
 	cap_q->m_samples[0] 	= samp * cos(phase);
@@ -159,8 +159,6 @@ void DownconvertFilter::DoFilterKernelGeneric(
 		for(size_t i=1; i<len; i++)
 		{
 			phase += lo_rad_per_sample;
-			if(phase > 2*M_PI)
-				phase -= 2*M_PI;
 
 			samp = din->m_samples[i];
 			cap_i->m_samples[i] 	= samp * sin(phase);
@@ -173,8 +171,6 @@ void DownconvertFilter::DoFilterKernelGeneric(
 		{
 			auto dt = din->m_offsets[i] - din->m_offsets[i-1];
 			phase += (dt * lo_rad_per_sample);
-			if(phase > 2*M_PI)
-				phase -= 2*M_PI;
 
 			samp = din->m_samples[i];
 			cap_i->m_samples[i] 	= samp * sin(phase);
@@ -198,12 +194,12 @@ void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 	auto pin		= (float*)&din->m_samples[0];
 	auto pout_i		= (float*)&cap_i->m_samples[0];
 	auto pout_q		= (float*)&cap_q->m_samples[0];
-	auto pvel		= _mm256_set1_ps(lo_rad_per_sample * 8);
-	float threshold = 16 * M_PI;	//we can rotate up to once per sample, 8 samples per vector
-	auto vthreshold	= _mm256_set1_ps(threshold);
+	auto pvel 		= _mm256_set1_pd(lo_rad_per_sample * 8);
+	double threshold = 16 * M_PI;	//we can rotate up to once per sample, 8 samples per vector
+	auto vthreshold	= _mm256_set1_pd(threshold);
 
 	//Initial samples
-	float phases[8];
+	double phases[8];
 	size_t i=0;
 	for(; i<8 && i<len_rounded; i++)
 	{
@@ -213,7 +209,8 @@ void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 		cap_i->m_samples[i] 	= samp * sin(phases[i]);
 		cap_q->m_samples[i] 	= samp * cos(phases[i]);
 	}
-	auto phase		= _mm256_loadu_ps(&phases[0]);
+	auto phase1		= _mm256_loadu_pd(&phases[0]);
+	auto phase2		= _mm256_loadu_pd(&phases[4]);
 
 	//Main vectorized loop
 	__m256 sinvec;
@@ -223,13 +220,25 @@ void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 		//Load sample data early so we can do phase math during the fetch latency
 		auto samp = _mm256_load_ps(pin + i);
 
-		//Add phase and wrap if needed
-		phase = _mm256_add_ps(phase, pvel);
-		if(_mm256_cvtss_f32(phase) > threshold)
-			phase = _mm256_sub_ps(phase, vthreshold);
+		//Increment both halves of the phase accumulator separately.
+		//We're not using AVX512 so we can't do this in a single vector
+		phase1 = _mm256_add_pd(phase1, pvel);
+		phase2 = _mm256_add_pd(phase2, pvel);
+
+		//Wrap if the first half went over the threshold
+		if(_mm256_cvtsd_f64(phase1) > threshold)
+		{
+			phase1 = _mm256_sub_pd(phase1, vthreshold);
+			phase2 = _mm256_sub_pd(phase2, vthreshold);
+		}
+
+		//Convert to single precision for the trig
+		auto phase1_sp = _mm256_cvtpd_ps(phase1);
+		auto phase2_sp = _mm256_cvtpd_ps(phase2);
+		auto phase_sp = _mm256_set_m128(phase2_sp, phase1_sp);
 
 		//Do the actual trig
-		_mm256_sincos_ps(phase, &sinvec, &cosvec);
+		_mm256_sincos_ps(phase_sp, &sinvec, &cosvec);
 		auto sinout = _mm256_mul_ps(samp, sinvec);
 		auto cosout = _mm256_mul_ps(samp, cosvec);
 
