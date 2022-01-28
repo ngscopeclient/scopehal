@@ -50,6 +50,16 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
 	m_parameters[m_maxGainName].SetFloatVal(20);
 
+	m_groupDelayTruncName = "Group Delay Truncation";
+	m_parameters[m_groupDelayTruncName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_groupDelayTruncName].SetFloatVal(0);
+
+	m_groupDelayTruncModeName = "Group Delay Truncation Mode";
+	m_parameters[m_groupDelayTruncModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_groupDelayTruncModeName].AddEnumValue("Auto", TRUNC_AUTO);
+	m_parameters[m_groupDelayTruncModeName].AddEnumValue("Manual", TRUNC_MANUAL);
+	m_parameters[m_groupDelayTruncModeName].SetIntVal(TRUNC_AUTO);
+
 	m_range = 1;
 	m_offset = 0;
 	m_min = FLT_MAX;
@@ -546,6 +556,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	int64_t groupdelay_fs = GetGroupDelay();
+	if(m_parameters[m_groupDelayTruncModeName].GetIntVal() == TRUNC_MANUAL)
+		groupdelay_fs = m_parameters[m_groupDelayTruncName].GetIntVal();
+
 	int64_t groupdelay_samples = ceil( groupdelay_fs / din->m_timescale );
 
 	//Sanity check: if we have noisy or poor quality S-parameter data, group delay might not make sense.
