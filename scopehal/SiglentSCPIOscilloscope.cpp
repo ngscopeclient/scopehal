@@ -41,7 +41,6 @@
  * Using Programming Guide  PG01-E02D an Firmware 6.1.37R8
  * Tested on SDS1104X-E. Should also support SDS10000CML+/CNL+/Dl+/E+/F+,  SDS2000/2000x, SDS1000x/1000x+,
  * SDS1000X-E/X-C but these are untested. Feedback and/or loan instruments appreciated.
-
  *
  *
  * Current State
@@ -65,11 +64,11 @@
  *   using 4 Channels ( 700 kpts  100 MSa/s)   got 1,62 WFM/s
  *   using 1 Channels ( 1.75 Mpts  250 MSa/s)  got 2,38 WFM/s
  *   using 4 Channels ( 3.5 Mpts  500 MSa/s)   got 0,39 WFM/s
- * 
+ *
  *  TODO Click "Reload configuration from scope"   sometimes we loosing WAVE rendering ( threading issue ?)
  *  TODO setting memory depth when scope is in run/stop ( workaround stop trigger -> press Auto on scope )
  *  TODO sometimes socket timeout (Warning: Socket read failed errno=11 errno=4)
- * 
+ *
  * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
  * archive if needed.
  */
@@ -1760,9 +1759,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
-					m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
 					if(enabled[i])
 					{
+						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
 						m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i]);
 						// This is the 0x0a0a at the end
 						m_transport->ReadRawData(2, (unsigned char*)tmp);
@@ -2160,11 +2159,12 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-			ret = {7 * 1000, 70 * 1000, 700 * 1000, 7 * 1000 * 1000};
+			ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+			ret = {10*1000, 100*1000, 1000*1000, 10*1000*1000};
 			break;
 		// --------------------------------------------------
 		default:
@@ -2187,6 +2187,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+			ret = {10*1000, 100*1000, 1000*1000, 10*1000*1000};
 			break;
 		// --------------------------------------------------
 		default:
