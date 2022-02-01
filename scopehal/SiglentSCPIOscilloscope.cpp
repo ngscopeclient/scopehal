@@ -152,7 +152,7 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 
 	LogTrace("TX: %s\r\n", opString);
 	this_thread::sleep_until(next_tx);
-        m_transport->FlushRXBuffer();
+	m_transport->FlushRXBuffer();
 	m_transport->SendCommand(opString);
 	ret = m_transport->ReadReply();
 	LogTrace("RX: %s\r\n\r\n", ret.c_str());
@@ -711,33 +711,72 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	switch(type)
+	switch(m_modelid)
 	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
-			sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
-			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+			switch(type)
+			{
+				case OscilloscopeChannel::COUPLE_AC_50:
+					sendOnly("C%d:COUPLING %s", i + 1, "A50");
+					break;
 
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
-			sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
-			break;
+				case OscilloscopeChannel::COUPLE_DC_50:
+					sendOnly("C%d:COUPLING %s", i + 1, "D50");
+					break;
 
-		case OscilloscopeChannel::COUPLE_DC_50:
-			sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
-			sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
-			break;
+				case OscilloscopeChannel::COUPLE_AC_1M:
+					sendOnly("C%d:COUPLING %s", i + 1, "A1M");
+					break;
 
-		case OscilloscopeChannel::COUPLE_AC_50:
-			sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
-			sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
-			break;
+				case OscilloscopeChannel::COUPLE_DC_1M:
+					sendOnly("C%d:COUPLING %s", i + 1, "D1M");
+					break;
 
-		//treat unrecognized as ground
-		case OscilloscopeChannel::COUPLE_GND:
+				//treat unrecognized as ground
+				case OscilloscopeChannel::COUPLE_GND:
+				default:
+					sendOnly("C%d:COUPLING %s", i + 1, "GND");
+					break;
+			}
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS5000X:
+			switch(type)
+			{
+				case OscilloscopeChannel::COUPLE_AC_1M:
+					sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
+					sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
+					break;
+
+				case OscilloscopeChannel::COUPLE_DC_1M:
+					sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
+					sendOnly(":CHANNEL%d:IMPEDANCE ONEMEG", i + 1);
+					break;
+
+				case OscilloscopeChannel::COUPLE_DC_50:
+					sendOnly(":CHANNEL%d:COUPLING DC", i + 1);
+					sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
+					break;
+
+				case OscilloscopeChannel::COUPLE_AC_50:
+					sendOnly(":CHANNEL%d:COUPLING AC", i + 1);
+					sendOnly(":CHANNEL%d:IMPEDANCE FIFTY", i + 1);
+					break;
+
+				//treat unrecognized as ground
+				case OscilloscopeChannel::COUPLE_GND:
+				default:
+					sendOnly(":CHANNEL%d:COUPLING GND", i + 1);
+					break;
+			}
+			break;
+		// --------------------------------------------------
 		default:
-			sendOnly(":CHANNEL%d:COUPLING GND", i + 1);
+			LogError("Unknown scope type\n");
 			break;
+			// --------------------------------------------------
 	}
 }
 
@@ -2028,9 +2067,25 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 	if(i > m_analogChannelCount)
 		return;
 
+	lock_guard<recursive_mutex> lock2(m_mutex);
 	{
-		lock_guard<recursive_mutex> lock2(m_mutex);
-		sendOnly(":CHANNEL%ld:OFFSET %1.2E", i + 1, offset);
+		switch(m_modelid)
+		{
+			// --------------------------------------------------
+			case MODEL_SIGLENT_SDS1000:
+				sendOnly("C%ld:OFST %1.2E", i + 1, offset);
+				break;
+			// --------------------------------------------------
+			case MODEL_SIGLENT_SDS2000XP:
+			case MODEL_SIGLENT_SDS5000X:
+				sendOnly(":CHANNEL%ld:OFFSET %1.2E", i + 1, offset);
+				break;
+			// --------------------------------------------------
+			default:
+				LogError("Unknown scope type\n");
+				break;
+				// --------------------------------------------------
+		}
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -2164,7 +2219,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-			ret = {10*1000, 100*1000, 1000*1000, 10*1000*1000};
+			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		default:
@@ -2187,7 +2242,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-			ret = {10*1000, 100*1000, 1000*1000, 10*1000*1000};
+			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		default:
@@ -2287,7 +2342,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-		    // we can not change memory size in Run/Stop mode
+			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
 			switch(depth)
 			{
@@ -3256,7 +3311,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			else
 				LogWarning("Unknown trigger type (not an edge)\n");
 			break;
-        // --------------------------------------------------
+		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
 			if(dt)
@@ -3309,14 +3364,12 @@ void SiglentSCPIOscilloscope::PushTrigger()
 
 			else
 				LogWarning("Unknown trigger type (not an edge)\n");
-	        break;
-	    // --------------------------------------------------
+			break;
+		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
 			break;
 			// --------------------------------------------------
-
-
 	}
 }
 
@@ -3364,7 +3417,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 					break;
 			}
 			//Level
-			sendOnly("C%d:TRIG_LEVEL %1.2E", nameChannel,trig->GetLevel());
+			sendOnly("C%d:TRIG_LEVEL %1.2E", nameChannel, trig->GetLevel());
 			break;
 
 		// --------------------------------------------------
@@ -3595,7 +3648,6 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 			LogError("Unknown scope type\n");
 			break;
 			// --------------------------------------------------
-
 	}
 	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
