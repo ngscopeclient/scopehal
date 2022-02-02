@@ -101,6 +101,7 @@
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "I2CEepromDecoder.h"
+#include "IBISDriverFilter.h"
 #include "IPv4Decoder.h"
 #include "ISIMeasurement.h"
 #include "JitterFilter.h"

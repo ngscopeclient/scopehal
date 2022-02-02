@@ -213,7 +213,7 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 
 	Each output point ranges from 0 (fully off) to 1 (fully on)
 
-	TODO: take in multiple corners so we can use low voltage and high cap, etc
+	TODO: this is completely wrong, we should use dV/dT settings
 
 	@param curve	V/T curve to use
 	@param oldstate	I/V curve set for currently-on buffer
@@ -223,13 +223,14 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 	@param rising	True for rising edge, false for falling edge
  */
 vector<float> IBISModel::CalculateTurnonCurve(
-	VTCurves* curve,
-	IVCurve* pullup,
-	IVCurve* pulldown,
-	IBISCorner corner,
-	float dt,
-	bool rising)
+	VTCurves* /*curve*/,
+	IVCurve* /*pullup*/,
+	IVCurve* /*pulldown*/,
+	IBISCorner /*corner*/,
+	float /*dt*/,
+	bool /*rising*/)
 {
+	/*
 	vector<float> ret;
 
 	float cap = m_dieCapacitance[corner];
@@ -292,6 +293,9 @@ vector<float> IBISModel::CalculateTurnonCurve(
 			break;
 	}
 
+	return ret;
+	*/
+	vector<float> ret;
 	return ret;
 }
 
