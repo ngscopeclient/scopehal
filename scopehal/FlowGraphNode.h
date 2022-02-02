@@ -123,6 +123,8 @@ public:
 
 	StreamDescriptor GetInput(size_t i);
 
+	virtual bool OnParameterChanged(const std::string& name);
+
 	//Parameters
 public:
 	FilterParameter& GetParameter(std::string s);

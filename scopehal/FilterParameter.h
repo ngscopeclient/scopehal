@@ -94,6 +94,12 @@ public:
 			values.push_back(it.first);
 	}
 
+	void ClearEnumValues()
+	{
+		m_forwardEnumMap.clear();
+		m_reverseEnumMap.clear();
+	}
+
 protected:
 	ParameterTypes m_type;
 

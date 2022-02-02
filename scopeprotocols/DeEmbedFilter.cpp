@@ -611,11 +611,21 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	m_offset = -( (m_max - m_min)/2 + m_min );
 }
 
+/**
+	@brief Returns the max mid-band group delay of the channel
+ */
 int64_t DeEmbedFilter::GetGroupDelay()
 {
 	float max_delay = 0;
-	for(size_t i=0; i<m_cachedSparams.size()-1 && i<50; i++)
-		max_delay = max(max_delay, m_cachedSparams.GetGroupDelay(i));
+	size_t mid = m_cachedSparams.size() / 2;
+	for(size_t i=0; i<50; i++)
+	{
+		size_t n = i+mid;
+		if(n >= m_cachedSparams.size())
+			break;
+
+		max_delay = max(max_delay, m_cachedSparams.GetGroupDelay(n));
+	}
 	return max_delay * FS_PER_SECOND;
 }
 

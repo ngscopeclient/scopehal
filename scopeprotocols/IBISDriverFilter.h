@@ -51,10 +51,10 @@ public:
 	virtual bool NeedsConfig();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	virtual bool OnParameterChanged(const std::string& name);
+
 	virtual void Refresh();
 	virtual void ClearSweeps();
-
-	std::string m_sampleRate;
 
 	PROTOCOL_DECODER_INITPROC(IBISDriverFilter)
 
@@ -66,6 +66,10 @@ protected:
 	float m_vmin;
 	float m_range;
 	float m_offset;
+
+	std::string m_sampleRate;
+	std::string m_fname;
+	std::string m_modelName;
 };
 
 #endif

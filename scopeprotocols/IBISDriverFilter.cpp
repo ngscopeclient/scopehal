@@ -37,7 +37,10 @@ using namespace std;
 
 IBISDriverFilter::IBISDriverFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	, m_model(NULL)
 	, m_sampleRate("Sample Rate")
+	, m_fname("File Path")
+	, m_modelName("Model Name")
 {
 	CreateInput("data");
 	CreateInput("clk");
@@ -45,8 +48,11 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
 	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
 
-	m_parser.Load("/ceph/bulk/datasheets/Xilinx/7_series/kintex-7/kintex7.ibs");
-	m_model = m_parser.m_models["SSTL135_F_HR"];
+	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_fname].m_fileFilterMask = "*.ibs";
+	m_parameters[m_fname].m_fileFilterName = "IBIS model files (*.ibs)";
+
+	m_parameters[m_modelName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 
 	ClearSweeps();
 }
@@ -117,8 +123,49 @@ void IBISDriverFilter::ClearSweeps()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+bool IBISDriverFilter::OnParameterChanged(const string& name)
+{
+	//Filename changed? Reload the main parser config
+	if(name == m_fname)
+	{
+		//Load the IBIS model
+		m_parser.Clear();
+		m_parser.Load(m_parameters[m_fname].ToString());
+		m_model = NULL;
+
+		//Make a list of candidate output models
+		vector<string> names;
+		for(auto it : m_parser.m_models)
+		{
+			//Skip any models other than push-pull output and I/O
+			auto model = it.second;
+			if( (model->m_type != IBISModel::TYPE_OUTPUT) && (model->m_type != IBISModel::TYPE_IO) )
+				continue;
+
+			names.push_back(it.first);
+		}
+
+		//Recreate the list of options
+		std::sort(names.begin(), names.end());
+		m_parameters[m_modelName].ClearEnumValues();
+		for(size_t i=0; i<names.size(); i++)
+			m_parameters[m_modelName].AddEnumValue(names[i], i);
+		return true;
+	}
+
+	if(name == m_modelName)
+	{
+		LogDebug("parameter changed: model name\n");
+		m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
+		Refresh();
+	}
+
+	return false;
+}
+
 void IBISDriverFilter::Refresh()
 {
+	//If we don't have a model, nothing to do
 	if(!VerifyAllInputsOK() || !m_model)
 	{
 		SetData(NULL, 0);
