@@ -70,7 +70,7 @@ float DCOffsetFilter::GetVoltageRange(size_t /*stream*/)
 
 float DCOffsetFilter::GetOffset(size_t /*stream*/)
 {
-	return m_inputs[0].GetOffset() + m_parameters[m_offsetname].GetFloatVal();
+	return m_inputs[0].GetOffset() - m_parameters[m_offsetname].GetFloatVal();
 }
 
 string DCOffsetFilter::GetProtocolName()
