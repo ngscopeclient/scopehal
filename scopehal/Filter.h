@@ -166,6 +166,8 @@ public:
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
 protected:
+	virtual void OnParametersLoaded();
+	virtual bool OnParameterChanged(const std::string& name);
 
 	///Group used for the display menu
 	Category m_category;

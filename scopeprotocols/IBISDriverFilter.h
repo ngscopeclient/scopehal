@@ -59,6 +59,8 @@ public:
 	PROTOCOL_DECODER_INITPROC(IBISDriverFilter)
 
 protected:
+	virtual void OnParametersLoaded();
+
 	IBISParser m_parser;
 	IBISModel* m_model;
 
@@ -70,6 +72,8 @@ protected:
 	std::string m_sampleRate;
 	std::string m_fname;
 	std::string m_modelName;
+	std::string m_cornerName;
+	std::string m_termName;
 };
 
 #endif

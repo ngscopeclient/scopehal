@@ -41,6 +41,8 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	, m_sampleRate("Sample Rate")
 	, m_fname("File Path")
 	, m_modelName("Model Name")
+	, m_cornerName("Corner")
+	, m_termName("Termination")
 {
 	CreateInput("data");
 	CreateInput("clk");
@@ -53,6 +55,14 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_fname].m_fileFilterName = "IBIS model files (*.ibs)";
 
 	m_parameters[m_modelName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+
+	m_parameters[m_cornerName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_cornerName].AddEnumValue("Minimum", CORNER_MIN);
+	m_parameters[m_cornerName].AddEnumValue("Typical", CORNER_TYP);
+	m_parameters[m_cornerName].AddEnumValue("Maximum", CORNER_MAX);
+	m_parameters[m_cornerName].SetIntVal(CORNER_TYP);
+
+	m_parameters[m_termName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 
 	ClearSweeps();
 }
@@ -123,8 +133,18 @@ void IBISDriverFilter::ClearSweeps()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void IBISDriverFilter::OnParametersLoaded()
+{
+	OnParameterChanged(m_fname);
+	m_parameters[m_modelName].Reinterpret();
+	OnParameterChanged(m_modelName);
+}
+
 bool IBISDriverFilter::OnParameterChanged(const string& name)
 {
+	if(name == "")
+		return false;
+
 	//Filename changed? Reload the main parser config
 	if(name == m_fname)
 	{
@@ -150,17 +170,33 @@ bool IBISDriverFilter::OnParameterChanged(const string& name)
 		m_parameters[m_modelName].ClearEnumValues();
 		for(size_t i=0; i<names.size(); i++)
 			m_parameters[m_modelName].AddEnumValue(names[i], i);
-		return true;
 	}
 
+	//Model changed? Refresh list of termination conditions
 	if(name == m_modelName)
 	{
-		LogDebug("parameter changed: model name\n");
 		m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
-		Refresh();
+
+		//For now, assume rising and falling waveforms have terminations in the same order
+		//TODO: check if spec requires this to be the case
+
+		//Recreate list of terminations
+		Unit ohms(Unit::UNIT_OHMS);
+		Unit volts(Unit::UNIT_VOLTS);
+		m_parameters[m_termName].ClearEnumValues();
+		for(size_t i=0; i<m_model->m_rising.size(); i++)
+		{
+			auto& w = m_model->m_rising[i];
+			auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
+			m_parameters[m_termName].AddEnumValue(ename, i);
+		}
 	}
 
-	return false;
+	//Our min / max are likely invalid now
+	ClearSweeps();
+
+	Refresh();
+	return true;
 }
 
 void IBISDriverFilter::Refresh()
@@ -197,11 +233,11 @@ void IBISDriverFilter::Refresh()
 	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
 	cap->Resize(caplen);
 
-	//Find the rising and falling edge waveform terminated to the highest voltage (Vcc etc)
-	//TODO: make this configurable
-	VTCurves* rising = m_model->GetHighestRisingWaveform();
-	VTCurves* falling = m_model->GetHighestFallingWaveform();
-	IBISCorner corner = CORNER_TYP;
+	//Find the rising and falling edge waveform
+	auto term = m_parameters[m_termName].GetIntVal();
+	VTCurves& rising = m_model->m_rising[term];
+	VTCurves& falling = m_model->m_falling[term];
+	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());;
 
 	//Process samples
 	size_t nsamp = 0;
@@ -220,9 +256,9 @@ void IBISDriverFilter::Refresh()
 		{
 			float v;
 			if(cur)
-				v = falling->InterpolateVoltage(corner, 0);
+				v = falling.InterpolateVoltage(corner, 0);
 			else
-				v = rising->InterpolateVoltage(corner, 0);
+				v = rising.InterpolateVoltage(corner, 0);
 
 			for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
 			{
@@ -247,9 +283,9 @@ void IBISDriverFilter::Refresh()
 				float toff = (nsamp - nstart) * samplePeriod / FS_PER_SECOND;
 				float v;
 				if(cur)
-					v = rising->InterpolateVoltage(corner, toff);
+					v = rising.InterpolateVoltage(corner, toff);
 				else
-					v = falling->InterpolateVoltage(corner, toff);
+					v = falling.InterpolateVoltage(corner, toff);
 				cap->m_samples[nsamp] = v;
 
 				m_vmax = max(m_vmax, v);

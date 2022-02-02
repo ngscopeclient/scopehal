@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,6 +90,9 @@ bool SubtractFilter::NeedsConfig()
 
 float SubtractFilter::GetOffset(size_t /*stream*/)
 {
+	if(!VerifyAllInputsOKAndAnalog())
+		return 0;
+
 	double v1 = m_inputs[0].GetVoltageRange();
 	double v2 = m_inputs[1].GetVoltageRange();
 	double o1 = m_inputs[0].GetOffset();
@@ -110,6 +113,9 @@ float SubtractFilter::GetOffset(size_t /*stream*/)
 
 float SubtractFilter::GetVoltageRange(size_t /*stream*/)
 {
+	if(!VerifyAllInputsOKAndAnalog())
+		return 1;
+
 	double v1 = m_inputs[0].GetVoltageRange();
 	double v2 = m_inputs[1].GetVoltageRange();
 	double o1 = m_inputs[0].GetOffset();

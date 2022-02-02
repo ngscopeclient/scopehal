@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -706,7 +706,11 @@ bool IBISParser::Load(string fname)
 
 			//Fixture properties in waveforms
 			else if(skeyword == "R_fixture")
-				sscanf(line, "R_fixture = %f", &waveform.m_fixtureResistance);
+			{
+				char fres[128];
+				sscanf(line, "R_fixture = %127s", fres);
+				waveform.m_fixtureResistance = ParseNumber(fres);
+			}
 
 			else if(skeyword == "V_fixture")
 				sscanf(line, "V_fixture = %f", &waveform.m_fixtureVoltage);
@@ -819,6 +823,9 @@ float IBISParser::ParseNumber(const char* str)
 
 	switch(scale)
 	{
+		case 'k':
+			return ret * 1e3;
+
 		case 'm':
 			return ret * 1e-3;
 
