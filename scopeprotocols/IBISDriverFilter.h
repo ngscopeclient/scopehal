@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,102 +27,53 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "DCOffsetFilter.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of IBISDriverFilter
+ */
+#ifndef IBISDriverFilter_h
+#define IBISDriverFilter_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-DCOffsetFilter::DCOffsetFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+class IBISDriverFilter : public Filter
 {
-	//Set up channels
-	CreateInput("din");
+public:
+	IBISDriverFilter(const std::string& color);
 
-	m_offsetname = "Offset";
-	m_parameters[m_offsetname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_offsetname].SetFloatVal(0);
-}
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
 
-bool DCOffsetFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
+	virtual bool IsOverlay();
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
+	virtual bool NeedsConfig();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	return false;
-}
+	virtual bool OnParameterChanged(const std::string& name);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	virtual void Refresh();
+	virtual void ClearSweeps();
 
-float DCOffsetFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
+	PROTOCOL_DECODER_INITPROC(IBISDriverFilter)
 
-float DCOffsetFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset() - m_parameters[m_offsetname].GetFloatVal();
-}
+protected:
+	virtual void OnParametersLoaded();
 
-string DCOffsetFilter::GetProtocolName()
-{
-	return "DC offset";
-}
+	IBISParser m_parser;
+	IBISModel* m_model;
 
-bool DCOffsetFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
+	float m_vmax;
+	float m_vmin;
+	float m_range;
+	float m_offset;
 
-bool DCOffsetFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
+	std::string m_sampleRate;
+	std::string m_fname;
+	std::string m_modelName;
+	std::string m_cornerName;
+	std::string m_termName;
+};
 
-void DCOffsetFilter::SetDefaultName()
-{
-	char hwname[256];
-	float offset = m_parameters[m_offsetname].GetFloatVal();
-	if(offset >= 0)
-		snprintf(hwname, sizeof(hwname), "%s + %.3f", GetInputDisplayName(0).c_str(), offset);
-	else
-		snprintf(hwname, sizeof(hwname), "%s %.3f", GetInputDisplayName(0).c_str(), offset);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void DCOffsetFilter::Refresh()
-{
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
-
-	float offset = m_parameters[m_offsetname].GetFloatVal();
-
-	//Subtract all of our samples
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
-	for(size_t i=0; i<len; i++)
-		out[i] 		= a[i] + offset;
-}
+#endif

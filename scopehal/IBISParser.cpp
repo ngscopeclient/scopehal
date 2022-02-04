@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -213,7 +213,7 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 
 	Each output point ranges from 0 (fully off) to 1 (fully on)
 
-	TODO: take in multiple corners so we can use low voltage and high cap, etc
+	TODO: this is completely wrong, we should use dV/dT settings
 
 	@param curve	V/T curve to use
 	@param oldstate	I/V curve set for currently-on buffer
@@ -223,13 +223,14 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 	@param rising	True for rising edge, false for falling edge
  */
 vector<float> IBISModel::CalculateTurnonCurve(
-	VTCurves* curve,
-	IVCurve* pullup,
-	IVCurve* pulldown,
-	IBISCorner corner,
-	float dt,
-	bool rising)
+	VTCurves* /*curve*/,
+	IVCurve* /*pullup*/,
+	IVCurve* /*pulldown*/,
+	IBISCorner /*corner*/,
+	float /*dt*/,
+	bool /*rising*/)
 {
+	/*
 	vector<float> ret;
 
 	float cap = m_dieCapacitance[corner];
@@ -292,6 +293,9 @@ vector<float> IBISModel::CalculateTurnonCurve(
 			break;
 	}
 
+	return ret;
+	*/
+	vector<float> ret;
 	return ret;
 }
 
@@ -702,7 +706,11 @@ bool IBISParser::Load(string fname)
 
 			//Fixture properties in waveforms
 			else if(skeyword == "R_fixture")
-				sscanf(line, "R_fixture = %f", &waveform.m_fixtureResistance);
+			{
+				char fres[128];
+				sscanf(line, "R_fixture = %127s", fres);
+				waveform.m_fixtureResistance = ParseNumber(fres);
+			}
 
 			else if(skeyword == "V_fixture")
 				sscanf(line, "V_fixture = %f", &waveform.m_fixtureVoltage);
@@ -815,6 +823,9 @@ float IBISParser::ParseNumber(const char* str)
 
 	switch(scale)
 	{
+		case 'k':
+			return ret * 1e3;
+
 		case 'm':
 			return ret * 1e-3;
 

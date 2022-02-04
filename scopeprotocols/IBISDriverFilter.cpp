@@ -1,0 +1,301 @@
+/***********************************************************************************************************************
+*                                                                                                                      *
+* libscopeprotocols                                                                                                    *
+*                                                                                                                      *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* All rights reserved.                                                                                                 *
+*                                                                                                                      *
+* Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
+* following conditions are met:                                                                                        *
+*                                                                                                                      *
+*    * Redistributions of source code must retain the above copyright notice, this list of conditions, and the         *
+*      following disclaimer.                                                                                           *
+*                                                                                                                      *
+*    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the       *
+*      following disclaimer in the documentation and/or other materials provided with the distribution.                *
+*                                                                                                                      *
+*    * Neither the name of the author nor the names of any contributors may be used to endorse or promote products     *
+*      derived from this software without specific prior written permission.                                           *
+*                                                                                                                      *
+* THIS SOFTWARE IS PROVIDED BY THE AUTHORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED   *
+* TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL *
+* THE AUTHORS BE HELD LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES        *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR       *
+* BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       *
+* POSSIBILITY OF SUCH DAMAGE.                                                                                          *
+*                                                                                                                      *
+***********************************************************************************************************************/
+
+#include "../scopehal/scopehal.h"
+#include "IBISDriverFilter.h"
+
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+IBISDriverFilter::IBISDriverFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	, m_model(NULL)
+	, m_sampleRate("Sample Rate")
+	, m_fname("File Path")
+	, m_modelName("Model Name")
+	, m_cornerName("Corner")
+	, m_termName("Termination")
+{
+	CreateInput("data");
+	CreateInput("clk");
+
+	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
+	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
+
+	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_fname].m_fileFilterMask = "*.ibs";
+	m_parameters[m_fname].m_fileFilterName = "IBIS model files (*.ibs)";
+
+	m_parameters[m_modelName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+
+	m_parameters[m_cornerName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_cornerName].AddEnumValue("Minimum", CORNER_MIN);
+	m_parameters[m_cornerName].AddEnumValue("Typical", CORNER_TYP);
+	m_parameters[m_cornerName].AddEnumValue("Maximum", CORNER_MAX);
+	m_parameters[m_cornerName].SetIntVal(CORNER_TYP);
+
+	m_parameters[m_termName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+
+	ClearSweeps();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i < 2) &&
+		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
+		(stream.m_channel->GetWidth() == 1)
+		)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string IBISDriverFilter::GetProtocolName()
+{
+	return "IBIS Driver";
+}
+
+void IBISDriverFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "IBIS(%s)", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+float IBISDriverFilter::GetVoltageRange(size_t /*stream*/)
+{
+	return m_range;
+}
+
+float IBISDriverFilter::GetOffset(size_t /*stream*/)
+{
+	return m_offset;
+}
+
+bool IBISDriverFilter::NeedsConfig()
+{
+	return true;
+}
+
+bool IBISDriverFilter::IsOverlay()
+{
+	return false;
+}
+
+void IBISDriverFilter::ClearSweeps()
+{
+	m_vmax = FLT_MIN;
+	m_vmin = FLT_MAX;
+	m_range = 1;
+	m_offset = 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void IBISDriverFilter::OnParametersLoaded()
+{
+	OnParameterChanged(m_fname);
+	m_parameters[m_modelName].Reinterpret();
+	OnParameterChanged(m_modelName);
+}
+
+bool IBISDriverFilter::OnParameterChanged(const string& name)
+{
+	if(name == "")
+		return false;
+
+	//Filename changed? Reload the main parser config
+	if(name == m_fname)
+	{
+		//Load the IBIS model
+		m_parser.Clear();
+		m_parser.Load(m_parameters[m_fname].ToString());
+		m_model = NULL;
+
+		//Make a list of candidate output models
+		vector<string> names;
+		for(auto it : m_parser.m_models)
+		{
+			//Skip any models other than push-pull output and I/O
+			auto model = it.second;
+			if( (model->m_type != IBISModel::TYPE_OUTPUT) && (model->m_type != IBISModel::TYPE_IO) )
+				continue;
+
+			names.push_back(it.first);
+		}
+
+		//Recreate the list of options
+		std::sort(names.begin(), names.end());
+		m_parameters[m_modelName].ClearEnumValues();
+		for(size_t i=0; i<names.size(); i++)
+			m_parameters[m_modelName].AddEnumValue(names[i], i);
+	}
+
+	//Model changed? Refresh list of termination conditions
+	if(name == m_modelName)
+	{
+		m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
+
+		//For now, assume rising and falling waveforms have terminations in the same order
+		//TODO: check if spec requires this to be the case
+
+		//Recreate list of terminations
+		Unit ohms(Unit::UNIT_OHMS);
+		Unit volts(Unit::UNIT_VOLTS);
+		m_parameters[m_termName].ClearEnumValues();
+		for(size_t i=0; i<m_model->m_rising.size(); i++)
+		{
+			auto& w = m_model->m_rising[i];
+			auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
+			m_parameters[m_termName].AddEnumValue(ename, i);
+		}
+	}
+
+	//Our min / max are likely invalid now
+	ClearSweeps();
+
+	Refresh();
+	return true;
+}
+
+void IBISDriverFilter::Refresh()
+{
+	//If we don't have a model, nothing to do
+	if(!VerifyAllInputsOK() || !m_model)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Get the input and sample it
+	auto din = GetDigitalInputWaveform(0);
+	auto clkin = GetDigitalInputWaveform(1);
+	DigitalWaveform samples;
+	SampleOnAnyEdges(din, clkin, samples);
+
+	size_t rate = m_parameters[m_sampleRate].GetIntVal();
+	size_t samplePeriod = FS_PER_SECOND / rate;
+
+	//Configure output waveform
+	auto cap = SetupEmptyOutputWaveform(din, 0);
+	cap->m_timescale = samplePeriod;
+	cap->m_densePacked = true;
+
+	//Round length to integer number of complete cycles
+	size_t len = samples.m_samples.size();
+
+	//Adjust for start time
+	int64_t capstart = samples.m_offsets[0];
+	cap->m_triggerPhase = capstart;
+
+	//Figure out how long the capture is going to be
+	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
+	cap->Resize(caplen);
+
+	//Find the rising and falling edge waveform
+	auto term = m_parameters[m_termName].GetIntVal();
+	VTCurves& rising = m_model->m_rising[term];
+	VTCurves& falling = m_model->m_falling[term];
+	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());;
+
+	//Process samples
+	size_t nsamp = 0;
+	bool last = samples.m_samples[0];
+	for(size_t i=0; i<len; i ++)
+	{
+		//Get start/end times of this UI
+		size_t tstart = samples.m_offsets[i] - capstart;
+		size_t tend = tstart + samples.m_durations[i];
+		size_t tend_rounded = tend / samplePeriod;
+		size_t nstart = nsamp;
+
+		//If this UI is NOT a toggle, just echo a constant value for every sample
+		auto cur = samples.m_samples[i];
+		if(cur == last)
+		{
+			float v;
+			if(cur)
+				v = falling.InterpolateVoltage(corner, 0);
+			else
+				v = rising.InterpolateVoltage(corner, 0);
+
+			for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
+			{
+				cap->m_offsets[nsamp] = nsamp;
+				cap->m_durations[nsamp] = 1;
+				cap->m_samples[nsamp] = v;
+			}
+
+			m_vmax = max(m_vmax, v);
+			m_vmin = min(m_vmin, v);
+		}
+
+		//Toggle, play back the waveform
+		else
+		{
+			for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
+			{
+				cap->m_offsets[nsamp] = nsamp;
+				cap->m_durations[nsamp] = 1;
+
+				//IBIS timestamps are in seconds not fs
+				float toff = (nsamp - nstart) * samplePeriod / FS_PER_SECOND;
+				float v;
+				if(cur)
+					v = rising.InterpolateVoltage(corner, toff);
+				else
+					v = falling.InterpolateVoltage(corner, toff);
+				cap->m_samples[nsamp] = v;
+
+				m_vmax = max(m_vmax, v);
+				m_vmin = min(m_vmin, v);
+			}
+		}
+
+		last = cur;
+	}
+
+	m_range = (m_vmax - m_vmin) * 1.05;
+	m_offset = -( (m_vmax - m_vmin)/2 + m_vmin );
+}
