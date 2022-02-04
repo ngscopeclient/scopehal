@@ -2214,7 +2214,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-			ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
+		    // According to programming guide and datasheet
+			// {7K,70K,700K,7M} for non-interleaved mode
+			ret = {7 * 1000, 70 * 1000, 700 * 1000, 7 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
@@ -2237,6 +2239,8 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
+		    // According to programming guide and datasheet
+		    // {14K,140K,1.4M,14M} for interleave mode
 			ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
@@ -2373,7 +2377,16 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				default:
 					LogError("Invalid memory depth for channel: %lu\n", depth);
 			}
-			sendOnly("TRIG_MODE STOP");
+			if(IsTriggerArmed())
+			{
+				// restart trigger
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else
+			{
+				// change to stop mode
+				sendOnly("TRIG_MODE STOP");
+			}
 			m_sampleRateValid = false;
 			break;
 
