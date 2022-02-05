@@ -310,7 +310,10 @@ void TouchstoneExportWizard::on_apply()
 		format = SParameters::FORMAT_REAL_IMAGINARY;
 
 	//Finally, save it
-	params.SaveToFile(m_filePathPage.m_chooser.get_current_name(), format, freqUnit);
+	params.SaveToFile(
+		m_filePathPage.m_chooser.get_filename(),
+		format,
+		freqUnit);
 
 	hide();
 }
