@@ -30,18 +30,32 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of ExportWizard
+	@brief Implementation of CSVExportWizard
  */
 #include "scopehal.h"
+#include "CSVExportWizard.h"
 
 using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSVExportChannelSelectionPage
+
+CSVExportChannelSelectionPage::CSVExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels)
+{
+//	m_grid.attach(m_timestampTypeLabel, 0, 0, 1, 1);
+//		m_timestampTypeLabel
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 CSVExportWizard::CSVExportWizard(const vector<OscilloscopeChannel*>& channels)
 	: ExportWizard(channels)
+	, m_channelSelectionPage(channels)
 {
+	append_page(m_channelSelectionPage.m_grid);
+	set_page_type(m_channelSelectionPage.m_grid, Gtk::ASSISTANT_PAGE_INTRO);
+	set_page_title(m_channelSelectionPage.m_grid, "Select Export Channels");
 }
 
 CSVExportWizard::~CSVExportWizard()

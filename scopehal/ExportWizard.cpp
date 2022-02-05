@@ -36,6 +36,8 @@
 
 using namespace std;
 
+ExportWizard::CreateMapType ExportWizard::m_createprocs;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -46,4 +48,36 @@ ExportWizard::ExportWizard(const vector<OscilloscopeChannel*>& channels)
 
 ExportWizard::~ExportWizard()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Object creation
+
+void ExportWizard::DoAddExportWizardClass(const string& name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
+
+void ExportWizard::EnumExportWizards(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+	std::sort(names.begin(), names.end());
+}
+
+ExportWizard* ExportWizard::CreateExportWizard(const string& name, const vector<OscilloscopeChannel*>& channels)
+{
+	if(m_createprocs.find(name) != m_createprocs.end())
+		return m_createprocs[name](channels);
+
+	LogError("Invalid export wizard name: %s\n", name.c_str());
+	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Event handlers
+
+void ExportWizard::on_cancel()
+{
+	hide();
 }

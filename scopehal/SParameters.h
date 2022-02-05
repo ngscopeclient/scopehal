@@ -66,6 +66,8 @@ public:
 	{}
 	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
 
+	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
+
 	SParameterPoint InterpolatePoint(float frequency) const;
 	float InterpolateMagnitude(float frequency) const;
 	float InterpolateAngle(float frequency) const;
@@ -118,9 +120,23 @@ public:
 
 	friend class TouchstoneParser;
 
-	void SaveToFile(const std::string& path);
+	enum FreqUnit
+	{
+		FREQ_HZ,
+		FREQ_KHZ,
+		FREQ_MHZ,
+		FREQ_GHZ
+	};
 
-	//TODO: support >2 ports
+	enum ParameterFormat
+	{
+		FORMAT_MAG_ANGLE,
+		FORMAT_DBMAG_ANGLE,
+		FORMAT_REAL_IMAGINARY
+	};
+
+	void SaveToFile(const std::string& path, ParameterFormat format = FORMAT_MAG_ANGLE, FreqUnit freqUnit = FREQ_GHZ);
+
 	size_t GetNumPorts()
 	{ return m_nports; }
 

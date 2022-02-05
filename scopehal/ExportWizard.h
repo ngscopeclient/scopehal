@@ -48,15 +48,17 @@ public:
 protected:
 	std::vector<OscilloscopeChannel*> m_channels;
 
+	virtual void on_cancel();
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation and enumeration
 
 public:
-	typedef ExportWizard* (*CreateProcType)(const std::vector<OscilloscopeChannel*>);
+	typedef ExportWizard* (*CreateProcType)(const std::vector<OscilloscopeChannel*>&);
 	static void DoAddExportWizardClass(const std::string& name, CreateProcType proc);
 
 	static void EnumExportWizards(std::vector<std::string>& names);
-	static ExportWizard* CreateExportWizard(const std::string& protocol, const std::vector<OscilloscopeChannel*>& channels);
+	static ExportWizard* CreateExportWizard(const std::string& name, const std::vector<OscilloscopeChannel*>& channels);
 
 protected:
 	//Class enumeration

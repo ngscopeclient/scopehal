@@ -37,6 +37,19 @@
 #define CSVExportWizard_h
 
 /**
+	@brief Select channels to export to CSV
+ */
+class CSVExportChannelSelectionPage
+{
+public:
+	CSVExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
+
+	Gtk::Grid m_grid;
+		Gtk::Label m_timestampTypeLabel;
+		Gtk::ComboBoxText m_timestampTypeBox;
+};
+
+/**
 	@brief CSV exporter
  */
 class CSVExportWizard : public ExportWizard
@@ -48,6 +61,9 @@ public:
 	static std::string GetExportName();
 
 	EXPORT_WIZARD_INITPROC(CSVExportWizard)
+
+protected:
+	CSVExportChannelSelectionPage m_channelSelectionPage;
 };
 
 #endif

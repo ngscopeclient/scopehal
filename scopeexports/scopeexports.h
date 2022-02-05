@@ -39,8 +39,6 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/ExportWizard.h"
 
-#include "CSVExportWizard.h"
-
 void ScopeExportStaticInit();
 
 #endif

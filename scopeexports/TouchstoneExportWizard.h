@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeexports                                                                                                      *
+* libscopeexports                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,18 +30,101 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope exporter initialization
+	@brief Declaration of TouchstoneExportWizard
  */
 
-#include "scopeexports.h"
-#include "CSVExportWizard.h"
-#include "TouchstoneExportWizard.h"
+#ifndef TouchstoneExportWizard_h
+#define TouchstoneExportWizard_h
 
 /**
-	@brief Static initialization for exporter list
+	@brief Initial configuration
  */
-void ScopeExportStaticInit()
+class TouchstoneExportConfigurationPage
 {
-	AddExportWizardClass(CSVExportWizard);
-	AddExportWizardClass(TouchstoneExportWizard);
-}
+public:
+	TouchstoneExportConfigurationPage();
+
+	Gtk::Grid m_grid;
+		Gtk::Label m_freqUnitLabel;
+			Gtk::ComboBoxText m_freqUnitBox;
+		Gtk::Label m_sFormatLabel;
+			Gtk::ComboBoxText m_sFormatBox;
+		Gtk::Label m_portCountLabel;
+			Gtk::SpinButton m_portCountSpin;
+};
+
+class TouchstoneExportChannelGroup
+{
+public:
+	TouchstoneExportChannelGroup(int to, int from, const std::vector<OscilloscopeChannel*>& channels);
+
+	Gtk::Frame m_frame;
+		Gtk::Grid m_grid;
+			Gtk::Label m_magLabel;
+				Gtk::ComboBoxText m_magBox;
+			Gtk::Label m_angLabel;
+				Gtk::ComboBoxText m_angBox;
+
+	std::vector<StreamDescriptor> m_magStreams;
+	std::vector<StreamDescriptor> m_angStreams;
+};
+
+/**
+	@brief Select channels to export to Touchstone
+ */
+class TouchstoneExportChannelSelectionPage
+{
+public:
+	TouchstoneExportChannelSelectionPage();
+	virtual ~TouchstoneExportChannelSelectionPage();
+
+	void Clear();
+	void Refresh(int channelCount, const std::vector<OscilloscopeChannel*>& channels);
+
+	Gtk::Grid m_grid;
+		Gtk::Label m_timestampTypeLabel;
+		Gtk::ComboBoxText m_timestampTypeBox;
+
+	std::map<std::pair<int, int>, TouchstoneExportChannelGroup*> m_groups;
+};
+
+/**
+	@brief Select channels to export to Touchstone
+ */
+class TouchstoneExportSummaryPage
+{
+public:
+	TouchstoneExportSummaryPage();
+	virtual ~TouchstoneExportSummaryPage();
+
+	void Refresh(int channelCount);
+
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+};
+
+/**
+	@brief Touchstone exporter
+ */
+class TouchstoneExportWizard : public ExportWizard
+{
+public:
+	TouchstoneExportWizard(const std::vector<OscilloscopeChannel*>& channels);
+	virtual ~TouchstoneExportWizard();
+
+	static std::string GetExportName();
+
+	EXPORT_WIZARD_INITPROC(TouchstoneExportWizard)
+
+protected:
+
+	void on_prepare(Gtk::Widget* page);
+	void on_apply();
+
+	TouchstoneExportConfigurationPage m_configPage;
+	TouchstoneExportChannelSelectionPage m_channelSelectionPage;
+	//TODO: error check page to detect if something is inconsistent
+	TouchstoneExportSummaryPage m_filePathPage;
+};
+
+#endif
