@@ -111,6 +111,8 @@ set(SCOPEHAL_SOURCES
 	SpectrumChannel.cpp
 
 	TestWaveformSource.cpp
+
+	ExportWizard.cpp
 	)
 
 configure_file(config.h.in config.h)
