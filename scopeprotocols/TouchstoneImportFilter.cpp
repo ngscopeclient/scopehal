@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,17 +36,13 @@ using namespace std;
 // Construction / destruction
 
 TouchstoneImportFilter::TouchstoneImportFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	: SParameterSourceFilter(color, CAT_GENERATION)
 	, m_fpname("Touchstone File")
 	, m_cachedFileName("")
 {
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.s*p";
 	m_parameters[m_fpname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
-
-	SetupStreams();
-
-	SetXAxisUnits(Unit(Unit::UNIT_HZ));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,83 +72,9 @@ void TouchstoneImportFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-bool TouchstoneImportFilter::NeedsConfig()
-{
-	return true;
-}
-
-float TouchstoneImportFilter::GetOffset(size_t stream)
-{
-	if(stream & 1)
-		return m_angoffset[stream/2];
-	else
-		return m_magoffset[stream/2];
-}
-
-float TouchstoneImportFilter::GetVoltageRange(size_t stream)
-{
-	if(stream & 1)
-		return m_angrange[stream/2];
-	else
-		return m_magrange[stream/2];
-}
-
-void TouchstoneImportFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream & 1)
-		m_magrange[stream/2] = range;
-	else
-		m_angrange[stream/2] = range;
-}
-
-void TouchstoneImportFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream & 1)
-		m_magoffset[stream/2] = offset;
-	else
-		m_angoffset[stream/2] = offset;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void TouchstoneImportFilter::SetupStreams()
-{
-	ClearStreams();
-
-	for(size_t to=0; to<m_params.GetNumPorts(); to++)
-	{
-		for(size_t from=0; from<m_params.GetNumPorts(); from++)
-		{
-			string param = string("S") + to_string(to+1) + to_string(from+1);
-
-			AddStream(Unit(Unit::UNIT_DB), param + "_mag");
-			AddStream(Unit(Unit::UNIT_DEGREES), param + "_ang");
-		}
-	}
-
-	SetupInitialPortScales();
-}
-
-void TouchstoneImportFilter::SetupInitialPortScales()
-{
-	//Resize port arrays
-	size_t oldsize = m_magrange.size();
-	size_t len = m_params.GetNumPorts() * m_params.GetNumPorts();
-	m_magrange.resize(len);
-	m_magoffset.resize(len);
-	m_angrange.resize(len);
-	m_angoffset.resize(len);
-
-	//If growing, fill new cells with reasonable default values
-	for(size_t i=oldsize; i<len; i++)
-	{
-		m_magrange[i] = 80;
-		m_magoffset[i] = 40;
-		m_angrange[i] = 370;
-		m_angoffset[i] = 0;
-	}
-}
 
 void TouchstoneImportFilter::Refresh()
 {

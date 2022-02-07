@@ -30,29 +30,39 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of TouchstoneImportFilter
+	@brief Declaration of SParameterSourceFilter
  */
-#ifndef TouchstoneImportFilter_h
-#define TouchstoneImportFilter_h
+#ifndef SParameterSourceFilter_h
+#define SParameterSourceFilter_h
 
-class TouchstoneImportFilter : public SParameterSourceFilter
+/**
+	@brief A filter that outputs a set of S-parameters
+ */
+class SParameterSourceFilter : public Filter
 {
 public:
-	TouchstoneImportFilter(const std::string& color);
+	SParameterSourceFilter(const std::string& color, Category cat);
 
-	virtual void Refresh();
+	virtual bool NeedsConfig();
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(TouchstoneImportFilter)
+	const SParameters& GetParams() const
+	{ return m_params; }
 
 protected:
-	std::string m_fpname;
+	void SetupStreams();
+	void SetupInitialPortScales();
 
-	std::string m_cachedFileName;
+	std::vector<float> m_magrange;
+	std::vector<float> m_magoffset;
+	std::vector<float> m_angrange;
+	std::vector<float> m_angoffset;
+
+	SParameters m_params;
 };
 
 #endif

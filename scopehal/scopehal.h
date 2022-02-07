@@ -94,15 +94,16 @@
 #include "RFSignalGenerator.h"
 #include "SCPIOscilloscope.h"
 
+#include "SParameters.h"
+#include "TouchstoneParser.h"
+#include "IBISParser.h"
+
 #include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
 #include "PeakDetectionFilter.h"
 #include "SpectrumChannel.h"
-
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+#include "SParameterSourceFilter.h"
 
 #include "ExportWizard.h"
 

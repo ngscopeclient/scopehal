@@ -109,6 +109,7 @@ set(SCOPEHAL_SOURCES
 	PeakDetectionFilter.cpp
 	Statistic.cpp
 	SpectrumChannel.cpp
+	SParameterSourceFilter.cpp
 
 	TestWaveformSource.cpp
 
