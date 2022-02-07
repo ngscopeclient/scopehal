@@ -38,29 +38,13 @@ using namespace std;
 TouchstoneImportFilter::TouchstoneImportFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
 	, m_fpname("Touchstone File")
-	, m_srcportname("Source Port")
-	, m_dstportname("Dest Port")
-	, m_magrange(80)
-	, m_magoffset(40)
-	, m_angrange(370)
-	, m_angoffset(0)
-	, m_cachedSrcPort(0)
-	, m_cachedDstPort(0)
 	, m_cachedFileName("")
 {
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.s*p";
 	m_parameters[m_fpname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
 
-	m_parameters[m_srcportname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_srcportname].SetIntVal(1);
-
-	m_parameters[m_dstportname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_dstportname].SetIntVal(2);
-
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_DB), "mag");
-	AddStream(Unit(Unit::UNIT_DEGREES), "angle");
+	SetupStreams();
 
 	SetXAxisUnits(Unit(Unit::UNIT_HZ));
 }
@@ -87,10 +71,7 @@ void TouchstoneImportFilter::SetDefaultName()
 	auto fname = m_parameters[m_fpname].ToString();
 
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "S%ld%ld(%s)",
-		m_parameters[m_dstportname].GetIntVal(),
-		m_parameters[m_srcportname].GetIntVal(),
-		BaseName(fname).c_str());
+	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
@@ -102,57 +83,87 @@ bool TouchstoneImportFilter::NeedsConfig()
 
 float TouchstoneImportFilter::GetOffset(size_t stream)
 {
-	if(stream == 0)
-		return m_magoffset;
+	if(stream & 1)
+		return m_angoffset[stream/2];
 	else
-		return m_angoffset;
+		return m_magoffset[stream/2];
 }
 
 float TouchstoneImportFilter::GetVoltageRange(size_t stream)
 {
-	if(stream == 0)
-		return m_magrange;
+	if(stream & 1)
+		return m_angrange[stream/2];
 	else
-		return m_angrange;
+		return m_magrange[stream/2];
 }
 
 void TouchstoneImportFilter::SetVoltageRange(float range, size_t stream)
 {
-	if(stream == 0)
-		m_magrange = range;
+	if(stream & 1)
+		m_magrange[stream/2] = range;
 	else
-		m_angrange = range;
+		m_angrange[stream/2] = range;
 }
 
 void TouchstoneImportFilter::SetOffset(float offset, size_t stream)
 {
-	if(stream == 0)
-		m_magoffset = offset;
+	if(stream & 1)
+		m_magoffset[stream/2] = offset;
 	else
-		m_angoffset = offset;
+		m_angoffset[stream/2] = offset;
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void TouchstoneImportFilter::SetupStreams()
+{
+	ClearStreams();
+
+	for(size_t to=0; to<m_params.GetNumPorts(); to++)
+	{
+		for(size_t from=0; from<m_params.GetNumPorts(); from++)
+		{
+			string param = string("S") + to_string(to+1) + to_string(from+1);
+
+			AddStream(Unit(Unit::UNIT_DB), param + "_mag");
+			AddStream(Unit(Unit::UNIT_DEGREES), param + "_ang");
+		}
+	}
+
+	SetupInitialPortScales();
+}
+
+void TouchstoneImportFilter::SetupInitialPortScales()
+{
+	//Resize port arrays
+	size_t oldsize = m_magrange.size();
+	size_t len = m_params.GetNumPorts() * m_params.GetNumPorts();
+	m_magrange.resize(len);
+	m_magoffset.resize(len);
+	m_angrange.resize(len);
+	m_angoffset.resize(len);
+
+	//If growing, fill new cells with reasonable default values
+	for(size_t i=oldsize; i<len; i++)
+	{
+		m_magrange[i] = 80;
+		m_magoffset[i] = 40;
+		m_angrange[i] = 370;
+		m_angoffset[i] = 0;
+	}
+}
+
 void TouchstoneImportFilter::Refresh()
 {
 	auto fname = m_parameters[m_fpname].ToString();
-	int src = m_parameters[m_srcportname].GetIntVal();
-	int dst = m_parameters[m_dstportname].GetIntVal();
 
-	//If cached values are still good, don't do anything
-	if( (m_cachedDstPort == dst) &&
-		(m_cachedSrcPort == src) &&
-		(m_cachedFileName == fname) )
-	{
+	//If cached values are still good, don't do anything.
+	//Also, early-out if no file name
+	if(m_cachedFileName == fname)
 		return;
-	}
-
-	//Update the cache
-	m_cachedSrcPort = src;
-	m_cachedDstPort = dst;
+	if(fname.empty())
+		return;
 	m_cachedFileName = fname;
 
 	//Load the touchstone file
@@ -162,54 +173,63 @@ void TouchstoneImportFilter::Refresh()
 	time_t timestamp = 0;
 	int64_t fs = 0;
 	GetTimestampOfFile(fname, timestamp, fs);
+	size_t nports = m_params.GetNumPorts();
 
-	//Extract our parameters
-	int nports = m_params.GetNumPorts();
-	if( (src > nports) || (dst > nports) )
-		return;
-	auto& vec = m_params[SPair(dst, src)];
-	size_t nsamples = vec.size();
+	//Recreate our output streams
+	SetupStreams();
 
-	//Create new waveform for magnitude and phase channels
-	auto mwfm = new AnalogWaveform;
-	mwfm->m_timescale = 1;
-	mwfm->m_startTimestamp = timestamp;
-	mwfm->m_startFemtoseconds = fs;
-	mwfm->m_triggerPhase = 0;
-	mwfm->m_densePacked = false;	//don't assume uniform frequency spacing
-	mwfm->Resize(nsamples);
-	SetData(mwfm, 0);
-
-	auto pwfm = new AnalogWaveform;
-	pwfm->m_timescale = 1;
-	pwfm->m_startTimestamp = timestamp;
-	pwfm->m_startFemtoseconds = fs;
-	pwfm->m_triggerPhase = 0;
-	pwfm->m_densePacked = false;	//don't assume uniform frequency spacing
-	pwfm->Resize(nsamples);
-	SetData(pwfm, 1);
-
-	//Populate them
-	float angscale = 180 / M_PI;	//we use degrees for display
-	for(size_t i=0; i<nsamples; i++)
+	for(size_t to=0; to < nports; to++)
 	{
-		auto& point = vec[i];
-
-		//Convert magnitude to dB
-		mwfm->m_offsets[i] = point.m_frequency;
-		mwfm->m_durations[i] = 1;
-		mwfm->m_samples[i] = 20 * log10(point.m_amplitude);
-
-		//Convert phase to degrees
-		pwfm->m_offsets[i] = point.m_frequency;
-		pwfm->m_durations[i] = 1;
-		pwfm->m_samples[i] = point.m_phase * angscale;
-
-		//Update previous sample's duration if possible
-		if(i > 0)
+		for(size_t from=0; from < nports; from++)
 		{
-			mwfm->m_durations[i-1] = mwfm->m_offsets[i] - mwfm->m_offsets[i-1];
-			pwfm->m_durations[i-1] = pwfm->m_offsets[i] - pwfm->m_offsets[i-1];
+			//Extract our parameters
+			auto& vec = m_params[SPair(to+1, from+1)];
+			size_t nsamples = vec.size();
+
+			size_t base = (to*nports + from) * 2;
+
+			//Create new waveform for magnitude and phase channels
+			auto mwfm = new AnalogWaveform;
+			mwfm->m_timescale = 1;
+			mwfm->m_startTimestamp = timestamp;
+			mwfm->m_startFemtoseconds = fs;
+			mwfm->m_triggerPhase = 0;
+			mwfm->m_densePacked = false;	//don't assume uniform frequency spacing
+			mwfm->Resize(nsamples);
+			SetData(mwfm, base);
+
+			auto pwfm = new AnalogWaveform;
+			pwfm->m_timescale = 1;
+			pwfm->m_startTimestamp = timestamp;
+			pwfm->m_startFemtoseconds = fs;
+			pwfm->m_triggerPhase = 0;
+			pwfm->m_densePacked = false;	//don't assume uniform frequency spacing
+			pwfm->Resize(nsamples);
+			SetData(pwfm, base + 1);
+
+			//Populate them
+			float angscale = 180 / M_PI;	//we use degrees for display
+			for(size_t i=0; i<nsamples; i++)
+			{
+				auto& point = vec[i];
+
+				//Convert magnitude to dB
+				mwfm->m_offsets[i] = point.m_frequency;
+				mwfm->m_durations[i] = 1;
+				mwfm->m_samples[i] = 20 * log10(point.m_amplitude);
+
+				//Convert phase to degrees
+				pwfm->m_offsets[i] = point.m_frequency;
+				pwfm->m_durations[i] = 1;
+				pwfm->m_samples[i] = point.m_phase * angscale;
+
+				//Update previous sample's duration if possible
+				if(i > 0)
+				{
+					mwfm->m_durations[i-1] = mwfm->m_offsets[i] - mwfm->m_offsets[i-1];
+					pwfm->m_durations[i-1] = pwfm->m_offsets[i] - pwfm->m_offsets[i-1];
+				}
+			}
 		}
 	}
 }

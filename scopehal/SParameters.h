@@ -137,7 +137,7 @@ public:
 
 	void SaveToFile(const std::string& path, ParameterFormat format = FORMAT_MAG_ANGLE, FreqUnit freqUnit = FREQ_GHZ);
 
-	size_t GetNumPorts()
+	size_t GetNumPorts() const
 	{ return m_nports; }
 
 protected:

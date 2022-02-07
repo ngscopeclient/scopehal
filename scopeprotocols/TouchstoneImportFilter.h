@@ -55,21 +55,20 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(TouchstoneImportFilter)
 
-	const SParameterVector& GetParams() const
-	{ return m_params[SPair(m_cachedDstPort, m_cachedSrcPort)]; }
+	const SParameters& GetParams() const
+	{ return m_params; }
 
 protected:
 	std::string m_fpname;
-	std::string m_srcportname;
-	std::string m_dstportname;
 
-	float m_magrange;
-	float m_magoffset;
-	float m_angrange;
-	float m_angoffset;
+	void SetupStreams();
+	void SetupInitialPortScales();
 
-	int m_cachedSrcPort;
-	int m_cachedDstPort;
+	std::vector<float> m_magrange;
+	std::vector<float> m_magoffset;
+	std::vector<float> m_angrange;
+	std::vector<float> m_angoffset;
+
 	std::string m_cachedFileName;
 
 	SParameters m_params;
