@@ -593,6 +593,25 @@ bool IBISParser::Load(string fname)
 					&model->m_voltages[CORNER_MAX]);
 			}
 
+			//TODO: IBIS 5.0 SSO
+			//See https://www.micron.com/-/media/client/global/documents/products/technical-note/dram/tn_0033_ibis_models_power_integrity_simulation.pdf
+			else if( (scmd == "ISSO PU") || (scmd == "ISSO PD") )
+			{
+				data_block = BLOCK_NONE;
+			}
+
+			//TODO: IBIS 5.0 composite current
+			else if(scmd == "Composite Current")
+			{
+				data_block = BLOCK_NONE;
+			}
+
+			//TODO: not sure what this is yet
+			else if(scmd == "Driver Schedule")
+			{
+				data_block = BLOCK_NONE;
+			}
+
 			else
 			{
 				LogWarning("Unrecognized command %s\n", command);
