@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -282,7 +282,11 @@ void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 {
 	auto parameters = node["parameters"];
 	for(auto it : parameters)
-		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
+	{
+		auto name = it.first.as<string>();
+		GetParameter(name).ParseString(it.second.as<string>());
+		OnParameterChanged(name);
+	}
 }
 
 void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)
