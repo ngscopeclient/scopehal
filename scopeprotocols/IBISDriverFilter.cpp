@@ -215,6 +215,11 @@ void IBISDriverFilter::Refresh()
 	SampleOnAnyEdges(din, clkin, samples);
 
 	size_t rate = m_parameters[m_sampleRate].GetIntVal();
+	if(rate == 0)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 	size_t samplePeriod = FS_PER_SECOND / rate;
 
 	//Configure output waveform
