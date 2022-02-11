@@ -178,6 +178,15 @@ protected:
 	{ return dynamic_cast<DigitalBusWaveform*>(GetInputWaveform(i)); }
 
 	/**
+		@brief Deletes our inputs
+	 */
+	void ClearInputs()
+	{
+		m_signalNames.clear();
+		m_inputs.clear();
+	}
+
+	/**
 		@brief Creates and names an input signal
 	 */
 	void CreateInput(const std::string& name)
