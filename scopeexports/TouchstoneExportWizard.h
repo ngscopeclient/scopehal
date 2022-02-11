@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeexports                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,120 +30,101 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameters and related classes
+	@brief Declaration of TouchstoneExportWizard
  */
-#ifndef SParameters_h
-#define SParameters_h
+
+#ifndef TouchstoneExportWizard_h
+#define TouchstoneExportWizard_h
 
 /**
-	@brief A single point in an S-parameter dataset
+	@brief Initial configuration
  */
-class SParameterPoint
+class TouchstoneExportConfigurationPage
 {
 public:
-	SParameterPoint()
-	{}
+	TouchstoneExportConfigurationPage();
 
-	SParameterPoint(float f, float a, float p)
-	: m_frequency(f)
-	, m_amplitude(a)
-	, m_phase(p)
-	{
-	}
+	Gtk::Grid m_grid;
+		Gtk::Label m_freqUnitLabel;
+			Gtk::ComboBoxText m_freqUnitBox;
+		Gtk::Label m_sFormatLabel;
+			Gtk::ComboBoxText m_sFormatBox;
+		Gtk::Label m_portCountLabel;
+			Gtk::SpinButton m_portCountSpin;
+};
 
-	float	m_frequency;	//Hz
-	float	m_amplitude;	//magnitude
-	float	m_phase;		//radians from -pi to +pi
+class TouchstoneExportChannelGroup
+{
+public:
+	TouchstoneExportChannelGroup(int to, int from, const std::vector<OscilloscopeChannel*>& channels);
+
+	Gtk::Frame m_frame;
+		Gtk::Grid m_grid;
+			Gtk::Label m_magLabel;
+				Gtk::ComboBoxText m_magBox;
+			Gtk::Label m_angLabel;
+				Gtk::ComboBoxText m_angBox;
+
+	std::vector<StreamDescriptor> m_magStreams;
+	std::vector<StreamDescriptor> m_angStreams;
 };
 
 /**
-	@brief A single S-parameter array
+	@brief Select channels to export to Touchstone
  */
-class SParameterVector
+class TouchstoneExportChannelSelectionPage
 {
 public:
-	SParameterVector()
-	{}
-	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
-
-	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
-
-	SParameterPoint InterpolatePoint(float frequency) const;
-	float InterpolateMagnitude(float frequency) const;
-	float InterpolateAngle(float frequency) const;
-
-	std::vector<SParameterPoint> m_points;
-
-	float GetGroupDelay(size_t bin) const;
-
-	size_t size() const
-	{ return m_points.size(); }
-
-	SParameterVector& operator *=(const SParameterVector& rhs);
-
-	SParameterPoint& operator[](size_t i)
-	{ return m_points[i]; }
-};
-
-typedef std::pair<int, int> SPair;
-
-/**
-	@brief A set of S-parameters.
-
-	For now, only supports full 2-port.
- */
-class SParameters
-{
-public:
-	SParameters();
-	virtual ~SParameters();
+	TouchstoneExportChannelSelectionPage();
+	virtual ~TouchstoneExportChannelSelectionPage();
 
 	void Clear();
-	void Allocate(int nports = 2);
+	void Refresh(int channelCount, const std::vector<OscilloscopeChannel*>& channels);
 
-	bool empty() const
-	{ return m_params.empty(); }
+	Gtk::Grid m_grid;
+		Gtk::Label m_timestampTypeLabel;
+		Gtk::ComboBoxText m_timestampTypeBox;
 
-	/**
-		@brief Sample a single point from a single S-parameter
-	 */
-	SParameterPoint SamplePoint(int to, int from, float frequency)
-	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
+	std::map<std::pair<int, int>, TouchstoneExportChannelGroup*> m_groups;
+};
 
-	SParameters& operator *=(const SParameters& rhs);
+/**
+	@brief Select channels to export to Touchstone
+ */
+class TouchstoneExportSummaryPage
+{
+public:
+	TouchstoneExportSummaryPage();
+	virtual ~TouchstoneExportSummaryPage();
 
-	SParameterVector& operator[] (SPair pair)
-	{ return *m_params[pair]; }
+	void Refresh(int channelCount);
 
-	const SParameterVector& operator[] (SPair pair) const
-	{ return *(m_params.find(pair)->second); }
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+};
 
-	friend class TouchstoneParser;
+/**
+	@brief Touchstone exporter
+ */
+class TouchstoneExportWizard : public ExportWizard
+{
+public:
+	TouchstoneExportWizard(const std::vector<OscilloscopeChannel*>& channels);
+	virtual ~TouchstoneExportWizard();
 
-	enum FreqUnit
-	{
-		FREQ_HZ,
-		FREQ_KHZ,
-		FREQ_MHZ,
-		FREQ_GHZ
-	};
+	static std::string GetExportName();
 
-	enum ParameterFormat
-	{
-		FORMAT_MAG_ANGLE,
-		FORMAT_DBMAG_ANGLE,
-		FORMAT_REAL_IMAGINARY
-	};
-
-	void SaveToFile(const std::string& path, ParameterFormat format = FORMAT_MAG_ANGLE, FreqUnit freqUnit = FREQ_GHZ);
-
-	size_t GetNumPorts() const
-	{ return m_nports; }
+	EXPORT_WIZARD_INITPROC(TouchstoneExportWizard)
 
 protected:
-	std::map< SPair , SParameterVector*> m_params;
 
-	size_t m_nports;
+	void on_prepare(Gtk::Widget* page);
+	void on_apply();
+
+	TouchstoneExportConfigurationPage m_configPage;
+	TouchstoneExportChannelSelectionPage m_channelSelectionPage;
+	//TODO: error check page to detect if something is inconsistent
+	TouchstoneExportSummaryPage m_filePathPage;
 };
 
 #endif

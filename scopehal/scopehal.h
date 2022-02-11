@@ -104,6 +104,8 @@
 #include "TouchstoneParser.h"
 #include "IBISParser.h"
 
+#include "ExportWizard.h"
+
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
 std::string GetDefaultChannelColor(int i);

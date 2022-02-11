@@ -45,6 +45,11 @@ using namespace std;
  */
 SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang)
 {
+	ConvertFromWaveforms(wmag, wang);
+}
+
+void SParameterVector::ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang)
+{
 	m_points.clear();
 
 	size_t len = min(wmag->m_samples.size(), wang->m_samples.size());
@@ -53,10 +58,10 @@ SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWavef
 	float ascale = M_PI / 180;
 	for(size_t i=0; i<len; i++)
 	{
-		m_points.push_back(SParameterPoint(
+		m_points[i] = SParameterPoint(
 			wmag->m_timescale*wmag->m_offsets[i].m_value + wmag->m_triggerPhase,
 			pow(10, wmag->m_samples[i].m_value / 20),
-			wang->m_samples[i].m_value * ascale));
+			wang->m_samples[i].m_value * ascale);
 	}
 }
 
@@ -272,14 +277,21 @@ SParameters& SParameters::operator *=(const SParameters& rhs)
 	@brief Serializes a S-parameter model to a Touchstone file
 
 	For now, assumes full 2 port
+
+	@param path		Output file name
+	@param format	Output data format
+	@param freqUnit	Frequency units for the generated file
  */
-void SParameters::SaveToFile(const string& path)
+void SParameters::SaveToFile(const string& path, ParameterFormat format, FreqUnit freqUnit)
 {
 	if(m_nports != 2)
 	{
 		LogError("SParameters::SaveToFile() only supports 2-port for now\n");
 		return;
 	}
+
+	if(format != FORMAT_MAG_ANGLE)
+		LogWarning("Formats other than mag-angle not implemented yet (exporting as mag-angle)\n");
 
 	FILE* fp = fopen(path.c_str(), "w");
 	if(!fp)
@@ -289,7 +301,32 @@ void SParameters::SaveToFile(const string& path)
 	}
 
 	//File header
-	fprintf(fp, "# GHz S MA R 50.000");
+	string freqText;
+	float freqScale = 1;
+	switch(freqUnit)
+	{
+		case FREQ_HZ:
+			freqText = "Hz";
+			freqScale = 1;
+			break;
+
+		case FREQ_KHZ:
+			freqText = "kHz";
+			freqScale = 1e-3;
+			break;
+
+		case FREQ_MHZ:
+			freqText = "MHz";
+			freqScale = 1e-6;
+			break;
+
+		case FREQ_GHZ:
+		default:
+			freqText = "GHz";
+			freqScale = 1e-9;
+			break;
+	}
+	fprintf(fp, "# %s S MA R 50.000\n", freqText.c_str());
 
 	//Get the parameters
 	auto& s11 = (*this)[SPair(1, 1)];
@@ -297,12 +334,16 @@ void SParameters::SaveToFile(const string& path)
 	auto& s21 = (*this)[SPair(2, 1)];
 	auto& s22 = (*this)[SPair(2, 2)];
 
+	//Mag-angle format
+	float rad2deg = 180 / M_PI;
 	for(size_t i=0; i<s11.size(); i++)
 	{
 		float freq = s11[i].m_frequency;
-		fprintf(fp, "%f %f %f %f %f %f %f %f %f\n", freq * 1e-9,
-			s11[i].m_amplitude, s11[i].m_phase, s21[i].m_amplitude, s21[i].m_phase,
-			s12[i].m_amplitude, s12[i].m_phase, s22[i].m_amplitude, s22[i].m_phase);
+		fprintf(fp, "%f %f %f %f %f %f %f %f %f\n", freq * freqScale,
+			s11[i].m_amplitude, s11[i].m_phase * rad2deg,
+			s21[i].m_amplitude, s21[i].m_phase * rad2deg,
+			s12[i].m_amplitude, s12[i].m_phase * rad2deg,
+			s22[i].m_amplitude, s22[i].m_phase * rad2deg);
 	}
 
 	fclose(fp);

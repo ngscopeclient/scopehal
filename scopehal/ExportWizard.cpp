@@ -30,120 +30,54 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameters and related classes
+	@brief Implementation of ExportWizard
  */
-#ifndef SParameters_h
-#define SParameters_h
+#include "scopehal.h"
 
-/**
-	@brief A single point in an S-parameter dataset
- */
-class SParameterPoint
+using namespace std;
+
+ExportWizard::CreateMapType ExportWizard::m_createprocs;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ExportWizard::ExportWizard(const vector<OscilloscopeChannel*>& channels)
+	: m_channels(channels)
 {
-public:
-	SParameterPoint()
-	{}
+}
 
-	SParameterPoint(float f, float a, float p)
-	: m_frequency(f)
-	, m_amplitude(a)
-	, m_phase(p)
-	{
-	}
-
-	float	m_frequency;	//Hz
-	float	m_amplitude;	//magnitude
-	float	m_phase;		//radians from -pi to +pi
-};
-
-/**
-	@brief A single S-parameter array
- */
-class SParameterVector
+ExportWizard::~ExportWizard()
 {
-public:
-	SParameterVector()
-	{}
-	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
+}
 
-	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Object creation
 
-	SParameterPoint InterpolatePoint(float frequency) const;
-	float InterpolateMagnitude(float frequency) const;
-	float InterpolateAngle(float frequency) const;
-
-	std::vector<SParameterPoint> m_points;
-
-	float GetGroupDelay(size_t bin) const;
-
-	size_t size() const
-	{ return m_points.size(); }
-
-	SParameterVector& operator *=(const SParameterVector& rhs);
-
-	SParameterPoint& operator[](size_t i)
-	{ return m_points[i]; }
-};
-
-typedef std::pair<int, int> SPair;
-
-/**
-	@brief A set of S-parameters.
-
-	For now, only supports full 2-port.
- */
-class SParameters
+void ExportWizard::DoAddExportWizardClass(const string& name, CreateProcType proc)
 {
-public:
-	SParameters();
-	virtual ~SParameters();
+	m_createprocs[name] = proc;
+}
 
-	void Clear();
-	void Allocate(int nports = 2);
+void ExportWizard::EnumExportWizards(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+	std::sort(names.begin(), names.end());
+}
 
-	bool empty() const
-	{ return m_params.empty(); }
+ExportWizard* ExportWizard::CreateExportWizard(const string& name, const vector<OscilloscopeChannel*>& channels)
+{
+	if(m_createprocs.find(name) != m_createprocs.end())
+		return m_createprocs[name](channels);
 
-	/**
-		@brief Sample a single point from a single S-parameter
-	 */
-	SParameterPoint SamplePoint(int to, int from, float frequency)
-	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
+	LogError("Invalid export wizard name: %s\n", name.c_str());
+	return NULL;
+}
 
-	SParameters& operator *=(const SParameters& rhs);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Event handlers
 
-	SParameterVector& operator[] (SPair pair)
-	{ return *m_params[pair]; }
-
-	const SParameterVector& operator[] (SPair pair) const
-	{ return *(m_params.find(pair)->second); }
-
-	friend class TouchstoneParser;
-
-	enum FreqUnit
-	{
-		FREQ_HZ,
-		FREQ_KHZ,
-		FREQ_MHZ,
-		FREQ_GHZ
-	};
-
-	enum ParameterFormat
-	{
-		FORMAT_MAG_ANGLE,
-		FORMAT_DBMAG_ANGLE,
-		FORMAT_REAL_IMAGINARY
-	};
-
-	void SaveToFile(const std::string& path, ParameterFormat format = FORMAT_MAG_ANGLE, FreqUnit freqUnit = FREQ_GHZ);
-
-	size_t GetNumPorts() const
-	{ return m_nports; }
-
-protected:
-	std::map< SPair , SParameterVector*> m_params;
-
-	size_t m_nports;
-};
-
-#endif
+void ExportWizard::on_cancel()
+{
+	hide();
+}
