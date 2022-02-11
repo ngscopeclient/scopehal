@@ -66,7 +66,6 @@
  *   using 4 Channels ( 3.5 Mpts  500 MSa/s)   got 0,39 WFM/s
  *
  *  TODO Click "Reload configuration from scope"   sometimes we loosing WAVE rendering ( threading issue ?)
- *  TODO setting memory depth when scope is in run/stop ( workaround stop trigger -> press Auto on scope )
  *  TODO sometimes socket timeout (Warning: Socket read failed errno=11 errno=4)
  *
  * Note that this port replaces the previous Siglent driver, which was non-functional. That is available in the git
@@ -1066,14 +1065,29 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 
 	//Update in hardware
 	lock_guard<recursive_mutex> lock(m_mutex);
-	if(i < m_analogChannelCount)
+	switch(m_modelid)
 	{
-		sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
-		sendOnly(":CHANNEL%ld:LABEL ON", i + 1);
-	}
-	else
-	{
-		sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS5000X:
+			if(i < m_analogChannelCount)
+			{
+				sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
+				sendOnly(":CHANNEL%ld:LABEL ON", i + 1);
+			}
+			else
+			{
+				sendOnly(":DIGITAL:LABEL%ld \"%s\"", i - (m_analogChannelCount + 1), name.c_str());
+			}
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
 	}
 }
 
@@ -2214,7 +2228,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-		    // According to programming guide and datasheet
+			// According to programming guide and datasheet
 			// {7K,70K,700K,7M} for non-interleaved mode
 			ret = {7 * 1000, 70 * 1000, 700 * 1000, 7 * 1000 * 1000};
 			break;
@@ -2239,8 +2253,8 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-		    // According to programming guide and datasheet
-		    // {14K,140K,1.4M,14M} for interleave mode
+			// According to programming guide and datasheet
+			// {14K,140K,1.4M,14M} for interleave mode
 			ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
