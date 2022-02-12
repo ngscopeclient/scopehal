@@ -36,6 +36,9 @@ using namespace std;
 
 string StreamDescriptor::GetName()
 {
+	if(m_channel == NULL)
+		return "NULL";
+
 	string name = m_channel->GetDisplayName();
 	if(m_channel->GetStreamCount() > 1)
 		name += string(".") + m_channel->GetStreamName(m_stream);
