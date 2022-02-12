@@ -110,6 +110,7 @@ set(SCOPEHAL_SOURCES
 	Statistic.cpp
 	SpectrumChannel.cpp
 	SParameterSourceFilter.cpp
+	SParameterFilter.cpp
 
 	TestWaveformSource.cpp
 
