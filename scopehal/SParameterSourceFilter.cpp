@@ -42,6 +42,10 @@ SParameterSourceFilter::SParameterSourceFilter(const string& color, Category cat
 	SetXAxisUnits(Unit(Unit::UNIT_HZ));
 }
 
+SParameterSourceFilter::~SParameterSourceFilter()
+{
+}
+
 bool SParameterSourceFilter::NeedsConfig()
 {
 	return true;
