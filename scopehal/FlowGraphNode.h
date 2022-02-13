@@ -87,10 +87,20 @@ public:
 	}
 
 	float GetVoltageRange()
-	{ return m_channel->GetVoltageRange(m_stream); }
+	{
+		if(m_channel == NULL)
+			return 1;
+		else
+			return m_channel->GetVoltageRange(m_stream);
+	}
 
 	float GetOffset()
-	{ return m_channel->GetOffset(m_stream); }
+	{
+		if(m_channel == NULL)
+			return 0;
+		else
+			return m_channel->GetOffset(m_stream);
+	}
 
 	void SetVoltageRange(float v)
 	{  m_channel->SetVoltageRange(v, m_stream); }
