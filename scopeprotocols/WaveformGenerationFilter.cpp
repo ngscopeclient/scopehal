@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -128,6 +128,11 @@ void WaveformGenerationFilter::Refresh()
 	SampleOnAnyEdges(din, clkin, samples);
 
 	size_t rate = m_parameters[m_sampleRate].GetIntVal();
+	if(rate == 0)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 	size_t samplePeriod = FS_PER_SECOND / rate;
 	size_t edgeTime = m_parameters[m_edgeTime].GetIntVal();
 	size_t edgeSamples = floor(edgeTime / samplePeriod);
