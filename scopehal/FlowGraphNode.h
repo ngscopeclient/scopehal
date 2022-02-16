@@ -140,6 +140,9 @@ public:
 	FilterParameter& GetParameter(std::string s);
 	typedef std::map<std::string, FilterParameter> ParameterMapType;
 
+	bool HasParameter(std::string s)
+	{ return (m_parameters.find(s) != m_parameters.end()); }
+
 	ParameterMapType::iterator GetParamBegin()
 	{ return m_parameters.begin(); }
 
