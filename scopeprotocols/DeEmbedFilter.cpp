@@ -409,25 +409,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Waveform object changed? Input parameters are no longer valid
-	bool inchange = false;
-	auto dmag = GetInput(1).GetData();
-	auto dang = GetInput(2).GetData();
-	if( (dmag != m_cachedMag) ||
-		(dang != m_cachedAngle) )
-	{
-		inchange = true;
-	}
-
-	//Timestamp changed? Input parameters are no longer valid
-	if( (dmag->m_startFemtoseconds != m_magStartFemtoseconds) ||
-		(dmag->m_startTimestamp != m_magStartTimestamp) ||
-		(dang->m_startFemtoseconds != m_angleStartFemtoseconds) ||
-		(dang->m_startTimestamp != m_angleStartTimestamp))
-	{
-		inchange = true;
-	}
-
 	//Did we change the max gain?
 	bool clipchange = false;
 	float maxgain = m_parameters[m_maxGainName].GetFloatVal();
@@ -438,18 +419,42 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		ClearSweeps();
 	}
 
+	//Waveform object changed? Input parameters are no longer valid
+	//We need check for input count because CTLE filter generates S-params internally (and deletes the mag/angle inputs)
+	//TODO: would it be cleaner to generate filter response then channel-emulate it?
+	bool inchange = false;
+	if(GetInputCount() > 1)
+	{
+		auto dmag = GetInput(1).GetData();
+		auto dang = GetInput(2).GetData();
+		if( (dmag != m_cachedMag) ||
+			(dang != m_cachedAngle) )
+		{
+			inchange = true;
+
+			m_cachedMag = dmag;
+			m_cachedAngle = dang;
+
+			m_magStartTimestamp = dmag->m_startTimestamp;
+			m_magStartFemtoseconds = dmag->m_startFemtoseconds;
+			m_angleStartTimestamp = dang->m_startTimestamp;
+			m_angleStartFemtoseconds = dang->m_startFemtoseconds;
+		}
+
+		//Timestamp changed? Input parameters are no longer valid
+		if( (dmag->m_startFemtoseconds != m_magStartFemtoseconds) ||
+			(dmag->m_startTimestamp != m_magStartTimestamp) ||
+			(dang->m_startFemtoseconds != m_angleStartFemtoseconds) ||
+			(dang->m_startTimestamp != m_angleStartTimestamp))
+		{
+			inchange = true;
+		}
+	}
+
 	//Resample our parameter to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
 	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || clipchange || inchange)
 	{
-		m_cachedMag = dmag;
-		m_cachedAngle = dang;
-
-		m_magStartTimestamp = dmag->m_startTimestamp;
-		m_magStartFemtoseconds = dmag->m_startFemtoseconds;
-		m_angleStartTimestamp = dang->m_startTimestamp;
-		m_angleStartFemtoseconds = dang->m_startFemtoseconds;
-
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
 		InterpolateSparameters(bin_hz, invert, nouts);

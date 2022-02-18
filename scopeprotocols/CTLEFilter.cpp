@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,6 +63,10 @@ CTLEFilter::CTLEFilter(const string& color)
 	m_cachedZeroFreq = 1;
 	m_cachedPole1Freq = 1;
 	m_cachedPole2Freq = 1;
+
+	//delete s-param inputs
+	m_signalNames.resize(1);
+	m_inputs.resize(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,11 +108,6 @@ void CTLEFilter::SetDefaultName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool CTLEFilter::LoadSparameters()
-{
-	return true;
-}
 
 int64_t CTLEFilter::GetGroupDelay()
 {
