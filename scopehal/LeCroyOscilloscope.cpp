@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -1294,7 +1294,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 		return OscilloscopeChannel::COUPLE_DC_50;
 	else if(reply == "GND")
 		return OscilloscopeChannel::COUPLE_GND;
-	else if(reply == "DC")
+	else if( (reply == "DC") || (reply == "DC1") )
 	{
 		m_probeIsActive[i] = true;
 		return OscilloscopeChannel::COUPLE_DC_50;
