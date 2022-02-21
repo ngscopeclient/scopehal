@@ -90,6 +90,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PkPkMeasurement.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
+	ReferencePlaneExtensionFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp

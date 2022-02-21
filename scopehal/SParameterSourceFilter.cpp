@@ -86,6 +86,11 @@ void SParameterSourceFilter::SetOffset(float offset, size_t stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+bool SParameterSourceFilter::IsOverlay()
+{
+	return false;
+}
+
 void SParameterSourceFilter::SetupStreams()
 {
 	ClearStreams();

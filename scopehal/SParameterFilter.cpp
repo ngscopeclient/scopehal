@@ -83,6 +83,8 @@ bool SParameterFilter::OnParameterChanged(const string& name)
 	//Refresh the dialog if we changed port count
 	if(name == m_portCountName)
 	{
+		m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
+
 		RefreshPorts();
 		return true;
 	}
@@ -92,6 +94,8 @@ bool SParameterFilter::OnParameterChanged(const string& name)
 
 void SParameterFilter::RefreshPorts()
 {
+	SetupStreams();
+
 	//Create new inputs
 	size_t nports = m_parameters[m_portCountName].GetIntVal();
 	for(size_t to = 0; to < nports; to++)

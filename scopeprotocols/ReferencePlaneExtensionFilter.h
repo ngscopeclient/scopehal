@@ -30,41 +30,29 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterSourceFilter
+	@brief Declaration of ReferencePlaneExtensionFilter
  */
-#ifndef SParameterSourceFilter_h
-#define SParameterSourceFilter_h
+#ifndef ReferencePlaneExtensionFilter_h
+#define ReferencePlaneExtensionFilter_h
 
-/**
-	@brief A filter that outputs a set of S-parameters
- */
-class SParameterSourceFilter : public Filter
+class ReferencePlaneExtensionFilter : public SParameterFilter
 {
 public:
-	SParameterSourceFilter(const std::string& color, Category cat);
-	virtual ~SParameterSourceFilter();
+	ReferencePlaneExtensionFilter(const std::string& color);
+	~ReferencePlaneExtensionFilter();
 
-	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	virtual void Refresh();
 
-	const SParameters& GetParams() const
-	{ return m_params; }
+	virtual bool OnParameterChanged(const std::string& name);
+
+	PROTOCOL_DECODER_INITPROC(ReferencePlaneExtensionFilter)
 
 protected:
-	void SetupStreams();
-	void SetupInitialPortScales();
-
-	std::vector<float> m_magrange;
-	std::vector<float> m_magoffset;
-	std::vector<float> m_angrange;
-	std::vector<float> m_angoffset;
-
-	SParameters m_params;
+	std::vector<std::string> m_portParamNames;
+	void RefreshParameters();
 };
 
 #endif

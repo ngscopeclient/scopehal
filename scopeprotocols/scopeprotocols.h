@@ -126,6 +126,7 @@
 #include "PkPkMeasurement.h"
 #include "PRBSCheckerFilter.h"
 #include "PRBSGeneratorFilter.h"
+#include "ReferencePlaneExtensionFilter.h"
 #include "RjBUjFilter.h"
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
