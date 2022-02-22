@@ -53,8 +53,10 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fname].m_fileFilterMask = "*.ibs";
 	m_parameters[m_fname].m_fileFilterName = "IBIS model files (*.ibs)";
+	m_parameters[m_fname].signal_changed().connect(sigc::mem_fun(this, &IBISDriverFilter::OnFnameChanged));
 
 	m_parameters[m_modelName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_modelName].signal_changed().connect(sigc::mem_fun(this, &IBISDriverFilter::OnModelChanged));
 
 	m_parameters[m_cornerName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_cornerName].AddEnumValue("Minimum", CORNER_MIN);
@@ -133,70 +135,63 @@ void IBISDriverFilter::ClearSweeps()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void IBISDriverFilter::OnParametersLoaded()
+void IBISDriverFilter::LoadParameters(const YAML::Node& node, IDTable& table)
 {
-	OnParameterChanged(m_fname);
+	Filter::LoadParameters(node, table);
 	m_parameters[m_modelName].Reinterpret();
-	OnParameterChanged(m_modelName);
 }
 
-bool IBISDriverFilter::OnParameterChanged(const string& name)
+void IBISDriverFilter::OnFnameChanged()
 {
-	if(name == "")
-		return false;
+	//Load the IBIS model
+	m_parser.Clear();
+	m_parser.Load(m_parameters[m_fname].ToString());
+	m_model = NULL;
 
-	//Filename changed? Reload the main parser config
-	if(name == m_fname)
+	//Make a list of candidate output models
+	vector<string> names;
+	for(auto it : m_parser.m_models)
 	{
-		//Load the IBIS model
-		m_parser.Clear();
-		m_parser.Load(m_parameters[m_fname].ToString());
-		m_model = NULL;
+		//Skip any models other than push-pull output and I/O
+		auto model = it.second;
+		if( (model->m_type != IBISModel::TYPE_OUTPUT) && (model->m_type != IBISModel::TYPE_IO) )
+			continue;
 
-		//Make a list of candidate output models
-		vector<string> names;
-		for(auto it : m_parser.m_models)
-		{
-			//Skip any models other than push-pull output and I/O
-			auto model = it.second;
-			if( (model->m_type != IBISModel::TYPE_OUTPUT) && (model->m_type != IBISModel::TYPE_IO) )
-				continue;
-
-			names.push_back(it.first);
-		}
-
-		//Recreate the list of options
-		std::sort(names.begin(), names.end());
-		m_parameters[m_modelName].ClearEnumValues();
-		for(size_t i=0; i<names.size(); i++)
-			m_parameters[m_modelName].AddEnumValue(names[i], i);
+		names.push_back(it.first);
 	}
 
-	//Model changed? Refresh list of termination conditions
-	if(name == m_modelName)
-	{
-		m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
+	//Recreate the list of options
+	std::sort(names.begin(), names.end());
+	m_parameters[m_modelName].ClearEnumValues();
+	for(size_t i=0; i<names.size(); i++)
+		m_parameters[m_modelName].AddEnumValue(names[i], i);
 
-		//For now, assume rising and falling waveforms have terminations in the same order
-		//TODO: check if spec requires this to be the case
+	//TODO: update enum models etc
 
-		//Recreate list of terminations
-		Unit ohms(Unit::UNIT_OHMS);
-		Unit volts(Unit::UNIT_VOLTS);
-		m_parameters[m_termName].ClearEnumValues();
-		for(size_t i=0; i<m_model->m_rising.size(); i++)
-		{
-			auto& w = m_model->m_rising[i];
-			auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
-			m_parameters[m_termName].AddEnumValue(ename, i);
-		}
-	}
-
-	//Our min / max are likely invalid now
+	//Min/max are likely invalid now
 	ClearSweeps();
+}
 
-	Refresh();
-	return true;
+void IBISDriverFilter::OnModelChanged()
+{
+	m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
+
+	//For now, assume rising and falling waveforms have terminations in the same order
+	//TODO: check if spec requires this to be the case
+
+	//Recreate list of terminations
+	Unit ohms(Unit::UNIT_OHMS);
+	Unit volts(Unit::UNIT_VOLTS);
+	m_parameters[m_termName].ClearEnumValues();
+	for(size_t i=0; i<m_model->m_rising.size(); i++)
+	{
+		auto& w = m_model->m_rising[i];
+		auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
+		m_parameters[m_termName].AddEnumValue(ename, i);
+	}
+
+	//Min/max are likely invalid now
+	ClearSweeps();
 }
 
 void IBISDriverFilter::Refresh()

@@ -51,15 +51,16 @@ public:
 	virtual bool NeedsConfig();
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual bool OnParameterChanged(const std::string& name);
-
 	virtual void Refresh();
 	virtual void ClearSweeps();
+
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 
 	PROTOCOL_DECODER_INITPROC(IBISDriverFilter)
 
 protected:
-	virtual void OnParametersLoaded();
+	void OnFnameChanged();
+	void OnModelChanged();
 
 	IBISParser m_parser;
 	IBISModel* m_model;

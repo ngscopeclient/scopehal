@@ -113,6 +113,7 @@ public:
 	{
 		m_forwardEnumMap[name] = value;
 		m_reverseEnumMap[value] = name;
+		m_enumSignal.emit();
 	}
 
 	/**
@@ -131,20 +132,28 @@ public:
 	{
 		m_forwardEnumMap.clear();
 		m_reverseEnumMap.clear();
+		m_enumSignal.emit();
 	}
 
 	void Reinterpret();
 
 	/**
-		@brief Signal emitted every time the parameter changes
+		@brief Signal emitted every time the parameter's value changes
 	 */
 	sigc::signal<void> signal_changed()
 	{ return m_changeSignal; }
+
+	/**
+		@brief Signal emitted every time the list of enumeration values changes
+	 */
+	sigc::signal<void> signal_enums_changed()
+	{ return m_enumSignal; }
 
 protected:
 	ParameterTypes m_type;
 
 	sigc::signal<void>			m_changeSignal;
+	sigc::signal<void>			m_enumSignal;
 
 	Unit						m_unit;
 

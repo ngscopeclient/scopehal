@@ -851,16 +851,6 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 				SetOffset(snode["offset"].as<float>(), index);
 		}
 	}
-
-	OnParametersLoaded();
-}
-
-/**
-	@brief Notification handler called during file loading once all parameters are valid
- */
-void Filter::OnParametersLoaded()
-{
-	//default implementation does nothing
 }
 
 bool Filter::OnParameterChanged(const string& /*name*/)

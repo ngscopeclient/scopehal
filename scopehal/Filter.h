@@ -165,9 +165,11 @@ public:
 
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
-protected:
-	virtual void OnParametersLoaded();
+	//these functions are deprecated so we want to catch anything calling them
+//private:
 	virtual bool OnParameterChanged(const std::string& name);
+
+protected:
 
 	///Group used for the display menu
 	Category m_category;
