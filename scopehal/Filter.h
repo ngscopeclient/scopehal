@@ -165,10 +165,6 @@ public:
 
 	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
 
-	//these functions are deprecated so we want to catch anything calling them
-//private:
-	virtual bool OnParameterChanged(const std::string& name);
-
 protected:
 
 	///Group used for the display menu
@@ -247,6 +243,14 @@ public:
 
 	//Checksum helpers
 	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
+
+public:
+	sigc::signal<void> signal_outputsChanged()
+	{ return m_outputsChangedSignal; }
+
+protected:
+	///@brief Signal emitted when the set of output streams changes
+	sigc::signal<void> m_outputsChangedSignal;
 
 protected:
 	//Common text formatting

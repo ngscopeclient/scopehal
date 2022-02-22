@@ -107,6 +107,8 @@ void SParameterSourceFilter::SetupStreams()
 	}
 
 	SetupInitialPortScales();
+
+	m_outputsChangedSignal.emit();
 }
 
 void SParameterSourceFilter::SetupInitialPortScales()

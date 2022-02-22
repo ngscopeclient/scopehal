@@ -37,6 +37,7 @@ SParameterFilter::SParameterFilter(const string& color, Category cat)
 {
 	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_portCountName].SetIntVal(2);
+	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &SParameterFilter::RefreshPorts));
 
 	RefreshPorts();
 }
@@ -78,22 +79,9 @@ bool SParameterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	return true;
 }
 
-bool SParameterFilter::OnParameterChanged(const string& name)
-{
-	//Refresh the dialog if we changed port count
-	if(name == m_portCountName)
-	{
-		m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
-
-		RefreshPorts();
-		return true;
-	}
-
-	return false;
-}
-
 void SParameterFilter::RefreshPorts()
 {
+	m_params.Allocate(m_parameters[m_portCountName].GetIntVal());
 	SetupStreams();
 
 	//Create new inputs
@@ -118,4 +106,6 @@ void SParameterFilter::RefreshPorts()
 		SetInput(i, NULL, true);
 	m_inputs.resize(nin);
 	m_signalNames.resize(nin);
+
+	m_inputsChangedSignal.emit();
 }

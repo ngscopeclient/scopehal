@@ -853,12 +853,6 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	}
 }
 
-bool Filter::OnParameterChanged(const string& /*name*/)
-{
-	Refresh();
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Complex protocol decodes
 

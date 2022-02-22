@@ -45,7 +45,6 @@ public:
 	~SParameterFilter();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-	virtual bool OnParameterChanged(const std::string& name);
 
 protected:
 	void RefreshPorts();

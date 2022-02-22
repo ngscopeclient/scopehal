@@ -77,16 +77,6 @@ void FlowGraphNode::DetachInputs()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-/**
-	@brief Notifies the node that a parameter has been changed (typically called by a GUI)
-
-	@return True if the GUI should refresh the parameters, ports, etc, false if no refreshing is required.
- */
-bool FlowGraphNode::OnParameterChanged(const string& /*name*/)
-{
-	return false;
-}
-
 FilterParameter& FlowGraphNode::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
@@ -287,7 +277,6 @@ void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 	{
 		auto name = it.first.as<string>();
 		GetParameter(name).ParseString(it.second.as<string>());
-		OnParameterChanged(name);
 	}
 }
 

@@ -42,7 +42,8 @@ using namespace std;
 ReferencePlaneExtensionFilter::ReferencePlaneExtensionFilter(const string& color)
 	: SParameterFilter(color, CAT_RF)
 {
-	RefreshParameters();
+	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
+	OnPortCountChanged();
 }
 
 ReferencePlaneExtensionFilter::~ReferencePlaneExtensionFilter()
@@ -78,24 +79,10 @@ void ReferencePlaneExtensionFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Main filter processing
 
-bool ReferencePlaneExtensionFilter::OnParameterChanged(const string& name)
-{
-	bool refresh = SParameterFilter::OnParameterChanged(name);
-
-	//Refresh the dialog if we changed port count
-	if(name == m_portCountName)
-	{
-		RefreshParameters();
-		refresh = true;
-	}
-
-	return refresh;
-}
-
 /**
-	@brief We apply an extension to each of the ports (in time units)
+	@brief Update the set of active parameters
  */
-void ReferencePlaneExtensionFilter::RefreshParameters()
+void ReferencePlaneExtensionFilter::OnPortCountChanged()
 {
 	size_t nports_cur = m_parameters[m_portCountName].GetIntVal();
 	size_t nports_old = m_portParamNames.size();
@@ -116,6 +103,9 @@ void ReferencePlaneExtensionFilter::RefreshParameters()
 		m_parameters[name] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 		m_parameters[name].SetIntVal(0);
 	}
+
+	//Notify dialogs etc that we have new parameters
+	m_parametersChangedSignal.emit();
 }
 
 void ReferencePlaneExtensionFilter::Refresh()
