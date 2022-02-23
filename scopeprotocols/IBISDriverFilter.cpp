@@ -237,63 +237,68 @@ void IBISDriverFilter::Refresh()
 	auto term = m_parameters[m_termName].GetIntVal();
 	VTCurves& rising = m_model->m_rising[term];
 	VTCurves& falling = m_model->m_falling[term];
-	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());;
+	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());
 
-	//Process samples
-	size_t nsamp = 0;
+	//Figure out the propagation delay of the buffers for rising and falling edges
+	int64_t rising_delay = rising.GetPropagationDelay(corner);
+	int64_t falling_delay = falling.GetPropagationDelay(corner);
+
+	//Make a list of rising/falling edges in the incoming data stream
 	bool last = samples.m_samples[0];
-	for(size_t i=0; i<len; i ++)
+	vector<bool> edgeDirections;
+	vector<int64_t> edgeTimestamps;
+	for(size_t i=1; i<len; i++)
 	{
-		//Get start/end times of this UI
-		size_t tstart = samples.m_offsets[i] - capstart;
-		size_t tend = tstart + samples.m_durations[i];
-		size_t tend_rounded = tend / samplePeriod;
-		size_t nstart = nsamp;
-
-		//If this UI is NOT a toggle, just echo a constant value for every sample
-		auto cur = samples.m_samples[i];
-		if(cur == last)
+		bool b = samples.m_samples[i];
+		if(b != last)
 		{
-			float v;
-			if(cur)
-				v = falling.InterpolateVoltage(corner, 0);
+			last = b;
+			edgeDirections.push_back(b);
+			edgeTimestamps.push_back(samples.m_offsets[i]);
+		}
+	}
+
+	//Generate output samples at uniform intervals
+	size_t iedge = 0;
+	for(size_t i=0; i<caplen; i++)
+	{
+		//Default fill of timestamps etc
+		cap->m_offsets[i] = i;
+		cap->m_durations[i] = 1;
+
+		//Timestamp of the current output sample
+		int64_t tnow = cap->m_timescale*i + cap->m_triggerPhase;
+
+		//Find timestamp of the next edge (including buffer propagation delay)
+		if( (iedge + 1) < edgeTimestamps.size())
+		{
+			//Nominal timestamp of the edge
+			int64_t tnextedge = edgeTimestamps[iedge+1];
+
+			//Shift by the buffer delay
+			int64_t tdelayed = tnextedge;
+			if(edgeDirections[iedge+1])
+				tdelayed += rising_delay;
 			else
-				v = rising.InterpolateVoltage(corner, 0);
+				tdelayed += falling_delay;
 
-			for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
-			{
-				cap->m_offsets[nsamp] = nsamp;
-				cap->m_durations[nsamp] = 1;
-				cap->m_samples[nsamp] = v;
-			}
-
-			m_vmax = max(m_vmax, v);
-			m_vmin = min(m_vmin, v);
+			//Move to the next edge if we're past the initial propagation delay of the upcoming edge
+			if(tnow >= tdelayed)
+				iedge ++;
 		}
 
-		//Toggle, play back the waveform
+		//Time since the edge started
+		int64_t relative_timestamp = tnow - edgeTimestamps[iedge];
+		float rel_sec = relative_timestamp * SECONDS_PER_FS;
+		float v;
+		if(edgeDirections[iedge])
+			v = rising.InterpolateVoltage(corner, rel_sec);
 		else
-		{
-			for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
-			{
-				cap->m_offsets[nsamp] = nsamp;
-				cap->m_durations[nsamp] = 1;
+			v = falling.InterpolateVoltage(corner, rel_sec);
+		cap->m_samples[i] = v;
 
-				//IBIS timestamps are in seconds not fs
-				float toff = (nsamp - nstart) * samplePeriod / FS_PER_SECOND;
-				float v;
-				if(cur)
-					v = rising.InterpolateVoltage(corner, toff);
-				else
-					v = falling.InterpolateVoltage(corner, toff);
-				cap->m_samples[nsamp] = v;
-
-				m_vmax = max(m_vmax, v);
-				m_vmin = min(m_vmin, v);
-			}
-		}
-
-		last = cur;
+		m_vmax = max(m_vmax, v);
+		m_vmin = min(m_vmin, v);
 	}
 
 	m_range = (m_vmax - m_vmin) * 1.05;

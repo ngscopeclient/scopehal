@@ -94,7 +94,7 @@ float IVCurve::InterpolateCurrent(float voltage)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// VTCurve
+// VTCurves
 
 float VTCurves::InterpolateVoltage(IBISCorner corner, float time)
 {
@@ -147,6 +147,25 @@ float VTCurves::InterpolateVoltage(IBISCorner corner, float time)
 	//Interpolate voltage
 	float vlo = m_curves[corner][last_lo].m_voltage;
 	return vlo + (m_curves[corner][last_hi].m_voltage - vlo)*frac;
+}
+
+/**
+	@brief Gets the propagation delay of a V/T curve
+
+	The propagation delay is defined as the timestamp at which the output voltage changes by more than 0.1% from
+	the initial value.
+ */
+int64_t VTCurves::GetPropagationDelay(IBISCorner corner)
+{
+	auto& curve = m_curves[corner];
+
+	float threshold = curve[0].m_voltage * 0.001;
+	for(auto& p : curve)
+	{
+		if(fabs(p.m_voltage - curve[0].m_voltage) > threshold)
+			return p.m_time * FS_PER_SECOND;
+	}
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
