@@ -38,11 +38,11 @@ using namespace std;
 TouchstoneImportFilter::TouchstoneImportFilter(const string& color)
 	: SParameterSourceFilter(color, CAT_GENERATION)
 	, m_fpname("Touchstone File")
-	, m_cachedFileName("")
 {
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.s*p";
 	m_parameters[m_fpname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
+	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &TouchstoneImportFilter::OnFileNameChanged));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,17 +76,11 @@ void TouchstoneImportFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void TouchstoneImportFilter::Refresh()
+void TouchstoneImportFilter::OnFileNameChanged()
 {
 	auto fname = m_parameters[m_fpname].ToString();
-
-	//If cached values are still good, don't do anything.
-	//Also, early-out if no file name
-	if(m_cachedFileName == fname)
-		return;
 	if(fname.empty())
 		return;
-	m_cachedFileName = fname;
 
 	//Load the touchstone file
 	TouchstoneParser parser;
@@ -100,6 +94,7 @@ void TouchstoneImportFilter::Refresh()
 	//Recreate our output streams
 	SetupStreams();
 
+	//Run the actual import
 	for(size_t to=0; to < nports; to++)
 	{
 		for(size_t from=0; from < nports; from++)
@@ -154,4 +149,9 @@ void TouchstoneImportFilter::Refresh()
 			}
 		}
 	}
+}
+
+void TouchstoneImportFilter::Refresh()
+{
+	//everything happens in OnFileNameChanged
 }

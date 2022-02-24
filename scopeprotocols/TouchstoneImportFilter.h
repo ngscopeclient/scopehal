@@ -52,7 +52,7 @@ public:
 protected:
 	std::string m_fpname;
 
-	std::string m_cachedFileName;
+	void OnFileNameChanged();
 };
 
 #endif
