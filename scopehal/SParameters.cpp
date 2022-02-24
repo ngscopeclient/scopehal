@@ -75,7 +75,11 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 
 	//If out of range, clip
 	if(frequency < m_points[0].m_frequency)
-		return SParameterPoint(frequency, m_points[0].m_amplitude, 0);
+	{
+		//Use insertion loss of the lowest point, but interpolate phase to zero at time zero
+		float phase = InterpolatePhase(0, m_points[0].m_phase, frequency / m_points[0].m_frequency);
+		return SParameterPoint(frequency, m_points[0].m_amplitude, phase);
+	}
 	else if(frequency > m_points[len-1].m_frequency)
 		return SParameterPoint(frequency, 0, 0);
 	else
@@ -125,10 +129,18 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 	float amp_hi = m_points[last_hi].m_amplitude;
 	ret.m_amplitude = amp_lo + (amp_hi - amp_lo)*frac;
 
-	//Normally phase angles are in the -pi to +pi range.
+	//Interpolate phase
+	ret.m_phase = InterpolatePhase(m_points[last_lo].m_phase, m_points[last_hi].m_phase, frac);
+
+	return ret;
+}
+
+/**
+	@brief Interpolates a phase angle, wrapping appropriately
+ */
+float SParameterVector::InterpolatePhase(float phase_lo, float phase_hi, float frac) const
+{
 	//Wrap so we have a well defined linear range to interpolate, with no wrapping.
-	float phase_lo = m_points[last_lo].m_phase;
-	float phase_hi = m_points[last_hi].m_phase;
 	if(fabs(phase_lo - phase_hi) > M_PI)
 	{
 		if(phase_lo < phase_hi)
@@ -138,11 +150,11 @@ SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
 	}
 
 	//Now we can interpolate normally
-	ret.m_phase = phase_lo + (phase_hi - phase_lo)*frac;
+	float ret = phase_lo + (phase_hi - phase_lo)*frac;
 
 	//If we went out of range, rescale
-	if(ret.m_phase > 2*M_PI)
-		ret.m_phase -= 2*M_PI;
+	if(ret > 2*M_PI)
+		ret -= 2*M_PI;
 
 	return ret;
 }

@@ -83,6 +83,9 @@ public:
 
 	SParameterPoint& operator[](size_t i)
 	{ return m_points[i]; }
+
+protected:
+	float InterpolatePhase(float phase_lo, float phase_hi, float frac) const;
 };
 
 typedef std::pair<int, int> SPair;
