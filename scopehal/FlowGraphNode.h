@@ -59,6 +59,9 @@ public:
 		, m_stream(stream)
 	{}
 
+	operator bool() const
+	{ return (m_channel != NULL); }
+
 	std::string GetName();
 
 	OscilloscopeChannel* m_channel;
