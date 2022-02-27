@@ -77,11 +77,6 @@ bool WaveformGenerationFilter::NeedsConfig()
 	return true;
 }
 
-bool WaveformGenerationFilter::IsOverlay()
-{
-	return false;
-}
-
 float WaveformGenerationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return (GetMaxLevel() - GetMinLevel()) * 1.05;

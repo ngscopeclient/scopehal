@@ -148,16 +148,6 @@ void Filter::Release()
 		delete this;
 }
 
-bool Filter::IsOverlay()
-{
-	//If we have no inputs, we can't be an overlay
-	if(GetInputCount() == 0)
-		return false;
-
-	//otherwise, assume we are one
-	return true;
-}
-
 /**
 	@brief Returns true if this filter outputs a waveform consisting of a single sample.
 

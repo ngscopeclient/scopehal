@@ -77,12 +77,6 @@ string CTLEFilter::GetProtocolName()
 	return "CTLE";
 }
 
-bool CTLEFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool CTLEFilter::NeedsConfig()
 {
 	return true;

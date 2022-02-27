@@ -119,11 +119,6 @@ bool IBISDriverFilter::NeedsConfig()
 	return true;
 }
 
-bool IBISDriverFilter::IsOverlay()
-{
-	return false;
-}
-
 void IBISDriverFilter::ClearSweeps()
 {
 	m_vmax = FLT_MIN;

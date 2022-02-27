@@ -90,12 +90,6 @@ string VectorFrequencyFilter::GetProtocolName()
 	return "Vector Frequency";
 }
 
-bool VectorFrequencyFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool VectorFrequencyFilter::NeedsConfig()
 {
 	return true;

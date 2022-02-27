@@ -243,12 +243,6 @@ string DeEmbedFilter::GetProtocolName()
 	return "De-Embed";
 }
 
-bool DeEmbedFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool DeEmbedFilter::NeedsConfig()
 {
 	//we need the offset to be specified, duh

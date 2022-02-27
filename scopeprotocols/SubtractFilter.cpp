@@ -76,12 +76,6 @@ string SubtractFilter::GetProtocolName()
 	return "Subtract";
 }
 
-bool SubtractFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool SubtractFilter::NeedsConfig()
 {
 	//we have more than one input

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -84,12 +84,6 @@ void ParallelBus::SetDefaultName()
 bool ParallelBus::NeedsConfig()
 {
 	return true;
-}
-
-bool ParallelBus::IsOverlay()
-{
-	//Probably doesn't make sense to be an overlay since we're not tied to the single bit we started decoding on
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

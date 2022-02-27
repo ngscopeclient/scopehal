@@ -83,12 +83,6 @@ string DownconvertFilter::GetProtocolName()
 	return "Downconvert";
 }
 
-bool DownconvertFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool DownconvertFilter::NeedsConfig()
 {
 	return true;

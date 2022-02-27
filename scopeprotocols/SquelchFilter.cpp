@@ -92,12 +92,6 @@ string SquelchFilter::GetProtocolName()
 	return "Squelch";
 }
 
-bool SquelchFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool SquelchFilter::NeedsConfig()
 {
 	return true;

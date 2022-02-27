@@ -96,12 +96,6 @@ string ClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (PLL)";
 }
 
-bool ClockRecoveryFilter::IsOverlay()
-{
-	//we're an overlaid digital channel
-	return true;
-}
-
 bool ClockRecoveryFilter::NeedsConfig()
 {
 	//we have need the base symbol rate configured

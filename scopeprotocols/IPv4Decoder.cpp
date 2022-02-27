@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,11 +63,6 @@ bool IPv4Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string IPv4Decoder::GetProtocolName()
 {
 	return "IPv4";
-}
-
-bool IPv4Decoder::IsOverlay()
-{
-	return true;
 }
 
 bool IPv4Decoder::NeedsConfig()

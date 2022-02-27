@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,12 +76,6 @@ float MultiplyFilter::GetOffset(size_t /*stream*/)
 string MultiplyFilter::GetProtocolName()
 {
 	return "Multiply";
-}
-
-bool MultiplyFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool MultiplyFilter::NeedsConfig()

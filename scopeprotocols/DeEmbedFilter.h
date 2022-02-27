@@ -51,7 +51,6 @@ public:
 	virtual void Refresh();
 
 	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();

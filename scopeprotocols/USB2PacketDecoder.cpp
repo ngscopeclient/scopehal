@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -71,11 +71,6 @@ void USB2PacketDecoder::SetDefaultName()
 string USB2PacketDecoder::GetProtocolName()
 {
 	return "USB 1.x/2.0 Packet";
-}
-
-bool USB2PacketDecoder::IsOverlay()
-{
-	return true;
 }
 
 bool USB2PacketDecoder::NeedsConfig()

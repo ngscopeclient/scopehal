@@ -43,7 +43,6 @@ public:
 	virtual void Refresh();
 
 	virtual bool NeedsConfig();
-	virtual bool IsOverlay();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
@@ -53,7 +52,6 @@ public:
 	virtual void SetVoltageRange(float range, size_t stream);
 	virtual void SetOffset(float offset, size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
 
 	PROTOCOL_DECODER_INITPROC(VectorFrequencyFilter)
 
