@@ -39,6 +39,9 @@ class OscilloscopeChannel;
 class WaveformBase;
 
 #include "FilterParameter.h"
+#include "Waveform.h"
+
+class OscilloscopeChannel;
 
 /**
 	@brief Descriptor for a single stream coming off a channel
@@ -61,52 +64,18 @@ public:
 	OscilloscopeChannel* m_channel;
 	size_t m_stream;
 
-	Unit GetXAxisUnits()
-	{ return m_channel->GetXAxisUnits(); }
-
-	Unit GetYAxisUnits()
-	{ return m_channel->GetYAxisUnits(m_stream); }
-
-	WaveformBase* GetData()
-	{ return m_channel->GetData(m_stream); }
-
-	bool operator==(const StreamDescriptor& rhs) const
-	{ return (m_channel == rhs.m_channel) && (m_stream == rhs.m_stream); }
-
-	bool operator!=(const StreamDescriptor& rhs) const
-	{ return (m_channel != rhs.m_channel) || (m_stream != rhs.m_stream); }
-
-	bool operator<(const StreamDescriptor& rhs) const
-	{
-		if(m_channel < rhs.m_channel)
-			return true;
-		if( (m_channel == rhs.m_channel) && (m_stream < rhs.m_stream) )
-			return true;
-
-		return false;
-	}
-
-	float GetVoltageRange()
-	{
-		if(m_channel == NULL)
-			return 1;
-		else
-			return m_channel->GetVoltageRange(m_stream);
-	}
-
-	float GetOffset()
-	{
-		if(m_channel == NULL)
-			return 0;
-		else
-			return m_channel->GetOffset(m_stream);
-	}
-
-	void SetVoltageRange(float v)
-	{  m_channel->SetVoltageRange(v, m_stream); }
-
-	void SetOffset(float v)
-	{  m_channel->SetOffset(v, m_stream); }
+	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
+	//See StreamDescriptor_inlines.h for implementations
+	Unit GetXAxisUnits();
+	Unit GetYAxisUnits();
+	WaveformBase* GetData();
+	bool operator==(const StreamDescriptor& rhs) const;
+	bool operator!=(const StreamDescriptor& rhs) const;
+	bool operator<(const StreamDescriptor& rhs) const;
+	float GetVoltageRange();
+	float GetOffset();
+	void SetVoltageRange(float v);
+	void SetOffset(float v);
 };
 
 /**
@@ -129,7 +98,7 @@ public:
 
 	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
 	void SetInput(const std::string& name, StreamDescriptor stream, bool force = false);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	StreamDescriptor GetInput(size_t i);
 
@@ -168,13 +137,7 @@ protected:
 
 		This function is safe to call on a NULL input and will return NULL in that case.
 	 */
-	WaveformBase* GetInputWaveform(size_t i)
-	{
-		auto chan = m_inputs[i].m_channel;
-		if(chan == NULL)
-			return NULL;
-		return chan->GetData(m_inputs[i].m_stream);
-	}
+	WaveformBase* GetInputWaveform(size_t i);	//implementation in FlowGraphNode_inlines.h
 
 	///Gets the analog waveform attached to the specified input
 	AnalogWaveform* GetAnalogInputWaveform(size_t i)

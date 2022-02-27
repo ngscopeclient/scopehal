@@ -212,6 +212,11 @@ string FlowGraphNode::GetInputDisplayName(size_t i)
 		return in.m_channel->GetDisplayName();
 }
 
+bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+{
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 

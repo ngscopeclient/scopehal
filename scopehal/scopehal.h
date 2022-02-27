@@ -81,8 +81,10 @@
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
 
-#include "OscilloscopeChannel.h"
 #include "FlowGraphNode.h"
+#include "OscilloscopeChannel.h"
+#include "StreamDescriptor_inlines.h"
+#include "FlowGraphNode_inlines.h"
 #include "Trigger.h"
 
 #include "Instrument.h"

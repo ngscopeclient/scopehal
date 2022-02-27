@@ -43,7 +43,6 @@
 	@brief Abstract base class for all filters and protocol decoders
  */
 class Filter	: public OscilloscopeChannel
-				, public FlowGraphNode
 {
 public:
 

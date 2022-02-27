@@ -36,8 +36,6 @@
 #ifndef OscilloscopeChannel_h
 #define OscilloscopeChannel_h
 
-#include "Waveform.h"
-
 class Oscilloscope;
 
 /**
@@ -73,7 +71,7 @@ public:
 
 	Each time the scope is triggered a new Waveform is created with the new capture's data.
  */
-class OscilloscopeChannel
+class OscilloscopeChannel : public FlowGraphNode
 {
 public:
 
