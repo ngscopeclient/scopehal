@@ -92,6 +92,7 @@ set(SCOPEHAL_SOURCES
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	DemoOscilloscope.cpp
+	DigilentOscilloscope.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
