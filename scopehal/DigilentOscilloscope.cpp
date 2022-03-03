@@ -363,8 +363,6 @@ bool DigilentOscilloscope::AcquireData()
 	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
 		return false;
 
-	LogDebug("%d channels, %zu fs/sample\n", numChannels, fs_per_sample);
-
 	//Acquire data for each channel
 	size_t chnum;
 	size_t memdepth;
@@ -385,8 +383,6 @@ bool DigilentOscilloscope::AcquireData()
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
 		double* buf = new double[memdepth];
-
-		LogDebug("Channel %zu has %zu samples\n", chnum, memdepth);
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
