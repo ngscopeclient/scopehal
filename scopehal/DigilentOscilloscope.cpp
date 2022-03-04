@@ -122,7 +122,7 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	if(!csock)
 		LogFatal("DigilentOscilloscope expects a SCPISocketTransport\n");
 
-	/*
+
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -130,8 +130,8 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	trig->SetInput(0, StreamDescriptor(m_channels[0]));
 	SetTrigger(trig);
 	PushTrigger();
-	SetTriggerOffset(10 * 1000L * 1000L);
-	*/
+	SetTriggerOffset(0);
+
 	//For now, assume control plane port is data plane +1
 	LogDebug("Connecting to data plane socket\n");
 	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -720,11 +720,10 @@ void DigilentOscilloscope::PushTrigger()
 
 void DigilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//Type
-	//m_transport->SendCommand(":TRIG:MODE EDGE");
+	m_transport->SendCommand(":TRIG:MODE EDGE");
 
 	//Delay
 	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
@@ -754,7 +753,6 @@ void DigilentOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 			LogWarning("Unknown edge type\n");
 			return;
 	}
-	*/
 }
 
 vector<Oscilloscope::AnalogBank> DigilentOscilloscope::GetAnalogBanks()
