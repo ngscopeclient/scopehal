@@ -248,13 +248,14 @@ vector<OscilloscopeChannel::CouplingType> DigilentOscilloscope::GetAvailableCoup
 
 void DigilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
+	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 	bool valid = true;
 	switch(type)
 	{
-		/*case OscilloscopeChannel::COUPLE_AC_1M:
+		case OscilloscopeChannel::COUPLE_AC_1M:
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC1M");
-			break;*/
+			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC1M");
@@ -263,9 +264,9 @@ void DigilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Cou
 		default:
 			LogError("Invalid coupling for channel\n");
 			valid = false;
-	}
+	}*/
 
-	if(valid)
+	//if(valid)
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_channelCouplings[i] = type;
@@ -280,14 +281,16 @@ double DigilentOscilloscope::GetChannelAttenuation(size_t i)
 
 void DigilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	double oldAtten = m_channelAttenuations[i];
-	m_channelAttenuations[i] = atten;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelAttenuations[i] = atten;
+	}
 
-	//Rescale channel voltage range and offset (no change to hardware side)
-	double delta = atten / oldAtten;
-	m_channelVoltageRanges[i] *= delta;
-	m_channelOffsets[i] *= delta;
+	//send attenuation info to hardware
+	lock_guard<recursive_mutex> lock(m_mutex);
+	char buf[128];
+	snprintf(buf, sizeof(buf), ":%s:ATTEN %f", m_channels[i]->GetHwname().c_str(), atten);
+	m_transport->SendCommand(buf);
 }
 
 int DigilentOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
@@ -314,7 +317,7 @@ void DigilentOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, f
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
+	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range);
 	m_transport->SendCommand(buf);
 }
 
@@ -339,7 +342,7 @@ void DigilentOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float o
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
+	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset);
 	m_transport->SendCommand(buf);
 }
 
@@ -373,7 +376,6 @@ bool DigilentOscilloscope::AcquireData()
 
 	//Analog channels get processed separately
 	vector<double*> abufs;
-	vector<float> scales;
 	vector<AnalogWaveform*> awfms;
 	for(size_t i=0; i<numChannels; i++)
 	{
@@ -406,7 +408,6 @@ bool DigilentOscilloscope::AcquireData()
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
-			scales.push_back(GetChannelAttenuation(chnum));
 
 			s[m_channels[chnum]] = cap;
 		}
@@ -504,13 +505,12 @@ bool DigilentOscilloscope::AcquireData()
 	{
 		auto cap = awfms[i];
 
-		float scale = scales[i];
 		double* buf = abufs[i];
 		for(size_t j=0; j<memdepth; j++)
 		{
 			cap->m_offsets[j] = j;
 			cap->m_durations[j] = 1;
-			cap->m_samples[j] = buf[j] * scale;
+			cap->m_samples[j] = buf[j];
 		}
 
 		delete[] abufs[i];
