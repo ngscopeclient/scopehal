@@ -240,15 +240,14 @@ vector<OscilloscopeChannel::CouplingType> DigilentOscilloscope::GetAvailableCoup
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	/*ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_GND);*/
+
+	//TODO: this is only available on AD Pro
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
 	return ret;
 }
 
 void DigilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
 {
-	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 	bool valid = true;
 	switch(type)
@@ -264,9 +263,9 @@ void DigilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Cou
 		default:
 			LogError("Invalid coupling for channel\n");
 			valid = false;
-	}*/
+	}
 
-	//if(valid)
+	if(valid)
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_channelCouplings[i] = type;
