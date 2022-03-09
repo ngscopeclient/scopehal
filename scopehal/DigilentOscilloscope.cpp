@@ -104,10 +104,13 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 		SetDigitalThreshold(chnum, 0);
 	}
 	*/
-	//Set initial memory configuration.
-	//100 Msps is highest rate supported on AD Pro
-	SetSampleRate(100000000L);
-	SetSampleDepth(65536);
+
+	//Set initial memory configuration to highest supported
+	auto rates = GetSampleRatesNonInterleaved();
+	SetSampleRate(rates[0]);
+
+	auto depths = GetSampleDepthsNonInterleaved();
+	SetSampleDepth(depths[0]);
 
 	/*
 	//Add the external trigger input
@@ -163,6 +166,17 @@ string DigilentOscilloscope::GetChannelColor(size_t i)
 
 void DigilentOscilloscope::IdentifyHardware()
 {
+	if(m_model.find("Analog Discovery Pro") == 0)
+		m_series = SERIES_ANALOG_DISCOVERY_PRO;
+	else if(m_model.find("Analog Discovery 2") == 0)
+		m_series = SERIES_ANALOG_DISCOVERY_2;
+	else if(m_model.find("Analog Discovery") == 0)
+		m_series = SERIES_ANALOG_DISCOVERY;
+	else if(m_model.find("Digital Discovery") == 0)
+		m_series = SERIES_DIGITAL_DISCOVERY;
+	else
+		m_series = SERIES_UNKNOWN;
+
 	//MSO channel support is still pending
 	m_digitalChannelCount = 0;
 
@@ -191,7 +205,6 @@ string DigilentOscilloscope::GetDriverNameInternal()
 {
 	return "digilent";
 }
-
 
 void DigilentOscilloscope::FlushConfigCache()
 {
@@ -241,8 +254,10 @@ vector<OscilloscopeChannel::CouplingType> DigilentOscilloscope::GetAvailableCoup
 	vector<OscilloscopeChannel::CouplingType> ret;
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 
-	//TODO: this is only available on AD Pro
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	//AD Pro is the only thing that has AC/DC coupling available
+	if(m_series == SERIES_ANALOG_DISCOVERY_PRO)
+		ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+
 	return ret;
 }
 

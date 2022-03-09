@@ -116,6 +116,16 @@ public:
 	virtual void SetDigitalHysteresis(size_t channel, float level);
 	virtual void SetDigitalThreshold(size_t channel, float level);
 
+	enum Series
+	{
+		SERIES_ANALOG_DISCOVERY,
+		SERIES_ANALOG_DISCOVERY_2,
+		SERIES_DIGITAL_DISCOVERY,
+		SERIES_ANALOG_DISCOVERY_PRO,
+
+		SERIES_UNKNOWN
+	};
+
 protected:
 	void IdentifyHardware();
 
@@ -148,7 +158,7 @@ protected:
 
 	Socket* m_dataSocket;
 
-	//Series m_series;
+	Series m_series;
 
 public:
 
