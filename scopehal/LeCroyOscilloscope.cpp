@@ -1283,8 +1283,12 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 		reply = Trim(m_transport->ReadReply().substr(0,3));
 	}
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_probeIsActive[i] = false;
+	//Check if we have an active probe connected
+	auto name = GetProbeName(i);
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_probeIsActive[i] = (name != "");
+	}
 
 	if(reply == "A1M")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -1295,10 +1299,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 	else if(reply == "GND")
 		return OscilloscopeChannel::COUPLE_GND;
 	else if( (reply == "DC") || (reply == "DC1") )
-	{
-		m_probeIsActive[i] = true;
 		return OscilloscopeChannel::COUPLE_DC_50;
-	}
 
 	//invalid
 	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
@@ -1532,7 +1533,7 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 	else if(sbw == "6GHZ")
 		return 6000;
 
-	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+	LogWarning("LeCroyOscilloscope::GetChannelBandwidthLimit got invalid BW limit %s\n", reply.c_str());
 	return 0;
 }
 
