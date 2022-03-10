@@ -156,8 +156,6 @@ protected:
 
 	void PushEdgeTrigger(EdgeTrigger* trig);
 
-	Socket* m_dataSocket;
-
 	Series m_series;
 
 public:

@@ -74,6 +74,7 @@
 
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
+#include "SCPITwinLanTransport.h"
 #include "SCPILxiTransport.h"
 #include "SCPINullTransport.h"
 #include "SCPITMCTransport.h"

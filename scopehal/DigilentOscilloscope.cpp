@@ -120,12 +120,6 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	m_extTrigChannel->SetDefaultDisplayName();
 	*/
 
-	//Set up the data plane socket
-	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
-	if(!csock)
-		LogFatal("DigilentOscilloscope expects a SCPISocketTransport\n");
-
-
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -134,12 +128,6 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(0);
-
-	//For now, assume control plane port is data plane +1
-	LogDebug("Connecting to data plane socket\n");
-	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	m_dataSocket->Connect(csock->GetHostname(), csock->GetPort() + 1);
-	m_dataSocket->DisableNagle();
 }
 
 /**
@@ -187,7 +175,7 @@ void DigilentOscilloscope::IdentifyHardware()
 
 DigilentOscilloscope::~DigilentOscilloscope()
 {
-	delete m_dataSocket;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -371,13 +359,13 @@ bool DigilentOscilloscope::AcquireData()
 {
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&numChannels, sizeof(numChannels)))
+	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
 		return false;
 
 	//Acquire data for each channel
@@ -394,9 +382,9 @@ bool DigilentOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
+		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
+		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 		double* buf = new double[memdepth];
 
@@ -405,12 +393,12 @@ bool DigilentOscilloscope::AcquireData()
 		{
 			abufs.push_back(buf);
 
-			if(!m_dataSocket->RecvLooped((uint8_t*)&trigphase, sizeof(trigphase)))
+			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
 				return false;
 
 			//TODO: stream timestamp from the server
 
-			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(double)))
+			if(!m_transport->ReadRawData(memdepth * sizeof(double), (uint8_t*)buf))
 				return false;
 
 			//Create our waveform
@@ -431,10 +419,10 @@ bool DigilentOscilloscope::AcquireData()
 		else
 		{
 			float trigphase;
-			if(!m_dataSocket->RecvLooped((uint8_t*)&trigphase, sizeof(trigphase)))
+			if(!m_transport->ReadRawData((uint8_t*)&trigphase, sizeof(trigphase)))
 				return false;
 			trigphase = -trigphase * fs_per_sample;
-			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
+			if(!m_transport->ReadRawData((uint8_t*)buf, memdepth * sizeof(int16_t)))
 				return false;
 
 			size_t podnum = chnum - m_analogChannelCount;

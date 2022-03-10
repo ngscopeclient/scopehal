@@ -54,6 +54,7 @@ set(SCOPEHAL_SOURCES
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
+	SCPITwinLanTransport.cpp
 	VICPSocketTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
