@@ -436,7 +436,15 @@ void InitializePlugins()
 	char selfPath[1024] = "";
 	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
 	if ( readlinkReturn > 0)
-		search_dirs.push_back(dirname(selfPath));
+	{
+		string dir = dirname(selfPath);
+
+		//If the binary directory is under /usr, do *not* search it!
+		//We're probably in /usr/bin and we really do not want to be dlopen-ing every single thing in there.
+		//See https://github.com/azonenberg/scopehal-apps/issues/393
+		if(dir.find("/usr") != 0)
+			search_dirs.push_back(dir);
+	}
 
 	//Home directory
 	snprintf(tmp, sizeof(tmp), "%s/.scopehal/plugins", getenv("HOME"));
