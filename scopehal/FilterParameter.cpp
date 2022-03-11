@@ -71,7 +71,7 @@ void FilterParameter::Reinterpret()
 
 	The string is converted to the appropriate internal representation.
  */
-void FilterParameter::ParseString(const string& str)
+void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 {
 	switch(m_type)
 	{
@@ -89,7 +89,7 @@ void FilterParameter::ParseString(const string& str)
 		//so e.g. 1.5M parses correctly
 		case TYPE_FLOAT:
 		case TYPE_INT:
-			m_floatval = m_unit.ParseString(str);
+			m_floatval = m_unit.ParseString(str, useDisplayLocale);
 			m_intval = m_floatval;
 			break;
 
@@ -117,17 +117,17 @@ void FilterParameter::ParseString(const string& str)
 /**
 	@brief Returns a pretty-printed representation of the parameter's value.
  */
-string FilterParameter::ToString()
+string FilterParameter::ToString(bool useDisplayLocale)
 {
 	string ret;
 	switch(m_type)
 	{
 		case TYPE_FLOAT:
-			return m_unit.PrettyPrint(m_floatval);
+			return m_unit.PrettyPrint(m_floatval, -1, useDisplayLocale);
 
 		case TYPE_BOOL:
 		case TYPE_INT:
-			return m_unit.PrettyPrint(m_intval);
+			return m_unit.PrettyPrint(m_intval, -1, useDisplayLocale);
 
 		case TYPE_FILENAME:
 		case TYPE_STRING:

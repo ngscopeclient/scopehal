@@ -257,7 +257,7 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				snprintf(
 					tmp,
 					sizeof(tmp),
-					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
 				break;
 
 			case FilterParameter::TYPE_FILENAME:
@@ -265,7 +265,7 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				snprintf(
 					tmp,
 					sizeof(tmp),
-					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
+					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
 				break;
 		}
 
@@ -281,7 +281,7 @@ void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 	for(auto it : parameters)
 	{
 		auto name = it.first.as<string>();
-		GetParameter(name).ParseString(it.second.as<string>());
+		GetParameter(name).ParseString(it.second.as<string>(), false);
 	}
 }
 

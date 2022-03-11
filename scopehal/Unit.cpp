@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -363,12 +363,15 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 /**
 	@brief Prints a value with SI scaling factors
 
-	@param value	The value
-	@param digits	Number of significant digits to display
+	@param value				The value
+	@param digits				Number of significant digits to display
+	@param useDisplayLocale		True if the string is formatted for display (user's locale)
+								False if the string is formatted for serialization ("C" locale regardless of user pref)
  */
-string Unit::PrettyPrint(double value, int sigfigs)
+string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale)
 {
-	SetPrintingLocale();
+	if(useDisplayLocale)
+		SetPrintingLocale();
 
 	//Figure out scaling, prefix, and suffix
 	double scaleFactor;
@@ -406,9 +409,8 @@ string Unit::PrettyPrint(double value, int sigfigs)
 						leftdigits = 1;
 					int rightdigits = sigfigs - leftdigits;
 
-					char format[32];
-					snprintf(format, sizeof(format), "%%%d.%df%%s%%s%%s", leftdigits, rightdigits);
-					snprintf(tmp, sizeof(tmp), format, value_rescaled, space, prefix.c_str(), suffix.c_str());
+					string format = string("%") + to_string(leftdigits) + "." + to_string(rightdigits) + "f%s%s%s";
+					snprintf(tmp, sizeof(tmp), format.c_str(), value_rescaled, space, prefix.c_str(), suffix.c_str());
 				}
 
 				//If not a round number, add more digits (up to 4)
@@ -615,17 +617,22 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 
 /**
 	@brief Parses a string based on the supplied unit
+
+	@param str					The string to parse
+	@param useDisplayLocale		True if the string is formatted for display (user's locale)
+								False if the string is formatted for serialization ("C" locale regardless of user pref)
  */
-double Unit::ParseString(const string& str)
+double Unit::ParseString(const string& str, bool useDisplayLocale)
 {
-	SetPrintingLocale();
+	if(useDisplayLocale)
+		SetPrintingLocale();
 
 	//Find the first non-numeric character in the strnig
 	double scale = 1;
 	for(size_t i=0; i<str.size(); i++)
 	{
 		char c = str[i];
-		if(isspace(c) || isdigit(c) || (c == '.') || (c == '-') )
+		if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
 			continue;
 
 		if(c == 'G')

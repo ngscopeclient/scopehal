@@ -61,8 +61,8 @@ public:
 
 	FilterParameter(ParameterTypes type = FilterParameter::TYPE_FLOAT, Unit unit  = Unit(Unit::UNIT_FS));
 
-	void ParseString(const std::string& str);
-	std::string ToString();
+	void ParseString(const std::string& str, bool useDisplayLocale = true);
+	std::string ToString(bool useDisplayLocale = true);
 
 	/**
 		@brief Returns the value of the parameter interpreted as a boolean
