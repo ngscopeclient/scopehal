@@ -52,7 +52,6 @@ public:
 	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
-	bool LoadTouchstone(const std::string& path);
 	bool LoadVCD(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
