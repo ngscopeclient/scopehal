@@ -489,8 +489,7 @@ vector<uint64_t> DSLabsOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto fs = stol(block);
-		auto hz = FS_PER_SECOND / fs;
+		auto hz = stol(block);
 		ret.push_back(hz);
 
 		//skip the comma
