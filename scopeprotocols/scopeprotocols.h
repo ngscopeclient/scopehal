@@ -46,6 +46,7 @@
 #include "CANDecoder.h"
 #include "ChannelEmulationFilter.h"
 #include "ClockRecoveryFilter.h"
+#include "ComplexImportFilter.h"
 #include "CTLEFilter.h"
 #include "CurrentShuntFilter.h"
 #include "DCDMeasurement.h"

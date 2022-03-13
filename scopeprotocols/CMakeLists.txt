@@ -9,6 +9,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp
+	ComplexImportFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
 	DCDMeasurement.cpp
