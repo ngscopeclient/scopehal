@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,7 +54,6 @@ public:
 	bool LoadBIN(const std::string& path);
 	bool LoadTouchstone(const std::string& path);
 	bool LoadVCD(const std::string& path);
-	bool LoadWAV(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
 	#pragma pack(push, 1)

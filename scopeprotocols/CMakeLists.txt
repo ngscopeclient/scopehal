@@ -130,6 +130,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	VerticalBathtub.cpp
 	WaveformGenerationFilter.cpp
 	Waterfall.cpp
+	WAVImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 
 	AverageStatistic.cpp

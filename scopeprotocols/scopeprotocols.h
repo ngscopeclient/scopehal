@@ -164,6 +164,7 @@
 #include "VectorPhaseFilter.h"
 #include "VerticalBathtub.h"
 #include "Waterfall.h"
+#include "WAVImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
 
 #include "AverageStatistic.h"
