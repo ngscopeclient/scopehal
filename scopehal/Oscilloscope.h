@@ -832,6 +832,13 @@ protected:
 	void Convert8BitSamplesAVX2(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
+	void ConvertUnsigned8BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void ConvertUnsigned8BitSamplesGeneric(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void ConvertUnsigned8BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+
 	void Convert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 	void Convert16BitSamplesGeneric(

@@ -356,7 +356,7 @@ bool DSLabsOscilloscope::AcquireData()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
-	vector<int8_t*> abufs;
+	vector<uint8_t*> abufs;
 	vector<AnalogWaveform*> awfms;
 	vector<float> scales;
 	vector<float> offsets;
@@ -368,7 +368,7 @@ bool DSLabsOscilloscope::AcquireData()
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
-		int8_t* buf = new int8_t[memdepth];
+		uint8_t* buf = new uint8_t[memdepth];
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
@@ -409,8 +409,7 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<awfms.size(); i++)
 	{
 		auto cap = awfms[i];
-		LogDebug("Convert %lu samples; scale=%f, offset=%f, exitem=%d\n", cap->m_offsets.size(), scales[i], offsets[i], abufs[i][100]);
-		Convert8BitSamples(
+		ConvertUnsigned8BitSamples(
 			(int64_t*)&cap->m_offsets[0],
 			(int64_t*)&cap->m_durations[0],
 			(float*)&cap->m_samples[0],
