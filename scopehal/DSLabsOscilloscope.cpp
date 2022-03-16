@@ -525,6 +525,10 @@ vector<uint64_t> DSLabsOscilloscope::GetSampleRatesInterleaved()
 
 set<Oscilloscope::InterleaveConflict> DSLabsOscilloscope::GetInterleaveConflicts()
 {
+	// TODO: Need to correctly report that the max ch0 + ch1 sample rate is 500MS/s
+	//       whereas the maximum ch0-only sample rate is 1GS/s. This appears to be
+	//       the only interleaving conflict that needs expressing.
+
 	//interleaving not supported
 	set<Oscilloscope::InterleaveConflict> ret;
 	return ret;
@@ -533,6 +537,12 @@ set<Oscilloscope::InterleaveConflict> DSLabsOscilloscope::GetInterleaveConflicts
 vector<uint64_t> DSLabsOscilloscope::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
+
+	// TODO: More principled way of reporting this. It Seems to cap out at 8MS
+	//       for one channel and less for two. Experimentation is needed to
+	//       determine if this is a hardware limitation or not (datasheet claims
+	//       "2MS single channel" realtime and "256MS single capture" -- does
+	//       this mean 256MS equivalent-time?)
 
 	string depths;
 	{
