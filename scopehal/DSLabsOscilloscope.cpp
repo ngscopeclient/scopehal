@@ -83,8 +83,8 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	SetSampleRate(10000000L);
-	SetSampleDepth(1000000);
+	SetSampleRate(100000L);
+	SetSampleDepth(1000);
 
 	//Set up the data plane socket
 	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
@@ -98,7 +98,7 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	trig->SetInput(0, StreamDescriptor(m_channels[0]));
 	SetTrigger(trig);
 	PushTrigger();
-	SetTriggerOffset(10 * 1000L * 1000L);
+	SetTriggerOffset(1000000000000); //1ms to allow trigphase interpolation
 
 	//For now, assume control plane port is data plane +1
 	LogDebug("Connecting to data plane socket\n");
@@ -335,6 +335,13 @@ Oscilloscope::TriggerMode DSLabsOscilloscope::PollTrigger()
 
 bool DSLabsOscilloscope::AcquireData()
 {
+	const uint8_t r = 'K';
+	m_dataSocket->SendLooped(&r, 1);
+
+	//Read the sequence number of the current waveform
+	uint32_t seqnum;
+	if(!m_dataSocket->RecvLooped((uint8_t*)&seqnum, sizeof(seqnum)))
+		return false;
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
@@ -346,6 +353,8 @@ bool DSLabsOscilloscope::AcquireData()
 	int64_t fs_per_sample;
 	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
 		return false;
+
+	// LogDebug("Receive header: SEQ#%u, %d channels\n", seqnum, numChannels);
 
 	//Acquire data for each channel
 	size_t chnum;
@@ -368,6 +377,9 @@ bool DSLabsOscilloscope::AcquireData()
 			return false;
 		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
 			return false;
+
+		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
+
 		uint8_t* buf = new uint8_t[memdepth];
 
 		//Analog channels
@@ -435,8 +447,15 @@ bool DSLabsOscilloscope::AcquireData()
 
 void DSLabsOscilloscope::Start()
 {
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.clear();
+	m_pendingWaveformsMutex.unlock();
+
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("START");
+	m_transport->FlushCommandQueue();
+	m_transport->ReadReply();
+
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -445,6 +464,13 @@ void DSLabsOscilloscope::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("SINGLE");
+	m_transport->FlushCommandQueue();
+	m_transport->ReadReply();
+
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.clear();
+	m_pendingWaveformsMutex.unlock();
+
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -453,15 +479,24 @@ void DSLabsOscilloscope::Stop()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("STOP");
+	m_transport->FlushCommandQueue();
+	m_transport->ReadReply();
+
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.clear();
+	m_pendingWaveformsMutex.unlock();
+
 	m_triggerArmed = false;
 }
 
 void DSLabsOscilloscope::ForceTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("FORCE");
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
+	// lock_guard<recursive_mutex> lock(m_mutex);
+	// m_transport->SendCommand("FORCE");
+	// m_triggerArmed = true;
+	// m_triggerOneShot = true;
+
+	this->StartSingleTrigger();
 }
 
 bool DSLabsOscilloscope::IsTriggerArmed()
