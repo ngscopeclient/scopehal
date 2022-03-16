@@ -447,14 +447,8 @@ bool DSLabsOscilloscope::AcquireData()
 
 void DSLabsOscilloscope::Start()
 {
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.clear();
-	m_pendingWaveformsMutex.unlock();
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("START");
-	m_transport->FlushCommandQueue();
-	m_transport->ReadReply();
 
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
@@ -464,12 +458,6 @@ void DSLabsOscilloscope::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("SINGLE");
-	m_transport->FlushCommandQueue();
-	m_transport->ReadReply();
-
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.clear();
-	m_pendingWaveformsMutex.unlock();
 
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
@@ -479,12 +467,6 @@ void DSLabsOscilloscope::Stop()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand("STOP");
-	m_transport->FlushCommandQueue();
-	m_transport->ReadReply();
-
-	m_pendingWaveformsMutex.lock();
-	m_pendingWaveforms.clear();
-	m_pendingWaveformsMutex.unlock();
 
 	m_triggerArmed = false;
 }
