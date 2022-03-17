@@ -47,8 +47,7 @@ using namespace std;
 //Construction / destruction
 
 DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport, true)
-	, m_triggerArmed(false)
+	: RemoteBridgeOscilloscope(transport, true)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 	IdentifyHardware();
@@ -187,74 +186,6 @@ void DSLabsOscilloscope::FlushConfigCache()
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 }
 
-bool DSLabsOscilloscope::IsChannelEnabled(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelsEnabled[i];
-}
-
-void DSLabsOscilloscope::EnableChannel(size_t i)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = true;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":ON");
-}
-
-void DSLabsOscilloscope::DisableChannel(size_t i)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = false;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFF");
-}
-
-OscilloscopeChannel::CouplingType DSLabsOscilloscope::GetChannelCoupling(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelCouplings[i];
-}
-
-vector<OscilloscopeChannel::CouplingType> DSLabsOscilloscope::GetAvailableCouplings(size_t /*i*/)
-{
-	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-	return ret;
-}
-
-void DSLabsOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	bool valid = true;
-	switch(type)
-	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC1M");
-			break;
-
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC1M");
-			break;
-
-		default:
-			LogError("Invalid coupling for channel\n");
-			valid = false;
-	}
-
-	if(valid)
-	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelCouplings[i] = type;
-	}
-}
-
 double DSLabsOscilloscope::GetChannelAttenuation(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -282,48 +213,10 @@ void DSLabsOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*l
 {
 }
 
-float DSLabsOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelVoltageRanges[i];
-}
-
-void DSLabsOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelVoltageRanges[i] = range;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
-}
-
 OscilloscopeChannel* DSLabsOscilloscope::GetExternalTrigger()
 {
 	//FIXME
 	return NULL;
-}
-
-float DSLabsOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelOffsets[i];
-}
-
-void DSLabsOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelOffsets[i] = offset;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
 }
 
 Oscilloscope::TriggerMode DSLabsOscilloscope::PollTrigger()
@@ -333,25 +226,33 @@ Oscilloscope::TriggerMode DSLabsOscilloscope::PollTrigger()
 	return TRIGGER_MODE_TRIGGERED;
 }
 
+void DSLabsOscilloscope::SendDataSocket(size_t n, const uint8_t* p) {
+	m_dataSocket->SendLooped(p, n);
+}
+
+bool DSLabsOscilloscope::ReadDataSocket(size_t n, uint8_t* p) {
+	return m_dataSocket->RecvLooped(p, n);
+}
+
 bool DSLabsOscilloscope::AcquireData()
 {
 	const uint8_t r = 'K';
-	m_dataSocket->SendLooped(&r, 1);
+	SendDataSocket(1, &r);
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&seqnum, sizeof(seqnum)))
+	if(!ReadDataSocket(sizeof(seqnum), (uint8_t*)&seqnum))
 		return false;
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&numChannels, sizeof(numChannels)))
+	if(!ReadDataSocket(sizeof(numChannels), (uint8_t*)&numChannels))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
+	if(!ReadDataSocket(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
 		return false;
 
 	// LogDebug("Receive header: SEQ#%u, %d channels\n", seqnum, numChannels);
@@ -373,9 +274,9 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
+		if(!ReadDataSocket(sizeof(chnum), (uint8_t*)&chnum))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
+		if(!ReadDataSocket(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 
 		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
@@ -388,7 +289,7 @@ bool DSLabsOscilloscope::AcquireData()
 			abufs.push_back(buf);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
+			if(!ReadDataSocket(sizeof(config), (uint8_t*)&config))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -397,7 +298,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 			//TODO: stream timestamp from the server
 
-			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int8_t)))
+			if(!ReadDataSocket(memdepth * sizeof(int8_t), (uint8_t*)buf))
 				return false;
 
 			//Create our waveform
@@ -443,47 +344,6 @@ bool DSLabsOscilloscope::AcquireData()
 		m_triggerArmed = false;
 
 	return true;
-}
-
-void DSLabsOscilloscope::Start()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("START");
-
-	m_triggerArmed = true;
-	m_triggerOneShot = false;
-}
-
-void DSLabsOscilloscope::StartSingleTrigger()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("SINGLE");
-
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
-void DSLabsOscilloscope::Stop()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("STOP");
-
-	m_triggerArmed = false;
-}
-
-void DSLabsOscilloscope::ForceTrigger()
-{
-	// lock_guard<recursive_mutex> lock(m_mutex);
-	// m_transport->SendCommand("FORCE");
-	// m_triggerArmed = true;
-	// m_triggerOneShot = true;
-
-	this->StartSingleTrigger();
-}
-
-bool DSLabsOscilloscope::IsTriggerArmed()
-{
-	return m_triggerArmed;
 }
 
 vector<uint64_t> DSLabsOscilloscope::GetSampleRatesNonInterleaved()
@@ -575,47 +435,6 @@ vector<uint64_t> DSLabsOscilloscope::GetSampleDepthsInterleaved()
 	return ret;
 }
 
-uint64_t DSLabsOscilloscope::GetSampleRate()
-{
-	return m_srate;
-}
-
-uint64_t DSLabsOscilloscope::GetSampleDepth()
-{
-	return m_mdepth;
-}
-
-void DSLabsOscilloscope::SetSampleDepth(uint64_t depth)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("DEPTH ") + to_string(depth));
-	m_mdepth = depth;
-}
-
-void DSLabsOscilloscope::SetSampleRate(uint64_t rate)
-{
-	m_srate = rate;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand( string("RATE ") + to_string(rate));
-}
-
-void DSLabsOscilloscope::SetTriggerOffset(int64_t offset)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Don't allow setting trigger offset beyond the end of the capture
-	int64_t captureDuration = GetSampleDepth() * FS_PER_SECOND / GetSampleRate();
-	m_triggerOffset = min(offset, captureDuration);
-
-	PushTrigger();
-}
-
-int64_t DSLabsOscilloscope::GetTriggerOffset()
-{
-	return m_triggerOffset;
-}
-
 bool DSLabsOscilloscope::IsInterleaving()
 {
 	//interleaving is done automatically in hardware based on sample rate, no user facing switch for it
@@ -628,61 +447,12 @@ bool DSLabsOscilloscope::SetInterleaving(bool /*combine*/)
 	return false;
 }
 
-void DSLabsOscilloscope::PullTrigger()
+vector<OscilloscopeChannel::CouplingType> DSLabsOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
-	//pulling not needed, we always have a valid trigger cached
-}
-
-void DSLabsOscilloscope::PushTrigger()
-{
-	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
-	if(et)
-		PushEdgeTrigger(et);
-
-	else
-		LogWarning("Unknown trigger type (not an edge)\n");
-
-	ClearPendingWaveforms();
-}
-
-/**
-	@brief Pushes settings for an edge trigger to the instrument
- */
-void DSLabsOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Type
-	//m_transport->SendCommand(":TRIG:MODE EDGE");
-
-	//Delay
-	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
-
-	//Source
-	auto chan = trig->GetInput(0).m_channel;
-	m_transport->SendCommand("TRIG:SOU " + chan->GetHwname());
-
-	//Level
-	char buf[128];
-	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel() / chan->GetAttenuation());
-	m_transport->SendCommand(buf);
-
-	//Slope
-	switch(trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("TRIG:EDGE:DIR RISING");
-			break;
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("TRIG:EDGE:DIR FALLING");
-			break;
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("TRIG:EDGE:DIR ANY");
-			break;
-		default:
-			LogWarning("Unknown edge type\n");
-			return;
-	}
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	return ret;
 }
 
 vector<Oscilloscope::AnalogBank> DSLabsOscilloscope::GetAnalogBanks()
