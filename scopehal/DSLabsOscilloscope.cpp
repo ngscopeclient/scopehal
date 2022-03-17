@@ -86,9 +86,9 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	SetSampleDepth(1000);
 
 	//Set up the data plane socket
-	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
+	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
 	if(!csock)
-		LogFatal("DSLabsOscilloscope expects a SCPISocketTransport\n");
+		LogFatal("DSLabsOscilloscope expects a SCPITwinLanTransport\n");
 
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
@@ -98,12 +98,6 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(1000000000000); //1ms to allow trigphase interpolation
-
-	//For now, assume control plane port is data plane +1
-	LogDebug("Connecting to data plane socket\n");
-	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	m_dataSocket->Connect(csock->GetHostname(), csock->GetPort() + 1);
-	m_dataSocket->DisableNagle();
 }
 
 /**
@@ -226,33 +220,25 @@ Oscilloscope::TriggerMode DSLabsOscilloscope::PollTrigger()
 	return TRIGGER_MODE_TRIGGERED;
 }
 
-void DSLabsOscilloscope::SendDataSocket(size_t n, const uint8_t* p) {
-	m_dataSocket->SendLooped(p, n);
-}
-
-bool DSLabsOscilloscope::ReadDataSocket(size_t n, uint8_t* p) {
-	return m_dataSocket->RecvLooped(p, n);
-}
-
 bool DSLabsOscilloscope::AcquireData()
 {
 	const uint8_t r = 'K';
-	SendDataSocket(1, &r);
+	m_transport->SendRawData(1, &r);
 
 	//Read the sequence number of the current waveform
 	uint32_t seqnum;
-	if(!ReadDataSocket(sizeof(seqnum), (uint8_t*)&seqnum))
+	if(!m_transport->ReadRawData(sizeof(seqnum), (uint8_t*)&seqnum))
 		return false;
 
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!ReadDataSocket(sizeof(numChannels), (uint8_t*)&numChannels))
+	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!ReadDataSocket(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
 		return false;
 
 	// LogDebug("Receive header: SEQ#%u, %d channels\n", seqnum, numChannels);
@@ -274,9 +260,9 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!ReadDataSocket(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
 			return false;
-		if(!ReadDataSocket(sizeof(memdepth), (uint8_t*)&memdepth))
+		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 
 		// LogDebug("ch%ld: Receive %ld samples\n", chnum, memdepth);
@@ -289,7 +275,7 @@ bool DSLabsOscilloscope::AcquireData()
 			abufs.push_back(buf);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!ReadDataSocket(sizeof(config), (uint8_t*)&config))
+			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -298,7 +284,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 			//TODO: stream timestamp from the server
 
-			if(!ReadDataSocket(memdepth * sizeof(int8_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
 				return false;
 
 			//Create our waveform
