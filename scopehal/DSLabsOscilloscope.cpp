@@ -82,8 +82,8 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	SetSampleRate(100000L);
-	SetSampleDepth(1000);
+	SetSampleRate(1000000L);
+	SetSampleDepth(10000);
 
 	//Set up the data plane socket
 	auto csock = dynamic_cast<SCPITwinLanTransport*>(m_transport);
@@ -352,7 +352,8 @@ vector<uint64_t> DSLabsOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto hz = stol(block);
+		auto fs = stol(block);
+		auto hz = FS_PER_SECOND / fs;
 		ret.push_back(hz);
 
 		//skip the comma
