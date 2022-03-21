@@ -96,6 +96,7 @@ public:
 	enum Series
 	{
 		DSCOPE_U3P100,
+		DSLOGIC_U3PRO16,
 
 		SERIES_UNKNOWN	//unknown or invalid model name
 	};
@@ -105,7 +106,6 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
-	//hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
 	size_t m_digitalChannelBase;
 	size_t m_digitalChannelCount;
@@ -113,6 +113,9 @@ protected:
 	//Most DSLabs API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
 	std::map<size_t, double> m_channelAttenuations;
+
+	// Only configurable for the entire device
+	float m_digitalThreshold;
 
 	void SendDataSocket(size_t n, const uint8_t* p);
 	bool ReadDataSocket(size_t n, uint8_t* p);

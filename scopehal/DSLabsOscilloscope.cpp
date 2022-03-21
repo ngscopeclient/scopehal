@@ -56,8 +56,7 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		//Hardware name of the channel
-		string chname = "0";
-		chname[0] += i;
+		string chname = to_string(i);
 
 		//Create the channel
 		auto chan = new OscilloscopeChannel(
@@ -70,8 +69,7 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 			true);
 		m_channels.push_back(chan);
 
-		string nicename = "ch0";
-		nicename[2] += i;
+		string nicename = "ch" + chname;
 		chan->SetDisplayName(nicename);
 
 		//Set initial configuration so we have a well-defined instrument state
@@ -79,6 +77,31 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_AC_1M);
 		SetChannelOffset(i, 0,  0);
 		SetChannelVoltageRange(i, 0, 5);
+	}
+
+	//Add digital channel objects
+	for(size_t i = 0; i < m_digitalChannelCount; i++)
+	{
+		//Hardware name of the channel
+		size_t chnum = m_digitalChannelBase + i;
+		string chname = to_string(chnum);
+
+		//Create the channel
+		auto chan = new OscilloscopeChannel(
+			this,
+			chname,
+			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			GetChannelColor(i),
+			1,
+			chnum,
+			true);
+		m_channels.push_back(chan);
+
+		string nicename = "d" + to_string(i);
+		chan->SetDisplayName(nicename);
+
+		SetDigitalHysteresis(chnum, 0.1);
+		SetDigitalThreshold(chnum, 0.1);
 	}
 
 	//Set initial memory configuration.
@@ -137,6 +160,8 @@ string DSLabsOscilloscope::GetChannelColor(size_t i)
 void DSLabsOscilloscope::IdentifyHardware()
 {
 	//Assume no MSO channels to start
+	m_analogChannelCount = 0;
+	m_digitalChannelBase = 0;
 	m_digitalChannelCount = 0;
 
 	m_series = SERIES_UNKNOWN;
@@ -144,14 +169,21 @@ void DSLabsOscilloscope::IdentifyHardware()
 	if (m_model == "DSCope U3P100") {
 		m_series = DSCOPE_U3P100;
 		LogDebug("Found DSCope U3P100\n");
+
+		m_analogChannelCount = 2;
+		m_digitalChannelCount = 0;
+
+	} else if (m_model == "DSLogic U3Pro16") {
+		m_series = DSLOGIC_U3PRO16;
+		LogDebug("Found DSLogic U3Pro16\n");
+
+		m_analogChannelCount = 0;
+		m_digitalChannelCount = 16;
+
 	}
 
 	if (m_series == SERIES_UNKNOWN)
 		LogWarning("Unknown DSLabs model \"%s\"\n", m_model.c_str());
-
-	//Ask the scope how many channels it has
-	m_transport->SendCommand("CHANS?");
-	m_analogChannelCount = stoi(m_transport->ReadReply());
 }
 
 DSLabsOscilloscope::~DSLabsOscilloscope()
@@ -300,6 +332,64 @@ bool DSLabsOscilloscope::AcquireData()
 			offsets.push_back(offset);
 
 			s[m_channels[chnum]] = cap;
+		} 
+		else
+		{
+			int trigphase = 0;
+			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
+				return false;
+
+			//Create buffers for output waveforms
+			DigitalWaveform* cap = new DigitalWaveform;
+			s[m_channels[chnum]] = cap;
+			cap->m_timescale = fs_per_sample;
+			cap->m_triggerPhase = trigphase;
+			cap->m_startTimestamp = time(NULL);
+			cap->m_densePacked = false;
+			cap->m_startFemtoseconds = fs;
+
+			//Preallocate memory assuming no deduplication possible
+			cap->Resize(memdepth);
+
+			//First sample never gets deduplicated
+			bool last = (buf[0] & 1) ? true : false;
+			size_t k = 0;
+			cap->m_offsets[0] = 0;
+			cap->m_durations[0] = 1;
+			cap->m_samples[0] = last;
+
+			//Read and de-duplicate the other samples
+			//TODO: can we vectorize this somehow?
+			for(size_t m=1; m<memdepth; m++)
+			{
+				for (int bit = 0; bit < 8; bit++) {
+					bool sample = (buf[m] & (1 << bit)) ? true : false;
+
+					//Deduplicate consecutive samples with same value
+					//FIXME: temporary workaround for rendering bugs
+					//if(last == sample)
+					if( (last == sample) && ((m+3) < memdepth) )
+						cap->m_durations[k] ++;
+
+					//Nope, it toggled - store the new value
+					else
+					{
+						k++;
+						cap->m_offsets[k] = (m * 8) + bit;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = sample;
+						last = sample;
+					}
+				}
+			}
+
+			//Free space reclaimed by deduplication
+			cap->Resize(k);
+			cap->m_offsets.shrink_to_fit();
+			cap->m_durations.shrink_to_fit();
+			cap->m_samples.shrink_to_fit();
+
+			delete[] buf;
 		}
 	}
 
@@ -500,7 +590,7 @@ bool DSLabsOscilloscope::IsDigitalHysteresisConfigurable()
 
 bool DSLabsOscilloscope::IsDigitalThresholdConfigurable()
 {
-	return false;
+	return true;
 }
 
 float DSLabsOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
@@ -508,9 +598,10 @@ float DSLabsOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 	return 0;
 }
 
-float DSLabsOscilloscope::GetDigitalThreshold(size_t /*channel*/)
+float DSLabsOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	return 0;
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_digitalThreshold;
 }
 
 void DSLabsOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*/)
@@ -518,9 +609,17 @@ void DSLabsOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*level*
 	// TODO
 }
 
-void DSLabsOscilloscope::SetDigitalThreshold(size_t /*channel*/, float /*level*/)
+void DSLabsOscilloscope::SetDigitalThreshold(size_t /*channel*/, float level)
 {
-	// TODO
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if (m_digitalThreshold == level) return;
+
+		m_digitalThreshold = level;
+	}
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(GetChannel(m_digitalChannelBase)->GetHwname() + ":THRESH " + to_string(level));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
