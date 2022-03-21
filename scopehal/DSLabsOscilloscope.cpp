@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2022- Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -166,14 +166,17 @@ void DSLabsOscilloscope::IdentifyHardware()
 
 	m_series = SERIES_UNKNOWN;
 
-	if (m_model == "DSCope U3P100") {
+	if (m_model == "DSCope U3P100")
+	{
 		m_series = DSCOPE_U3P100;
 		LogDebug("Found DSCope U3P100\n");
 
 		m_analogChannelCount = 2;
 		m_digitalChannelCount = 0;
 
-	} else if (m_model == "DSLogic U3Pro16") {
+	}
+	else if (m_model == "DSLogic U3Pro16")
+	{
 		m_series = DSLOGIC_U3PRO16;
 		LogDebug("Found DSLogic U3Pro16\n");
 
@@ -332,7 +335,7 @@ bool DSLabsOscilloscope::AcquireData()
 			offsets.push_back(offset);
 
 			s[m_channels[chnum]] = cap;
-		} 
+		}
 		else
 		{
 			int trigphase = 0;
@@ -362,7 +365,8 @@ bool DSLabsOscilloscope::AcquireData()
 			//TODO: can we vectorize this somehow?
 			for(size_t m=1; m<memdepth; m++)
 			{
-				for (int bit = 0; bit < 8; bit++) {
+				for (int bit = 0; bit < 8; bit++)
+				{
 					bool sample = (buf[m] & (1 << bit)) ? true : false;
 
 					//Deduplicate consecutive samples with same value
