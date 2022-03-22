@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2022- Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,34 +27,71 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIOscilloscope_h
-#define SCPIOscilloscope_h
+#ifndef RemoteBridgeOscilloscope_h
+#define RemoteBridgeOscilloscope_h
+
+#include "EdgeTrigger.h"
 
 /**
-	@brief An SCPI-based oscilloscope
+	@brief An oscilloscope connected over a SDK-to-SCPI bridge that follows our pattern
+	       (i.e. uses scpi-server-tools)
  */
-class SCPIOscilloscope 	: public Oscilloscope
-						, public SCPIDevice
+class RemoteBridgeOscilloscope 	: public SCPIOscilloscope
 {
 public:
-	SCPIOscilloscope(SCPITransport* transport, bool identify = true);
-	virtual ~SCPIOscilloscope();
+	RemoteBridgeOscilloscope(SCPITransport* transport, bool identify = true);
+	virtual ~RemoteBridgeOscilloscope();
 
-	virtual std::string IDPing();
+	// Channel Configuration
+	virtual bool IsChannelEnabled(size_t i);
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
 
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
+	OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
+	
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 
-	SCPITransport* GetTransport()
-	{ return m_transport; }
+	// Triggering
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void ForceTrigger();
+	virtual void Stop();
+	virtual void PushTrigger();
+	virtual void PullTrigger();
+	virtual bool IsTriggerArmed();
+
+	// Timebase
+	virtual void SetTriggerOffset(int64_t offset);
+	virtual int64_t GetTriggerOffset();
+	virtual uint64_t GetSampleRate();
+	virtual uint64_t GetSampleDepth();
+	virtual void SetSampleDepth(uint64_t depth);
+	virtual void SetSampleRate(uint64_t rate);
 
 protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
+	int64_t m_triggerOffset;
+
+	uint64_t m_srate;
+	uint64_t m_mdepth;
+
+	//Mutexing for thread safety
+	std::recursive_mutex m_cacheMutex;
+
+	std::map<int, bool> m_channelsEnabled;
+	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
+
+	void PushEdgeTrigger(EdgeTrigger* trig);
 };
 
 #endif
+
+

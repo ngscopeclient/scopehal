@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.g                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2022- Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,12 +30,12 @@
 #ifndef DSLabsOscilloscope_h
 #define DSLabsOscilloscope_h
 
-class EdgeTrigger;
+#include "RemoteBridgeOscilloscope.h"
 
 /**
 	@brief DSLabsOscilloscope - driver for talking to the scopehal-dslabs-bridge daemons
  */
-class DSLabsOscilloscope : public SCPIOscilloscope
+class DSLabsOscilloscope : public RemoteBridgeOscilloscope
 {
 public:
 	DSLabsOscilloscope(SCPITransport* transport);
@@ -49,37 +49,20 @@ public:
 
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
-
 	virtual void FlushConfigCache();
 
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
 	virtual double GetChannelAttenuation(size_t i);
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 	virtual bool CanEnableChannel(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
-	virtual void PushTrigger();
-	virtual void PullTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -87,12 +70,6 @@ public:
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
@@ -119,6 +96,7 @@ public:
 	enum Series
 	{
 		DSCOPE_U3P100,
+		DSLOGIC_U3PRO16,
 
 		SERIES_UNKNOWN	//unknown or invalid model name
 	};
@@ -128,28 +106,19 @@ protected:
 
 	std::string GetChannelColor(size_t i);
 
-	//hardware analog channel count, independent of LA option etc
 	size_t m_analogChannelCount;
 	size_t m_digitalChannelBase;
 	size_t m_digitalChannelCount;
 
-	//Mutexing for thread safety
-	std::recursive_mutex m_cacheMutex;
-
 	//Most DSLabs API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
-	std::map<int, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
-	std::map<size_t, float> m_channelOffsets;
-	std::map<size_t, float> m_channelVoltageRanges;
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-	uint64_t m_srate;
-	uint64_t m_mdepth;
-	int64_t m_triggerOffset;
 	std::map<size_t, double> m_channelAttenuations;
 
-	void PushEdgeTrigger(EdgeTrigger* trig);
+	// Only configurable for the entire device
+	float m_digitalThreshold;
+
+	void SendDataSocket(size_t n, const uint8_t* p);
+	bool ReadDataSocket(size_t n, uint8_t* p);
 
 	Socket* m_dataSocket;
 
