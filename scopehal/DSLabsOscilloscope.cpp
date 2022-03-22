@@ -606,7 +606,7 @@ float DSLabsOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 	return 0;
 }
 
-float DSLabsOscilloscope::GetDigitalThreshold(size_t channel)
+float DSLabsOscilloscope::GetDigitalThreshold(size_t /*channel*/)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_digitalThreshold;
