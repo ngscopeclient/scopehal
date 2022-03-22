@@ -376,7 +376,7 @@ bool DSLabsOscilloscope::AcquireData()
 					//Deduplicate consecutive samples with same value
 					//FIXME: temporary workaround for rendering bugs
 					//if(last == sample)
-					if( (last == sample) && ((m+3) < memdepth) && (m > 3))
+					if( (last == sample) && ((m+1) < memdepth) && (m > 0))
 						cap->m_durations[k] ++;
 
 					//Nope, it toggled - store the new value
