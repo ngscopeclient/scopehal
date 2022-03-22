@@ -338,7 +338,11 @@ bool DSLabsOscilloscope::AcquireData()
 		}
 		else
 		{
-			int trigphase = 0;
+			int32_t first_sample;
+
+			if(!m_transport->ReadRawData(sizeof(first_sample), (uint8_t*)&first_sample))
+				return false;
+
 			if(!m_transport->ReadRawData(memdepth * sizeof(uint8_t), (uint8_t*)buf))
 				return false;
 
@@ -346,7 +350,7 @@ bool DSLabsOscilloscope::AcquireData()
 			DigitalWaveform* cap = new DigitalWaveform;
 			s[m_channels[chnum]] = cap;
 			cap->m_timescale = fs_per_sample;
-			cap->m_triggerPhase = trigphase;
+			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
 			cap->m_densePacked = false;
 			cap->m_startFemtoseconds = fs;
@@ -357,7 +361,7 @@ bool DSLabsOscilloscope::AcquireData()
 			//First sample never gets deduplicated
 			bool last = (buf[0] & 1) ? true : false;
 			size_t k = 0;
-			cap->m_offsets[0] = 0;
+			cap->m_offsets[0] = first_sample;
 			cap->m_durations[0] = 1;
 			cap->m_samples[0] = last;
 
@@ -372,14 +376,14 @@ bool DSLabsOscilloscope::AcquireData()
 					//Deduplicate consecutive samples with same value
 					//FIXME: temporary workaround for rendering bugs
 					//if(last == sample)
-					if( (last == sample) && ((m+3) < memdepth) )
+					if( (last == sample) && ((m+1) < memdepth) && (m > 0))
 						cap->m_durations[k] ++;
 
 					//Nope, it toggled - store the new value
 					else
 					{
 						k++;
-						cap->m_offsets[k] = (m * 8) + bit;
+						cap->m_offsets[k] = first_sample + (m * 8) + bit;
 						cap->m_durations[k] = 1;
 						cap->m_samples[k] = sample;
 						last = sample;
@@ -602,7 +606,7 @@ float DSLabsOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 	return 0;
 }
 
-float DSLabsOscilloscope::GetDigitalThreshold(size_t channel)
+float DSLabsOscilloscope::GetDigitalThreshold(size_t /*channel*/)
 {
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_digitalThreshold;
