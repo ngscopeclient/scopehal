@@ -30,12 +30,12 @@
 #ifndef DigilentOscilloscope_h
 #define DigilentOscilloscope_h
 
-class EdgeTrigger;
+#include "RemoteBridgeOscilloscope.h"
 
 /**
 	@brief DigilentOscilloscope - driver for talking to the scopehal-waveforms-bridge daemon (wfmserver)
  */
-class DigilentOscilloscope : public SCPIOscilloscope
+class DigilentOscilloscope : public RemoteBridgeOscilloscope
 {
 public:
 	DigilentOscilloscope(SCPITransport* transport);
@@ -53,33 +53,18 @@ public:
 	virtual void FlushConfigCache();
 
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
 	virtual double GetChannelAttenuation(size_t i);
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 	virtual bool CanEnableChannel(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
-	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
-	virtual void PullTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -87,12 +72,6 @@ public:
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
-	virtual uint64_t GetSampleRate();
-	virtual uint64_t GetSampleDepth();
-	virtual void SetSampleDepth(uint64_t depth);
-	virtual void SetSampleRate(uint64_t rate);
-	virtual void SetTriggerOffset(int64_t offset);
-	virtual int64_t GetTriggerOffset();
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
@@ -138,23 +117,9 @@ protected:
 
 	//OscilloscopeChannel* m_extTrigChannel;
 
-	//Mutexing for thread safety
-	std::recursive_mutex m_cacheMutex;
-
 	//Most SCPI API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
-	std::map<int, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
-	std::map<size_t, float> m_channelOffsets;
-	std::map<size_t, float> m_channelVoltageRanges;
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-	uint64_t m_srate;
-	uint64_t m_mdepth;
-	int64_t m_triggerOffset;
 	std::map<size_t, double> m_channelAttenuations;
-
-	void PushEdgeTrigger(EdgeTrigger* trig);
 
 	Series m_series;
 
