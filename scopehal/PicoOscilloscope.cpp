@@ -47,8 +47,7 @@ using namespace std;
 //Construction / destruction
 
 PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
-	, m_triggerArmed(false)
+	: RemoteBridgeOscilloscope(transport)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 
@@ -266,13 +265,7 @@ void PicoOscilloscope::EnableChannel(size_t i)
 		}
 	}
 
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = true;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":ON");
+	RemoteBridgeOscilloscope::EnableChannel(i);
 }
 
 void PicoOscilloscope::DisableChannel(size_t i)
@@ -294,12 +287,6 @@ void PicoOscilloscope::DisableChannel(size_t i)
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFF");
 }
 
-OscilloscopeChannel::CouplingType PicoOscilloscope::GetChannelCoupling(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelCouplings[i];
-}
-
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
@@ -308,36 +295,6 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
 	ret.push_back(OscilloscopeChannel::COUPLE_GND);
 	return ret;
-}
-
-void PicoOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	bool valid = true;
-	switch(type)
-	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC1M");
-			break;
-
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC1M");
-			break;
-
-		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC50");
-			break;
-
-		default:
-			LogError("Invalid coupling for channel\n");
-			valid = false;
-	}
-
-	if(valid)
-	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelCouplings[i] = type;
-	}
 }
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
@@ -367,48 +324,10 @@ void PicoOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*lim
 {
 }
 
-float PicoOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelVoltageRanges[i];
-}
-
-void PicoOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelVoltageRanges[i] = range;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
-}
-
 OscilloscopeChannel* PicoOscilloscope::GetExternalTrigger()
 {
 	//FIXME
 	return NULL;
-}
-
-float PicoOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelOffsets[i];
-}
-
-void PicoOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelOffsets[i] = offset;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
 }
 
 Oscilloscope::TriggerMode PicoOscilloscope::PollTrigger()
@@ -601,37 +520,6 @@ bool PicoOscilloscope::AcquireData()
 	return true;
 }
 
-void PicoOscilloscope::Start()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("START");
-	m_triggerArmed = true;
-	m_triggerOneShot = false;
-}
-
-void PicoOscilloscope::StartSingleTrigger()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("SINGLE");
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
-void PicoOscilloscope::Stop()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("STOP");
-	m_triggerArmed = false;
-}
-
-void PicoOscilloscope::ForceTrigger()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("FORCE");
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
 bool PicoOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
@@ -770,11 +658,6 @@ bool PicoOscilloscope::SetInterleaving(bool /*combine*/)
 	return false;
 }
 
-void PicoOscilloscope::PullTrigger()
-{
-	//pulling not needed, we always have a valid trigger cached
-}
-
 void PicoOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
@@ -785,46 +668,6 @@ void PicoOscilloscope::PushTrigger()
 		LogWarning("Unknown trigger type (not an edge)\n");
 
 	ClearPendingWaveforms();
-}
-
-/**
-	@brief Pushes settings for an edge trigger to the instrument
- */
-void PicoOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Type
-	//m_transport->SendCommand(":TRIG:MODE EDGE");
-
-	//Delay
-	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
-
-	//Source
-	auto chan = trig->GetInput(0).m_channel;
-	m_transport->SendCommand("TRIG:SOU " + chan->GetHwname());
-
-	//Level
-	char buf[128];
-	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel() / chan->GetAttenuation());
-	m_transport->SendCommand(buf);
-
-	//Slope
-	switch(trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("TRIG:EDGE:DIR RISING");
-			break;
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("TRIG:EDGE:DIR FALLING");
-			break;
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("TRIG:EDGE:DIR ANY");
-			break;
-		default:
-			LogWarning("Unknown edge type\n");
-			return;
-	}
 }
 
 vector<Oscilloscope::AnalogBank> PicoOscilloscope::GetAnalogBanks()
