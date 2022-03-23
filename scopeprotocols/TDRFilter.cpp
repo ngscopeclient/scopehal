@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -82,22 +82,22 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRFilter::GetVoltageRange()
+float TDRFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TDRFilter::GetOffset()
+float TDRFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-void TDRFilter::SetVoltageRange(double range)
+void TDRFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void TDRFilter::SetOffset(double offset)
+void TDRFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }
@@ -105,12 +105,6 @@ void TDRFilter::SetOffset(double offset)
 string TDRFilter::GetProtocolName()
 {
 	return "TDR";
-}
-
-bool TDRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool TDRFilter::NeedsConfig()
@@ -154,9 +148,9 @@ void TDRFilter::Refresh()
 
 	//Set up units
 	if(mode == MODE_IMPEDANCE)
-		m_yAxisUnit = Unit(Unit::UNIT_OHMS);
+		SetYAxisUnits(Unit(Unit::UNIT_OHMS), 0);
 	else
-		m_yAxisUnit = Unit(Unit::UNIT_RHO);
+		SetYAxisUnits(Unit(Unit::UNIT_RHO), 0);
 
 	//Reset gain/offset if output mode was changed
 	if(mode != m_oldMode)

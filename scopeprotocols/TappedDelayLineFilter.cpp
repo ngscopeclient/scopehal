@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -121,23 +121,17 @@ string TappedDelayLineFilter::GetProtocolName()
 	return "Tapped Delay Line";
 }
 
-bool TappedDelayLineFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool TappedDelayLineFilter::NeedsConfig()
 {
 	return true;
 }
 
-double TappedDelayLineFilter::GetVoltageRange()
+float TappedDelayLineFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TappedDelayLineFilter::GetOffset()
+float TappedDelayLineFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
@@ -162,7 +156,7 @@ void TappedDelayLineFilter::Refresh()
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
 	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();

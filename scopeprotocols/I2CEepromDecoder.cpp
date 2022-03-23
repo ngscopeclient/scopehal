@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -106,19 +106,9 @@ vector<string> I2CEepromDecoder::GetHeaders()
 	return ret;
 }
 
-double I2CEepromDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string I2CEepromDecoder::GetProtocolName()
 {
 	return "I2C EEPROM";
-}
-
-bool I2CEepromDecoder::IsOverlay()
-{
-	return true;
 }
 
 bool I2CEepromDecoder::NeedsConfig()

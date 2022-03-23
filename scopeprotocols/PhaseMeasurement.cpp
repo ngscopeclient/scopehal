@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,7 @@ PhaseMeasurement::PhaseMeasurement(const string& color)
 	, m_freqModeName("Frequency Mode")
 	, m_freqName("Center Frequency")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -87,23 +87,17 @@ string PhaseMeasurement::GetProtocolName()
 	return "Phase";
 }
 
-bool PhaseMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool PhaseMeasurement::NeedsConfig()
 {
 	return true;
 }
 
-double PhaseMeasurement::GetVoltageRange()
+float PhaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 370;
 }
 
-double PhaseMeasurement::GetOffset()
+float PhaseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

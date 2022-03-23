@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -94,7 +94,7 @@ float IVCurve::InterpolateCurrent(float voltage)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// VTCurve
+// VTCurves
 
 float VTCurves::InterpolateVoltage(IBISCorner corner, float time)
 {
@@ -147,6 +147,25 @@ float VTCurves::InterpolateVoltage(IBISCorner corner, float time)
 	//Interpolate voltage
 	float vlo = m_curves[corner][last_lo].m_voltage;
 	return vlo + (m_curves[corner][last_hi].m_voltage - vlo)*frac;
+}
+
+/**
+	@brief Gets the propagation delay of a V/T curve
+
+	The propagation delay is defined as the timestamp at which the output voltage changes by more than 0.1% from
+	the initial value.
+ */
+int64_t VTCurves::GetPropagationDelay(IBISCorner corner)
+{
+	auto& curve = m_curves[corner];
+
+	float threshold = curve[0].m_voltage * 0.001;
+	for(auto& p : curve)
+	{
+		if(fabs(p.m_voltage - curve[0].m_voltage) > threshold)
+			return p.m_time * FS_PER_SECOND;
+	}
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +232,7 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 
 	Each output point ranges from 0 (fully off) to 1 (fully on)
 
-	TODO: take in multiple corners so we can use low voltage and high cap, etc
+	TODO: this is completely wrong, we should use dV/dT settings
 
 	@param curve	V/T curve to use
 	@param oldstate	I/V curve set for currently-on buffer
@@ -223,13 +242,14 @@ VTCurves* IBISModel::GetHighestRisingWaveform()
 	@param rising	True for rising edge, false for falling edge
  */
 vector<float> IBISModel::CalculateTurnonCurve(
-	VTCurves* curve,
-	IVCurve* pullup,
-	IVCurve* pulldown,
-	IBISCorner corner,
-	float dt,
-	bool rising)
+	VTCurves* /*curve*/,
+	IVCurve* /*pullup*/,
+	IVCurve* /*pulldown*/,
+	IBISCorner /*corner*/,
+	float /*dt*/,
+	bool /*rising*/)
 {
+	/*
 	vector<float> ret;
 
 	float cap = m_dieCapacitance[corner];
@@ -292,6 +312,9 @@ vector<float> IBISModel::CalculateTurnonCurve(
 			break;
 	}
 
+	return ret;
+	*/
+	vector<float> ret;
 	return ret;
 }
 
@@ -589,6 +612,25 @@ bool IBISParser::Load(string fname)
 					&model->m_voltages[CORNER_MAX]);
 			}
 
+			//TODO: IBIS 5.0 SSO
+			//See https://www.micron.com/-/media/client/global/documents/products/technical-note/dram/tn_0033_ibis_models_power_integrity_simulation.pdf
+			else if( (scmd == "ISSO PU") || (scmd == "ISSO PD") )
+			{
+				data_block = BLOCK_NONE;
+			}
+
+			//TODO: IBIS 5.0 composite current
+			else if(scmd == "Composite Current")
+			{
+				data_block = BLOCK_NONE;
+			}
+
+			//TODO: not sure what this is yet
+			else if(scmd == "Driver Schedule")
+			{
+				data_block = BLOCK_NONE;
+			}
+
 			else
 			{
 				LogWarning("Unrecognized command %s\n", command);
@@ -702,7 +744,11 @@ bool IBISParser::Load(string fname)
 
 			//Fixture properties in waveforms
 			else if(skeyword == "R_fixture")
-				sscanf(line, "R_fixture = %f", &waveform.m_fixtureResistance);
+			{
+				char fres[128];
+				sscanf(line, "R_fixture = %127s", fres);
+				waveform.m_fixtureResistance = ParseNumber(fres);
+			}
 
 			else if(skeyword == "V_fixture")
 				sscanf(line, "V_fixture = %f", &waveform.m_fixtureVoltage);
@@ -815,6 +861,9 @@ float IBISParser::ParseNumber(const char* str)
 
 	switch(scale)
 	{
+		case 'k':
+			return ret * 1e3;
+
 		case 'm':
 			return ret * 1e-3;
 

@@ -43,8 +43,8 @@ public:
 	virtual void Refresh();
 	virtual bool NeedsConfig();
 
-	virtual double GetVoltageRange();
-	virtual double GetOffset();
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();

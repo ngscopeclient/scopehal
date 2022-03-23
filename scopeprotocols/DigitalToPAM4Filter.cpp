@@ -71,6 +71,38 @@ void DigitalToPAM4Filter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
+float DigitalToPAM4Filter::GetVoltageRange(size_t /*stream*/)
+{
+	float v0 = m_parameters[m_level00].GetFloatVal();
+	float v1 = m_parameters[m_level01].GetFloatVal();
+	float v2 = m_parameters[m_level10].GetFloatVal();
+	float v3 = m_parameters[m_level11].GetFloatVal();
+	float vmin = min(v0, v1);
+	vmin = min(vmin, v2);
+	vmin = min(vmin, v3);
+	float vmax = max(v0, v1);
+	vmax = max(vmax, v2);
+	vmax = max(vmax, v3);
+
+	return fabs(vmax - vmin) * 1.05;
+}
+
+float DigitalToPAM4Filter::GetOffset(size_t /*stream*/)
+{
+	float v0 = m_parameters[m_level00].GetFloatVal();
+	float v1 = m_parameters[m_level01].GetFloatVal();
+	float v2 = m_parameters[m_level10].GetFloatVal();
+	float v3 = m_parameters[m_level11].GetFloatVal();
+	float vmin = min(v0, v1);
+	vmin = min(vmin, v2);
+	vmin = min(vmin, v3);
+	float vmax = max(v0, v1);
+	vmax = max(vmax, v2);
+	vmax = max(vmax, v3);
+
+	return (vmax-vmin)/2;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -32,10 +32,12 @@
 
 class EdgeTrigger;
 
+#include "RemoteBridgeOscilloscope.h"
+
 /**
 	@brief PicoOscilloscope - driver for talking to the scopehal-pico-bridge daemons
  */
-class PicoOscilloscope : public SCPIOscilloscope
+class PicoOscilloscope : public RemoteBridgeOscilloscope
 {
 public:
 	PicoOscilloscope(SCPITransport* transport);
@@ -56,30 +58,19 @@ public:
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
 	virtual double GetChannelAttenuation(size_t i);
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
 	virtual bool CanEnableChannel(size_t i);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
-	virtual void Start();
-	virtual void StartSingleTrigger();
-	virtual void Stop();
-	virtual void ForceTrigger();
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
-	virtual void PullTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -177,29 +168,13 @@ protected:
 
 	OscilloscopeChannel* m_extTrigChannel;
 
-	//Mutexing for thread safety
-	std::recursive_mutex m_cacheMutex;
-
 	//Most Pico API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
-	std::map<int, bool> m_channelsEnabled;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
-	std::map<size_t, double> m_channelOffsets;
-	std::map<size_t, double> m_channelVoltageRanges;
-	bool m_triggerArmed;
-	bool m_triggerOneShot;
-	uint64_t m_srate;
-	uint64_t m_mdepth;
-	int64_t m_triggerOffset;
 	std::map<size_t, double> m_channelAttenuations;
 	ADCMode m_adcMode;
 	std::map<int, bool> m_digitalBankPresent;
 	std::map<int, float> m_digitalThresholds;
 	std::map<int, float> m_digitalHysteresis;
-
-	void PushEdgeTrigger(EdgeTrigger* trig);
-
-	Socket* m_dataSocket;
 
 	Series m_series;
 

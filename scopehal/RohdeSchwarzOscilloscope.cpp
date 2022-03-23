@@ -390,7 +390,7 @@ void RohdeSchwarzOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned i
 	LogWarning("RohdeSchwarzOscilloscope::SetChannelBandwidthLimit unimplemented\n");
 }
 
-double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
+float RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -403,14 +403,14 @@ double RohdeSchwarzOscilloscope::GetChannelVoltageRange(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
 
 	string reply = m_transport->ReadReply();
-	double range;
-	sscanf(reply.c_str(), "%lf", &range);
+	float range;
+	sscanf(reply.c_str(), "%f", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelVoltageRanges[i] = range;
 	return range;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void RohdeSchwarzOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -430,7 +430,7 @@ OscilloscopeChannel* RohdeSchwarzOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
-double RohdeSchwarzOscilloscope::GetChannelOffset(size_t i)
+float RohdeSchwarzOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -444,15 +444,15 @@ double RohdeSchwarzOscilloscope::GetChannelOffset(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
 
 	string reply = m_transport->ReadReply();
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 	offset = -offset;
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void RohdeSchwarzOscilloscope::SetChannelOffset(size_t i, double offset)
+void RohdeSchwarzOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,7 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_FS);
-	m_yAxisUnit = Unit(Unit::UNIT_VOLTS);
+	SetYAxisUnits(Unit(Unit::UNIT_VOLTS), 0);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -95,24 +95,18 @@ string EyeHeightMeasurement::GetProtocolName()
 	return "Eye Height";
 }
 
-bool EyeHeightMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool EyeHeightMeasurement::NeedsConfig()
 {
 	//need manual config
 	return true;
 }
 
-double EyeHeightMeasurement::GetVoltageRange()
+float EyeHeightMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;
 }
 
-double EyeHeightMeasurement::GetOffset()
+float EyeHeightMeasurement::GetOffset(size_t /*stream*/)
 {
 	return - (m_min + m_max)/2;
 }
@@ -156,7 +150,7 @@ void EyeHeightMeasurement::Refresh()
 	end_bin = min(end_bin, din->GetWidth());
 
 	//Approximate center of the eye opening
-	float vrange = m_inputs[0].m_channel->GetVoltageRange();
+	float vrange = m_inputs[0].GetVoltageRange();
 	size_t height = din->GetHeight();
 	float volts_per_row = vrange / height;
 	float volts_at_bottom = din->GetCenterVoltage() - vrange/2;

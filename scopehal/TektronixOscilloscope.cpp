@@ -117,7 +117,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 
 	//TODO: get colors for channels 5-8 on wide instruments
 	const char* colors_default[4] = { "#ffff00", "#32ff00", "#5578ff", "#ff0084" };	//yellow-green-violet-pink
-	const char* colors_mso56[4] = { "#ffff00", "#20d3d8", "#f23f59", "#f16727" };	//yellow-cyan-pink-orange
+	const char* colors_mso5[6] = { "#faf539", "#23cdda", "#ee435f",
+	                               "#90ce3b", "#fa9a32", "#2526bb" };	            //yellow-cyan-red-green-orange-blue
+	                                                                                //picked from a remoting screenshot,
+	                                                                                //seems like they might be a little dim
+	const char* colors_mso6[4] = { "#ffff00", "#20d3d8", "#f23f59", "#f16727" };	//yellow-cyan-pink-orange
 
 	for(int i=0; i<nchans; i++)
 	{
@@ -126,8 +130,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		switch(m_family)
 		{
 			case FAMILY_MSO5:
+				color = colors_mso5[i % 6];
+				break;
+
 			case FAMILY_MSO6:
-				color = colors_mso56[i % 4];
+				color = colors_mso6[i % 4];
 				break;
 
 			default:
@@ -161,7 +168,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					this,
 					string("CH") + to_string(i+1) + "_SPECTRUM",
 					OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-					colors_mso56[i % 4],
+					m_channels[i]->m_displaycolor,
 					m_channels.size(),
 					true));
 			}
@@ -501,7 +508,7 @@ void TektronixOscilloscope::FlushConfigCache()
 bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
-	if(i == m_extTrigChannel->GetIndex())
+	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
 		return false;
 
 	//Pre-checks based on type
@@ -578,7 +585,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 {
 	if(!CanEnableChannel(i))
 		return;
-	if(i == m_extTrigChannel->GetIndex())
+	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
 		return;
 
 	{
@@ -763,6 +770,9 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelCouplings[i] = coupling;
+
+	// Different couplings imply different bandwidth limits
+	m_channelBandwidthLimits.clear();
 	return coupling;
 }
 
@@ -772,7 +782,8 @@ vector<OscilloscopeChannel::CouplingType> TektronixOscilloscope::GetAvailableCou
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
 	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	// ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	// TODO: This is not present on the MSO5, and it is not supported in SetChannelCoupling. Remove?
 	return ret;
 }
 
@@ -984,11 +995,20 @@ vector<unsigned int> TektronixOscilloscope::GetChannelBandwidthLimiters(size_t i
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
-		case FAMILY_MSO6:
+			ret.push_back(20);
+			ret.push_back(250);
+
+			if (is_1m)
+				ret.push_back(500);
 
 			//Only show "unlimited" for 50 ohm channels
-			if(!is_1m)
+			//TODO: Behavior copied from MSO6. Appropriate?
+			if (!is_1m)
 				ret.push_back(0);
+			
+			break;
+
+		case FAMILY_MSO6:
 
 			ret.push_back(20);
 			ret.push_back(200);
@@ -1015,6 +1035,11 @@ vector<unsigned int> TektronixOscilloscope::GetChannelBandwidthLimiters(size_t i
 			}
 			else if(m_maxBandwidth >= 1000)
 				ret.push_back(1000);
+
+			//Only show "unlimited" for 50 ohm channels
+			if(!is_1m)
+				ret.push_back(0);
+
 			break;
 
 		default:
@@ -1056,7 +1081,7 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 	}
 }
 
-double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
+float TektronixOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//Check cache
 	{
@@ -1074,7 +1099,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 		return 1;
 
 	//We want total range, not per division
-	double range = 1;
+	float range = 1;
 	{
 		switch(m_family)
 		{
@@ -1102,7 +1127,7 @@ double TektronixOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void TektronixOscilloscope::SetChannelVoltageRange(size_t i, size_t stream, float range)
 {
 	//Update cache
 	{
@@ -1124,8 +1149,8 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, double range)
 		case FAMILY_MSO6:
 			if(IsSpectrum(i))
 			{
-				double divsize = range/10;
-				double offset_div = (GetChannelOffset(i) / divsize) - 5;
+				float divsize = range/10;
+				float offset_div = (GetChannelOffset(i, stream) / divsize) - 5;
 
 				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:SCA " + to_string(divsize));
@@ -1240,7 +1265,7 @@ void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
 	}
 }
 
-double TektronixOscilloscope::GetChannelOffset(size_t i)
+float TektronixOscilloscope::GetChannelOffset(size_t i, size_t stream)
 {
 	//Check cache
 	{
@@ -1270,7 +1295,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 					//It also seems to be negative, and reported from the top of the display rather than the middle.
 					float pos = stof(m_transport->SendCommandQueuedWithReply(
 						string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) + ":VERT:POS?"));
-					offset = (pos+5) * (GetChannelVoltageRange(i)/10);
+					offset = (pos+5) * (GetChannelVoltageRange(i, stream)/10);
 				}
 				else
 					offset = -stof(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
@@ -1287,7 +1312,7 @@ double TektronixOscilloscope::GetChannelOffset(size_t i)
 	return offset;
 }
 
-void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
+void TektronixOscilloscope::SetChannelOffset(size_t i, size_t stream, float offset)
 {
 	//Update cache
 	{
@@ -1309,8 +1334,8 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, double offset)
 		case FAMILY_MSO6:
 			if(IsSpectrum(i))
 			{
-				double divsize = GetChannelVoltageRange(i) / 10;
-				double offset_div = (offset / divsize) - 5;
+				float divsize = GetChannelVoltageRange(i, stream) / 10;
+				float offset_div = (offset / divsize) - 5;
 
 				m_transport->SendCommandQueued(string("DISP:SPECV:CH") + to_string(i-m_spectrumChannelBase+1) +
 					":VERT:POS " + to_string(offset_div));
@@ -1864,25 +1889,32 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 	const int64_t g = k*m;
 
 	uint64_t bases[] = { 1000, 1250, 2500, 3125, 5000, 6250 };
-	uint64_t scales_mso6[] = {1, 10, 100, 1*k, 10*k};
+	vector<uint64_t> scales = {1, 10, 100, 1*k};
 
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
-			break;
-
 		case FAMILY_MSO6:
 			{
 				for(auto b : bases)
 					ret.push_back(b / 10);
 
-				for(auto scale : scales_mso6)
+				for(auto scale : scales)
 				{
 					for(auto b : bases)
 						ret.push_back(b * scale);
 				}
 
-				//We break with the pattern on the upper end of the frequency range
+				// MSO6 also supports these, or at least had them available in the picker before.
+				// TODO: Are these actually supported?
+
+				if (m_family == FAMILY_MSO6) {
+					for(auto b : bases) {
+						ret.push_back(b * 10 * k);
+					}
+				}
+
+				// We break with the pattern on the upper end of the frequency range
 				ret.push_back(12500 * k);
 				ret.push_back(25 * m);
 				ret.push_back(31250 * k);
@@ -1896,8 +1928,21 @@ vector<uint64_t> TektronixOscilloscope::GetSampleRatesNonInterleaved()
 				ret.push_back(3125 * m);
 				ret.push_back(6250 * m);
 				ret.push_back(12500 * m);
-				ret.push_back(25 * g);		//8 bits, not 12.
-											//TODO: we can save bandwidth by using 8 bit waveform download for this
+
+				// Below are interpolated. 8 bits, not 12.
+				//TODO: we can save bandwidth by using 8 bit waveform download for these
+
+				ret.push_back(25 * g);
+
+				// MSO5 supports these, TODO: Does MSO6?
+				if (m_family == FAMILY_MSO5) {
+					ret.push_back(25000 * m);
+					ret.push_back(62500 * m);
+					ret.push_back(125000 * m);
+					ret.push_back(250000 * m);
+					ret.push_back(500000 * m);
+				}
+
 			}
 			break;
 
@@ -1946,12 +1991,10 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 
 	switch(m_family)
 	{
-		case FAMILY_MSO5:
-			break;
-
 		//The scope allows extremely granular specification of memory depth.
 		//For our purposes, only show a bunch of common step values.
 		//No need for super fine granularity since record length isn't tied to the UI display width.
+		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			{
 				ret.push_back(500);

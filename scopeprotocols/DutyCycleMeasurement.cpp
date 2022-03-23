@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,7 @@ using namespace std;
 DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_PERCENT);
+	SetYAxisUnits(Unit(Unit::UNIT_PERCENT), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -89,24 +89,18 @@ string DutyCycleMeasurement::GetProtocolName()
 	return "Duty Cycle";
 }
 
-bool DutyCycleMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool DutyCycleMeasurement::NeedsConfig()
 {
 	//automatic configuration
 	return false;
 }
 
-double DutyCycleMeasurement::GetVoltageRange()
+float DutyCycleMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DutyCycleMeasurement::GetOffset()
+float DutyCycleMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }
@@ -150,11 +144,11 @@ void DutyCycleMeasurement::Refresh()
 		int64_t mid = edges[i+1];
 		int64_t end = edges[i+2];
 
-		double t1 = mid-start;
-		double t2 = end-mid;
-		double total = t1+t2;
+		float t1 = mid-start;
+		float t2 = end-mid;
+		float total = t1+t2;
 
-		double duty;
+		float duty;
 
 		//T1 is high time
 		if(!initial_polarity)

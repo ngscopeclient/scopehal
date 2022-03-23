@@ -9,6 +9,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp
+	ComplexImportFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
 	DCDMeasurement.cpp
@@ -20,6 +21,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DeskewFilter.cpp
 	DigitalToPAM4Filter.cpp
 	DigitalToNRZFilter.cpp
+	DivideFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp
@@ -43,6 +45,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetAutonegotiationDecoder.cpp
 	EthernetGMIIDecoder.cpp
 	EthernetRGMIIDecoder.cpp
+	EthernetRMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
 	EyeBitRateMeasurement.cpp
 	EyePattern.cpp
@@ -55,10 +58,14 @@ set(SCOPEPROTOCOLS_SOURCES
 	FFTFilter.cpp
 	FIRFilter.cpp
 	FrequencyMeasurement.cpp
+	FSKDecoder.cpp
+	GroupDelayFilter.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp
+	HyperRAMDecoder.cpp
 	I2CDecoder.cpp
 	I2CEepromDecoder.cpp
+	IBISDriverFilter.cpp
 	IBM8b10bDecoder.cpp
 	IPv4Decoder.cpp
 	ISIMeasurement.cpp
@@ -82,17 +89,21 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeriodMeasurement.cpp
 	PhaseMeasurement.cpp
 	PkPkMeasurement.cpp
+	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
+	ReferencePlaneExtensionFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
+    ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
 	SpectrogramFilter.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
+	SquelchFilter.cpp
 	StepGeneratorFilter.cpp
 	SubtractFilter.cpp
 	SWDDecoder.cpp
@@ -104,6 +115,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	ToneGeneratorFilter.cpp
+	TouchstoneImportFilter.cpp
 	TMDSDecoder.cpp
 	TopMeasurement.cpp
 	UARTDecoder.cpp
@@ -114,9 +126,12 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
+	VectorFrequencyFilter.cpp
+	VectorPhaseFilter.cpp
 	VerticalBathtub.cpp
 	WaveformGenerationFilter.cpp
 	Waterfall.cpp
+	WAVImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 
 	AverageStatistic.cpp

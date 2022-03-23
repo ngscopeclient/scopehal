@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,6 +76,14 @@ public:
 		If a derived class caches configuration, it should override this function to clear any cached data.
 	 */
 	virtual void FlushConfigCache();
+
+	/**
+		@brief Checks if the instrument is currently online.
+
+		@return True if the Oscilloscope object is actively connected to a physical scope.
+				False if working offline, a file import, etc.
+	 */
+	virtual bool IsOffline();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Channel information
@@ -251,8 +259,9 @@ public:
 		The range does not depend on the offset.
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 	 */
-	virtual double GetChannelVoltageRange(size_t i) =0;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) =0;
 
 	/**
 		@brief Sets the range of the current channel configuration.
@@ -264,9 +273,10 @@ public:
 		The range does not depend on the offset.
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 		@param range		Voltage range
 	 */
-	virtual void SetChannelVoltageRange(size_t i, double range) =0;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) =0;
 
 	/**
 		@brief Determines if a channel has a probe connected which supports the "auto zero" feature.
@@ -327,16 +337,18 @@ public:
 		@brief Gets the offset, in volts, for a given channel
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 	 */
-	virtual double GetChannelOffset(size_t i) =0;
+	virtual float GetChannelOffset(size_t i, size_t stream) =0;
 
 	/**
 		@brief Sets the offset for a given channel
 
 		@param i			Zero-based index of channel
+		@param stream		Zero-based index of stream within channel (0 if only one stream, as is normally the case)
 		@param offset		Offset, in volts
 	 */
-	virtual void SetChannelOffset(size_t i, double offset) =0;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) =0;
 
 	/**
 		@brief Checks if a channel is capable of hardware polarity inversion
@@ -820,6 +832,13 @@ protected:
 	void Convert8BitSamplesAVX2(
 		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
+	void ConvertUnsigned8BitSamples(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void ConvertUnsigned8BitSamplesGeneric(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	void ConvertUnsigned8BitSamplesAVX2(
+		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+
 	void Convert16BitSamples(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 	void Convert16BitSamplesGeneric(
@@ -836,7 +855,7 @@ public:
 	virtual bool PopPendingWaveform();
 
 protected:
-	typedef std::map<OscilloscopeChannel*, WaveformBase*> SequenceSet;
+	typedef std::map<StreamDescriptor, WaveformBase*> SequenceSet;
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
 	std::recursive_mutex m_mutex;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,24 +74,18 @@ string BaseMeasurement::GetProtocolName()
 	return "Base";
 }
 
-bool BaseMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool BaseMeasurement::NeedsConfig()
 {
 	//automatic configuration
 	return false;
 }
 
-double BaseMeasurement::GetVoltageRange()
+float BaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double BaseMeasurement::GetOffset()
+float BaseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

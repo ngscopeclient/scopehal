@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,20 +63,19 @@ bool DCOffsetFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DCOffsetFilter::GetVoltageRange()
+float DCOffsetFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
+}
+
+float DCOffsetFilter::GetOffset(size_t /*stream*/)
+{
+	return m_inputs[0].GetOffset() - m_parameters[m_offsetname].GetFloatVal();
 }
 
 string DCOffsetFilter::GetProtocolName()
 {
 	return "DC offset";
-}
-
-bool DCOffsetFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool DCOffsetFilter::NeedsConfig()

@@ -63,6 +63,22 @@ void DigitalToNRZFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
+float DigitalToNRZFilter::GetVoltageRange(size_t /*stream*/)
+{
+	float v0 = m_parameters[m_level0].GetFloatVal();
+	float v1 = m_parameters[m_level1].GetFloatVal();
+
+	return fabs(v1 - v0) * 1.05;
+}
+
+float DigitalToNRZFilter::GetOffset(size_t /*stream*/)
+{
+	float v0 = m_parameters[m_level0].GetFloatVal();
+	float v1 = m_parameters[m_level1].GetFloatVal();
+
+	return -(v0+v1)/2;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

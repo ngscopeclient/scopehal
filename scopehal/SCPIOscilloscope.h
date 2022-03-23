@@ -51,6 +51,10 @@ public:
 
 	SCPITransport* GetTransport()
 	{ return m_transport; }
+
+protected:
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
 };
 
 #endif

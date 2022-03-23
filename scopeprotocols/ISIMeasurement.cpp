@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,7 @@ using namespace std;
 ISIMeasurement::ISIMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("DDJ");
@@ -73,12 +73,6 @@ string ISIMeasurement::GetProtocolName()
 	return "ISI";
 }
 
-bool ISIMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool ISIMeasurement::IsScalarOutput()
 {
 	return true;
@@ -89,12 +83,12 @@ bool ISIMeasurement::NeedsConfig()
 	return false;
 }
 
-double ISIMeasurement::GetVoltageRange()
+float ISIMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;
 }
 
-double ISIMeasurement::GetOffset()
+float ISIMeasurement::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }

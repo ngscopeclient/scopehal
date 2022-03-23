@@ -272,12 +272,12 @@ void DemoOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz
 	m_channelBandwidth[i] = limit_mhz;
 }
 
-double DemoOscilloscope::GetChannelVoltageRange(size_t i)
+float DemoOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	return m_channelVoltageRange[i];
 }
 
-void DemoOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void DemoOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	m_channelVoltageRange[i] = range;
 }
@@ -287,12 +287,12 @@ OscilloscopeChannel* DemoOscilloscope::GetExternalTrigger()
 	return m_extTrigger;
 }
 
-double DemoOscilloscope::GetChannelOffset(size_t i)
+float DemoOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	return m_channelOffset[i];
 }
 
-void DemoOscilloscope::SetChannelOffset(size_t i, double offset)
+void DemoOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	m_channelOffset[i] = offset;
 }

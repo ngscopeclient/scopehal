@@ -57,16 +57,19 @@ public:
 	enum InstrumentTypes
 	{
 		//An oscilloscope or logic analyzer
-		INST_OSCILLOSCOPE 		= 1,
+		INST_OSCILLOSCOPE 		= 0x01,
 
 		//A multimeter (query to see what measurements it supports)
-		INST_DMM 				= 2,
+		INST_DMM 				= 0x02,
 
 		//A power supply
-		INST_PSU				= 4,
+		INST_PSU				= 0x04,
 
 		//A function generator
-		INST_FUNCTION			= 8
+		INST_FUNCTION			= 0x08,
+
+		//An RF signal generator
+		INST_RF_GEN				= 0x10
 	};
 
 	virtual unsigned int GetInstrumentTypes() =0;

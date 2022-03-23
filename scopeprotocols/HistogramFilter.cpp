@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,7 @@ using namespace std;
 HistogramFilter::HistogramFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_COUNTS_SCI);
+	SetYAxisUnits(Unit(Unit::UNIT_COUNTS_SCI), 0);
 
 	//Set up channels
 	CreateInput("data");
@@ -81,24 +81,18 @@ string HistogramFilter::GetProtocolName()
 	return "Histogram";
 }
 
-bool HistogramFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool HistogramFilter::NeedsConfig()
 {
 	//automatic configuration
 	return false;
 }
 
-double HistogramFilter::GetVoltageRange()
+float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double HistogramFilter::GetOffset()
+float HistogramFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }
@@ -124,7 +118,7 @@ void HistogramFilter::Refresh()
 	}
 
 	auto din = GetAnalogInputWaveform(0);
-	m_xAxisUnit = GetInput(0).m_channel->GetYAxisUnits();
+	m_xAxisUnit = GetInput(0).GetYAxisUnits();
 
 	//Calculate min/max of the input data
 	float nmin = FLT_MAX;

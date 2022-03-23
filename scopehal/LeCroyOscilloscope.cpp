@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -294,7 +294,7 @@ void LeCroyOscilloscope::DetectOptions()
 			else if(o.find("_TD") != string::npos)
 				type = "Trig/decode";
 			else if( (o.find("_D") != string::npos) || (o.find("-DECODE") != string::npos) )
-				type = "Protocol decode";
+				type = "Protocol Decode";
 
 			//If we have an LA module installed, add the digital channels
 			if( (o == "MSXX") && !m_hasLA)
@@ -472,12 +472,14 @@ void LeCroyOscilloscope::DetectOptions()
 			//Has to be before USB2 to match properly.
 			else if(o == "USB2-HSIC-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "USB2 HSIC";
 			}
 
+			//What is DECODE_MEASURE? (with no protocol name)
+
 			//Currently unsupported trigger/decodes, to be added in the future
-			else if(o.find("CAN_FD") == 0)
+			else if(o.find("CAN_FD") == 0)		//CAN_FD_TD, CAN_FD_TDM, CAN_FD_TD_SYMB
 				desc = "CAN FD";
 			else if(o.find("FIBER_CH") == 0)
 				desc = "Fibre Channel";
@@ -503,6 +505,18 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "HD analog TV";
 			}
 
+			//QualiPHY
+			else if(o.find("QPHY-") == 0)
+			{
+				type = "Protocol Compliance";
+				desc = "QualiPHY";
+			}
+			else if(o == "HDMI")
+			{
+				type = "Protocol Compliance";
+				desc = "HDMI";
+			}
+
 			//High speed serial trigger
 			else if(o == "SERIALPAT_T")
 			{
@@ -514,34 +528,44 @@ void LeCroyOscilloscope::DetectOptions()
 			//Print out name but otherwise ignore
 			else if(o == "10-100M-ENET-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "10/100 Ethernet";
+			}
+			else if(o == "ENET")
+			{
+				type = "Protocol Decode";
+				desc = "Ethernet";			//TODO: What speed?
+			}
+			else if(o == "ENET100G")
+			{
+				type = "Protocol Decode";
+				desc = "100G Ethernet";
 			}
 			else if(o == "10G-ENET-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "10G Ethernet";
 			}
 			else if(o == "8B10B-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "8B/10B";
 			}
 			else if(o == "64B66B-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "64B/66B";
 			}
 			else if(
 				(o == "ARINC429") ||
 				(o == "ARINC429_DME_SYMB") )
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "ARINC 429";
 			}
 			else if(o == "AUTOENETDEBUG")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Automotive Ethernet";
 			}
 			else if(o == "DIGRF_3G_D")
@@ -552,32 +576,45 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "MIPI D-PHY";
 			else if(o == "ET")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Electrical Telecom";
 			}
 			else if(o == "MANCHESTER-BUS")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Manchester";
 			}
 			else if(o == "MDIO")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "Ethernet MDIO";
 			}
 			else if(o == "MPHY-DECODE")
 				desc = "MIPI M-PHY";
+			else if(o == "PCIE")
+			{
+				desc = "PCIe";
+				type = "Protocol Decode";	//TODO: What's difference between PCIE and PCIE_D
+			}
 			else if(o == "PCIE_D")
-				desc = "PCIe gen 1";
+			{
+				desc = "PCIe";
+				type = "Protocol Decode";
+			}
+			else if( (o == "SAS") || (o == "SAS_TD" ) )
+			{
+				desc = "Serial Attached SCSI";
+				type = "Protocol Decode";	//TODO: What's difference between SAS and SAS_TD
+			}
 			else if(o == "SPACEWIRE")
 			{
-				type = "Protocol decode";
+				type = "Protocol Decode";
 				desc = "SpaceWire";
 			}
 			else if(o == "NRZ-BUS")
 			{
 				desc = "NRZ";
-				type = "Protocol decode";
+				type = "Protocol Decode";
 			}
 			else if(o == "UNIPRO-DECODE")
 				desc = "UniPro";
@@ -588,6 +625,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Math";
 				desc = "Cable De-Embedding";
+			}
+			else if(o == "DDA")
+			{
+				type = "Protocol Decode";
+				desc = "Disk Drive Analysis";
 			}
 			else if(o == "DDM2")
 			{
@@ -679,6 +721,21 @@ void LeCroyOscilloscope::DetectOptions()
 				type = "Miscellaneous";
 				desc = "3-Phase Power Analysis";
 			}
+			else if(o == "AORM")
+			{
+				type = "Measurement";
+				desc = "Advanced Optical Recording Measurements";
+			}
+			else if(o == "PMA2")
+			{
+				type = "Miscellaneous";
+				desc = "PowerMeasure Analysis";
+			}
+			else if(o == "CROSS-SYNC-PHY")
+			{
+				type = "Miscellaneous";
+				desc = "Protocol analyzer cross-trigger";
+			}
 
 			//UI etc options
 			else if(o == "SPECTRUM")
@@ -707,6 +764,11 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Informational";
 				desc = "Software licenses are demo/trial";
+			}
+			else if(o == "DEMOSCOPE")
+			{
+				type = "Informational";
+				desc = "Scope is a demo unit";
 			}
 			else if(o == "SIM")
 			{
@@ -1113,6 +1175,19 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 
 bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 {
+	//In DBI models, additional checks are needed.
+	//Separate from normal interleaving
+	if(HasDBICapability())
+	{
+		//DBI active on channel 2 blocks channel 1 from being enabled
+		if(i == 0 && IsDBIEnabled(1))
+			return false;
+
+		//DBI active on channel 3 blocks channel 4 from being enabled
+		if(i == 3 && IsDBIEnabled(2))
+			return false;
+	}
+
 	//All channels are always legal if we're not interleaving
 	if(!m_interleaving)
 		return true;
@@ -1126,6 +1201,9 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 		case MODEL_HDO_4KA:
 		case MODEL_WAVERUNNER_8K:
 		case MODEL_WAVERUNNER_8K_HD:		//TODO: seems like multiple levels of interleaving possible
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVEMASTER_8ZI_B:
 		case MODEL_WAVEPRO_HD:
 		case MODEL_WAVERUNNER_9K:
@@ -1183,11 +1261,24 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 	}
 }
 
-vector<OscilloscopeChannel::CouplingType> LeCroyOscilloscope::GetAvailableCouplings(size_t /*i*/)
+vector<OscilloscopeChannel::CouplingType> LeCroyOscilloscope::GetAvailableCouplings(size_t i)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+
+	//For WaveMaster/SDA/DDA scopes, we cannot use 1M ohm coupling if the ProLink input is selected
+	bool isProBus = true;
+	if(HasInputMux(i))
+	{
+		if(GetInputMuxSetting(i) == 0)
+			isProBus = false;
+	}
+
+	if(isProBus)
+	{
+		ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+		ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+	}
+
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
 	ret.push_back(OscilloscopeChannel::COUPLE_GND);
 	return ret;
@@ -1205,8 +1296,12 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 		reply = Trim(m_transport->ReadReply().substr(0,3));
 	}
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_probeIsActive[i] = false;
+	//Check if we have an active probe connected
+	auto name = GetProbeName(i);
+	{
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		m_probeIsActive[i] = (name != "");
+	}
 
 	if(reply == "A1M")
 		return OscilloscopeChannel::COUPLE_AC_1M;
@@ -1216,11 +1311,8 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 		return OscilloscopeChannel::COUPLE_DC_50;
 	else if(reply == "GND")
 		return OscilloscopeChannel::COUPLE_GND;
-	else if(reply == "DC")
-	{
-		m_probeIsActive[i] = true;
+	else if( (reply == "DC") || (reply == "DC1") )
 		return OscilloscopeChannel::COUPLE_DC_50;
-	}
 
 	//invalid
 	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
@@ -1454,7 +1546,7 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 	else if(sbw == "6GHZ")
 		return 6000;
 
-	LogWarning("LeCroyOscilloscope::GetChannelCoupling got invalid coupling %s\n", reply.c_str());
+	LogWarning("LeCroyOscilloscope::GetChannelBandwidthLimit got invalid BW limit %s\n", reply.c_str());
 	return 0;
 }
 
@@ -1548,6 +1640,11 @@ bool LeCroyOscilloscope::CanAutoZero(size_t i)
 		return true;
 	else if(probe.find("CP") == 0)
 		return true;
+
+	//Recent firmware reports "ring" for passive probes detected via the resistive ID ring
+	//None of these have auto zero capability
+	else if(probe.find("Ring") == 0)
+		return false;
 
 	//ZS series single ended probes do not
 	else if(probe.find("ZS") == 0)
@@ -2381,11 +2478,6 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 
 map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data, int64_t analog_hoff)
 {
-	//DEBUG
-	FILE* fp = fopen("/tmp/waveform.xml", "w");
-	fwrite(data.c_str(), data.length(), 1, fp);
-	fclose(fp);
-
 	map<int, DigitalWaveform*> ret;
 
 	//See what channels are enabled
@@ -2471,7 +2563,7 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 		{
 			DigitalWaveform* cap = new DigitalWaveform;
 			cap->m_timescale = interval;
-			cap->m_densePacked = true;
+			cap->m_densePacked = false;
 
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
@@ -2671,7 +2763,7 @@ bool LeCroyOscilloscope::AcquireData()
 
 			waveforms[i] = ProcessAnalogWaveform(
 				&analogWaveformData[i][16],			//skip 16-byte SCPI header DATA,\n#9xxxxxxxx
-				analogWaveformData[i].size() - 16,
+				analogWaveformData[i].size() - 17,	//skip header plus \n at end
 				wavedescs[i],
 				num_sequences,
 				ttime,
@@ -2760,7 +2852,7 @@ void LeCroyOscilloscope::ForceTrigger()
 	m_transport->SendCommand("FRTR");
 }
 
-double LeCroyOscilloscope::GetChannelOffset(size_t i)
+float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2778,15 +2870,15 @@ double LeCroyOscilloscope::GetChannelOffset(size_t i)
 	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
 
 	string reply = m_transport->ReadReply();
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
+void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2803,7 +2895,7 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, double offset)
 	m_channelOffsets[i] = offset;
 }
 
-double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
+float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	//not meaningful for trigger or digital channels
 	if(i > m_analogChannelCount)
@@ -2829,7 +2921,7 @@ double LeCroyOscilloscope::GetChannelVoltageRange(size_t i)
 	return v;
 }
 
-void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 
@@ -3579,6 +3671,63 @@ void LeCroyOscilloscope::SetSamplingMode(SamplingMode mode)
 	m_memoryDepthValid = false;
 	m_interleaving = false;
 	m_interleavingValid = true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DBI mode
+
+bool LeCroyOscilloscope::HasDBICapability()
+{
+	switch(m_modelid)
+	{
+		//Base 8Zi: DBI added past 16 GHz
+		case MODEL_SDA_8ZI:
+		case MODEL_WAVEMASTER_8ZI:
+			return (m_maxBandwidth > 16000);
+
+		//8Zi-A: DBI added for 25/30/45 GHz models
+		case MODEL_SDA_8ZI_A:
+		case MODEL_WAVEMASTER_8ZI_A:
+			return (m_maxBandwidth > 20000);
+
+		//8Zi-B: DBI added for 25/30 GHz models
+		case MODEL_SDA_8ZI_B:
+		case MODEL_WAVEMASTER_8ZI_B:
+			return (m_maxBandwidth > 20000);
+
+		//LabMaster: DBI added for >36 GHz models
+		case MODEL_LABMASTER_ZI_A:
+			return (m_maxBandwidth > 36000);
+
+		//All other models lack DBI
+		default:
+			return false;
+	}
+}
+
+bool LeCroyOscilloscope::IsDBIEnabled(size_t channel)
+{
+	if(!HasDBICapability())
+		return false;
+
+	//TODO: LabMaster scopes can have >4 channels. How do we figure out what acquisition modules are present?
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//Ask scope for the DBI mode
+	//For now, no caching since we don't expect to be touching this too often.
+	//We can add caching in the future if there's performance issues.
+	if(channel == 1)
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI2Mode'");
+	else if(channel == 2)
+		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI3Mode'");
+
+	//Can only enable DBI on center two channels
+	else
+		return false;
+
+	auto reply = Trim(m_transport->ReadReply().c_str());
+	return (reply == "DBION");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -41,17 +41,17 @@ string MinimumStatistic::GetStatisticName()
 	return "Minimum";
 }
 
-bool MinimumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
+bool MinimumStatistic::Calculate(StreamDescriptor stream, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData(0));
+	auto data = dynamic_cast<AnalogWaveform*>(stream.GetData());
 	if(!data)
 		return false;
 
 	//Starting value is previous minimum, if we have one
 	value = 1e20;
-	if(m_pastMinimums.find(channel) != m_pastMinimums.end())
-		value = m_pastMinimums[channel];
+	if(m_pastMinimums.find(stream) != m_pastMinimums.end())
+		value = m_pastMinimums[stream];
 
 	for(auto sample : data->m_samples)
 	{
@@ -59,7 +59,7 @@ bool MinimumStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 			value = sample;
 	}
 
-	m_pastMinimums[channel] = value;
+	m_pastMinimums[stream] = value;
 
 	return true;
 }

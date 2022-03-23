@@ -51,23 +51,14 @@ string ChannelEmulationFilter::GetProtocolName()
 
 void ChannelEmulationFilter::SetDefaultName()
 {
-	vector<string> fnames = m_parameters[m_fname].GetFileNames();
-	string base;
-	for(auto f : fnames)
-	{
-		if(base != "")
-			base += ", ";
-		base += BaseName(f);
-	}
-
 	char hwname[256];
 	snprintf(
 		hwname,
 		sizeof(hwname),
 		"ChannelEmulation(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
-		base.c_str(),
-		m_parameters[m_pathName].ToString().c_str()
+		GetInputDisplayName(1).c_str(),
+		GetInputDisplayName(2).c_str()
 		);
 
 	m_hwname = hwname;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,7 @@ using namespace std;
 CurrentShuntFilter::CurrentShuntFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_POWER)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_AMPS);
+	SetYAxisUnits(Unit(Unit::UNIT_AMPS), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -65,27 +65,21 @@ bool CurrentShuntFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double CurrentShuntFilter::GetVoltageRange()
+float CurrentShuntFilter::GetVoltageRange(size_t /*stream*/)
 {
-	double rshunt = m_parameters[m_resistanceName].GetFloatVal();
-	return m_inputs[0].m_channel->GetVoltageRange() / rshunt;
+	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
+	return m_inputs[0].GetVoltageRange() / rshunt;
 }
 
-double CurrentShuntFilter::GetOffset()
+float CurrentShuntFilter::GetOffset(size_t /*stream*/)
 {
-	double rshunt = m_parameters[m_resistanceName].GetFloatVal();
-	return m_inputs[0].m_channel->GetOffset() / rshunt;
+	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
+	return m_inputs[0].GetOffset() / rshunt;
 }
 
 string CurrentShuntFilter::GetProtocolName()
 {
 	return "Current Shunt";
-}
-
-bool CurrentShuntFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool CurrentShuntFilter::NeedsConfig()

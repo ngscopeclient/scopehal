@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,12 +63,12 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MultiplyFilter::GetVoltageRange()
+float MultiplyFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MultiplyFilter::GetOffset()
+float MultiplyFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }
@@ -76,12 +76,6 @@ double MultiplyFilter::GetOffset()
 string MultiplyFilter::GetProtocolName()
 {
 	return "Multiply";
-}
-
-bool MultiplyFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool MultiplyFilter::NeedsConfig()
@@ -118,10 +112,13 @@ void MultiplyFilter::Refresh()
 	auto len = min(a->m_samples.size(), b->m_samples.size());
 
 	//Multiply the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() * m_inputs[1].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
 
 	//Set up the output waveform
 	auto cap = SetupOutputWaveform(a, 0, 0, 0);
+	cap->m_samples.resize(len);
+	cap->m_offsets.resize(len);
+	cap->m_durations.resize(len);
 
 	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);

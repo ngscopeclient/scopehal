@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,7 @@ using namespace std;
 RjBUjFilter::RjBUjFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("TIE");
@@ -84,24 +84,18 @@ string RjBUjFilter::GetProtocolName()
 	return "Rj + BUj";
 }
 
-bool RjBUjFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool RjBUjFilter::NeedsConfig()
 {
 	//we have more than one input
 	return true;
 }
 
-double RjBUjFilter::GetVoltageRange()
+float RjBUjFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double RjBUjFilter::GetOffset()
+float RjBUjFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

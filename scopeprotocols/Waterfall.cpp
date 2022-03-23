@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,12 +90,12 @@ bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double Waterfall::GetOffset()
+float Waterfall::GetOffset(size_t /*stream*/)
 {
 	return 0;
 }
 
-double Waterfall::GetVoltageRange()
+float Waterfall::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;
 }
@@ -103,12 +103,6 @@ double Waterfall::GetVoltageRange()
 string Waterfall::GetProtocolName()
 {
 	return "Waterfall";
-}
-
-bool Waterfall::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool Waterfall::NeedsConfig()
@@ -166,8 +160,8 @@ void Waterfall::Refresh()
 	double bins_per_pixel = 1.0f / (m_pixelsPerHz  * hz_per_bin);
 	double bin_offset = m_offsetHz / hz_per_bin;
 	float vmin = 1.0 / 255.0;
-	float vrange = m_inputs[0].m_channel->GetVoltageRange();	//db from min to max scale
-	float vfs = vrange/2 - m_inputs[0].m_channel->GetOffset();
+	float vrange = m_inputs[0].GetVoltageRange();	//db from min to max scale
+	float vfs = vrange/2 - m_inputs[0].GetOffset();
 	for(size_t x=0; x<m_width; x++)
 	{
 		//Look up the frequency bin(s) for this position

@@ -43,14 +43,16 @@ PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
 {
 	//Set up streams
 	ClearStreams();
-	AddStream("Data");
-	AddStream("Clock");
+	AddStream(Unit(Unit::UNIT_COUNTS), "Data");
+	AddStream(Unit(Unit::UNIT_COUNTS), "Clock");
 
 	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_baudname].SetIntVal(103125L * 100L * 1000L);
 
 	m_parameters[m_polyname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_polyname].AddEnumValue("PRBS-7", POLY_PRBS7);
+	m_parameters[m_polyname].AddEnumValue("PRBS-9", POLY_PRBS9);
+	m_parameters[m_polyname].AddEnumValue("PRBS-11", POLY_PRBS11);
 	m_parameters[m_polyname].AddEnumValue("PRBS-15", POLY_PRBS15);
 	m_parameters[m_polyname].AddEnumValue("PRBS-23", POLY_PRBS23);
 	m_parameters[m_polyname].AddEnumValue("PRBS-31", POLY_PRBS31);
@@ -88,6 +90,14 @@ void PRBSGeneratorFilter::SetDefaultName()
 			prefix = "PRBS7";
 			break;
 
+		case POLY_PRBS9:
+			prefix = "PRBS9";
+			break;
+
+		case POLY_PRBS11:
+			prefix = "PRBS11";
+			break;
+
 		case POLY_PRBS15:
 			prefix = "PRBS15";
 			break;
@@ -114,11 +124,45 @@ bool PRBSGeneratorFilter::NeedsConfig()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+bool PRBSGeneratorFilter::RunPRBS(uint32_t& state, Polynomials poly)
+{
+	uint32_t next;
+	switch(poly)
+	{
+		case POLY_PRBS7:
+			next = ( (state >> 6) ^ (state >> 5) ) & 1;
+			break;
+
+		case POLY_PRBS9:
+			next = ( (state >> 8) ^ (state >> 4) ) & 1;
+			break;
+
+		case POLY_PRBS11:
+			next = ( (state >> 10) ^ (state >> 8) ) & 1;
+			break;
+
+		case POLY_PRBS15:
+			next = ( (state >> 14) ^ (state >> 13) ) & 1;
+			break;
+
+		case POLY_PRBS23:
+			next = ( (state >> 22) ^ (state >> 17) ) & 1;
+			break;
+
+		case POLY_PRBS31:
+		default:
+			next = ( (state >> 30) ^ (state >> 27) ) & 1;
+			break;
+	}
+	state = (state << 1) | next;
+	return (bool)next;
+}
+
 void PRBSGeneratorFilter::Refresh()
 {
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 	int64_t baudrate = m_parameters[m_baudname].GetIntVal();
-	int poly = m_parameters[m_polyname].GetIntVal();
+	auto poly = static_cast<Polynomials>(m_parameters[m_polyname].GetIntVal());
 	size_t samplePeriod = FS_PER_SECOND / baudrate;
 
 	double t = GetTime();
@@ -161,34 +205,9 @@ void PRBSGeneratorFilter::Refresh()
 		clk->m_samples[i] = lastclk;
 		lastclk = !lastclk;
 
-		//Generate data
-		bool value = false;
-		uint32_t next;
-		switch(poly)
-		{
-			case POLY_PRBS7:
-				next = ( (prbs >> 7) ^ (prbs >> 6) ) & 1;
-				break;
-
-			case POLY_PRBS15:
-				next = ( (prbs >> 15) ^ (prbs >> 14) ) & 1;
-				break;
-
-			case POLY_PRBS23:
-				next = ( (prbs >> 23) ^ (prbs >> 18) ) & 1;
-				break;
-
-			case POLY_PRBS31:
-			default:
-				next = ( (prbs >> 31) ^ (prbs >> 28) ) & 1;
-				break;
-		}
-		prbs = (prbs << 1) | next;
-		value = (bool)next;
-
 		//Fill data
 		dat->m_offsets[i] = i;
 		dat->m_durations[i] = 1;
-		dat->m_samples[i] = value;
+		dat->m_samples[i] = RunPRBS(prbs, poly);
 	}
 }

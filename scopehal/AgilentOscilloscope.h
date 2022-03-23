@@ -62,11 +62,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -102,6 +102,8 @@ protected:
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
+	unsigned int m_digitalChannelCount;
+	unsigned int m_digitalChannelBase;
 
 	enum ProbeType {
 		None,
@@ -110,8 +112,8 @@ protected:
 	};
 
 	//config cache
-	std::map<size_t, double> m_channelOffsets;
-	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, double> m_channelAttenuations;
 	std::map<size_t, int> m_channelBandwidthLimits;
@@ -146,6 +148,27 @@ protected:
 private:
 	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
 
+	struct WaveformPreamble {
+		unsigned int format;
+		unsigned int type;
+		size_t length;
+		unsigned int average_count;
+		double xincrement;
+		double xorigin;
+		double xreference;
+		double yincrement;
+		double yorigin;
+		double yreference;
+	};
+
+	void ConfigureWaveform(std::string channel);
+	bool IsAnalogChannel(size_t i);
+	std::vector<uint8_t> GetWaveformData(std::string channel);
+	WaveformPreamble GetWaveformPreamble(std::string channel);
+	void ProcessDigitalWaveforms(
+		std::map<int, std::vector<WaveformBase*>> &pending_waveforms,
+		std::vector<uint8_t> &data, WaveformPreamble &preamble,
+		size_t chan_start);
 	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
 
 

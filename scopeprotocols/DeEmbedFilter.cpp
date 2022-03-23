@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -31,6 +31,8 @@
 #include "DeEmbedFilter.h"
 #include <immintrin.h>
 
+extern std::mutex g_clfftMutex;
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,21 +42,23 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	//Set up channels
-	CreateInput("din");
+	CreateInput("signal");
+	CreateInput("mag");
+	CreateInput("angle");
 
-	m_fname = "S-Parameters";
-	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAMES, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_fname].m_fileFilterMask = "*.s2p";
-	m_parameters[m_fname].m_fileFilterName = "Touchstone S-parameter files (*.s2p)";
+	m_maxGainName = "Max Gain";
+	m_parameters[m_maxGainName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DB));
+	m_parameters[m_maxGainName].SetFloatVal(20);
 
-	m_pathName = "Path";
-	m_parameters[m_pathName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_pathName].AddEnumValue("S11", S11);
-	m_parameters[m_pathName].AddEnumValue("S12", S12);
-	m_parameters[m_pathName].AddEnumValue("S21", S21);
-	m_parameters[m_pathName].AddEnumValue("S22", S22);
-	m_parameters[m_pathName].SetIntVal(S21);
-	m_cachedPath = S21;
+	m_groupDelayTruncName = "Group Delay Truncation";
+	m_parameters[m_groupDelayTruncName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	m_parameters[m_groupDelayTruncName].SetFloatVal(0);
+
+	m_groupDelayTruncModeName = "Group Delay Truncation Mode";
+	m_parameters[m_groupDelayTruncModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_groupDelayTruncModeName].AddEnumValue("Auto", TRUNC_AUTO);
+	m_parameters[m_groupDelayTruncModeName].AddEnumValue("Manual", TRUNC_MANUAL);
+	m_parameters[m_groupDelayTruncModeName].SetIntVal(TRUNC_AUTO);
 
 	m_range = 1;
 	m_offset = 0;
@@ -66,6 +70,14 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_reversePlan = NULL;
 
 	m_cachedNumPoints = 0;
+	m_cachedMaxGain = 0;
+	m_cachedMag = nullptr;
+	m_cachedAngle = nullptr;
+
+	m_magStartFemtoseconds = 0;
+	m_magStartTimestamp = 0;
+	m_angleStartFemtoseconds = 0;
+	m_angleStartTimestamp = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -108,16 +120,22 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 			if(e.err() == CL_BUILD_PROGRAM_FAILURE)
 			{
-				LogError("Failed to build OpenCL program for FFT\n");
+				LogError("Failed to build OpenCL program for de-embed\n");
 
 				string log;
-				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Window program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_windowProgram)
+				{
+					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Window program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
 
-				m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("De-embed program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_deembedProgram)
+				{
+					m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("De-embed program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
 			}
 
 			delete m_windowProgram;
@@ -184,8 +202,25 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
-		return true;
+	switch(i)
+	{
+		//signal
+		case 0:
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+
+		//mag
+		case 1:
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+					(stream.GetYAxisUnits() == Unit::UNIT_DB);
+
+		//angle
+		case 2:
+			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
+
+		default:
+			return false;
+	}
 
 	return false;
 }
@@ -193,12 +228,12 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DeEmbedFilter::GetVoltageRange()
+float DeEmbedFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DeEmbedFilter::GetOffset()
+float DeEmbedFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
@@ -206,12 +241,6 @@ double DeEmbedFilter::GetOffset()
 string DeEmbedFilter::GetProtocolName()
 {
 	return "De-Embed";
-}
-
-bool DeEmbedFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool DeEmbedFilter::NeedsConfig()
@@ -222,23 +251,14 @@ bool DeEmbedFilter::NeedsConfig()
 
 void DeEmbedFilter::SetDefaultName()
 {
-	vector<string> fnames = m_parameters[m_fname].GetFileNames();
-	string base;
-	for(auto f : fnames)
-	{
-		if(base != "")
-			base += ", ";
-		base += BaseName(f);
-	}
-
 	char hwname[256];
 	snprintf(
 		hwname,
 		sizeof(hwname),
 		"DeEmbed(%s, %s, %s)",
 		GetInputDisplayName(0).c_str(),
-		base.c_str(),
-		m_parameters[m_pathName].ToString().c_str()
+		GetInputDisplayName(1).c_str(),
+		GetInputDisplayName(2).c_str()
 		);
 
 	m_hwname = hwname;
@@ -261,51 +281,13 @@ void DeEmbedFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-bool DeEmbedFilter::LoadSparameters()
-{
-	//Reload the S-parameters from the Touchstone file(s) if the filename has changed
-	vector<string> fnames = m_parameters[m_fname].GetFileNames();
-	if(fnames != m_cachedFileNames)
-	{
-		m_cachedFileNames = fnames;
-
-		m_sparams.Clear();
-		TouchstoneParser parser;
-		SParameters temp;
-		for(auto f : fnames)
-		{
-			if(!parser.Load(f, temp))
-				return false;
-
-			m_sparams *= temp;
-		}
-
-		//Clear out cached S-parameters
-		m_cachedBinSize = 0;
-		m_resampledSparamCosines.clear();
-		m_resampledSparamSines.clear();
-	}
-
-	//Don't die if the file couldn't be loaded
-	if(m_sparams.empty())
-		return false;
-
-	return true;
-}
-
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
 void DeEmbedFilter::DoRefresh(bool invert)
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	if(!LoadSparameters())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
@@ -348,6 +330,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			{
 				try
 				{
+					lock_guard<mutex> lock(g_clfftMutex);
+
 					if(m_clfftForwardPlan != 0)
 						clfftDestroyPlan(&m_clfftForwardPlan);
 					if(m_clfftReversePlan != 0)
@@ -356,8 +340,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					//Set up the FFT object
 					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 					{
-						LogError("clfftCreateDefaultPlan failed\n");
-						abort();
+						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
 					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
@@ -366,8 +351,9 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftReversePlan, (*g_clContext)(), CLFFT_1D, &npoints))
 					{
-						LogError("clfftCreateDefaultPlan failed\n");
-						abort();
+						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
 					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
@@ -381,15 +367,21 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)\n", err);
-						abort();
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
 					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)\n", err);
-						abort();
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
+						delete m_windowProgram;
+						m_windowProgram = 0;
 					}
+
+					//Need to block while mutex is still locked
+					//to ensure we don't have two bake operations in progress at once
+					queue.finish();
 
 					//Allocate buffers
 					delete m_windowbuf;
@@ -411,19 +403,51 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
-	//Check if we're now computing a different S-parameter than before
-	bool paramchange = false;
-	auto path = static_cast<SParameterNames>(m_parameters[m_pathName].GetIntVal());
-	if(path != m_cachedPath)
+	//Did we change the max gain?
+	bool clipchange = false;
+	float maxgain = m_parameters[m_maxGainName].GetFloatVal();
+	if(maxgain != m_cachedMaxGain)
 	{
-		m_cachedPath = path;
-		paramchange = true;
+		m_cachedMaxGain = maxgain;
+		clipchange = true;
 		ClearSweeps();
+	}
+
+	//Waveform object changed? Input parameters are no longer valid
+	//We need check for input count because CTLE filter generates S-params internally (and deletes the mag/angle inputs)
+	//TODO: would it be cleaner to generate filter response then channel-emulate it?
+	bool inchange = false;
+	if(GetInputCount() > 1)
+	{
+		auto dmag = GetInput(1).GetData();
+		auto dang = GetInput(2).GetData();
+		if( (dmag != m_cachedMag) ||
+			(dang != m_cachedAngle) )
+		{
+			inchange = true;
+
+			m_cachedMag = dmag;
+			m_cachedAngle = dang;
+
+			m_magStartTimestamp = dmag->m_startTimestamp;
+			m_magStartFemtoseconds = dmag->m_startFemtoseconds;
+			m_angleStartTimestamp = dang->m_startTimestamp;
+			m_angleStartFemtoseconds = dang->m_startFemtoseconds;
+		}
+
+		//Timestamp changed? Input parameters are no longer valid
+		if( (dmag->m_startFemtoseconds != m_magStartFemtoseconds) ||
+			(dmag->m_startTimestamp != m_magStartTimestamp) ||
+			(dang->m_startFemtoseconds != m_angleStartFemtoseconds) ||
+			(dang->m_startTimestamp != m_angleStartTimestamp))
+		{
+			inchange = true;
+		}
 	}
 
 	//Resample our parameter to our FFT bin size if needed.
 	//Cache trig function output because there's no AVX instructions for this.
-	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || paramchange )
+	if( (fabs(m_cachedBinSize - bin_hz) > FLT_EPSILON) || sizechange || clipchange || inchange)
 	{
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
@@ -531,7 +555,18 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	int64_t groupdelay_fs = GetGroupDelay();
+	if(m_parameters[m_groupDelayTruncModeName].GetIntVal() == TRUNC_MANUAL)
+		groupdelay_fs = m_parameters[m_groupDelayTruncName].GetIntVal();
+
 	int64_t groupdelay_samples = ceil( groupdelay_fs / din->m_timescale );
+
+	//Sanity check: if we have noisy or poor quality S-parameter data, group delay might not make sense.
+	//Skip this correction pass in that case.
+	if(llabs(groupdelay_samples) >= npoints)
+	{
+		groupdelay_fs = 0;
+		groupdelay_samples = 0;
+	}
 
 	//Calculate bounds for the *meaningful* output data.
 	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
@@ -575,17 +610,26 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	m_offset = -( (m_max - m_min)/2 + m_min );
 }
 
+/**
+	@brief Returns the max mid-band group delay of the channel
+ */
 int64_t DeEmbedFilter::GetGroupDelay()
 {
-	auto& s21 = m_sparams[SPair(2,1)];
 	float max_delay = 0;
-	for(size_t i=0; i<s21.size()-1 && i<50; i++)
-		max_delay = max(max_delay, s21.GetGroupDelay(i));
+	size_t mid = m_cachedSparams.size() / 2;
+	for(size_t i=0; i<50; i++)
+	{
+		size_t n = i+mid;
+		if(n >= m_cachedSparams.size())
+			break;
+
+		max_delay = max(max_delay, m_cachedSparams.GetGroupDelay(n));
+	}
 	return max_delay * FS_PER_SECOND;
 }
 
 /**
-	@brief Recalculate the cached S-parameters
+	@brief Recalculate the cached S-parameters (and clamp gain if requested)
 
 	Since there's no AVX sin/cos instructions, precompute sin(phase) and cos(phase)
  */
@@ -593,52 +637,37 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 {
 	m_cachedBinSize = bin_hz;
 
-	//Figure out which parameter to use
-	int to, from;
-	switch(m_parameters[m_pathName].GetIntVal())
-	{
-		case S11:
-			to = 1;
-			from = 1;
-			break;
+	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
-		case S21:
-			to = 2;
-			from = 1;
-			break;
-
-		case S12:
-			to = 1;
-			from = 2;
-			break;
-
-		case S22:
-		default:
-			to = 2;
-			from = 2;
-			break;
-	}
+	//Extract the S-parameters
+	m_cachedSparams = SParameterVector(
+		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
+		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
 
 	for(size_t i=0; i<nouts; i++)
 	{
-		auto point = m_sparams.SamplePoint(to, from, bin_hz * i);
+		float freq = bin_hz * i;
+
+		float mag = m_cachedSparams.InterpolateMagnitude(freq);
+		float ang = m_cachedSparams.InterpolateAngle(freq);
 
 		//De-embedding
 		if(invert)
 		{
 			float amp = 0;
-			if(fabs(point.m_amplitude) > FLT_EPSILON)
-				amp = 1.0f / point.m_amplitude;
+			if(fabs(mag) > FLT_EPSILON)
+				amp = 1.0f / mag;
+			amp = min(amp, maxGain);
 
-			m_resampledSparamSines.push_back(sin(-point.m_phase) * amp);
-			m_resampledSparamCosines.push_back(cos(-point.m_phase) * amp);
+			m_resampledSparamSines.push_back(sin(-ang) * amp);
+			m_resampledSparamCosines.push_back(cos(-ang) * amp);
 		}
 
 		//Channel emulation
 		else
 		{
-			m_resampledSparamSines.push_back(sin(point.m_phase) * point.m_amplitude);
-			m_resampledSparamCosines.push_back(cos(point.m_phase) * point.m_amplitude);
+			m_resampledSparamSines.push_back(sin(ang) * mag);
+			m_resampledSparamCosines.push_back(cos(ang) * mag);
 		}
 	}
 }

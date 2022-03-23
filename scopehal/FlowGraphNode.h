@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,6 +39,9 @@ class OscilloscopeChannel;
 class WaveformBase;
 
 #include "FilterParameter.h"
+#include "Waveform.h"
+
+class OscilloscopeChannel;
 
 /**
 	@brief Descriptor for a single stream coming off a channel
@@ -56,29 +59,26 @@ public:
 		, m_stream(stream)
 	{}
 
+	operator bool() const
+	{ return (m_channel != NULL); }
+
 	std::string GetName();
 
 	OscilloscopeChannel* m_channel;
 	size_t m_stream;
 
-	WaveformBase* GetData()
-	{ return m_channel->GetData(m_stream); }
-
-	bool operator==(const StreamDescriptor& rhs) const
-	{ return (m_channel == rhs.m_channel) && (m_stream == rhs.m_stream); }
-
-	bool operator!=(const StreamDescriptor& rhs) const
-	{ return (m_channel != rhs.m_channel) || (m_stream != rhs.m_stream); }
-
-	bool operator<(const StreamDescriptor& rhs) const
-	{
-		if(m_channel < rhs.m_channel)
-			return true;
-		if( (m_channel == rhs.m_channel) && (m_stream < rhs.m_stream) )
-			return true;
-
-		return false;
-	}
+	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.
+	//See StreamDescriptor_inlines.h for implementations
+	Unit GetXAxisUnits();
+	Unit GetYAxisUnits();
+	WaveformBase* GetData();
+	bool operator==(const StreamDescriptor& rhs) const;
+	bool operator!=(const StreamDescriptor& rhs) const;
+	bool operator<(const StreamDescriptor& rhs) const;
+	float GetVoltageRange();
+	float GetOffset();
+	void SetVoltageRange(float v);
+	void SetOffset(float v);
 };
 
 /**
@@ -101,7 +101,7 @@ public:
 
 	void SetInput(size_t i, StreamDescriptor stream, bool force = false);
 	void SetInput(const std::string& name, StreamDescriptor stream, bool force = false);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) =0;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	StreamDescriptor GetInput(size_t i);
 
@@ -109,6 +109,9 @@ public:
 public:
 	FilterParameter& GetParameter(std::string s);
 	typedef std::map<std::string, FilterParameter> ParameterMapType;
+
+	bool HasParameter(std::string s)
+	{ return (m_parameters.find(s) != m_parameters.end()); }
 
 	ParameterMapType::iterator GetParamBegin()
 	{ return m_parameters.begin(); }
@@ -137,13 +140,7 @@ protected:
 
 		This function is safe to call on a NULL input and will return NULL in that case.
 	 */
-	WaveformBase* GetInputWaveform(size_t i)
-	{
-		auto chan = m_inputs[i].m_channel;
-		if(chan == NULL)
-			return NULL;
-		return chan->GetData(m_inputs[i].m_stream);
-	}
+	WaveformBase* GetInputWaveform(size_t i);	//implementation in FlowGraphNode_inlines.h
 
 	///Gets the analog waveform attached to the specified input
 	AnalogWaveform* GetAnalogInputWaveform(size_t i)
@@ -177,6 +174,22 @@ protected:
 
 	//Parameters
 	ParameterMapType m_parameters;
+
+public:
+
+	sigc::signal<void> signal_parametersChanged()
+	{ return m_parametersChangedSignal; }
+
+	sigc::signal<void> signal_inputsChanged()
+	{ return m_inputsChangedSignal; }
+
+protected:
+
+	///@brief Signal emitted when the set of parameters changes
+	sigc::signal<void> m_parametersChangedSignal;
+
+	///@brief Signal emitted when the set of inputs changes
+	sigc::signal<void> m_inputsChangedSignal;
 };
 
 #endif

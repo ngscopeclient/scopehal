@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,6 +44,10 @@ DownsampleFilter::DownsampleFilter(const string& color)
 	m_factorname = "Downsample Factor";
 	m_parameters[m_factorname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_factorname].SetIntVal(10);
+
+	m_aaname = "Antialiasing Filter";
+	m_parameters[m_aaname] = FilterParameter(FilterParameter::TYPE_BOOL, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_aaname].SetBoolVal(1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,20 +67,19 @@ bool DownsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double DownsampleFilter::GetVoltageRange()
+float DownsampleFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
+}
+
+float DownsampleFilter::GetOffset(size_t /*stream*/)
+{
+	return m_inputs[0].GetOffset();
 }
 
 string DownsampleFilter::GetProtocolName()
 {
 	return "Downsample";
-}
-
-bool DownsampleFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool DownsampleFilter::NeedsConfig()
@@ -110,55 +113,114 @@ void DownsampleFilter::Refresh()
 	auto din = GetAnalogInputWaveform(0);
 	size_t len = din->m_samples.size();
 
-	//Cut off all frequencies shorter than our decimation factor
+	//Set up output waveform and get configuration
 	int64_t factor = m_parameters[m_factorname].GetIntVal();
 	size_t outlen = len / factor;
-	float cutoff_period = factor;
-	float sigma = cutoff_period / sqrt(2 * log(2));
-	int kernel_radius = ceil(3*sigma);
+	auto cap = SetupEmptyOutputWaveform(din, 0, false);
 
-	//Generate the actual Gaussian kernel
-	int kernel_size = kernel_radius*2 + 1;
-	vector<float> kernel;
-	kernel.resize(kernel_size);
-	float alpha = 1.0f / (sigma * sqrt(2*M_PI));
-	for(int x=0; x < kernel_size; x++)
+	//Default path with antialiasing filter
+	if(m_parameters[m_aaname].GetBoolVal())
 	{
-		int delta = (x - kernel_radius);
-		kernel[x] = alpha * exp(-delta*delta/(2*sigma));
-	}
-	float sum = 0;
-	for(auto k : kernel)
-		sum += k;
-	for(int i=0; i<kernel_size; i++)
-		kernel[i] /= sum;
+		cap->Resize(outlen);
 
-	//Do the actual downsampling.
-	//For now, assume uniform sample rate
-	auto cap = new AnalogWaveform;
-	cap->Resize(outlen);
-	for(size_t i=0; i<outlen; i++)
-	{
-		//Copy timestamps
-		cap->m_offsets[i]	= din->m_offsets[i*factor] / factor;
-		cap->m_durations[i]	= din->m_durations[i*factor] / factor;
+		//Cut off all frequencies shorter than our decimation factor
+		float cutoff_period = factor;
+		float sigma = cutoff_period / sqrt(2 * log(2));
+		int kernel_radius = ceil(3*sigma);
 
-		//Do the convolution
-		float conv = 0;
-		ssize_t base = i*factor;
-		for(ssize_t delta = -kernel_radius; delta <= kernel_radius; delta ++)
+		//Generate the actual Gaussian kernel
+		int kernel_size = kernel_radius*2 + 1;
+		vector<float> kernel;
+		kernel.resize(kernel_size);
+		float alpha = 1.0f / (sigma * sqrt(2*M_PI));
+		for(int x=0; x < kernel_size; x++)
 		{
-			ssize_t pos = base + delta;
-			if( (pos < 0) || (pos >= (ssize_t)len) )
-				continue;
+			int delta = (x - kernel_radius);
+			kernel[x] = alpha * exp(-delta*delta/(2*sigma));
+		}
+		float sum = 0;
+		for(auto k : kernel)
+			sum += k;
+		for(int i=0; i<kernel_size; i++)
+			kernel[i] /= sum;
 
-			conv += din->m_samples[pos] * kernel[delta + kernel_radius];
+		//Do the actual downsampling.
+		//For now, assume uniform sample rate
+		for(size_t i=0; i<outlen; i++)
+		{
+			//Copy timestamps
+			cap->m_offsets[i]	= din->m_offsets[i*factor] / factor;
+			cap->m_durations[i]	= din->m_durations[i*factor] / factor;
+
+			//Do the convolution
+			float conv = 0;
+			ssize_t base = i*factor;
+			for(ssize_t delta = -kernel_radius; delta <= kernel_radius; delta ++)
+			{
+				ssize_t pos = base + delta;
+				if( (pos < 0) || (pos >= (ssize_t)len) )
+					continue;
+
+				conv += din->m_samples[pos] * kernel[delta + kernel_radius];
+			}
+
+			//Do the actual decimation
+			cap->m_samples[i] 	= conv;
+		}
+	}
+
+	//Optimized path with no AA if the input is known to not contain any higher frequency content
+	else
+	{
+		size_t oldlen = cap->m_samples.size();
+		cap->Resize(outlen);
+
+		//Dense packed, optimize a bit.
+		//Timestamp stuff based on Filter::SetupOutputWaveform()
+		if(din->m_densePacked)
+		{
+			//Existing output is not dense packed. Need to fill from zero
+			if(!cap->m_densePacked)
+			{
+				cap->m_densePacked = true;
+				for(size_t i=0; i<outlen; i++)
+				{
+					cap->m_offsets[i]	= i;
+					cap->m_durations[i]	= 1;
+				}
+			}
+
+			//Both dense packed, but bigger? Fill extra spots
+			else if(outlen > oldlen)
+			{
+				for(size_t i=oldlen; i<outlen; i++)
+				{
+					cap->m_offsets[i]	= i;
+					cap->m_durations[i]	= 1;
+				}
+			}
+
+			//Same size or smaller than what we had before. Don't touch timestamps.
+			else
+			{
+			}
+
+			//Copy the output
+			for(size_t i=0; i<outlen; i++)
+				cap->m_samples[i]	= din->m_samples[i*factor];
 		}
 
-		//Do the actual decimation
-		cap->m_samples[i] 	= conv;
+		//Not dense packed, just copy stuff
+		else
+		{
+			for(size_t i=0; i<outlen; i++)
+			{
+				cap->m_offsets[i]	= din->m_offsets[i*factor] / factor;
+				cap->m_durations[i]	= din->m_durations[i*factor] / factor;
+				cap->m_samples[i]	= din->m_samples[i*factor];
+			}
+		}
 	}
-	SetData(cap, 0);
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale * factor;

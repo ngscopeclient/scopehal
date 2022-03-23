@@ -42,20 +42,20 @@ string AverageStatistic::GetStatisticName()
 	return "Average";
 }
 
-bool AverageStatistic::Calculate(OscilloscopeChannel* channel, double& value)
+bool AverageStatistic::Calculate(StreamDescriptor stream, double& value)
 {
 	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(channel->GetData(0));
+	auto data = dynamic_cast<AnalogWaveform*>(stream.GetData());
 	if(!data)
 		return false;
 
 	//Start integrating from the past value, if we have one
 	value = 0;
 	size_t count = 0;
-	if(m_pastSums.find(channel) != m_pastSums.end())
+	if(m_pastSums.find(stream) != m_pastSums.end())
 	{
-		value = m_pastSums[channel];
-		count = m_pastCounts[channel];
+		value = m_pastSums[stream];
+		count = m_pastCounts[stream];
 	}
 
 	//Add new sample data
@@ -64,8 +64,8 @@ bool AverageStatistic::Calculate(OscilloscopeChannel* channel, double& value)
 	count += data->m_samples.size();
 
 	//Average and save
-	m_pastCounts[channel] = count;
-	m_pastSums[channel] = value;
+	m_pastCounts[stream] = count;
+	m_pastSums[stream] = value;
 
 	value /= count;
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -192,22 +192,22 @@ void EyePattern::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-bool EyePattern::IsOverlay()
-{
-	return false;
-}
-
 bool EyePattern::NeedsConfig()
 {
 	return true;
 }
 
-double EyePattern::GetVoltageRange()
+float EyePattern::GetVoltageRange(size_t /*stream*/)
 {
 	if(m_parameters[m_vmodeName].GetIntVal() == RANGE_AUTO)
-		return m_inputs[0].m_channel->GetVoltageRange();
+		return m_inputs[0].GetVoltageRange();
 	else
 		return m_parameters[m_rangeName].GetFloatVal();
+}
+
+float EyePattern::GetOffset(size_t /*stream*/)
+{
+	return -m_parameters[m_centerName].GetFloatVal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -366,11 +366,6 @@ void EyePattern::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-double EyePattern::GetOffset()
-{
-	return -m_parameters[m_centerName].GetFloatVal();
-}
-
 void EyePattern::Refresh()
 {
 	static double total_time = 0;
@@ -380,7 +375,8 @@ void EyePattern::Refresh()
 
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		//if input goes momentarily bad, don't delete output - just stop updating
+		//SetData(NULL, 0);
 		return;
 	}
 
@@ -389,12 +385,14 @@ void EyePattern::Refresh()
 	auto clock = GetDigitalInputWaveform(1);
 	double start = GetTime();
 
+	SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
+
 	//If center of the eye was changed, reset existing eye data
 	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	double center = m_parameters[m_centerName].GetFloatVal();
 	if(cap)
 	{
-		if(abs(cap->GetCenterVoltage() - center) > 0.001)
+		if(fabs(cap->GetCenterVoltage() - center) > 0.001)
 		{
 			SetData(NULL, 0);
 			cap = NULL;
@@ -461,7 +459,7 @@ void EyePattern::Refresh()
 	m_xoff = -round(cap->m_uiWidth);
 
 	//Precompute some scaling factors
-	float yscale = m_height / GetVoltageRange();
+	float yscale = m_height / GetVoltageRange(0);
 	float ymid = m_height / 2;
 	float yoff = -center*yscale + ymid;
 	float xtimescale = waveform->m_timescale * m_xscale;
@@ -682,7 +680,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;
 		int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
-		if(y1 >= ymax)
+		if( (y1 >= ymax) || (y1 < 0) )
 			continue;
 
 		//Calculate how much of the pixel's intensity to put in each row
@@ -936,7 +934,7 @@ void EyePattern::DoMaskTest(EyeWaveform* cap)
 	cr->fill();
 
 	//Software rendering
-	float yscale = m_height / GetVoltageRange();
+	float yscale = m_height / GetVoltageRange(0);
 	m_mask.RenderForAnalysis(
 		cr,
 		cap,

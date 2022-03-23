@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,6 +46,7 @@
 #include "CANDecoder.h"
 #include "ChannelEmulationFilter.h"
 #include "ClockRecoveryFilter.h"
+#include "ComplexImportFilter.h"
 #include "CTLEFilter.h"
 #include "CurrentShuntFilter.h"
 #include "DCDMeasurement.h"
@@ -57,6 +58,7 @@
 #include "DeskewFilter.h"
 #include "DigitalToPAM4Filter.h"
 #include "DigitalToNRZFilter.h"
+#include "DivideFilter.h"
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
 #include "DPhyDataDecoder.h"
@@ -76,6 +78,7 @@
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "EthernetRGMIIDecoder.h"
+#include "EthernetRMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
 #include "Ethernet100BaseTDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
@@ -88,14 +91,18 @@
 #include "EyePeriodMeasurement.h"
 #include "EyeWidthMeasurement.h"
 #include "FallMeasurement.h"
+#include "FSKDecoder.h"
 #include "FFTFilter.h"
 #include "FIRFilter.h"
 #include "FrequencyMeasurement.h"
+#include "GroupDelayFilter.h"
 #include "HistogramFilter.h"
 #include "HorizontalBathtub.h"
+#include "HyperRAMDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "I2CDecoder.h"
 #include "I2CEepromDecoder.h"
+#include "IBISDriverFilter.h"
 #include "IPv4Decoder.h"
 #include "ISIMeasurement.h"
 #include "JitterFilter.h"
@@ -118,16 +125,20 @@
 #include "PeriodMeasurement.h"
 #include "PhaseMeasurement.h"
 #include "PkPkMeasurement.h"
+#include "PRBSCheckerFilter.h"
 #include "PRBSGeneratorFilter.h"
+#include "ReferencePlaneExtensionFilter.h"
 #include "RjBUjFilter.h"
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"
+#include "ScaleFilter.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
 #include "SpectrogramFilter.h"
 #include "SPIDecoder.h"
 #include "SPIFlashDecoder.h"
+#include "SquelchFilter.h"
 #include "StepGeneratorFilter.h"
 #include "SubtractFilter.h"
 #include "SWDDecoder.h"
@@ -141,6 +152,7 @@
 #include "TMDSDecoder.h"
 #include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
+#include "TouchstoneImportFilter.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
 #include "UndershootMeasurement.h"
@@ -149,8 +161,11 @@
 #include "USB2PacketDecoder.h"
 #include "USB2PCSDecoder.h"
 #include "USB2PMADecoder.h"
+#include "VectorFrequencyFilter.h"
+#include "VectorPhaseFilter.h"
 #include "VerticalBathtub.h"
 #include "Waterfall.h"
+#include "WAVImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
 
 #include "AverageStatistic.h"
@@ -158,5 +173,7 @@
 #include "MinimumStatistic.h"
 
 void ScopeProtocolStaticInit();
+
+extern std::mutex g_clfftMutex;
 
 #endif

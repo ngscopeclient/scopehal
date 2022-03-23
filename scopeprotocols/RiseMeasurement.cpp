@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,7 +49,7 @@ RiseMeasurement::RiseMeasurement(const string& color)
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
 	m_parameters[m_endname].SetFloatVal(0.8);
 
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	m_midpoint = 0;
 	m_range = 1;
@@ -89,23 +89,17 @@ string RiseMeasurement::GetProtocolName()
 	return "Rise";
 }
 
-bool RiseMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool RiseMeasurement::NeedsConfig()
 {
 	return true;
 }
 
-double RiseMeasurement::GetVoltageRange()
+float RiseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double RiseMeasurement::GetOffset()
+float RiseMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

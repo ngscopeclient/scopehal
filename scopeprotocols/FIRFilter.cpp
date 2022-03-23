@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -143,23 +143,17 @@ string FIRFilter::GetProtocolName()
 	return "FIR Filter";
 }
 
-bool FIRFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool FIRFilter::NeedsConfig()
 {
 	return true;
 }
 
-double FIRFilter::GetVoltageRange()
+float FIRFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double FIRFilter::GetOffset()
+float FIRFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
@@ -212,6 +206,13 @@ void FIRFilter::Refresh()
 		filterlen = (atten / 22) * (sample_hz / (fhi - flo) );
 	filterlen |= 1;	//force length to be odd
 
+	//Don't choke if given an invalid filter configuration
+	if(flo == fhi)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the filter coefficients (TODO: cache this)
 	vector<float> coeffs;
 	coeffs.resize(filterlen);
@@ -225,7 +226,7 @@ void FIRFilter::Refresh()
 
 	//Set up output
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	size_t radius = (filterlen - 1) / 2;
 	auto cap = SetupOutputWaveform(din, 0, 0, filterlen);
 

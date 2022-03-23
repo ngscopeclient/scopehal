@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -75,12 +75,12 @@ bool WindowedAutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor s
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double WindowedAutocorrelationFilter::GetVoltageRange()
+float WindowedAutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double WindowedAutocorrelationFilter::GetOffset()
+float WindowedAutocorrelationFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }
@@ -88,12 +88,6 @@ double WindowedAutocorrelationFilter::GetOffset()
 string WindowedAutocorrelationFilter::GetProtocolName()
 {
 	return "Windowed Autocorrelation";
-}
-
-bool WindowedAutocorrelationFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool WindowedAutocorrelationFilter::NeedsConfig()
@@ -139,7 +133,7 @@ void WindowedAutocorrelationFilter::Refresh()
 	auto din_q = GetAnalogInputWaveform(1);
 
 	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Convert window and period to samples
 	int window_ps = m_parameters[m_windowName].GetIntVal();

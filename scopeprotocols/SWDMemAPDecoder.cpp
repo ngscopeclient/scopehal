@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -68,19 +68,9 @@ vector<string> SWDMemAPDecoder::GetHeaders()
 	return ret;
 }
 
-double SWDMemAPDecoder::GetVoltageRange()
-{
-	return m_inputs[0].m_channel->GetVoltageRange();
-}
-
 string SWDMemAPDecoder::GetProtocolName()
 {
 	return "SWD MEM-AP";
-}
-
-bool SWDMemAPDecoder::IsOverlay()
-{
-	return true;
 }
 
 bool SWDMemAPDecoder::NeedsConfig()

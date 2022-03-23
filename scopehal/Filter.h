@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,7 +43,6 @@
 	@brief Abstract base class for all filters and protocol decoders
  */
 class Filter	: public OscilloscopeChannel
-				, public FlowGraphNode
 {
 public:
 
@@ -117,13 +116,6 @@ public:
 	Category GetCategory()
 	{ return m_category; }
 
-	/**
-		@brief Return true (default) if this decoder should be overlaid on top of the original waveform.
-
-		Return false (override) if it should be rendered as its own line.
-	 */
-	virtual bool IsOverlay();
-
 	virtual bool NeedsConfig() =0;	//false if we can automatically do the decode from the signal w/ no configuration
 
 	void RefreshIfDirty();
@@ -179,6 +171,7 @@ protected:
 	bool VerifyAllInputsOK(bool allowEmpty = false);
 	bool VerifyInputOK(size_t i, bool allowEmpty = false);
 	bool VerifyAllInputsOKAndAnalog();
+	bool VerifyAllInputsOKAndDigital();
 
 	///Gets the timestamp of the next event (if any) on a waveform
 	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
@@ -219,6 +212,7 @@ public:
 	static float GetTopVoltage(AnalogWaveform* cap);
 	static float GetAvgVoltage(AnalogWaveform* cap);
 	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
+	static std::vector<size_t> MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins);
 
 	//Samples a digital channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
@@ -241,6 +235,14 @@ public:
 
 	//Checksum helpers
 	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
+
+public:
+	sigc::signal<void> signal_outputsChanged()
+	{ return m_outputsChangedSignal; }
+
+protected:
+	///@brief Signal emitted when the set of output streams changes
+	sigc::signal<void> m_outputsChangedSignal;
 
 protected:
 	//Common text formatting

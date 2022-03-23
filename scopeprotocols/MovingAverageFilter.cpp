@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,10 +44,8 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_depthname].SetFloatVal(0);
 
-	m_range = 1;
+	m_range = 0;
 	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,25 +65,29 @@ bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MovingAverageFilter::GetVoltageRange()
+float MovingAverageFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MovingAverageFilter::GetOffset()
+float MovingAverageFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
+}
+
+void MovingAverageFilter::SetVoltageRange(float range, size_t /*stream*/)
+{
+	m_range = range;
+}
+
+void MovingAverageFilter::SetOffset(float offset, size_t /*stream*/)
+{
+	m_offset = offset;
 }
 
 string MovingAverageFilter::GetProtocolName()
 {
 	return "Moving average";
-}
-
-bool MovingAverageFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool MovingAverageFilter::NeedsConfig()
@@ -107,14 +109,6 @@ void MovingAverageFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void MovingAverageFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
-
 void MovingAverageFilter::Refresh()
 {
 	if(!VerifyAllInputsOKAndAnalog())
@@ -134,15 +128,13 @@ void MovingAverageFilter::Refresh()
 	}
 
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Do the average
 	auto cap = new AnalogWaveform;
 	size_t nsamples = len - depth;
 	size_t off = depth/2;
 	cap->Resize(nsamples);
-	float vmin = FLT_MAX;
-	float vmax = -FLT_MAX;
 	//#pragma omp parallel for
 	for(size_t i=0; i<nsamples; i++)
 	{
@@ -151,9 +143,6 @@ void MovingAverageFilter::Refresh()
 			v += din->m_samples[i+j];
 		v /= depth;
 
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
-
 		cap->m_offsets[i] = din->m_offsets[i+off];
 		cap->m_durations[i] = din->m_durations[i+off];
 		cap->m_samples[i] = v;
@@ -161,10 +150,19 @@ void MovingAverageFilter::Refresh()
 	SetData(cap, 0);
 
 	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
+	if(m_range == 0)
+	{
+		float vmin = FLT_MAX;
+		float vmax = -FLT_MAX;
+		for(size_t i=0; i<nsamples; i++)
+		{
+			float v = cap->m_samples[i];
+			vmin = min(vmin, v);
+			vmax = max(vmax, v);
+		}
+		m_range = (vmax - vmin) * 1.05;
+		m_offset = -( (vmax - vmin)/2 + m_min );
+	}
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;

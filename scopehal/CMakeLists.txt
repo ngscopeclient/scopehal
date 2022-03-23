@@ -54,6 +54,7 @@ set(SCOPEHAL_SOURCES
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
+	SCPITwinLanTransport.cpp
 	VICPSocketTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
@@ -81,25 +82,30 @@ set(SCOPEHAL_SOURCES
 
 	Instrument.cpp
 	FunctionGenerator.cpp
+	Multimeter.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
+	PowerSupply.cpp
+	RFSignalGenerator.cpp
 	SCPIOscilloscope.cpp
+	RemoteBridgeOscilloscope.cpp
+
 	AgilentOscilloscope.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	DemoOscilloscope.cpp
+	DigilentOscilloscope.cpp
+	DSLabsOscilloscope.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
 	RigolOscilloscope.cpp
 	SiglentSCPIOscilloscope.cpp
-	SignalGeneratorOscilloscope.cpp
+	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
-	Multimeter.cpp
-	PowerSupply.cpp
 
 	Filter.cpp
 	FilterParameter.cpp
@@ -107,8 +113,12 @@ set(SCOPEHAL_SOURCES
 	PeakDetectionFilter.cpp
 	Statistic.cpp
 	SpectrumChannel.cpp
+	SParameterSourceFilter.cpp
+	SParameterFilter.cpp
 
 	TestWaveformSource.cpp
+
+	ExportWizard.cpp
 	)
 
 configure_file(config.h.in config.h)

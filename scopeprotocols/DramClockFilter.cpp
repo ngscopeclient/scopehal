@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,8 +40,8 @@ DramClockFilter::DramClockFilter(const string& color)
 {
 	//Set up channels
 	ClearStreams();
-	AddStream("RD");
-	AddStream("WR");
+	AddStream(Unit(Unit::UNIT_COUNTS), "RD");
+	AddStream(Unit(Unit::UNIT_COUNTS), "WR");
 
 	//Set up channels
 	CreateInput("CMD");
@@ -96,11 +96,6 @@ void DramClockFilter::SetDefaultName()
 string DramClockFilter::GetProtocolName()
 {
 	return "DRAM Clocks";
-}
-
-bool DramClockFilter::IsOverlay()
-{
-	return false;
 }
 
 bool DramClockFilter::NeedsConfig()

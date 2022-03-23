@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,13 +43,11 @@ using namespace std;
 #define RATE_1P25GSPS	(1250L * 1000L * 1000L)
 #define RATE_625MSPS	(625L * 1000L * 1000L)
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
 
 PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
-	, m_triggerArmed(false)
+	: RemoteBridgeOscilloscope(transport)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 
@@ -80,8 +78,8 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		//Set initial configuration so we have a well-defined instrument state
 		m_channelAttenuations[i] = 1;
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_DC_1M);
-		SetChannelOffset(i, 0);
-		SetChannelVoltageRange(i, 5);
+		SetChannelOffset(i, 0,  0);
+		SetChannelVoltageRange(i, 0, 5);
 	}
 
 	//Add digital channels (named 1D0...7 and 2D0...7)
@@ -124,11 +122,6 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 
-	//Set up the data plane socket
-	auto csock = dynamic_cast<SCPISocketTransport*>(m_transport);
-	if(!csock)
-		LogFatal("PicoOscilloscope expects a SCPISocketTransport\n");
-
 	//Configure the trigger
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
@@ -137,12 +130,6 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(10 * 1000L * 1000L);
-
-	//For now, assume control plane port is data plane +1
-	LogDebug("Connecting to data plane socket\n");
-	m_dataSocket = new Socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	m_dataSocket->Connect(csock->GetHostname(), csock->GetPort() + 1);
-	m_dataSocket->DisableNagle();
 }
 
 /**
@@ -236,7 +223,6 @@ void PicoOscilloscope::IdentifyHardware()
 
 PicoOscilloscope::~PicoOscilloscope()
 {
-	delete m_dataSocket;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,13 +274,7 @@ void PicoOscilloscope::EnableChannel(size_t i)
 		}
 	}
 
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelsEnabled[i] = true;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":ON");
+	RemoteBridgeOscilloscope::EnableChannel(i);
 }
 
 void PicoOscilloscope::DisableChannel(size_t i)
@@ -316,12 +296,6 @@ void PicoOscilloscope::DisableChannel(size_t i)
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFF");
 }
 
-OscilloscopeChannel::CouplingType PicoOscilloscope::GetChannelCoupling(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelCouplings[i];
-}
-
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
@@ -330,36 +304,6 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
 	ret.push_back(OscilloscopeChannel::COUPLE_GND);
 	return ret;
-}
-
-void PicoOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	bool valid = true;
-	switch(type)
-	{
-		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP AC1M");
-			break;
-
-		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC1M");
-			break;
-
-		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":COUP DC50");
-			break;
-
-		default:
-			LogError("Invalid coupling for channel\n");
-			valid = false;
-	}
-
-	if(valid)
-	{
-		lock_guard<recursive_mutex> lock2(m_cacheMutex);
-		m_channelCouplings[i] = type;
-	}
 }
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
@@ -389,48 +333,10 @@ void PicoOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*lim
 {
 }
 
-double PicoOscilloscope::GetChannelVoltageRange(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelVoltageRanges[i];
-}
-
-void PicoOscilloscope::SetChannelVoltageRange(size_t i, double range)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelVoltageRanges[i] = range;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:RANGE %f", m_channels[i]->GetHwname().c_str(), range / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
-}
-
 OscilloscopeChannel* PicoOscilloscope::GetExternalTrigger()
 {
 	//FIXME
 	return NULL;
-}
-
-double PicoOscilloscope::GetChannelOffset(size_t i)
-{
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelOffsets[i];
-}
-
-void PicoOscilloscope::SetChannelOffset(size_t i, double offset)
-{
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelOffsets[i] = offset;
-	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:OFFS %f", m_channels[i]->GetHwname().c_str(), -offset / GetChannelAttenuation(i));
-	m_transport->SendCommand(buf);
 }
 
 Oscilloscope::TriggerMode PicoOscilloscope::PollTrigger()
@@ -444,13 +350,13 @@ bool PicoOscilloscope::AcquireData()
 {
 	//Read the number of channels in the current waveform
 	uint16_t numChannels;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&numChannels, sizeof(numChannels)))
+	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
 		return false;
 
 	//Get the sample interval.
 	//May be different from m_srate if we changed the rate after the trigger was armed
 	int64_t fs_per_sample;
-	if(!m_dataSocket->RecvLooped((uint8_t*)&fs_per_sample, sizeof(fs_per_sample)))
+	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
 		return false;
 
 	//Acquire data for each channel
@@ -470,9 +376,9 @@ bool PicoOscilloscope::AcquireData()
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_dataSocket->RecvLooped((uint8_t*)&chnum, sizeof(chnum)))
+		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
 			return false;
-		if(!m_dataSocket->RecvLooped((uint8_t*)&memdepth, sizeof(memdepth)))
+		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
 		int16_t* buf = new int16_t[memdepth];
 
@@ -482,7 +388,7 @@ bool PicoOscilloscope::AcquireData()
 			abufs.push_back(buf);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
-			if(!m_dataSocket->RecvLooped((uint8_t*)&config, sizeof(config)))
+			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
 				return false;
 			float scale = config[0];
 			float offset = config[1];
@@ -491,7 +397,7 @@ bool PicoOscilloscope::AcquireData()
 
 			//TODO: stream timestamp from the server
 
-			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
 				return false;
 
 			//Create our waveform
@@ -513,22 +419,37 @@ bool PicoOscilloscope::AcquireData()
 		else
 		{
 			float trigphase;
-			if(!m_dataSocket->RecvLooped((uint8_t*)&trigphase, sizeof(trigphase)))
+			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
 				return false;
 			trigphase = -trigphase * fs_per_sample;
-			if(!m_dataSocket->RecvLooped((uint8_t*)buf, memdepth * sizeof(int16_t)))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
 				return false;
 
 			size_t podnum = chnum - m_analogChannelCount;
+			if(podnum > 2)
+			{
+				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
+					chnum);
+				return false;
+			}
+
+			//Create buffers for output waveforms
+			DigitalWaveform* caps[8];
+			for(size_t j=0; j<8; j++)
+			{
+				caps[j] = new DigitalWaveform;
+				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = caps[j];
+			}
 
 			//Now that we have the waveform data, unpack it into individual channels
+			#pragma omp parallel for
 			for(size_t j=0; j<8; j++)
 			{
 				//Bitmask for this digital channel
 				int16_t mask = (1 << j);
 
 				//Create the waveform
-				DigitalWaveform* cap = new DigitalWaveform;
+				auto cap = caps[j];
 				cap->m_timescale = fs_per_sample;
 				cap->m_triggerPhase = trigphase;
 				cap->m_startTimestamp = time(NULL);
@@ -573,9 +494,6 @@ bool PicoOscilloscope::AcquireData()
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
-
-				//Done
-				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = cap;
 			}
 
 			delete[] buf;
@@ -609,37 +527,6 @@ bool PicoOscilloscope::AcquireData()
 		m_triggerArmed = false;
 
 	return true;
-}
-
-void PicoOscilloscope::Start()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("START");
-	m_triggerArmed = true;
-	m_triggerOneShot = false;
-}
-
-void PicoOscilloscope::StartSingleTrigger()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("SINGLE");
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
-}
-
-void PicoOscilloscope::Stop()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("STOP");
-	m_triggerArmed = false;
-}
-
-void PicoOscilloscope::ForceTrigger()
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("FORCE");
-	m_triggerArmed = true;
-	m_triggerOneShot = true;
 }
 
 bool PicoOscilloscope::IsTriggerArmed()
@@ -780,11 +667,6 @@ bool PicoOscilloscope::SetInterleaving(bool /*combine*/)
 	return false;
 }
 
-void PicoOscilloscope::PullTrigger()
-{
-	//pulling not needed, we always have a valid trigger cached
-}
-
 void PicoOscilloscope::PushTrigger()
 {
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
@@ -795,46 +677,6 @@ void PicoOscilloscope::PushTrigger()
 		LogWarning("Unknown trigger type (not an edge)\n");
 
 	ClearPendingWaveforms();
-}
-
-/**
-	@brief Pushes settings for an edge trigger to the instrument
- */
-void PicoOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
-{
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	//Type
-	//m_transport->SendCommand(":TRIG:MODE EDGE");
-
-	//Delay
-	m_transport->SendCommand("TRIG:DELAY " + to_string(m_triggerOffset));
-
-	//Source
-	auto chan = trig->GetInput(0).m_channel;
-	m_transport->SendCommand("TRIG:SOU " + chan->GetHwname());
-
-	//Level
-	char buf[128];
-	snprintf(buf, sizeof(buf), "TRIG:LEV %f", trig->GetLevel() / chan->GetAttenuation());
-	m_transport->SendCommand(buf);
-
-	//Slope
-	switch(trig->GetType())
-	{
-		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand("TRIG:EDGE:DIR RISING");
-			break;
-		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand("TRIG:EDGE:DIR FALLING");
-			break;
-		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand("TRIG:EDGE:DIR ANY");
-			break;
-		default:
-			LogWarning("Unknown edge type\n");
-			return;
-	}
 }
 
 vector<Oscilloscope::AnalogBank> PicoOscilloscope::GetAnalogBanks()
@@ -906,6 +748,8 @@ void PicoOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 			break;
 
 		default:
+			LogWarning("PicoOscilloscope::SetADCMode requested invalid mode %zu, interpreting as 8 bit\n", mode);
+			m_adcMode = ADC_MODE_8BIT;
 			break;
 	}
 }

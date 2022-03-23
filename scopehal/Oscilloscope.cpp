@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -111,6 +111,11 @@ void Oscilloscope::FlushConfigCache()
 	//nothing to do, base class has no caching
 }
 
+bool Oscilloscope::IsOffline()
+{
+	return false;
+}
+
 size_t Oscilloscope::GetChannelCount()
 {
 	return m_channels.size();
@@ -204,7 +209,7 @@ bool Oscilloscope::PopPendingWaveform()
 	{
 		SequenceSet set = *m_pendingWaveforms.begin();
 		for(auto it : set)
-			it.first->SetData(it.second, 0);	//assume stream 0
+			it.first.m_channel->SetData(it.second, it.first.m_stream);
 		m_pendingWaveforms.pop_front();
 		return true;
 	}
@@ -302,16 +307,28 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		else
 			config += "                enabled:     0\n";
 
+		snprintf(tmp, sizeof(tmp), "                xunit:       \"%s\"\n", chan->GetXAxisUnits().ToString().c_str());
+		config += tmp;
+
+		size_t nstreams = chan->GetStreamCount();
 		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
 		{
 			snprintf(tmp, sizeof(tmp), "                attenuation: %f\n", chan->GetAttenuation());
 			config += tmp;
 			snprintf(tmp, sizeof(tmp), "                bwlimit:     %d\n", chan->GetBandwidthLimit());
 			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange());
-			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset());
-			config += tmp;
+
+			//single stream unit goes here
+			//multi stream unit goes under streams heading
+			if(nstreams == 1)
+			{
+				snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits(0).ToString().c_str());
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange(0));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset(0));
+				config += tmp;
+			}
 
 			switch(chan->GetCoupling())
 			{
@@ -336,7 +353,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		}
 
 		//Save streams if there's more than one
-		size_t nstreams = chan->GetStreamCount();
 		if(nstreams > 1)
 		{
 			snprintf(tmp, sizeof(tmp), "                nstreams:     %zu\n", nstreams);
@@ -350,6 +366,12 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				snprintf(tmp, sizeof(tmp), "                        index: %zu\n", j);
 				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                        name: \"%s\"\n", chan->GetStreamName(j).c_str());
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        yunit:       \"%s\"\n", chan->GetYAxisUnits(j).ToString().c_str());
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        vrange:      %f\n", chan->GetVoltageRange(j));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                        offset:      %f\n", chan->GetOffset(j));
 				config += tmp;
 			}
 		}
@@ -386,13 +408,57 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
+		if(cnode["yunit"])
+			chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
+		if(cnode["vrange"])
+			chan->SetVoltageRange(cnode["vrange"].as<float>(), 0);
+		if(cnode["offset"])
+			chan->SetOffset(cnode["offset"].as<float>(), 0);
+
+		//Add multiple streams if present
+		auto snode = cnode["nstreams"];
+		if(snode)
+		{
+			size_t nstreams = snode.as<size_t>();
+			if(nstreams > 1)
+			{
+				chan->ClearStreams();
+
+				//We have to keep track of indexes because streams might show up out of order
+				//but right now OscilloscopeChannel only lets us add them in order
+				map<int, string> names;
+				map<int, string> yunits;
+
+				auto streams = cnode["streams"];
+				for(auto st : streams)
+				{
+					auto index = st.second["index"].as<size_t>();
+					names[index] = st.second["name"].as<string>();
+
+					if(st.second["yunit"])
+						yunits[index] = st.second["yunit"].as<string>();
+					else
+						yunits[index] = "V";
+
+					if(st.second["vrange"])
+						chan->SetVoltageRange(st.second["vrange"].as<float>(), index);
+					if(st.second["offset"])
+						chan->SetOffset(st.second["offset"].as<float>(), index);
+				}
+
+				for(size_t j=0; j<nstreams; j++)
+					chan->AddStream(Unit(yunits[j]), names[j]);
+			}
+		}
+
 		switch(chan->GetType())
 		{
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
 				chan->SetAttenuation(cnode["attenuation"].as<float>());
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
-				chan->SetVoltageRange(cnode["vrange"].as<float>());
-				chan->SetOffset(cnode["offset"].as<float>());
+
+				if(cnode["xunit"])
+					chan->SetXAxisUnits(cnode["xunit"].as<string>());
 
 				if(cnode["coupling"])
 				{
@@ -419,28 +485,6 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 
 			default:
 				break;
-		}
-
-		//Add multiple streams if present
-		auto snode = cnode["nstreams"];
-		if(snode)
-		{
-			size_t nstreams = snode.as<size_t>();
-			if(nstreams > 1)
-			{
-				chan->ClearStreams();
-
-				//We have to keep track of indexes because streams might show up out of order
-				//but right now OscilloscopeChannel only lets us add them in order
-				map<int, string> names;
-
-				auto streams = cnode["streams"];
-				for(auto st : streams)
-					names[st.second["index"].as<size_t>()] = st.second["name"].as<string>();
-
-				for(size_t j=0; j<nstreams; j++)
-					chan->AddStream(names[j]);
-			}
 		}
 	}
 
@@ -906,11 +950,196 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 	}
 }
 
+/**
+	@brief Converts Unsigned 8-bit ADC samples to floating point
+ */
+void Oscilloscope::ConvertUnsigned8BitSamples(
+	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	//Divide large waveforms (>1M points) into blocks and multithread them
+	//TODO: tune split
+	if(count > 1000000)
+	{
+		//Round blocks to multiples of 32 samples for clean vectorization
+		size_t numblocks = omp_get_max_threads();
+		size_t lastblock = numblocks - 1;
+		size_t blocksize = count / numblocks;
+		blocksize = blocksize - (blocksize % 32);
+
+		#pragma omp parallel for
+		for(size_t i=0; i<numblocks; i++)
+		{
+			//Last block gets any extra that didn't divide evenly
+			size_t nsamp = blocksize;
+			if(i == lastblock)
+				nsamp = count - i*blocksize;
+
+			size_t off = i*blocksize;
+			if(g_hasAvx2)
+			{
+				ConvertUnsigned8BitSamplesAVX2(
+					offs + off,
+					durs + off,
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp,
+					ibase + off);
+			}
+			else
+			{
+				ConvertUnsigned8BitSamplesGeneric(
+					offs + off,
+					durs + off,
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp,
+					ibase + off);
+			}
+		}
+	}
+
+	//Small waveforms get done single threaded to avoid overhead
+	else
+	{
+		if(g_hasAvx2)
+			ConvertUnsigned8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+		else
+			ConvertUnsigned8BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
+	}
+}
+
+/**
+	@brief Generic backend for ConvertUnsigned8BitSamples()
+ */
+void Oscilloscope::ConvertUnsigned8BitSamplesGeneric(
+	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	for(unsigned int k=0; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
+}
+
+/**
+	@brief Optimized version of ConvertUnsigned8BitSamples()
+ */
+__attribute__((target("avx2")))
+void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
+	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	unsigned int end = count - (count % 32);
+
+	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
+	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
+	int64_t __attribute__ ((aligned(32))) count_x4[] =
+	{
+		ibase + 0,
+		ibase + 1,
+		ibase + 2,
+		ibase + 3
+	};
+
+	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
+	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
+	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(unsigned int k=0; k<end; k += 32)
+	{
+		//Load all 32 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+
+		//Fill duration
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
+
+		//Extract the low and high 16 samples from the block
+		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
+		__m128i block23_x8 = _mm256_extracti128_si256(raw_samples, 1);
+
+		//Swap the low and high halves of these vectors
+		//Ugly casting needed because all permute instrinsics expect float/double datatypes
+		__m128i block10_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block01_x8), 1));
+		__m128i block32_x8 = _mm_castpd_si128(_mm_permute_pd(_mm_castsi128_pd(block23_x8), 1));
+
+		//Divide into blocks of 8 samples and sign extend to 32 bit
+		__m256i block0_int = _mm256_cvtepu8_epi32(block01_x8);
+		__m256i block1_int = _mm256_cvtepu8_epi32(block10_x8);
+		__m256i block2_int = _mm256_cvtepu8_epi32(block23_x8);
+		__m256i block3_int = _mm256_cvtepu8_epi32(block32_x8);
+
+		//Fill offset
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
+		counts = _mm256_add_epi64(counts, all_fours);
+
+		//Convert the 32-bit int blocks to float.
+		//Apparently there's no direct epi8 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_int);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_int);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_int);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_int);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
+
+		block0_float = _mm256_sub_ps(block0_float, offsets);
+		block1_float = _mm256_sub_ps(block1_float, offsets);
+		block2_float = _mm256_sub_ps(block2_float, offsets);
+		block3_float = _mm256_sub_ps(block3_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(unsigned int k=end; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers for converting raw 16-bit ADC samples to fp32 waveforms
 
 /**
-	@brief Converts 8-bit ADC samples to floating point
+	@brief Converts 16-bit ADC samples to floating point
  */
 void Oscilloscope::Convert16BitSamples(
 	int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
@@ -1106,7 +1335,7 @@ void Oscilloscope::Convert16BitSamplesAVX2(
 	}
 }
 
-__attribute__((target("avx2","fma")))
+__attribute__((target("avx2,fma")))
 void Oscilloscope::Convert16BitSamplesFMA(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {

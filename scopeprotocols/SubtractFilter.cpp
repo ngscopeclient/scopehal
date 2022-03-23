@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,24 +76,21 @@ string SubtractFilter::GetProtocolName()
 	return "Subtract";
 }
 
-bool SubtractFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool SubtractFilter::NeedsConfig()
 {
 	//we have more than one input
 	return true;
 }
 
-double SubtractFilter::GetOffset()
+float SubtractFilter::GetOffset(size_t /*stream*/)
 {
-	double v1 = m_inputs[0].m_channel->GetVoltageRange();
-	double v2 = m_inputs[1].m_channel->GetVoltageRange();
-	double o1 = m_inputs[0].m_channel->GetOffset();
-	double o2 = m_inputs[1].m_channel->GetOffset();
+	if(!VerifyAllInputsOKAndAnalog())
+		return 0;
+
+	double v1 = m_inputs[0].GetVoltageRange();
+	double v2 = m_inputs[1].GetVoltageRange();
+	double o1 = m_inputs[0].GetOffset();
+	double o2 = m_inputs[1].GetOffset();
 
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;
@@ -108,12 +105,15 @@ double SubtractFilter::GetOffset()
 	return -(vout_min + ((vout_max - vout_min) / 2));
 }
 
-double SubtractFilter::GetVoltageRange()
+float SubtractFilter::GetVoltageRange(size_t /*stream*/)
 {
-	double v1 = m_inputs[0].m_channel->GetVoltageRange();
-	double v2 = m_inputs[1].m_channel->GetVoltageRange();
-	double o1 = m_inputs[0].m_channel->GetOffset();
-	double o2 = m_inputs[1].m_channel->GetOffset();
+	if(!VerifyAllInputsOKAndAnalog())
+		return 1;
+
+	double v1 = m_inputs[0].GetVoltageRange();
+	double v2 = m_inputs[1].GetVoltageRange();
+	double o1 = m_inputs[0].GetOffset();
+	double o2 = m_inputs[1].GetOffset();
 
 	double vmax_p = v1/2 - o1;
 	double vmin_p = -v1/2 - o1;
@@ -145,9 +145,9 @@ void SubtractFilter::Refresh()
 
 	//Set up units and complain if they're inconsistent
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	if( (m_xAxisUnit != m_inputs[1].m_channel->GetXAxisUnits()) ||
-		(m_yAxisUnit != m_inputs[1].m_channel->GetYAxisUnits()) )
+		(m_inputs[0].GetYAxisUnits() != m_inputs[1].GetYAxisUnits()) )
 	{
 		SetData(NULL, 0);
 		return;
@@ -162,11 +162,28 @@ void SubtractFilter::Refresh()
 	float* a = (float*)&din_p->m_samples[0];
 	float* b = (float*)&din_n->m_samples[0];
 
-	//Do the actual subtraction
-	if(g_hasAvx2)
-		InnerLoopAVX2(out, a, b, len);
+	//Special case if input units are degrees: we want to do modular arithmetic
+	//TODO: vectorized version of this
+	if(GetYAxisUnits(0) == Unit::UNIT_DEGREES)
+	{
+		for(size_t i=0; i<len; i++)
+		{
+			out[i] 		= a[i] - b[i];
+			if(out[i] < -180)
+				out[i] += 360;
+			if(out[i] > 180)
+				out[i] -= 360;
+		}
+	}
+
+	//Just regular subtraction
 	else
-		InnerLoop(out, a, b, len);
+	{
+		if(g_hasAvx2)
+			InnerLoopAVX2(out, a, b, len);
+		else
+			InnerLoop(out, a, b, len);
+	}
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization

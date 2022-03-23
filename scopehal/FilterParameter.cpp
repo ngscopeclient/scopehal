@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,6 +41,12 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FilterParameter
 
+/**
+	@brief Creates a parameter
+
+	@param type	Type of parameter
+	@param unit	Unit of measurement (ignored for non-numeric types)
+ */
 FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 	: m_fileIsOutput(false)
 	, m_type(type)
@@ -52,7 +58,20 @@ FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 
 }
 
-void FilterParameter::ParseString(const string& str)
+/**
+	@brief Reinterprets our string representation (in case our type or enums changed)
+ */
+void FilterParameter::Reinterpret()
+{
+	ParseString(m_string);
+}
+
+/**
+	@brief Sets the parameter to a value represented as a string.
+
+	The string is converted to the appropriate internal representation.
+ */
+void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 {
 	switch(m_type)
 	{
@@ -70,7 +89,7 @@ void FilterParameter::ParseString(const string& str)
 		//so e.g. 1.5M parses correctly
 		case TYPE_FLOAT:
 		case TYPE_INT:
-			m_floatval = m_unit.ParseString(str);
+			m_floatval = m_unit.ParseString(str, useDisplayLocale);
 			m_intval = m_floatval;
 			break;
 
@@ -79,78 +98,40 @@ void FilterParameter::ParseString(const string& str)
 			m_intval = 0;
 			m_floatval = 0;
 			m_string = str;
-			m_filenames.push_back(str);
-			break;
-
-		case TYPE_FILENAMES:
-			{
-				m_intval = 0;
-				m_floatval = 0;
-				m_string = "";
-
-				//Split out semicolon-delimited filenames
-				string tmp;
-				for(size_t i=0; i<str.length(); i++)
-				{
-					if(str[i] ==';')
-					{
-						if(tmp.empty())
-							continue;
-
-						if(m_string == "")
-							m_string = tmp;
-						m_filenames.push_back(tmp);
-						tmp = "";
-						continue;
-					}
-
-					tmp += str[i];
-				}
-				if(tmp != "")
-				{
-					m_string = tmp;
-					m_filenames.push_back(tmp);
-				}
-			}
 			break;
 
 		case TYPE_ENUM:
 			m_intval = 0;
 			m_floatval = 0;
 			m_string = str;
-			m_filenames.push_back(str);
 
 			if(m_forwardEnumMap.find(str) != m_forwardEnumMap.end())
 				m_intval = m_forwardEnumMap[str];
 
 			break;
 	}
+
+	m_changeSignal.emit();
 }
 
-string FilterParameter::ToString()
+/**
+	@brief Returns a pretty-printed representation of the parameter's value.
+ */
+string FilterParameter::ToString(bool useDisplayLocale)
 {
 	string ret;
 	switch(m_type)
 	{
 		case TYPE_FLOAT:
-			return m_unit.PrettyPrint(m_floatval);
+			return m_unit.PrettyPrint(m_floatval, -1, useDisplayLocale);
 
 		case TYPE_BOOL:
 		case TYPE_INT:
-			return m_unit.PrettyPrint(m_intval);
+			return m_unit.PrettyPrint(m_intval, -1, useDisplayLocale);
 
 		case TYPE_FILENAME:
 		case TYPE_STRING:
 			return m_string;
-
-		case TYPE_FILENAMES:
-			for(auto f : m_filenames)
-			{
-				if(ret != "")
-					ret += ";";
-				ret += f;
-			}
-			return ret;
 
 		case TYPE_ENUM:
 			return m_reverseEnumMap[m_intval];
@@ -160,64 +141,53 @@ string FilterParameter::ToString()
 	}
 }
 
-int64_t FilterParameter::GetIntVal()
+/**
+	@brief Sets the parameter to a boolean value
+ */
+void FilterParameter::SetBoolVal(bool b)
 {
-	return m_intval;
+	m_intval = b;
+	m_floatval = b;
+	m_string = b ? "1" : "0";
+
+	m_changeSignal.emit();
 }
 
-float FilterParameter::GetFloatVal()
-{
-	return m_floatval;
-}
-
-string FilterParameter::GetFileName()
-{
-	return m_string;
-}
-
-vector<string> FilterParameter::GetFileNames()
-{
-	return m_filenames;
-}
-
+/**
+	@brief Sets the parameter to an integer value
+ */
 void FilterParameter::SetIntVal(int64_t i)
 {
 	m_intval = i;
 	m_floatval = i;
 	m_string = "";
-	m_filenames.clear();
 
 	if(m_reverseEnumMap.find(i) != m_reverseEnumMap.end())
-	{
 		m_string = m_reverseEnumMap[i];
-		m_filenames.push_back(m_string);
-	}
+
+	m_changeSignal.emit();
 }
 
+/**
+	@brief Sets the parameter to a floating point value
+ */
 void FilterParameter::SetFloatVal(float f)
 {
 	m_intval = f;
 	m_floatval = f;
 	m_string = "";
-	m_filenames.clear();
+
+	m_changeSignal.emit();
 }
 
+/**
+	@brief Sets the parameter to a file path
+ */
 void FilterParameter::SetFileName(const string& f)
 {
 	m_intval = 0;
 	m_floatval = 0;
 	m_string = f;
-	m_filenames.clear();
-	m_filenames.push_back(f);
-}
 
-void FilterParameter::SetFileNames(const vector<string>& names)
-{
-	m_intval = 0;
-	m_floatval = 0;
-	if(names.empty())
-		m_string = "";
-	else
-		m_string = names[0];
-	m_filenames = names;
+	m_changeSignal.emit();
 }

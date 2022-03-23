@@ -41,7 +41,7 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	: FFTFilter(color)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 	m_category = CAT_ANALYSIS;
 
 	m_range = 1000;
@@ -63,7 +63,7 @@ bool JitterSpectrumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) &&
 		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetYAxisUnits() == Unit::UNIT_FS)
+		(stream.GetYAxisUnits() == Unit::UNIT_FS)
 		)
 	{
 		return true;

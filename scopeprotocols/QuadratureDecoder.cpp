@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,7 +61,7 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_debouncename].ParseString("1 ms");
 
-	m_yAxisUnit = Unit(Unit::UNIT_DEGREES);
+	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	m_max = 10;
 	m_min = -10;
@@ -91,12 +91,12 @@ void QuadratureDecoder::ClearSweeps()
 	SetData(NULL, 0);
 }
 
-double QuadratureDecoder::GetVoltageRange()
+float QuadratureDecoder::GetVoltageRange(size_t /*stream*/)
 {
 	return (m_max - m_min) + 20;
 }
 
-double QuadratureDecoder::GetOffset()
+float QuadratureDecoder::GetOffset(size_t /*stream*/)
 {
 	return -( (m_max - m_min)/2 + m_min );
 }
@@ -104,12 +104,6 @@ double QuadratureDecoder::GetOffset()
 string QuadratureDecoder::GetProtocolName()
 {
 	return "Quadrature";
-}
-
-bool QuadratureDecoder::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool QuadratureDecoder::NeedsConfig()

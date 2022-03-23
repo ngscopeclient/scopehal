@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,7 @@ VerticalBathtub::VerticalBathtub(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	m_yAxisUnit = Unit(Unit::UNIT_LOG_BER);
+	SetYAxisUnits(Unit(Unit::UNIT_LOG_BER), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -82,24 +82,18 @@ string VerticalBathtub::GetProtocolName()
 	return "Vert Bathtub";
 }
 
-bool VerticalBathtub::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool VerticalBathtub::NeedsConfig()
 {
 	return true;
 }
 
-double VerticalBathtub::GetVoltageRange()
+float VerticalBathtub::GetVoltageRange(size_t /*stream*/)
 {
 	//1e12 total height
 	return 12;
 }
 
-double VerticalBathtub::GetOffset()
+float VerticalBathtub::GetOffset(size_t /*stream*/)
 {
 	//1e-6 is the midpoint
 	return 6;
@@ -117,7 +111,6 @@ void VerticalBathtub::Refresh()
 	}
 
 	//Get the input data
-	auto ein = GetInput(0).m_channel;
 	auto eye = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
 	int64_t timestamp = m_parameters[m_timeName].GetIntVal();
 
@@ -138,8 +131,9 @@ void VerticalBathtub::Refresh()
 	cap->m_triggerPhase = 0;
 
 	//Eye height config
-	double mv_per_pixel = 1000 * ein->GetVoltageRange() / eye->GetHeight();
-	double mv_off = 1000 * (ein->GetVoltageRange()/2 - eye->GetCenterVoltage());
+	auto range = GetInput(0).GetVoltageRange();
+	double mv_per_pixel = 1000 * range / eye->GetHeight();
+	double mv_off = 1000 * (range/2 - eye->GetCenterVoltage());
 
 	//Extract the single column we're interested in
 	//TODO: support a range of times around the midpoint

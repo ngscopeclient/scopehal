@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,9 +41,10 @@ using namespace std;
 FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 	, m_windowName("Window")
+	, m_roundingName("Length Rounding")
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_DBM);
+	SetYAxisUnits(Unit(Unit::UNIT_DBM), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -62,6 +63,11 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_windowName].AddEnumValue("Hann", WINDOW_HANN);
 	m_parameters[m_windowName].AddEnumValue("Rectangular", WINDOW_RECTANGULAR);
 	m_parameters[m_windowName].SetIntVal(WINDOW_HAMMING);
+
+	m_parameters[m_roundingName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_roundingName].AddEnumValue("Down (Truncate)", ROUND_TRUNCATE);
+	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
+	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
 
 	#ifdef HAVE_CLFFT
 
@@ -117,13 +123,23 @@ FFTFilter::FFTFilter(const string& color)
 				LogError("Failed to build OpenCL program for FFT\n");
 
 				string log;
-				m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Window program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_windowProgram)
+				{
+					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Window program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
+				else
+					LogDebug("Window program object not present\n");
 
-				m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-				LogDebug("Normalize program build log:\n");
-				LogDebug("%s\n", log.c_str());
+				if(m_normalizeProgram)
+				{
+					m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
+					LogDebug("Normalize program build log:\n");
+					LogDebug("%s\n", log.c_str());
+				}
+				else
+					LogDebug("Normalize program object not present\n");
 			}
 
 			delete m_windowProgram;
@@ -189,22 +205,22 @@ bool FFTFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double FFTFilter::GetOffset()
+float FFTFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-double FFTFilter::GetVoltageRange()
+float FFTFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-void FFTFilter::SetVoltageRange(double range)
+void FFTFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void FFTFilter::SetOffset(double offset)
+void FFTFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }
@@ -212,12 +228,6 @@ void FFTFilter::SetOffset(double offset)
 string FFTFilter::GetProtocolName()
 {
 	return "FFT";
-}
-
-bool FFTFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool FFTFilter::NeedsConfig()
@@ -241,6 +251,9 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 {
 	m_cachedNumPoints = npoints_raw;
 
+	m_rdinbuf.resize(npoints);
+	m_rdoutbuf.resize(2*nouts);
+
 	if(m_cachedNumPointsFFT != npoints)
 	{
 		m_cachedNumPointsFFT = npoints;
@@ -257,6 +270,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 
 		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 
+		//This must be the last block since we return on error
 		#ifdef HAVE_CLFFT
 
 			if(g_clContext)
@@ -264,8 +278,10 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				//Set up the FFT object
 				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 				{
-					LogError("clfftCreateDefaultPlan failed\n");
-					abort();
+					LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
+					delete m_windowProgram;
+					m_windowProgram = 0;
+					return;
 				}
 				clfftSetPlanBatchSize(m_clfftPlan, 1);
 				clfftSetPlanPrecision(m_clfftPlan, CLFFT_SINGLE);
@@ -277,16 +293,15 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
 				if(CLFFT_SUCCESS != err)
 				{
-					LogError("clfftBakePlan failed (%d)\n", err);
-					abort();
+					LogError("clfftBakePlan failed (%d) Disabling clFFT and falling back to ffts\n", err);
+					delete m_windowProgram;
+					m_windowProgram = 0;
+					return;
 				}
 			}
 
 		#endif
 	}
-
-	m_rdinbuf.resize(npoints);
-	m_rdoutbuf.resize(2*nouts);
 }
 
 void FFTFilter::Refresh()
@@ -299,9 +314,12 @@ void FFTFilter::Refresh()
 	}
 	auto din = GetAnalogInputWaveform(0);
 
-	//Round size up to next power of two
 	const size_t npoints_raw = din->m_samples.size();
-	const size_t npoints = next_pow2(npoints_raw);
+	size_t npoints;
+	if(m_parameters[m_roundingName].GetIntVal() == ROUND_TRUNCATE)
+		npoints = prev_pow2(npoints_raw);
+	else
+		npoints = next_pow2(npoints_raw);
 	LogTrace("FFTFilter: processing %zu raw points\n", npoints_raw);
 	LogTrace("Rounded to %zu\n", npoints);
 
@@ -324,7 +342,6 @@ void FFTFilter::DoRefresh(
 	bool log_output)
 {
 	//Look up some parameters
-	float scale = 2.0 / npoints;
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 	auto window = static_cast<WindowFunction>(m_parameters[m_windowName].GetIntVal());
@@ -339,7 +356,7 @@ void FFTFilter::DoRefresh(
 	}
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
+	cap->m_triggerPhase = 1*bin_hz;
 	cap->m_timescale = bin_hz;
 	cap->m_densePacked = true;
 
@@ -355,6 +372,32 @@ void FFTFilter::DoRefresh(
 		}
 	}
 
+	//Output scale is based on the number of points we FFT that contain actual sample data.
+	//(If we're zero padding, the zeroes don't contribute any power)
+	size_t numActualSamples = min(data.size(), npoints);
+	float scale = sqrt(2.0) / numActualSamples;
+
+	//We also need to adjust the scale by the coherent power gain of the window function
+	switch(window)
+	{
+		case WINDOW_HAMMING:
+			scale *= 1.862;
+			break;
+
+		case WINDOW_HANN:
+			scale *= 2.013;
+			break;
+
+		case WINDOW_BLACKMAN_HARRIS:
+			scale *= 2.805;
+			break;
+
+		//unit
+		case WINDOW_RECTANGULAR:
+		default:
+			break;
+	}
+
 	#ifdef HAVE_CLFFT
 		if(g_clContext && m_windowProgram && m_normalizeProgram)
 		{
@@ -368,7 +411,7 @@ void FFTFilter::DoRefresh(
 
 				//Apply the window function
 				cl::Kernel* windowKernel = NULL;
-				float windowscale = 2 * M_PI / m_cachedNumPoints;
+				float windowscale = 2 * M_PI / numActualSamples;
 				switch(window)
 				{
 					case WINDOW_RECTANGULAR:
@@ -394,7 +437,7 @@ void FFTFilter::DoRefresh(
 				}
 				windowKernel->setArg(0, inbuf);
 				windowKernel->setArg(1, windowoutbuf);
-				windowKernel->setArg(2, data.size());
+				windowKernel->setArg(2, numActualSamples);
 				if(window != WINDOW_RECTANGULAR)
 					windowKernel->setArg(3, windowscale);
 				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
@@ -435,13 +478,14 @@ void FFTFilter::DoRefresh(
 		{
 	#endif
 
-		//Copy the input with windowing, then zero pad to the desired input length
+		//Copy the input with windowing, then zero pad to the desired input length if needed
 		ApplyWindow(
 			(float*)&data[0],
-			m_cachedNumPoints,
+			numActualSamples,
 			&m_rdinbuf[0],
 			window);
-		memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+		if(npoints > m_cachedNumPoints)
+			memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
 
 		//Calculate the FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
@@ -761,6 +805,7 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	__m256 alpha2_x8	= { alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2, alpha2 };
 	__m256 alpha3_x8	= { alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3, alpha3 };
 	__m256 two_x8		= { 2, 2, 2, 2, 2, 2, 2, 2 };
+	__m256 six_x8		= { 6, 6, 6, 6, 6, 6, 6, 6 };
 
 	size_t i;
 	size_t len_rounded = len - (len % 8);
@@ -768,11 +813,11 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	{
 		__m256 vscale		= _mm256_mul_ps(count_x8, scale_x8);
 		__m256 vscale_x2	= _mm256_mul_ps(vscale, two_x8);
-		__m256 vscale_x3	= _mm256_add_ps(vscale, vscale_x2);
+		__m256 vscale_x6	= _mm256_mul_ps(vscale, six_x8);
 
 		__m256 term1		= _mm256_cos_ps(vscale);
 		__m256 term2		= _mm256_cos_ps(vscale_x2);
-		__m256 term3		= _mm256_cos_ps(vscale_x3);
+		__m256 term3		= _mm256_cos_ps(vscale_x6);
 		term1 				= _mm256_mul_ps(term1, alpha1_x8);
 		term2 				= _mm256_mul_ps(term2, alpha2_x8);
 		term3 				= _mm256_mul_ps(term3, alpha3_x8);

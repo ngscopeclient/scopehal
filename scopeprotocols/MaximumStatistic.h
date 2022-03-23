@@ -41,12 +41,12 @@ class MaximumStatistic : public Statistic
 public:
 	virtual void Clear();
 	static std::string GetStatisticName();
-	virtual bool Calculate(OscilloscopeChannel* channel, double& value);
+	virtual bool Calculate(StreamDescriptor stream, double& value);
 
 	STATISTIC_INITPROC(MaximumStatistic)
 
 protected:
-	std::map<OscilloscopeChannel*, double> m_pastMaximums;
+	std::map<StreamDescriptor, double> m_pastMaximums;
 };
 
 #endif

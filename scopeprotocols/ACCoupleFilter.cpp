@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,20 +58,14 @@ bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double ACCoupleFilter::GetVoltageRange()
+float ACCoupleFilter::GetVoltageRange(size_t /*stream*/)
 {
-	return m_inputs[0].m_channel->GetVoltageRange();
+	return m_inputs[0].GetVoltageRange();
 }
 
 string ACCoupleFilter::GetProtocolName()
 {
 	return "AC Couple";
-}
-
-bool ACCoupleFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool ACCoupleFilter::NeedsConfig()

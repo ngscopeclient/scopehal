@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,11 +40,12 @@
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
 #include "DemoOscilloscope.h"
+#include "DigilentOscilloscope.h"
+#include "DSLabsOscilloscope.h"
 #include "LeCroyOscilloscope.h"
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
-#include "SignalGeneratorOscilloscope.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
@@ -95,6 +96,7 @@ void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
 	AddTransportClass(SCPITMCTransport);
+	AddTransportClass(SCPITwinLanTransport);
 	AddTransportClass(SCPIUARTTransport);
 	AddTransportClass(SCPINullTransport);
 	AddTransportClass(VICPSocketTransport);
@@ -281,7 +283,7 @@ void DetectGPUFeatures()
 						//For now, create a context on the first device of the first detected platform
 						//and hope for the best.
 						//TODO: multi-device support?
-						if(!g_clContext)
+						if(!g_clContext && !devices.empty())
 						{
 							vector<cl::Device> devs;
 							devs.push_back(devices[0]);
@@ -311,23 +313,28 @@ void DetectGPUFeatures()
 
 		#ifdef HAVE_CLFFT
 
-			clfftSetupData data;
-			clfftInitSetupData(&data);
-			if(CLFFT_SUCCESS != clfftSetup(&data))
+			if(g_clContext)
 			{
-				LogError("clFFT init failed, aborting\n");
-				abort();
-			}
+				clfftSetupData data;
+				clfftInitSetupData(&data);
+				if(CLFFT_SUCCESS != clfftSetup(&data))
+				{
+					LogError("clFFT init failed, aborting\n");
+					abort();
+				}
 
-			cl_uint major;
-			cl_uint minor;
-			cl_uint patch;
-			if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
-			{
-				LogError("clFFT version query failed, aborting\n");
-				abort();
+				cl_uint major;
+				cl_uint minor;
+				cl_uint patch;
+				if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
+				{
+					LogError("clFFT version query failed, aborting\n");
+					abort();
+				}
+				LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
 			}
-			LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
+			else
+				LogDebug("clFFT: present at compile time, but cannot use because no OpenCL devices found\n");
 
 		#else
 			LogNotice("clFFT support: not present at compile time\n");
@@ -362,12 +369,13 @@ void DriverStaticInit()
 	AddDriverClass(AntikernelLabsOscilloscope);
 	AddDriverClass(AntikernelLogicAnalyzer);
 	AddDriverClass(DemoOscilloscope);
+	AddDriverClass(DigilentOscilloscope);
+	AddDriverClass(DSLabsOscilloscope);
 	AddDriverClass(PicoOscilloscope);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
-	AddDriverClass(SignalGeneratorOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 
 	AddTriggerClass(DropoutTrigger);
@@ -430,7 +438,15 @@ void InitializePlugins()
 	char selfPath[1024] = "";
 	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
 	if ( readlinkReturn > 0)
-		search_dirs.push_back(dirname(selfPath));
+	{
+		string dir = dirname(selfPath);
+
+		//If the binary directory is under /usr, do *not* search it!
+		//We're probably in /usr/bin and we really do not want to be dlopen-ing every single thing in there.
+		//See https://github.com/azonenberg/scopehal-apps/issues/393
+		if(dir.find("/usr") != 0)
+			search_dirs.push_back(dir);
+	}
 
 	//Home directory
 	snprintf(tmp, sizeof(tmp), "%s/.scopehal/plugins", getenv("HOME"));
@@ -695,6 +711,19 @@ uint64_t next_pow2(uint64_t v)
 }
 
 /**
+	@brief Rounds a 64-bit integer down to the next power of 2
+ */
+uint64_t prev_pow2(uint64_t v)
+{
+	uint64_t next = next_pow2(v);
+
+	if(next == v)
+		return v;
+	else
+		return next/2;
+}
+
+/**
 	@brief Returns the contents of a file
  */
 string ReadFile(const string& path)
@@ -840,4 +869,17 @@ string FindDataFile(const string& relpath)
 	}
 
 	return "";
+}
+
+void GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
+{
+	//TODO: Add Windows equivalent
+	#ifndef _WIN32
+		struct stat st;
+		if(0 == stat(path.c_str(), &st))
+		{
+			timestamp = st.st_mtim.tv_sec;
+			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
+		}
+	#endif
 }

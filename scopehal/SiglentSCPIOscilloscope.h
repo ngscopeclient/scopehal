@@ -50,9 +50,10 @@ class WindowTrigger;
 #define MAX_ANALOG 4
 #define WAVEDESC_SIZE 346
 
-// These scopes will actually sample 200MPoints, but the maxiumum it can transfer in one
+// These SDS2000/SDS5000 scopes will actually sample 200MPoints, but the maximum it can transfer in one
 // chunk is 10MPoints
-#define WAVEFORM_SIZE (10 * 1000 * 1000)
+// TODO(dannas): Can the Siglent SDS1104x-e really transfer 14MPoints? Update comment and constant
+#define WAVEFORM_SIZE (14 * 1000 * 1000)
 
 #define c_digiChannelsPerBus 8
 
@@ -100,11 +101,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
 	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
@@ -129,6 +130,7 @@ public:
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
 	enum Model
 	{
+		MODEL_SIGLENT_SDS1000,
 		MODEL_SIGLENT_SDS2000XP,
 		MODEL_SIGLENT_SDS5000X,
 		MODEL_UNKNOWN
@@ -262,8 +264,8 @@ protected:
 	std::string m_digitalWaveformData;
 
 	//Cached configuration
-	std::map<size_t, double> m_channelVoltageRanges;
-	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
+	std::map<size_t, float> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;
@@ -277,6 +279,8 @@ protected:
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
 	std::map<size_t, bool> m_probeIsActive;
+
+	int64_t m_timeDiv;
 
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;

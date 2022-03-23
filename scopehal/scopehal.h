@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,6 +74,7 @@
 
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
+#include "SCPITwinLanTransport.h"
 #include "SCPILxiTransport.h"
 #include "SCPINullTransport.h"
 #include "SCPITMCTransport.h"
@@ -81,26 +82,34 @@
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
 
-#include "OscilloscopeChannel.h"
 #include "FlowGraphNode.h"
+#include "OscilloscopeChannel.h"
+#include "StreamDescriptor_inlines.h"
+#include "FlowGraphNode_inlines.h"
 #include "Trigger.h"
 
 #include "Instrument.h"
 #include "FunctionGenerator.h"
 #include "Multimeter.h"
 #include "Oscilloscope.h"
-#include "SCPIOscilloscope.h"
+#include "SParameterChannel.h"
 #include "PowerSupply.h"
+#include "RFSignalGenerator.h"
+#include "SCPIOscilloscope.h"
+
+#include "SParameters.h"
+#include "TouchstoneParser.h"
+#include "IBISParser.h"
 
 #include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
 #include "PeakDetectionFilter.h"
 #include "SpectrumChannel.h"
+#include "SParameterSourceFilter.h"
+#include "SParameterFilter.h"
 
-#include "SParameters.h"
-#include "TouchstoneParser.h"
-#include "IBISParser.h"
+#include "ExportWizard.h"
 
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
@@ -113,6 +122,7 @@ std::string BaseName(const std::string& path);
 std::string ReadFile(const std::string& path);
 std::string ReadDataFile(const std::string& relpath);
 std::string FindDataFile(const std::string& relpath);
+void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
 
 std::string to_string_sci(double d);
 std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
@@ -130,6 +140,7 @@ void ScopehalStaticCleanup();
 float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);
+uint64_t prev_pow2(uint64_t v);
 
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;

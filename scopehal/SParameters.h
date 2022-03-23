@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,20 +62,30 @@ public:
 class SParameterVector
 {
 public:
+	SParameterVector()
+	{}
+	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
+
+	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
 
 	SParameterPoint InterpolatePoint(float frequency) const;
+	float InterpolateMagnitude(float frequency) const;
+	float InterpolateAngle(float frequency) const;
 
 	std::vector<SParameterPoint> m_points;
 
-	float GetGroupDelay(size_t bin);
+	float GetGroupDelay(size_t bin) const;
 
-	size_t size()
+	size_t size() const
 	{ return m_points.size(); }
 
 	SParameterVector& operator *=(const SParameterVector& rhs);
 
 	SParameterPoint& operator[](size_t i)
 	{ return m_points[i]; }
+
+protected:
+	float InterpolatePhase(float phase_lo, float phase_hi, float frac) const;
 };
 
 typedef std::pair<int, int> SPair;
@@ -92,7 +102,7 @@ public:
 	virtual ~SParameters();
 
 	void Clear();
-	void Allocate();
+	void Allocate(int nports = 2);
 
 	bool empty() const
 	{ return m_params.empty(); }
@@ -108,12 +118,35 @@ public:
 	SParameterVector& operator[] (SPair pair)
 	{ return *m_params[pair]; }
 
+	const SParameterVector& operator[] (SPair pair) const
+	{ return *(m_params.find(pair)->second); }
+
 	friend class TouchstoneParser;
 
-	void SaveToFile(const std::string& path);
+	enum FreqUnit
+	{
+		FREQ_HZ,
+		FREQ_KHZ,
+		FREQ_MHZ,
+		FREQ_GHZ
+	};
+
+	enum ParameterFormat
+	{
+		FORMAT_MAG_ANGLE,
+		FORMAT_DBMAG_ANGLE,
+		FORMAT_REAL_IMAGINARY
+	};
+
+	void SaveToFile(const std::string& path, ParameterFormat format = FORMAT_MAG_ANGLE, FreqUnit freqUnit = FREQ_GHZ);
+
+	size_t GetNumPorts() const
+	{ return m_nports; }
 
 protected:
 	std::map< SPair , SParameterVector*> m_params;
+
+	size_t m_nports;
 };
 
 #endif

@@ -49,6 +49,8 @@ public:
 
 protected:
 	void ComplexToPolar(float& f1, float& f2);
+
+	bool ReadFloat(const char* buf, size_t& i, size_t len, float& f);
 };
 
 #endif

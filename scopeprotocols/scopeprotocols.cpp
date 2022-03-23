@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,6 +36,18 @@
 #include "scopeprotocols.h"
 
 /**
+	@brief Mutex used to ensure two clfftBakePlan() calls are not in progress simultaneously
+
+	Per docs this SHOULD be thread safe...
+
+	But we get assertion failures if we try:
+		glscopeclient: /build/clfft-8xRwfG/clfft-2.12.2/src/library/repo.cpp:217:
+		clfftStatus FFTRepo::setclProgram(clfftGenerators, const FFTKernelSignatureHeader*, _cl_program* const&,
+		_cl_device_id* const&, _cl_context* const&): Assertion `NULL == p' failed.
+ */
+std::mutex g_clfftMutex;
+
+/**
 	@brief Static initialization for protocol list
  */
 void ScopeProtocolStaticInit()
@@ -47,6 +59,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
 	AddDecoderClass(ClockRecoveryFilter);
+	AddDecoderClass(ComplexImportFilter);
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
 	AddDecoderClass(DCDMeasurement);
@@ -58,6 +71,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DeskewFilter);
 	AddDecoderClass(DigitalToPAM4Filter);
 	AddDecoderClass(DigitalToNRZFilter);
+	AddDecoderClass(DivideFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
 	AddDecoderClass(DPhyDataDecoder);
@@ -80,6 +94,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(Ethernet64b66bDecoder);
 	AddDecoderClass(EthernetGMIIDecoder);
 	AddDecoderClass(EthernetRGMIIDecoder);
+	AddDecoderClass(EthernetRMIIDecoder);
 	AddDecoderClass(EthernetAutonegotiationDecoder);
 	AddDecoderClass(EyeBitRateMeasurement);
 	AddDecoderClass(EyePattern);
@@ -91,11 +106,15 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FFTFilter);
 	AddDecoderClass(FIRFilter);
 	AddDecoderClass(FrequencyMeasurement);
+	AddDecoderClass(FSKDecoder);
+	AddDecoderClass(GroupDelayFilter);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
+	AddDecoderClass(HyperRAMDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(I2CEepromDecoder);
 	AddDecoderClass(IBM8b10bDecoder);
+	AddDecoderClass(IBISDriverFilter);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(ISIMeasurement);
 	AddDecoderClass(JitterFilter);
@@ -118,16 +137,20 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PeriodMeasurement);
 	AddDecoderClass(PhaseMeasurement);
 	AddDecoderClass(PkPkMeasurement);
+	AddDecoderClass(PRBSCheckerFilter);
 	AddDecoderClass(PRBSGeneratorFilter);
+	AddDecoderClass(ReferencePlaneExtensionFilter);
 	AddDecoderClass(RjBUjFilter);
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
 	AddDecoderClass(RiseMeasurement);
+	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
 	AddDecoderClass(SpectrogramFilter);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
+	AddDecoderClass(SquelchFilter);
 	AddDecoderClass(StepGeneratorFilter);
 	AddDecoderClass(SubtractFilter);
 	AddDecoderClass(SWDDecoder);
@@ -141,6 +164,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TMDSDecoder);
 	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
+	AddDecoderClass(TouchstoneImportFilter);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);
@@ -149,8 +173,11 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(USB2PMADecoder);
+	AddDecoderClass(VectorFrequencyFilter);
+	AddDecoderClass(VectorPhaseFilter);
 	AddDecoderClass(VerticalBathtub);
 	AddDecoderClass(Waterfall);
+	AddDecoderClass(WAVImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
 
 	AddStatisticClass(AverageStatistic);

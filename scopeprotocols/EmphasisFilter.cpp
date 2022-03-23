@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -101,23 +101,17 @@ string EmphasisFilter::GetProtocolName()
 	return "Emphasis";
 }
 
-bool EmphasisFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool EmphasisFilter::NeedsConfig()
 {
 	return true;
 }
 
-double EmphasisFilter::GetVoltageRange()
+float EmphasisFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double EmphasisFilter::GetOffset()
+float EmphasisFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
@@ -142,7 +136,7 @@ void EmphasisFilter::Refresh()
 		return;
 	}
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up output
 	const int64_t tap_count = 8;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,8 +79,14 @@ public:
 	: m_type(t)
 	{}
 
-	std::string PrettyPrint(double value, int sigfigs = -1);
-	double ParseString(const std::string& str);
+	Unit(const std::string& rhs);
+	std::string ToString();
+
+	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true);
+
+	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax);
+
+	double ParseString(const std::string& str, bool useDisplayLocale = true);
 
 	UnitType GetType()
 	{ return m_type; }
@@ -100,6 +106,9 @@ public:
 
 protected:
 	UnitType m_type;
+
+	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix);
+	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix);
 
 #ifdef _WIN32
 	/**

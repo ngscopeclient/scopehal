@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,7 @@ using namespace std;
 TachometerFilter::TachometerFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_RPM);
+	SetYAxisUnits(Unit(Unit::UNIT_RPM), 0);
 
 	//Set up channels
 	CreateInput("din");
@@ -81,23 +81,17 @@ string TachometerFilter::GetProtocolName()
 	return "Tachometer";
 }
 
-bool TachometerFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool TachometerFilter::NeedsConfig()
 {
 	return true;
 }
 
-double TachometerFilter::GetVoltageRange()
+float TachometerFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TachometerFilter::GetOffset()
+float TachometerFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -148,16 +148,6 @@ void Filter::Release()
 		delete this;
 }
 
-bool Filter::IsOverlay()
-{
-	//If we have no inputs, we can't be an overlay
-	if(GetInputCount() == 0)
-		return false;
-
-	//otherwise, assume we are one
-	return true;
-}
-
 /**
 	@brief Returns true if this filter outputs a waveform consisting of a single sample.
 
@@ -279,6 +269,29 @@ bool Filter::VerifyAllInputsOKAndAnalog()
 	return true;
 }
 
+/**
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty digital waveform present
+ */
+bool Filter::VerifyAllInputsOKAndDigital()
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == NULL)
+			return false;
+
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == NULL)
+			return false;
+		if(data->m_offsets.size() == 0)
+			return false;
+
+		auto ddata = dynamic_cast<DigitalWaveform*>(data);
+		if(ddata == NULL)
+			return false;
+	}
+
+	return true;
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sampling helpers
 
@@ -780,10 +793,20 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 	config += tmp;
 
 	//Save gain and offset (not applicable to all filters, but save it just in case)
-	snprintf(tmp, sizeof(tmp), "        vrange:          %f\n", GetVoltageRange());
+	snprintf(tmp, sizeof(tmp), "        streams:\n");
 	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        offset:          %f\n", GetOffset());
-	config += tmp;
+	for(size_t i=0; i<GetStreamCount(); i++)
+	{
+		snprintf(tmp, sizeof(tmp), "            stream%zu:\n", i);
+		config += tmp;
+
+		snprintf(tmp, sizeof(tmp), "                index:           %zu\n", i);
+		config += tmp;
+		snprintf(tmp, sizeof(tmp), "                vrange:          %f\n", GetVoltageRange(i));
+		config += tmp;
+		snprintf(tmp, sizeof(tmp), "                offset:          %f\n", GetOffset(i));
+		config += tmp;
+	}
 
 	return config;
 }
@@ -796,10 +819,28 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	m_displayname = node["nick"].as<string>();
 	m_hwname = node["name"].as<string>();
 
+	//Load legacy single-stream range/offset parameters
 	if(node["vrange"])
-		SetVoltageRange(node["vrange"].as<double>());
+		SetVoltageRange(node["vrange"].as<float>(), 0);
 	if(node["offset"])
-		SetOffset(node["offset"].as<double>());
+		SetOffset(node["offset"].as<float>(), 0);
+
+	//Load stream configuration
+	auto streams = node["streams"];
+	if(streams)
+	{
+		for(auto it : streams)
+		{
+			auto snode = it.second;
+			if(!snode["index"])
+				continue;
+			auto index = snode["index"].as<int>();
+			if(snode["vrange"])
+				SetVoltageRange(snode["vrange"].as<float>(), index);
+			if(snode["offset"])
+				SetOffset(snode["offset"].as<float>(), index);
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -974,8 +1015,43 @@ vector<size_t> Filter::MakeHistogram(AnalogWaveform* cap, float low, float high,
 	{
 		float fbin = (v-low) / delta;
 		size_t bin = floor(fbin * bins);
-		bin = max(bin, (size_t)0);
-		bin = min(bin, bins-1);
+		if(fbin < 0)
+			bin = 0;
+		else
+			bin = min(bin, bins-1);
+		ret[bin] ++;
+	}
+
+	return ret;
+}
+
+/**
+	@brief Makes a histogram from a waveform with the specified number of bins.
+
+	Any values outside the range are discarded.
+
+	@param low	Low endpoint of the histogram (volts)
+	@param high High endpoint of the histogram (volts)
+	@param bins	Number of histogram bins
+ */
+vector<size_t> Filter::MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins)
+{
+	vector<size_t> ret;
+	for(size_t i=0; i<bins; i++)
+		ret.push_back(0);
+
+	//Early out if we have zero span
+	if(bins == 0)
+		return ret;
+
+	float delta = high-low;
+
+	for(float v : cap->m_samples)
+	{
+		float fbin = (v-low) / delta;
+		size_t bin = floor(fbin * bins);
+		if(bin >= bins)	//negative values wrap to huge positive and get caught here
+			continue;
 		ret[bin] ++;
 	}
 
@@ -1131,6 +1207,8 @@ AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, si
 	auto cap = SetupEmptyOutputWaveform(din, stream, false);
 
 	cap->m_timescale 			= din->m_timescale;
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
 
 	size_t len = din->m_offsets.size() - (skipstart + skipend);

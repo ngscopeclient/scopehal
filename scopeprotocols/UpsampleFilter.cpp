@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -104,33 +104,27 @@ string UpsampleFilter::GetProtocolName()
 	return "Upsample";
 }
 
-bool UpsampleFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool UpsampleFilter::NeedsConfig()
 {
 	return true;
 }
 
-double UpsampleFilter::GetOffset()
+float UpsampleFilter::GetOffset(size_t /*stream*/)
 {
 	auto chan = m_inputs[0].m_channel;
 	if(chan == NULL)
 		return 0;
 	else
-		return chan->GetOffset();
+		return m_inputs[0].GetOffset();
 }
 
-double UpsampleFilter::GetVoltageRange()
+float UpsampleFilter::GetVoltageRange(size_t /*stream*/)
 {
 	auto chan = m_inputs[0].m_channel;
 	if(chan == NULL)
 		return 0;
 	else
-		return chan->GetVoltageRange();
+		return m_inputs[0].GetVoltageRange();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,6 +203,7 @@ void UpsampleFilter::Refresh()
 	cap->m_timescale = din->m_timescale / upsample_factor;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
 
 	SetData(cap, 0);
 }

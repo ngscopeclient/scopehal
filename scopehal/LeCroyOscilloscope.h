@@ -88,11 +88,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 	virtual std::string GetChannelDisplayName(size_t i);
 	virtual void SetChannelDisplayName(size_t i, std::string name);
 	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
@@ -173,6 +173,8 @@ public:
 		MODEL_SDA_8ZI,
 		MODEL_SDA_8ZI_A,
 		MODEL_SDA_8ZI_B,
+		MODEL_WAVEMASTER_8ZI,
+		MODEL_WAVEMASTER_8ZI_A,
 		MODEL_WAVEMASTER_8ZI_B,
 
 		MODEL_WAVEPRO_HD,
@@ -205,6 +207,10 @@ public:
 	virtual bool IsSamplingModeAvailable(SamplingMode mode);
 	virtual SamplingMode GetSamplingMode();
 	virtual void SetSamplingMode(SamplingMode mode);
+
+	//DBI mode
+	bool HasDBICapability();
+	bool IsDBIEnabled(size_t channel);
 
 	virtual void SetTriggerOffset(int64_t offset);
 	virtual int64_t GetTriggerOffset();
@@ -308,8 +314,8 @@ protected:
 	bool m_triggerOneShot;
 
 	//Cached configuration
-	std::map<size_t, double> m_channelVoltageRanges;
-	std::map<size_t, double> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
+	std::map<size_t, float> m_channelOffsets;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;

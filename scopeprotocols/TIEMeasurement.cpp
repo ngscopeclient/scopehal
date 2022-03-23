@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,7 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	, m_threshname("Threshold")
 	, m_skipname("Skip Start")
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("Clock");
@@ -90,24 +90,18 @@ string TIEMeasurement::GetProtocolName()
 	return "Clock Jitter (TIE)";
 }
 
-bool TIEMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool TIEMeasurement::NeedsConfig()
 {
 	//we have more than one input
 	return true;
 }
 
-double TIEMeasurement::GetVoltageRange()
+float TIEMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TIEMeasurement::GetOffset()
+float TIEMeasurement::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }

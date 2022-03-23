@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,6 +57,11 @@ MockOscilloscope::~MockOscilloscope()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Information queries
+
+bool MockOscilloscope::IsOffline()
+{
+	return true;
+}
 
 string MockOscilloscope::IDPing()
 {
@@ -245,14 +250,14 @@ void MockOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz
 	m_channelBandwidth[i] = limit_mhz;
 }
 
-double MockOscilloscope::GetChannelVoltageRange(size_t i)
+float MockOscilloscope::GetChannelVoltageRange(size_t i, size_t stream)
 {
-	return m_channelVoltageRange[i];
+	return m_channelVoltageRange[pair<size_t, size_t>(i, stream)];
 }
 
-void MockOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void MockOscilloscope::SetChannelVoltageRange(size_t i, size_t stream, float range)
 {
-	m_channelVoltageRange[i] = range;
+	m_channelVoltageRange[pair<size_t, size_t>(i, stream)] = range;
 }
 
 OscilloscopeChannel* MockOscilloscope::GetExternalTrigger()
@@ -260,14 +265,14 @@ OscilloscopeChannel* MockOscilloscope::GetExternalTrigger()
 	return m_extTrigger;
 }
 
-double MockOscilloscope::GetChannelOffset(size_t i)
+float MockOscilloscope::GetChannelOffset(size_t i, size_t stream)
 {
-	return m_channelOffset[i];
+	return m_channelOffset[pair<size_t, size_t>(i, stream)];
 }
 
-void MockOscilloscope::SetChannelOffset(size_t i, double offset)
+void MockOscilloscope::SetChannelOffset(size_t i, size_t stream, float offset)
 {
-	m_channelOffset[i] = offset;
+	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
 }
 
 vector<uint64_t> MockOscilloscope::GetSampleRatesNonInterleaved()
@@ -359,439 +364,6 @@ void MockOscilloscope::PullTrigger()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Import a waveform from file
-
-void MockOscilloscope::GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
-{
-	//TODO: Add Windows equivalent
-	#ifndef _WIN32
-		struct stat st;
-		if(0 == stat(path.c_str(), &st))
-		{
-			timestamp = st.st_mtim.tv_sec;
-			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
-		}
-	#endif
-}
-
-/**
-	@brief Imports a waveform from a complex file containing samples of unknown format
- */
-bool MockOscilloscope::LoadComplexUnknownFormat(const string& path, int64_t samplerate)
-{
-	LogDebug("Importing complex file \"%s\" (unknown format)\n", path.c_str());
-	LogIndenter li;
-
-	size_t numBytesToTest = 1024;
-
-	//Read test buffer
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Failed to open file\n");
-		return false;
-	}
-	fseek(fp, 0, SEEK_END);
-	size_t len = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	numBytesToTest = min(numBytesToTest, len);
-	uint8_t* buf = new uint8_t[numBytesToTest];
-	if(numBytesToTest != fread(buf, 1, numBytesToTest, fp))
-	{
-		LogError("Failed to read file\n");
-		return false;
-	}
-	fclose(fp);
-
-	//Prepare to cast the buffer to each format and see what makes sense
-	float score_int8 = FLT_MAX;
-	float score_int16 = FLT_MAX;
-	float score_fp32 = FLT_MAX;
-	float score_fp64 = FLT_MAX;
-
-	LogDebug("Score (lower is better):\n");
-	{
-		LogIndenter li2;
-
-		size_t numSamples = numBytesToTest / 2;
-		int8_t* tbuf = reinterpret_cast<int8_t*>(buf);
-		float sum_i = 0;
-		float sum_q = 0;
-		float scale = 1.0f / 127;
-		for(size_t i=0; i<numSamples; i++)
-		{
-			sum_i += scale * tbuf[i*2];
-			sum_q += scale * tbuf[i*2 + 1];
-		}
-		sum_i /= numSamples;
-		sum_q /= numSamples;
-		score_int8 = sqrt(sum_i*sum_i + sum_q*sum_q);
-		LogDebug("int8:    %f\n", score_int8);
-	}
-
-	{
-		LogIndenter li2;
-
-		//Don't bother to test unless we have a round number of samples
-		if((len % 4) == 0)
-		{
-			size_t numSamples = numBytesToTest / 4;
-			int16_t* tbuf = reinterpret_cast<int16_t*>(buf);
-			float sum_i = 0;
-			float sum_q = 0;
-			float scale = 1.0f / 32767;
-			for(size_t i=0; i<numSamples; i++)
-			{
-				sum_i += scale * tbuf[i*2];
-				sum_q += scale * tbuf[i*2 + 1];
-			}
-			sum_i /= numSamples;
-			sum_q /= numSamples;
-			score_int16 = sqrt(sum_i*sum_i + sum_q*sum_q);
-			LogDebug("int16:   %f\n", score_int16);
-		}
-	}
-
-	{
-		LogIndenter li2;
-
-		//Don't bother to test unless we have a round number of samples
-		if((len % 8) == 0)
-		{
-			size_t numSamples = numBytesToTest / 8;
-			float* tbuf = reinterpret_cast<float*>(buf);
-			float sum_i = 0;
-			float sum_q = 0;
-			float max_i = 0;
-			float max_q = 0;
-			for(size_t i=0; i<numSamples; i++)
-			{
-				if(isnan(tbuf[i*2]))
-					sum_i = FLT_MAX;
-				if(isnan(tbuf[i*2+1]))
-					sum_q = FLT_MAX;
-
-				sum_i += tbuf[i*2];
-				sum_q += tbuf[i*2 + 1];
-
-				max_i = max(max_i, fabs(tbuf[i*2]));
-				max_q = max(max_q, fabs(tbuf[i*2]));
-			}
-			sum_i /= numSamples;
-			sum_q /= numSamples;
-			float avg_max = (max_i + max_q)/2;
-			if(avg_max > 1e-6)
-				score_fp32 = sqrt(sum_i*sum_i + sum_q*sum_q);
-			LogDebug("float32: %f\n", score_fp32);
-		}
-	}
-
-	{
-		LogIndenter li2;
-
-		//Don't bother to test unless we have a round number of samples
-		if((len % 16) == 0)
-		{
-			size_t numSamples = numBytesToTest / 16;
-			double* tbuf = reinterpret_cast<double*>(buf);
-			float sum_i = 0;
-			float sum_q = 0;
-			float max_i = 0;
-			float max_q = 0;
-			for(size_t i=0; i<numSamples; i++)
-			{
-				if(isnan(tbuf[i*2]))
-					sum_i = FLT_MAX;
-				if(isnan(tbuf[i*2+1]))
-					sum_q = FLT_MAX;
-
-				sum_i += tbuf[i*2];
-				sum_q += tbuf[i*2 + 1];
-
-				max_i = max(max_i, (float)fabs(tbuf[i*2]));
-				max_q = max(max_q, (float)fabs(tbuf[i*2]));
-			}
-			sum_i /= numSamples;
-			sum_q /= numSamples;
-			float avg_max = (max_i + max_q)/2;
-			if(avg_max > 1e-6)
-				score_fp64 = sqrt(sum_i*sum_i + sum_q*sum_q);
-			LogDebug("float64: %f\n", score_fp64);
-		}
-	}
-
-	//Clean up
-	delete[] buf;
-
-	//Find the minimum score of all
-	float minScore = min(score_int8, score_int16);
-	minScore = min(minScore, score_fp32);
-	minScore = min(minScore, score_fp64);
-	LogDebug("Best score: %f\n", minScore);
-	if(minScore > 0.05)
-		LogWarning("No candidate format seems plausible, trying best guess anyway\n");
-
-	if(minScore == score_int8)
-		return LoadComplexInt8(path, samplerate);
-	else if(minScore == score_int16)
-		return LoadComplexInt16(path, samplerate);
-	else if(minScore == score_fp32)
-		return LoadComplexFloat32(path, samplerate);
-	else
-		return LoadComplexFloat64(path, samplerate);
-}
-
-void MockOscilloscope::LoadComplexCommon(
-	const string& path,
-	AnalogWaveform*& iwfm,
-	AnalogWaveform*& qwfm,
-	int64_t samplerate,
-	size_t numSamples)
-{
-	LogTrace("Importing complex file \"%s\" (int16 format)\n", path.c_str());
-	LogIndenter li;
-
-	//Find sample period
-	int64_t fs_per_sample = FS_PER_SECOND / samplerate;
-
-	//Get timestamp
-	time_t timestamp = 0;
-	int64_t fs = 0;
-	GetTimestampOfFile(path, timestamp, fs);
-
-	//Create the channel
-	auto chan = new OscilloscopeChannel(
-		this,
-		"RF",
-		OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-		GetDefaultChannelColor(0),
-		1,
-		0,
-		true);
-	AddChannel(chan);
-	chan->SetDefaultDisplayName();
-	chan->ClearStreams();
-	chan->AddStream("I");
-	chan->AddStream("Q");
-	chan->SetVoltageRange(2);
-	chan->SetOffset(0);
-
-	//Create the waveforms for each of the two complex streams
-	iwfm = new AnalogWaveform;
-	iwfm->m_timescale = fs_per_sample;
-	iwfm->m_startTimestamp = timestamp;
-	iwfm->m_startFemtoseconds = fs;
-	iwfm->m_triggerPhase = 0;
-	iwfm->Resize(numSamples);
-	iwfm->m_densePacked = true;
-	chan->SetData(iwfm, 0);
-
-	qwfm = new AnalogWaveform;
-	qwfm->m_timescale = fs_per_sample;
-	qwfm->m_startTimestamp = timestamp;
-	qwfm->m_startFemtoseconds = fs;
-	qwfm->m_triggerPhase = 0;
-	qwfm->Resize(numSamples);
-	qwfm->m_densePacked = true;
-	chan->SetData(qwfm, 1);
-}
-
-/**
-	@brief Imports a waveform from a complex file containing signed 8-bit samples in IQIQ order.
- */
-bool MockOscilloscope::LoadComplexInt8(const string& path, int64_t samplerate)
-{
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Failed to open file\n");
-		return false;
-	}
-
-	//Figure out length of the file in complex samples (2x int8 per sample)
-	fseek(fp, 0, SEEK_END);
-	size_t len = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	size_t numSamples = len/2;
-
-	//Read sample data
-	int8_t* temp = new int8_t[numSamples * 2];
-	if(numSamples*2 != fread(temp, sizeof(int8_t), numSamples*2, fp))
-	{
-		LogError("Failed to read file\n");
-		return false;
-	}
-
-	AnalogWaveform* iwfm;
-	AnalogWaveform* qwfm;
-	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
-
-	//Copy sample data
-	//TODO: vectorize
-	float scale = 1.0f / 127.0f;
-	for(size_t i=0; i<numSamples; i++)
-	{
-		iwfm->m_offsets[i] = i;
-		qwfm->m_offsets[i] = i;
-
-		iwfm->m_durations[i] = 1;
-		qwfm->m_durations[i] = 1;
-
-		iwfm->m_samples[i] = temp[i*2] * scale;
-		qwfm->m_samples[i] = temp[i*2 + 1] * scale;
-	}
-
-	delete[] temp;
-	fclose(fp);
-	return true;
-}
-
-/**
-	@brief Imports a waveform from a complex file containing signed 16-bit samples in IQIQ order.
- */
-bool MockOscilloscope::LoadComplexInt16(const string& path, int64_t samplerate)
-{
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Failed to open file\n");
-		return false;
-	}
-
-	//Figure out length of the file in complex samples (2x int16 per sample)
-	fseek(fp, 0, SEEK_END);
-	size_t len = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	size_t numSamples = len/4;
-
-	//Read sample data
-	int16_t* temp = new int16_t[numSamples * 2];
-	if(numSamples*2 != fread(temp, sizeof(int16_t), numSamples*2, fp))
-	{
-		LogError("Failed to read file\n");
-		return false;
-	}
-
-	AnalogWaveform* iwfm;
-	AnalogWaveform* qwfm;
-	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
-
-	//Copy sample data
-	//TODO: vectorize
-	float scale = 1.0f / 32767.0f;
-	for(size_t i=0; i<numSamples; i++)
-	{
-		iwfm->m_offsets[i] = i;
-		qwfm->m_offsets[i] = i;
-
-		iwfm->m_durations[i] = 1;
-		qwfm->m_durations[i] = 1;
-
-		iwfm->m_samples[i] = temp[i*2] * scale;
-		qwfm->m_samples[i] = temp[i*2 + 1] * scale;
-	}
-
-	delete[] temp;
-	fclose(fp);
-	return true;
-}
-
-/**
-	@brief Imports a waveform from a complex file containing normalized 32-bit floating point samples in IQIQ order.
- */
-bool MockOscilloscope::LoadComplexFloat32(const string& path, int64_t samplerate)
-{
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Failed to open file\n");
-		return false;
-	}
-
-	//Figure out length of the file in complex samples (2x float32 per sample)
-	fseek(fp, 0, SEEK_END);
-	size_t len = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	size_t numSamples = len/8;
-
-	//Read sample data
-	float* temp = new float[numSamples * 2];
-	if(numSamples*2 != fread(temp, sizeof(float), numSamples*2, fp))
-	{
-		LogError("Failed to read file\n");
-		return false;
-	}
-
-	AnalogWaveform* iwfm;
-	AnalogWaveform* qwfm;
-	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
-
-	//Copy sample data
-	//TODO: vectorize
-	for(size_t i=0; i<numSamples; i++)
-	{
-		iwfm->m_offsets[i] = i;
-		qwfm->m_offsets[i] = i;
-
-		iwfm->m_durations[i] = 1;
-		qwfm->m_durations[i] = 1;
-
-		iwfm->m_samples[i] = temp[i*2];
-		qwfm->m_samples[i] = temp[i*2 + 1];
-	}
-
-	delete[] temp;
-	fclose(fp);
-	return true;
-}
-
-/**
-	@brief Imports a waveform from a complex file containing normalized 64-bit floating point samples in IQIQ order.
- */
-bool MockOscilloscope::LoadComplexFloat64(const string& path, int64_t samplerate)
-{
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Failed to open file\n");
-		return false;
-	}
-
-	//Figure out length of the file in complex samples (2x float64 per sample)
-	fseek(fp, 0, SEEK_END);
-	size_t len = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	size_t numSamples = len/16;
-
-	//Read sample data
-	double* temp = new double[numSamples * 2];
-	if(numSamples*2 != fread(temp, sizeof(double), numSamples*2, fp))
-	{
-		LogError("Failed to read file\n");
-		return false;
-	}
-
-	AnalogWaveform* iwfm;
-	AnalogWaveform* qwfm;
-	LoadComplexCommon(path, iwfm, qwfm, samplerate, numSamples);
-
-	//Copy sample data
-	//TODO: vectorize
-	for(size_t i=0; i<numSamples; i++)
-	{
-		iwfm->m_offsets[i] = i;
-		qwfm->m_offsets[i] = i;
-
-		iwfm->m_durations[i] = 1;
-		qwfm->m_durations[i] = 1;
-
-		iwfm->m_samples[i] = temp[i*2];
-		qwfm->m_samples[i] = temp[i*2 + 1];
-	}
-
-	delete[] temp;
-	fclose(fp);
-	return true;
-}
 
 /**
 	@brief Imports waveforms from Comma Separated Value files
@@ -1060,8 +632,8 @@ bool MockOscilloscope::LoadCSV(const string& path)
 		vrange = max(vrange, 0.001f);
 
 		auto chan = GetChannel(i);
-		chan->SetVoltageRange(vrange);
-		chan->SetOffset(-vavg);
+		chan->SetVoltageRange(vrange, 0);
+		chan->SetOffset(-vavg, 0);
 	}
 
 	NormalizeTimebases();
@@ -1083,6 +655,8 @@ void MockOscilloscope::NormalizeTimebases()
 	//Find the mean sample interval
 	//Use channel 0 since everything uses the same timebase
 	auto wfm = GetChannel(0)->GetData(0);
+	if(!wfm)
+		return;
 	uint64_t interval_sum = 0;
 	uint64_t interval_count = wfm->m_offsets.size();
 	for(size_t i=0; i<interval_count; i++)
@@ -1100,9 +674,12 @@ void MockOscilloscope::NormalizeTimebases()
 	uint64_t stdev = sqrt(stdev_sum / interval_count);
 	LogTrace("Stdev of intervals: %s\n", fs.PrettyPrint(stdev).c_str());
 
-	//If the standard deviation is more than 1% of the average sample period, assume the data is sampled irregularly.
-	if( (stdev * 100) > avg)
+	//If the standard deviation is more than 2% of the average sample period, assume the data is sampled irregularly.
+	if( (stdev * 50) > avg)
+	{
+		LogTrace("Deviation is too large, assuming non-uniform sample interval\n");
 		return;
+	}
 
 	//If we get here, assume uniform sampling.
 	//Use time zero as the trigger phase.
@@ -1293,8 +870,8 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		}
 
 		//Calculate offset and range
-		chan->SetVoltageRange((vmax-vmin) * 1.5);
-		chan->SetOffset(-((vmax-abs(vmin)) / 2));
+		chan->SetVoltageRange((vmax-vmin) * 1.5, 0);
+		chan->SetOffset(-((vmax-abs(vmin)) / 2), 0);
 	}
 
 	return true;
@@ -1617,224 +1194,29 @@ bool MockOscilloscope::LoadVCD(const string& path)
 }
 
 /**
-	@brief Imports a waveform from a Microsoft WAV file
+	@brief Calculate min/max of each channel and adjust gain/offset accordingly
  */
-bool MockOscilloscope::LoadWAV(const string& path)
+void MockOscilloscope::AutoscaleVertical()
 {
-	FILE* fp = fopen(path.c_str(), "rb");
-	if(!fp)
+	for(auto c : m_channels)
 	{
-		LogError("Couldn't open WAV file \"%s\"\n", path.c_str());
-		return false;
-	}
+		auto wfm = dynamic_cast<AnalogWaveform*>(c->GetData(0));
+		if(!wfm)
+			continue;
+		if(wfm->m_samples.empty())
+			continue;
 
-	//Read the RIFF tag, should be "RIFF", uint32 len, "WAVE", then data
-	uint32_t header[3];
-	if(3 != fread(header, sizeof(uint32_t), 3, fp))
-	{
-		LogError("Failed to read RIFF header\n");
-		fclose(fp);
-		return false;
-	}
-	if(header[0] != 0x46464952)	// "RIFF"
-	{
-		LogError("Bad top level chunk type (not a RIFF file)\n");
-		fclose(fp);
-		return false;
-	}
-	if(header[2] != 0x45564157)	// "WAVE"
-	{
-		LogError("Bad WAVE data type (not a WAV file)\n");
-		fclose(fp);
-		return false;
-	}
-	//Ignore RIFF length, it should encompass the entire file
+		float vmin = wfm->m_samples[0];
+		float vmax = vmin;
 
-	//Read the format chunk header
-	if(2 != fread(header, sizeof(uint32_t), 2, fp))
-	{
-		LogError("Failed to read format header\n");
-		fclose(fp);
-		return false;
-	}
-	if(header[0] != 0x20746d66)	// "FMT "
-	{
-		LogError("Bad WAV format chunk type (not FMT)\n");
-		fclose(fp);
-		return false;
-	}
-	if( (header[1] < 16) || (header[1] > 128) )
-	{
-		LogError("Bad WAV format length (expected >= 16 and <= 128)\n");
-		fclose(fp);
-		return false;
-	}
-
-	//Read the format
-	uint8_t format[128];
-	if(header[1] != fread(format, 1, header[1], fp))
-	{
-		LogError("Failed to read format\n");
-		fclose(fp);
-		return false;
-	}
-	uint16_t afmt = *(uint16_t*)(format);
-	uint16_t nchans = *(uint16_t*)(format + 2);
-	uint32_t srate = *(uint32_t*)(format + 4);
-	uint16_t nbits = *(uint16_t*)(format + 14);
-	//Ignore any extensions to the format header
-
-	//1 = integer PCM, 3 = ieee754 float
-	if(afmt == 1)
-	{
-		//TODO: support int24?
-		if( (nbits != 8) && (nbits != 16) )
+		for(auto s : wfm->m_samples)
 		{
-			LogError(
-				"Integer PCM (fmt=1) must be 8 or 16 bit resolution, got %d instead\n",
-				nbits);
-			fclose(fp);
-			return false;
+			vmin = min(vmin, (float)s);
+			vmax = max(vmax, (float)s);
 		}
+
+		//Calculate bounds
+		c->SetVoltageRange((vmax - vmin) * 1.05, 0);
+		c->SetOffset( -( (vmax - vmin)/2 + vmin ), 0);
 	}
-	else if(afmt == 3)
-	{
-		//TODO: support fp64?
-		if(nbits != 32)
-		{
-			LogError(
-				"Floating point PCM (fmt=3) must be 32 bit resolution, got %d instead\n",
-				nbits);
-			fclose(fp);
-			return false;
-		}
-	}
-	else
-	{
-		LogError(
-			"Importing compressed WAVs (format %d) is not supported. "
-			"Try re-encoding as uncompressed integer or floating point PCM\n",
-			afmt);
-		fclose(fp);
-		return false;
-	}
-
-	//Read and discard chunks until we see the data header
-	while(true)
-	{
-		if(2 != fread(header, sizeof(uint32_t), 2, fp))
-		{
-			LogError("Failed to read chunk header\n");
-			fclose(fp);
-			return false;
-		}
-		if(header[0] == 0x61746164)	//"data"
-			break;
-		fseek(fp, header[1], SEEK_CUR);
-	}
-
-	//Get timestamp of the file if no header timestamp
-	//TODO: Add Windows equivalent
-	int64_t timestamp = 0;
-	int64_t fs = 0;
-	#ifndef _WIN32
-		struct stat st;
-		if(0 == stat(path.c_str(), &st))
-		{
-			timestamp = st.st_mtim.tv_sec;
-			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
-		}
-	#endif
-
-	//Create our channels
-	size_t datalen = header[1];
-	size_t bytes_per_sample = nbits / 8;
-	size_t bytes_per_row = bytes_per_sample * nchans;
-	size_t nsamples = datalen / bytes_per_row;
-	int64_t interval = FS_PER_SECOND / srate;
-	vector<AnalogWaveform*> wfms;
-	for(size_t i=0; i<nchans; i++)
-	{
-		auto chan = new OscilloscopeChannel(
-			this,			//Parent scope
-			string("CH") + to_string(i+1),		//Channel name
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-			GetDefaultChannelColor(i),
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_VOLTS),
-			1,				//Bus width
-			i,				//Channel index
-			true			//Is physical channel
-		);
-		AddChannel(chan);
-		chan->SetDefaultDisplayName();
-		chan->SetVoltageRange(2);
-		chan->SetOffset(0);
-
-		//Create new waveform for channel
-		auto wfm = new AnalogWaveform;
-		wfm->m_timescale = interval;
-		wfm->m_startTimestamp = timestamp;
-		wfm->m_startFemtoseconds = fs;
-		wfm->m_triggerPhase = 0;
-		wfm->m_densePacked = true;
-		wfm->Resize(nsamples);
-		wfms.push_back(wfm);
-		chan->SetData(wfm, 0);
-	}
-
-	//Read the entire file into a buffer rather than doing a whole bunch of tiny fread's
-	uint8_t* buf = new uint8_t[datalen];
-	if(datalen != fread(buf, 1, datalen, fp))
-	{
-		LogError("Failed to read WAV data\n");
-		fclose(fp);
-		return false;
-	}
-	fclose(fp);
-	fp = NULL;
-
-	//TODO: vectorized offset/duration fill if possible
-	//TODO: vectorized shuffling for the common case of 2 channel?
-
-	//Crunch the samples
-	size_t off = 0;
-	for(size_t i=0; i<nsamples; i++)
-	{
-		for(size_t j=0; j<nchans; j++)
-		{
-			auto wfm = wfms[j];
-			wfm->m_offsets[i] = i;
-			wfm->m_durations[i] = 0;
-
-			//Floating point samples can be read as is
-			if(afmt == 3)
-			{
-				wfm->m_samples[i] = *(float*)(buf + off);
-				off += 4;
-			}
-
-			//Integer samples get normalized
-			else
-			{
-				//16 bit is signed
-				if(nbits == 16)
-				{
-					wfm->m_samples[i] = *(int16_t*)(buf + off) / 32768.0f;
-					off += 2;
-				}
-
-				//8 bit is unsigned
-				else
-				{
-					wfm->m_samples[i] = (*(uint8_t*)(buf + off) - 127) / 127.0f;
-					off ++;
-				}
-			}
-		}
-	}
-
-	//Done, clean up
-	delete[] buf;
-	return true;
 }

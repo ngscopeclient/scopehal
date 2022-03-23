@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,7 @@ using namespace std;
 EyePeriodMeasurement::EyePeriodMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -77,12 +77,6 @@ string EyePeriodMeasurement::GetProtocolName()
 	return "Eye Period";
 }
 
-bool EyePeriodMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool EyePeriodMeasurement::IsScalarOutput()
 {
 	//single point
@@ -95,12 +89,12 @@ bool EyePeriodMeasurement::NeedsConfig()
 	return false;
 }
 
-double EyePeriodMeasurement::GetVoltageRange()
+float EyePeriodMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 10;
 }
 
-double EyePeriodMeasurement::GetOffset()
+float EyePeriodMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_value;
 }

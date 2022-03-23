@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,16 +42,12 @@ public:
 	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
 	virtual ~MockOscilloscope();
 
+	virtual bool IsOffline();
+
 	//Capture file importing
-	bool LoadComplexUnknownFormat(const std::string& path, int64_t samplerate);
-	bool LoadComplexFloat32(const std::string& path, int64_t samplerate);
-	bool LoadComplexFloat64(const std::string& path, int64_t samplerate);
-	bool LoadComplexInt8(const std::string& path, int64_t samplerate);
-	bool LoadComplexInt16(const std::string& path, int64_t samplerate);
 	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
 	bool LoadVCD(const std::string& path);
-	bool LoadWAV(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
 	#pragma pack(push, 1)
@@ -130,11 +126,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -165,7 +161,6 @@ public:
 	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
 
 protected:
-	static void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
 
 	void LoadComplexCommon(
 		const std::string& path,
@@ -188,10 +183,11 @@ protected:
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCoupling;
 	std::map<size_t, double> m_channelAttenuation;
 	std::map<size_t, unsigned int> m_channelBandwidth;
-	std::map<size_t, double> m_channelVoltageRange;
-	std::map<size_t, double> m_channelOffset;
+	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
+	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
 
 	void NormalizeTimebases();
+	void AutoscaleVertical();
 
 public:
 	static std::string GetDriverNameInternal();

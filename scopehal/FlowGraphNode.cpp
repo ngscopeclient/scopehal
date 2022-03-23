@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,6 +36,9 @@ using namespace std;
 
 string StreamDescriptor::GetName()
 {
+	if(m_channel == NULL)
+		return "NULL";
+
 	string name = m_channel->GetDisplayName();
 	if(m_channel->GetStreamCount() > 1)
 		name += string(".") + m_channel->GetStreamName(m_stream);
@@ -201,10 +204,17 @@ StreamDescriptor FlowGraphNode::GetInput(size_t i)
 string FlowGraphNode::GetInputDisplayName(size_t i)
 {
 	auto in = m_inputs[i];
-	if(in.m_channel->GetStreamCount() > 1)
+	if(in.m_channel == NULL)
+		return "NULL";
+	else if(in.m_channel->GetStreamCount() > 1)
 		return in.m_channel->GetDisplayName() + "." + in.m_channel->GetStreamName(in.m_stream);
 	else
 		return in.m_channel->GetDisplayName();
+}
+
+bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+{
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -247,16 +257,15 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				snprintf(
 					tmp,
 					sizeof(tmp),
-					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString().c_str());
+					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
 				break;
 
 			case FilterParameter::TYPE_FILENAME:
-			case FilterParameter::TYPE_FILENAMES:
 			default:
 				snprintf(
 					tmp,
 					sizeof(tmp),
-					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString().c_str());
+					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
 				break;
 		}
 
@@ -270,7 +279,10 @@ void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)
 {
 	auto parameters = node["parameters"];
 	for(auto it : parameters)
-		GetParameter(it.first.as<string>()).ParseString(it.second.as<string>());
+	{
+		auto name = it.first.as<string>();
+		GetParameter(name).ParseString(it.second.as<string>(), false);
+	}
 }
 
 void FlowGraphNode::LoadInputs(const YAML::Node& node, IDTable& table)

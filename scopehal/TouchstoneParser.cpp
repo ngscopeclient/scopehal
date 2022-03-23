@@ -57,39 +57,71 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	params.Clear();
 
 	//If file doesn't exist, bail early
-	FILE* fp = fopen(fname.c_str(), "r");
+	//Open in binary mode because we ignore \r characters for files with Windows line endings,
+	//but we need files with Unix line endings to open correctly on Windows even if no \r is present.
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
 		LogError("Unable to open S-parameter file %s\n", fname.c_str());
 		return false;
 	}
 
-	params.Allocate();
+	//Figure out port count from the file name
+	size_t nports = 0;
+	auto extoff = fname.rfind(".s");
+	if(extoff != string::npos)
+		nports = atoi(&fname[extoff] + 2);
+	if(nports <= 0)
+	{
+		LogError("Unable to determine port count for S-parameter file %s\n", fname.c_str());
+		return false;
+	}
+	params.Allocate(nports);
 
-	//Read line by line.
-	char line[256];
+	//Read entire file into working buffer
+	fseek(fp, 0, SEEK_END);
+	size_t len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	char* buf = new char[len];
+	if(len != fread(buf, 1, len, fp))
+	{
+		delete[] buf;
+		fclose(fp);
+		return false;
+	}
+	fclose(fp);
+
+	//Main parsing loop
+	size_t i = 0;
+	bool ok = true;
 	double unit_scale = 1;
 	bool mag_is_db = false;
 	bool polar = true;			//mag/angle
-	while(!feof(fp))
+	while(i < len)
 	{
-		fgets(line, sizeof(line), fp);
+		//Discard whitespace
+		if(isspace(buf[i]))
+			i++;
 
-		//Comments start with a !
-		if(line[0] == '!')
-			continue;
+		//! is a comment, ignore everything until the next newline
+		else if(buf[i] == '!')
+		{
+			while( (i < len) && (buf[i] != '\n') )
+				i++;
+		}
 
-		//Header line with metadata starts with a #
-		if(line[0] == '#')
+		//# is the option line
+		else if(buf[i] == '#')
 		{
 			//Format: # [freq unit] S [MA|DB|RI] R [impedance]
 			char freq_unit[32];
 			char volt_unit[32];
 			int impedance;
-			if(3 != sscanf(line, "# %31s S %31s R %d", freq_unit, volt_unit, &impedance))
+			if(3 != sscanf(buf+i, "# %31s S %31s R %d", freq_unit, volt_unit, &impedance))
 			{
-				LogError("Failed to parse S2P header line \"%s\"\n", line);
-				return false;
+				LogError("Failed to parse Touchstone header line \"%s\"\n", buf+i);
+				ok = false;
+				break;
 			}
 
 			//Figure out units
@@ -104,8 +136,9 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 				unit_scale = 1;
 			else
 			{
-				LogError("Unrecognized S2P frequency unit (got %s)\n", freq_unit);
-				return false;
+				LogError("Unrecognized Touchstone frequency unit (got %s)\n", freq_unit);
+				ok = false;
+				break;
 			}
 			if(0 == strcmp(volt_unit, "MA"))
 			{
@@ -117,64 +150,110 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 				polar = false;
 			else
 			{
-				LogError("S2P units other than magnitude, real/imaginary, and dB not supported (got %s)\n", volt_unit);
-				return false;
+				LogError("Touchstone units other than magnitude, real/imaginary, and dB not supported (got %s)\n", volt_unit);
+				ok = false;
+				break;
 			}
 
-			continue;
+			//Skip ahead to the next newline
+			while( (i < len) && (buf[i] != '\n') )
+				i++;
 		}
 
-		//Each S2P line is formatted as freq s11 s21 s12 s22
-		float hz, s11m, s11p, s21m, s21p, s12m, s12p, s22m, s22p;
-		if(9 != sscanf(line, "%f %f %f %f %f %f %f %f %f", &hz, &s11m, &s11p, &s21m, &s21p, &s12m, &s12p, &s22m, &s22p))
-		{
-			LogError("Malformed S2P line \"%s\"", line);
-			return false;
-		}
-
-		//Convert magnitudes if needed
-		if(mag_is_db)
-		{
-			s11m = pow(10, s11m/20);
-			s12m = pow(10, s12m/20);
-			s21m = pow(10, s21m/20);
-			s22m = pow(10, s22m/20);
-		}
-
-		//Rescale frequency
-		hz *= unit_scale;
-
-		//Convert angles from degrees to radians
-		if(polar)
-		{
-			s11p *= (M_PI / 180);
-			s21p *= (M_PI / 180);
-			s12p *= (M_PI / 180);
-			s22p *= (M_PI / 180);
-		}
-
-		//Convert real/imaginary to mag/angle if needed
+		//Actual network data
 		else
 		{
-			ComplexToPolar(s11m, s11p);
-			ComplexToPolar(s21m, s21p);
-			ComplexToPolar(s12m, s12p);
-			ComplexToPolar(s22m, s22p);
-		}
+			//Read the frequency and scale appropriately
+			float freq;
+			if(!ReadFloat(buf, i, len, freq))
+			{
+				ok = false;
+				break;
+			}
+			freq *= unit_scale;
 
-		//Save everything
-		params.m_params[SPair(1,1)]->m_points.push_back(SParameterPoint(hz, s11m, s11p));
-		params.m_params[SPair(2,1)]->m_points.push_back(SParameterPoint(hz, s21m, s21p));
-		params.m_params[SPair(1,2)]->m_points.push_back(SParameterPoint(hz, s12m, s12p));
-		params.m_params[SPair(2,2)]->m_points.push_back(SParameterPoint(hz, s22m, s22p));
+			//The actual S-matrix is nports * nports mag/angle or real/imaginary tuples
+			float mag;
+			float angle;
+			for(size_t outer=1; outer <= nports; outer ++)
+			{
+				for(size_t inner=1; inner <= nports; inner ++)
+				{
+					//NOTE! Parameter ordering is different for 2 vs 3+ port
+					//For 2 port, we loop destination inner and source outer (S11 S21 S12 S22)
+					//For 3+ port, we have source inner and destination outer (S11 S12 S13 S21 S22 S23 ...)
+					//See pages 6 and 8 of Touchstone File Specification rev 1.1
+					size_t src;
+					size_t dest;
+					if(nports <= 2)
+					{
+						dest = inner;
+						src = outer;
+					}
+					else
+					{
+						dest = outer;
+						src = inner;
+					}
+
+					//Read the inputs
+					if(!ReadFloat(buf, i, len, mag) || !ReadFloat(buf, i, len, angle))
+					{
+						ok = false;
+						break;
+					}
+
+					//Convert dB magnitudes to absolute magnitudes
+					if(mag_is_db)
+						mag = pow(10, mag/20);
+
+					//Touchstone uses degrees, but we use radians internally
+					if(polar)
+						angle *= (M_PI / 180);
+
+					//Convert real/imaginary format to mag/angle
+					else
+						ComplexToPolar(mag, angle);
+
+					//and save the final results
+					params.m_params[SPair(dest, src)]->m_points.push_back(SParameterPoint(freq, mag, angle));
+				}
+				if(!ok)
+					break;
+			}
+			if(!ok)
+				break;
+
+			i++;
+		}
 	}
 
-	//Clean up
-	fclose(fp);
 
-	LogTrace("Loaded %zu S-parameter points\n", params.m_params[SPair(2,1)]->m_points.size());
+	delete[] buf;
+	LogTrace("Loaded %zu S-parameter points\n", params.m_params[SPair(1,1)]->m_points.size());
 
+	return ok;
+}
+
+/**
+	@brief Reads a single ASCII float from the input buffer
+ */
+bool TouchstoneParser::ReadFloat(const char* buf, size_t& i, size_t len, float& f)
+{
+	//eat spaces
+	while(isspace(buf[i]) && (i < len) )
+		i++;
+	if(i >= len)
+		return false;
+
+	//read the value
+	f = atof(buf + i);
+
+	//eat digits
+	while(!isspace(buf[i]) && (i < len) )
+		i++;
 	return true;
+
 }
 
 /**
@@ -184,10 +263,6 @@ void TouchstoneParser::ComplexToPolar(float& f1, float& f2)
 {
 	float real = f1;
 	float imag = f2;
-
-	//Magnitude is easy
 	f1 = sqrtf(real*real + imag*imag);
-
-	//Angle needs some trig
 	f2 = atan2(imag, real);
 }

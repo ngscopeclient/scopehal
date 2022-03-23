@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -66,12 +66,12 @@ bool AutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double AutocorrelationFilter::GetVoltageRange()
+float AutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double AutocorrelationFilter::GetOffset()
+float AutocorrelationFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }
@@ -79,12 +79,6 @@ double AutocorrelationFilter::GetOffset()
 string AutocorrelationFilter::GetProtocolName()
 {
 	return "Autocorrelation";
-}
-
-bool AutocorrelationFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool AutocorrelationFilter::NeedsConfig()
@@ -116,7 +110,7 @@ void AutocorrelationFilter::Refresh()
 	auto len = din->m_samples.size();
 
 	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	SetYAxisUnits(m_inputs[0].m_channel->GetYAxisUnits(0), 0);
 
 	//Sanity check range
 	size_t range = m_parameters[m_maxDeltaName].GetIntVal();

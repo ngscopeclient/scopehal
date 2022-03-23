@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 MagnitudeFilter::MagnitudeFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
 {
 	//Set up channels
 	CreateInput("I");
@@ -63,25 +63,19 @@ bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double MagnitudeFilter::GetVoltageRange()
+float MagnitudeFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double MagnitudeFilter::GetOffset()
+float MagnitudeFilter::GetOffset(size_t /*stream*/)
 {
 	return -m_offset;
 }
 
 string MagnitudeFilter::GetProtocolName()
 {
-	return "Magnitude";
-}
-
-bool MagnitudeFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
+	return "Vector Magnitude";
 }
 
 bool MagnitudeFilter::NeedsConfig()
@@ -117,8 +111,8 @@ void MagnitudeFilter::Refresh()
 	auto b = GetAnalogInputWaveform(1);
 	auto len = min(a->m_samples.size(), b->m_samples.size());
 
-	//Copy the units
-	m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits();
+	//Copy Y axis units from input
+	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
 	//Set up the output waveform
 	auto cap = new AnalogWaveform;
@@ -129,7 +123,7 @@ void MagnitudeFilter::Refresh()
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
-		fdst[i] = sqrtf(fa[i]*fa[i] * fb[i]*fb[i]);
+		fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
 
 	//Calculate range of the output waveform
 	float x = GetMaxVoltage(cap);

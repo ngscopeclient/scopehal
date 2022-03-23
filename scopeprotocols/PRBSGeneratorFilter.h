@@ -52,11 +52,15 @@ public:
 
 	enum Polynomials
 	{
-		POLY_PRBS7,
-		POLY_PRBS15,
-		POLY_PRBS23,
-		POLY_PRBS31
+		POLY_PRBS7 = 7,
+		POLY_PRBS9 = 9,
+		POLY_PRBS11 = 11,
+		POLY_PRBS15 = 15,
+		POLY_PRBS23 = 23,
+		POLY_PRBS31 = 31
 	};
+
+	static bool RunPRBS(uint32_t& state, Polynomials poly);
 
 protected:
 	std::string m_baudname;

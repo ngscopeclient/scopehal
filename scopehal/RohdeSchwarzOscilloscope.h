@@ -59,11 +59,11 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual double GetChannelVoltageRange(size_t i);
-	virtual void SetChannelVoltageRange(size_t i, double range);
+	virtual float GetChannelVoltageRange(size_t i, size_t stream);
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
 	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual double GetChannelOffset(size_t i);
-	virtual void SetChannelOffset(size_t i, double offset);
+	virtual float GetChannelOffset(size_t i, size_t stream);
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -101,8 +101,8 @@ protected:
 	unsigned int m_analogChannelCount;
 
 	//config cache
-	std::map<size_t, double> m_channelOffsets;
-	std::map<size_t, double> m_channelVoltageRanges;
+	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<int, bool> m_channelsEnabled;
 	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
 	std::map<size_t, double> m_channelAttenuations;

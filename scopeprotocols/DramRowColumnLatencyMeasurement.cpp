@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,7 @@ DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& c
 	//Set up channels
 	CreateInput("din");
 
-	m_yAxisUnit = Unit(Unit::UNIT_FS);
+	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 
 	m_midpoint = 0;
 	m_range = 1;
@@ -77,23 +77,17 @@ string DramRowColumnLatencyMeasurement::GetProtocolName()
 	return "DRAM Trcd";
 }
 
-bool DramRowColumnLatencyMeasurement::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
-}
-
 bool DramRowColumnLatencyMeasurement::NeedsConfig()
 {
 	return false;
 }
 
-double DramRowColumnLatencyMeasurement::GetVoltageRange()
+float DramRowColumnLatencyMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double DramRowColumnLatencyMeasurement::GetOffset()
+float DramRowColumnLatencyMeasurement::GetOffset(size_t /*stream*/)
 {
 	return -m_midpoint;
 }

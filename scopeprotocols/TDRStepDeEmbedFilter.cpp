@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,7 +40,7 @@ TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	m_yAxisUnit = Unit(Unit::UNIT_DB);
+	SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
 
 	//Set up channels
 	CreateInput("step");
@@ -78,22 +78,22 @@ bool TDRStepDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-double TDRStepDeEmbedFilter::GetVoltageRange()
+float TDRStepDeEmbedFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;
 }
 
-double TDRStepDeEmbedFilter::GetOffset()
+float TDRStepDeEmbedFilter::GetOffset(size_t /*stream*/)
 {
 	return m_offset;
 }
 
-void TDRStepDeEmbedFilter::SetVoltageRange(double range)
+void TDRStepDeEmbedFilter::SetVoltageRange(float range, size_t /*stream*/)
 {
 	m_range = range;
 }
 
-void TDRStepDeEmbedFilter::SetOffset(double offset)
+void TDRStepDeEmbedFilter::SetOffset(float offset, size_t /*stream*/)
 {
 	m_offset = offset;
 }
@@ -101,12 +101,6 @@ void TDRStepDeEmbedFilter::SetOffset(double offset)
 string TDRStepDeEmbedFilter::GetProtocolName()
 {
 	return "TDR Step De-Embed";
-}
-
-bool TDRStepDeEmbedFilter::IsOverlay()
-{
-	//we create a new analog channel
-	return false;
 }
 
 bool TDRStepDeEmbedFilter::NeedsConfig()

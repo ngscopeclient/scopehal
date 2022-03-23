@@ -565,7 +565,7 @@ void RigolOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mh
 	}
 }
 
-double RigolOscilloscope::GetChannelVoltageRange(size_t i)
+float RigolOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -581,8 +581,8 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 		m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":SCALE?");
 
 	string reply = m_transport->ReadReply();
-	double range;
-	sscanf(reply.c_str(), "%lf", &range);
+	float range;
+	sscanf(reply.c_str(), "%f", &range);
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	if(m_protocol == MSO5)
 		range = 8 * range;
@@ -593,7 +593,7 @@ double RigolOscilloscope::GetChannelVoltageRange(size_t i)
 	return range;
 }
 
-void RigolOscilloscope::SetChannelVoltageRange(size_t i, double range)
+void RigolOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	{
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -618,7 +618,7 @@ OscilloscopeChannel* RigolOscilloscope::GetExternalTrigger()
 	return NULL;
 }
 
-double RigolOscilloscope::GetChannelOffset(size_t i)
+float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -632,15 +632,15 @@ double RigolOscilloscope::GetChannelOffset(size_t i)
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFFS?");
 
 	string reply = m_transport->ReadReply();
-	double offset;
-	sscanf(reply.c_str(), "%lf", &offset);
+	float offset;
+	sscanf(reply.c_str(), "%f", &offset);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
 	return offset;
 }
 
-void RigolOscilloscope::SetChannelOffset(size_t i, double offset)
+void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
@@ -727,8 +727,8 @@ bool RigolOscilloscope::AcquireData()
 			yreference = 0;
 			npoints = maxpoints;
 
-			yincrement = GetChannelVoltageRange(i) / 256.0f;
-			yorigin = GetChannelOffset(i);
+			yincrement = GetChannelVoltageRange(i, 0) / 256.0f;
+			yorigin = GetChannelOffset(i, 0);
 
 			m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":OFFS?");
 			string reply = m_transport->ReadReply();

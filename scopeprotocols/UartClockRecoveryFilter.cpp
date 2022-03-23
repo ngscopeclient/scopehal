@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -80,22 +80,10 @@ string UartClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (UART)";
 }
 
-bool UartClockRecoveryFilter::IsOverlay()
-{
-	//we're an overlaid digital channel
-	return true;
-}
-
 bool UartClockRecoveryFilter::NeedsConfig()
 {
 	//we have need the base symbol rate configured
 	return true;
-}
-
-double UartClockRecoveryFilter::GetVoltageRange()
-{
-	//ignored
-	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
