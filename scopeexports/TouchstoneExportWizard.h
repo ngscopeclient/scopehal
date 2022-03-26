@@ -118,8 +118,8 @@ public:
 
 protected:
 
-	void on_prepare(Gtk::Widget* page);
-	void on_apply();
+	virtual void on_prepare(Gtk::Widget* page);
+	virtual void on_apply();
 
 	TouchstoneExportConfigurationPage m_configPage;
 	TouchstoneExportChannelSelectionPage m_channelSelectionPage;

@@ -67,7 +67,6 @@ TouchstoneExportConfigurationPage::TouchstoneExportConfigurationPage()
 		m_portCountSpin.set_range(01, 30);
 		m_portCountSpin.set_value(2);
 
-
 	m_grid.show_all();
 }
 
