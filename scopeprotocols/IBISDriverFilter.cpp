@@ -253,6 +253,13 @@ void IBISDriverFilter::Refresh()
 		}
 	}
 
+	//Sanity check that we actually have some data
+	if(edgeTimestamps.empty())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Generate output samples at uniform intervals
 	size_t iedge = 0;
 	for(size_t i=0; i<caplen; i++)
