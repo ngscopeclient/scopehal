@@ -294,17 +294,16 @@ void CSVExportWizard::on_apply()
 	//Prepare to generate output waveform
 	vector<WaveformBase*> waveforms;
 	vector<size_t> indexes;
-	vector<int64_t> timestamps;
 	for(auto s : streams)
 	{
 		waveforms.push_back(s.GetData());
 		indexes.push_back(0);
-		timestamps.push_back(LONG_MIN);
 	}
 	auto timebaseWaveform = waveforms[0];
 
 	//Write data
 	//TODO: lots of redundant casting, this can probably be optimized!
+	int64_t lastTimestamp = LONG_LONG_MIN;
 	for(size_t i=0; i<timebaseWaveform->m_offsets.size(); i++)
 	{
 		//Get current timestamp
@@ -320,7 +319,7 @@ void CSVExportWizard::on_apply()
 		else
 			fprintf(fp, "%ld", timestamp);
 
-		//Write data from the reference channel as-is
+		//Write data from the reference channel as-is (no interpolation, it's the timebase by definition)
 		auto reftype = streams[0].m_channel->GetType();
 		switch(reftype)
 		{
@@ -352,10 +351,85 @@ void CSVExportWizard::on_apply()
 		//Write additional channel data
 		for(size_t j=1; j<waveforms.size(); j++)
 		{
-			//Figure out the data
+			//Find closest sample
+			size_t k = indexes[j];
+			auto w = waveforms[j];
+			int64_t sstart = 0;
+			int64_t send = 0;
+			for(; k < w->m_offsets.size(); k++)
+			{
+				sstart = (w->m_offsets[k] * w->m_timescale) + w->m_triggerPhase;
+				send = sstart + (w->m_durations[k] * w->m_timescale);
+
+				//If this sample ends in the future, we're good to go.
+				if(send > timestamp)
+				{
+					indexes[j] = k;
+					break;
+				}
+			}
+			k = indexes[j];
+
+			//See if this is the first time we've seen this sample
+			//(if our timestamp is within it, but the previous timestamp was not)
+			bool firstHit = (timestamp >= sstart) && (lastTimestamp < sstart);
+
+			//Separate processing is needed depending on the data type
+			auto type = streams[j].m_channel->GetType();
+			switch(type)
+			{
+				//Linear interpolation
+				case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+					{
+						//No interpolation for last sample since there's no next to lerp to
+						auto an = dynamic_cast<AnalogWaveform*>(w);
+						if(k+1 > w->m_offsets.size())
+							fprintf(fp, ",%f", an->m_samples[k].m_value);
+
+						//Interpolate
+						else
+						{
+							float vleft = an->m_samples[k].m_value;
+							float vright = an->m_samples[k+1].m_value;
+
+							int64_t tleft = sstart;
+							int64_t tright = (w->m_offsets[k+1] * w->m_timescale) + w->m_triggerPhase;
+
+							float frac = 1.0 * (timestamp - tleft) / (tright - tleft);
+
+							float flerp = vleft + frac * (vright-vleft);
+							fprintf(fp, ",%f", flerp);
+						}
+					}
+					break;
+
+				//Nearest neighbor interpolation
+				case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+					{
+						auto dig = dynamic_cast<DigitalWaveform*>(w);
+						fprintf(fp, ",%d", dig->m_samples[k].m_value);
+					}
+					break;
+
+				//First-hit "interpolation"
+				case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+					{
+						auto filt = dynamic_cast<Filter*>(streams[j].m_channel);
+						if(firstHit)
+							fprintf(fp, ",%s", filt->GetText(k).c_str());
+						else
+							fprintf(fp, ",");
+					}
+					break;
+
+				default:
+					break;
+			}
+
 		}
 
 		fprintf(fp, "\n");
+		lastTimestamp = timestamp;
 	}
 
 	fclose(fp);
