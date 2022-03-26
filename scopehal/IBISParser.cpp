@@ -471,7 +471,8 @@ bool IBISParser::Load(string fname)
 		BLOCK_FALLING_WAVEFORM,
 		BLOCK_MODEL_SPEC,
 		BLOCK_RAMP,
-		BLOCK_SUBMODEL
+		BLOCK_SUBMODEL,
+		BLOCK_MODEL_SELECTOR
 	} data_block = BLOCK_NONE;
 
 	//IBIS file is line oriented, so fetch an entire line then figure out what to do with it.
@@ -518,7 +519,7 @@ bool IBISParser::Load(string fname)
 				sscanf(line, "[Manufacturer] %127s", tmp);
 				m_manufacturer = tmp;
 			}
-			else if(scmd == "IBIS ver")
+			else if( (scmd == "IBIS ver") || (scmd == "IBIS Ver") )
 			{}
 			else if(scmd == "File name")
 			{}
@@ -551,9 +552,9 @@ bool IBISParser::Load(string fname)
 				data_block = BLOCK_PULLUP;
 			else if(scmd == "Pulldown")
 				data_block = BLOCK_PULLDOWN;
-			else if(scmd == "GND_clamp")
+			else if( (scmd == "GND_clamp") || (scmd == "GND Clamp") )
 				data_block = BLOCK_GND_CLAMP;
-			else if(scmd == "POWER_clamp")
+			else if( (scmd == "POWER_clamp") || (scmd == "POWER Clamp") )
 				data_block = BLOCK_POWER_CLAMP;
 			else if(scmd == "Rising Waveform")
 			{
@@ -567,12 +568,14 @@ bool IBISParser::Load(string fname)
 				for(int i=0; i<3; i++)
 					waveform.m_curves[i].clear();
 			}
-			else if(scmd == "Model Spec")
+			else if( (scmd == "Model Spec") || (scmd == "Model spec") )
 				data_block = BLOCK_MODEL_SPEC;
 			else if(scmd == "Ramp")
 				data_block = BLOCK_RAMP;
 			else if(scmd == "Add Submodel")
 				data_block = BLOCK_SUBMODEL;
+			else if(scmd == "Model Selector")
+				data_block = BLOCK_MODEL_SELECTOR;
 
 			//TODO: Terminations
 			else if(scmd == "R Series")
@@ -592,7 +595,7 @@ bool IBISParser::Load(string fname)
 				model = NULL;
 			}
 
-			//Temp/voltage range are one-liners
+			//One-line specifications
 			else if(scmd == "Temperature Range")
 			{
 				sscanf(
@@ -610,6 +613,22 @@ bool IBISParser::Load(string fname)
 					&model->m_voltages[CORNER_TYP],
 					&model->m_voltages[CORNER_MIN],
 					&model->m_voltages[CORNER_MAX]);
+			}
+			else if(scmd == "Power Clamp Reference")
+			{
+				//ignore for now
+			}
+			else if(scmd == "GND Clamp Reference")
+			{
+				//ignore for now
+			}
+			else if(scmd == "Pullup Reference")
+			{
+				//ignore for now
+			}
+			else if(scmd == "Pulldown Reference")
+			{
+				//ignore for now
 			}
 
 			//TODO: IBIS 5.0 SSO
