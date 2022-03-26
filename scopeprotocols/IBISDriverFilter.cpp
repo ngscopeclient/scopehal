@@ -171,9 +171,6 @@ void IBISDriverFilter::OnModelChanged()
 {
 	m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
 
-	//For now, assume rising and falling waveforms have terminations in the same order
-	//TODO: check if spec requires this to be the case
-
 	//Recreate list of terminations
 	Unit ohms(Unit::UNIT_OHMS);
 	Unit volts(Unit::UNIT_VOLTS);
@@ -228,10 +225,22 @@ void IBISDriverFilter::Refresh()
 	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
 	cap->Resize(caplen);
 
-	//Find the rising and falling edge waveform
-	auto term = m_parameters[m_termName].GetIntVal();
-	VTCurves& rising = m_model->m_rising[term];
-	VTCurves& falling = m_model->m_falling[term];
+	//Find the rising edge waveform - easy
+	auto risingTerm = m_parameters[m_termName].GetIntVal();
+	VTCurves& rising = m_model->m_rising[risingTerm];
+
+	//Find the falling edge waveform. We have to search all of them because they might not be in the same order!!
+	size_t fallingTerm=0;
+	for(; fallingTerm < m_model->m_falling.size(); fallingTerm ++)
+	{
+		if(
+			( (m_model->m_falling[fallingTerm].m_fixtureResistance - rising.m_fixtureResistance) < 0.01) &&
+			( (m_model->m_falling[fallingTerm].m_fixtureVoltage - rising.m_fixtureVoltage) < 0.01) )
+		{
+			break;
+		}
+	}
+	VTCurves& falling = m_model->m_falling[fallingTerm];
 	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());
 
 	//Figure out the propagation delay of the buffers for rising and falling edges
