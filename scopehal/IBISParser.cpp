@@ -653,12 +653,19 @@ float IBISParser::ParseNumber(const char* str)
 	//Pull out the digits
 	string digits;
 	char scale = ' ';
+	bool foundE = false;
 	for(size_t i=0; i<32; i++)
 	{
 		char c = str[i];
 
-		if( (c == '-') || (c == '.') || (isdigit(c)))
+		if( (c == '-') || (c == '.') || isdigit(c))
 			digits += c;
+
+		else if(c == 'e')
+		{
+			digits += c;
+			foundE = true;
+		}
 
 		else if(isspace(c))
 			continue;
@@ -674,7 +681,10 @@ float IBISParser::ParseNumber(const char* str)
 	}
 
 	float ret;
-	sscanf(digits.c_str(), "%f", &ret);
+	if(foundE)
+		sscanf(digits.c_str(), "%e", &ret);
+	else
+		sscanf(digits.c_str(), "%f", &ret);
 
 	switch(scale)
 	{
