@@ -78,13 +78,28 @@ public:
 
 	void UpdateChannelList();
 
+	std::map<std::string, StreamDescriptor> m_targets;
+
 protected:
 	const CSVExportReferenceChannelSelectionPage& m_ref;
 
 	void OnAddChannel();
 	void OnRemoveChannel();
+};
 
-	std::map<std::string, StreamDescriptor> m_targets;
+/**
+	@brief Final configuration and output path
+ */
+class CSVExportFinalPage
+{
+public:
+	CSVExportFinalPage();
+	virtual ~CSVExportFinalPage();
+
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+
+protected:
 };
 
 /**
@@ -102,9 +117,11 @@ public:
 
 protected:
 	virtual void on_prepare(Gtk::Widget* page);
+	virtual void on_apply();
 
 	CSVExportReferenceChannelSelectionPage m_referenceSelectionPage;
 	CSVExportOtherChannelSelectionPage m_otherChannelSelectionPage;
+	CSVExportFinalPage m_finalPage;
 };
 
 #endif

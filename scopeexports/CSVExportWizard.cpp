@@ -196,6 +196,26 @@ void CSVExportOtherChannelSelectionPage::OnRemoveChannel()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSVExportFinalPage
+
+CSVExportFinalPage::CSVExportFinalPage()
+	: m_chooser(Gtk::FILE_CHOOSER_ACTION_SAVE)
+{
+	auto filter = Gtk::FileFilter::create();
+	filter->add_pattern("*.csv");
+	filter->set_name("Comma Separated Value (*.csv)");
+	m_chooser.add_filter(filter);
+
+	m_grid.attach(m_chooser, 0, 0, 1, 1);
+
+	m_grid.show_all();
+}
+
+CSVExportFinalPage::~CSVExportFinalPage()
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
 CSVExportWizard::CSVExportWizard(const vector<OscilloscopeChannel*>& channels)
@@ -216,6 +236,13 @@ CSVExportWizard::CSVExportWizard(const vector<OscilloscopeChannel*>& channels)
 
 	//can move on immediately, no requirement to select a channel
 	set_page_complete(m_otherChannelSelectionPage.m_grid);
+
+	append_page(m_finalPage.m_grid);
+	set_page_type(m_finalPage.m_grid, Gtk::ASSISTANT_PAGE_CONFIRM);
+	set_page_title(m_finalPage.m_grid, "File Path");
+	set_page_complete(m_finalPage.m_grid);
+
+	show_all();
 }
 
 CSVExportWizard::~CSVExportWizard()
@@ -229,6 +256,111 @@ void CSVExportWizard::on_prepare(Gtk::Widget* page)
 {
 	if(page == &m_otherChannelSelectionPage.m_grid)
 		m_otherChannelSelectionPage.UpdateChannelList();
+}
+
+void CSVExportWizard::on_apply()
+{
+	//Timebase reference channel
+	vector<StreamDescriptor> streams;
+	streams.push_back(m_referenceSelectionPage.GetActiveChannel());
+	auto timebaseUnit = streams[0].GetXAxisUnits();
+
+	//Other channels
+	size_t len = m_otherChannelSelectionPage.m_selectedChannels.size();
+	for(size_t i=0; i<len; i++)
+	{
+		auto name = m_otherChannelSelectionPage.m_selectedChannels.get_text(i);
+		streams.push_back(m_otherChannelSelectionPage.m_targets[name]);
+	}
+
+	//Write header row
+	auto fname = m_finalPage.m_chooser.get_filename();
+	FILE* fp = fopen(fname.c_str(), "w");
+	if(!fp)
+	{
+		LogError("Failed to open output file\n");
+		return;
+	}
+	if(timebaseUnit == Unit(Unit::UNIT_FS))
+		fprintf(fp, "Time (s)");
+	else if(timebaseUnit == Unit(Unit::UNIT_HZ))
+		fprintf(fp, "Frequency (Hz)");
+	else
+		fprintf(fp, "X Unit");
+	for(auto s : streams)
+		fprintf(fp, ",%s", s.GetName().c_str());
+	fprintf(fp, "\n");
+
+	//Prepare to generate output waveform
+	vector<WaveformBase*> waveforms;
+	vector<size_t> indexes;
+	vector<int64_t> timestamps;
+	for(auto s : streams)
+	{
+		waveforms.push_back(s.GetData());
+		indexes.push_back(0);
+		timestamps.push_back(LONG_MIN);
+	}
+	auto timebaseWaveform = waveforms[0];
+
+	//Write data
+	//TODO: lots of redundant casting, this can probably be optimized!
+	for(size_t i=0; i<timebaseWaveform->m_offsets.size(); i++)
+	{
+		//Get current timestamp
+		auto timestamp =
+			(timebaseWaveform->m_offsets[i] * timebaseWaveform->m_timescale) +
+			timebaseWaveform->m_triggerPhase;
+
+		//Write timestamp
+		if(timebaseUnit == Unit(Unit::UNIT_FS))
+			fprintf(fp, "%e", timestamp / FS_PER_SECOND);
+		else if(timebaseUnit == Unit(Unit::UNIT_HZ))
+			fprintf(fp, "%ld", timestamp);
+		else
+			fprintf(fp, "%ld", timestamp);
+
+		//Write data from the reference channel as-is
+		auto reftype = streams[0].m_channel->GetType();
+		switch(reftype)
+		{
+			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+				{
+					auto refan = dynamic_cast<AnalogWaveform*>(timebaseWaveform);
+					fprintf(fp, ",%f", refan->m_samples[i].m_value);
+				}
+				break;
+
+			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+				{
+					auto refdig = dynamic_cast<DigitalWaveform*>(timebaseWaveform);
+					fprintf(fp, ",%d", refdig->m_samples[i].m_value);
+				}
+				break;
+
+			case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+				{
+					auto reffilt = dynamic_cast<Filter*>(streams[0].m_channel);
+					fprintf(fp, ",%s", reffilt->GetText(i).c_str());
+				}
+				break;
+
+			default:
+				break;
+		}
+
+		//Write additional channel data
+		for(size_t j=1; j<waveforms.size(); j++)
+		{
+			//Figure out the data
+		}
+
+		fprintf(fp, "\n");
+	}
+
+	fclose(fp);
+
+	hide();
 }
 
 string CSVExportWizard::GetExportName()
