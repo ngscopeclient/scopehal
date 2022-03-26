@@ -172,22 +172,6 @@ public:
 
 	VTCurves* GetHighestFallingWaveform();
 	VTCurves* GetHighestRisingWaveform();
-
-	std::vector<float> CalculateTurnonCurve(
-		VTCurves* curve,
-		IVCurve* pullup,
-		IVCurve* pulldown,
-		IBISCorner corner,
-		float dt,
-		bool rising);
-
-	AnalogWaveform* SimulatePRBS(
-		/*DigitalWaveform* input, */
-		uint32_t seed,
-		IBISCorner corner,
-		int64_t timescale,
-		size_t length,
-		size_t ui);
 };
 
 /**
