@@ -27,26 +27,78 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of WAVImportFilter
- */
-#ifndef WAVImportFilter_h
-#define WAVImportFilter_h
+#include "../scopehal/scopehal.h"
+#include "ImportFilter.h"
 
-class WAVImportFilter : public ImportFilter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ImportFilter::ImportFilter(const string& color)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
 {
-public:
-	WAVImportFilter(const std::string& color);
+}
 
-	static std::string GetProtocolName();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	PROTOCOL_DECODER_INITPROC(WAVImportFilter)
+bool ImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+{
+	//no inputs
+	return false;
+}
 
-protected:
-	void OnFileNameChanged();
-	void SetupStreams(size_t chans);
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-#endif
+void ImportFilter::SetDefaultName()
+{
+	auto fname = m_parameters[m_fpname].ToString();
+
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+bool ImportFilter::NeedsConfig()
+{
+	return true;
+}
+
+float ImportFilter::GetOffset(size_t stream)
+{
+	if(stream >= m_offsets.size())
+		return 0;
+	return m_offsets[stream];
+}
+
+float ImportFilter::GetVoltageRange(size_t stream)
+{
+	if(stream >= m_ranges.size())
+		return 1;
+	return m_ranges[stream];
+}
+
+void ImportFilter::SetVoltageRange(float range, size_t stream)
+{
+	if(stream >= m_ranges.size())
+		return;
+	m_ranges[stream] = range;
+}
+
+void ImportFilter::SetOffset(float offset, size_t stream)
+{
+	if(stream >= m_offsets.size())
+		return;
+	m_offsets[stream] = offset;
+}
+
+void ImportFilter::Refresh()
+{
+	//everything happens in OnFileNameChanged
+}

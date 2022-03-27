@@ -30,23 +30,34 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of WAVImportFilter
+	@brief Declaration of ImportFilter
  */
-#ifndef WAVImportFilter_h
-#define WAVImportFilter_h
+#ifndef ImportFilter_h
+#define ImportFilter_h
 
-class WAVImportFilter : public ImportFilter
+class ImportFilter : public Filter
 {
 public:
-	WAVImportFilter(const std::string& color);
+	ImportFilter(const std::string& color);
 
-	static std::string GetProtocolName();
+	virtual void Refresh();
 
-	PROTOCOL_DECODER_INITPROC(WAVImportFilter)
+	virtual void SetDefaultName();
+
+	virtual bool NeedsConfig();
+
+	virtual float GetVoltageRange(size_t stream);
+	virtual float GetOffset(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 protected:
-	void OnFileNameChanged();
-	void SetupStreams(size_t chans);
+	std::string m_fpname;
+
+	std::vector<float> m_ranges;
+	std::vector<float> m_offsets;
 };
 
 #endif

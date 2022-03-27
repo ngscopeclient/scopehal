@@ -104,6 +104,7 @@
 #include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
+#include "ImportFilter.h"
 #include "PeakDetectionFilter.h"
 #include "SpectrumChannel.h"
 #include "SParameterSourceFilter.h"

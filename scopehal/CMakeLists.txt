@@ -109,6 +109,7 @@ set(SCOPEHAL_SOURCES
 
 	Filter.cpp
 	FilterParameter.cpp
+	ImportFilter.cpp
 	PacketDecoder.cpp
 	PeakDetectionFilter.cpp
 	Statistic.cpp
