@@ -35,6 +35,11 @@
 #ifndef ImportFilter_h
 #define ImportFilter_h
 
+/**
+	@brief Helper base class for filters that import a waveform from a file.
+
+	Note that not all import filters derive from this class (e.g. some derive from SParameterSourceFilter instead).
+ */
 class ImportFilter : public Filter
 {
 public:
