@@ -47,6 +47,7 @@
 #include "ChannelEmulationFilter.h"
 #include "ClockRecoveryFilter.h"
 #include "ComplexImportFilter.h"
+#include "CSVImportFilter.h"
 #include "CTLEFilter.h"
 #include "CurrentShuntFilter.h"
 #include "DCDMeasurement.h"

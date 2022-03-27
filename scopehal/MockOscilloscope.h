@@ -45,7 +45,6 @@ public:
 	virtual bool IsOffline();
 
 	//Capture file importing
-	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
 	bool LoadVCD(const std::string& path);
 
