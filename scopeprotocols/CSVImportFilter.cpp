@@ -36,22 +36,13 @@ using namespace std;
 // Construction / destruction
 
 CSVImportFilter::CSVImportFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
-	, m_fpname("CSV File")
+	: ImportFilter(color)
 {
+	m_fpname = "CSV File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.csv";
 	m_parameters[m_fpname].m_fileFilterName = "Comma Separated Value files (*.csv)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &CSVImportFilter::OnFileNameChanged));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool CSVImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
-{
-	//no inputs
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,52 +53,8 @@ string CSVImportFilter::GetProtocolName()
 	return "CSV Import";
 }
 
-void CSVImportFilter::SetDefaultName()
-{
-	auto fname = m_parameters[m_fpname].ToString();
-
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool CSVImportFilter::NeedsConfig()
-{
-	return true;
-}
-
-float CSVImportFilter::GetOffset(size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return 0;
-	return m_offsets[stream];
-}
-
-float CSVImportFilter::GetVoltageRange(size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return 1;
-	return m_ranges[stream];
-}
-
-void CSVImportFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return;
-	m_ranges[stream] = range;
-}
-
-void CSVImportFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return;
-	m_offsets[stream] = offset;
-}
 
 void CSVImportFilter::OnFileNameChanged()
 {
@@ -378,6 +325,8 @@ void CSVImportFilter::OnFileNameChanged()
 				wfm->m_durations[j] = 100000;
 				wfm->m_samples[j] = false;
 			}
+
+			NormalizeTimebase(wfm);
 		}
 
 		//Analog data
@@ -419,13 +368,8 @@ void CSVImportFilter::OnFileNameChanged()
 
 			SetVoltageRange(vrange, i);
 			SetOffset(-vavg, i);
+
+			NormalizeTimebase(wfm);
 		}
 	}
-
-	//Normalize the timescales
-}
-
-void CSVImportFilter::Refresh()
-{
-	//everything happens in OnFileNameChanged
 }

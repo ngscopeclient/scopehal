@@ -102,3 +102,50 @@ void ImportFilter::Refresh()
 {
 	//everything happens in OnFileNameChanged
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Import helpers
+
+/**
+	@brief Helper for
+ */
+void ImportFilter::NormalizeTimebase(WaveformBase* wfm)
+{
+	//Find the mean sample interval
+	Unit fs(Unit::UNIT_FS);
+	uint64_t interval_sum = 0;
+	uint64_t interval_count = wfm->m_offsets.size();
+	for(size_t i=0; i<interval_count; i++)
+		interval_sum += wfm->m_durations[i];
+	uint64_t avg = interval_sum / interval_count;
+	LogTrace("Average sample interval: %s\n", fs.PrettyPrint(avg).c_str());
+
+	//Find the standard deviation of sample intervals
+	uint64_t stdev_sum = 0;
+	for(size_t i=0; i<interval_count; i++)
+	{
+		int64_t delta = (wfm->m_durations[i] - avg);
+		stdev_sum += delta*delta;
+	}
+	uint64_t stdev = sqrt(stdev_sum / interval_count);
+	LogTrace("Stdev of intervals: %s\n", fs.PrettyPrint(stdev).c_str());
+
+	//If the standard deviation is more than 2% of the average sample period, assume the data is sampled irregularly.
+	if( (stdev * 50) > avg)
+	{
+		LogTrace("Deviation is too large, assuming non-uniform sample interval\n");
+		return;
+	}
+
+	//If we get here, assume uniform sampling.
+	//Use time zero as the trigger phase.
+	wfm->m_densePacked = true;
+	wfm->m_timescale = avg;
+	wfm->m_triggerPhase = wfm->m_offsets[0];
+	size_t len = wfm->m_offsets.size();
+	for(size_t j=0; j<len; j++)
+	{
+		wfm->m_offsets[j] = j;
+		wfm->m_durations[j] = 1;
+	}
+}

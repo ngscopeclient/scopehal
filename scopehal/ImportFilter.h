@@ -63,6 +63,8 @@ protected:
 
 	std::vector<float> m_ranges;
 	std::vector<float> m_offsets;
+
+	void NormalizeTimebase(WaveformBase* wfm);
 };
 
 #endif
