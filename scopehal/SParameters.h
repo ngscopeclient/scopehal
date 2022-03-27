@@ -92,8 +92,6 @@ typedef std::pair<int, int> SPair;
 
 /**
 	@brief A set of S-parameters.
-
-	For now, only supports full 2-port.
  */
 class SParameters
 {
