@@ -107,7 +107,11 @@ void ImportFilter::Refresh()
 // Import helpers
 
 /**
-	@brief Helper for
+	@brief Cleans up timebase of data that might be regularly or irregularly sampled.
+
+	This function identifies data sampled at regular intervals and adjusts the timescale and sample duration/offset
+	values accordingly, to enable dense packed optimizations and proper display of instrument timebase settings on
+	imported waveforms.
  */
 void ImportFilter::NormalizeTimebase(WaveformBase* wfm)
 {

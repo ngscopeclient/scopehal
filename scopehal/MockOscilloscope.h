@@ -185,7 +185,6 @@ protected:
 	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
 	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
 
-	void NormalizeTimebases();
 	void AutoscaleVertical();
 
 public:
