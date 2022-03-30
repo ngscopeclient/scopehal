@@ -46,7 +46,6 @@ public:
 
 	//Capture file importing
 	bool LoadBIN(const std::string& path);
-	bool LoadVCD(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
 	#pragma pack(push, 1)

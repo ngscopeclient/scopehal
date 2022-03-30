@@ -127,6 +127,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
+	VCDImportFilter.cpp
 	VectorFrequencyFilter.cpp
 	VectorPhaseFilter.cpp
 	VerticalBathtub.cpp
