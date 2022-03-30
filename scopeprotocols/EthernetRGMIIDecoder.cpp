@@ -176,7 +176,7 @@ void EthernetRGMIIDecoder::Refresh()
 		//TODO: alert if clock isn't close to one of the three legal frequencies
 		int64_t clkperiod = dctl.m_offsets[i] - dctl.m_offsets[i-2];
 		bool ddr = false;		//Default to 2.5/25 MHz SDR.
-		if(clkperiod < 10000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
+		if(clkperiod < 10000000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
 			ddr = true;
 
 		//Set of recovered bytes and timestamps
@@ -230,7 +230,6 @@ void EthernetRGMIIDecoder::Refresh()
 				i += 4;
 			}
 		}
-
 		//Crunch the data
 		BytesToFrames(bytes, starts, ends, cap);
 	}
