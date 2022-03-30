@@ -79,14 +79,6 @@ void VCDImportFilter::OnFileNameChanged()
 
 	ClearStreams();
 
-	/*
-	FILE* fp = fopen(path.c_str(), "r");
-	if(!fp)
-	{
-		LogError("Couldn't open VCD file \"%s\"\n", path.c_str());
-		return false;
-	}
-
 	enum
 	{
 		STATE_IDLE,
@@ -98,8 +90,6 @@ void VCDImportFilter::OnFileNameChanged()
 		STATE_DUMP
 	} state = STATE_IDLE;
 
-	time_t timestamp = 0;
-	int64_t fs = 0;
 	int64_t timescale = 1;
 
 	int64_t current_time = 0;
@@ -250,18 +240,8 @@ void VCDImportFilter::OnFileNameChanged()
 					if(waveforms.find(symbol) != waveforms.end())
 						continue;
 
-					//Create the channel
-					size_t ichan = m_channels.size();
-					string vname = sscope + name;
-					auto chan = new OscilloscopeChannel(
-						this,
-						vname,
-						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
-						GetDefaultChannelColor(ichan),
-						width,
-						ichan,
-						true);
-					m_channels.push_back(chan);
+					//Create the stream
+					AddStream(Unit(Unit::UNIT_COUNTS), sscope + name);
 
 					//Create the waveform
 					WaveformBase* wfm;
@@ -277,7 +257,7 @@ void VCDImportFilter::OnFileNameChanged()
 					wfm->m_densePacked = false;
 					waveforms[symbol] = wfm;
 					widths[symbol] = width;
-					chan->SetData(wfm, 0);
+					SetData(wfm, m_streams.size() - 1);
 				}
 				break;	//end STATE_VARS
 
@@ -367,14 +347,14 @@ void VCDImportFilter::OnFileNameChanged()
 	fclose(fp);
 
 	//Nothing to do if we didn't get any channels
-	if(m_channels.empty())
-		return false;
+	if(m_streams.empty())
+		return;
 
 	//Find the longest common prefix from all signal names
-	string prefix = m_channels[0]->GetHwname();
-	for(size_t i=1; i<m_channels.size(); i++)
+	auto prefix = m_streams[0].m_name;
+	for(size_t i=1; i<m_streams.size(); i++)
 	{
-		string name = m_channels[i]->GetHwname();
+		auto name = m_streams[i].m_name;
 		size_t nlen = 1;
 		for(; (nlen < prefix.length()) && (nlen < name.length()); nlen ++)
 		{
@@ -385,7 +365,8 @@ void VCDImportFilter::OnFileNameChanged()
 	}
 
 	//Remove the prefix from all signal names
-	for(auto chan : m_channels)
-		chan->SetDisplayName(chan->GetHwname().substr(prefix.length()));
-	*/
+	for(size_t i=0; i<m_streams.size(); i++)
+		m_streams[i].m_name = m_streams[i].m_name.substr(prefix.length());
+
+	m_outputsChangedSignal.emit();
 }
