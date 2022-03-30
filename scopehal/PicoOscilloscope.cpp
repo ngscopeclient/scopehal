@@ -69,7 +69,6 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetChannelColor(i),
-			1,
 			i,
 			true);
 		m_channels.push_back(chan);
@@ -100,7 +99,6 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetChannelColor(ichan),
-			1,
 			chnum,
 			true);
 		m_channels.push_back(chan);
@@ -118,7 +116,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	//Add the external trigger input
 	m_extTrigChannel =
-		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
+		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -46,7 +46,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& hwname,
 	OscilloscopeChannel::ChannelType type,
 	const string& color,
-	int width,
 	size_t index,
 	bool physical)
 	: m_displaycolor(color)
@@ -54,7 +53,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_scope(scope)
 	, m_type(type)
 	, m_hwname(hwname)
-	, m_width(width)
 	, m_index(index)
 	, m_physical(physical)
 	, m_refcount(0)
@@ -70,7 +68,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& color,
 	Unit xunit,
 	Unit yunit,
-	int width,
 	size_t index,
 	bool physical)
 	: m_displaycolor(color)
@@ -78,7 +75,6 @@ OscilloscopeChannel::OscilloscopeChannel(
 	, m_scope(scope)
 	, m_type(type)
 	, m_hwname(hwname)
-	, m_width(width)
 	, m_index(index)
 	, m_physical(physical)
 	, m_refcount(0)

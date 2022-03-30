@@ -84,6 +84,7 @@ public:
 		//Conventional time-series waveforms (or similar graphs like a FFT)
 		CHANNEL_TYPE_ANALOG,
 		CHANNEL_TYPE_DIGITAL,
+		CHANNEL_TYPE_DIGITAL_BUS,
 
 		//2D density plots
 		CHANNEL_TYPE_EYE,
@@ -101,7 +102,6 @@ public:
 		const std::string& hwname,
 		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
-		int width = 1,
 		size_t index = 0,
 		bool physical = false);
 	OscilloscopeChannel(
@@ -111,7 +111,6 @@ public:
 		const std::string& color,
 		Unit xunit,
 		Unit yunit,
-		int width = 1,
 		size_t index = 0,
 		bool physical = false);
 	virtual ~OscilloscopeChannel();
@@ -157,9 +156,6 @@ public:
 
 	///Set new data, overwriting the old data as appropriate
 	void SetData(WaveformBase* pNew, size_t stream);
-
-	int GetWidth()
-	{ return m_width; }
 
 	Oscilloscope* GetScope()
 	{ return m_scope; }
@@ -285,9 +281,6 @@ protected:
 
 	///Hardware name as labeled on the scope
 	std::string m_hwname;
-
-	///Bus width (1 to N, only meaningful for digital channels)
-	int m_width;
 
 	///Channel index
 	size_t m_index;

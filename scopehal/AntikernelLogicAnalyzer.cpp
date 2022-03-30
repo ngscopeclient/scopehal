@@ -170,6 +170,7 @@ string AntikernelLogicAnalyzer::GetSerial()
 
 void AntikernelLogicAnalyzer::LoadChannels()
 {
+	/*
 	LogDebug("Logic analyzer: loading channel metadata\n");
 	LogIndenter li;
 
@@ -191,7 +192,6 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		"clk",
 		OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 		GetDefaultChannelColor(m_channels.size()),
-		1,
 		m_channels.size(),
 		false);	//not a physical channel
 	m_channels.push_back(chan);
@@ -234,14 +234,6 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		m_lowIndexes.push_back(index);
 		m_highIndexes.push_back(index + width - 1);
 		index += width;
-
-		/*
-		LogDebug("Channel: %s (%d bits wide, from %zu to %zu)\n",
-			realname.c_str(),
-			width,
-			m_lowIndexes[i],
-			m_highIndexes[i]);
-		*/
 	}
 
 	delete[] namebuf;
@@ -269,6 +261,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	//(this is needed so the clock can be double-rate and not lose sync)
 	if(m_samplePeriod & 1)
 		m_samplePeriod --;
+	*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,6 +290,7 @@ Oscilloscope::TriggerMode AntikernelLogicAnalyzer::PollTrigger()
 
 bool AntikernelLogicAnalyzer::AcquireData()
 {
+	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//LogDebug("Acquiring data...\n");
@@ -422,7 +416,7 @@ bool AntikernelLogicAnalyzer::AcquireData()
 		ArmTrigger();
 	else
 		m_triggerArmed = false;
-
+	*/
 	return true;
 }
 

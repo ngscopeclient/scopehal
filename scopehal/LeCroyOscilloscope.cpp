@@ -91,7 +91,6 @@ void LeCroyOscilloscope::SharedCtorInit()
 		"Ext",
 		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
-		1,
 		m_channels.size(),
 		true);
 	m_channels.push_back(m_extTrigChannel);
@@ -807,7 +806,6 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 			chn,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
-			1,
 			m_channels.size(),
 			true);
 		m_channels.push_back(chan);
@@ -963,7 +961,6 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			1,
 			i,
 			true));
 	}

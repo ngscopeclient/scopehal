@@ -64,7 +64,6 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetChannelColor(i),
-			1,
 			i,
 			true);
 		m_channels.push_back(chan);
@@ -92,7 +91,6 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 			chname,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetChannelColor(i),
-			1,
 			chnum,
 			true);
 		m_channels.push_back(chan);

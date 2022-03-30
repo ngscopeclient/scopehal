@@ -49,8 +49,6 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
-
 	PROTOCOL_DECODER_INITPROC(ParallelBus)
 
 protected:

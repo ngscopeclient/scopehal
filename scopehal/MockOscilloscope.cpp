@@ -178,7 +178,6 @@ void MockOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			cnode["name"].as<string>(),
 			type,
 			cnode["color"].as<string>(),
-			1,
 			index,
 			true);
 		m_channels[index] = chan;
@@ -450,7 +449,6 @@ bool MockOscilloscope::LoadBIN(const string& path)
 			GetDefaultChannelColor(i),
 			units[wh.x],
 			units[wh.y],
-			1,				//Bus width
 			i,				//Channel index
 			true			//Is physical channel
 		);

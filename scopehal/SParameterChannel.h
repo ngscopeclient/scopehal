@@ -47,7 +47,7 @@ public:
 		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
 		size_t index)
-		: OscilloscopeChannel(scope, hwname, type, color, 1, index, true)
+		: OscilloscopeChannel(scope, hwname, type, color, index, true)
 	{
 		ClearStreams();
 		AddStream(Unit(Unit::UNIT_DB), "mag");

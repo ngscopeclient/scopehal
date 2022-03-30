@@ -181,7 +181,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 
 	//Add the external trigger input
 	m_extTrigChannel =
-		new OscilloscopeChannel(this, "Ext", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", 1, m_channels.size(), true);
+		new OscilloscopeChannel(this, "Ext", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
 
 	switch(m_modelid)
@@ -319,7 +319,6 @@ void SiglentSCPIOscilloscope::AddDigitalChannels(unsigned int count)
 			chn,
 			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
-			1,
 			m_channels.size(),
 			true);
 		m_channels.push_back(chan);
@@ -379,7 +378,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 
 		//Create the channel
 		m_channels.push_back(
-			new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, 1, i, true));
+			new OscilloscopeChannel(this, chname, OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, i, true));
 	}
 	m_analogChannelCount = nchans;
 }

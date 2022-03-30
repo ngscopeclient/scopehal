@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -149,7 +149,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			string("CH") + to_string(i+1),
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			1,
 			i,
 			true));
 	}
@@ -195,7 +194,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 						m_channels[i]->GetHwname() + "_D" + to_string(j),
 						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 						m_channels[i]->m_displaycolor,
-						1,
 						m_channels.size(),
 						true);
 
@@ -226,7 +224,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				"AUX",
 				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				1,
 				m_channels.size(),
 				true);
 			m_channels.push_back(m_extTrigChannel);
@@ -238,7 +235,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				"EX",
 				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				1,
 				m_channels.size(),
 				true);
 			m_channels.push_back(m_extTrigChannel);
@@ -1005,7 +1001,7 @@ vector<unsigned int> TektronixOscilloscope::GetChannelBandwidthLimiters(size_t i
 			//TODO: Behavior copied from MSO6. Appropriate?
 			if (!is_1m)
 				ret.push_back(0);
-			
+
 			break;
 
 		case FAMILY_MSO6:

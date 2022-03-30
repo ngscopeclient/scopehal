@@ -285,8 +285,6 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				break;
 			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
 				config += "                type:        digital\n";
-				snprintf(tmp, sizeof(tmp), "                width:       %d\n", chan->GetWidth());
-				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                thresh:      %f\n", GetDigitalThreshold(i));
 				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                hys:         %f\n", GetDigitalHysteresis(i));
@@ -297,6 +295,8 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 				break;
 
 			//should never get complex channels on a scope
+			//TODO: how to handle digital bus channels? are they possible?
+			//TODO: how to handle eye patterns from sampling scope?
 			default:
 				break;
 		}
