@@ -97,7 +97,6 @@ static const struct
 	float val;
 } c_sds2000xp_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
-static const std::chrono::milliseconds c_setting_delay(50);		 // Delay required when setting parameters via SCPI
 static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
 static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
 static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
@@ -128,8 +127,9 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_interleavingValid(false)
 	, m_highDefinition(false)
 {
-	// Set a base read time
-	next_tx = chrono::system_clock::now();
+	//Enable command rate limiting
+	//TODO: only for some firmware versions or instrument SKUs?
+	transport->EnableRateLimiting(chrono::milliseconds(50));
 
 	//standard initialization
 	FlushConfigCache();
@@ -140,7 +140,6 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 }
 
 string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
-
 {
 	string ret;
 	char opString[128];
@@ -150,16 +149,12 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	va_end(va);
 
 	LogTrace("TX: %s\r\n", opString);
-	this_thread::sleep_until(next_tx);
-	m_transport->FlushRXBuffer();
-	m_transport->SendCommand(opString);
-	ret = m_transport->ReadReply();
+	ret = m_transport->SendCommandQueuedWithReply(opString, false);
 	LogTrace("RX: %s\r\n\r\n", ret.c_str());
 	return ret;
 }
 
 void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
-
 {
 	char opString[128];
 	va_list va;
@@ -169,10 +164,7 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 	va_end(va);
 
 	LogTrace("TXO: %s\r\n", opString);
-	this_thread::sleep_until(next_tx);
-	m_transport->FlushRXBuffer();
-	m_transport->SendCommand(opString);
-	next_tx = chrono::system_clock::now() + c_setting_delay;
+	m_transport->SendCommandQueued(opString);
 }
 
 void SiglentSCPIOscilloscope::SharedCtorInit()
@@ -1501,6 +1493,8 @@ map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(strin
 	// Digital channels not yet implemented
 	return ret;
 
+	/*
+
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
 	tmp = tmp.substr(0, 16);
@@ -1622,13 +1616,11 @@ map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(strin
 			cap->m_samples.shrink_to_fit();
 
 			//See how much space we saved
-			/*
 			LogDebug("%s: %zu samples deduplicated to %zu (%.1f %%)\n",
 				m_digitalChannels[i]->GetDisplayName().c_str(),
 				num_samples,
 				k,
 				(k * 100.0f) / num_samples);
-			*/
 
 			//Done, save data and go on to next
 			ret[m_digitalChannels[i]->GetIndex()] = cap;
@@ -1641,6 +1633,7 @@ map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(strin
 	}
 	delete[] block;
 	return ret;
+	*/
 }
 
 bool SiglentSCPIOscilloscope::AcquireData()

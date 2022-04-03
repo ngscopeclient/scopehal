@@ -77,7 +77,6 @@ protected:
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
-	std::chrono::system_clock::time_point next_tx;
 
 public:
 	//Device information

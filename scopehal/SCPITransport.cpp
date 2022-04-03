@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,6 +40,8 @@ using namespace std;
 SCPITransport::CreateMapType SCPITransport::m_createprocs;
 
 SCPITransport::SCPITransport()
+	: m_rateLimitingEnabled(false)
+	, m_rateLimitingInterval(0)
 {
 }
 
@@ -85,6 +87,15 @@ void SCPITransport::SendCommandQueued(const string& cmd)
 }
 
 /**
+	@brief Block until it's time to send the next command when rate limiting.
+ */
+void SCPITransport::RateLimitingWait()
+{
+	this_thread::sleep_until(m_nextCommandReady);
+	m_nextCommandReady = chrono::system_clock::now() + m_rateLimitingInterval;
+}
+
+/**
 	@brief Pushes all pending commands from SendCommandQueued() calls and blocks until they are all sent.
  */
 bool SCPITransport::FlushCommandQueue()
@@ -99,7 +110,11 @@ bool SCPITransport::FlushCommandQueue()
 
 	lock_guard<recursive_mutex> lock(m_netMutex);
 	for(auto str : tmp)
+	{
+		if(m_rateLimitingEnabled)
+			RateLimitingWait();
 		SendCommand(str);
+	}
 	return true;
 }
 
@@ -122,7 +137,12 @@ string SCPITransport::SendCommandQueuedWithReply(string cmd, bool endOnSemicolon
 string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemicolon)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
+
+	if(m_rateLimitingEnabled)
+		RateLimitingWait();
+
 	SendCommand(cmd);
+
 	return ReadReply(endOnSemicolon);
 }
 
@@ -132,6 +152,10 @@ string SCPITransport::SendCommandImmediateWithReply(string cmd, bool endOnSemico
 void SCPITransport::SendCommandImmediate(string cmd)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
+
+	if(m_rateLimitingEnabled)
+		RateLimitingWait();
+
 	SendCommand(cmd);
 }
 
@@ -141,6 +165,9 @@ void SCPITransport::SendCommandImmediate(string cmd)
 void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& len)
 {
 	lock_guard<recursive_mutex> lock(m_netMutex);
+
+	if(m_rateLimitingEnabled)
+		RateLimitingWait();
 	SendCommand(cmd);
 
 	//Read the length
