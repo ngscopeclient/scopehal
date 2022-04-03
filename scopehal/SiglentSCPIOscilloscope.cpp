@@ -464,9 +464,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 			return m_channelsEnabled[i];
 	}
 
-	//Need to lock the main mutex first to prevent deadlocks
 	lock_guard<recursive_mutex> lock(m_mutex);
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 
 	//Analog
 	if(i < m_analogChannelCount)
@@ -479,13 +477,20 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS1000:
 				reply = converse("C%d:TRACE?", i + 1);
-				m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
+
+				{
+					lock_guard<recursive_mutex> lock2(m_cacheMutex);
+					m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
+				}
 				break;
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
 				reply = converse(":CHANNEL%d:SWITCH?", i + 1);
-				m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
+				{
+					lock_guard<recursive_mutex> lock2(m_cacheMutex);
+					m_channelsEnabled[i] = (reply.find("OFF") != 0);	//may have a trailing newline, ignore that
+				}
 				break;
 			// --------------------------------------------------
 			default:
@@ -501,6 +506,8 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 		//See if the channel is on
 		size_t nchan = i - (m_analogChannelCount + 1);
 		string str = converse(":DIGITAL:D%d?", nchan);
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_channelsEnabled[i] = (str == "OFF") ? false : true;
 	}
 
@@ -509,7 +516,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 
 void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	//No need to lock the main mutex since sendOnly now pushes to the queue
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
@@ -542,6 +549,7 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 		sendOnly(":DIGITAL:D%d ON", i - (m_analogChannelCount + 1));
 	}
 
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelsEnabled[i] = true;
 }
 
@@ -553,9 +561,10 @@ bool SiglentSCPIOscilloscope::CanEnableChannel(size_t i)
 
 void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_channelsEnabled[i] = false;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelsEnabled[i] = false;
+	}
 
 	if(i < m_analogChannelCount)
 	{
@@ -640,7 +649,6 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 	string replyImp;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);	// WARNING: Moved outside switch
 	m_probeIsActive[i] = false;
 
 	switch(m_modelid)
@@ -648,7 +656,6 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 			replyType = Trim(converse("C%d:COUPLING?", i + 1));
-
 			if(replyType == "A50")
 				return OscilloscopeChannel::COUPLE_AC_50;
 			else if(replyType == "D50")
@@ -990,7 +997,6 @@ void SiglentSCPIOscilloscope::Invert(size_t i, bool invert)
 	if(i >= m_analogChannelCount)
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -1055,7 +1061,6 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 	}
 
 	//Update in hardware
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -1155,7 +1160,6 @@ bool SiglentSCPIOscilloscope::IsTriggerArmed()
 }
 
 Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
-
 {
 	//Read the Internal State Change Register
 	string sinr = "";
@@ -1209,7 +1213,6 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 }
 
 int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
-
 {
 	char packetSizeSequence[17];
 	uint32_t getLength;
@@ -1247,14 +1250,17 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
  */
 void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-
-	//Check enable state in the cache.
 	vector<int> uncached;
-	for(unsigned int i = 0; i < m_analogChannelCount; i++)
+
 	{
-		if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
-			uncached.push_back(i);
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		//Check enable state in the cache.
+		for(unsigned int i = 0; i < m_analogChannelCount; i++)
+		{
+			if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
+				uncached.push_back(i);
+		}
 	}
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
@@ -1901,8 +1907,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 void SiglentSCPIOscilloscope::Start()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -1931,7 +1935,6 @@ void SiglentSCPIOscilloscope::Start()
 
 void SiglentSCPIOscilloscope::StartSingleTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	//LogDebug("Start single trigger\n");
 
 	switch(m_modelid)
@@ -1962,7 +1965,6 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 
 void SiglentSCPIOscilloscope::Stop()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -1990,8 +1992,6 @@ void SiglentSCPIOscilloscope::Stop()
 
 void SiglentSCPIOscilloscope::ForceTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	// Don't allow more than one force at a time
 	if(m_triggerForced)
 		return;
@@ -2073,7 +2073,6 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 	if(i > m_analogChannelCount)
 		return;
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
 	{
 		switch(m_modelid)
 		{
@@ -2142,8 +2141,6 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 
 void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	float vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
@@ -2346,8 +2343,6 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 
 void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -2452,7 +2447,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 
 void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_sampleRate = rate;
 	m_sampleRateValid = false;
 
@@ -2491,8 +2485,6 @@ void SiglentSCPIOscilloscope::SetUseExternalRefclk(bool /*external*/)
 
 void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Siglents standard has the offset being from the midpoint of the capture.
 	//Scopehal has offset from the start.
 	int64_t rate = GetSampleRate();
@@ -2577,8 +2569,6 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	//Cannot deskew digital/trigger channels
 	if(channel >= m_analogChannelCount)
 		return;
-
-	lock_guard<recursive_mutex> lock(m_mutex);
 
 	switch(m_modelid)
 	{

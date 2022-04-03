@@ -50,7 +50,16 @@ public:
 	virtual std::string GetConnectionString() =0;
 	virtual std::string GetName() =0;
 
-	//Queued command API
+	/*
+		Queued command API
+
+		Note that glscopeclient flushes the command queue in ScopeThread.
+		Headless applications will need to do this manually after performing a write-only application, otherwise
+		the command will remain queued indefinitely.
+
+		TODO: look into a background thread or something that's automatically launched by the transport to do this
+		after some kind of fixed timeout?
+	 */
 	void SendCommandQueued(const std::string& cmd);
 	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
 	void SendCommandImmediate(std::string cmd);
