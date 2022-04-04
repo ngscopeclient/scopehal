@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -273,8 +273,6 @@ protected:
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
-	bool m_interleaving;
-	bool m_interleavingValid;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
 	std::map<size_t, bool> m_probeIsActive;

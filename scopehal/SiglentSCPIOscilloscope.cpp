@@ -123,8 +123,6 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	, m_memoryDepth(1)
 	, m_triggerOffsetValid(false)
 	, m_triggerOffset(0)
-	, m_interleaving(false)
-	, m_interleavingValid(false)
 	, m_highDefinition(false)
 {
 	//Enable command rate limiting
@@ -409,7 +407,6 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
-	m_interleavingValid = false;
 	m_meterModeValid = false;
 }
 
@@ -517,6 +514,8 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 
 void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 {
+	bool wasInterleaving = IsInterleaving();
+
 	//No need to lock the main mutex since sendOnly now pushes to the queue
 
 	//If this is an analog channel, just toggle it
@@ -552,6 +551,13 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelsEnabled[i] = true;
+
+	//Sample rate and memory depth can change if interleaving state changed
+	if(IsInterleaving() != wasInterleaving)
+	{
+		m_memoryDepthValid = false;
+		m_sampleRateValid = false;
+	}
 }
 
 bool SiglentSCPIOscilloscope::CanEnableChannel(size_t i)
@@ -562,6 +568,8 @@ bool SiglentSCPIOscilloscope::CanEnableChannel(size_t i)
 
 void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 {
+	bool wasInterleaving = IsInterleaving();
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_channelsEnabled[i] = false;
@@ -608,6 +616,13 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 
 		//        if(!anyDigitalEnabled)
 		//sendOnly(":DIGITAL:BUS%d:DISP OFF",chNum/8);
+	}
+
+	//Sample rate and memory depth can change if interleaving state changed
+	if(IsInterleaving() != wasInterleaving)
+	{
+		m_memoryDepthValid = false;
+		m_sampleRateValid = false;
 	}
 }
 
@@ -2190,8 +2205,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 				100 * 1000 * 1000,
 				200 * 1000 * 1000,
 				500 * 1000 * 1000,
-				1 * 1000 * 1000 * 1000,
-				2 * 1000 * 1000 * 1000};
+				1 * 1000 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		default:
@@ -2205,8 +2219,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 {
-	vector<uint64_t> ret = {};
-	GetSampleRatesNonInterleaved();
+	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
+	for(size_t i=0; i<ret.size(); i++)
+		ret[i] *= 2;
 	return ret;
 }
 
@@ -2238,26 +2253,9 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 {
-	vector<uint64_t> ret = {};
-	switch(m_modelid)
-	{
-		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS1000:
-			// According to programming guide and datasheet
-			// {14K,140K,1.4M,14M} for interleave mode
-			ret = {14 * 1000, 140 * 1000, 1400 * 1000, 14 * 1000 * 1000};
-			break;
-		// --------------------------------------------------
-		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS5000X:
-			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
-			break;
-		// --------------------------------------------------
-		default:
-			LogError("Unknown scope type\n");
-			break;
-			// --------------------------------------------------
-	}
+	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
+	for(size_t i=0; i<ret.size(); i++)
+		ret[i] *= 2;
 	return ret;
 }
 
@@ -2671,10 +2669,7 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 			// <size>:={7K,70K,700K,7M} for non-interleaved mode.
-			// Non-interleaved means a single channel is active per A/D
-			// converter. Most oscilloscopes feature two channels per A/D converter.
 			// <size>:={14K,140K,1.4M,14M}for interleave mode.
-			// Interleave mode means multiple active channels per A/Dconverter.
 
 			if((m_channelsEnabled[0] == true) && (m_channelsEnabled[1] == true))
 			{
@@ -2691,8 +2686,17 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-			LogWarning("IsInterleaving is not implemented\n");
-			return false;
+			if((m_channelsEnabled[0] == true) && (m_channelsEnabled[1] == true))
+			{
+				// Channel 1 and 2
+				return false;
+			}
+			else if((m_channelsEnabled[3] == true) && (m_channelsEnabled[4] == true))
+			{
+				// Channel 3 and 4
+				return false;
+			}
+			return true;
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -2703,7 +2707,7 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 
 bool SiglentSCPIOscilloscope::SetInterleaving(bool /* combine*/)
 {
-	LogWarning("SetInterleaving is not implemented\n");
+	//Setting interleaving is not supported, it's always hardware managed
 	return false;
 }
 
