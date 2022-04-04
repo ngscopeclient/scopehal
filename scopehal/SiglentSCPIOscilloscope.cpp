@@ -1493,7 +1493,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	return ret;
 }
 
-map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& data)
+map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& /*data*/)
 {
 	map<int, DigitalWaveform*> ret;
 
@@ -2312,7 +2312,7 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 	double f;
 	if(!m_memoryDepthValid)
 	{
-		//:AQUIRE:MDEPTH can sometimes return incorrect values! It returns the *cap* on memory depth,
+		//:ACQUIRE:MDEPTH can sometimes return incorrect values! It returns the *cap* on memory depth,
 		// not the *actual* memory depth....we don't know that until we've collected samples
 
 		// What you see below is the only observed method that seems to reliably get the *actual* memory depth.
@@ -2344,6 +2344,12 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 
 void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 {
+	//Need to lock the mutex when setting depth because of the quirks around needing to change trigger mode too
+	lock_guard<recursive_mutex> lock(m_mutex);
+
+	//save original sample rate (scope often changes sample rate when adjusting memory depth)
+	uint64_t rate = GetSampleRate();
+
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -2395,6 +2401,10 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+
+			// we can not change memory size in Run/Stop mode
+			sendOnly("TRIG_MODE AUTO");
+
 			switch(depth)
 			{
 				case 10000:
@@ -2435,6 +2445,18 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				default:
 					LogError("Invalid memory depth for channel: %lu\n", depth);
 			}
+
+			if(IsTriggerArmed())
+			{
+				// restart trigger
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else
+			{
+				// change to stop mode
+				sendOnly("TRIG_MODE STOP");
+			}
+
 			break;
 		// --------------------------------------------------
 		default:
@@ -2444,6 +2466,9 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 	}
 
 	m_memoryDepthValid = false;
+
+	//restore old sample rate
+	SetSampleRate(rate);
 }
 
 void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
@@ -2470,7 +2495,6 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 			break;
 			// --------------------------------------------------
 	}
-
 	m_memoryDepthValid = false;
 }
 
