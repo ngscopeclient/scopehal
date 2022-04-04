@@ -511,6 +511,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 		m_channelsEnabled[i] = (str == "OFF") ? false : true;
 	}
 
+	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	return m_channelsEnabled[i];
 }
 
