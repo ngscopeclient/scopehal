@@ -580,7 +580,7 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 			case MODEL_SIGLENT_SDS5000X:
 				//If this is an analog channel, just toggle it
 				if(i < m_analogChannelCount)
-					sendOnly(":CHANNEL%d:TRACE OFF", i + 1);
+					sendOnly(":CHANNEL%d:SWITCH OFF", i + 1);
 				break;
 			// --------------------------------------------------
 			default:
