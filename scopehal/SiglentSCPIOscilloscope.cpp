@@ -210,6 +210,21 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
+
+	//Enable deduplication for vertical axis commands once we know what we're dealing with
+	switch(m_modelid)
+	{
+		case MODEL_SIGLENT_SDS1000:
+			m_transport->DeduplicateCommand("OFST");
+			m_transport->DeduplicateCommand("VOLT_DIV");
+			break;
+
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS5000X:
+			m_transport->DeduplicateCommand("OFFSET");
+			m_transport->DeduplicateCommand("SCALE");
+			break;
+	}
 }
 
 void SiglentSCPIOscilloscope::IdentifyHardware()

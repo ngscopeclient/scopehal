@@ -97,6 +97,27 @@ public:
 		m_nextCommandReady = std::chrono::system_clock::now();
 	}
 
+	/**
+		@brief Adds a command to the set of commands which may be deduplicated in the queue.
+
+		If SendCommandQueued() is called with a command in this list, and a second instance of the same command is
+		already present in the queue, then the redundant instance will be removed.
+
+		The command subject, if present, must match. For example, if "OFFS" is in the deduplication set, then
+
+		C2:OFFS 1.1
+		C2:OFFS 1.2
+
+		will be deduplicated, while
+
+		C1:OFFS 1.1
+		C2:OFFS 1.2
+
+		will not be.
+	 */
+	void DeduplicateCommand(const std::string& cmd)
+	{ m_dedupCommands.emplace(cmd); }
+
 public:
 	typedef SCPITransport* (*CreateProcType)(const std::string& args);
 	static void DoAddTransportClass(std::string name, CreateProcType proc);
@@ -115,6 +136,9 @@ protected:
 	std::mutex m_queueMutex;
 	std::recursive_mutex m_netMutex;
 	std::list<std::string> m_txQueue;
+
+	//Set of commands that are OK to deduplicate
+	std::set<std::string> m_dedupCommands;
 
 	//Rate limiting (send max of one command per X time)
 	bool m_rateLimitingEnabled;
