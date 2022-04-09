@@ -37,7 +37,8 @@ class EdgeTrigger;
 /**
 	@brief PicoOscilloscope - driver for talking to the scopehal-pico-bridge daemons
  */
-class PicoOscilloscope : public RemoteBridgeOscilloscope
+class PicoOscilloscope 	: public RemoteBridgeOscilloscope
+						, public FunctionGenerator
 {
 public:
 	PicoOscilloscope(SCPITransport* transport);
@@ -94,6 +95,38 @@ public:
 	virtual std::vector<std::string> GetADCModeNames(size_t channel);
 	virtual size_t GetADCMode(size_t channel);
 	virtual void SetADCMode(size_t channel, size_t mode);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Function generator
+
+	//Channel info
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
@@ -175,6 +208,14 @@ protected:
 	std::map<int, bool> m_digitalBankPresent;
 	std::map<int, float> m_digitalThresholds;
 	std::map<int, float> m_digitalHysteresis;
+
+	//Function generator state
+	bool m_awgEnabled;
+	float m_awgDutyCycle;
+	float m_awgRange;
+	float m_awgOffset;
+	float m_awgFrequency;
+	FunctionGenerator::WaveShape m_awgShape;
 
 	Series m_series;
 

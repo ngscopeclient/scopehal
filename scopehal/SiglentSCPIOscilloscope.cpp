@@ -224,6 +224,9 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			m_transport->DeduplicateCommand("OFFSET");
 			m_transport->DeduplicateCommand("SCALE");
 			break;
+
+		default:
+			break;
 	}
 }
 

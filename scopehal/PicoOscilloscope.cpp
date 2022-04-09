@@ -114,6 +114,14 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetSampleRate(625000000L);
 	SetSampleDepth(1000000);
 
+	//Set initial AWG configuration
+	SetFunctionChannelAmplitude(0, 0.1);
+	SetFunctionChannelDutyCycle(0, 0.5);
+	SetFunctionChannelFrequency(0, 1e6);
+	SetFunctionChannelOffset(0, 0);
+	SetFunctionChannelShape(0, SHAPE_SINE);
+	SetFunctionChannelActive(0, false);
+
 	//Add the external trigger input
 	m_extTrigChannel =
 		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", m_channels.size(), true);
@@ -219,7 +227,18 @@ PicoOscilloscope::~PicoOscilloscope()
 
 unsigned int PicoOscilloscope::GetInstrumentTypes()
 {
-	return Instrument::INST_OSCILLOSCOPE;
+	switch(m_series)
+	{
+		//has function generator
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+			return Instrument::INST_OSCILLOSCOPE | Instrument::INST_FUNCTION;
+
+		//no special features
+		default:
+			return Instrument::INST_OSCILLOSCOPE;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1216,4 +1235,174 @@ bool PicoOscilloscope::Is12BitModeAvailable()
 		else
 			return (GetEnabledAnalogChannelCountAToB() <= 1) && (GetEnabledAnalogChannelCountCToD() <= 1);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator
+
+int PicoOscilloscope::GetFunctionChannelCount()
+{
+	switch(m_series)
+	{
+		//has function generator
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+			return 1;
+
+		//no special features
+		default:
+			return 0;
+	}
+}
+
+string PicoOscilloscope::GetFunctionChannelName(int /*chan*/)
+{
+	return "AWG";
+}
+
+bool PicoOscilloscope::GetFunctionChannelActive(int /*chan*/)
+{
+	return m_awgEnabled;
+}
+
+void PicoOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
+{
+	m_awgEnabled = on;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(on)
+		m_transport->SendCommand("AWG:START");
+	else
+		m_transport->SendCommand("AWG:STOP");
+}
+
+float PicoOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
+{
+	return m_awgDutyCycle;
+}
+
+void PicoOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
+{
+	m_awgDutyCycle = duty;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AWG:DUTY ") + to_string(duty));
+}
+
+float PicoOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
+{
+	return m_awgRange;
+}
+
+void PicoOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+{
+	m_awgRange = amplitude;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AWG:RANGE ") + to_string(amplitude));
+}
+
+float PicoOscilloscope::GetFunctionChannelOffset(int /*chan*/)
+{
+	return m_awgOffset;
+}
+
+void PicoOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
+{
+	m_awgOffset = offset;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AWG:OFFS ") + to_string(offset));
+}
+
+float PicoOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
+{
+	return m_awgFrequency;
+}
+
+void PicoOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
+{
+	m_awgFrequency = hz;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AWG:FREQ ") + to_string(hz));
+}
+
+FunctionGenerator::WaveShape PicoOscilloscope::GetFunctionChannelShape(int /*chan*/)
+{
+	return m_awgShape;
+}
+
+void PicoOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+{
+	m_awgShape = shape;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(shape)
+	{
+		case SHAPE_SINE:
+			m_transport->SendCommand(string("AWG:SHAPE SINE"));
+			break;
+
+		case SHAPE_SQUARE:
+			m_transport->SendCommand(string("AWG:SHAPE SQUARE"));
+			break;
+
+		case SHAPE_TRIANGLE:
+			m_transport->SendCommand(string("AWG:SHAPE TRIANGLE"));
+			break;
+
+		case SHAPE_DC:
+			m_transport->SendCommand(string("AWG:SHAPE DC"));
+			break;
+
+		case SHAPE_NOISE:
+			m_transport->SendCommand(string("AWG:SHAPE WHITENOISE"));
+			break;
+
+		case SHAPE_SAWTOOTH_UP:
+			m_transport->SendCommand(string("AWG:SHAPE RAMP_UP"));
+			break;
+
+		case SHAPE_SAWTOOTH_DOWN:
+			m_transport->SendCommand(string("AWG:SHAPE RAMP_DOWN"));
+			break;
+
+		case SHAPE_SINC:
+			m_transport->SendCommand(string("AWG:SHAPE SINC"));
+			break;
+
+		case SHAPE_GAUSSIAN:
+			m_transport->SendCommand(string("AWG:SHAPE GAUSSIAN"));
+			break;
+
+		case SHAPE_HALF_SINE:
+			m_transport->SendCommand(string("AWG:SHAPE HALF_SINE"));
+			break;
+
+		default:
+			break;
+	}
+}
+
+float PicoOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void PicoOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
+{
+	//not supported
+}
+
+float PicoOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void PicoOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
+{
 }
