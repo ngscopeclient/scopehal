@@ -52,8 +52,7 @@ public:
 		SHAPE_SINC,
 		SHAPE_GAUSSIAN,
 		SHAPE_HALF_SINE,
-
-		//SHAPE_PRBS,	//TODO: will be renamed to whatever Pico supports
+		SHAPE_PRBS_NONSTANDARD,
 
 		SHAPE_ARB
 	};
@@ -86,6 +85,18 @@ public:
 
 	virtual float GetFunctionChannelFallTime(int chan) =0;
 	virtual void SetFunctionChannelFallTime(int chan, float sec) =0;
+
+	enum OutputImpedance
+	{
+		IMPEDANCE_HIGH_Z,
+		IMPEDANCE_50_OHM
+	};
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) =0;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) =0;
+
+	//Query the set of available pre-defined waveforms for this generator
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) =0;
 };
 
 #endif

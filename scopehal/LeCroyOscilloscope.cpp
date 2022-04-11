@@ -2023,6 +2023,13 @@ string LeCroyOscilloscope::GetFunctionChannelName(int /*chan*/)
 	return "FUNC";
 }
 
+vector<FunctionGenerator::WaveShape> LeCroyOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> ret;
+	ret.push_back(FunctionGenerator::SHAPE_SINE);
+	return ret;
+}
+
 bool LeCroyOscilloscope::GetFunctionChannelActive(int /*chan*/)
 {
 	LogWarning("LeCroyOscilloscope::GetFunctionChannelActive unimplemented\n");
@@ -2130,6 +2137,17 @@ void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
 	m_transport->SendCommand(tmp);
+}
+
+FunctionGenerator::OutputImpedance LeCroyOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)
+{
+	LogWarning("LeCroyOscilloscope::GetFunctionChannelOutputImpedance unimplemented\n");
+	return IMPEDANCE_HIGH_Z;
+}
+
+void LeCroyOscilloscope::SetFunctionChannelOutputImpedance(int /*chan*/, OutputImpedance /*z*/)
+{
+	LogWarning("LeCroyOscilloscope::SetFunctionChannelOutputImpedance unimplemented\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

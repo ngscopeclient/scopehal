@@ -103,6 +103,8 @@ public:
 	virtual int GetFunctionChannelCount();
 	virtual std::string GetFunctionChannelName(int chan);
 
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+
 	//Configuration
 	virtual bool GetFunctionChannelActive(int chan);
 	virtual void SetFunctionChannelActive(int chan, bool on);
@@ -127,6 +129,9 @@ public:
 
 	virtual float GetFunctionChannelFallTime(int chan);
 	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
@@ -216,6 +221,7 @@ protected:
 	float m_awgOffset;
 	float m_awgFrequency;
 	FunctionGenerator::WaveShape m_awgShape;
+	FunctionGenerator::OutputImpedance m_awgImpedance;
 
 	Series m_series;
 

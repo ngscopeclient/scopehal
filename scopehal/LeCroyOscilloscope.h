@@ -137,6 +137,7 @@ public:
 	//Function generator
 	virtual int GetFunctionChannelCount();
 	virtual std::string GetFunctionChannelName(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 	virtual bool GetFunctionChannelActive(int chan);
 	virtual void SetFunctionChannelActive(int chan, bool on);
 	virtual float GetFunctionChannelDutyCycle(int chan);
@@ -153,6 +154,8 @@ public:
 	virtual void SetFunctionChannelRiseTime(int chan, float sec);
 	virtual float GetFunctionChannelFallTime(int chan);
 	virtual void SetFunctionChannelFallTime(int chan, float sec);
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
