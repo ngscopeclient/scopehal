@@ -72,7 +72,7 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 		chan->SetDisplayName(nicename);
 
 		//Set initial configuration so we have a well-defined instrument state
-		m_channelAttenuations[i] = 1;
+		m_channelAttenuations[i] = 10;
 		SetChannelCoupling(i, OscilloscopeChannel::COUPLE_AC_1M);
 		SetChannelOffset(i, 0,  0);
 		SetChannelVoltageRange(i, 0, 5);
@@ -314,6 +314,7 @@ bool DSLabsOscilloscope::AcquireData()
 			float offset = config[1];
 			float trigphase = -config[2] * fs_per_sample;
 			scale *= GetChannelAttenuation(chnum);
+			offset *= GetChannelAttenuation(chnum);
 
 			//TODO: stream timestamp from the server
 
