@@ -1409,6 +1409,9 @@ void PicoOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
 
 		case SHAPE_PRBS_NONSTANDARD:
 			m_transport->SendCommand(string("AWG:SHAPE PRBS"));
+			//per Martyn at Pico:
+			//lfsr42 <= lfsr42(lfsr42'HIGH - 1 downto 0) & (lfsr42(41) xnor lfsr42(40)
+			//xnor lfsr42(19) xnor lfsr42(18));
 			break;
 
 		default:
