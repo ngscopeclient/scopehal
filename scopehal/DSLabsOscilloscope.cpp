@@ -316,6 +316,10 @@ bool DSLabsOscilloscope::AcquireData()
 			scale *= GetChannelAttenuation(chnum);
 			offset *= GetChannelAttenuation(chnum);
 
+			bool clipping;
+			if(!m_transport->ReadRawData(sizeof(clipping), (uint8_t*)&clipping))
+				return false;
+
 			//TODO: stream timestamp from the server
 
 			if(!m_transport->ReadRawData(memdepth * sizeof(int8_t), (uint8_t*)buf))
@@ -328,6 +332,9 @@ bool DSLabsOscilloscope::AcquireData()
 			cap->m_startTimestamp = time(NULL);
 			cap->m_densePacked = true;
 			cap->m_startFemtoseconds = fs;
+			if (clipping)
+				cap->m_flags |= WaveformBase::WAVEFORM_CLIPPING;
+			
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
 			scales.push_back(scale);
