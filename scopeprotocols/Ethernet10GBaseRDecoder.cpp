@@ -134,7 +134,75 @@ void Ethernet10GBaseRDecoder::Refresh()
 				//for now, assume it's an idle
 				continue;
 
-			//TODO: handle 0x66 / 0x55 which have ordered sets
+			//TODO: handle 0x66 ordered set
+
+			//Three data bytes, ordered set code, ordered set code, three data bytes
+			case 0x55:
+				{
+					//Byte 4 defines ordered set code.
+					//Must be 0x00
+					if(vbytes[4] != 0x00)
+					{
+						cap->m_offsets.push_back(offsets[4]);
+						cap->m_durations.push_back(durations[4]);
+						cap->m_samples.push_back(EthernetFrameSegment(EthernetFrameSegment::TYPE_INVALID, 0));
+						continue;
+					}
+
+					//It's two ordered sets. All supported ordered sets start with 0x00 00, verify that.
+					if( (vbytes[1] != 0x00) || (vbytes[2] != 0x00) || (vbytes[5] != 0x00) || (vbytes[6] != 0x00) )
+					{
+						cap->m_offsets.push_back(offsets[4]);
+						cap->m_durations.push_back(durations[4]);
+						cap->m_samples.push_back(EthernetFrameSegment(EthernetFrameSegment::TYPE_INVALID, 0));
+						continue;
+					}
+
+					//Different ordered set code in each half? Not currently implemented
+					if(vbytes[3] != vbytes[7])
+					{
+						continue;
+					}
+
+					//Same ordered set code in both half? Decode it
+					EthernetFrameSegment::SegmentType vtype;
+					switch(vbytes[3])
+					{
+						case 0x01:
+							vtype = EthernetFrameSegment::TYPE_LOCAL_FAULT;
+							break;
+
+						case 0x02:
+							vtype = EthernetFrameSegment::TYPE_REMOTE_FAULT;
+							break;
+
+						case 0x03:
+							vtype = EthernetFrameSegment::TYPE_LINK_INTERRUPTION;
+							break;
+
+						default:
+							vtype = EthernetFrameSegment::TYPE_INVALID;
+							break;
+
+					}
+
+					//If we have two consecutive identical samples, extend them
+					if(!cap->m_samples.empty())
+					{
+						auto n = cap->m_samples.size()-1;
+						if(cap->m_samples[n].m_type == vtype)
+						{
+							cap->m_durations[n] = offsets[7] + durations[7] - cap->m_offsets[n];
+							continue;
+						}
+					}
+
+					//Add sample
+					cap->m_offsets.push_back(offsets[0]);
+					cap->m_durations.push_back(offsets[7] + durations[7] - offsets[0]);
+					cap->m_samples.push_back(EthernetFrameSegment(vtype, 0));
+				}
+				break;
 
 			//Four control fields, four padding bits, start of frame, 3 data bytes
 			//In other words, frame starts in the second half of the block

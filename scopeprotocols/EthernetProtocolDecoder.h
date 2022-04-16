@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -56,7 +56,10 @@ public:
 		TYPE_FCS_GOOD,
 		TYPE_FCS_BAD,
 		TYPE_INBAND_STATUS,	//RGMII or similar
-		TYPE_NO_CARRIER
+		TYPE_NO_CARRIER,
+		TYPE_REMOTE_FAULT,
+		TYPE_LOCAL_FAULT,
+		TYPE_LINK_INTERRUPTION
 	} m_type;
 
 	std::vector<uint8_t> m_data;
