@@ -274,6 +274,16 @@ bool DSLabsOscilloscope::AcquireData()
 	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
 		return false;
 
+	//Get the de-facto trigger position.
+	uint64_t trigger_fs;
+	if(!m_transport->ReadRawData(sizeof(trigger_fs), (uint8_t*)&trigger_fs))
+		return false;
+
+	{
+		lock_guard<recursive_mutex> lock(m_mutex);
+		m_triggerOffset = trigger_fs;
+	}
+
 	// LogDebug("Receive header: SEQ#%u, %d channels\n", seqnum, numChannels);
 
 	//Acquire data for each channel
