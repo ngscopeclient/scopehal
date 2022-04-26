@@ -64,6 +64,11 @@ public:
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
 
+	// Captures
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void ForceTrigger();
+
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
@@ -103,6 +108,7 @@ public:
 
 protected:
 	void IdentifyHardware();
+	void ResetPerCaptureDiagnostics();
 
 	std::string GetChannelColor(size_t i);
 

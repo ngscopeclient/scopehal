@@ -849,6 +849,9 @@ protected:
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
 public:
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Waveform Access
+
 	bool HasPendingWaveforms();
 	void ClearPendingWaveforms();
 	size_t GetPendingWaveformCount();
@@ -859,6 +862,42 @@ protected:
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
 	std::recursive_mutex m_mutex;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Diagnostics Access
+protected:
+	std::deque<std::string> m_diagnosticLogMessages;
+	std::map<std::string, FilterParameter> m_diagnosticValues;
+
+	void AddDiagnosticLog(std::string message)
+	{
+		m_diagnosticLogMessages.push_back(message);
+	}
+
+public:
+	bool HasPendingDiagnosticLogMessages()
+	{
+		return !m_diagnosticLogMessages.empty();
+	}
+
+	std::string PopPendingDiagnosticLogMessage()
+	{
+		std::string message = m_diagnosticLogMessages.front();
+		m_diagnosticLogMessages.pop_front();
+		return message;
+	}
+
+	typedef std::map<std::string, FilterParameter>::const_iterator DiagnosticValueIterator;
+
+	DiagnosticValueIterator GetDiagnosticValuesBegin()
+	{
+		return m_diagnosticValues.cbegin();
+	}
+
+	DiagnosticValueIterator GetDiagnosticValuesEnd()
+	{
+		return m_diagnosticValues.cend();
+	}
 
 protected:
 
