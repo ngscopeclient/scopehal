@@ -65,6 +65,14 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 	, m_maxBandwidth(1000)
 	, m_hasDVM(false)
+	, m_hasAFG(false)
+	, m_afgEnabled(false)
+	, m_afgAmplitude(0.5)
+	, m_afgOffset(0)
+	, m_afgFrequency(100000)
+	, m_afgDutyCycle(0.5)
+	, m_afgShape(FunctionGenerator::SHAPE_SINE)
+	, m_afgImpedance(FunctionGenerator::IMPEDANCE_HIGH_Z)
 {
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
@@ -241,175 +249,34 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			break;
 	}
 
-	//See what options we have
-	vector<string> options;
-	string reply = m_transport->SendCommandQueuedWithReply("*OPT?", false) + ',';
-	switch(m_family)
-	{
-		case FAMILY_MSO5:
-		case FAMILY_MSO6:
-			{
-				/*
-					Seems like we have blocks divided by commas
-					Each block contains three semicolon delimited fields: code, text description, license type
-					Option code has is further divided into code:type, e.g. BW6-1000:License
-					For extra fun, there can be commas inside the internal fields!
-
-					So ultimately what we expect is:
-						Option code
-						Colon
-						Option type
-						Semicolon
-						Description
-						Semicolon
-						License type
-						Comma
-				*/
-
-				size_t pos = 0;
-				while(pos < reply.length())
-				{
-
-					//Read option code (the only part we care about)
-					string optcode;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ':')
-							break;
-						optcode += reply[pos];
-					}
-					options.push_back(optcode);
-
-					//Skip the colon
-					pos++;
-
-					//Read and discard option type
-					string opttype;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ';')
-							break;
-						opttype += reply[pos];
-					}
-
-					//Skip the semicolon
-					pos++;
-
-					//Read and discard option description (commas are legal here... thanks Tek)
-					string optdesc;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ';')
-							break;
-						optdesc += reply[pos];
-					}
-
-					//Skip the semicolon
-					pos ++;
-
-					//Read and discard license type
-					string lictype;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ',')
-							break;
-						lictype += reply[pos];
-					}
-
-					//Skip the comma
-					pos ++;
-				}
-			}
-			break;
-
-		default:
-			{
-
-
-				for (std::string::size_type prev_pos=0, pos=0;
-					 (pos = reply.find(',', pos)) != std::string::npos;
-					 prev_pos=++pos)
-				{
-					std::string opt( reply.substr(prev_pos, pos-prev_pos) );
-					if (opt == "0")
-						continue;
-					if (opt.substr(opt.length()-3, 3) == "(d)")
-						opt.erase(opt.length()-3);
-
-					options.push_back(opt);
-				}
-			}
-			break;
+	string reply = m_transport->SendCommandQueuedWithReply("LICENSE:APPID?", false);
+	reply = reply.substr(1, reply.size() - 2); // Chop off quotes
+	vector<string> apps;
+	stringstream s_stream(reply);
+	while(s_stream.good()) {
+		string substr;
+		getline(s_stream, substr, ',');
+		apps.push_back(substr);
 	}
 
-	//Print out the option list and do processing for each
-	LogDebug("Installed options:\n");
-	if(options.empty())
-		LogDebug("* None\n");
-	for(auto opt : options)
+	for (auto app : apps)
 	{
-		if(opt == "BW6-1000")
+		if (app == "DVM")
 		{
-			LogDebug("* BW6-1000 (1 GHz bandwidth)\n");
-			//Don't touch m_maxBandwidth, we already got it from CONFIG:ANALO:BANDWIDTH
-		}
-		else if(opt == "SUP6-DVM")
-		{
-			LogDebug("* SUP6-DVM (Digital voltmeter)\n");
 			m_hasDVM = true;
+			LogDebug(" * Tek has DVM\n");
 		}
-		else if(opt == "SUP6-DEMO")
+		else if (app == "AFG")
 		{
-			LogDebug("* SUP6-DEMO (Arbitrary function generator)\n");
+			m_hasAFG = true;
+			LogDebug(" * Tek has AFG\n");
 		}
-		else if(opt == "LIC6-SREMBD")
-		{
-			LogDebug("* LIC6-SREMBD (I2C/SPI trigger/decode)\n");
-		}
-		else if(opt == "LIC6-DDU")
-		{
-			/*
-				This is a bundle code that unlocks lots of stuff:
-					* 8 GHZ bandwidth
-					* Function generator
-					* Multimeter
-					* I3C (decode only, no trigger)
-					* 100baseT1 (decode only, no trigger)
-					* SpaceWire (decode only, no trigger)
-
-				Trigger/decode types:
-					* Parallel bus
-					* I2C
-					* SPI
-					* RS232
-					* CAN
-					* LIN
-					* FlexRay
-					* SENT
-					* USB
-					* 10/100 Ethernet
-					* SPMI
-					* MIL-STD-1553
-					* ARINC 429
-					* I2S/LJ/RJ/TDM audio
-
-				This is in addition to the probably-standard trigger types:
-					* Edge
-					* Pulse width
-					* Timeout
-					* Runt
-					* Window
-					* Logic pattern
-					* Setup/hold
-					* Slew rate
-					* Sequence
-			 */
-			 LogDebug("* LIC6-DDU (6 series distribution demo)\n");
-			 m_hasDVM = true;
-		}
-
 		else
-			LogDebug("* %s (unknown)\n", opt.c_str());
+		{
+			LogDebug("(* Tek also has '%s' (ignored))\n", app.c_str());
+		}
+
+		// Bandwidth expanding options reflected in earlier query for max B/W
 	}
 
 	//Figure out what probes we have connected
@@ -433,6 +300,8 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 	unsigned int mask = Instrument::INST_OSCILLOSCOPE;
 	if(m_hasDVM)
 		mask |= Instrument::INST_DMM;
+	if(m_hasAFG)
+		mask |= Instrument::INST_FUNCTION;
 	return mask;
 }
 
@@ -3570,3 +3439,234 @@ int TektronixOscilloscope::GetMeterDigits()
 {
 	return 4;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator
+
+int TektronixOscilloscope::GetFunctionChannelCount()
+{
+	return m_hasAFG ? 1 : 0;
+}
+
+string TektronixOscilloscope::GetFunctionChannelName(int /*chan*/)
+{
+	return "AWG";
+}
+
+vector<FunctionGenerator::WaveShape> TektronixOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> ret;
+	ret.push_back(FunctionGenerator::SHAPE_SINE);
+	ret.push_back(FunctionGenerator::SHAPE_SQUARE);
+	ret.push_back(FunctionGenerator::SHAPE_PULSE); // TODO: Support set width (default: 1us)
+	ret.push_back(FunctionGenerator::SHAPE_TRIANGLE); // TODO: Support set symmetry (default: 50%)
+	ret.push_back(FunctionGenerator::SHAPE_DC);
+	ret.push_back(FunctionGenerator::SHAPE_NOISE);
+	ret.push_back(FunctionGenerator::SHAPE_SINC);
+	ret.push_back(FunctionGenerator::SHAPE_GAUSSIAN);
+	ret.push_back(FunctionGenerator::SHAPE_LORENTZ);
+	ret.push_back(FunctionGenerator::SHAPE_EXPONENTIAL_RISE);
+	ret.push_back(FunctionGenerator::SHAPE_EXPONENTIAL_DECAY);
+	ret.push_back(FunctionGenerator::SHAPE_HAVERSINE);
+	ret.push_back(FunctionGenerator::SHAPE_CARDIAC);
+	return ret;
+}
+
+bool TektronixOscilloscope::GetFunctionChannelActive(int /*chan*/)
+{
+	return m_afgEnabled;
+}
+
+void TektronixOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
+{
+	m_afgEnabled = on;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(on)
+	{
+		m_transport->SendCommand("AFG:OUTPUT:STATE 1");
+		m_transport->SendCommand("AFG:OUTPUT:MODE CONTINUOUS");
+	}
+	else
+	{
+		m_transport->SendCommand("AFG:OUTPUT:STATE 0");
+	}
+}
+
+float TektronixOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
+{
+	return m_afgShape == SHAPE_SQUARE ? m_afgDutyCycle : 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
+{
+	m_afgDutyCycle = duty;
+
+	if (m_afgShape != SHAPE_SQUARE)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:SQUARE:DUTY ") + to_string(duty * 100));
+}
+
+float TektronixOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
+{
+	return m_afgAmplitude;
+}
+
+void TektronixOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+{
+	m_afgAmplitude = amplitude;
+
+	//Rescale if load is not high-Z
+	if(m_afgImpedance == IMPEDANCE_50_OHM)
+		amplitude *= 2;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:AMPLITUDE ") + to_string(amplitude));
+}
+
+float TektronixOscilloscope::GetFunctionChannelOffset(int /*chan*/)
+{
+	return m_afgOffset;
+}
+
+void TektronixOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
+{
+	m_afgOffset = offset;
+
+	//Rescale if load is not high-Z
+	if(m_afgImpedance == IMPEDANCE_50_OHM)
+		offset *= 2;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:OFFSET ") + to_string(offset));
+}
+
+float TektronixOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
+{
+	return m_afgFrequency;
+}
+
+void TektronixOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
+{
+	m_afgFrequency = hz;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:FREQUENCY ") + to_string(hz));
+}
+
+FunctionGenerator::WaveShape TektronixOscilloscope::GetFunctionChannelShape(int /*chan*/)
+{
+	return m_afgShape;
+}
+
+void TektronixOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+{
+	m_afgShape = shape;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(shape)
+	{
+		case SHAPE_SINE:
+			m_transport->SendCommand(string("AFG:FUNCTION SINE"));
+			break;
+
+		case SHAPE_SQUARE:
+			m_transport->SendCommand(string("AFG:FUNCTION SQUARE"));
+			break;
+
+		case SHAPE_PULSE:
+			m_transport->SendCommand(string("AFG:FUNCTION PULSE"));
+			break;
+
+		case SHAPE_TRIANGLE:
+			m_transport->SendCommand(string("AFG:FUNCTION RAMP"));
+			break;
+
+		case SHAPE_DC:
+			m_transport->SendCommand(string("AFG:FUNCTION DC"));
+			break;
+
+		case SHAPE_NOISE:
+			m_transport->SendCommand(string("AFG:FUNCTION NOISE"));
+			break;
+
+		case SHAPE_SINC:
+			m_transport->SendCommand(string("AFG:FUNCTION SINC")); // Called Sin(x)/x in scope UI
+			break;
+
+		case SHAPE_GAUSSIAN:
+			m_transport->SendCommand(string("AFG:FUNCTION GAUSSIAN"));
+			break;
+
+		case SHAPE_LORENTZ:
+			m_transport->SendCommand(string("AFG:FUNCTION LORENTZ"));
+			break;
+
+		case SHAPE_EXPONENTIAL_RISE:
+			m_transport->SendCommand(string("AFG:FUNCTION ERISE"));
+			break;
+
+		case SHAPE_EXPONENTIAL_DECAY:
+			m_transport->SendCommand(string("AFG:FUNCTION EDECAY"));
+			break;
+
+		case SHAPE_HAVERSINE:
+			m_transport->SendCommand(string("AFG:FUNCTION HAVERSINE"));
+			break;
+
+		case SHAPE_CARDIAC:
+			m_transport->SendCommand(string("AFG:FUNCTION CARDIAC"));
+			break;
+
+		// TODO: ARB
+
+		default:
+			break;
+	}
+}
+
+float TektronixOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
+{
+	//not supported
+}
+
+float TektronixOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
+{
+}
+
+FunctionGenerator::OutputImpedance TektronixOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)
+{
+	return m_afgImpedance;
+}
+
+void TektronixOscilloscope::SetFunctionChannelOutputImpedance(int chan, OutputImpedance z)
+{
+	//Save old offset/amplitude
+	float off = GetFunctionChannelOffset(chan);
+	float amp = GetFunctionChannelAmplitude(chan);
+
+	m_afgImpedance = z;
+	if (z == IMPEDANCE_50_OHM)
+		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE FIFTY"));
+	else
+		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE HIGHZ"));
+
+	//Restore with new impedance
+	SetFunctionChannelAmplitude(chan, amp);
+	SetFunctionChannelOffset(chan, off);
+}
+
