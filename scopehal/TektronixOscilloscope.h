@@ -59,6 +59,7 @@ class WindowTrigger;
  */
 class TektronixOscilloscope
 	: public SCPIOscilloscope
+	, public FunctionGenerator
 	, public Multimeter
 {
 public:
@@ -158,6 +159,43 @@ public:
 	virtual void StopMeter();
 	virtual double GetMeterValue();
 	virtual int GetMeterDigits();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Function generator
+
+	//Channel info
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration
@@ -296,6 +334,16 @@ protected:
 	std::set<size_t> m_channelEnableStatusDirty;
 	bool IsEnableStateDirty(size_t chan);
 	void FlushChannelEnableStates();
+
+	//Function generator state
+	bool m_hasAFG;
+	bool m_afgEnabled;
+	float m_afgAmplitude;
+	float m_afgOffset;
+	float m_afgFrequency;
+	float m_afgDutyCycle;
+	FunctionGenerator::WaveShape m_afgShape;
+	FunctionGenerator::OutputImpedance m_afgImpedance;
 
 public:
 	static std::string GetDriverNameInternal();
