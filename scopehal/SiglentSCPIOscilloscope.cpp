@@ -3750,7 +3750,11 @@ vector<FunctionGenerator::WaveShape> SiglentSCPIOscilloscope::GetAvailableWavefo
 	ret.push_back(SHAPE_STAIRCASE_DOWN);
 	ret.push_back(SHAPE_STAIRCASE_UP_DOWN);
 	ret.push_back(SHAPE_PULSE);
-	ret.push_back(SHAPE_NEGATIVE_PULSE);
+
+	//Docs say this is supported, but doesn't seem to work on SDS2104X+
+	//Might be SDG only?
+	//ret.push_back(SHAPE_NEGATIVE_PULSE);
+
 	//what's "trapezia"?
 	ret.push_back(SHAPE_SAWTOOTH_UP);
 	ret.push_back(SHAPE_SAWTOOTH_DOWN);
@@ -4126,10 +4130,6 @@ FunctionGenerator::WaveShape SiglentSCPIOscilloscope::GetFunctionChannelShape(in
 				m_awgShape[chan] = FunctionGenerator::SHAPE_ATAN;
 			else if(name == "Acot")
 				m_awgShape[chan] = FunctionGenerator::SHAPE_ACOT;
-			else if(name == "Ppulse")
-				m_awgShape[chan] = FunctionGenerator::SHAPE_PULSE;
-			else if(name == "Npulse")
-				m_awgShape[chan] = FunctionGenerator::SHAPE_NEGATIVE_PULSE;
 			//TODO: Trapezia
 			else if(name == "Upramp")
 				m_awgShape[chan] = FunctionGenerator::SHAPE_SAWTOOTH_UP;
@@ -4193,11 +4193,6 @@ void SiglentSCPIOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerato
 		case SHAPE_STAIRCASE_UP_DOWN:
 			basicType = "ARB";
 			arbType = "StairUD";
-			break;
-
-		case SHAPE_NEGATIVE_PULSE:
-			basicType = "ARB";
-			arbType = "NPulse";
 			break;
 
 		case SHAPE_SAWTOOTH_UP:
