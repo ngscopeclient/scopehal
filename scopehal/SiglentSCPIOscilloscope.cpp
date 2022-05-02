@@ -279,6 +279,10 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 350;
 			if(m_model.compare(4, 1, "5") == 0)
 				m_maxBandwidth = 500;
+
+			//TODO: check for whether we actually have the license
+			//(no SCPI command for this yet)
+			m_hasFunctionGen = true;
 		}
 		else if(m_model.compare(0, 4, "SDS5") == 0)
 		{
@@ -426,6 +430,13 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_meterModeValid = false;
+	m_awgEnabled.clear();
+	m_awgDutyCycle.clear();
+	m_awgRange.clear();
+	m_awgOffset.clear();
+	m_awgFrequency.clear();
+	m_awgShape.clear();
+	m_awgImpedance.clear();
 }
 
 /**
@@ -478,8 +489,6 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
 	}
-
-	lock_guard<recursive_mutex> lock(m_mutex);
 
 	//Analog
 	if(i < m_analogChannelCount)
@@ -682,7 +691,6 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 	string replyType;
 	string replyImp;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	m_probeIsActive[i] = false;
 
 	switch(m_modelid)
@@ -741,7 +749,6 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 	if(m_probeIsActive[i])
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -820,7 +827,6 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return 1;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	string reply;
 
 	switch(m_modelid)
@@ -862,7 +868,6 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 			return;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -935,7 +940,6 @@ int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 	if(i > m_analogChannelCount)
 		return 0;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	string reply;
 
 	switch(m_modelid)
@@ -972,7 +976,6 @@ int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -1055,7 +1058,6 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 	if(i >= m_analogChannelCount)
 		return false;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	string reply;
 
 	switch(m_modelid)
@@ -1137,8 +1139,6 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 			return m_channelDisplayNames[chan];
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
 	string name = "";
@@ -1197,7 +1197,6 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 {
 	//Read the Internal State Change Register
 	string sinr = "";
-	lock_guard<recursive_mutex> lock(m_mutex);
 
 	if(m_triggerForced)
 	{
@@ -1296,8 +1295,6 @@ void SiglentSCPIOscilloscope::BulkCheckChannelEnableState()
 				uncached.push_back(i);
 		}
 	}
-
-	lock_guard<recursive_mutex> lock2(m_mutex);
 
 	for(auto i : uncached)
 	{
@@ -1695,7 +1692,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 
 	//Acquire the data (but don't parse it)
 
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 	start = GetTime();
 	//Get the wavedescs for all channels
 	unsigned int firstEnabledChannel = UINT_MAX;
@@ -1868,7 +1865,6 @@ bool SiglentSCPIOscilloscope::AcquireData()
 			//Re-arm the trigger if not in one-shot mode
 			if(!m_triggerOneShot)
 			{
-				//		lock_guard<recursive_mutex> lock(m_mutex);
 				sendOnly(":TRIGGER:MODE SINGLE");
 				m_triggerArmed = true;
 			}
@@ -2071,8 +2067,6 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 			return m_channelOffsets[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
-
 	string reply;
 
 	switch(m_modelid)
@@ -2143,7 +2137,6 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 			return m_channelVoltageRanges[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
 	string reply;
 
 	switch(m_modelid)
@@ -2314,7 +2307,6 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 	double f;
 	if(!m_sampleRateValid)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
 		string reply;
 		switch(m_modelid)
 		{
@@ -2351,7 +2343,6 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 		// not the *actual* memory depth....we don't know that until we've collected samples
 
 		// What you see below is the only observed method that seems to reliably get the *actual* memory depth.
-		lock_guard<recursive_mutex> lock(m_mutex);
 		string reply;
 		switch(m_modelid)
 		{
@@ -2380,7 +2371,7 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 {
 	//Need to lock the mutex when setting depth because of the quirks around needing to change trigger mode too
-	lock_guard<recursive_mutex> lock(m_mutex);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	//save original sample rate (scope often changes sample rate when adjusting memory depth)
 	uint64_t rate = GetSampleRate();
@@ -2585,8 +2576,6 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 	}
 	string reply;
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-
 		switch(m_modelid)
 		{
 			// --------------------------------------------------
@@ -2667,7 +2656,6 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 	}
 
 	//Read the deskew
-	lock_guard<recursive_mutex> lock(m_mutex);
 	string reply;
 
 	switch(m_modelid)
@@ -2833,8 +2821,6 @@ float SiglentSCPIOscilloscope::GetDigitalHysteresis(size_t /*channel*/)
 
 float SiglentSCPIOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	channel -= m_analogChannelCount + 1;
 
 	string r = converse(":DIGITAL:THRESHOLD%d?", (channel / 8) + 1).c_str();
@@ -2863,7 +2849,6 @@ void SiglentSCPIOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*l
 
 void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	channel -= m_analogChannelCount + 1;
 
 	// Search through standard thresholds to see if one matches
@@ -2889,7 +2874,6 @@ void SiglentSCPIOscilloscope::SetDigitalThreshold(size_t channel, float level)
 
 void SiglentSCPIOscilloscope::PullTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	std::string reply;
 
 	switch(m_modelid)
@@ -3341,7 +3325,6 @@ Trigger::Condition SiglentSCPIOscilloscope::GetCondition(string reply)
 
 void SiglentSCPIOscilloscope::PushTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
@@ -3732,4 +3715,733 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 	}
 	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator mode
+
+//Per docs, this is almost the same API as the SDG series generators.
+//But the SAG102I and integrated generator have only a single output.
+//This code can likely be ported to work with SDG* fairly easily, though.
+
+int SiglentSCPIOscilloscope::GetFunctionChannelCount()
+{
+	return 1;
+}
+
+string SiglentSCPIOscilloscope::GetFunctionChannelName(int chan)
+{
+	return string("C") + to_string(chan+1);
+}
+
+vector<FunctionGenerator::WaveShape> SiglentSCPIOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> ret;
+	ret.push_back(SHAPE_SINE);
+	ret.push_back(SHAPE_SQUARE);
+	ret.push_back(SHAPE_NOISE);
+
+	//Docs say this is supported, but doesn't seem to work on SDS2104X+
+	//Might be SDG only?
+	//ret.push_back(SHAPE_PRBS_NONSTANDARD);
+
+	ret.push_back(SHAPE_DC);
+	ret.push_back(SHAPE_STAIRCASE_UP);
+	ret.push_back(SHAPE_STAIRCASE_DOWN);
+	ret.push_back(SHAPE_STAIRCASE_UP_DOWN);
+	ret.push_back(SHAPE_PULSE);
+	ret.push_back(SHAPE_NEGATIVE_PULSE);
+	//what's "trapezia"?
+	ret.push_back(SHAPE_SAWTOOTH_UP);
+	ret.push_back(SHAPE_SAWTOOTH_DOWN);
+	ret.push_back(SHAPE_EXPONENTIAL_DECAY);
+	ret.push_back(SHAPE_EXPONENTIAL_RISE);
+	ret.push_back(SHAPE_LOG_DECAY);
+	ret.push_back(SHAPE_LOG_RISE);
+	ret.push_back(SHAPE_SQUARE_ROOT);
+	ret.push_back(SHAPE_CUBE_ROOT);
+	ret.push_back(SHAPE_QUADRATIC);
+	ret.push_back(SHAPE_CUBIC);
+	ret.push_back(SHAPE_SINC);
+	ret.push_back(SHAPE_GAUSSIAN);
+	ret.push_back(SHAPE_DLORENTZ);
+	ret.push_back(SHAPE_HAVERSINE);
+	ret.push_back(SHAPE_LORENTZ);
+	ret.push_back(SHAPE_GAUSSIAN_PULSE);
+	//What's Gmonopuls?
+	//What's Tripuls?
+	ret.push_back(SHAPE_CARDIAC);
+	//What's quake?
+	//What's chirp?
+	//What's twotone?
+	//What's snr?
+	ret.push_back(SHAPE_HAMMING);
+	ret.push_back(SHAPE_HANNING);
+	ret.push_back(SHAPE_KAISER);
+	ret.push_back(SHAPE_BLACKMAN);
+	ret.push_back(SHAPE_GAUSSIAN_WINDOW);
+	ret.push_back(SHAPE_TRIANGLE);
+	ret.push_back(SHAPE_HARRIS);
+	ret.push_back(SHAPE_BARTLETT);
+	ret.push_back(SHAPE_TAN);
+	ret.push_back(SHAPE_COT);
+	ret.push_back(SHAPE_SEC);
+	ret.push_back(SHAPE_CSC);
+	ret.push_back(SHAPE_ASIN);
+	ret.push_back(SHAPE_ACOS);
+	ret.push_back(SHAPE_ATAN);
+	ret.push_back(SHAPE_ACOT);
+
+	return ret;
+}
+
+bool SiglentSCPIOscilloscope::GetFunctionChannelActive(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgEnabled.find(chan) != m_awgEnabled.end())
+			return m_awgEnabled[chan];
+	}
+
+	auto reply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":OUTP?", false);
+
+	//Crack result
+	//Note that both enable/disable and impedance are in the same command, so we get the other for free
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		if(reply.find("OFF") != string::npos)
+			m_awgEnabled[chan] = false;
+		else
+			m_awgEnabled[chan] = true;
+
+		if(reply.find("50"))
+			m_awgImpedance[chan] = IMPEDANCE_50_OHM;
+		else
+			m_awgImpedance[chan] = IMPEDANCE_HIGH_Z;
+
+		return m_awgEnabled[chan];
+	}
+
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelActive(int chan, bool on)
+{
+	string state;
+	if(on)
+		state = "ON";
+	else
+		state = "OFF";
+
+	//Have to do this first, since it touches m_awgEnabled too
+	string imp;
+	if(GetFunctionChannelOutputImpedance(chan) == IMPEDANCE_50_OHM)
+		imp = "50";
+	else
+		imp = "HZ";
+
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":OUTP " + state + ",LOAD," + imp);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgEnabled[chan] = on;
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelDutyCycle(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgDutyCycle.find(chan) != m_awgDutyCycle.end())
+			return m_awgDutyCycle[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgDutyCycle[chan];
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
+{
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV DUTY," + to_string(round(duty * 100)));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgDutyCycle[chan] = duty;
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelAmplitude(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgRange.find(chan) != m_awgRange.end())
+			return m_awgRange[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgRange[chan];
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
+{
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV AMP," + to_string(amplitude));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgRange[chan] = amplitude;
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelOffset(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgOffset.find(chan) != m_awgOffset.end())
+			return m_awgOffset[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgOffset[chan];
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelOffset(int chan, float offset)
+{
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV OFST," + to_string(offset));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgOffset[chan] = offset;
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelFrequency(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgFrequency.find(chan) != m_awgFrequency.end())
+			return m_awgFrequency[chan];
+	}
+
+	//Get lots of config settings from the hardware, then return newly updated cache entry
+	GetFunctionChannelShape(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgFrequency[chan];
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
+{
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV FRQ," + to_string(hz));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgFrequency[chan] = hz;
+}
+
+/**
+	@brief Parses a name-value set expressed as pairs of comma separated values
+
+	Expected format: COMMAND? Name1, Value1, Name2, Value2
+
+	If forwardMap is true, returns name -> value. If false, returns value -> name.
+ */
+map<string, string> SiglentSCPIOscilloscope::ParseCommaSeparatedNameValueList(string str, bool forwardMap)
+{
+	str += ',';
+	size_t ispace = str.find(' ');
+	string tmpName;
+	string tmpVal;
+	bool firstHalf = true;
+	map<string, string> ret;
+	for(size_t i=ispace+1; i<str.length(); i++)
+	{
+		if(str[i] == ',')
+		{
+			//Done with name
+			if(firstHalf)
+				firstHalf = false;
+
+			//Done with value
+			else
+			{
+				firstHalf = true;
+
+				if(forwardMap)
+					ret[tmpName] = tmpVal;
+				else
+					ret[tmpVal] = tmpName;
+
+				tmpName = "";
+				tmpVal = "";
+			}
+		}
+
+		//ignore spaces, some commands have them and others don't - doesn't seem to matter
+		else if(isspace(str[i]))
+			continue;
+
+		else if(firstHalf)
+			tmpName += str[i];
+		else
+			tmpVal += str[i];
+	}
+	return ret;
+}
+
+FunctionGenerator::WaveShape SiglentSCPIOscilloscope::GetFunctionChannelShape(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgShape.find(chan) != m_awgShape.end())
+			return m_awgShape[chan];
+	}
+
+	//Query the basic wave parameters
+	auto reply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":BSWV?", false);
+	auto areply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":ARWV?", false);
+
+	//Crack the replies
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+
+		auto bswv = ParseCommaSeparatedNameValueList(reply);
+
+		//Some of the fields  are redundant, we don't care about all of them.
+
+		Unit volts(Unit::UNIT_VOLTS);
+		m_awgRange[chan] = volts.ParseString(bswv["AMP"]);
+		m_awgOffset[chan] = volts.ParseString(bswv["OFST"]);
+
+		Unit hz(Unit::UNIT_HZ);
+		m_awgFrequency[chan] = hz.ParseString(bswv["FRQ"]);
+
+		Unit percent(Unit::UNIT_PERCENT);
+		m_awgDutyCycle[chan] = percent.ParseString(bswv["DUTY"]);
+
+		//TODO: RISE/FALL seems only supported on SDGs, not scope integrated generator
+
+		//TODO: PHSE is phase (not relevant for single channel integrated func gens, but will matter when
+		//we support multichannel SDGs
+
+		auto shape = bswv["WVTP"];
+		if(shape == "SINE")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_SINE;
+		else if(shape == "SQUARE")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE;
+		else if(shape == "RAMP")
+		{
+			LogWarning("wave type RAMP unimplemented\n");
+		}
+		else if(shape == "PULSE")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_PULSE;
+		else if(shape == "NOISE")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_NOISE;
+		else if(shape == "DC")
+			m_awgShape[chan] = FunctionGenerator::SHAPE_DC;
+		else if(shape == "PRBS")
+		{
+			//TODO: LENGTH if type is PRBS?
+			//Might only be supported on SDGs
+			m_awgShape[chan] = FunctionGenerator::SHAPE_PRBS_NONSTANDARD;
+		}
+		else if(shape == "IQ")
+		{
+			//TODO
+			LogWarning("wave type IQ unimplemented\n");
+		}
+		else if(shape == "ARB")
+		{
+			string name = areply.substr(areply.find("NAME,") + 5);
+
+			if(name == "ExpFal")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_EXPONENTIAL_DECAY;
+			else if(name == "ExpRise")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_EXPONENTIAL_RISE;
+			else if(name == "LogFall")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LOG_DECAY;
+			else if(name == "LogRise")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LOG_RISE;
+			else if(name == "Sqrt")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE_ROOT;
+			else if(name == "Root3")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CUBE_ROOT;
+			else if(name == "X^2")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SQUARE;
+			else if(name == "X^3")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CUBIC;
+			else if(name == "Sinc")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SINC;
+			else if(name == "Gaussian")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN;
+			else if(name == "StairUp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_UP;
+			//DLorentz
+			else if(name == "Haversine")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HAVERSINE;
+			else if(name == "Lorentz")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_LORENTZ;
+			else if(name == "Gauspuls")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN_PULSE;
+			//TODO: Gmonopuls
+			//TODO: Tripuls
+			else if(name == "Cardiac")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CARDIAC;
+			//TODO: Quake
+			//TODO: Chirp
+			//TODO: Twotone
+			else if(name == "StairDn")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_DOWN;
+			//TODO: SNR
+			else if(name == "Hamming")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HAMMING;
+			else if(name == "Hanning")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_HANNING;
+			else if(name == "kaiser")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_KAISER;
+			else if(name == "Blackman")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BLACKMAN;
+			else if(name == "Gausswin")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_GAUSSIAN_WINDOW;
+			else if(name == "Triangle")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_TRIANGLE;
+			else if(name == "BlackmanH")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BLACKMAN;
+			else if(name == "Bartlett-Hann")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_BARTLETT;
+			else if(name == "Tan")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_TAN;
+			else if(name == "StairUD")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_STAIRCASE_UP_DOWN;
+			else if(name == "Cot")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_COT;
+			else if(name == "Sec")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SEC;
+			else if(name == "Csc")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_CSC;
+			else if(name == "Asin")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ASIN;
+			else if(name == "Acos")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ACOS;
+			else if(name == "Atan")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ATAN;
+			else if(name == "Acot")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_ACOT;
+			else if(name == "Ppulse")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_PULSE;
+			else if(name == "Npulse")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_NEGATIVE_PULSE;
+			//TODO: Trapezia
+			else if(name == "Upramp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SAWTOOTH_UP;
+			else if(name == "Dnramp")
+				m_awgShape[chan] = FunctionGenerator::SHAPE_SAWTOOTH_DOWN;
+			else
+				LogWarning("Arb shape %s unimplemented\n", name.c_str());
+		}
+		else
+			LogWarning("wave type %s unimplemented\n", shape.c_str());
+
+		return m_awgShape[chan];
+	}
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::WaveShape shape)
+{
+	string basicType;
+	string arbType;
+
+	switch(shape)
+	{
+		//Basic wave types
+		case SHAPE_SINE:
+			basicType = "SINE";
+			break;
+
+		case SHAPE_SQUARE:
+			basicType = "SQUARE";
+			break;
+
+		//TODO: "ramp"
+
+		case SHAPE_PULSE:
+			basicType = "PULSE";
+			break;
+
+		case SHAPE_NOISE:
+			basicType = "NOISE";
+			break;
+
+		case SHAPE_PRBS_NONSTANDARD:
+			basicType = "PRBS";
+			break;
+
+		case SHAPE_DC:
+			basicType = "DC";
+			break;
+
+		//Arb wave types
+		case SHAPE_STAIRCASE_UP:
+			basicType = "ARB";
+			arbType = "StairUp";
+			break;
+
+		case SHAPE_STAIRCASE_DOWN:
+			basicType = "ARB";
+			arbType = "StairDn";
+			break;
+
+		case SHAPE_STAIRCASE_UP_DOWN:
+			basicType = "ARB";
+			arbType = "StairUD";
+			break;
+
+		case SHAPE_NEGATIVE_PULSE:
+			basicType = "ARB";
+			arbType = "NPulse";
+			break;
+
+		case SHAPE_SAWTOOTH_UP:
+			basicType = "ARB";
+			arbType = "Upramp";
+			break;
+
+		case SHAPE_SAWTOOTH_DOWN:
+			basicType = "ARB";
+			arbType = "Dnramp";
+			break;
+
+		case SHAPE_EXPONENTIAL_DECAY:
+			basicType = "ARB";
+			arbType = "ExpFal";
+			break;
+
+		case SHAPE_EXPONENTIAL_RISE:
+			basicType = "ARB";
+			arbType = "ExpRise";
+			break;
+
+		case SHAPE_LOG_DECAY:
+			basicType = "ARB";
+			arbType = "LogFall";
+			break;
+
+		case SHAPE_LOG_RISE:
+			basicType = "ARB";
+			arbType = "LogRise";
+			break;
+
+		case SHAPE_SQUARE_ROOT:
+			basicType = "ARB";
+			arbType = "Sqrt";
+			break;
+
+		case SHAPE_CUBE_ROOT:
+			basicType = "ARB";
+			arbType = "Root3";
+			break;
+
+		case SHAPE_QUADRATIC:
+			basicType = "ARB";
+			arbType = "X^2";
+			break;
+
+		case SHAPE_CUBIC:
+			basicType = "ARB";
+			arbType = "X^3";
+			break;
+
+		case SHAPE_SINC:
+			basicType = "ARB";
+			arbType = "Sinc";
+			break;
+
+		case SHAPE_GAUSSIAN:
+			basicType = "ARB";
+			arbType = "Gaussian";
+			break;
+
+		case SHAPE_DLORENTZ:
+			basicType = "ARB";
+			arbType = "DLorentz";
+			break;
+
+		case SHAPE_HAVERSINE:
+			basicType = "ARB";
+			arbType = "Haversine";
+			break;
+
+		case SHAPE_LORENTZ:
+			basicType = "ARB";
+			arbType = "Lorentz";
+			break;
+
+		case SHAPE_GAUSSIAN_PULSE:
+			basicType = "ARB";
+			arbType = "Gauspuls";
+			break;
+
+		case SHAPE_CARDIAC:
+			basicType = "ARB";
+			arbType = "Cardiac";
+			break;
+
+		case SHAPE_HAMMING:
+			basicType = "ARB";
+			arbType = "Hamming";
+			break;
+
+		case SHAPE_HANNING:
+			basicType = "ARB";
+			arbType = "Hanning";
+			break;
+
+		case SHAPE_KAISER:
+			basicType = "ARB";
+			arbType = "kaiser";	//yes, lowercase is intentional
+			break;
+
+		case SHAPE_BLACKMAN:
+			basicType = "ARB";
+			arbType = "Blackman";
+			break;
+
+		case SHAPE_GAUSSIAN_WINDOW:
+			basicType = "ARB";
+			arbType = "Gausswin";
+			break;
+
+		case SHAPE_TRIANGLE:
+			basicType = "ARB";
+			arbType = "Triangle";
+			break;
+
+		case SHAPE_HARRIS:
+			basicType = "ARB";
+			arbType = "BlackmanH";
+			break;
+
+		case SHAPE_BARTLETT:
+			basicType = "ARB";
+			arbType = "Bartlett-Hann";
+			break;
+
+		case SHAPE_TAN:
+			basicType = "ARB";
+			arbType = "Tan";
+			break;
+
+		case SHAPE_COT:
+			basicType = "ARB";
+			arbType = "Cot";
+			break;
+
+		case SHAPE_SEC:
+			basicType = "ARB";
+			arbType = "Sec";
+			break;
+
+		case SHAPE_CSC:
+			basicType = "ARB";
+			arbType = "Csc";
+			break;
+
+		case SHAPE_ASIN:
+			basicType = "ARB";
+			arbType = "Asin";
+			break;
+
+		case SHAPE_ACOS:
+			basicType = "ARB";
+			arbType = "Acos";
+			break;
+
+		case SHAPE_ATAN:
+			basicType = "ARB";
+			arbType = "Atan";
+			break;
+
+		case SHAPE_ACOT:
+			basicType = "ARB";
+			arbType = "Acot";
+			break;
+
+		//unsupported, ignore
+		default:
+			return;
+	}
+
+	//Select type
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV WVTP," + basicType);
+	if(basicType == "ARB")
+	{
+		//Returns map of memory slots ("M10") to waveform names
+		//Mapping is explicitly not stable, so we have to check for each instrument
+		//(but can be cached for a given session)
+		auto stl = m_transport->SendCommandQueuedWithReply("STL?");
+		auto arbmap = ParseCommaSeparatedNameValueList(stl, false);
+
+		m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":ARWV INDEX," + arbmap[arbType].substr(1));
+	}
+
+	//Update cache
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgShape[chan] = shape;
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
+{
+	//not supported
+}
+
+float SiglentSCPIOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
+{
+	//not supported
+}
+
+FunctionGenerator::OutputImpedance SiglentSCPIOscilloscope::GetFunctionChannelOutputImpedance(int chan)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_awgImpedance.find(chan) != m_awgImpedance.end())
+			return m_awgImpedance[chan];
+	}
+
+	//Get output enable status and impedance from the hardware, then return newly updated cache entry
+	GetFunctionChannelActive(chan);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_awgImpedance[chan];
+}
+
+void SiglentSCPIOscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
+{
+	//Have to do this first, since it touches m_awgImpedance
+	string state;
+	if(GetFunctionChannelActive(chan))
+		state = "ON";
+	else
+		state = "OFF";
+
+	string imp;
+	if(z == IMPEDANCE_50_OHM)
+		imp = "50";
+	else
+		imp = "HZ";
+
+	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":OUTP " + state + ",LOAD," + imp);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_awgImpedance[chan] = z;
 }
