@@ -2840,8 +2840,6 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
 	else
 		m_transport->SendCommandQueued("TRIG_MODE STOP");
-
-	return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
