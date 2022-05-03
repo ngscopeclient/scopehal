@@ -212,6 +212,12 @@ public:
 	//All currently supported Sig2 scopes have only one analog bank (same ADC config for all channels)
 	//so no need to override those
 
+	enum ADCMode
+	{
+		ADC_MODE_8BIT	= 0,
+		ADC_MODE_10BIT	= 1
+	};
+
 	virtual bool IsADCModeConfigurable();
 	virtual std::vector<std::string> GetADCModeNames(size_t channel);
 	virtual size_t GetADCMode(size_t channel);
@@ -247,7 +253,7 @@ protected:
 	std::string GetPossiblyEmptyString(const std::string& property);
 
 	//  bool ReadWaveformBlock(std::string& data);
-	int ReadWaveformBlock(uint32_t maxsize, char* data);
+	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false);
 	//  	bool ReadWavedescs(
 	//		std::vector<std::string>& wavedescs,
 	//		bool* enabled,
@@ -321,6 +327,8 @@ protected:
 	std::map<size_t, float> m_awgFrequency;
 	std::map<size_t, FunctionGenerator::WaveShape> m_awgShape;
 	std::map<size_t, FunctionGenerator::OutputImpedance> m_awgImpedance;
+	ADCMode m_adcMode;
+	bool m_adcModeValid;
 
 	std::map<std::string, std::string> ParseCommaSeparatedNameValueList(std::string str, bool forwardMap = true);
 

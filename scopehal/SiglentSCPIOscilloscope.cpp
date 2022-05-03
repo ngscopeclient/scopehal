@@ -135,6 +135,9 @@ SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
 	DetectAnalogChannels();
 	SharedCtorInit();
 	DetectOptions();
+
+	//Figure out if scope is in low or high bit depth mode so we can download waveforms with the correct format
+	GetADCMode(0);
 }
 
 string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
@@ -146,9 +149,7 @@ string SiglentSCPIOscilloscope::converse(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
-	LogTrace("TX: %s\r\n", opString);
 	ret = m_transport->SendCommandQueuedWithReply(opString, false);
-	LogTrace("RX: %s\r\n\r\n", ret.c_str());
 	return ret;
 }
 
@@ -161,7 +162,6 @@ void SiglentSCPIOscilloscope::sendOnly(const char* fmt, ...)
 	vsnprintf(opString, sizeof(opString), fmt, va);
 	va_end(va);
 
-	LogTrace("TXO: %s\r\n", opString);
 	m_transport->SendCommandQueued(opString);
 }
 
@@ -197,6 +197,11 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+
+			//This is the default behavior, but it's safer to explicitly specify it
+			//TODO: save bandwidth and simplify parsing by doing OFF
+			sendOnly("CHDR SHORT");
+
 			//Desired format for waveform data
 			//Only use increased bit depth if the scope actually puts content there!
 			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
@@ -437,6 +442,7 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_awgFrequency.clear();
 	m_awgShape.clear();
 	m_awgImpedance.clear();
+	m_adcModeValid = false;
 }
 
 /**
@@ -1245,7 +1251,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	return TRIGGER_MODE_RUN;
 }
 
-int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
+int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround)
 {
 	char packetSizeSequence[17];
 	uint32_t getLength;
@@ -1272,9 +1278,16 @@ int SiglentSCPIOscilloscope::ReadWaveformBlock(uint32_t maxsize, char* data)
 	LogTrace("INITIAL PACKET [%s]\n", packetSizeSequence);
 	getLength = atoi(packetSizeSequence);
 
-	// Now get the data
-	m_transport->ReadRawData((getLength > maxsize) ? maxsize : getLength, (unsigned char*)data);
+	uint32_t len = getLength;
+	if(hdSizeWorkaround)
+		len *= 2;
+	len = min(len, maxsize);
 
+	// Now get the data
+	m_transport->ReadRawData(len, (unsigned char*)data);
+
+	if(hdSizeWorkaround)
+		return getLength*2;
 	return getLength;
 }
 
@@ -1457,6 +1470,10 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	// SDS2000X+ and SDS5000X have 30 codes per div. Todo; SDS6000X has 425.
 	// We also need to accomodate probe attenuation here.
 	v_gain = v_gain * v_probefactor / 30;
+
+	//in word mode, we have 256x as many codes
+	if(m_highDefinition)
+		v_gain /= 256;
 
 	// Vertical offset is also scaled by the probefactor
 	v_off = v_off * v_probefactor;
@@ -1838,13 +1855,19 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					wavetime = m_transport->ReadReply();
 				pwtime = reinterpret_cast<double*>(&wavetime[16]);	  //skip 16-byte SCPI header
 
+				//BUG: When SDS2000X+ is in 10-bit mode, the SCPI length header reports the size of the data blob in
+				//16-bit words, rather than bytes!
+				bool hdWorkaround = false;
+				if( (m_modelid == MODEL_SIGLENT_SDS2000XP) && m_highDefinition)
+					hdWorkaround = true;
+
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
 				{
 					if(enabled[i])
 					{
 						m_transport->SendCommand(":WAVEFORM:SOURCE C" + to_string(i + 1) + ";:WAVEFORM:DATA?");
-						m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i]);
+						m_analogWaveformDataSize[i] = ReadWaveformBlock(WAVEFORM_SIZE, m_analogWaveformData[i], hdWorkaround);
 						// This is the 0x0a0a at the end
 						m_transport->ReadRawData(2, (unsigned char*)tmp);
 					}
@@ -2739,25 +2762,85 @@ bool SiglentSCPIOscilloscope::SetInterleaving(bool /* combine*/)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Analog bank configuration
 
+//NOTE: As of PG01-E11A this command is undocumented.
+//Only source for this information is email discussions with Angel from the SDS2000X+ firmware engineering team
+//TODO: 12 bit mode for Asia market SDS6000 series scopes
+
 bool SiglentSCPIOscilloscope::IsADCModeConfigurable()
 {
-	return false;
+	return (m_modelid == MODEL_SIGLENT_SDS2000XP);
 }
 
 vector<string> SiglentSCPIOscilloscope::GetADCModeNames(size_t /*channel*/)
 {
 	vector<string> v;
-	LogWarning("GetADCModeNames is not implemented\n");
+	v.push_back("8 bit");
+	if(m_modelid == MODEL_SIGLENT_SDS2000XP)
+		v.push_back("10 bit");
 	return v;
 }
 
 size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 {
-	return 0;
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_adcModeValid)
+			return m_adcMode;
+	}
+
+	auto reply = m_transport->SendCommandQueuedWithReply("ACQ:RES?");
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_adcModeValid = true;
+	if(reply == "10Bits")
+	{
+		m_adcMode = ADC_MODE_10BIT;
+		m_highDefinition = true;
+		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+	}
+	else //if(reply == "8Bits")
+	{
+		m_adcMode = ADC_MODE_8BIT;
+		m_highDefinition = false;
+		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+	}
+
+	return m_adcMode;
 }
 
-void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t /*mode*/)
+void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 {
+	//Update cache first
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_adcMode = (ADCMode)mode;
+		if(mode == ADC_MODE_8BIT)
+			m_highDefinition = false;
+		else
+			m_highDefinition = true;
+	}
+
+	//Seems ADC mode cannot be changed while stopped
+	if(!m_triggerArmed)
+		m_transport->SendCommandQueued("TRIG_MODE AUTO");
+
+	//Send the actual command
+	if(mode == ADC_MODE_10BIT)
+	{
+		m_transport->SendCommandQueued("ACQ:RES 10Bits");
+		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+	}
+	else //if(mode == ADC_MODE_8BIT)
+	{
+		m_transport->SendCommandQueued("ACQ:RES 8Bits");
+		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+	}
+
+	if(IsTriggerArmed())
+		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
+	else
+		m_transport->SendCommandQueued("TRIG_MODE STOP");
+
 	return;
 }
 
