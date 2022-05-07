@@ -362,7 +362,7 @@ void HyperRAMDecoder::Refresh()
 struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 {
 	return {
-		/*.address        = */(uint32_t)((data & 3) | ((data >> 16) & 0x3FFFFFFF)),
+		/*.address        = */(uint32_t)((data & 3) | ((data >> 13) & 0xFFFFFFF8)),
 		/*.read           = */(bool)(data & (1l << 47)),
 		/*.register_space = */(bool)(data & (1l << 46)),
 		/*.linear         = */(bool)(data & (1l << 45)),
