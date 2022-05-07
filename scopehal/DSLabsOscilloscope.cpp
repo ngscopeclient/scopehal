@@ -48,6 +48,11 @@ using namespace std;
 
 DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	: RemoteBridgeOscilloscope(transport, true)
+	, m_diag_hardwareWFMHz(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ))
+	, m_diag_receivedWFMHz(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ))
+	, m_diag_totalWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
+	, m_diag_droppedWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
+	, m_diag_droppedPercent(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT))
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 	IdentifyHardware();
@@ -122,20 +127,23 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 	PushTrigger();
 	SetTriggerOffset(1000000000000); //1ms to allow trigphase interpolation
 
-	m_diagnosticValues["Hardware WFM/s"] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
-	m_diagnosticValues["Total Waveforms"] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_diagnosticValues["Dropped Waveforms"] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_diagnosticValues["Percent Dropped"] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
+	m_diagnosticValues["Hardware WFM/s"] = &m_diag_hardwareWFMHz;
+	m_diagnosticValues["Received WFM/s"] = &m_diag_receivedWFMHz;
+	m_diagnosticValues["Total Waveforms Received"] = &m_diag_totalWFMs;
+	m_diagnosticValues["Received Waveforms Dropped"] = &m_diag_droppedWFMs;
+	m_diagnosticValues["% Received Waveforms Dropped"] = &m_diag_droppedPercent;
 
 	ResetPerCaptureDiagnostics();
 }
 
 void DSLabsOscilloscope::ResetPerCaptureDiagnostics()
 {
-	m_diagnosticValues["Hardware WFM/s"].SetFloatVal(0);
-	m_diagnosticValues["Total Waveforms"].SetIntVal(0);
-	m_diagnosticValues["Dropped Waveforms"].SetIntVal(0);
-	m_diagnosticValues["Percent Dropped"].SetFloatVal(100);
+	m_diag_hardwareWFMHz.SetFloatVal(0);
+	m_diag_receivedWFMHz.SetFloatVal(0);
+	m_diag_totalWFMs.SetIntVal(0);
+	m_diag_droppedWFMs.SetIntVal(0);
+	m_diag_droppedPercent.SetFloatVal(1);
+	m_receiveClock.Reset();
 }
 
 /**
@@ -310,7 +318,7 @@ bool DSLabsOscilloscope::AcquireData()
 	if(!m_transport->ReadRawData(sizeof(wfms_s), (uint8_t*)&wfms_s))
 		return false;
 
-	m_diagnosticValues["Hardware WFM/s"].SetFloatVal(wfms_s);
+	m_diag_hardwareWFMHz.SetFloatVal(wfms_s);
 
 	// AddDiagnosticLog("Something... " + to_string(GetTime()));
 
@@ -464,11 +472,11 @@ bool DSLabsOscilloscope::AcquireData()
 		delete[] abufs[i];
 	}
 
-	FilterParameter* param = &m_diagnosticValues["Total Waveforms"];
+	FilterParameter* param = &m_diag_totalWFMs;
 	int total = param->GetIntVal() + 1;
 	param->SetIntVal(total);
 
-	param = &m_diagnosticValues["Dropped Waveforms"];
+	param = &m_diag_droppedWFMs;
 	int dropped = param->GetIntVal();
 
 	//Save the waveforms to our queue
@@ -486,8 +494,11 @@ bool DSLabsOscilloscope::AcquireData()
 
 	param->SetIntVal(dropped);
 
-	param = &m_diagnosticValues["Percent Dropped"];
+	param = &m_diag_droppedPercent;
 	param->SetFloatVal((float)dropped / (float)total);
+
+	m_receiveClock.Tick();
+	m_diag_receivedWFMHz.SetFloatVal(m_receiveClock.GetAverageHz());
 
 	//If this was a one-shot trigger we're no longer armed
 	if(m_triggerOneShot)

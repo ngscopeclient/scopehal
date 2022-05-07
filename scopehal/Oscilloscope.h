@@ -867,7 +867,8 @@ protected:
 	// Diagnostics Access
 protected:
 	std::deque<std::string> m_diagnosticLogMessages;
-	std::map<std::string, FilterParameter> m_diagnosticValues;
+	std::map<std::string, FilterParameter*> m_diagnosticValues;
+	// Pointers are expected to be to members of this class; not dynamically allocated
 
 	void AddDiagnosticLog(std::string message)
 	{
@@ -887,16 +888,10 @@ public:
 		return message;
 	}
 
-	typedef std::map<std::string, FilterParameter>::const_iterator DiagnosticValueIterator;
-
-	DiagnosticValueIterator GetDiagnosticValuesBegin()
+	std::map<std::string, FilterParameter*>& GetDiagnosticsValues()
 	{
-		return m_diagnosticValues.cbegin();
-	}
-
-	DiagnosticValueIterator GetDiagnosticValuesEnd()
-	{
-		return m_diagnosticValues.cend();
+		// TODO: Should really be readonly, but need to mutate to add change listeners...
+		return m_diagnosticValues;
 	}
 
 protected:
