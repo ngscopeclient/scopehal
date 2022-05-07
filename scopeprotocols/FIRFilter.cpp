@@ -213,6 +213,13 @@ void FIRFilter::Refresh()
 		return;
 	}
 
+	//Don't allow filters with more than 4096 taps (probably means something went wrong)
+	if(filterlen > 4096)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the filter coefficients (TODO: cache this)
 	vector<float> coeffs;
 	coeffs.resize(filterlen);

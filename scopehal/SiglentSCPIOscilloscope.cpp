@@ -2204,6 +2204,25 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
+			ret = {1 * 1000,
+			       2 * 1000,
+			       5 * 1000,
+			       10 * 1000,
+			       20 * 1000,
+			       50 * 1000,
+			       100 * 1000,
+			       200 * 1000,
+			       500 * 1000,
+			       1 * 1000 * 1000,
+			       2 * 1000 * 1000,
+			       5 * 1000 * 1000,
+			       10 * 1000 * 1000,
+			       20 * 1000 * 1000,
+			       50 * 1000 * 1000,
+			       100 * 1000 * 1000,
+			       250 * 1000 * 1000,
+			       500 * 1000 * 1000,
+			       1 * 1000 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
@@ -3445,36 +3464,42 @@ void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::string trigType)
 {
-	//Slope
-	size_t nameChannel;
-
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
-
-			nameChannel = trig->GetInput(0).m_channel[0].GetIndex() + 1;
-			switch(trig->GetType())
 			{
-				case EdgeTrigger::EDGE_RISING:
-					sendOnly("C%d:TRIG_SLOPE POS", nameChannel);
-					break;
+				auto chan = trig->GetInput(0).m_channel;
+				if(chan == NULL)
+				{
+					LogError("Trigger input 0 has null channel (probable bug in SiglentSCPIOscilloscope::PullTrigger())\n");
+					return;
+				}
+				string source = chan->GetHwname();
 
-				case EdgeTrigger::EDGE_FALLING:
-					sendOnly("C%d:TRIG_SLOPE NEG", nameChannel);
-					break;
+				switch(trig->GetType())
+				{
+					case EdgeTrigger::EDGE_RISING:
+						sendOnly("%s:TRIG_SLOPE POS", source.c_str());
+						break;
 
-				case EdgeTrigger::EDGE_ANY:
-					sendOnly("C%d:TRIG_SLOPE WINDOW", nameChannel);
-					break;
+					case EdgeTrigger::EDGE_FALLING:
+						sendOnly("%s:TRIG_SLOPE NEG", source.c_str());
+						break;
 
-				default:
-					LogWarning("Invalid trigger type %d\n", trig->GetType());
-					break;
+					case EdgeTrigger::EDGE_ANY:
+						sendOnly("%s:TRIG_SLOPE WINDOW", source.c_str());
+						break;
+
+					default:
+						LogWarning("Invalid trigger type %d\n", trig->GetType());
+						break;
+				}
+
+				//Level
+				sendOnly("%s:TRIG_LEVEL %1.2E", source.c_str(), trig->GetLevel());
+				break;
 			}
-			//Level
-			sendOnly("C%d:TRIG_LEVEL %1.2E", nameChannel, trig->GetLevel());
-			break;
 
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
