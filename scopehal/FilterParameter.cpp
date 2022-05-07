@@ -117,7 +117,7 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 /**
 	@brief Returns a pretty-printed representation of the parameter's value.
  */
-string FilterParameter::ToString(bool useDisplayLocale)
+string FilterParameter::ToString(bool useDisplayLocale) const
 {
 	string ret;
 	switch(m_type)
@@ -134,7 +134,7 @@ string FilterParameter::ToString(bool useDisplayLocale)
 			return m_string;
 
 		case TYPE_ENUM:
-			return m_reverseEnumMap[m_intval];
+			return m_reverseEnumMap.at(m_intval);
 
 		default:
 			return "unimplemented";
@@ -178,6 +178,14 @@ void FilterParameter::SetFloatVal(float f)
 	m_string = "";
 
 	m_changeSignal.emit();
+}
+
+/**
+	@brief Sets the parameter to a string
+ */
+void FilterParameter::SetStringVal(const string& f)
+{
+	SetFileName(f);
 }
 
 /**

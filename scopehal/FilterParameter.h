@@ -62,42 +62,49 @@ public:
 	FilterParameter(ParameterTypes type = FilterParameter::TYPE_FLOAT, Unit unit  = Unit(Unit::UNIT_FS));
 
 	void ParseString(const std::string& str, bool useDisplayLocale = true);
-	std::string ToString(bool useDisplayLocale = true);
+	std::string ToString(bool useDisplayLocale = true) const;
 
 	/**
 		@brief Returns the value of the parameter interpreted as a boolean
 	 */
-	bool GetBoolVal()
+	bool GetBoolVal() const
 	{ return (m_intval != 0); }
 
 	/**
 		@brief Returns the value of the parameter interpreted as an integer
 	 */
-	int64_t GetIntVal()
+	int64_t GetIntVal() const
 	{ return m_intval; }
 
 	/**
 		@brief Returns the value of the parameter interpreted as a floating point number
 	 */
-	float GetFloatVal()
+	float GetFloatVal() const
 	{ return m_floatval; }
 
 	/**
 		@brief Returns the value of the parameter interpreted as a file path
 	 */
-	std::string GetFileName()
+	std::string GetFileName() const
 	{ return m_string; }
 
 	void SetBoolVal(bool b);
 	void SetIntVal(int64_t i);
 	void SetFloatVal(float f);
+	void SetStringVal(const std::string& f);
 	void SetFileName(const std::string& f);
 
 	/**
 		@brief Returns the type of the parameter
 	 */
-	ParameterTypes GetType()
+	ParameterTypes GetType() const
 	{ return m_type; }
+
+	/**
+		@brief Returns the units of the parameter
+	 */
+	Unit GetUnit() const
+	{ return m_unit; }
 
 	//File filters for TYPE_FILENAME (otherwise ignored)
 	std::string m_fileFilterMask;

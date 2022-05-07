@@ -31,6 +31,7 @@
 #define DSLabsOscilloscope_h
 
 #include "RemoteBridgeOscilloscope.h"
+#include "../xptools/HzClock.h"
 
 /**
 	@brief DSLabsOscilloscope - driver for talking to the scopehal-dslabs-bridge daemons
@@ -63,6 +64,11 @@ public:
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
+
+	// Captures
+	virtual void Start();
+	virtual void StartSingleTrigger();
+	virtual void ForceTrigger();
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
@@ -103,6 +109,7 @@ public:
 
 protected:
 	void IdentifyHardware();
+	void ResetPerCaptureDiagnostics();
 
 	std::string GetChannelColor(size_t i);
 
@@ -123,6 +130,13 @@ protected:
 	Socket* m_dataSocket;
 
 	Series m_series;
+
+	FilterParameter m_diag_hardwareWFMHz;
+	FilterParameter m_diag_receivedWFMHz;
+	FilterParameter m_diag_totalWFMs;
+	FilterParameter m_diag_droppedWFMs;
+	FilterParameter m_diag_droppedPercent;
+	HzClock m_receiveClock;
 
 public:
 

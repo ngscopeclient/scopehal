@@ -849,6 +849,9 @@ protected:
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 
 public:
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Waveform Access
+
 	bool HasPendingWaveforms();
 	void ClearPendingWaveforms();
 	size_t GetPendingWaveformCount();
@@ -859,6 +862,37 @@ protected:
 	std::list<SequenceSet> m_pendingWaveforms;
 	std::mutex m_pendingWaveformsMutex;
 	std::recursive_mutex m_mutex;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Diagnostics Access
+protected:
+	std::deque<std::string> m_diagnosticLogMessages;
+	std::map<std::string, FilterParameter*> m_diagnosticValues;
+	// Pointers are expected to be to members of this class; not dynamically allocated
+
+	void AddDiagnosticLog(std::string message)
+	{
+		m_diagnosticLogMessages.push_back(message);
+	}
+
+public:
+	bool HasPendingDiagnosticLogMessages()
+	{
+		return !m_diagnosticLogMessages.empty();
+	}
+
+	std::string PopPendingDiagnosticLogMessage()
+	{
+		std::string message = m_diagnosticLogMessages.front();
+		m_diagnosticLogMessages.pop_front();
+		return message;
+	}
+
+	std::map<std::string, FilterParameter*>& GetDiagnosticsValues()
+	{
+		// TODO: Should really be readonly, but need to mutate to add change listeners...
+		return m_diagnosticValues;
+	}
 
 protected:
 

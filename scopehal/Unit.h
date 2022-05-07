@@ -80,11 +80,11 @@ public:
 	{}
 
 	Unit(const std::string& rhs);
-	std::string ToString();
+	std::string ToString() const;
 
-	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true);
+	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true) const;
 
-	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax);
+	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax) const;
 
 	double ParseString(const std::string& str, bool useDisplayLocale = true);
 
@@ -107,8 +107,8 @@ public:
 protected:
 	UnitType m_type;
 
-	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix);
-	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix);
+	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix) const;
+	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix) const;
 
 #ifdef _WIN32
 	/**
