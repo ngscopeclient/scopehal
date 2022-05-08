@@ -32,7 +32,9 @@
 
 class EdgeTrigger;
 
-class RigolOscilloscope : public SCPIOscilloscope
+class RigolOscilloscope
+	: public SCPIOscilloscope
+	, public FunctionGenerator
 {
 public:
 	RigolOscilloscope(SCPITransport* transport);
@@ -92,6 +94,27 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
+	//Function generator
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+
 protected:
 	enum protocol_version
 	{
@@ -128,6 +151,7 @@ protected:
 
 	int m_modelNumber;
 	unsigned int m_bandwidth;
+	bool m_hasFunctionGen;
 	bool m_opt200M;
 	protocol_version m_protocol;
 
