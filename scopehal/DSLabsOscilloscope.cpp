@@ -485,6 +485,9 @@ bool DSLabsOscilloscope::AcquireData()
 
 	while (m_pendingWaveforms.size() > 2)
 	{
+		SequenceSet set = *m_pendingWaveforms.begin();
+		for(auto it : set)
+			delete it.second;
 		m_pendingWaveforms.pop_front();
 
 		dropped++;
