@@ -58,6 +58,9 @@ public:
 
 	TRANSPORT_INITPROC(SCPITwinLanTransport)
 
+	const Socket& GetSecondarySocket()
+	{ return m_secondarysocket; }
+
 protected:
 	unsigned short m_dataport;
 
