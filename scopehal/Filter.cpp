@@ -1347,3 +1347,56 @@ uint32_t Filter::CRC32(vector<uint8_t>& bytes, size_t start, size_t end)
 				((crc & 0x00ff0000) >> 8) |
 				 (crc >> 24) );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Event driven filter processing
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in timescale units
+ */
+int64_t Filter::GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return wfm->m_offsets[i+1];
+	else
+		return timestamp;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in timescale units
+ */
+void Filter::AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+{
+	while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
+		i ++;
+}
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in native X axis units
+ */
+int64_t Filter::GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return (wfm->m_offsets[i+1] * wfm->m_timescale) + wfm->m_triggerPhase;
+	else
+		return timestamp;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in native X axis units
+ */
+void Filter::AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+{
+	timestamp -= wfm->m_triggerPhase;
+
+	while( ((i+1) < len) && ( (wfm->m_offsets[i+1] * wfm->m_timescale) <= timestamp) )
+		i ++;
+}

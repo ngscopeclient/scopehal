@@ -173,21 +173,10 @@ protected:
 	bool VerifyAllInputsOKAndAnalog();
 	bool VerifyAllInputsOKAndDigital();
 
-	///Gets the timestamp of the next event (if any) on a waveform
-	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
-	{
-		if(i+1 < len)
-			return wfm->m_offsets[i+1];
-		else
-			return timestamp;
-	}
-
-	///Advance the waveform to a given timestamp
-	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
-	{
-		while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
-			i ++;
-	}
+	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
 	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
 	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
