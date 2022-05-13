@@ -676,8 +676,8 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 {
 	for(size_t i=0; i<nouts; i++)
 	{
-		float cosval = m_resampledSparamSines[i];
-		float sinval = m_resampledSparamCosines[i];
+		float sinval = m_resampledSparamSines[i];
+		float cosval = m_resampledSparamCosines[i];
 
 		//Uncorrected complex value
 		float real_orig = m_forwardOutBuf[i*2 + 0];
