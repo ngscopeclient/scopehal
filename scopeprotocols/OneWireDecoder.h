@@ -50,17 +50,19 @@ public:
 	OneWireSymbol()
 	{}
 
-	OneWireSymbol(stype t,uint8_t d)
+	OneWireSymbol(stype t, uint8_t d, bool s = false)
 	 : m_stype(t)
 	 , m_data(d)
+	 , m_tooShort(s)
 	{}
 
 	stype m_stype;
 	uint8_t m_data;
+	bool m_tooShort;
 
 	bool operator== (const OneWireSymbol& s) const
 	{
-		return (m_stype == s.m_stype) && (m_data == s.m_data);
+		return (m_stype == s.m_stype) && (m_data == s.m_data) && (m_tooShort == s.m_tooShort);
 	}
 };
 
