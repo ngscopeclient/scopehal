@@ -140,7 +140,13 @@ void EmphasisRemovalFilter::Refresh()
 
 	//Set up output
 	const int64_t tap_count = 8;
-	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
+	auto dataRate = m_parameters[m_dataRateName].GetFloatVal();
+	if(dataRate < 1)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+	int64_t tap_delay = round(FS_PER_SECOND / dataRate);
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupOutputWaveform(din, 0, tap_count * samples_per_tap, 0);
 
