@@ -403,6 +403,7 @@ bool PicoOscilloscope::AcquireData()
 			float offset = config[1];
 			float trigphase = -config[2] * fs_per_sample;
 			scale *= GetChannelAttenuation(chnum);
+			offset *= GetChannelAttenuation(chnum);
 
 			//TODO: stream timestamp from the server
 
