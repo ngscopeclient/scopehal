@@ -84,12 +84,6 @@ string EyeHeightMeasurement::GetProtocolName()
 	return "Eye Height";
 }
 
-bool EyeHeightMeasurement::NeedsConfig()
-{
-	//need manual config
-	return true;
-}
-
 float EyeHeightMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;

@@ -81,12 +81,6 @@ string DutyCycleMeasurement::GetProtocolName()
 	return "Duty Cycle";
 }
 
-bool DutyCycleMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float DutyCycleMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

@@ -69,11 +69,6 @@ string DramRefreshActivateMeasurement::GetProtocolName()
 	return "DRAM Trfc";
 }
 
-bool DramRefreshActivateMeasurement::NeedsConfig()
-{
-	return false;
-}
-
 float DramRefreshActivateMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

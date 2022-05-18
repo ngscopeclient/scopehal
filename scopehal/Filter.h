@@ -116,7 +116,7 @@ public:
 	Category GetCategory()
 	{ return m_category; }
 
-	virtual bool NeedsConfig() =0;	//false if we can automatically do the decode from the signal w/ no configuration
+	virtual bool NeedsConfig();
 
 	void RefreshIfDirty();
 	void RefreshInputsIfDirty();

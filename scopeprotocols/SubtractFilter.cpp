@@ -76,12 +76,6 @@ string SubtractFilter::GetProtocolName()
 	return "Subtract";
 }
 
-bool SubtractFilter::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
 float SubtractFilter::GetOffset(size_t /*stream*/)
 {
 	if(!VerifyAllInputsOKAndAnalog())

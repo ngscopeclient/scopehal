@@ -52,12 +52,6 @@ Ethernet64b66bDecoder::Ethernet64b66bDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool Ethernet64b66bDecoder::NeedsConfig()
-{
-	//baud rate has to be set
-	return true;
-}
-
 bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

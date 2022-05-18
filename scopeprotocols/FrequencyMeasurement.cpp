@@ -75,12 +75,6 @@ string FrequencyMeasurement::GetProtocolName()
 	return "Frequency";
 }
 
-bool FrequencyMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float FrequencyMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

@@ -42,8 +42,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	virtual void ClearSweeps();
 
 	static std::string GetProtocolName();

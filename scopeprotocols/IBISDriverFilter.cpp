@@ -101,11 +101,6 @@ float IBISDriverFilter::GetOffset(size_t /*stream*/)
 	return m_offset;
 }
 
-bool IBISDriverFilter::NeedsConfig()
-{
-	return true;
-}
-
 void IBISDriverFilter::ClearSweeps()
 {
 	m_vmax = FLT_MIN;

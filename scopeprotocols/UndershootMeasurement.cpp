@@ -67,12 +67,6 @@ string UndershootMeasurement::GetProtocolName()
 	return "Undershoot";
 }
 
-bool UndershootMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float UndershootMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

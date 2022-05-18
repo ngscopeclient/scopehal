@@ -79,11 +79,6 @@ string PhaseMeasurement::GetProtocolName()
 	return "Phase";
 }
 
-bool PhaseMeasurement::NeedsConfig()
-{
-	return true;
-}
-
 float PhaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 370;

@@ -88,12 +88,6 @@ string ClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (PLL)";
 }
 
-bool ClockRecoveryFilter::NeedsConfig()
-{
-	//we have need the base symbol rate configured
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

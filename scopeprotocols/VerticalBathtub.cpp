@@ -71,11 +71,6 @@ string VerticalBathtub::GetProtocolName()
 	return "Vert Bathtub";
 }
 
-bool VerticalBathtub::NeedsConfig()
-{
-	return true;
-}
-
 float VerticalBathtub::GetVoltageRange(size_t /*stream*/)
 {
 	//1e12 total height

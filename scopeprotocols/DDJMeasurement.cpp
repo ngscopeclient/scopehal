@@ -82,12 +82,6 @@ bool DDJMeasurement::IsScalarOutput()
 	return true;
 }
 
-bool DDJMeasurement::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
 float DDJMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 0;

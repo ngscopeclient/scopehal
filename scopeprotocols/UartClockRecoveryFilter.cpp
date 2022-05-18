@@ -72,12 +72,6 @@ string UartClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (UART)";
 }
 
-bool UartClockRecoveryFilter::NeedsConfig()
-{
-	//we have need the base symbol rate configured
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -94,11 +94,6 @@ string SPIFlashDecoder::GetProtocolName()
 	return "SPI Flash";
 }
 
-bool SPIFlashDecoder::NeedsConfig()
-{
-	return true;
-}
-
 vector<string> SPIFlashDecoder::GetHeaders()
 {
 	vector<string> ret;

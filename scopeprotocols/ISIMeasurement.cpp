@@ -70,11 +70,6 @@ bool ISIMeasurement::IsScalarOutput()
 	return true;
 }
 
-bool ISIMeasurement::NeedsConfig()
-{
-	return false;
-}
-
 float ISIMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;

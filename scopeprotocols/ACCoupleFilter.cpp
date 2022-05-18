@@ -68,12 +68,6 @@ string ACCoupleFilter::GetProtocolName()
 	return "AC Couple";
 }
 
-bool ACCoupleFilter::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

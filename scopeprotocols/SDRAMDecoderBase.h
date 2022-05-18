@@ -81,8 +81,6 @@ public:
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
-
-	virtual bool NeedsConfig();
 };
 
 #endif

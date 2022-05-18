@@ -113,11 +113,6 @@ string TappedDelayLineFilter::GetProtocolName()
 	return "Tapped Delay Line";
 }
 
-bool TappedDelayLineFilter::NeedsConfig()
-{
-	return true;
-}
-
 float TappedDelayLineFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

@@ -106,8 +106,6 @@ public:
 	virtual void Refresh();
 	static std::string GetProtocolName();
 
-	virtual bool NeedsConfig();
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	std::vector<std::string> GetHeaders();

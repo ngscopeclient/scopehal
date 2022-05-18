@@ -51,11 +51,6 @@ EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(const string& col
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool EthernetAutonegotiationDecoder::NeedsConfig()
-{
-	return false;
-}
-
 bool EthernetAutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

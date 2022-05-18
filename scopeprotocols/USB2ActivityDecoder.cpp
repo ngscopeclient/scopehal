@@ -65,11 +65,6 @@ string USB2ActivityDecoder::GetProtocolName()
 	return "USB 1.x/2.0 Activity";
 }
 
-bool USB2ActivityDecoder::NeedsConfig()
-{
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

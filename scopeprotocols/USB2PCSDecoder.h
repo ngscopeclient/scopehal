@@ -79,8 +79,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
 
 	virtual std::string GetText(int i);

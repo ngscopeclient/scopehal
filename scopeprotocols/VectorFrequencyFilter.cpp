@@ -90,11 +90,6 @@ string VectorFrequencyFilter::GetProtocolName()
 	return "Vector Frequency";
 }
 
-bool VectorFrequencyFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

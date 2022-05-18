@@ -42,7 +42,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
 	virtual bool IsScalarOutput();
 
 	static std::string GetProtocolName();

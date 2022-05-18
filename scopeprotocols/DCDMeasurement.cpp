@@ -70,11 +70,6 @@ bool DCDMeasurement::IsScalarOutput()
 	return true;
 }
 
-bool DCDMeasurement::NeedsConfig()
-{
-	return false;
-}
-
 float DCDMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 1;

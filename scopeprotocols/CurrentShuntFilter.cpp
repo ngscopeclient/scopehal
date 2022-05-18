@@ -82,12 +82,6 @@ string CurrentShuntFilter::GetProtocolName()
 	return "Current Shunt";
 }
 
-bool CurrentShuntFilter::NeedsConfig()
-{
-	//need to specify shunt value
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

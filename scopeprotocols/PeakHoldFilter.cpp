@@ -76,11 +76,6 @@ string PeakHoldFilter::GetProtocolName()
 	return "Peak Hold";
 }
 
-bool PeakHoldFilter::NeedsConfig()
-{
-	return true;
-}
-
 void PeakHoldFilter::ClearSweeps()
 {
 	SetData(NULL, 0);

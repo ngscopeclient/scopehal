@@ -124,8 +124,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();

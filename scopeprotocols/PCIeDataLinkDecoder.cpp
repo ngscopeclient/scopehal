@@ -56,12 +56,6 @@ PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PCIeDataLinkDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
-
 bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

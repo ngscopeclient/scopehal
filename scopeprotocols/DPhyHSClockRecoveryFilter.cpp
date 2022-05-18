@@ -66,12 +66,6 @@ string DPhyHSClockRecoveryFilter::GetProtocolName()
 	return "Clock Recovery (D-PHY HS Mode)";
 }
 
-bool DPhyHSClockRecoveryFilter::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

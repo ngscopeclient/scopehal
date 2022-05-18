@@ -74,12 +74,6 @@ string RjBUjFilter::GetProtocolName()
 	return "Rj + BUj";
 }
 
-bool RjBUjFilter::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
 float RjBUjFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

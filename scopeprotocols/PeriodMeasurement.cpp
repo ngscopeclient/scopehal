@@ -69,12 +69,6 @@ string PeriodMeasurement::GetProtocolName()
 	return "Period";
 }
 
-bool PeriodMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float PeriodMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

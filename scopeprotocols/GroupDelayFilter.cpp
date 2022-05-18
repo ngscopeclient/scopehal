@@ -76,11 +76,6 @@ string GroupDelayFilter::GetProtocolName()
 	return "Group Delay";
 }
 
-bool GroupDelayFilter::NeedsConfig()
-{
-	return false;
-}
-
 void GroupDelayFilter::ClearSweeps()
 {
 	m_range = 1;

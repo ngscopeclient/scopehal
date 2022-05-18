@@ -63,11 +63,6 @@ SWDDecoder::SWDDecoder(const string& color) : Filter(OscilloscopeChannel::CHANNE
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SWDDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

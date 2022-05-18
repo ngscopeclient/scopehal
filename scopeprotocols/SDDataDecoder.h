@@ -84,7 +84,6 @@ public:
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
-	virtual bool NeedsConfig();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

@@ -77,7 +77,6 @@ public:
 	Gdk::Color GetColor(int i) override;
 
 	void Refresh() override;
-	bool NeedsConfig() override;
 
 	static std::string GetProtocolName();
 

@@ -65,12 +65,6 @@ string IPv4Decoder::GetProtocolName()
 	return "IPv4";
 }
 
-bool IPv4Decoder::NeedsConfig()
-{
-	//we just work on the provided ethernet link
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

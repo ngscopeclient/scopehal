@@ -81,12 +81,6 @@ string ScaleFilter::GetProtocolName()
 	return "Scale";
 }
 
-bool ScaleFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
 void ScaleFilter::SetDefaultName()
 {
 	char hwname[256];

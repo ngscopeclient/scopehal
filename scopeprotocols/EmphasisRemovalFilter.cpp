@@ -91,11 +91,6 @@ string EmphasisRemovalFilter::GetProtocolName()
 	return "Emphasis Removal";
 }
 
-bool EmphasisRemovalFilter::NeedsConfig()
-{
-	return true;
-}
-
 float EmphasisRemovalFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

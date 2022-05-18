@@ -69,11 +69,6 @@ string DramRowColumnLatencyMeasurement::GetProtocolName()
 	return "DRAM Trcd";
 }
 
-bool DramRowColumnLatencyMeasurement::NeedsConfig()
-{
-	return false;
-}
-
 float DramRowColumnLatencyMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

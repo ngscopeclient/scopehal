@@ -56,12 +56,6 @@ TMDSDecoder::TMDSDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool TMDSDecoder::NeedsConfig()
-{
-	//baud rate has to be set
-	return true;
-}
-
 bool TMDSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

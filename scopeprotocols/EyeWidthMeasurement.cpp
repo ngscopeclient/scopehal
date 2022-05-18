@@ -80,12 +80,6 @@ string EyeWidthMeasurement::GetProtocolName()
 	return "Eye Width";
 }
 
-bool EyeWidthMeasurement::NeedsConfig()
-{
-	//need manual config
-	return true;
-}
-
 float EyeWidthMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;

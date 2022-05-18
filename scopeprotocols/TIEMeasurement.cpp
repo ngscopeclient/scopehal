@@ -80,12 +80,6 @@ string TIEMeasurement::GetProtocolName()
 	return "Clock Jitter (TIE)";
 }
 
-bool TIEMeasurement::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
 float TIEMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

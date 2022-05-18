@@ -56,12 +56,6 @@ PCIeTransportDecoder::~PCIeTransportDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PCIeTransportDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
-
 bool PCIeTransportDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

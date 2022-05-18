@@ -90,11 +90,6 @@ string WindowedAutocorrelationFilter::GetProtocolName()
 	return "Windowed Autocorrelation";
 }
 
-bool WindowedAutocorrelationFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

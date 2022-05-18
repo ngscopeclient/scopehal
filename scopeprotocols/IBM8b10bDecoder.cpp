@@ -59,12 +59,6 @@ IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool IBM8b10bDecoder::NeedsConfig()
-{
-	//baud rate has to be set
-	return true;
-}
-
 bool IBM8b10bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

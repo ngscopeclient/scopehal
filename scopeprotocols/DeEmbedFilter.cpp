@@ -243,12 +243,6 @@ string DeEmbedFilter::GetProtocolName()
 	return "De-Embed";
 }
 
-bool DeEmbedFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

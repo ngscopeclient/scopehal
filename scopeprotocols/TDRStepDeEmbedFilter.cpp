@@ -103,11 +103,6 @@ string TDRStepDeEmbedFilter::GetProtocolName()
 	return "TDR Step De-Embed";
 }
 
-bool TDRStepDeEmbedFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -105,12 +105,6 @@ string Waterfall::GetProtocolName()
 	return "Waterfall";
 }
 
-bool Waterfall::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

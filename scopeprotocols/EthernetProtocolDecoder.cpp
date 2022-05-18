@@ -77,12 +77,6 @@ bool EthernetProtocolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-bool EthernetProtocolDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
-
 vector<string> EthernetProtocolDecoder::GetHeaders()
 {
 	vector<string> ret;

@@ -94,8 +94,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual bool NeedsConfig();
-
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 

@@ -78,12 +78,6 @@ string DeskewFilter::GetProtocolName()
 	return "Deskew";
 }
 
-bool DeskewFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

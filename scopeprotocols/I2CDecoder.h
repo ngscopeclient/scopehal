@@ -79,7 +79,6 @@ public:
 	virtual Gdk::Color GetColor(int i);
 
 	virtual void Refresh();
-	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
 

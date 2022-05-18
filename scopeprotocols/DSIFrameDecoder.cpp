@@ -52,11 +52,6 @@ DSIFrameDecoder::DSIFrameDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool DSIFrameDecoder::NeedsConfig()
-{
-	return false;
-}
-
 bool DSIFrameDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

@@ -68,11 +68,6 @@ string VectorPhaseFilter::GetProtocolName()
 	return "Vector Phase";
 }
 
-bool VectorPhaseFilter::NeedsConfig()
-{
-	return true;
-}
-
 float VectorPhaseFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return 370;

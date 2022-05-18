@@ -69,11 +69,6 @@ string ESPIDecoder::GetProtocolName()
 	return "Intel eSPI";
 }
 
-bool ESPIDecoder::NeedsConfig()
-{
-	return true;
-}
-
 vector<string> ESPIDecoder::GetHeaders()
 {
 	vector<string> ret;

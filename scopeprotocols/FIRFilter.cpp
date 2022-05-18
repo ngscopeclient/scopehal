@@ -143,11 +143,6 @@ string FIRFilter::GetProtocolName()
 	return "FIR Filter";
 }
 
-bool FIRFilter::NeedsConfig()
-{
-	return true;
-}
-
 float FIRFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

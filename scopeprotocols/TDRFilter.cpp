@@ -107,11 +107,6 @@ string TDRFilter::GetProtocolName()
 	return "TDR";
 }
 
-bool TDRFilter::NeedsConfig()
-{
-	return true;
-}
-
 void TDRFilter::SetDefaultName()
 {
 	char hwname[256];

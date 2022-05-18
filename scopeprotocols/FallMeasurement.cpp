@@ -77,11 +77,6 @@ string FallMeasurement::GetProtocolName()
 	return "Fall";
 }
 
-bool FallMeasurement::NeedsConfig()
-{
-	return true;
-}
-
 float FallMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

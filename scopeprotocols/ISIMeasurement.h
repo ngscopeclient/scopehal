@@ -44,8 +44,6 @@ public:
 
 	virtual bool IsScalarOutput();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
 
 	virtual float GetVoltageRange(size_t stream);

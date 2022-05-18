@@ -64,12 +64,6 @@ string DSIPacketDecoder::GetProtocolName()
 	return "MIPI DSI Packet";
 }
 
-bool DSIPacketDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

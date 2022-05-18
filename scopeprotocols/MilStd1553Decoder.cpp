@@ -65,12 +65,6 @@ bool MilStd1553Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
-bool MilStd1553Decoder::NeedsConfig()
-{
-	//Everything is specified by the protocol, nothing to configure
-	return false;
-}
-
 vector<string> MilStd1553Decoder::GetHeaders()
 {
 	vector<string> ret;

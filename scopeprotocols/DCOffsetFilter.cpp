@@ -78,12 +78,6 @@ string DCOffsetFilter::GetProtocolName()
 	return "DC offset";
 }
 
-bool DCOffsetFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
 void DCOffsetFilter::SetDefaultName()
 {
 	char hwname[256];

@@ -153,11 +153,6 @@ string SpectrogramFilter::GetProtocolName()
 	return "Spectrogram";
 }
 
-bool SpectrogramFilter::NeedsConfig()
-{
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

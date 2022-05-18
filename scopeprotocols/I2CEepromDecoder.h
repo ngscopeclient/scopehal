@@ -80,8 +80,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
 
 	std::vector<std::string> GetHeaders();

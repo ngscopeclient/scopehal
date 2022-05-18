@@ -58,11 +58,6 @@ SDCmdDecoder::SDCmdDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SDCmdDecoder::NeedsConfig()
-{
-	return true;
-}
-
 string SDCmdDecoder::GetProtocolName()
 {
 	return "SD Card Command Bus";

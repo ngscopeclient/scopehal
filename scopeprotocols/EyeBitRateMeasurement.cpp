@@ -75,12 +75,6 @@ bool EyeBitRateMeasurement::IsScalarOutput()
 	return true;
 }
 
-bool EyeBitRateMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float EyeBitRateMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 10;

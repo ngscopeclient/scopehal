@@ -87,12 +87,6 @@ JtagDecoder::JtagDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool JtagDecoder::NeedsConfig()
-{
-	//need to set channel configuration
-	return true;
-}
-
 bool JtagDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

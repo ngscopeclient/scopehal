@@ -89,11 +89,6 @@ string RiseMeasurement::GetProtocolName()
 	return "Rise";
 }
 
-bool RiseMeasurement::NeedsConfig()
-{
-	return true;
-}
-
 float RiseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

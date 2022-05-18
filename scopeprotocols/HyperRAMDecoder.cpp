@@ -59,11 +59,6 @@ HyperRAMDecoder::HyperRAMDecoder(const string& color)
 	m_parameters[m_latencyname].SetIntVal(3);
 }
 
-bool HyperRAMDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

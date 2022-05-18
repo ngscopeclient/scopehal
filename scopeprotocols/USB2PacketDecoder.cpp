@@ -65,11 +65,6 @@ string USB2PacketDecoder::GetProtocolName()
 	return "USB 1.x/2.0 Packet";
 }
 
-bool USB2PacketDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool USB2PacketDecoder::GetShowDataColumn()
 {
 	return false;

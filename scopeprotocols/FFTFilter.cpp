@@ -230,12 +230,6 @@ string FFTFilter::GetProtocolName()
 	return "FFT";
 }
 
-bool FFTFilter::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

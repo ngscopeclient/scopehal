@@ -67,12 +67,6 @@ string OvershootMeasurement::GetProtocolName()
 	return "Overshoot";
 }
 
-bool OvershootMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float OvershootMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

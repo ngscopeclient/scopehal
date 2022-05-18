@@ -55,11 +55,6 @@ OneWireDecoder::~OneWireDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool OneWireDecoder::NeedsConfig()
-{
-	return false;
-}
-
 bool OneWireDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

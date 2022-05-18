@@ -75,12 +75,6 @@ bool EyePeriodMeasurement::IsScalarOutput()
 	return true;
 }
 
-bool EyePeriodMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float EyePeriodMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return 10;

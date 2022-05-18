@@ -90,12 +90,6 @@ string MovingAverageFilter::GetProtocolName()
 	return "Moving average";
 }
 
-bool MovingAverageFilter::NeedsConfig()
-{
-	//we need the depth to be specified, duh
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -70,11 +70,6 @@ string HorizontalBathtub::GetProtocolName()
 	return "Horz Bathtub";
 }
 
-bool HorizontalBathtub::NeedsConfig()
-{
-	return true;
-}
-
 float HorizontalBathtub::GetVoltageRange(size_t /*stream*/)
 {
 	//1e12 total height

@@ -44,8 +44,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
 
 	PROTOCOL_DECODER_INITPROC(CTLEFilter)

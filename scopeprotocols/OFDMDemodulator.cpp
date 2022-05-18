@@ -113,11 +113,6 @@ string OFDMDemodulator::GetProtocolName()
 	return "OFDM Demodulator";
 }
 
-bool OFDMDemodulator::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -80,12 +80,6 @@ string EyeJitterMeasurement::GetProtocolName()
 	return "Eye P-P Jitter";
 }
 
-bool EyeJitterMeasurement::NeedsConfig()
-{
-	//need manual config
-	return true;
-}
-
 float EyeJitterMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_max - m_min;

@@ -96,11 +96,6 @@ string UpsampleFilter::GetProtocolName()
 	return "Upsample";
 }
 
-bool UpsampleFilter::NeedsConfig()
-{
-	return true;
-}
-
 float UpsampleFilter::GetOffset(size_t /*stream*/)
 {
 	auto chan = m_inputs[0].m_channel;

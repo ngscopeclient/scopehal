@@ -53,11 +53,6 @@ I2CDecoder::I2CDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool I2CDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool I2CDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

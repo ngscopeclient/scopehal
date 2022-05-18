@@ -91,11 +91,6 @@ string EmphasisFilter::GetProtocolName()
 	return "Emphasis";
 }
 
-bool EmphasisFilter::NeedsConfig()
-{
-	return true;
-}
-
 float EmphasisFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

@@ -58,12 +58,6 @@ PCIeGen2LogicalDecoder::~PCIeGen2LogicalDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PCIeGen2LogicalDecoder::NeedsConfig()
-{
-	//No config for now (might need it when we have multiple lanes etc)
-	return false;
-}
-
 bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

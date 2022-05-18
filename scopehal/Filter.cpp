@@ -1409,7 +1409,7 @@ void Filter::AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, 
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Naming
+// Naming and other info
 
 /**
 	@brief Sets the name of a filter based on its inputs
@@ -1503,4 +1503,18 @@ void Filter::SetDefaultName()
 	m_hwname = name;
 	m_displayname = name;
 
+}
+
+/**
+	@brief Determines if we need to display the configuration / setup dialog
+
+	The default implementation returns true if we have more than one input or any parameters, and false otherwise.
+ */
+bool Filter::NeedsConfig()
+{
+	if(m_parameters.size())
+		return true;
+	if(m_inputs.size() > 1)
+		return true;
+	return false;
 }

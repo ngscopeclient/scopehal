@@ -53,11 +53,6 @@ SPIDecoder::SPIDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SPIDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool SPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

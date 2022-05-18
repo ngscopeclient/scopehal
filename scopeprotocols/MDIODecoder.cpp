@@ -58,11 +58,6 @@ MDIODecoder::MDIODecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool MDIODecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

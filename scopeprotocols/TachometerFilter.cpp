@@ -73,11 +73,6 @@ string TachometerFilter::GetProtocolName()
 	return "Tachometer";
 }
 
-bool TachometerFilter::NeedsConfig()
-{
-	return true;
-}
-
 float TachometerFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

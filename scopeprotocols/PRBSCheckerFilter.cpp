@@ -112,11 +112,6 @@ void PRBSCheckerFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-bool PRBSCheckerFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

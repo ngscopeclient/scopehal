@@ -64,12 +64,6 @@ string ADL5205Decoder::GetProtocolName()
 	return "ADL5205";
 }
 
-bool ADL5205Decoder::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

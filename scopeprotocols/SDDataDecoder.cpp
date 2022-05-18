@@ -56,11 +56,6 @@ SDDataDecoder::SDDataDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SDDataDecoder::NeedsConfig()
-{
-	return true;
-}
-
 string SDDataDecoder::GetProtocolName()
 {
 	return "SD Card Data Bus";

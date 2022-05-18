@@ -66,12 +66,6 @@ string BaseMeasurement::GetProtocolName()
 	return "Base";
 }
 
-bool BaseMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float BaseMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

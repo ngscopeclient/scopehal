@@ -67,12 +67,6 @@ vector<string> UARTDecoder::GetHeaders()
 	return ret;
 }
 
-bool UARTDecoder::NeedsConfig()
-{
-	//baud rate has to be set
-	return true;
-}
-
 bool UARTDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

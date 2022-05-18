@@ -81,11 +81,6 @@ string AutocorrelationFilter::GetProtocolName()
 	return "Autocorrelation";
 }
 
-bool AutocorrelationFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

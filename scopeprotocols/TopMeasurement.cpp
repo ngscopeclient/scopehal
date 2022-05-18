@@ -66,12 +66,6 @@ string TopMeasurement::GetProtocolName()
 	return "Top";
 }
 
-bool TopMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float TopMeasurement::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

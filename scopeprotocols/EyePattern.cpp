@@ -182,11 +182,6 @@ string EyePattern::GetProtocolName()
 	return "Eye pattern";
 }
 
-bool EyePattern::NeedsConfig()
-{
-	return true;
-}
-
 float EyePattern::GetVoltageRange(size_t /*stream*/)
 {
 	if(m_parameters[m_vmodeName].GetIntVal() == RANGE_AUTO)
