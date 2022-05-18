@@ -80,7 +80,6 @@ public:
 	bool NeedsConfig() override;
 
 	static std::string GetProtocolName();
-	void SetDefaultName() override;
 
 	bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 

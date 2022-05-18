@@ -95,20 +95,6 @@ bool WindowedAutocorrelationFilter::NeedsConfig()
 	return true;
 }
 
-void WindowedAutocorrelationFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "WindowedAutocorrelation(%s, %s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str(),
-		m_parameters[m_windowName].ToString().c_str(),
-		m_parameters[m_periodName].ToString().c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

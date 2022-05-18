@@ -70,14 +70,6 @@ bool DSIPacketDecoder::NeedsConfig()
 	return false;
 }
 
-void DSIPacketDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DSIPacket(%s)",	GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

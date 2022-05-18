@@ -93,7 +93,6 @@ public:
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool NeedsConfig();
 

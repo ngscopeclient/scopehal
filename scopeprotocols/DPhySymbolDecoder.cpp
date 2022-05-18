@@ -82,23 +82,6 @@ string DPhySymbolDecoder::GetProtocolName()
 	return "MIPI D-PHY Symbol";
 }
 
-void DPhySymbolDecoder::SetDefaultName()
-{
-	auto din1 = GetInput(1);
-
-	char hwname[256];
-	if(din1.m_channel == NULL)
-		snprintf(hwname, sizeof(hwname), "DPHYSymbol(%s)", GetInputDisplayName(0).c_str());
-	else
-	{
-		snprintf(hwname, sizeof(hwname), "DPHYSymbol(%s,%s)",
-			GetInputDisplayName(0).c_str(),
-			GetInputDisplayName(1).c_str());
-	}
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 bool DPhySymbolDecoder::NeedsConfig()
 {
 	return true;

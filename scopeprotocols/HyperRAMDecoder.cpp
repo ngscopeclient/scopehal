@@ -80,12 +80,6 @@ string HyperRAMDecoder::GetProtocolName()
 	return "HyperRAM";
 }
 
-void HyperRAMDecoder::SetDefaultName()
-{
-	m_hwname = "HyperRAM(" + GetInputDisplayName(3) + ")";
-	m_displayname = m_hwname;
-}
-
 void HyperRAMDecoder::Refresh()
 {
 	//Make sure we've got valid inputs

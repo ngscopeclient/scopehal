@@ -64,14 +64,6 @@ bool DramRowColumnLatencyMeasurement::ValidateChannel(size_t i, StreamDescriptor
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DramRowColumnLatencyMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Trcd(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DramRowColumnLatencyMeasurement::GetProtocolName()
 {
 	return "DRAM Trcd";

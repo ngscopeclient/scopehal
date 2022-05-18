@@ -111,21 +111,6 @@ bool QuadratureDecoder::NeedsConfig()
 	return true;
 }
 
-void QuadratureDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"Quadrature(%s,%s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

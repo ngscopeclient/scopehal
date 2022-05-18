@@ -62,14 +62,6 @@ bool UndershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void UndershootMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Undershoot(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string UndershootMeasurement::GetProtocolName()
 {
 	return "Undershoot";

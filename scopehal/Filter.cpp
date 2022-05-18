@@ -44,6 +44,8 @@ set<Filter*> Filter::m_filters;
 mutex Filter::m_cacheMutex;
 map<pair<WaveformBase*, float>, vector<int64_t> > Filter::m_zeroCrossingCache;
 
+map<string, unsigned int> Filter::m_instanceCount;
+
 Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 {
 	Gdk::Color("#336699"),	//COLOR_DATA
@@ -71,6 +73,7 @@ Filter::Filter(
 	, m_usingDefault(true)
 {
 	m_physical = false;
+	m_instanceNum = 0;
 	m_filters.emplace(this);
 
 	//Load our OpenCL kernel, if we have one
@@ -200,7 +203,11 @@ void Filter::EnumProtocols(vector<string>& names)
 Filter* Filter::CreateFilter(const string& protocol, const string& color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
-		return m_createprocs[protocol](color);
+	{
+		auto f = m_createprocs[protocol](color);
+		f->m_instanceNum = (m_instanceCount[protocol] ++);
+		return f;
+	}
 
 	LogError("Invalid filter name: %s\n", protocol.c_str());
 	return NULL;
@@ -1399,4 +1406,101 @@ void Filter::AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, 
 
 	while( ((i+1) < len) && ( (wfm->m_offsets[i+1] * wfm->m_timescale) <= timestamp) )
 		i ++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Naming
+
+/**
+	@brief Sets the name of a filter based on its inputs
+
+	This method may be overridden in derived classes for specialized applications, but there is no need to do so in
+	typical filters.
+ */
+void Filter::SetDefaultName()
+{
+	//Start with our immediate inputs
+	set<StreamDescriptor> inputs;
+	for(auto i : m_inputs)
+		inputs.emplace(i);
+
+	//If we're a measurement, stop
+	//We want to see the full list of inputs as-is
+	if(m_category == CAT_MEASUREMENT)
+	{
+	}
+
+	//Walk filter graph back to find source nodes
+	else
+	{
+		//Replace each input with its ancestor
+		while(true)
+		{
+			bool changed = false;
+			set<StreamDescriptor> next;
+
+			for(auto i : inputs)
+			{
+				//If the channel is not a filter, it's a scope channel.
+				//Pass through unchanged.
+				auto f = dynamic_cast<Filter*>(i.m_channel);
+				if(!f)
+					next.emplace(i);
+
+				//It's a filter. Does it have any inputs?
+				//If not, it's an import or waveform generation filter. Pass through unchanged.
+				else if(f->GetInputCount() == 0)
+					next.emplace(i);
+
+				//Filter that has inputs. Use them.
+				else
+				{
+					for(size_t j=0; j<f->GetInputCount(); j++)
+						next.emplace(f->GetInput(j));
+					changed = true;
+				}
+			}
+
+			if(!changed)
+				break;
+			inputs = next;
+		}
+	}
+
+	//Sort the inputs alphabetically (up to now, they're sorted by the std::set)
+	vector<string> sorted;
+	for(auto i : inputs)
+		sorted.push_back(i.GetName());
+	sort(sorted.begin(), sorted.end());
+
+	string inames = "";
+	for(auto s : sorted)
+	{
+		if(s == "NULL")
+			continue;
+
+		if(inames.length() > 12)
+		{
+			inames += ", ...";
+			break;
+		}
+
+		if(inames != "")
+			inames += ",";
+		inames += s;
+	}
+
+	//Format final output: remove spaces from display name, add instance number
+	auto pname = GetProtocolDisplayName();
+	string pname2;
+	for(auto c : pname)
+	{
+		if(isalpha(c))
+			pname2 += c;
+	}
+	string name = pname2 + +"_" + to_string(m_instanceNum + 1) + "(" + inames + ")";
+
+	m_hwname = name;
+	m_displayname = name;
+
 }

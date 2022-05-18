@@ -91,14 +91,6 @@ bool UpsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void UpsampleFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Upsample(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string UpsampleFilter::GetProtocolName()
 {
 	return "Upsample";

@@ -58,24 +58,6 @@ string ReferencePlaneExtensionFilter::GetProtocolName()
 	return "Reference Plane Extension";
 }
 
-void ReferencePlaneExtensionFilter::SetDefaultName()
-{
-	auto in = GetInput(0);
-	if(!in.m_channel)
-		return;
-
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"RefExt(%s)",
-		in.m_channel->GetDisplayName().c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Main filter processing
 

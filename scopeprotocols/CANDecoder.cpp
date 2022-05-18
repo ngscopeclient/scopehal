@@ -76,14 +76,6 @@ string CANDecoder::GetProtocolName()
 	return "CAN";
 }
 
-void CANDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "CAN(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

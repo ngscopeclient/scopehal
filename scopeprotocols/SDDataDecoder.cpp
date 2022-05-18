@@ -80,19 +80,6 @@ bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
-void SDDataDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SDData(%s, %s, %s, %s)",
-		GetInputDisplayName(1).c_str(),
-		GetInputDisplayName(2).c_str(),
-		GetInputDisplayName(3).c_str(),
-		GetInputDisplayName(4).c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

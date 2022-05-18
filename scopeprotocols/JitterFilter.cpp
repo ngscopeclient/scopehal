@@ -83,14 +83,6 @@ bool JitterFilter::NeedsConfig()
 	return true;
 }
 
-void JitterFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Jitter(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

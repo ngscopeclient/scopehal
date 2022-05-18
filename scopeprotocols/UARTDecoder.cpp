@@ -88,14 +88,6 @@ string UARTDecoder::GetProtocolName()
 	return "UART";
 }
 
-void UARTDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "UART(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

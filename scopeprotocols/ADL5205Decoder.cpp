@@ -70,14 +70,6 @@ bool ADL5205Decoder::NeedsConfig()
 	return true;
 }
 
-void ADL5205Decoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ADL5205(%s)",	GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

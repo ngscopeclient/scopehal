@@ -75,14 +75,6 @@ bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetRMIIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "RMII(%s)", GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 void EthernetRMIIDecoder::Refresh()
 {
 	ClearPackets();

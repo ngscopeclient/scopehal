@@ -61,14 +61,6 @@ bool TopMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void TopMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Top(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string TopMeasurement::GetProtocolName()
 {
 	return "Top";

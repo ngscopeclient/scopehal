@@ -60,14 +60,6 @@ bool USB2PacketDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void USB2PacketDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USB2Packet(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string USB2PacketDecoder::GetProtocolName()
 {
 	return "USB 1.x/2.0 Packet";

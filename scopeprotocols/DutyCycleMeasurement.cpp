@@ -76,14 +76,6 @@ void DutyCycleMeasurement::ClearSweeps()
 	m_rmax = 0.001;
 }
 
-void DutyCycleMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DutyCycle(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DutyCycleMeasurement::GetProtocolName()
 {
 	return "Duty Cycle";

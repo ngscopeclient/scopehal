@@ -73,14 +73,6 @@ string ParallelBus::GetProtocolName()
 	return "Parallel Bus";
 }
 
-void ParallelBus::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ParallelBus(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 bool ParallelBus::NeedsConfig()
 {
 	return true;

@@ -88,17 +88,6 @@ bool CurrentShuntFilter::NeedsConfig()
 	return true;
 }
 
-void CurrentShuntFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Shunt(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_resistanceName].ToString().c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

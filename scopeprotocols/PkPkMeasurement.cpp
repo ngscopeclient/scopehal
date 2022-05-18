@@ -64,17 +64,9 @@ bool PkPkMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void PkPkMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PkPk(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string PkPkMeasurement::GetProtocolName()
 {
-	return "Peak-to-Peak";
+	return "Peak-To-Peak";
 }
 
 bool PkPkMeasurement::NeedsConfig()

@@ -64,14 +64,6 @@ bool EyeBitRateMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeBitRateMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeBitRate(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EyeBitRateMeasurement::GetProtocolName()
 {
 	return "Eye Bit Rate";

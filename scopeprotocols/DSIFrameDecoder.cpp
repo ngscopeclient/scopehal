@@ -73,14 +73,6 @@ string DSIFrameDecoder::GetProtocolName()
 	return "MIPI DSI Frame";
 }
 
-void DSIFrameDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DSIFrame(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 vector<string> DSIFrameDecoder::GetHeaders()
 {
 	vector<string> ret;

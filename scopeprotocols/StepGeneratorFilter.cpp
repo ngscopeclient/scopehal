@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -74,19 +74,6 @@ bool StepGeneratorFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*strea
 string StepGeneratorFilter::GetProtocolName()
 {
 	return "Step";
-}
-
-void StepGeneratorFilter::SetDefaultName()
-{
-	Unit volts(Unit::UNIT_VOLTS);
-
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Step(%s - %s)",
-		volts.PrettyPrint(m_parameters[m_lowname].GetFloatVal()).c_str(),
-		volts.PrettyPrint(m_parameters[m_highname].GetFloatVal()).c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 bool StepGeneratorFilter::NeedsConfig()

@@ -111,7 +111,7 @@ public:
 	 */
 	virtual void ClearSweeps();
 
-	virtual void SetDefaultName() =0;
+	virtual void SetDefaultName();
 
 	Category GetCategory()
 	{ return m_category; }
@@ -233,6 +233,13 @@ protected:
 	///@brief Signal emitted when the set of output streams changes
 	sigc::signal<void> m_outputsChangedSignal;
 
+	/**
+		@brief Instance number (for auto naming)
+
+		Starts at 0 for the first filter of a given class type created, then increments
+	 */
+	unsigned int m_instanceNum;
+
 protected:
 	//Common text formatting
 	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
@@ -259,6 +266,9 @@ protected:
 
 	//Object enumeration
 	static std::set<Filter*> m_filters;
+
+	//Instance naming
+	static std::map<std::string, unsigned int> m_instanceCount;
 
 	//Caching
 	static std::mutex m_cacheMutex;

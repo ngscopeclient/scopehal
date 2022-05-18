@@ -45,7 +45,6 @@ public:
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor streaml);
 

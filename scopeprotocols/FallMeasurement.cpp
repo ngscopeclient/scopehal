@@ -72,18 +72,6 @@ bool FallMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void FallMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Fall(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_startname].ToString().c_str(),
-		m_parameters[m_endname].ToString().c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string FallMeasurement::GetProtocolName()
 {
 	return "Fall";

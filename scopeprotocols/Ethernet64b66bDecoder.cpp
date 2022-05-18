@@ -74,14 +74,6 @@ string Ethernet64b66bDecoder::GetProtocolName()
 	return "64b/66b";
 }
 
-void Ethernet64b66bDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "64b66b(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

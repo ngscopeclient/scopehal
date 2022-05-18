@@ -45,7 +45,6 @@ public:
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual void ClearSweeps();
 

@@ -83,17 +83,6 @@ bool MagnitudeFilter::NeedsConfig()
 	return true;
 }
 
-void MagnitudeFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Magnitude(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

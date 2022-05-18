@@ -55,14 +55,6 @@ string DigitalToNRZFilter::GetProtocolName()
 	return "Digital to NRZ";
 }
 
-void DigitalToNRZFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DigitalToNRZ(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 float DigitalToNRZFilter::GetVoltageRange(size_t /*stream*/)
 {
 	float v0 = m_parameters[m_level0].GetFloatVal();

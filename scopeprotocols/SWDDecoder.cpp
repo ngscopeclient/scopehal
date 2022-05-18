@@ -86,14 +86,6 @@ string SWDDecoder::GetProtocolName()
 	return "SWD";
 }
 
-void SWDDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SWD(%s)", GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -78,14 +78,6 @@ bool SWDMemAPDecoder::NeedsConfig()
 	return true;
 }
 
-void SWDMemAPDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SWDMemAP(%s)",	GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

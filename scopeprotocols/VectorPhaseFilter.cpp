@@ -63,14 +63,6 @@ bool VectorPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void VectorPhaseFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "VectorPhase(%s,%s)", GetInputDisplayName(0).c_str(), GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string VectorPhaseFilter::GetProtocolName()
 {
 	return "Vector Phase";

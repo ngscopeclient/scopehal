@@ -86,15 +86,6 @@ bool AutocorrelationFilter::NeedsConfig()
 	return true;
 }
 
-void AutocorrelationFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Autocorrelation(%s)", GetInputDisplayName(0).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

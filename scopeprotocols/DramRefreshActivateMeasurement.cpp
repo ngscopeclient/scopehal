@@ -64,14 +64,6 @@ bool DramRefreshActivateMeasurement::ValidateChannel(size_t i, StreamDescriptor 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DramRefreshActivateMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Trfc(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DramRefreshActivateMeasurement::GetProtocolName()
 {
 	return "DRAM Trfc";

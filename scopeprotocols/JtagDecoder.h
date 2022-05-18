@@ -108,7 +108,6 @@ public:
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual std::vector<std::string> GetHeaders();
 

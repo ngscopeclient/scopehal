@@ -67,14 +67,6 @@ bool UartClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void UartClockRecoveryFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "UartClockRec(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string UartClockRecoveryFilter::GetProtocolName()
 {
 	return "Clock Recovery (UART)";

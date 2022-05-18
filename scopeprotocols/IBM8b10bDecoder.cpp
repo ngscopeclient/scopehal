@@ -81,14 +81,6 @@ string IBM8b10bDecoder::GetProtocolName()
 	return "8b/10b (IBM)";
 }
 
-void IBM8b10bDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "8b10b(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

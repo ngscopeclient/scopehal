@@ -74,17 +74,6 @@ string I2CDecoder::GetProtocolName()
 	return "I2C";
 }
 
-void I2CDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "I2C(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

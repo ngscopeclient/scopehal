@@ -86,16 +86,6 @@ void EmphasisFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-void EmphasisFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Emphasis(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_emphasisAmountName].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EmphasisFilter::GetProtocolName()
 {
 	return "Emphasis";

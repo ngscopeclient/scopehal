@@ -73,14 +73,6 @@ string DDR3Decoder::GetProtocolName()
 	return "DDR3 Command Bus";
 }
 
-void DDR3Decoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DDR3Cmd(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

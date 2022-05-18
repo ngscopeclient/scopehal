@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -51,7 +51,6 @@ public:
 	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual std::vector<std::string> GetHeaders();
 

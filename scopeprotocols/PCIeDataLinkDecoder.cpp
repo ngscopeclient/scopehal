@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,14 +76,6 @@ bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string PCIeDataLinkDecoder::GetProtocolName()
 {
 	return "PCIe Data Link";
-}
-
-void PCIeDataLinkDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PCIEDataLink(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

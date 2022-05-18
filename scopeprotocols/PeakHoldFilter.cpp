@@ -81,14 +81,6 @@ bool PeakHoldFilter::NeedsConfig()
 	return true;
 }
 
-void PeakHoldFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PeakHold(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 void PeakHoldFilter::ClearSweeps()
 {
 	SetData(NULL, 0);

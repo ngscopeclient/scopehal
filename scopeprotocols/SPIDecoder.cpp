@@ -74,14 +74,6 @@ string SPIDecoder::GetProtocolName()
 	return "SPI";
 }
 
-void SPIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SPI(%s)",	GetInputDisplayName(2).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

@@ -41,7 +41,6 @@ public:
 	IBISDriverFilter(const std::string& color);
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual float GetVoltageRange(size_t stream);
 	virtual float GetOffset(size_t stream);

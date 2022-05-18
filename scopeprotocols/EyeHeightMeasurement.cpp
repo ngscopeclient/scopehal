@@ -79,17 +79,6 @@ bool EyeHeightMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeHeightMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeHeight(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_startname].ToString().c_str(),
-		m_parameters[m_endname].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EyeHeightMeasurement::GetProtocolName()
 {
 	return "Eye Height";

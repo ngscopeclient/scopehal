@@ -108,14 +108,6 @@ void TappedDelayLineFilter::ClearSweeps()
 	m_max = -FLT_MAX;
 }
 
-void TappedDelayLineFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "TappedDelayLine(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string TappedDelayLineFilter::GetProtocolName()
 {
 	return "Tapped Delay Line";

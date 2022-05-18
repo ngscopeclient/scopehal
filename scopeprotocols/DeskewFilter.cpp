@@ -84,33 +84,6 @@ bool DeskewFilter::NeedsConfig()
 	return true;
 }
 
-void DeskewFilter::SetDefaultName()
-{
-	char hwname[256];
-	float offset = m_parameters[m_skewname].GetFloatVal();
-	if(offset >= 0)
-	{
-		snprintf(
-			hwname,
-			sizeof(hwname),
-			"%s + %s",
-			GetInputDisplayName(0).c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
-			);
-	}
-	else
-	{
-		snprintf(
-			hwname,
-			sizeof(hwname),
-			"%s %s",
-			GetInputDisplayName(0).c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
-			);
-	}
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
