@@ -43,12 +43,6 @@ OFDMDemodulator::OFDMDemodulator(const string& color)
 	CreateInput("I");
 	CreateInput("Q");
 
-	m_range = 1;
-	m_offset = 0;
-
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	//TODO: create outputs
 
 	m_symbolTimeName = "Symbol Time";
@@ -98,16 +92,6 @@ bool OFDMDemodulator::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float OFDMDemodulator::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float OFDMDemodulator::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
-
 string OFDMDemodulator::GetProtocolName()
 {
 	return "OFDM Demodulator";
@@ -115,14 +99,6 @@ string OFDMDemodulator::GetProtocolName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void OFDMDemodulator::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void OFDMDemodulator::Refresh()
 {

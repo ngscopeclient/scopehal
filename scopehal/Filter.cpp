@@ -76,6 +76,10 @@ Filter::Filter(
 	m_instanceNum = 0;
 	m_filters.emplace(this);
 
+	//Create default stream gain/offset
+	m_ranges.push_back(0);
+	m_offsets.push_back(0);
+
 	//Load our OpenCL kernel, if we have one
 	#ifdef HAVE_OPENCL
 
@@ -1524,4 +1528,76 @@ bool Filter::NeedsConfig()
 	if(m_inputs.size() > 1)
 		return true;
 	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Vertical scaling
+
+void Filter::ClearStreams()
+{
+	OscilloscopeChannel::ClearStreams();
+	m_ranges.clear();
+	m_offsets.clear();
+}
+
+void Filter::AddStream(Unit yunit, const string& name)
+{
+	OscilloscopeChannel::AddStream(yunit, name);
+	m_ranges.push_back(0);
+	m_offsets.push_back(0);
+}
+
+/**
+	@brief Adjusts gain and offset such that the active waveform occupies the entire vertical area of the plot
+ */
+void Filter::AutoscaleVertical(size_t stream)
+{
+	//Autoscaling anything but an analog waveform makes no sense
+	auto waveform = dynamic_cast<AnalogWaveform*>(GetData(stream));
+	if(!waveform)
+		return;
+
+	//Find extrema of the waveform
+	//TODO: vectorize?
+	float vmin = FLT_MAX;
+	float vmax = -FLT_MAX;
+	for(auto s : waveform->m_samples)
+	{
+		float v = s;
+		vmin = min(v, vmin);
+		vmax = max(v, vmax);
+	}
+
+	float range = vmax - vmin;
+	if(IsScalarOutput())
+		range = vmax * 0.05;
+
+	SetVoltageRange(range * 1.05, stream);
+	SetOffset(-(vmin + vmax) / 2, stream);
+}
+
+float Filter::GetVoltageRange(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+		AutoscaleVertical(stream);
+
+	return m_ranges[stream];
+}
+
+void Filter::SetVoltageRange(float range, size_t stream)
+{
+	m_ranges[stream] = range;
+}
+
+float Filter::GetOffset(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+		AutoscaleVertical(stream);
+
+	return m_offsets[stream];
+}
+
+void Filter::SetOffset(float offset, size_t stream)
+{
+	m_offsets[stream] = offset;
 }

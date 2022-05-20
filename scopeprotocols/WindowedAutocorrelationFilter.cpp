@@ -43,12 +43,6 @@ WindowedAutocorrelationFilter::WindowedAutocorrelationFilter(const string& color
 	CreateInput("I");
 	CreateInput("Q");
 
-	m_range = 1;
-	m_offset = 0;
-
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	m_windowName = "Window";
 	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_windowName].SetFloatVal(400e6);
@@ -75,16 +69,6 @@ bool WindowedAutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor s
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float WindowedAutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float WindowedAutocorrelationFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
-
 string WindowedAutocorrelationFilter::GetProtocolName()
 {
 	return "Windowed Autocorrelation";
@@ -92,14 +76,6 @@ string WindowedAutocorrelationFilter::GetProtocolName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void WindowedAutocorrelationFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void WindowedAutocorrelationFilter::Refresh()
 {
@@ -135,8 +111,6 @@ void WindowedAutocorrelationFilter::Refresh()
 	auto cap = SetupOutputWaveform(din_i, 0, 0, 2*period_samples);
 
 	size_t end = len - 2*period_samples;
-	float vmax = -FLT_MAX;
-	float vmin = FLT_MAX;
 	for(size_t i=0; i < end; i ++)
 	{
 		complex<float> total = 0;
@@ -152,15 +126,7 @@ void WindowedAutocorrelationFilter::Refresh()
 		}
 
 		float v = abs(total) / window_samples;
-		vmax = max(vmax, v);
-		vmin = min(vmin, v);
 
 		cap->m_samples[i] = v;
 	}
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = ( (m_max - m_min)/2 + m_min );
 }

@@ -42,12 +42,6 @@ DutyCycleMeasurement::DutyCycleMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0.5;
-	m_range = 1;
-
-	m_rmin = 0;
-	m_rmax = 0.001;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,28 +61,9 @@ bool DutyCycleMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DutyCycleMeasurement::ClearSweeps()
-{
-	m_midpoint = 0.5;
-	m_range = 1;
-
-	m_rmin = 0;
-	m_rmax = 0.001;
-}
-
 string DutyCycleMeasurement::GetProtocolName()
 {
 	return "Duty Cycle";
-}
-
-float DutyCycleMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float DutyCycleMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,13 +120,7 @@ void DutyCycleMeasurement::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(total);
 		cap->m_samples.push_back(duty);
-
-		m_rmin = min(m_rmin, duty);
-		m_rmax = max(m_rmax, duty);
 	}
-
-	m_range = m_rmax - m_rmin;
-	m_midpoint = m_rmin + m_range/2;
 
 	SetData(cap, 0);
 

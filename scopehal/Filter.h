@@ -77,6 +77,9 @@ public:
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
 
+	virtual void ClearStreams();
+	virtual void AddStream(Unit yunit, const std::string& name);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Name generation
 
@@ -144,6 +147,22 @@ public:
 	void SetDirty()
 	{ m_dirty = true; }
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Vertical scaling
+
+	virtual void AutoscaleVertical(size_t stream);
+
+	virtual float GetVoltageRange(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
+
+	virtual float GetOffset(size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
+
+protected:
+	std::vector<float> m_ranges;
+	std::vector<float> m_offsets;
+
+public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Serialization
 

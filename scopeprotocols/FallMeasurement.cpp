@@ -50,9 +50,6 @@ FallMeasurement::FallMeasurement(const string& color)
 	m_parameters[m_endname].SetFloatVal(0.2);
 
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,16 +72,6 @@ bool FallMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 string FallMeasurement::GetProtocolName()
 {
 	return "Fall";
-}
-
-float FallMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float FallMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,8 +103,6 @@ void FallMeasurement::Refresh()
 
 	float last = -1e20;
 	double tedge = 0;
-	float fmax = -1e20;
-	float fmin =  1e20;
 
 	int state = 0;
 	int64_t tlast = 0;
@@ -150,26 +135,12 @@ void FallMeasurement::Refresh()
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
-				if(dt < fmin)
-					fmin = dt;
-				if(dt > fmax)
-					fmax = dt;
-
 				state = 0;
 			}
 		}
 
 		last = cur;
 	}
-
-	m_range = fmax - fmin;
-	m_midpoint = (fmax + fmin) / 2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
-	if(m_range < 200)
-		m_range = 200;
 
 	SetData(cap, 0);
 

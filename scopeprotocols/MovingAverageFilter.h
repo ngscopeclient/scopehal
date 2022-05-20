@@ -44,23 +44,12 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(MovingAverageFilter)
 
 protected:
 	std::string m_depthname;
-
-	bool m_rangeValid;
-
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
 };
 
 #endif

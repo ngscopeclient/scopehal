@@ -45,13 +45,8 @@ public:
 
 	virtual void Refresh();
 
-	virtual void ClearSweeps();
-
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -60,9 +55,7 @@ public:
 	void DoFilterKernel(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 
 	enum FilterType
 	{
@@ -86,37 +79,24 @@ protected:
 	void DoFilterKernelGeneric(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 
 #ifdef HAVE_OPENCL
 	void DoFilterKernelOpenCL(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 #endif
 
 	void DoFilterKernelAVX2(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 
 	void DoFilterKernelAVX512F(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
-
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
+		AnalogWaveform* cap);
 
 	std::string m_filterTypeName;
 	std::string m_filterLengthName;

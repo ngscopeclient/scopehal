@@ -75,16 +75,6 @@ bool EyeBitRateMeasurement::IsScalarOutput()
 	return true;
 }
 
-float EyeBitRateMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 10;
-}
-
-float EyeBitRateMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_value;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

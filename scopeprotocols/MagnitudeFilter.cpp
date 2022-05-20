@@ -41,9 +41,6 @@ MagnitudeFilter::MagnitudeFilter(const string& color)
 	//Set up channels
 	CreateInput("I");
 	CreateInput("Q");
-
-	m_range = 1;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,16 +59,6 @@ bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float MagnitudeFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float MagnitudeFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
 
 string MagnitudeFilter::GetProtocolName()
 {
@@ -108,12 +95,6 @@ void MagnitudeFilter::Refresh()
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
 		fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
-
-	//Calculate range of the output waveform
-	float x = GetMaxVoltage(cap);
-	float n = GetMinVoltage(cap);
-	m_range = x - n;
-	m_offset = (x+n)/2;
 
 	//Copy our time scales from the input
 	cap->m_timescale 		= a->m_timescale;

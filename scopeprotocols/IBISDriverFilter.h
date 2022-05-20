@@ -42,13 +42,9 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	virtual void Refresh();
-	virtual void ClearSweeps();
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 
@@ -60,11 +56,6 @@ protected:
 
 	IBISParser m_parser;
 	IBISModel* m_model;
-
-	float m_vmax;
-	float m_vmin;
-	float m_range;
-	float m_offset;
 
 	std::string m_sampleRate;
 	std::string m_fname;

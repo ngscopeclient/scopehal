@@ -76,16 +76,6 @@ string StepGeneratorFilter::GetProtocolName()
 	return "Step";
 }
 
-float StepGeneratorFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return fabs(m_parameters[m_lowname].GetFloatVal() - m_parameters[m_highname].GetFloatVal()) * 1.05;
-}
-
-float StepGeneratorFilter::GetOffset(size_t /*stream*/)
-{
-	return -(m_parameters[m_lowname].GetFloatVal() + m_parameters[m_highname].GetFloatVal()) / 2;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

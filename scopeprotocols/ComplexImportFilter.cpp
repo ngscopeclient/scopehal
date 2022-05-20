@@ -62,12 +62,6 @@ ComplexImportFilter::ComplexImportFilter(const string& color)
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "I");
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q");
-
-	m_ranges.push_back(2);
-	m_ranges.push_back(2);
-
-	m_offsets.push_back(0);
-	m_offsets.push_back(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

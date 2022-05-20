@@ -43,9 +43,6 @@ TachometerFilter::TachometerFilter(const string& color)
 	//Set up channels
 	CreateInput("din");
 
-	m_midpoint = 0.5;
-	m_range = 1;
-
 	m_ticksname = "Pulses per revolution";
 	m_parameters[m_ticksname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_ticksname].SetIntVal(1);
@@ -71,16 +68,6 @@ bool TachometerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string TachometerFilter::GetProtocolName()
 {
 	return "Tachometer";
-}
-
-float TachometerFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TachometerFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,8 +101,6 @@ void TachometerFilter::Refresh()
 	int64_t pulses_per_rev = m_parameters[m_ticksname].GetIntVal();
 	float pulses_to_rpm = 60.0f / pulses_per_rev;
 
-	double rmin = FLT_MAX;
-	double rmax = 0;
 	size_t elen = edges.size();
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
@@ -130,17 +115,7 @@ void TachometerFilter::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(delta);
 		cap->m_samples.push_back(rpm);
-
-		rmin = min(rmin, rpm);
-		rmax = max(rmax, rpm);
 	}
-
-	m_range = rmax - rmin;
-	m_midpoint = rmin + m_range/2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
 
 	SetData(cap, 0);
 

@@ -50,9 +50,6 @@ RiseMeasurement::RiseMeasurement(const string& color)
 	m_parameters[m_endname].SetFloatVal(0.8);
 
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,16 +86,6 @@ string RiseMeasurement::GetProtocolName()
 	return "Rise";
 }
 
-float RiseMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float RiseMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -129,8 +116,6 @@ void RiseMeasurement::Refresh()
 
 	float last = 1e20;
 	double tedge = 0;
-	float fmax = -1e20;
-	float fmin =  1e20;
 
 	int state = 0;
 	int64_t tlast = 0;
@@ -163,26 +148,12 @@ void RiseMeasurement::Refresh()
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
-				if(dt < fmin)
-					fmin = dt;
-				if(dt > fmax)
-					fmax = dt;
-
 				state = 0;
 			}
 		}
 
 		last = cur;
 	}
-
-	m_range = fmax - fmin;
-	m_midpoint = (fmax + fmin) / 2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
-	if(m_range < 200)
-		m_range = 200;
 
 	SetData(cap, 0);
 

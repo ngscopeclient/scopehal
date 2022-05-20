@@ -249,18 +249,12 @@ protected:
 	/**
 		@brief Clears out any existing streams
 	 */
-	void ClearStreams()
-	{
-		for(auto s : m_streams)
-			delete s.m_waveform;
-		m_streams.clear();
-	}
+	virtual void ClearStreams();
 
 	/**
 		@brief Adds a new data stream to the channel
 	 */
-	void AddStream(Unit yunit, const std::string& name)
-	{ m_streams.push_back(Stream(yunit, name)); }
+	virtual void AddStream(Unit yunit, const std::string& name);
 
 	/**
 		@brief Display name (user defined, defaults to m_hwname)

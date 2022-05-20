@@ -61,16 +61,6 @@ bool PeakHoldFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float PeakHoldFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float PeakHoldFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string PeakHoldFilter::GetProtocolName()
 {
 	return "Peak Hold";

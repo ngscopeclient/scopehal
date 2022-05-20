@@ -47,12 +47,7 @@ public:
 
 	virtual void Refresh();
 
-	virtual void ClearSweeps();
-
 	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -62,9 +57,7 @@ public:
 		int64_t tap_delay,
 		float* taps,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 
 protected:
 
@@ -72,22 +65,13 @@ protected:
 		int64_t tap_delay,
 		float* taps,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
+		AnalogWaveform* cap);
 
 	static void DoFilterKernelAVX2(
 		int64_t tap_delay,
 		float* taps,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax);
-
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
+		AnalogWaveform* cap);
 
 	std::string m_tapDelayName;
 	std::string m_tap0Name;

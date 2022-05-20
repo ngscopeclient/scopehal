@@ -96,24 +96,6 @@ string UpsampleFilter::GetProtocolName()
 	return "Upsample";
 }
 
-float UpsampleFilter::GetOffset(size_t /*stream*/)
-{
-	auto chan = m_inputs[0].m_channel;
-	if(chan == NULL)
-		return 0;
-	else
-		return m_inputs[0].GetOffset();
-}
-
-float UpsampleFilter::GetVoltageRange(size_t /*stream*/)
-{
-	auto chan = m_inputs[0].m_channel;
-	if(chan == NULL)
-		return 0;
-	else
-		return m_inputs[0].GetVoltageRange();
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

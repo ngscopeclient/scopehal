@@ -45,12 +45,6 @@ public:
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(TDRFilter)
@@ -68,9 +62,6 @@ protected:
 	std::string m_portImpedanceName;
 	std::string m_stepStartVoltageName;
 	std::string m_stepEndVoltageName;
-
-	float m_range;
-	float m_offset;
 };
 
 #endif

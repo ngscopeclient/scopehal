@@ -42,9 +42,6 @@ PeriodMeasurement::PeriodMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0.5;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,16 +64,6 @@ bool PeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 string PeriodMeasurement::GetProtocolName()
 {
 	return "Period";
-}
-
-float PeriodMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float PeriodMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,9 +94,6 @@ void PeriodMeasurement::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	int64_t rmin = LONG_MAX;
-	int64_t rmax = 0;
-
 	for(size_t i=0; i < (edges.size()-2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -120,17 +104,7 @@ void PeriodMeasurement::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(delta);
 		cap->m_samples.push_back(delta);
-
-		rmin = min(rmin, delta);
-		rmax = max(rmax, delta);
 	}
-
-	m_range = rmax - rmin;
-	m_midpoint = rmin + m_range/2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
 
 	SetData(cap, 0);
 

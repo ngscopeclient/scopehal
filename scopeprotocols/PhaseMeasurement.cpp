@@ -79,16 +79,6 @@ string PhaseMeasurement::GetProtocolName()
 	return "Phase";
 }
 
-float PhaseMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 370;
-}
-
-float PhaseMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

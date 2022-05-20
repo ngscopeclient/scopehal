@@ -45,10 +45,6 @@ TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
 	//Set up channels
 	CreateInput("step");
 
-	//Default config
-	m_range = 70;
-	m_offset = 35;
-
 	m_plan = NULL;
 	m_cachedPlanSize = 0;
 
@@ -77,26 +73,6 @@ bool TDRStepDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float TDRStepDeEmbedFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TDRStepDeEmbedFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void TDRStepDeEmbedFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void TDRStepDeEmbedFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
 
 string TDRStepDeEmbedFilter::GetProtocolName()
 {

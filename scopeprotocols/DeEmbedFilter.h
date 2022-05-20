@@ -52,11 +52,7 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void ClearSweeps();
 
 	PROTOCOL_DECODER_INITPROC(DeEmbedFilter)
 
@@ -75,10 +71,6 @@ protected:
 		TRUNC_MANUAL
 	};
 
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
 	float m_cachedMaxGain;
 	WaveformBase* m_cachedMag;
 	WaveformBase* m_cachedAngle;

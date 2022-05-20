@@ -75,8 +75,6 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_plan = NULL;
 
 	//Default config
-	m_range = 1e9;
-	m_offset = -5e8;
 	m_cachedFFTLength = 0;
 
 	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -127,26 +125,6 @@ bool SpectrogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float SpectrogramFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-float SpectrogramFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-void SpectrogramFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void SpectrogramFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
 
 string SpectrogramFilter::GetProtocolName()
 {

@@ -44,9 +44,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-
 	PROTOCOL_DECODER_INITPROC(DigitalToPAM4Filter)
 
 protected:

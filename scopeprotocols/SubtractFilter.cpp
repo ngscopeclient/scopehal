@@ -76,52 +76,6 @@ string SubtractFilter::GetProtocolName()
 	return "Subtract";
 }
 
-float SubtractFilter::GetOffset(size_t /*stream*/)
-{
-	if(!VerifyAllInputsOKAndAnalog())
-		return 0;
-
-	double v1 = m_inputs[0].GetVoltageRange();
-	double v2 = m_inputs[1].GetVoltageRange();
-	double o1 = m_inputs[0].GetOffset();
-	double o2 = m_inputs[1].GetOffset();
-
-	double vmax_p = v1/2 - o1;
-	double vmin_p = -v1/2 - o1;
-
-	//double vmax_n = v2/2 - o2;
-	double vmin_n = -v2/2 - o2;
-
-	//Possible output range
-	double vout_max = vmax_p - vmin_n;
-	double vout_min = vmin_p - vmax_p;
-
-	return -(vout_min + ((vout_max - vout_min) / 2));
-}
-
-float SubtractFilter::GetVoltageRange(size_t /*stream*/)
-{
-	if(!VerifyAllInputsOKAndAnalog())
-		return 1;
-
-	double v1 = m_inputs[0].GetVoltageRange();
-	double v2 = m_inputs[1].GetVoltageRange();
-	double o1 = m_inputs[0].GetOffset();
-	double o2 = m_inputs[1].GetOffset();
-
-	double vmax_p = v1/2 - o1;
-	double vmin_p = -v1/2 - o1;
-
-	//double vmax_n = v2/2 - o2;
-	double vmin_n = -v2/2 - o2;
-
-	//Possible output range
-	double vout_max = vmax_p - vmin_n;
-	double vout_min = vmin_p - vmax_p;
-
-	return (vout_max - vout_min);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

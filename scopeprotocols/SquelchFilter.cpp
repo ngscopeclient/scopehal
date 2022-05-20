@@ -71,22 +71,6 @@ bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float SquelchFilter::GetVoltageRange(size_t stream)
-{
-	if(stream == 1)
-		return m_inputs[1].GetVoltageRange();
-	else
-		return m_inputs[0].GetVoltageRange();
-}
-
-float SquelchFilter::GetOffset(size_t stream)
-{
-	if(stream == 1)
-		return m_inputs[1].GetOffset();
-	else
-		return m_inputs[0].GetOffset();
-}
-
 string SquelchFilter::GetProtocolName()
 {
 	return "Squelch";

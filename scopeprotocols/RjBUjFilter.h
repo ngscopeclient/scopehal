@@ -42,22 +42,11 @@ public:
 
 	virtual void Refresh();
 
-	virtual void ClearSweeps();
-
 	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(RjBUjFilter)
-
-protected:
-	float m_min;
-	float m_max;
-	float m_range;
-	float m_offset;
 };
 
 #endif

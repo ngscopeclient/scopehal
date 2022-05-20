@@ -58,11 +58,6 @@ bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float ACCoupleFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
 string ACCoupleFilter::GetProtocolName()
 {
 	return "AC Couple";

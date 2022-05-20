@@ -53,10 +53,6 @@ FFTFilter::FFTFilter(const string& color)
 	m_cachedNumPointsFFT = 0;
 	m_plan = NULL;
 
-	//Default config
-	m_range = 70;
-	m_offset = 35;
-
 	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", WINDOW_BLACKMAN_HARRIS);
 	m_parameters[m_windowName].AddEnumValue("Hamming", WINDOW_HAMMING);
@@ -204,26 +200,6 @@ bool FFTFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float FFTFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-float FFTFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-void FFTFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void FFTFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
 
 string FFTFilter::GetProtocolName()
 {

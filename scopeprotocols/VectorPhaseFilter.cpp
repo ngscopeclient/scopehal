@@ -68,16 +68,6 @@ string VectorPhaseFilter::GetProtocolName()
 	return "Vector Phase";
 }
 
-float VectorPhaseFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return 370;
-}
-
-float VectorPhaseFilter::GetOffset(size_t /*stream*/)
-{
-	return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

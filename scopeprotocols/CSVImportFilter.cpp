@@ -298,17 +298,6 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 	}
 
-	//Resize port arrays
-	size_t oldsize = m_ranges.size();
-	m_ranges.resize(ncols);
-	m_offsets.resize(ncols);
-
-	//If growing, fill new cells with reasonable default values
-	for(size_t i=oldsize; i<ncols; i++)
-	{
-		m_ranges[i] = 2;
-		m_offsets[i] = 0;
-	}
 	m_outputsChangedSignal.emit();
 
 	//Process each actual waveform and figure out how to handle it
@@ -335,8 +324,6 @@ void CSVImportFilter::OnFileNameChanged()
 			auto wfm = anwaves[i];
 
 			//Read the sample data
-			float vmin = FLT_MAX;
-			float vmax = -FLT_MAX;
 			for(size_t j=0; j<lines.size(); j++)
 			{
 				wfm->m_offsets[j] = timestamps[j];
@@ -357,17 +344,7 @@ void CSVImportFilter::OnFileNameChanged()
 				else
 					sscanf(tmp.c_str(), "%e", &v);
 				wfm->m_samples[j] = v;
-
-				vmax = max(vmax, v);
-				vmin = min(vmin, v);
 			}
-
-			float vrange = vmax - vmin;
-			float vavg = vmin + vrange/2;
-			vrange = max(vrange, 0.001f);
-
-			SetVoltageRange(vrange, i);
-			SetOffset(-vavg, i);
 
 			NormalizeTimebase(wfm);
 		}

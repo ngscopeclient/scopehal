@@ -43,9 +43,6 @@ VectorFrequencyFilter::VectorFrequencyFilter(const string& color)
 	CreateInput("Q");
 
 	SetYAxisUnits(Unit(Unit::UNIT_HZ), 0);
-
-	m_offset = 1e6;
-	m_range = 1e6;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,26 +61,6 @@ bool VectorFrequencyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float VectorFrequencyFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float VectorFrequencyFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void VectorFrequencyFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void VectorFrequencyFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
 
 string VectorFrequencyFilter::GetProtocolName()
 {

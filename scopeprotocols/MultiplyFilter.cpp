@@ -41,9 +41,6 @@ MultiplyFilter::MultiplyFilter(const string& color)
 	//Set up channels
 	CreateInput("a");
 	CreateInput("b");
-
-	m_range = 1;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,16 +59,6 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float MultiplyFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float MultiplyFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
 
 string MultiplyFilter::GetProtocolName()
 {
@@ -109,10 +96,4 @@ void MultiplyFilter::Refresh()
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
 		fdst[i] = fa[i] * fb[i];
-
-	//Calculate range of the output waveform
-	float x = GetMaxVoltage(cap);
-	float n = GetMinVoltage(cap);
-	m_range = x - n;
-	m_offset = (x+n)/2;
 }

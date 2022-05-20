@@ -43,9 +43,6 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 	m_category = CAT_ANALYSIS;
-
-	m_range = 1000;
-	m_offset = -500;
 }
 
 JitterSpectrumFilter::~JitterSpectrumFilter()

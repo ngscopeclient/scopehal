@@ -63,16 +63,6 @@ bool DeskewFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DeskewFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float DeskewFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string DeskewFilter::GetProtocolName()
 {
 	return "Deskew";

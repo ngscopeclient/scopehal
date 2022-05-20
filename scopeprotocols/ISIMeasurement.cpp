@@ -70,16 +70,6 @@ bool ISIMeasurement::IsScalarOutput()
 	return true;
 }
 
-float ISIMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 1;
-}
-
-float ISIMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

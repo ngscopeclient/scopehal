@@ -59,9 +59,6 @@ TDRFilter::TDRFilter(const string& color)
 	m_parameters[m_stepEndVoltageName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_stepEndVoltageName].SetFloatVal(1);
 
-	m_range = 20;
-	m_offset = -50;
-
 	m_oldMode = MODE_IMPEDANCE;
 }
 
@@ -81,26 +78,6 @@ bool TDRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-float TDRFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TDRFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void TDRFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void TDRFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
 
 string TDRFilter::GetProtocolName()
 {
@@ -147,22 +124,6 @@ void TDRFilter::Refresh()
 	else
 		SetYAxisUnits(Unit(Unit::UNIT_RHO), 0);
 
-	//Reset gain/offset if output mode was changed
-	if(mode != m_oldMode)
-	{
-		if(mode == MODE_IMPEDANCE)
-		{
-			m_range = 20;
-			m_offset = -50;
-		}
-		else
-		{
-			m_range = 2;
-			m_offset = 0;
-		}
-		m_oldMode = mode;
-	}
-
 	//Set up the output waveform
 	auto cap = SetupOutputWaveform(din, 0, 0, 0);
 
@@ -178,5 +139,12 @@ void TDRFilter::Refresh()
 
 		else
 			cap->m_samples[i] = rho;
+	}
+
+	//Reset gain/offset if output mode was changed
+	if(mode != m_oldMode)
+	{
+		AutoscaleVertical(0);
+		m_oldMode = mode;
 	}
 }

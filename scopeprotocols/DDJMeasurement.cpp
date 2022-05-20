@@ -82,16 +82,6 @@ bool DDJMeasurement::IsScalarOutput()
 	return true;
 }
 
-float DDJMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 0;
-}
-
-float DDJMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

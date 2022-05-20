@@ -63,19 +63,6 @@ bool ScaleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float ScaleFilter::GetVoltageRange(size_t /*stream*/)
-{
-    // FIXME: This is akward and couples the scaling of the filtered waveform to the scaling
-    // of the input waveform, i.e. the only way to adjust scaling on the output is via
-    // adjusting the scaling of the input
-	return m_inputs[0].GetVoltageRange() * m_parameters[m_scalefactorname].GetFloatVal();
-}
-
-float ScaleFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();// * m_parameters[m_scalefactorname].GetFloatVal();
-}
-
 string ScaleFilter::GetProtocolName()
 {
 	return "Scale";

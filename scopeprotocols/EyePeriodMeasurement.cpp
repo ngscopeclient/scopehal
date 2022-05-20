@@ -43,8 +43,6 @@ EyePeriodMeasurement::EyePeriodMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("Eye");
-
-	m_value = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,16 +73,6 @@ bool EyePeriodMeasurement::IsScalarOutput()
 	return true;
 }
 
-float EyePeriodMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 10;
-}
-
-float EyePeriodMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_value;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -103,8 +91,7 @@ void EyePeriodMeasurement::Refresh()
 	auto cap = new AnalogWaveform;
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(2 * din->m_uiWidth);
-	m_value = din->m_uiWidth;
-	cap->m_samples.push_back(m_value);
+	cap->m_samples.push_back(din->m_uiWidth);
 
 	SetData(cap, 0);
 

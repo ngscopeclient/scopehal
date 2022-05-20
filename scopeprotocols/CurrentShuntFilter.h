@@ -44,8 +44,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(CurrentShuntFilter)

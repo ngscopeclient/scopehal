@@ -71,18 +71,6 @@ string VerticalBathtub::GetProtocolName()
 	return "Vert Bathtub";
 }
 
-float VerticalBathtub::GetVoltageRange(size_t /*stream*/)
-{
-	//1e12 total height
-	return 12;
-}
-
-float VerticalBathtub::GetOffset(size_t /*stream*/)
-{
-	//1e-6 is the midpoint
-	return 6;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

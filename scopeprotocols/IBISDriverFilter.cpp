@@ -65,8 +65,6 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_cornerName].SetIntVal(CORNER_TYP);
 
 	m_parameters[m_termName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-
-	ClearSweeps();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,24 +87,6 @@ bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string IBISDriverFilter::GetProtocolName()
 {
 	return "IBIS Driver";
-}
-
-float IBISDriverFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float IBISDriverFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void IBISDriverFilter::ClearSweeps()
-{
-	m_vmax = FLT_MIN;
-	m_vmin = FLT_MAX;
-	m_range = 1;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,9 +124,6 @@ void IBISDriverFilter::OnFnameChanged()
 		m_parameters[m_modelName].AddEnumValue(names[i], i);
 
 	//TODO: update enum models etc
-
-	//Min/max are likely invalid now
-	ClearSweeps();
 }
 
 void IBISDriverFilter::OnModelChanged()
@@ -163,9 +140,6 @@ void IBISDriverFilter::OnModelChanged()
 		auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
 		m_parameters[m_termName].AddEnumValue(ename, i);
 	}
-
-	//Min/max are likely invalid now
-	ClearSweeps();
 }
 
 void IBISDriverFilter::Refresh()
@@ -289,11 +263,5 @@ void IBISDriverFilter::Refresh()
 		else
 			v = falling.InterpolateVoltage(corner, rel_sec);
 		cap->m_samples[i] = v;
-
-		m_vmax = max(m_vmax, v);
-		m_vmin = min(m_vmin, v);
 	}
-
-	m_range = (m_vmax - m_vmin) * 1.05;
-	m_offset = -( (m_vmax - m_vmin)/2 + m_vmin );
 }

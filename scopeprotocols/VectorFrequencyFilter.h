@@ -44,17 +44,9 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(VectorFrequencyFilter)
-
-protected:
-	float m_offset;
-	float m_range;
 };
 
 #endif

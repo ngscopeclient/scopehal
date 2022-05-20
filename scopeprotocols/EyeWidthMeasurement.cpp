@@ -53,9 +53,6 @@ EyeWidthMeasurement::EyeWidthMeasurement(const string& color)
 	m_endname = "End Voltage";
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_endname].SetFloatVal(0);
-
-	m_min = 0;
-	m_max = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,16 +75,6 @@ bool EyeWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 string EyeWidthMeasurement::GetProtocolName()
 {
 	return "Eye Width";
-}
-
-float EyeWidthMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_max - m_min;
-}
-
-float EyeWidthMeasurement::GetOffset(size_t /*stream*/)
-{
-	return - (m_min + m_max)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,9 +116,6 @@ void EyeWidthMeasurement::Refresh()
 	float duration_mv = volts_per_row * 1000;
 	float base_mv = volts_at_bottom * 1000;
 
-	m_min = FLT_MAX;
-	m_max = 0;
-
 	float* data = din->GetData();
 	int64_t w = din->GetWidth();
 	int64_t xcenter = w / 2;
@@ -165,13 +149,7 @@ void EyeWidthMeasurement::Refresh()
 		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
 		cap->m_durations.push_back(round(duration_mv));
 		cap->m_samples.push_back(value);
-		m_max = max(m_max, value);
-		m_min = min(m_min, value);
 	}
-
-	//Proper display of flat lines
-	m_min -= 10;
-	m_max += 10;
 
 	SetData(cap, 0);
 

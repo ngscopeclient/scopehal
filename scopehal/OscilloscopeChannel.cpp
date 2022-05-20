@@ -116,6 +116,24 @@ OscilloscopeChannel::~OscilloscopeChannel()
 	m_streams.clear();
 }
 
+/**
+	@brief Clears out any existing streams
+ */
+void OscilloscopeChannel::ClearStreams()
+{
+	for(auto s : m_streams)
+		delete s.m_waveform;
+	m_streams.clear();
+}
+
+/**
+	@brief Adds a new data stream to the channel
+ */
+void OscilloscopeChannel::AddStream(Unit yunit, const std::string& name)
+{
+	m_streams.push_back(Stream(yunit, name));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers for calling scope functions
 

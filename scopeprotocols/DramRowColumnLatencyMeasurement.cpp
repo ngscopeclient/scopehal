@@ -42,9 +42,6 @@ DramRowColumnLatencyMeasurement::DramRowColumnLatencyMeasurement(const string& c
 	CreateInput("din");
 
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,16 +66,6 @@ string DramRowColumnLatencyMeasurement::GetProtocolName()
 	return "DRAM Trcd";
 }
 
-float DramRowColumnLatencyMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float DramRowColumnLatencyMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -98,9 +85,6 @@ void DramRowColumnLatencyMeasurement::Refresh()
 
 	//Measure delay from activating a row in a bank until a read or write to the same bank
 	int64_t lastAct[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-	float fmax = -1e20;
-	float fmin =  1e20;
 
 	int64_t tlast = 0;
 	size_t len = din->m_samples.size();
@@ -131,15 +115,9 @@ void DramRowColumnLatencyMeasurement::Refresh()
 				continue;
 
 			//Valid access, measure the latency
-			int64_t latency = tcol - tact;
-			if(fmin > latency)
-				fmin = latency;
-			if(fmax < latency)
-				fmax = latency;
-
 			cap->m_offsets.push_back(tlast);
 			cap->m_durations.push_back(tnow - tlast);
-			cap->m_samples.push_back(latency);
+			cap->m_samples.push_back(tcol - tact);
 			tlast = tnow;
 
 			//Purge the last-refresh activate so we don't report false times for the next read or write
@@ -153,11 +131,6 @@ void DramRowColumnLatencyMeasurement::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-
-	m_range = fmax - fmin + 500;
-	if(m_range < 5)
-		m_range = 5;
-	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap, 0);
 
