@@ -1478,8 +1478,13 @@ void Filter::SetDefaultName()
 	{
 		if(s == "NULL")
 			continue;
+		if(inames.empty())
+		{
+			inames = s;
+			continue;
+		}
 
-		if(inames.length() > 12)
+		if(inames.length() + s.length() > 25)
 		{
 			inames += ", ...";
 			break;
@@ -1498,7 +1503,9 @@ void Filter::SetDefaultName()
 		if(isalpha(c))
 			pname2 += c;
 	}
-	string name = pname2 + +"_" + to_string(m_instanceNum + 1) + "(" + inames + ")";
+	string name = pname2 + +"_" + to_string(m_instanceNum + 1);
+	if(!inames.empty())
+		name += "(" + inames + ")";
 
 	m_hwname = name;
 	m_displayname = name;

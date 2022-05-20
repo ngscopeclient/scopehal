@@ -46,6 +46,9 @@ class Filter	: public OscilloscopeChannel
 {
 public:
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Construction and enumeration
+
 	//Add new categories to the end of this list to maintain ABI compatibility with existing plugins
 	enum Category
 	{
@@ -70,6 +73,15 @@ public:
 		const std::string& kernelName = "");
 	virtual ~Filter();
 
+	//Get all currently existing filters
+	static std::set<Filter*> GetAllInstances()
+	{ return m_filters; }
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Name generation
+
+	virtual void SetDefaultName();
+
 	/**
 		@brief Specifies whether we're using an auto-generated name or not
 	 */
@@ -83,9 +95,8 @@ public:
 	bool IsUsingDefaultName()
 	{ return m_usingDefault; }
 
-	virtual bool IsScalarOutput();
-
-	virtual void Refresh() =0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Reference counting
 
 	virtual void AddRef();
 	virtual void Release();
@@ -93,9 +104,25 @@ public:
 	size_t GetRefCount()
 	{ return m_refcount; }
 
-	//Get all currently existing filters
-	static std::set<Filter*> GetAllInstances()
-	{ return m_filters; }
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Accessors
+
+	virtual bool IsScalarOutput();
+
+	Category GetCategory()
+	{ return m_category; }
+
+	virtual bool NeedsConfig();
+
+	/**
+		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
+	 */
+	virtual std::string GetProtocolDisplayName() =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Evaluation
+
+	virtual void Refresh() =0;
 
 	//Set all currently existing filters to the dirty state
 	static void SetAllFiltersDirty()
@@ -111,23 +138,14 @@ public:
 	 */
 	virtual void ClearSweeps();
 
-	virtual void SetDefaultName();
-
-	Category GetCategory()
-	{ return m_category; }
-
-	virtual bool NeedsConfig();
-
 	void RefreshIfDirty();
 	void RefreshInputsIfDirty();
 
 	void SetDirty()
 	{ m_dirty = true; }
 
-	/**
-		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
-	 */
-	virtual std::string GetProtocolDisplayName() =0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Serialization
 
 	/**
 		@brief Serialize this decoder's configuration to a string
@@ -135,6 +153,9 @@ public:
 	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Color table (TODO: probably should be refactored)
 
 	/**
 		@brief Standard colors for protocol decode overlays.
