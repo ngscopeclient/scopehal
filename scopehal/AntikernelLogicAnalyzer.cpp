@@ -69,6 +69,7 @@ enum opcodes_t
 	@brief Connects to a UART and reads the stuff off it
  */
 AntikernelLogicAnalyzer::AntikernelLogicAnalyzer(SCPITransport* transport)
+	: SCPIDevice(transport, false)
 {
 	m_transport = transport;
 

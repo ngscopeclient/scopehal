@@ -42,7 +42,11 @@ using namespace std;
 //Construction / destruction
 
 RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport), m_triggerArmed(false), m_triggerWasLive(false), m_triggerOneShot(false)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
+	, m_triggerArmed(false)
+	, m_triggerWasLive(false)
+	, m_triggerOneShot(false)
 {
 	//Last digit of the model number is the number of channels
 	if(1 != sscanf(m_model.c_str(), "DS%d", &m_modelNumber))

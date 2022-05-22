@@ -58,9 +58,9 @@ class WindowTrigger;
 		Prints the error log in a somewhat confusing and not-human-readable format
  */
 class TektronixOscilloscope
-	: public SCPIOscilloscope
+	: public virtual SCPIOscilloscope
 	, public FunctionGenerator
-	, public Multimeter
+	, public virtual SCPIMultimeter
 {
 public:
 	TektronixOscilloscope(SCPITransport* transport);
@@ -347,7 +347,7 @@ protected:
 
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC_H(TektronixOscilloscope)
+	OSCILLOSCOPE_INITPROC(TektronixOscilloscope)
 };
 
 #endif

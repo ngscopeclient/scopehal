@@ -87,7 +87,11 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	PowerSupply.cpp
 	RFSignalGenerator.cpp
+	SCPIInstrument.cpp
+	SCPIMultimeter.cpp
 	SCPIOscilloscope.cpp
+	SCPIPowerSupply.cpp
+	SCPIRFSignalGenerator.cpp
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp

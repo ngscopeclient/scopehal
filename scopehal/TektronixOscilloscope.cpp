@@ -42,10 +42,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-OSCILLOSCOPE_INITPROC_CPP(TektronixOscilloscope)
-
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 	, m_sampleRateValid(false)
 	, m_sampleRate(0)
 	, m_sampleDepthValid(false)

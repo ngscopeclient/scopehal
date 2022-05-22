@@ -47,7 +47,9 @@ using namespace std;
 //Construction / destruction
 
 DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
-	: RemoteBridgeOscilloscope(transport, true)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
+	, RemoteBridgeOscilloscope(transport, true)
 	, m_diag_hardwareWFMHz(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ))
 	, m_diag_receivedWFMHz(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ))
 	, m_diag_totalWFMs(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS))
@@ -382,7 +384,7 @@ bool DSLabsOscilloscope::AcquireData()
 			cap->m_startFemtoseconds = fs;
 			if (clipping)
 				cap->m_flags |= WaveformBase::WAVEFORM_CLIPPING;
-			
+
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
 			scales.push_back(scale);

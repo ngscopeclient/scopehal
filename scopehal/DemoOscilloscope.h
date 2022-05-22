@@ -39,7 +39,7 @@
 #include "TestWaveformSource.h"
 #include <random>
 
-class DemoOscilloscope : public SCPIOscilloscope
+class DemoOscilloscope : public virtual SCPIOscilloscope
 {
 public:
 	DemoOscilloscope(SCPITransport* transport);

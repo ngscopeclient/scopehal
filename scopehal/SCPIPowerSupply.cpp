@@ -27,39 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#include "scopehal.h"
 
-/**
-	@brief Siglent vector signal generators
+using namespace std;
 
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
- */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+SCPIPowerSupply::PowerCreateMapType SCPIPowerSupply::m_powercreateprocs;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPIPowerSupply::SCPIPowerSupply()
 {
-public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+}
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+SCPIPowerSupply::~SCPIPowerSupply()
+{
 
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
+}
 
-public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
 
-#endif
+void SCPIPowerSupply::DoAddDriverClass(string name, PowerCreateProcType proc)
+{
+	m_powercreateprocs[name] = proc;
+}
+
+void SCPIPowerSupply::EnumDrivers(vector<string>& names)
+{
+	for(auto it=m_powercreateprocs.begin(); it != m_powercreateprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+SCPIPowerSupply* SCPIPowerSupply::CreatePowerSupply(string driver, SCPITransport* transport)
+{
+	if(m_powercreateprocs.find(driver) != m_powercreateprocs.end())
+		return m_powercreateprocs[driver](transport);
+
+	LogError("Invalid driver name");
+	return NULL;
+}

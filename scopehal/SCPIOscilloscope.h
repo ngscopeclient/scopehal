@@ -33,24 +33,14 @@
 /**
 	@brief An SCPI-based oscilloscope
  */
-class SCPIOscilloscope 	: public Oscilloscope
-						, public SCPIDevice
+class SCPIOscilloscope 	: public virtual Oscilloscope
+						, public virtual SCPIInstrument
 {
 public:
-	SCPIOscilloscope(SCPITransport* transport, bool identify = true);
+	SCPIOscilloscope();
 	virtual ~SCPIOscilloscope();
 
 	virtual std::string IDPing();
-
-	virtual std::string GetTransportConnectionString();
-	virtual std::string GetTransportName();
-
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	SCPITransport* GetTransport()
-	{ return m_transport; }
 
 protected:
 	bool m_triggerArmed;

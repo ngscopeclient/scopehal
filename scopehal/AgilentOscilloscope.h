@@ -34,7 +34,7 @@
 #include "PulseWidthTrigger.h"
 #include "NthEdgeBurstTrigger.h"
 
-class AgilentOscilloscope : public SCPIOscilloscope
+class AgilentOscilloscope : public virtual SCPIOscilloscope
 {
 public:
 	AgilentOscilloscope(SCPITransport* transport);

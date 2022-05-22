@@ -48,7 +48,8 @@ using namespace std;
 // Construction / destruction
 
 LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)

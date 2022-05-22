@@ -27,39 +27,25 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#ifndef SCPIInstrument_h
+#define SCPIInstrument_h
 
 /**
-	@brief Siglent vector signal generators
-
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
+	@brief An SCPI-based oscilloscope
  */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+class SCPIInstrument 	: public virtual Instrument
+						, public virtual SCPIDevice
 {
 public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+	SCPIInstrument(SCPITransport* transport, bool identify = true);
+	virtual ~SCPIInstrument();
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
+	virtual std::string GetTransportConnectionString();
+	virtual std::string GetTransportName();
+
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
-
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
-
-public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
 };
 
 #endif

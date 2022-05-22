@@ -27,39 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#ifndef SCPIRFSignalGenerator_h
+#define SCPIRFSignalGenerator_h
 
 /**
-	@brief Siglent vector signal generators
-
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
+	@brief An SCPI-based vsg supply
  */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
+								, public virtual SCPIInstrument
 {
 public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+	SCPIRFSignalGenerator();
+	virtual ~SCPIRFSignalGenerator();
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dynamic creation
 public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
+	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+
+	static void EnumDrivers(std::vector<std::string>& names);
+	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+
+	virtual std::string GetDriverName() =0;
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
+	static VSGCreateMapType m_vsgcreateprocs;
 };
+
+#define VSG_INITPROC(T) \
+	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
+	{	return new T(transport); } \
+	virtual std::string GetDriverName() \
+	{ return GetDriverNameInternal(); }
+
+#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+
 
 #endif

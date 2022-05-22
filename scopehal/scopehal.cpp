@@ -49,6 +49,12 @@
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
+#include "RohdeSchwarzHMC8012Multimeter.h"
+
+#include "RohdeSchwarzHMC804xPowerSupply.h"
+
+#include "SiglentVectorSignalGenerator.h"
+
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -357,7 +363,7 @@ void ScopehalStaticCleanup()
 }
 
 /**
-	@brief Static initialization for oscilloscopes
+	@brief Static initialization for instrument drivers
  */
 void DriverStaticInit()
 {
@@ -377,6 +383,12 @@ void DriverStaticInit()
 	AddDriverClass(LeCroyOscilloscope);
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
+
+	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
+
+	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
+
+	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);

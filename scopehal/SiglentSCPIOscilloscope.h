@@ -57,7 +57,7 @@ class WindowTrigger;
 
 #define c_digiChannelsPerBus 8
 
-class SiglentSCPIOscilloscope 	: public SCPIOscilloscope
+class SiglentSCPIOscilloscope 	: public virtual SCPIOscilloscope
 								, public FunctionGenerator
 {
 public:

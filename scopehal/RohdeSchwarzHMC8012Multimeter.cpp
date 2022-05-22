@@ -37,6 +37,7 @@ using namespace std;
 
 RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* transport)
 	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 {
 	m_mode = GetMeterMode();
 }
@@ -49,19 +50,9 @@ RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
-string RohdeSchwarzHMC8012Multimeter::GetName()
+string RohdeSchwarzHMC8012Multimeter::GetDriverNameInternal()
 {
-	return m_model;
-}
-
-string RohdeSchwarzHMC8012Multimeter::GetVendor()
-{
-	return m_vendor;
-}
-
-string RohdeSchwarzHMC8012Multimeter::GetSerial()
-{
-	return m_serial;
+	return "rs_hmc8012";
 }
 
 unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes()

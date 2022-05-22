@@ -34,17 +34,11 @@
 	@brief A Rohde & Schwarz HMC8012 multimeter
  */
 class RohdeSchwarzHMC8012Multimeter
-	: public virtual Multimeter
-	, public SCPIDevice
+	: public virtual SCPIMultimeter
 {
 public:
 	RohdeSchwarzHMC8012Multimeter(SCPITransport* transport);
 	virtual ~RohdeSchwarzHMC8012Multimeter();
-
-	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
 
 	virtual unsigned int GetInstrumentTypes();
 
@@ -73,6 +67,10 @@ public:
 
 protected:
 	MeasurementTypes m_mode;
+
+public:
+	static std::string GetDriverNameInternal();
+	METER_INITPROC(RohdeSchwarzHMC8012Multimeter)
 };
 
 #endif

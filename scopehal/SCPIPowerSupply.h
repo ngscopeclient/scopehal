@@ -27,39 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#ifndef SCPIPowerSupply_h
+#define SCPIPowerSupply_h
 
 /**
-	@brief Siglent vector signal generators
-
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
+	@brief An SCPI-based power supply
  */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+class SCPIPowerSupply 	: public virtual PowerSupply
+						, public virtual SCPIInstrument
 {
 public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+	SCPIPowerSupply();
+	virtual ~SCPIPowerSupply();
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dynamic creation
 public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
+	typedef SCPIPowerSupply* (*PowerCreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, PowerCreateProcType proc);
+
+	static void EnumDrivers(std::vector<std::string>& names);
+	static SCPIPowerSupply* CreatePowerSupply(std::string driver, SCPITransport* transport);
+
+	virtual std::string GetDriverName() =0;
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, PowerCreateProcType > PowerCreateMapType;
+	static PowerCreateMapType m_powercreateprocs;
 };
+
+#define POWER_INITPROC(T) \
+	static SCPIPowerSupply* CreateInstance(SCPITransport* transport) \
+	{	return new T(transport); } \
+	virtual std::string GetDriverName() \
+	{ return GetDriverNameInternal(); }
+
+#define AddPowerSupplyDriverClass(T) SCPIPowerSupply::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+
 
 #endif

@@ -27,39 +27,44 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#ifndef SCPIMultimeter_h
+#define SCPIMultimeter_h
 
 /**
-	@brief Siglent vector signal generators
-
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
+	@brief An SCPI-based multimeter
  */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+class SCPIMultimeter 	: public virtual Multimeter
+						, public virtual SCPIInstrument
 {
 public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+	SCPIMultimeter();
+	virtual ~SCPIMultimeter();
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dynamic creation
 public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
+	typedef SCPIMultimeter* (*MeterCreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, MeterCreateProcType proc);
+
+	static void EnumDrivers(std::vector<std::string>& names);
+	static SCPIMultimeter* CreateMultimeter(std::string driver, SCPITransport* transport);
+
+	virtual std::string GetDriverName() =0;
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, MeterCreateProcType > MeterCreateMapType;
+	static MeterCreateMapType m_metercreateprocs;
 };
+
+//Use this for multimeters that are not also oscilloscopes
+#define METER_INITPROC(T) \
+	static SCPIMultimeter* CreateInstance(SCPITransport* transport) \
+	{	return new T(transport); } \
+	virtual std::string GetDriverName() \
+	{ return GetDriverNameInternal(); }
+
+#define AddMultimeterDriverClass(T) SCPIMultimeter::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+
 
 #endif

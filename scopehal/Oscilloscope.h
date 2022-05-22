@@ -512,16 +512,6 @@ public:
 	 */
 	virtual void EnableTriggerOutput();
 
-	/**
-		@brief Gets the connection string for our transport
-	 */
-	virtual std::string GetTransportConnectionString() =0;
-
-	/**
-		@brief Gets the name of our transport
-	 */
-	virtual std::string GetTransportName() =0;
-
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Memory depth / sample rate control.
@@ -921,25 +911,9 @@ protected:
 	static CreateMapType m_createprocs;
 };
 
+#ifndef STRINGIFY
 #define STRINGIFY(T) #T
-
-/*
-	For some reason, certain classes don't like being created with OSCILLOSCOPE_INITPROC.
-	sizeof(T) has inconsistent values between .h and .cpp and we get memory bounds errors writing off the end of a
-	too-small memory block in the constructor.
-
-	If this happens use OSCILLOSCOPE_INITPROC_H in the header and OSCILLOSCOPE_INITPROC_CPP in the source.
-
-	The cause of this is currently unknown but this workaround shows no errors in valgrind and doesn't crash sooo...
-*/
-#define OSCILLOSCOPE_INITPROC_H(T) \
-	static Oscilloscope* CreateInstance(SCPITransport* transport); \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define OSCILLOSCOPE_INITPROC_CPP(T) \
-	Oscilloscope* T::CreateInstance(SCPITransport* transport) \
-	{ return new T(transport); }
+#endif
 
 #define OSCILLOSCOPE_INITPROC(T) \
 	static Oscilloscope* CreateInstance(SCPITransport* transport) \

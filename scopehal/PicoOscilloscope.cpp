@@ -47,7 +47,9 @@ using namespace std;
 //Construction / destruction
 
 PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
-	: RemoteBridgeOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
+	, RemoteBridgeOscilloscope(transport)
 {
 	//Set up initial cache configuration as "not valid" and let it populate as we go
 

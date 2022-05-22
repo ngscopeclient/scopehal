@@ -27,39 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#include "scopehal.h"
 
-/**
-	@brief Siglent vector signal generators
+using namespace std;
 
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
- */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+SCPIRFSignalGenerator::VSGCreateMapType SCPIRFSignalGenerator::m_vsgcreateprocs;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPIRFSignalGenerator::SCPIRFSignalGenerator()
 {
-public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+}
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+SCPIRFSignalGenerator::~SCPIRFSignalGenerator()
+{
 
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
+}
 
-public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
 
-#endif
+void SCPIRFSignalGenerator::DoAddDriverClass(string name, VSGCreateProcType proc)
+{
+	m_vsgcreateprocs[name] = proc;
+}
+
+void SCPIRFSignalGenerator::EnumDrivers(vector<string>& names)
+{
+	for(auto it=m_vsgcreateprocs.begin(); it != m_vsgcreateprocs.end(); ++it)
+		names.push_back(it->first);
+}
+
+SCPIRFSignalGenerator* SCPIRFSignalGenerator::CreateRFSignalGenerator(string driver, SCPITransport* transport)
+{
+	if(m_vsgcreateprocs.find(driver) != m_vsgcreateprocs.end())
+		return m_vsgcreateprocs[driver](transport);
+
+	LogError("Invalid driver name");
+	return NULL;
+}

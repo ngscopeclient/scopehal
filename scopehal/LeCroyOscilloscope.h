@@ -47,8 +47,8 @@ class WindowTrigger;
 	May not work on lower-end instruments that are rebranded third-party hardware.
  */
 class LeCroyOscilloscope
-	: public SCPIOscilloscope
-	, public Multimeter
+	: public virtual SCPIOscilloscope
+	, public virtual SCPIMultimeter
 	, public FunctionGenerator
 {
 public:

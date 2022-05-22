@@ -105,7 +105,8 @@ static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold 
 // Construction / destruction
 
 SiglentSCPIOscilloscope::SiglentSCPIOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 	, m_hasLA(false)
 	, m_hasDVM(false)
 	, m_hasFunctionGen(false)

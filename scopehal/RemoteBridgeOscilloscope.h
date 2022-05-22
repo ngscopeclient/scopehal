@@ -36,7 +36,7 @@
 	@brief An oscilloscope connected over a SDK-to-SCPI bridge that follows our pattern
 	       (i.e. uses scpi-server-tools)
  */
-class RemoteBridgeOscilloscope 	: public SCPIOscilloscope
+class RemoteBridgeOscilloscope 	: public virtual SCPIOscilloscope
 {
 public:
 	RemoteBridgeOscilloscope(SCPITransport* transport, bool identify = true);

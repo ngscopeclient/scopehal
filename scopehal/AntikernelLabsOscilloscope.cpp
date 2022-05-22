@@ -38,7 +38,8 @@ using namespace std;
 // Construction / destruction
 
 AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 	/*
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)*/

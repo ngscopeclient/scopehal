@@ -27,39 +27,47 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SiglentVectorSignalGenerator_h
-#define SiglentVectorSignalGenerator_h
+#include "scopehal.h"
 
-/**
-	@brief Siglent vector signal generators
+using namespace std;
 
-	Tested on SSG5000X-V series. May also support 3000X but not tested.
- */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPIInstrument::SCPIInstrument(SCPITransport* transport, bool identify)
+	: SCPIDevice(transport, identify)
 {
-public:
-	SiglentVectorSignalGenerator(SCPITransport* transport);
-	virtual ~SiglentVectorSignalGenerator();
+}
 
-	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+SCPIInstrument::~SCPIInstrument()
+{
 
-	//Vector signal generator
-	virtual int GetChannelCount();
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
+}
 
-public:
-	static std::string GetDriverNameInternal();
-	VSG_INITPROC(SiglentVectorSignalGenerator)
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-#endif
+string SCPIInstrument::GetTransportName()
+{
+	return m_transport->GetName();
+}
+
+string SCPIInstrument::GetTransportConnectionString()
+{
+	return m_transport->GetConnectionString();
+}
+
+string SCPIInstrument::GetName()
+{
+	return m_model;
+}
+
+string SCPIInstrument::GetVendor()
+{
+	return m_vendor;
+}
+
+string SCPIInstrument::GetSerial()
+{
+	return m_serial;
+}

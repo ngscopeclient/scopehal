@@ -43,7 +43,8 @@ using namespace std;
 // Construction / destruction
 
 DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport, false)
+	: SCPIDevice(transport, false)
+	, SCPIInstrument(transport, false)
 	, m_extTrigger(NULL)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)

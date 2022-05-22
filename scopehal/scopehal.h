@@ -95,7 +95,11 @@
 #include "SParameterChannel.h"
 #include "PowerSupply.h"
 #include "RFSignalGenerator.h"
+#include "SCPIInstrument.h"
+#include "SCPIMultimeter.h"
 #include "SCPIOscilloscope.h"
+#include "SCPIRFSignalGenerator.h"
+#include "SCPIPowerSupply.h"
 
 #include "SParameters.h"
 #include "TouchstoneParser.h"
