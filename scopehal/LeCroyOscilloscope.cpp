@@ -1996,9 +1996,7 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 			break;
 
 		//not implemented, disable
-		case Multimeter::AC_CURRENT:
-		case Multimeter::DC_CURRENT:
-		case Multimeter::TEMPERATURE:
+		default:
 			LogWarning("unsupported multimeter mode\n");
 			return;
 

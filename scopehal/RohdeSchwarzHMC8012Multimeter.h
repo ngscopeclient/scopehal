@@ -43,6 +43,7 @@ public:
 	virtual unsigned int GetInstrumentTypes();
 
 	virtual unsigned int GetMeasurementTypes();
+	virtual unsigned int GetSecondaryMeasurementTypes();
 
 	//Channel info
 	virtual int GetMeterChannelCount();
@@ -52,7 +53,9 @@ public:
 
 	//Meter operating mode
 	virtual MeasurementTypes GetMeterMode();
+	virtual MeasurementTypes GetSecondaryMeterMode();
 	virtual void SetMeterMode(MeasurementTypes type);
+	virtual void SetSecondaryMeterMode(MeasurementTypes type);
 
 	//Control
 	virtual void SetMeterAutoRange(bool enable);
@@ -64,9 +67,13 @@ public:
 
 	//Get readings
 	virtual double GetMeterValue();
+	virtual double GetSecondaryMeterValue();
 
 protected:
+	bool m_modeValid;
+	bool m_secmodeValid;
 	MeasurementTypes m_mode;
+	MeasurementTypes m_secmode;
 
 public:
 	static std::string GetDriverNameInternal();
