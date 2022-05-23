@@ -77,6 +77,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	MDIODecoder.cpp
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
+	MultimeterTrendFilter.cpp
 	MultiplyFilter.cpp
 	NoiseFilter.cpp
 	OFDMDemodulator.cpp

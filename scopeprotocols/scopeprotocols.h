@@ -113,6 +113,7 @@
 #include "MDIODecoder.h"
 #include "MilStd1553Decoder.h"
 #include "MovingAverageFilter.h"
+#include "MultimeterTrendFilter.h"
 #include "MultiplyFilter.h"
 #include "NoiseFilter.h"
 #include "OFDMDemodulator.h"
