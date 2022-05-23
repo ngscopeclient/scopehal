@@ -255,11 +255,13 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 
 void RohdeSchwarzHMC8012Multimeter::SetSecondaryMeterMode(Multimeter::MeasurementTypes type)
 {
+	auto mode = GetMeterMode();
+
 	switch(type)
 	{
 		case FREQUENCY:
 			{
-				switch(GetMeterMode())
+				switch(mode)
 				{
 					case AC_RMS_AMPLITUDE:
 						m_transport->SendCommand("CONF:FREQ:VOLT");
@@ -274,6 +276,10 @@ void RohdeSchwarzHMC8012Multimeter::SetSecondaryMeterMode(Multimeter::Measuremen
 						return;
 				}
 			}
+			break;
+
+		case NONE:
+			SetMeterMode(mode);
 			break;
 
 		//not supported
