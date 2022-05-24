@@ -1406,6 +1406,64 @@ bool TektronixOscilloscope::AcquireData()
 	return true;
 }
 
+bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& preamble_out)
+{
+	size_t semicolons = std::count(preamble_in.begin(), preamble_in.end(), ';');
+
+	int read = 0;
+	mso56_preamble& p = preamble_out;
+
+	if (semicolons == 23)
+	{
+		read = sscanf(preamble_in.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order, p.wfid,
+			&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+			&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+
+		if (read == 22) return true;
+	}
+	else if (semicolons == 22)
+	{
+		read = sscanf(preamble_in.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%d;%c;%31[^;];" // wfid missing
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order,
+			&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+			&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+		strcpy(p.wfid, "<missing (Tek bug)>");
+
+		LogDebug("!!Tek decided to not send the WFId in WFMO? preamble. Compensating!!\n");
+
+		if (read == 21) return true;
+	}
+	
+	LogWarning("Preamble error (read only %d fields)\n", read);
+	LogDebug(" -> Failed preamble: %s\n", preamble_in.c_str());
+	return false;
+}
+
+void TektronixOscilloscope::ResynchronizeSCPI()
+{
+	//Resynchronize
+	LogWarning("SCPI out of sync, attempting to recover\n");
+	while(1)
+	{
+		m_transport->SendCommandImmediate("\n*CLS");
+		// The manual has very confusing things to say about this needing to follow an "<EOI>" which
+		// appears to be a holdover from IEEE488 that IDK how is supposed to work (or not) over socket
+		// transport. Who knows. Another option: set Protocol to Terminal in socket server settings and
+		// use '!d' which issues the "DCL (Device CLear) control message" but this means dealing with
+		// prompts and stuff like that.
+
+		m_transport->FlushRXBuffer();
+
+		if (IDPing() != "")
+			break;
+	}
+}
+
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Seems like we might need a command before reading data after the trigger?
@@ -1413,30 +1471,6 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 	//Make sure record length is valid
 	GetSampleDepth();
-
-	//Preamble fields (not all are used)
-	int byte_num;
-	int bit_num;
-	char encoding[32];
-	char bin_format[32];
-	char asc_format[32];
-	char byte_order[32];
-	char wfid[256];
-	int nr_pt;
-	char pt_fmt[32];
-	char pt_order[32];
-	char xunit[32];
-	double xincrement;
-	double xzero;
-	int pt_off;
-	char yunit[32];
-	double ymult;
-	double yoff;
-	double yzero;
-	char domain[32];
-	char wfmtype[32];
-	double centerfreq;
-	double span;
 
 	//Ask for the analog data
 	m_transport->SendCommandImmediate("DAT:WID 1");					//8-bit data in NORMAL mode
@@ -1454,67 +1488,90 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		// Set source & get preamble+data
-		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-
-		//Process it (grab the whole block, semicolons and all)
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-
-		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
-		m_channelOffsets[i] = -yoff;
-
-		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
-		LogIndenter li2;
-
-		//Read the data block
-		size_t nsamples;
-		int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
-		if(samples == NULL)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			//Resynchronize
-			LogWarning("Timeout, attempting to recover\n");
-			while(IDPing() == "")
-			{}
 
-			return false;
+			// Set source & get preamble+data
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
+
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			//Process it (grab the whole block, semicolons and all)
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			timebase = preamble.xincrement * FS_PER_SECOND;	//scope gives sec, not fs
+			m_channelOffsets[i] = -preamble.yoff;
+
+			//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+			LogIndenter li2;
+
+			//Read the data block
+			size_t nsamples;
+			int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
+			if(samples == NULL)
+			{
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
+			}
+
+			if (nsamples != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Set up the capture we're going to store our data into
+			//(no TDC data or fine timestamping available on Tektronix scopes?)
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->m_densePacked = true;
+			cap->m_timescale = timebase;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time(NULL);
+			double t = GetTime();
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+			cap->Resize(nsamples);
+
+			Convert8BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				samples,
+				preamble.ymult,
+				-preamble.yoff,
+				nsamples,
+				0);
+
+			//Done, update the data
+			pending_waveforms[i].push_back(cap);
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			if (m_transport->ReadReply() != "")
+				LogWarning("Tek has junk after CURV? reply\n");
+
+			succeeded = true;
+			break;
 		}
 
-		//Set up the capture we're going to store our data into
-		//(no TDC data or fine timestamping available on Tektronix scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_densePacked = true;
-		cap->m_timescale = timebase;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-		cap->Resize(nsamples);
-
-		Convert8BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
-			samples,
-			ymult,
-			-yoff,
-			nsamples,
-			0);
-
-		//Done, update the data
-		pending_waveforms[i].push_back(cap);
-
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
+			return false;
+		}
 	}
 
 	//Get the spectrum stuff
@@ -1540,65 +1597,94 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			firstSpectrum = false;
 		}
 
-		// Set source & get preamble+data
-		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-
-		//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
-		//LogIndenter li2;
-
-		//Process it
-		double hzbase = 0;
-		double hzoff = 0;
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &hzbase, &hzoff,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-		m_channelOffsets[i] = -yoff;
-
-		//Read the data block
-		size_t msglen;
-		double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
-		if(samples == NULL)
-			return false;
-		size_t nsamples = msglen/8;
-
-		//Set up the capture we're going to store our data into
-		//(no TDC data or fine timestamping available on Tektronix scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = hzbase;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		cap->m_densePacked = true;
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-		cap->Resize(nsamples);
-
-		//We get dBm from the instrument, so just have to convert double to single precision
-		//TODO: are other units possible here?
-		int64_t ibase = hzoff / hzbase;
-		for(size_t j=0; j<nsamples; j++)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			cap->m_offsets[j] = j + ibase;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = ymult*samples[j] + yoff;
+
+			// Set source & get preamble+data
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
+
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
+			//LogIndenter li2;
+
+			//Process it
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			m_channelOffsets[i] = -preamble.yoff;
+
+			//Read the data block
+			size_t msglen;
+			double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
+			if(samples == NULL)
+			{
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
+			}
+
+			size_t nsamples = msglen/8;
+
+			if (nsamples != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Set up the capture we're going to store our data into
+			//(no TDC data or fine timestamping available on Tektronix scopes?)
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->m_timescale = preamble.hzbase;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time(NULL);
+			cap->m_densePacked = true;
+			double t = GetTime();
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+			cap->Resize(nsamples);
+
+			//We get dBm from the instrument, so just have to convert double to single precision
+			//TODO: are other units possible here?
+			int64_t ibase = preamble.hzoff / preamble.hzbase;
+			for(size_t j=0; j<nsamples; j++)
+			{
+				cap->m_offsets[j] = j + ibase;
+				cap->m_durations[j] = 1;
+				cap->m_samples[j] = preamble.ymult*samples[j] + preamble.yoff;
+			}
+
+			//Done, update the data
+			pending_waveforms[nchan].push_back(cap);
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			m_transport->ReadReply();
+
+			//Look for peaks
+			//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
+			dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000);
+
+			succeeded = true;
+			break;
 		}
 
-		//Done, update the data
-		pending_waveforms[nchan].push_back(cap);
-
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
-
-		//Look for peaks
-		//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
-		dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000);
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
+			return false;
+		}
 	}
 
 	//Get the digital stuff
@@ -1643,56 +1729,87 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			firstDigital = false;
 		}
 
-		//Ask for all of the data
-		m_transport->SendCommandImmediate(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
-
-		//And the acutal data
-		size_t msglen;
-		char* samples = (char*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
-		if(samples == NULL)
-			return false;
-
-		//Process the data for each channel
-		for(int j=0; j<8; j++)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			//Set up the capture we're going to store our data into
-			//(no TDC data or fine timestamping available on Tektronix scopes?)
-			DigitalWaveform* cap = new DigitalWaveform;
-			cap->m_timescale = timebase;
-			cap->m_triggerPhase = 0;
-			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
-			double t = GetTime();
-			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-			cap->Resize(msglen);
 
-			//Extract sample data
-			int mask = (1 << j);
-			for(size_t k=0; k<msglen; k++)
+			//Ask for all of the data
+			m_transport->SendCommandImmediate(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
+
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			timebase = preamble.xincrement * FS_PER_SECOND;	//scope gives sec, not fs
+
+			//And the acutal data
+			size_t msglen;
+			char* samples = (char*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
+			if(samples == NULL)
 			{
-				cap->m_offsets[k] = k;
-				cap->m_durations[k] = 1;
-				cap->m_samples[k] = (samples[k] & mask) ? true : false;
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
 			}
 
-			//Done, update the data
-			pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
+			if (msglen != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Process the data for each channel
+			for(int j=0; j<8; j++)
+			{
+				//Set up the capture we're going to store our data into
+				//(no TDC data or fine timestamping available on Tektronix scopes?)
+				DigitalWaveform* cap = new DigitalWaveform;
+				cap->m_timescale = timebase;
+				cap->m_triggerPhase = 0;
+				cap->m_startTimestamp = time(NULL);
+				cap->m_densePacked = true;
+				double t = GetTime();
+				cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+				cap->Resize(msglen);
+
+				//Extract sample data
+				int mask = (1 << j);
+				for(size_t k=0; k<msglen; k++)
+				{
+					cap->m_offsets[k] = k;
+					cap->m_durations[k] = 1;
+					cap->m_samples[k] = (samples[k] & mask) ? true : false;
+				}
+
+				//Done, update the data
+				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
+			}
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			m_transport->ReadReply();
+
+			succeeded = true;
+			break;
 		}
 
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
+			return false;
+		}
 	}
 	return true;
 }
@@ -1860,7 +1977,7 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 	vector<uint64_t> ret;
 
 	const int64_t k = 1000;
-	//const int64_t m = k*k;
+	const int64_t m = k*k;
 
 	switch(m_family)
 	{
@@ -1881,9 +1998,6 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(200 * k);
 				ret.push_back(500 * k);
 
-				//Deeper memory is disabled because using it seems to crash the scope firmware. Not sure why yet.
-
-				/*
 				ret.push_back(1 * m);
 				ret.push_back(2 * m);
 				ret.push_back(5 * m);
@@ -1891,7 +2005,8 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(20 * m);
 				ret.push_back(50 * m);
 				ret.push_back(62500 * k);
-				*/
+				ret.push_back(100 * m);
+				ret.push_back(125 * m);
 			}
 			break;
 
