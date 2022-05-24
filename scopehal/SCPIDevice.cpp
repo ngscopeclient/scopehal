@@ -39,22 +39,37 @@ SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify)
 {
 	if(identify)
 	{
-		//Ask for the ID
-		m_transport->SendCommand("*IDN?");
-		string reply = m_transport->ReadReply();
-		char vendor[128] = "";
-		char model[128] = "";
-		char serial[128] = "";
-		char version[128] = "";
-		if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			LogError("Bad IDN response %s\n", reply.c_str());
+			//Ask for the ID
+			m_transport->SendCommand("*IDN?");
+			string reply = m_transport->ReadReply();
+			char vendor[128] = "";
+			char model[128] = "";
+			char serial[128] = "";
+			char version[128] = "";
+			if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+			{
+				LogWarning("Bad IDN response %s\n", reply.c_str());
+				m_transport->FlushRXBuffer();
+				continue; // retry
+			}
+			m_vendor = vendor;
+			m_model = model;
+			m_serial = serial;
+			m_fwVersion = version;
+
+			succeeded = true;
+			m_transport->FlushRXBuffer(); // In case our *IDNs got queued behind each other (Tek...)
+			break; // success
+		}
+
+		if (!succeeded)
+		{
+			LogError("Persistent bad IDN response, giving up\n");
 			return;
 		}
-		m_vendor = vendor;
-		m_model = model;
-		m_serial = serial;
-		m_fwVersion = version;
 	}
 }
 
