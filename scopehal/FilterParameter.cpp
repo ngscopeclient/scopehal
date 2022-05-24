@@ -54,6 +54,8 @@ FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 	, m_intval(0)
 	, m_floatval(0)
 	, m_string("")
+	, m_hidden(false)
+	, m_readOnly(false)
 {
 
 }

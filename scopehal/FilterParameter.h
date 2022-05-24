@@ -156,8 +156,39 @@ public:
 	sigc::signal<void> signal_enums_changed()
 	{ return m_enumSignal; }
 
+	/**
+		@brief Marks this parameter to be hidden from the GUI.
+
+		The most common use case for this is a derived filter class that wraps a base filter class but automatically
+		calculates coefficients or other configuration based on user input. The coefficients are no longer direct user
+		inputs, so they should be marked hidden to avoid confusing the user.
+	 */
+	void MarkHidden()
+	{ m_hidden = true; }
+
+	/**
+		@brief Checks if this parameter should be hidden in the GUI.
+	 */
+	bool IsHidden()
+	{ return m_hidden; }
+
+	/**
+		@brief Marks this parameter as read-only in the GUI.
+
+		This is typically used for a filter to output configuration values to the user (bandwidth, resolution, etc)
+		calculated from user input, while not allowing the user to override them.
+	 */
+	void MarkReadOnly()
+	{ m_readOnly = true; }
+
+	/**
+		@brief Checks if this parameter should be read-only in the GUI.
+	 */
+	bool IsReadOnly()
+	{ return m_readOnly; }
+
 protected:
-	ParameterTypes m_type;
+	ParameterTypes				m_type;
 
 	sigc::signal<void>			m_changeSignal;
 	sigc::signal<void>			m_enumSignal;
@@ -170,6 +201,9 @@ protected:
 	int64_t						m_intval;
 	float						m_floatval;
 	std::string					m_string;
+
+	bool						m_hidden;
+	bool						m_readOnly;
 };
 
 #endif
