@@ -37,6 +37,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DVIDecoder.cpp
 	EmphasisFilter.cpp
 	EmphasisRemovalFilter.cpp
+	EnhancedResolutionFilter.cpp
 	ESPIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
