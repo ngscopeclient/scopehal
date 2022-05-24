@@ -309,6 +309,12 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 
 void TektronixOscilloscope::DetectProbes()
 {
+	std::vector<bool> currentlyEnabled;
+	for (size_t i = 0; i < m_analogChannelCount; i++)
+	{
+		currentlyEnabled.push_back(IsChannelEnabled(i));
+	}
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -339,6 +345,12 @@ void TektronixOscilloscope::DetectProbes()
 
 		default:
 			break;
+	}
+
+	for (size_t i = 0; i < m_analogChannelCount; i++)
+	{
+		if (currentlyEnabled[i]) EnableChannel(i);
+		else                     DisableChannel(i);
 	}
 }
 
@@ -375,36 +387,33 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//Pre-checks based on type
-	if(IsDigital(i))
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-		//If the parent analog channel doesn't have a digital probe, we're disabled
-		size_t parent = m_flexChannelParents[m_channels[i]];
-		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-	else if(IsAnalog(i))
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeTypes.find(i) != m_probeTypes.end())
+		{
+			//Pre-checks based on type
+			if(IsDigital(i))
+			{
+				//If the parent analog channel doesn't have a digital probe, we're disabled
+				size_t parent = m_flexChannelParents[m_channels[i]];
+				if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+			else if(IsAnalog(i))
+			{
+				//If we're an analog channel with a digital probe connected, the analog channel is unusable
+				if(m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+			else if(IsSpectrum(i))
+			{
+				//If we're an analog channel with a digital probe connected, the analog channel is unusable
+				if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+		}
 
-		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-	else if(IsSpectrum(i))
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-
-		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-
-	//Check the cache
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
 	}
@@ -423,7 +432,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			}
 			else
 			{
-				m_transport->SendCommandQueuedWithReply(
+				reply = m_transport->SendCommandQueuedWithReply(
 					string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 			}
 			break;
