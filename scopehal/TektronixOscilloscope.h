@@ -211,7 +211,43 @@ public:
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
+	struct mso56_preamble
+	{
+		int byte_num;
+		int bit_num;
+		char encoding[32];
+		char bin_format[32];
+		char asc_format[32];
+		char byte_order[32];
+		char wfid[256];
+		int nr_pt;
+		char pt_fmt[32];
+		char pt_order[32];
+		char xunit[32];
+		union
+		{
+			double xincrement;
+			double hzbase;
+		};
+		union
+		{
+			double xzero;
+			double hzoff;
+		};
+		int pt_off;
+		char yunit[32];
+		double ymult;
+		double yoff;
+		double yzero;
+		char domain[32];
+		char wfmtype[32];
+		double centerfreq;
+		double span;
+	};
+
 	//acquisition
+	void ResynchronizeSCPI();
+	bool ReadPreamble(std::string& preamble_in, mso56_preamble& preamble_out);
 	bool AcquireDataMSO56(std::map<int, std::vector<WaveformBase*> >& pending_waveforms);
 	void DetectProbes();
 
