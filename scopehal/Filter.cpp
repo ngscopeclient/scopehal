@@ -1471,6 +1471,24 @@ void Filter::SetDefaultName()
 		}
 	}
 
+	//If we have any non-import inputs, hide all import inputs
+	//This prevents e.g. s-parameter filenames propagating into all dependent filter names
+	bool hasNonImportInputs = false;
+	set<StreamDescriptor> imports;
+	for(auto i : inputs)
+	{
+		auto f = dynamic_cast<Filter*>(i.m_channel);
+		if((f != nullptr) && (f->GetInputCount() == 0) )
+			imports.emplace(i);
+		else
+			hasNonImportInputs = true;
+	}
+	if(hasNonImportInputs)
+	{
+		for(auto i : imports)
+			inputs.erase(i);
+	}
+
 	//Sort the inputs alphabetically (up to now, they're sorted by the std::set)
 	vector<string> sorted;
 	for(auto i : inputs)
