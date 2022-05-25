@@ -1098,7 +1098,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
 		size_t nchan = i - (m_analogChannelCount+1);
 		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'");
-		string str = m_transport->ReadReply();
+		string str = Trim(m_transport->ReadReply());
 		if(str == "0")
 			m_channelsEnabled[i] = false;
 		else
