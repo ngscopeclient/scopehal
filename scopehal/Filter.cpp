@@ -1504,7 +1504,7 @@ void Filter::SetDefaultName()
 	string pname2;
 	for(auto c : pname)
 	{
-		if(isalpha(c))
+		if(isalnum(c))
 			pname2 += c;
 	}
 	string name = pname2 + +"_" + to_string(m_instanceNum + 1);
