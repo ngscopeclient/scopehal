@@ -94,6 +94,10 @@ public:
 
 protected:
 	uint8_t RunScrambler(uint16_t& state);
+
+	void RefreshPorts();
+
+	std::string m_portCountName;
 };
 
 #endif
