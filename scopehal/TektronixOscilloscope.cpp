@@ -2109,6 +2109,17 @@ void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_sampleDepth = depth;
 		m_sampleDepthValid = true;
+
+		for (size_t i = 0; i < m_analogChannelCount; i++)
+		{
+			if (IsChannelEnabled(m_spectrumChannelBase + i))
+			{
+				depth = min<size_t>(depth, 62500 * 1000);
+				// Having a spectrum channel enabled silently caps the depth to 62.5Mpts.
+				// Setting it higher via SCPI "works" but does really weird stuff to the
+				// hdiv that breaks us, so cap.
+			}
+		}
 	}
 
 	//Send it
