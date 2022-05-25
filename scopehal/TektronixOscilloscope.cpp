@@ -1473,8 +1473,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	GetSampleDepth();
 
 	//Ask for the analog data
-	m_transport->SendCommandImmediate("DAT:WID 1");					//8-bit data in NORMAL mode
-	m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+	bool firstAnalog = true;
 	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -1491,9 +1490,15 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		bool succeeded = false;
 		for (int retry = 0; retry < 3; retry++)
 		{
-
-			// Set source & get preamble+data
+			// Set source (before setting format)
 			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
+
+			if (firstAnalog || retry) // set again on retry
+			{
+				m_transport->SendCommandImmediate("DAT:WID 1");					//8-bit data in NORMAL mode
+				m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+				firstAnalog = false;
+			}
 
 			//Ask for the waveform preamble
 			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
@@ -1589,20 +1594,19 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		//Select mode
-		if(firstSpectrum)
-		{
-			m_transport->SendCommandImmediate("DAT:WID 8");					//double precision floating point data
-			m_transport->SendCommandImmediate("DAT:ENC SFPB");				//IEEE754 float
-			firstSpectrum = false;
-		}
-
 		bool succeeded = false;
 		for (int retry = 0; retry < 3; retry++)
 		{
-
-			// Set source & get preamble+data
+			// Set source (before setting format)
 			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
+
+			//Select mode
+			if(firstSpectrum || retry) // set again on retry
+			{
+				m_transport->SendCommandImmediate("DAT:WID 8");					//double precision floating point data
+				m_transport->SendCommandImmediate("DAT:ENC SFPB");				//IEEE754 float
+				firstSpectrum = false;
+			}
 
 			//Ask for the waveform preamble
 			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
@@ -1721,20 +1725,19 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		//Configuration
-		if(firstDigital)
-		{
-			m_transport->SendCommandImmediate("DAT:WID 1");					//8 data bits per channel
-			m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
-			firstDigital = false;
-		}
-
 		bool succeeded = false;
 		for (int retry = 0; retry < 3; retry++)
 		{
-
-			//Ask for all of the data
+			//Set source (before setting format); Ask for all of the data
 			m_transport->SendCommandImmediate(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
+
+			//Configuration
+			if(firstDigital || retry) // set again on retry
+			{
+				m_transport->SendCommandImmediate("DAT:WID 1");					//8 data bits per channel
+				m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+				firstDigital = false;
+			}
 
 			//Ask for the waveform preamble
 			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
@@ -1784,12 +1787,41 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 				//Extract sample data
 				int mask = (1 << j);
-				for(size_t k=0; k<msglen; k++)
+
+				bool last = (samples[0] & mask) ? true : false;
+
+				cap->m_offsets[0] = 0;
+				cap->m_durations[0] = 1;
+				cap->m_samples[0] = last;
+
+				size_t k = 0;
+
+				for(size_t m=1; m<msglen; m++)
 				{
-					cap->m_offsets[k] = k;
-					cap->m_durations[k] = 1;
-					cap->m_samples[k] = (samples[k] & mask) ? true : false;
+					bool sample = (samples[m] & mask) ? true : false;
+
+					//Deduplicate consecutive samples with same value
+					//FIXME: temporary workaround for rendering bugs
+					//if(last == sample)
+					if( (last == sample) && ((m+5) < msglen) && (m > 5))
+						cap->m_durations[k] ++;
+
+					//Nope, it toggled - store the new value
+					else
+					{
+						k++;
+						cap->m_offsets[k] = m;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = sample;
+						last = sample;
+					}
 				}
+
+				//Free space reclaimed by deduplication
+				cap->Resize(k);
+				cap->m_offsets.shrink_to_fit();
+				cap->m_durations.shrink_to_fit();
+				cap->m_samples.shrink_to_fit();
 
 				//Done, update the data
 				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
