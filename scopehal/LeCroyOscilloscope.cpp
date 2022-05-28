@@ -33,6 +33,7 @@
 #include <locale>
 #include <omp.h>
 
+#include "CDR8B10BTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -58,7 +59,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasI2cTrigger(false)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
-	, m_hasSerdesTrigger(false)
+	, m_has8b10bTrigger(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -449,6 +450,14 @@ void LeCroyOscilloscope::DetectOptions()
 				if(o == "SMBUS")
 					type = "Trig/decode";
 			}
+			//High speed serial trigger
+			else if(o == "SERIALPAT_T")
+			{
+				type = "Trigger";
+				desc = "Serial Pattern (8b10b/64b66b/NRZ)";
+				action = "Enabling trigger";
+				m_has8b10bTrigger = true;
+			}
 
 			//Currently unsupported protocol decode with trigger capability, but no _TD in the option code
 			//Print out names but ignore for now
@@ -515,13 +524,6 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "Protocol Compliance";
 				desc = "HDMI";
-			}
-
-			//High speed serial trigger
-			else if(o == "SERIALPAT_T")
-			{
-				type = "Trigger";
-				desc = "Serial Pattern (8b10b/64b66b/NRZ)";
 			}
 
 			//Protocol decodes without trigger capability
@@ -3908,7 +3910,9 @@ void LeCroyOscilloscope::PullTrigger()
 	//Figure out what kind of trigger is active.
 	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Type'");
 	string reply = Trim(m_transport->ReadReply());
-	if (reply == "Dropout")
+	if (reply == "C8B10B")
+		Pull8b10bTrigger();
+	else if (reply == "Dropout")
 		PullDropoutTrigger();
 	else if (reply == "Edge")
 		PullEdgeTrigger();
@@ -3950,6 +3954,58 @@ void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+/**
+	@brief Reads settings for an 8B/10B trigger from the instrument
+ */
+void LeCroyOscilloscope::Pull8b10bTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != nullptr) && (dynamic_cast<CDR8B10BTrigger*>(m_trigger) != nullptr) )
+	{
+		delete m_trigger;
+		m_trigger = nullptr;
+	}
+
+	//Create a new trigger if necessary
+	auto trig = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
+	if(trig == nullptr)
+	{
+		trig = new CDR8B10BTrigger(this);
+		m_trigger = trig;
+
+		trig->signal_calculateBitRate().connect(sigc::mem_fun(*this, &LeCroyOscilloscope::OnCDRTriggerAutoBaud));
+	}
+
+	//Get the baud rate
+	Unit bps(Unit::UNIT_BITRATE);
+	auto reply = m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.BitRate'");
+	trig->SetBitRate(bps.ParseString(reply));
+
+	//TODO
+	LogDebug("Pull8b10bTrigger\n");
+}
+
+/**
+	@brief Automatic baud rate configuration
+ */
+void LeCroyOscilloscope::OnCDRTriggerAutoBaud()
+{
+	auto trig = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
+	if(trig == nullptr)
+		return;
+
+	//Request autobaud
+	m_transport->SendCommandQueued(
+		"VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ComputeBitRate'");
+
+	//Get the new baud rate
+	Unit bps(Unit::UNIT_BITRATE);
+	auto reply = m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.BitRate'");
+	trig->SetBitRate(bps.ParseString(reply));
 }
 
 /**
@@ -4386,6 +4442,7 @@ void LeCroyOscilloscope::PushTrigger()
 	m_transport->SendCommand(tmp);
 
 	//The rest depends on the type
+	auto c8t = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
@@ -4394,7 +4451,12 @@ void LeCroyOscilloscope::PushTrigger()
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
-	if(dt)
+	if(c8t)
+	{
+		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"C8B10B\"");
+		Push8b10bTrigger(c8t);
+	}
+	else if(dt)
 	{
 		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"");
 		PushDropoutTrigger(dt);
@@ -4437,6 +4499,13 @@ void LeCroyOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for an 8B/10B trigger to the instrument
+ */
+void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
+{
 }
 
 /**
@@ -4747,6 +4816,8 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	ret.push_back(SlewRateTrigger::GetTriggerName());
 	if(m_hasUartTrigger)
 		ret.push_back(UartTrigger::GetTriggerName());
+	if(m_has8b10bTrigger)
+		ret.push_back(CDR8B10BTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,6 +40,7 @@ class RuntTrigger;
 class SlewRateTrigger;
 class UartTrigger;
 class WindowTrigger;
+class CDR8B10BTrigger;
 
 /**
 	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
@@ -244,6 +245,9 @@ public:
 	virtual void SetADCMode(size_t channel, size_t mode);
 
 protected:
+
+	//Trigger config
+	void Pull8b10bTrigger();
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();
 	void PullGlitchTrigger();
@@ -257,6 +261,7 @@ protected:
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
+	void Push8b10bTrigger(CDR8B10BTrigger* trig);
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& tree);
 	void PushGlitchTrigger(GlitchTrigger* trig);
@@ -268,6 +273,8 @@ protected:
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushUartTrigger(UartTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
+
+	void OnCDRTriggerAutoBaud();
 
 	void BulkCheckChannelEnableState();
 
@@ -308,7 +315,7 @@ protected:
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
-	bool m_hasSerdesTrigger;
+	bool m_has8b10bTrigger;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
