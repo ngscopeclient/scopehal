@@ -68,6 +68,8 @@ set(SCOPEHAL_SOURCES
 
 	FlowGraphNode.cpp
 	Trigger.cpp
+	CDRTrigger.cpp
+	CDR8B10BTrigger.cpp
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	GlitchTrigger.cpp
