@@ -335,12 +335,12 @@ void Filter::FillDurationsAVX2(WaveformBase& wfm)
 	size_t end = len - (len % 4);
 	int64_t* po = reinterpret_cast<int64_t*>(&wfm.m_offsets[0]);
 	int64_t* pd = reinterpret_cast<int64_t*>(&wfm.m_durations[0]);
-	for(size_t i=0; i<end; i+=4)
+	for(size_t i=1; i<end; i+=4)
 	{
 		__m256i a 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i));
 		__m256i b 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i - 1));
 		__m256i delta	= _mm256_sub_epi64(a, b);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(pd + i), delta);
+		_mm256_storeu_si256(reinterpret_cast<__m256i*>(pd + i - 1), delta);
 	}
 
 	for(size_t i=end; i<len; i++)
