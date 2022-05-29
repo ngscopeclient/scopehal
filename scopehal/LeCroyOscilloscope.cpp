@@ -4666,6 +4666,198 @@ void LeCroyOscilloscope::PushTrigger()
  */
 void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 {
+	PushFloat("app.Acquisition.Trigger.Serial.Level", trig->GetLevel());
+
+	//Bit rate
+	m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.BitRate = ") +
+		to_string(trig->GetBitRate()) + "'");
+
+	//Equalizer mode
+	switch(trig->GetEqualizerMode())
+	{
+		case CDRTrigger::LECROY_EQ_NONE:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"None\"");
+			break;
+
+		case CDRTrigger::LECROY_EQ_LOW:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Low\"");
+			break;
+
+		case CDRTrigger::LECROY_EQ_MEDIUM:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Medium\"");
+			break;
+
+		case CDRTrigger::LECROY_EQ_HIGH:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"High\"");
+			break;
+	}
+
+	//Trigger position
+	switch(trig->GetTriggerPosition())
+	{
+		case CDRTrigger::POSITION_START:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"Start\"");
+			break;
+
+		case CDRTrigger::POSITION_END:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"End\"");
+			break;
+	}
+
+	//Inversion
+	switch(trig->GetPolarity())
+	{
+		case CDRTrigger::POLARITY_NORMAL:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"0\"");
+			break;
+
+		case CDRTrigger::POLARITY_INVERTED:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"1\"");
+			break;
+	}
+
+	//Include/exclude mode
+	switch(trig->GetMatchMode())
+	{
+		case CDR8B10BTrigger::MATCH_INCLUDE:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Include\"");
+			break;
+
+		case CDR8B10BTrigger::MATCH_EXCLUDE:
+			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Exclude\"");
+			break;
+	}
+
+	//Pattern mode
+	//TODO: Primitive, ProtocolError
+	auto pattern = trig->GetPattern();
+	size_t nsymbols = trig->GetSymbolCount();
+	switch(trig->GetPatternMode())
+	{
+		case CDR8B10BTrigger::PATTERN_LIST:
+			{
+				m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolOR\"");
+
+				m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.SymbolCount = ") +
+					to_string(nsymbols) + "'");
+
+				for(size_t i=0; i<nsymbols; i++)
+				{
+					auto si = to_string(i);
+
+					int code5 = pattern[i].value & 0x1f;
+					int code3 = pattern[i].value >> 5;
+					string val = to_string(code5) + "." + to_string(code3);
+
+					switch(pattern[i].disparity)
+					{
+						case T8B10BSymbol::ANY:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+								si + "Rd = \"Either\"'");
+							break;
+
+						case T8B10BSymbol::POSITIVE:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+								si + "Rd = \"Positive\"'");
+							break;
+
+						case T8B10BSymbol::NEGATIVE:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+								si + "Rd = \"Negative\"'");
+							break;
+					}
+
+					switch(pattern[i].ktype)
+					{
+						case T8B10BSymbol::KSYMBOL:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+								si + "Type = \"KSymbol\"'");
+
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.KSymbol") +
+								si + "ValueOR = \"K" + val + "\"'");
+							break;
+
+						case T8B10BSymbol::DSYMBOL:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+								si + "Type = \"DSymbol\"'");
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.DSymbol") +
+								si + "EightBitsValueOR = \"D" + val + "\"'");
+							break;
+
+						//DONTCARE is not legal for list mode
+						default:
+							break;
+					}
+				}
+			}
+			break;
+
+		case CDR8B10BTrigger::PATTERN_SEQUENCE:
+			{
+				m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolString\"");
+
+				//Sequence is always 8 elements long, but we may not actually have all 8 elements internally
+				//Only push the ones we have in our parameter
+				for(size_t i=0; i<nsymbols; i++)
+				{
+					auto si = to_string(i);
+
+					int code5 = pattern[i].value & 0x1f;
+					int code3 = pattern[i].value >> 5;
+					string val = to_string(code5) + "." + to_string(code3);
+
+					switch(pattern[i].disparity)
+					{
+						case T8B10BSymbol::ANY:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Rd = \"Either\"'");
+							break;
+
+						case T8B10BSymbol::POSITIVE:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Rd = \"Positive\"'");
+							break;
+
+						case T8B10BSymbol::NEGATIVE:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Rd = \"Negative\"'");
+							break;
+					}
+
+					switch(pattern[i].ktype)
+					{
+						case T8B10BSymbol::KSYMBOL:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Type = \"KSymbol\"'");
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") +
+								si + "Value = \"K" + val + "\"'");
+							break;
+
+						case T8B10BSymbol::DSYMBOL:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Type = \"DSymbol\"'");
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrDSymbol") +
+								si + "EightBitsValue = \"D" + val + "\"'");
+							break;
+
+						case T8B10BSymbol::DONTCARE:
+						default:
+							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+								si + "Type = \"DontCare\"'");
+							break;
+					}
+				}
+
+				//Pad out extra space with dontcares
+				for(size_t i=nsymbols; i<8; i++)
+				{
+					m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+						to_string(i) + "Type = \"DontCare\"'");
+				}
+
+			}
+			break;
+	}
 }
 
 /**
