@@ -35,6 +35,7 @@
 
 #include "scopehal.h"
 #include "Filter.h"
+#include <immintrin.h>
 
 using namespace std;
 
@@ -307,6 +308,49 @@ bool Filter::VerifyAllInputsOKAndDigital()
 // Sampling helpers
 
 /**
+	@brief Computes durations of samples based on offsets, assuming the capture is gapless.
+
+	The last sample has a duration of 1 unit.
+ */
+void Filter::FillDurationsGeneric(WaveformBase& wfm)
+{
+	size_t len = wfm.m_offsets.size();
+	wfm.m_durations.resize(len);
+	for(size_t i=1; i<len; i++)
+		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
+
+	//Constant duration of last sample
+	wfm.m_durations[len-1] = 1;
+}
+
+/**
+	@brief AVX2 optimized version of FillDurationsGeneric()
+ */
+__attribute__((target("avx2")))
+void Filter::FillDurationsAVX2(WaveformBase& wfm)
+{
+	size_t len = wfm.m_offsets.size();
+	wfm.m_durations.resize(len);
+
+	size_t end = len - (len % 4);
+	int64_t* po = reinterpret_cast<int64_t*>(&wfm.m_offsets[0]);
+	int64_t* pd = reinterpret_cast<int64_t*>(&wfm.m_durations[0]);
+	for(size_t i=0; i<end; i+=4)
+	{
+		__m256i a 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i));
+		__m256i b 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i - 1));
+		__m256i delta	= _mm256_sub_epi64(a, b);
+		_mm256_store_si256(reinterpret_cast<__m256i*>(pd + i), delta);
+	}
+
+	for(size_t i=end; i<len; i++)
+		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
+
+	//Constant duration of last sample
+	wfm.m_durations[len-1] = 1;
+}
+
+/**
 	@brief Samples a digital waveform on the rising edges of a clock
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
@@ -337,19 +381,16 @@ void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, 
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -383,19 +424,16 @@ void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* cloc
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -429,19 +467,16 @@ void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock,
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -459,6 +494,9 @@ void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, Dig
 {
 	samples.clear();
 
+	//TODO: split up into blocks and multithread?
+	//TODO: AVX vcompress
+
 	size_t ndata = 0;
 	size_t len = clock->m_offsets.size();
 	size_t dlen = data->m_samples.size();
@@ -475,19 +513,16 @@ void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, Dig
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -521,19 +556,16 @@ void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, 
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**

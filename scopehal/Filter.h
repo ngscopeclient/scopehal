@@ -265,6 +265,11 @@ public:
 	//Checksum helpers
 	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
 
+protected:
+	//Helpers for sampling
+	static void FillDurationsGeneric(WaveformBase& wfm);
+	static void FillDurationsAVX2(WaveformBase& wfm);
+
 public:
 	sigc::signal<void> signal_outputsChanged()
 	{ return m_outputsChangedSignal; }
