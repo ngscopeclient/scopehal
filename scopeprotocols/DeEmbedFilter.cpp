@@ -588,30 +588,41 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
 		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
 
-	for(size_t i=0; i<nouts; i++)
+	m_resampledSparamSines.resize(nouts);
+	m_resampledSparamCosines.resize(nouts);
+
+	//De-embedding
+	if(invert)
 	{
-		float freq = bin_hz * i;
-
-		float mag = m_cachedSparams.InterpolateMagnitude(freq);
-		float ang = m_cachedSparams.InterpolateAngle(freq);
-
-		//De-embedding
-		if(invert)
+		for(size_t i=0; i<nouts; i++)
 		{
+			float freq = bin_hz * i;
+
+			float mag = m_cachedSparams.InterpolateMagnitude(freq);
+			float ang = m_cachedSparams.InterpolateAngle(freq);
+
 			float amp = 0;
 			if(fabs(mag) > FLT_EPSILON)
 				amp = 1.0f / mag;
 			amp = min(amp, maxGain);
 
-			m_resampledSparamSines.push_back(sin(-ang) * amp);
-			m_resampledSparamCosines.push_back(cos(-ang) * amp);
+			m_resampledSparamSines[i] = sin(-ang) * amp;
+			m_resampledSparamCosines[i] = cos(-ang) * amp;
 		}
+	}
 
-		//Channel emulation
-		else
+	//Channel emulation
+	else
+	{
+		for(size_t i=0; i<nouts; i++)
 		{
-			m_resampledSparamSines.push_back(sin(ang) * mag);
-			m_resampledSparamCosines.push_back(cos(ang) * mag);
+			float freq = bin_hz * i;
+
+			float mag = m_cachedSparams.InterpolateMagnitude(freq);
+			float ang = m_cachedSparams.InterpolateAngle(freq);
+
+			m_resampledSparamSines[i] = sin(ang) * mag;
+			m_resampledSparamCosines[i] = cos(ang) * mag;
 		}
 	}
 }
