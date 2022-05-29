@@ -100,6 +100,24 @@ protected:
 	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
 	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
 
+	void ProcessSpectrumGeneric(
+		size_t nblocks,
+		size_t block,
+		size_t nouts,
+		float minscale,
+		float range,
+		float scale,
+		float* data);
+
+	void ProcessSpectrumAVX2FMA(
+		size_t nblocks,
+		size_t block,
+		size_t nouts,
+		float minscale,
+		float range,
+		float scale,
+		float* data);
+
 	size_t m_cachedFFTLength;
 
 	ffts_plan_t* m_plan;
