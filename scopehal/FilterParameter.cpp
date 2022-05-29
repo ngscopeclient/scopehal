@@ -75,10 +75,16 @@ void FilterParameter::Reinterpret()
  */
 void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 {
+	//Default conversions
+	m_8b10bPattern.clear();
+	m_intval = 0;
+	m_floatval = 0;
+	m_string = str;
+
+	//Handle specific types
 	switch(m_type)
 	{
 		case TYPE_BOOL:
-			m_string = "";
 			if( (str == "1") || (str == "true") )
 				m_intval = 1;
 			else
@@ -97,23 +103,69 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 
 		case TYPE_FILENAME:
 		case TYPE_STRING:
-			m_intval = 0;
-			m_floatval = 0;
-			m_string = str;
 			break;
 
 		case TYPE_ENUM:
-			m_intval = 0;
-			m_floatval = 0;
-			m_string = str;
-
 			if(m_forwardEnumMap.find(str) != m_forwardEnumMap.end())
 				m_intval = m_forwardEnumMap[str];
 
 			break;
 
 		case TYPE_8B10B_PATTERN:
-			LogError("FilterParameter::ParseString for TYPE_8B10B_PATTERN unimplemented\n");
+			{
+				//Chunk the message up into blocks
+				vector<string> blocks;
+				string tmp;
+				for(auto c : str)
+				{
+					if(isspace(c))
+					{
+						if(!tmp.empty())
+							blocks.push_back(tmp);
+						tmp = "";
+					}
+					else
+						tmp += c;
+				}
+				if(!tmp.empty())
+					blocks.push_back(tmp);
+
+				//Parse each block
+				m_8b10bPattern.resize(blocks.size());
+				for(size_t i=0; i<blocks.size(); i++)
+				{
+					auto& b = blocks[i];
+
+					//First character is type field
+					if(b[0] == 'x')
+					{
+						m_8b10bPattern[i].ktype = T8B10BSymbol::DONTCARE;
+						continue;
+					}
+					else if(b[0] == 'K')
+						m_8b10bPattern[i].ktype = T8B10BSymbol::KSYMBOL;
+					else //if(b[0] == 'D')
+						m_8b10bPattern[i].ktype = T8B10BSymbol::DSYMBOL;
+
+					//Parse the data byte
+					int code5;
+					int code3;
+					char unused;
+					char suffix;
+					m_8b10bPattern[i].disparity = T8B10BSymbol::ANY;
+					if(4 == sscanf(b.c_str(), "%c%d.%d%c", &unused, &code5, &code3, &suffix))
+					{
+						if(suffix == '+')
+							m_8b10bPattern[i].disparity = T8B10BSymbol::POSITIVE;
+						else if(suffix == '-')
+							m_8b10bPattern[i].disparity = T8B10BSymbol::NEGATIVE;
+					}
+					else if(3 != sscanf(b.c_str(), "%c%d.%d", &unused, &code5, &code3))
+						continue;
+
+					m_8b10bPattern[i].value = (code3 << 5) | code5;
+				}
+			}
 			break;
 	}
 
@@ -181,8 +233,6 @@ string FilterParameter::ToString(bool useDisplayLocale) const
 							break;
 					}
 				}
-
-				LogDebug("8b10b pattern is %s\n", ret.c_str());
 				return ret;
 			}
 
