@@ -274,11 +274,9 @@ void SpectrogramFilter::ProcessSpectrumAVX2FMA(
 	float* data)
 {
 	const float impedance = 50;
-	const float inverse_impedance = 1.0f / impedance;
-	const float flog10 = log(10);
-	const float logscale = 10 / flog10;
+	const float logscale = 10 / log(10);
 	const float irange = 1.0 / range;
-	const float impscale = scale*scale * inverse_impedance;
+	const float impscale = scale*scale / impedance;
 
 	float* pout = data + block;
 
@@ -325,6 +323,7 @@ void SpectrogramFilter::ProcessSpectrumAVX2FMA(
 		vsq = _mm256_mul_ps(vsq, vimpscale);
 
 		//Convert to dBm
+		vsq = _mm256_log_ps(vsq);
 		__m256 dbm = _mm256_fmadd_ps(vsq, vlogscale, const_30);
 
 		//Format output
