@@ -445,9 +445,10 @@ void FFTFilter::DoRefresh(
 					normalizeKernel = m_normalizeLogMagnitudeKernel;
 				else
 					normalizeKernel = m_normalizeMagnitudeKernel;
+				float fscale = scale*scale / 50;
 				normalizeKernel->setArg(0, fftoutbuf);
 				normalizeKernel->setArg(1, outbuf);
-				normalizeKernel->setArg(2, scale);
+				normalizeKernel->setArg(2, fscale);
 				m_queue->enqueueNDRangeKernel(
 					*normalizeKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
 
@@ -479,8 +480,8 @@ void FFTFilter::DoRefresh(
 		//Normalize magnitudes
 		if(log_output)
 		{
-			if(g_hasAvx2)
-				NormalizeOutputLogAVX2(cap, nouts, scale);
+			if(g_hasAvx2 && g_hasFMA)
+				NormalizeOutputLogAVX2FMA(cap, nouts, scale);
 			else
 				NormalizeOutputLog(cap, nouts, scale);
 		}
@@ -510,15 +511,16 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
 {
 	//assume constant 50 ohms for now
 	const float impedance = 50;
+	const float sscale = scale*scale / impedance;
 	for(size_t i=0; i<nouts; i++)
 	{
 		float real = m_rdoutbuf[i*2];
 		float imag = m_rdoutbuf[i*2 + 1];
 
-		float voltage = sqrtf(real*real + imag*imag) * scale;
+		float vsq = real*real + imag*imag;
 
 		//Convert to dBm
-		cap->m_samples[i] = (10 * log10(voltage*voltage / impedance) + 30);
+		cap->m_samples[i] = (10 * log10(vsq * sscale) + 30);
 	}
 }
 
@@ -539,24 +541,19 @@ void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float s
 /**
 	@brief Normalize FFT output and convert to dBm (optimized AVX2 implementation)
  */
-__attribute__((target("avx2")))
-void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale)
+__attribute__((target("avx2,fma")))
+void FFTFilter::NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, float scale)
 {
 	size_t end = nouts - (nouts % 8);
 
 	//double since we only look at positive half
-	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
-
-	//1 / nominal line impedance
 	float impedance = 50;
-	__m256 inv_imp =
-	{
-		1/impedance, 1/impedance, 1/impedance, 1/impedance,
-		1/impedance, 1/impedance, 1/impedance, 1/impedance
-	};
+	const float sscale = scale*scale / impedance;
+	__m256 vscale = { sscale, sscale, sscale, sscale, sscale, sscale, sscale, sscale };
 
 	//Constant values for dBm conversion
-	__m256 const_10 = {10, 10, 10, 10, 10, 10, 10, 10 };
+	const float logscale = 10 / log(10);
+	__m256 vlogscale = { logscale, logscale, logscale, logscale, logscale, logscale, logscale, logscale };
 	__m256 const_30 = {30, 30, 30, 30, 30, 30, 30, 30 };
 
 	float* pout = (float*)&cap->m_samples[0];
@@ -584,26 +581,15 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 		//Actual vector normalization
 		real = _mm256_mul_ps(real, real);
 		imag = _mm256_mul_ps(imag, imag);
-		__m256 sum = _mm256_add_ps(real, imag);
-		__m256 mag = _mm256_sqrt_ps(sum);
-		mag = _mm256_mul_ps(mag, norm_f);
+		__m256 vsq = _mm256_add_ps(real, imag);
+		vsq = _mm256_mul_ps(vsq, vscale);
 
-		//Convert to watts
-		__m256 vsq = _mm256_mul_ps(mag, mag);
-		__m256 watts = _mm256_mul_ps(vsq, inv_imp);
+		//Convert to dBm
+		vsq = _mm256_log_ps(vsq);
+		__m256 dbm = _mm256_fmadd_ps(vsq, vlogscale, const_30);
 
-		//TODO: figure out better way to do efficient logarithm
-		_mm256_store_ps(pout + k, watts);
-		for(size_t i=k; i<k+8; i++)
-			pout[i] = log10(pout[i]);
-		__m256 logpwr = _mm256_load_ps(pout + k);
-
-		//Final scaling
-		logpwr = _mm256_mul_ps(logpwr, const_10);
-		logpwr = _mm256_add_ps(logpwr, const_30);
-
-		//and store the actual
-		_mm256_store_ps(pout + k, logpwr);
+		//and store the actual output
+		_mm256_store_ps(pout + k, dbm);
 	}
 
 	//Get any extras we didn't get in the SIMD loop
@@ -612,10 +598,10 @@ void FFTFilter::NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float 
 		float real = m_rdoutbuf[k*2];
 		float imag = m_rdoutbuf[k*2 + 1];
 
-		float voltage = sqrtf(real*real + imag*imag) * scale;
+		float vsq = real*real + imag*imag;
+		float dbm = (logscale * log(vsq * sscale) + 30);
 
-		//Convert to dBm
-		pout[k] = (10 * log10(voltage*voltage / impedance) + 30);
+		pout[k] = dbm;
 	}
 }
 

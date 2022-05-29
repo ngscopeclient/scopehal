@@ -85,7 +85,7 @@ public:
 
 protected:
 	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+	void NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, float scale);
 	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
 	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
 

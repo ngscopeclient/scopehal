@@ -54,8 +54,7 @@ __kernel void NormalizeToLogMagnitude(
 	float real = din[i*2];
 	float imag = din[i*2 + 1];
 
-	float v = sqrt(real*real + imag*imag) * scale;
+	float v = real*real + imag*imag;
 
-	const float impedance = 50;
-	dout[i] = (10 * log10(v*v / impedance) + 30);
+	dout[i] = 10 * log10(v * scale) + 30;
 }
