@@ -4030,18 +4030,18 @@ void LeCroyOscilloscope::Pull8b10bTrigger()
 		mode = CDR8B10BTrigger::PATTERN_SEQUENCE;
 	trig->SetPatternMode(mode);
 
-	//Symbol count
-	reply = Trim(m_transport->SendCommandQueuedWithReply(
-		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.SymbolCount'"));
-	size_t patternlen = stoi(reply);
-	trig->SetSymbolCount(patternlen);
-
 	//Mode-specific stuff
 	auto pattern = trig->GetPattern();
 	switch(mode)
 	{
 		case CDR8B10BTrigger::PATTERN_LIST:
 			{
+				//Symbol count is only used in pattern list mode
+				reply = Trim(m_transport->SendCommandQueuedWithReply(
+					"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.SymbolCount'"));
+				size_t patternlen = stoi(reply);
+				trig->SetSymbolCount(patternlen);
+
 				for(size_t i=0; i<patternlen; i++)
 				{
 					auto si = to_string(i);
@@ -4086,9 +4086,59 @@ void LeCroyOscilloscope::Pull8b10bTrigger()
 
 		case CDR8B10BTrigger::PATTERN_SEQUENCE:
 			{
+				//Sequence is always 8 elements long, but we don't want to actually show all 8 elements
+				//if the last N are dontcares. Start by making it 8 elements long, then remove all dontcares from the end
+				size_t iLastValidSymbol = 0;
+				pattern.resize(8);
 				for(size_t i=0; i<8; i++)
 				{
+					auto si = to_string(i);
+					reply = Trim(m_transport->SendCommandQueuedWithReply(
+						string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") + si + "Rd'"));
+					if(reply == "Either")
+						pattern[i].disparity = T8B10BSymbol::ANY;
+					else if(reply == "Positive")
+						pattern[i].disparity = T8B10BSymbol::POSITIVE;
+					else// if(reply == "Negative")
+						pattern[i].disparity = T8B10BSymbol::NEGATIVE;
+
+					reply = Trim(m_transport->SendCommandQueuedWithReply(
+						string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") + si + "Type'"));
+					if(reply == "KSymbol")
+					{
+						pattern[i].ktype = T8B10BSymbol::KSYMBOL;
+						iLastValidSymbol = i;
+					}
+					else if(reply == "DSymbol")
+					{
+						pattern[i].ktype = T8B10BSymbol::DSYMBOL;
+						iLastValidSymbol = i;
+					}
+					else// if(reply == "DontCare")
+						pattern[i].ktype = T8B10BSymbol::DONTCARE;
+
+					if(pattern[i].ktype == T8B10BSymbol::KSYMBOL)
+					{
+						reply = Trim(m_transport->SendCommandQueuedWithReply(
+							string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") + si + "Value'"));
+					}
+					else
+					{
+						reply = Trim(m_transport->SendCommandQueuedWithReply(
+							string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.StrDSymbol") + si + "EightBitsValue'"));
+					}
+
+					char unused;
+					int code5;
+					int code3;
+					if(3 != sscanf(reply.c_str(), "%c%d.%d", &unused, &code5, &code3))
+						continue;
+
+					pattern[i].value = (code3 << 5) | code5;
 				}
+				auto nsym = iLastValidSymbol + 1;
+				pattern.resize(nsym);
+				trig->SetSymbolCount(nsym);
 			}
 			break;
 
@@ -4096,9 +4146,6 @@ void LeCroyOscilloscope::Pull8b10bTrigger()
 			break;
 	}
 	trig->SetPattern(pattern);
-
-	//TODO
-	LogDebug("Pull8b10bTrigger\n");
 }
 
 /**
