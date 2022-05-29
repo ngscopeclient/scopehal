@@ -80,7 +80,7 @@ void FlowGraphNode::DetachInputs()
 FilterParameter& FlowGraphNode::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
-		LogError("Invalid parameter name\n");
+		LogError("Invalid parameter name \"%s\"\n", s.c_str());
 
 	return m_parameters[s];
 }

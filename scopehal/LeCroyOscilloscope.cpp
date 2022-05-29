@@ -4728,10 +4728,18 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 			break;
 	}
 
-	//Pattern mode
-	//TODO: Primitive, ProtocolError
+	//Figure out actual pattern length
+	//(early on during creation we may not be fully populated)
 	auto pattern = trig->GetPattern();
 	size_t nsymbols = trig->GetSymbolCount();
+	if(nsymbols > pattern.size())
+	{
+		pattern.resize(nsymbols);
+		trig->SetPattern(pattern);
+	}
+
+	//Pattern mode
+	//TODO: Primitive, ProtocolError
 	switch(trig->GetPatternMode())
 	{
 		case CDR8B10BTrigger::PATTERN_LIST:
