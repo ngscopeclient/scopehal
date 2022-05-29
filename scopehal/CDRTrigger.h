@@ -72,7 +72,6 @@ public:
 	const std::string GetBitRateName()
 	{ return m_bitRateName; }
 
-	//TODO
 	enum LeCroyEqualizerMode
 	{
 		LECROY_EQ_NONE,		//0 dB
