@@ -610,9 +610,9 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 		for(size_t i=0; i<nouts; i++)
 		{
 			float freq = bin_hz * i;
-
-			float mag = m_cachedSparams.InterpolateMagnitude(freq);
-			float ang = m_cachedSparams.InterpolateAngle(freq);
+			auto pt = m_cachedSparams.InterpolatePoint(freq);
+			float mag = pt.m_amplitude;
+			float ang = pt.m_phase;
 
 			float amp = 0;
 			if(fabs(mag) > FLT_EPSILON)
@@ -630,9 +630,9 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 		for(size_t i=0; i<nouts; i++)
 		{
 			float freq = bin_hz * i;
-
-			float mag = m_cachedSparams.InterpolateMagnitude(freq);
-			float ang = m_cachedSparams.InterpolateAngle(freq);
+			auto pt = m_cachedSparams.InterpolatePoint(freq);
+			float mag = pt.m_amplitude;
+			float ang = pt.m_phase;
 
 			m_resampledSparamSines[i] = sin(ang) * mag;
 			m_resampledSparamCosines[i] = cos(ang) * mag;
