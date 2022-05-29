@@ -261,6 +261,7 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				break;
 
 			case FilterParameter::TYPE_FILENAME:
+			case FilterParameter::TYPE_8B10B_PATTERN:
 			default:
 				snprintf(
 					tmp,
