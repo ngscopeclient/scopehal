@@ -39,11 +39,36 @@ using namespace std;
 CDRTrigger::CDRTrigger(Oscilloscope* scope)
 	: Trigger(scope)
 	, m_bitRateName("Bit Rate")
+	, m_positionName("Trigger Point")
+	, m_lecroyEqName("Equalization")
+	, m_polarityName("Polarity")
 {
 	CreateInput("in");
 
 	m_parameters[m_bitRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_bitRateName].SetIntVal(1250000000);
+
+	m_parameters[m_positionName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_positionName].AddEnumValue("Start of pattern", POSITION_START);
+	m_parameters[m_positionName].AddEnumValue("End of pattern", POSITION_END);
+	m_parameters[m_positionName].SetIntVal(POSITION_START);
+
+	m_parameters[m_polarityName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_polarityName].AddEnumValue("Normal", POLARITY_NORMAL);
+	m_parameters[m_polarityName].AddEnumValue("Inverted", POLARITY_INVERTED);
+	m_parameters[m_polarityName].SetIntVal(POLARITY_NORMAL);
+
+	//Equalization (only for LeCroy scopes)
+	//TODO: this is for SDA 8Zi, does the set of parameters change for other scopes?
+	if(dynamic_cast<LeCroyOscilloscope*>(m_scope) != nullptr)
+	{
+		m_parameters[m_lecroyEqName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		m_parameters[m_lecroyEqName].AddEnumValue("None (0 dB)", LECROY_EQ_NONE);
+		m_parameters[m_lecroyEqName].AddEnumValue("Low (2 dB)", LECROY_EQ_LOW);
+		m_parameters[m_lecroyEqName].AddEnumValue("Medium (5 dB)", LECROY_EQ_MEDIUM);
+		m_parameters[m_lecroyEqName].AddEnumValue("High (9 dB)", LECROY_EQ_HIGH);
+		m_parameters[m_lecroyEqName].SetIntVal(LECROY_EQ_NONE);
+	}
 }
 
 CDRTrigger::~CDRTrigger()

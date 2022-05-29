@@ -111,6 +111,10 @@ void FilterParameter::ParseString(const string& str, bool useDisplayLocale)
 				m_intval = m_forwardEnumMap[str];
 
 			break;
+
+		case TYPE_8B10B_PATTERN:
+			LogError("FilterParameter::ParseString for TYPE_8B10B_PATTERN unimplemented\n");
+			break;
 	}
 
 	m_changeSignal.emit();
@@ -136,7 +140,51 @@ string FilterParameter::ToString(bool useDisplayLocale) const
 			return m_string;
 
 		case TYPE_ENUM:
-			return m_reverseEnumMap.at(m_intval);
+			{
+				if(m_reverseEnumMap.find(m_intval) != m_reverseEnumMap.end())
+					return m_reverseEnumMap.at(m_intval);
+				else
+					return "";
+			}
+
+		//Yay, complex formatting!
+		case TYPE_8B10B_PATTERN:
+			{
+				for(auto p : m_8b10bPattern)
+				{
+					if(!ret.empty())
+						ret += " ";
+
+					if(p.ktype == T8B10BSymbol::DONTCARE)
+					{
+						ret += "x";
+						continue;
+					}
+					else if(p.ktype == T8B10BSymbol::KSYMBOL)
+						ret += "K";
+					else
+						ret += "D";
+
+					ret += to_string(p.value & 0x1f) + '.' + to_string(p.value >> 5);
+
+					switch(p.disparity)
+					{
+						case T8B10BSymbol::POSITIVE:
+							ret += "+";
+							break;
+
+						case T8B10BSymbol::NEGATIVE:
+							ret += "-";
+							break;
+
+						default:
+							break;
+					}
+				}
+
+				LogDebug("8b10b pattern is %s\n", ret.c_str());
+				return ret;
+			}
 
 		default:
 			return "unimplemented";
@@ -151,6 +199,7 @@ void FilterParameter::SetBoolVal(bool b)
 	m_intval = b;
 	m_floatval = b;
 	m_string = b ? "1" : "0";
+	m_8b10bPattern.clear();
 
 	m_changeSignal.emit();
 }
@@ -163,6 +212,7 @@ void FilterParameter::SetIntVal(int64_t i)
 	m_intval = i;
 	m_floatval = i;
 	m_string = "";
+	m_8b10bPattern.clear();
 
 	if(m_reverseEnumMap.find(i) != m_reverseEnumMap.end())
 		m_string = m_reverseEnumMap[i];
@@ -178,6 +228,7 @@ void FilterParameter::SetFloatVal(float f)
 	m_intval = f;
 	m_floatval = f;
 	m_string = "";
+	m_8b10bPattern.clear();
 
 	m_changeSignal.emit();
 }
@@ -198,6 +249,17 @@ void FilterParameter::SetFileName(const string& f)
 	m_intval = 0;
 	m_floatval = 0;
 	m_string = f;
+	m_8b10bPattern.clear();
+
+	m_changeSignal.emit();
+}
+
+void FilterParameter::Set8B10BPattern(const vector<T8B10BSymbol>& pattern)
+{
+	m_intval = 0;
+	m_floatval = 0;
+	m_8b10bPattern = pattern;
+	m_string = ToString();
 
 	m_changeSignal.emit();
 }

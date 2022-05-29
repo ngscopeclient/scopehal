@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "CDR8B10BTrigger.h"
+#include "LeCroyOscilloscope.h"
 
 using namespace std;
 
@@ -37,7 +38,37 @@ using namespace std;
 
 CDR8B10BTrigger::CDR8B10BTrigger(Oscilloscope* scope)
 	: CDRTrigger(scope)
+	, m_patternModeName("Mode")
+	, m_patternName("Pattern")
+	, m_patternLengthName("Length")
+	, m_matchModeName("Match")
 {
+	m_parameters[m_patternModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_patternModeName].AddEnumValue("Sequence", PATTERN_SEQUENCE);
+	m_parameters[m_patternModeName].AddEnumValue("List", PATTERN_LIST);
+	m_parameters[m_patternModeName].SetIntVal(PATTERN_SEQUENCE);
+	m_parameters[m_patternModeName].signal_changed().connect(
+		sigc::mem_fun(*this, &CDR8B10BTrigger::OnModeChanged));
+
+	m_parameters[m_matchModeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_matchModeName].AddEnumValue("Include", MATCH_INCLUDE);
+	m_parameters[m_matchModeName].AddEnumValue("Exclude", MATCH_EXCLUDE);
+	m_parameters[m_matchModeName].SetIntVal(MATCH_INCLUDE);
+
+	//Pattern length can be up to 8 in sequence mode, or 6 in match mode
+	//Default to 8 at startup, we can cut down to 6 at run time as needed if mode changes
+	if(dynamic_cast<LeCroyOscilloscope*>(m_scope) != nullptr)
+	{
+		m_parameters[m_patternLengthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+		for(int i=1; i<=8; i++)
+			m_parameters[m_patternLengthName].AddEnumValue(to_string(i), i);
+		m_parameters[m_patternLengthName].SetIntVal(1);
+
+		m_parameters[m_patternLengthName].signal_changed().connect(
+			sigc::mem_fun(*this, &CDR8B10BTrigger::OnLengthChanged));
+	}
+
+	m_parameters[m_patternName] = FilterParameter(FilterParameter::TYPE_8B10B_PATTERN, Unit(Unit::UNIT_COUNTS));
 }
 
 CDR8B10BTrigger::~CDR8B10BTrigger()
@@ -50,4 +81,28 @@ CDR8B10BTrigger::~CDR8B10BTrigger()
 string CDR8B10BTrigger::GetTriggerName()
 {
 	return "CDR (8B/10B)";
+}
+
+void CDR8B10BTrigger::OnLengthChanged()
+{
+	auto pat = m_parameters[m_patternName].Get8B10BPattern();
+	pat.resize(m_parameters[m_patternLengthName].GetIntVal());
+	m_parameters[m_patternName].Set8B10BPattern(pat);
+}
+
+void CDR8B10BTrigger::OnModeChanged()
+{
+	//Pattern length can be up to 8 in sequence mode, or 6 in match mode
+	if(dynamic_cast<LeCroyOscilloscope*>(m_scope) != nullptr)
+	{
+		m_parameters[m_patternLengthName].ClearEnumValues();
+
+		int nmax = 8;
+		if(m_parameters[m_patternModeName].GetIntVal() == PATTERN_LIST)
+			nmax = 6;
+
+		for(int i=1; i<=nmax; i++)
+			m_parameters[m_patternLengthName].AddEnumValue(to_string(i), i);
+
+	}
 }

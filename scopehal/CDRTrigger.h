@@ -72,9 +72,51 @@ public:
 	const std::string GetBitRateName()
 	{ return m_bitRateName; }
 
+	//TODO
+	enum LeCroyEqualizerMode
+	{
+		LECROY_EQ_NONE,		//0 dB
+		LECROY_EQ_LOW,		//2 dB
+		LECROY_EQ_MEDIUM,	//5 dB
+		LECROY_EQ_HIGH		//9 dB
+	};
+
+	enum TriggerPosition
+	{
+		POSITION_END,
+		POSITION_START
+	};
+
+	enum Polarity
+	{
+		POLARITY_NORMAL,
+		POLARITY_INVERTED
+	};
+
+	TriggerPosition GetTriggerPosition()
+	{ return static_cast<TriggerPosition>(m_parameters[m_positionName].GetIntVal()); }
+
+	void SetTriggerPosition(TriggerPosition p)
+	{ m_parameters[m_positionName].SetIntVal(p); }
+
+	LeCroyEqualizerMode GetEqualizerMode()
+	{ return static_cast<LeCroyEqualizerMode>(m_parameters[m_lecroyEqName].GetIntVal()); }
+
+	void SetEqualizerMode(LeCroyEqualizerMode mode)
+	{ m_parameters[m_lecroyEqName].SetIntVal(mode); }
+
+	Polarity GetPolarity()
+	{ return static_cast<Polarity>(m_parameters[m_polarityName].GetIntVal()); }
+
+	void SetPolarity(Polarity mode)
+	{ m_parameters[m_polarityName].SetIntVal(mode); }
+
 protected:
 
 	std::string m_bitRateName;
+	std::string m_positionName;
+	std::string m_lecroyEqName;
+	std::string m_polarityName;
 
 	sigc::signal<void> m_calculateBitRateSignal;
 };

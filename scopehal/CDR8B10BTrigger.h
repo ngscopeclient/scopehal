@@ -48,6 +48,51 @@ public:
 
 	static std::string GetTriggerName();
 	TRIGGER_INITPROC(CDR8B10BTrigger);
+
+	enum PatternMode
+	{
+		PATTERN_SEQUENCE,
+		PATTERN_LIST
+	};
+
+	enum MatchMode
+	{
+		MATCH_INCLUDE,
+		MATCH_EXCLUDE
+	};
+
+	void SetMatchMode(MatchMode mode)
+	{ m_parameters[m_matchModeName].SetIntVal(mode); }
+
+	MatchMode GetMatchMode()
+	{ return static_cast<MatchMode>(m_parameters[m_matchModeName].GetIntVal()); }
+
+	void SetPatternMode(PatternMode mode)
+	{ m_parameters[m_patternModeName].SetIntVal(mode); }
+
+	PatternMode GetPatternMode()
+	{ return static_cast<PatternMode>(m_parameters[m_patternModeName].GetIntVal()); }
+
+	void SetSymbolCount(size_t i)
+	{ m_parameters[m_patternLengthName].SetIntVal(i); }
+
+	size_t GetSymbolCount()
+	{ return m_parameters[m_patternLengthName].GetIntVal(); }
+
+	std::vector<T8B10BSymbol> GetPattern()
+	{ return m_parameters[m_patternName].Get8B10BPattern(); }
+
+	void SetPattern(const std::vector<T8B10BSymbol>& pattern)
+	{ return m_parameters[m_patternName].Set8B10BPattern(pattern); }
+
+protected:
+	void OnLengthChanged();
+	void OnModeChanged();
+
+	std::string m_patternModeName;
+	std::string m_patternName;
+	std::string m_patternLengthName;
+	std::string m_matchModeName;
 };
 
 #endif

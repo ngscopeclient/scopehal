@@ -3984,6 +3984,119 @@ void LeCroyOscilloscope::Pull8b10bTrigger()
 		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.BitRate'");
 	trig->SetBitRate(bps.ParseString(reply));
 
+	//Grab the equalizer mode (None, Low=2, Medium=5, High=9 dB)
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode'"));
+	if(reply == "None")
+		trig->SetEqualizerMode(CDRTrigger::LECROY_EQ_NONE);
+	else if(reply == "Low")
+		trig->SetEqualizerMode(CDRTrigger::LECROY_EQ_LOW);
+	else if(reply == "Medium")
+		trig->SetEqualizerMode(CDRTrigger::LECROY_EQ_MEDIUM);
+	else// if(reply == "High")
+		trig->SetEqualizerMode(CDRTrigger::LECROY_EQ_HIGH);
+
+	//Grab the trigger position (Start, End)
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition'"));
+	if(reply == "Start")
+		trig->SetTriggerPosition(CDRTrigger::POSITION_START);
+	else //if(reply == "End")
+		trig->SetTriggerPosition(CDRTrigger::POSITION_END);
+
+	//Grab the polarity (true, false)
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.Invert'"));
+	if(reply == "0")
+		trig->SetPolarity(CDRTrigger::POLARITY_NORMAL);
+	else //if(reply == "1")
+		trig->SetPolarity(CDRTrigger::POLARITY_INVERTED);
+
+	//Grab include/exclude mode
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.Operation'"));
+	if(reply ==  "Include")
+		trig->SetMatchMode(CDR8B10BTrigger::MATCH_INCLUDE);
+	else //if(reply ==  "Exclude")
+		trig->SetMatchMode(CDR8B10BTrigger::MATCH_EXCLUDE);
+
+	//Pattern type (can also be Primitive, ProtocolError but we don't implement this yet)
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.PatternType'"));
+	CDR8B10BTrigger::PatternMode mode = CDR8B10BTrigger::PATTERN_LIST;
+	if(reply == "SymbolOR")
+		mode = CDR8B10BTrigger::PATTERN_LIST;
+	else //if(reply == "SymbolString")
+		mode = CDR8B10BTrigger::PATTERN_SEQUENCE;
+	trig->SetPatternMode(mode);
+
+	//Symbol count
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.SymbolCount'"));
+	size_t patternlen = stoi(reply);
+	trig->SetSymbolCount(patternlen);
+
+	//Mode-specific stuff
+	auto pattern = trig->GetPattern();
+	switch(mode)
+	{
+		case CDR8B10BTrigger::PATTERN_LIST:
+			{
+				for(size_t i=0; i<patternlen; i++)
+				{
+					auto si = to_string(i);
+					reply = Trim(m_transport->SendCommandQueuedWithReply(
+						string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") + si + "Rd'"));
+					if(reply == "Either")
+						pattern[i].disparity = T8B10BSymbol::ANY;
+					else if(reply == "Positive")
+						pattern[i].disparity = T8B10BSymbol::POSITIVE;
+					else// if(reply == "Negative")
+						pattern[i].disparity = T8B10BSymbol::NEGATIVE;
+
+					reply = Trim(m_transport->SendCommandQueuedWithReply(
+						string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") + si + "Type'"));
+					if(reply == "KSymbol")
+						pattern[i].ktype = T8B10BSymbol::KSYMBOL;
+					else //if(reply == "DSymbol")
+						pattern[i].ktype = T8B10BSymbol::DSYMBOL;
+					//DontCare type is not valid for pattern list mode, only sequence
+
+					if(pattern[i].ktype == T8B10BSymbol::KSYMBOL)
+					{
+						reply = Trim(m_transport->SendCommandQueuedWithReply(
+							string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.KSymbol") + si + "ValueOR'"));
+					}
+					else
+					{
+						reply = Trim(m_transport->SendCommandQueuedWithReply(
+							string("VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.DSymbol") + si + "EightBitsValueOR'"));
+					}
+
+					char unused;
+					int code5;
+					int code3;
+					if(3 != sscanf(reply.c_str(), "%c%d.%d", &unused, &code5, &code3))
+						continue;
+
+					pattern[i].value = (code3 << 5) | code5;
+				}
+			}
+			break;
+
+		case CDR8B10BTrigger::PATTERN_SEQUENCE:
+			{
+				for(size_t i=0; i<8; i++)
+				{
+				}
+			}
+			break;
+
+		default:
+			break;
+	}
+	trig->SetPattern(pattern);
+
 	//TODO
 	LogDebug("Pull8b10bTrigger\n");
 }

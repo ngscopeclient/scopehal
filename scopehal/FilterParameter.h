@@ -37,6 +37,42 @@
 #define FilterParameter_h
 
 /**
+	@brief An 8B/10B symbol within a pattern, used for trigger matching
+ */
+class T8B10BSymbol
+{
+public:
+
+	enum disparity_t
+	{
+		POSITIVE,
+		NEGATIVE,
+		ANY
+	} disparity;
+
+	enum type_t
+	{
+		KSYMBOL,
+		DSYMBOL,
+		DONTCARE
+	} ktype;
+
+	T8B10BSymbol()
+	: disparity(ANY)
+	, ktype(DONTCARE)
+	, value(0)
+	{}
+
+	T8B10BSymbol(T8B10BSymbol::disparity_t d, T8B10BSymbol::type_t t, uint8_t v)
+	: disparity(d)
+	, ktype(t)
+	, value(v)
+	{}
+
+	uint8_t value;
+};
+
+/**
 	@brief A parameter to a filter
 
 	Parameters are used for scalar inputs, configuration settings, and generally any input a filter takes which is not
@@ -51,12 +87,13 @@ public:
 	 */
 	enum ParameterTypes
 	{
-		TYPE_FLOAT,		//32-bit floating point number
-		TYPE_INT,		//64-bit integer
-		TYPE_BOOL,		//boolean value
-		TYPE_FILENAME,	//file path
-		TYPE_ENUM,		//enumerated constant
-		TYPE_STRING		//arbitrary string
+		TYPE_FLOAT,			//32-bit floating point number
+		TYPE_INT,			//64-bit integer
+		TYPE_BOOL,			//boolean value
+		TYPE_FILENAME,		//file path
+		TYPE_ENUM,			//enumerated constant
+		TYPE_STRING,		//arbitrary string
+		TYPE_8B10B_PATTERN	//8B/10B pattern
 	};
 
 	FilterParameter(ParameterTypes type = FilterParameter::TYPE_FLOAT, Unit unit  = Unit(Unit::UNIT_FS));
@@ -83,6 +120,12 @@ public:
 	{ return m_floatval; }
 
 	/**
+		@brief Access to the underlying pattern
+	 */
+	std::vector<T8B10BSymbol> Get8B10BPattern()
+	{ return m_8b10bPattern; }
+
+	/**
 		@brief Returns the value of the parameter interpreted as a file path
 	 */
 	std::string GetFileName() const
@@ -93,6 +136,7 @@ public:
 	void SetFloatVal(float f);
 	void SetStringVal(const std::string& f);
 	void SetFileName(const std::string& f);
+	void Set8B10BPattern(const std::vector<T8B10BSymbol>& pattern);
 
 	/**
 		@brief Returns the type of the parameter
@@ -197,6 +241,8 @@ protected:
 
 	std::map<std::string, int>	m_forwardEnumMap;
 	std::map<int, std::string>	m_reverseEnumMap;
+
+	std::vector<T8B10BSymbol>	m_8b10bPattern;
 
 	int64_t						m_intval;
 	float						m_floatval;
