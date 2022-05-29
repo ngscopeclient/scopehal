@@ -266,12 +266,17 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	if(m_cachedNumPoints != npoints)
 	{
 		if(m_forwardPlan)
+		{
 			ffts_free(m_forwardPlan);
-		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
+			m_forwardPlan = nullptr;
+		}
 		if(m_reversePlan)
+		{
 			ffts_free(m_reversePlan);
-		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+			m_reversePlan = nullptr;
+		}
+
+		bool cl_ok = false;
 
 		m_forwardInBuf.resize(npoints);
 		m_forwardOutBuf.resize(2 * nouts);
@@ -344,6 +349,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					delete m_fftoutbuf;
 					m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
 					m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
+
+					cl_ok = true;
 				}
 				catch(const cl::Error& e)
 				{
@@ -352,6 +359,12 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			}
 
 		#endif
+
+		if(!cl_ok)
+		{
+			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+		}
 	}
 
 	//Calculate size of each bin
