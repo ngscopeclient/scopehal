@@ -91,10 +91,12 @@ int RohdeSchwarzHMC8012Multimeter::GetMeterDigits()
 
 bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 {
+	string reply;
+
 	switch(m_mode)
 	{
 		case DC_CURRENT:
-			m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO?");
+			reply = m_transport->SendCommandQueuedWithReply("SENSE:CURR:DC:RANGE:AUTO?");
 			break;
 
 		//TODO
@@ -103,8 +105,7 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 			return false;
 	}
 
-	string str = m_transport->ReadReply();
-	return (str == "1");
+	return (reply == "1");
 }
 
 void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
@@ -113,9 +114,9 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 	{
 		case DC_CURRENT:
 			if(enable)
-				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 1");
+				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 1");
 			else
-				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 0");
+				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 0");
 			break;
 
 		default:
@@ -135,16 +136,14 @@ void RohdeSchwarzHMC8012Multimeter::StopMeter()
 
 double RohdeSchwarzHMC8012Multimeter::GetMeterValue()
 {
-	m_transport->SendCommand("FETCH?");
-	return stod(m_transport->ReadReply());
+	return stod(m_transport->SendCommandQueuedWithReply("FETCH?"));
 }
 
 double RohdeSchwarzHMC8012Multimeter::GetSecondaryMeterValue()
 {
 	//If we have a secondary value, this gets it
 	//If no secondary mode configured, returns primary value
-	m_transport->SendCommand("READ?");
-	return stod(m_transport->ReadReply());
+	return stod(m_transport->SendCommandQueuedWithReply("READ?"));
 }
 
 int RohdeSchwarzHMC8012Multimeter::GetMeterChannelCount()
@@ -172,8 +171,7 @@ Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetMeterMode()
 	if(m_modeValid)
 		return m_mode;
 
-	m_transport->SendCommand("CONF?");
-	string str = m_transport->ReadReply();
+	auto str = m_transport->SendCommandQueuedWithReply("CONF?");
 
 	char mode[32];
 	sscanf(str.c_str(), "\"%31[^,]", mode);
@@ -226,23 +224,23 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes ty
 	switch(type)
 	{
 		case AC_RMS_AMPLITUDE:
-			m_transport->SendCommand("CONF:VOLT:AC");
+			m_transport->SendCommandQueued("CONF:VOLT:AC");
 			break;
 
 		case DC_VOLTAGE:
-			m_transport->SendCommand("CONF:VOLT:DC");
+			m_transport->SendCommandQueued("CONF:VOLT:DC");
 			break;
 
 		case DC_CURRENT:
-			m_transport->SendCommand("CONF:CURR:DC");
+			m_transport->SendCommandQueued("CONF:CURR:DC");
 			break;
 
 		case AC_CURRENT:
-			m_transport->SendCommand("CONF:CURR:DC");
+			m_transport->SendCommandQueued("CONF:CURR:DC");
 			break;
 
 		case TEMPERATURE:	//TODO: type of temp sensor
-			m_transport->SendCommand("CONF:TEMP");
+			m_transport->SendCommandQueued("CONF:TEMP");
 			break;
 
 		//whatever it is, not supported
@@ -264,11 +262,11 @@ void RohdeSchwarzHMC8012Multimeter::SetSecondaryMeterMode(Multimeter::Measuremen
 				switch(mode)
 				{
 					case AC_RMS_AMPLITUDE:
-						m_transport->SendCommand("CONF:FREQ:VOLT");
+						m_transport->SendCommandQueued("CONF:FREQ:VOLT");
 						break;
 
 					case AC_CURRENT:
-						m_transport->SendCommand("CONF:FREQ:CURR");
+						m_transport->SendCommandQueued("CONF:FREQ:CURR");
 						break;
 
 					//not supported
