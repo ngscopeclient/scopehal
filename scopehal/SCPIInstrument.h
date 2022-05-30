@@ -46,6 +46,7 @@ public:
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
+	virtual std::string GetDriverName() =0;
 };
 
 #endif
