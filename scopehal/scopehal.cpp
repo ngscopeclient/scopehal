@@ -897,3 +897,26 @@ void GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
 		}
 	#endif
 }
+
+/**
+	@brief Splits a string up into an array separated by delimiters
+ */
+vector<string> explode(const string& str, char separator)
+{
+	vector<string> ret;
+	string tmp;
+	for(auto c : str)
+	{
+		if(c == separator)
+		{
+			if(!tmp.empty())
+				ret.push_back(tmp);
+			tmp = "";
+		}
+		else
+			tmp += c;
+	}
+	if(!tmp.empty())
+		ret.push_back(tmp);
+	return ret;
+}

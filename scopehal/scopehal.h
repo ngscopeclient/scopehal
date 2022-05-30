@@ -147,6 +147,8 @@ float FreqToPhase(float hz);
 uint64_t next_pow2(uint64_t v);
 uint64_t prev_pow2(uint64_t v);
 
+std::vector<std::string> explode(const std::string& str, char separator);
+
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;
 extern bool g_hasAvx512VL;
