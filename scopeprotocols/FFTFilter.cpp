@@ -33,6 +33,8 @@
 #include <immintrin.h>
 #include "../scopehal/avx_mathfun.h"
 
+extern std::mutex g_clfftMutex;
+
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -261,6 +263,8 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 
 			if(g_clContext)
 			{
+				lock_guard<mutex> lock(g_clfftMutex);
+
 				//Set up the FFT object
 				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
 				{
