@@ -100,12 +100,12 @@ void LeCroyOscilloscope::SharedCtorInit()
 	//Desired format for waveform data
 	//Only use increased bit depth if the scope actually puts content there!
 	if(m_highDefinition)
-		m_transport->SendCommand("COMM_FORMAT DEF9,WORD,BIN");
+		m_transport->SendCommandQueued("COMM_FORMAT DEF9,WORD,BIN");
 	else
-		m_transport->SendCommand("COMM_FORMAT DEF9,BYTE,BIN");
+		m_transport->SendCommandQueued("COMM_FORMAT DEF9,BYTE,BIN");
 
 	//Always use "fixed sample rate" config for setting timebase
-	m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.Maximize=\"FixedSampleRate\"'");
+	m_transport->SendCommandQueued("VBS 'app.Acquisition.Horizontal.Maximize=\"FixedSampleRate\"'");
 
 	//If interleaving, disable the extra channels
 	if(IsInterleaving())
@@ -121,11 +121,10 @@ void LeCroyOscilloscope::SharedCtorInit()
 void LeCroyOscilloscope::IdentifyHardware()
 {
 	//Turn off headers (complicate parsing and add fluff to the packets)
-	m_transport->SendCommand("CHDR OFF");
+	m_transport->SendCommandQueued("CHDR OFF");
 
 	//Ask for the ID
-	m_transport->SendCommand("*IDN?");
-	string reply = m_transport->ReadReply();
+	string reply = m_transport->SendCommandQueuedWithReply("*IDN?");
 	char vendor[128] = "";
 	char model[128] = "";
 	char serial[128] = "";
@@ -245,8 +244,7 @@ void LeCroyOscilloscope::DetectOptions()
 {
 	LogDebug("\n");
 
-	m_transport->SendCommand("*OPT?");
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply("*OPT?");
 	if(reply.length() > 3)
 	{
 		//Read options until we hit a null
@@ -816,11 +814,11 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 	}
 
 	//Set the threshold to "user defined" vs using a canned family
-	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily0 = \"USERDEFINED\" '");
-	m_transport->SendCommand("VBS? 'app.LogicAnalyzer.MSxxLogicFamily1 = \"USERDEFINED\" '");
+	m_transport->SendCommandQueued("VBS? 'app.LogicAnalyzer.MSxxLogicFamily0 = \"USERDEFINED\" '");
+	m_transport->SendCommandQueued("VBS? 'app.LogicAnalyzer.MSxxLogicFamily1 = \"USERDEFINED\" '");
 
 	//Select display to be "CUSTOM" so we can assign nicknames to the bits
-	m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.Labels=\"CUSTOM\"'");
+	m_transport->SendCommandQueued("VBS 'app.LogicAnalyzer.Digital1.Labels=\"CUSTOM\"'");
 }
 
 /**
@@ -869,9 +867,7 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 				for(int i=1; i<80; i++)
 				{
 					snprintf(tmp, sizeof(tmp), "VBS? 'return=IsObject(app.Acquisition.C%d)'", i);
-
-					m_transport->SendCommand(tmp);
-					string reply = m_transport->ReadReply();
+					auto reply = m_transport->SendCommandQueuedWithReply(tmp);
 
 					//All good
 					if(Trim(reply) == "-1")
@@ -1076,17 +1072,14 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 			return m_channelsEnabled[i];
 	}
 
-	//Need to lock the main mutex first to prevent deadlocks
-	lock_guard<recursive_mutex> lock(m_mutex);
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-
 	//Analog
 	if(i < m_analogChannelCount)
 	{
 		//See if the channel is enabled, hide it if not
 		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
-		m_transport->SendCommand(cmd);
-		string reply = m_transport->ReadReply();
+		auto reply = m_transport->SendCommandQueuedWithReply(cmd);
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		if(reply.find("OFF") == 0)	//may have a trailing newline, ignore that
 			m_channelsEnabled[i] = false;
 		else
@@ -1099,9 +1092,11 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		//See if the channel is on
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
 		size_t nchan = i - (m_analogChannelCount+1);
-		m_transport->SendCommand(string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'");
-		string str = Trim(m_transport->ReadReply());
-		if(str == "0")
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+			string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'"));
+
+		lock_guard<recursive_mutex> lock2(m_cacheMutex);
+		if(reply == "0")
 			m_channelsEnabled[i] = false;
 		else
 			m_channelsEnabled[i] = true;
@@ -1112,10 +1107,6 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 void LeCroyOscilloscope::EnableChannel(size_t i)
 {
-	//LogDebug("enable channel %d\n", i);
-	lock_guard<recursive_mutex> lock(m_mutex);
-	//LogDebug("got mutex\n");
-
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
 	{
@@ -1135,7 +1126,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 			}
 		}
 
-		m_transport->SendCommand(chan->GetHwname() + ":TRACE ON");
+		m_transport->SendCommandQueued(chan->GetHwname() + ":TRACE ON");
 	}
 
 	//Trigger can't be enabled
@@ -1158,16 +1149,16 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
+			m_transport->SendCommandQueued("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"YT1\"'");
 
 		//Enable this channel on the hardware
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
 		size_t nchan = i - (m_analogChannelCount+1);
-		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 1'");
+		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 1'");
 		char tmp[128];
 		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
 		snprintf(tmp, sizeof(tmp), "VBS 'app.LogicAnalyzer.Digital1.BitIndex%zu = %zu'", nbit, nbit);
-		m_transport->SendCommand(tmp);
+		m_transport->SendCommandQueued(tmp);
 	}
 
 	m_channelsEnabled[i] = true;
@@ -1223,15 +1214,11 @@ bool LeCroyOscilloscope::CanEnableChannel(size_t i)
 
 void LeCroyOscilloscope::DisableChannel(size_t i)
 {
-	//LogDebug("enable channel %d\n", i);
-	lock_guard<recursive_mutex> lock(m_mutex);
-	//LogDebug("got mutex\n");
-
 	m_channelsEnabled[i] = false;
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE OFF");
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TRACE OFF");
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
@@ -1253,11 +1240,11 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 		}
 
 		if(!anyDigitalEnabled)
-			m_transport->SendCommand("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
+			m_transport->SendCommandQueued("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
 
 		//Disable this channel
 		size_t nchan = i - (m_analogChannelCount+1);
-		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 0'");
+		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 0'");
 	}
 }
 
@@ -1291,9 +1278,8 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 
 	string reply;
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING?");
-		reply = Trim(m_transport->ReadReply().substr(0,3));
+		reply = Trim(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":COUPLING?"));
+		reply = reply.substr(0,3);
 	}
 
 	//Check if we have an active probe connected
@@ -1332,25 +1318,24 @@ void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupl
 	if(m_probeIsActive[i])
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING A1M");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING A1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING D1M");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING D1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING D50");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING D50");
 			break;
 
 		//treat unrecognized as ground
 		case OscilloscopeChannel::COUPLE_GND:
 		default:
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUPLING GND");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING GND");
 			break;
 	}
 }
@@ -1364,10 +1349,7 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return 1;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":ATTENUATION?");
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":ATTENUATION?");
 
 	double d;
 	sscanf(reply.c_str(), "%lf", &d);
@@ -1392,9 +1374,7 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:ATTENUATION %f", m_channels[i]->GetHwname().c_str(), atten);
-
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
@@ -1511,11 +1491,7 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 	if(i > m_analogChannelCount)
 		return 0;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	string cmd = "BANDWIDTH_LIMIT?";
-	m_transport->SendCommand(cmd);
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply("BANDWIDTH_LIMIT?");
 
 	size_t index = reply.find(m_channels[i]->GetHwname());
 	if(index == string::npos)
@@ -1552,8 +1528,6 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	char cmd[128];
 	if(limit_mhz == 0)
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", m_channels[i]->GetHwname().c_str());
@@ -1562,7 +1536,7 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 	else
 		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
 
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 bool LeCroyOscilloscope::CanInvert(size_t i)
@@ -1576,12 +1550,10 @@ void LeCroyOscilloscope::Invert(size_t i, bool invert)
 	if(i >= m_analogChannelCount)
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	if(invert)
-		m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = true'");
+		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = true'");
 	else
-		m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = false'");
+		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = false'");
 }
 
 bool LeCroyOscilloscope::IsInverted(size_t i)
@@ -1589,9 +1561,8 @@ bool LeCroyOscilloscope::IsInverted(size_t i)
 	if(i >= m_analogChannelCount)
 		return false;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("VBS? 'return = app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert'");
-	auto reply = Trim(m_transport->ReadReply());
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		string("VBS? 'return = app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert'"));
 	return (reply == "-1");
 }
 
@@ -1600,17 +1571,14 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 	if(i >= m_analogChannelCount)
 		return "";
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Step 1: Determine which input is active.
 	//There's always a mux selector in software, even if only one is present on the physical acquisition board
 	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
-	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
-	string mux = Trim(m_transport->ReadReply());
+	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 
 	//Step 2: Identify the probe connected to this mux channel
-	m_transport->SendCommand(string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'");
-	string name = Trim(m_transport->ReadReply());
+	auto name = Trim(m_transport->SendCommandQueuedWithReply(
+		string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
 
 	//API requires empty string if no probe
 	if(name == "None")
@@ -1666,16 +1634,13 @@ void LeCroyOscilloscope::AutoZero(size_t i)
 	if(i >= m_analogChannelCount)
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Get the active input and probe name
 	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
-	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
-	string mux = Trim(m_transport->ReadReply());
-	m_transport->SendCommand(string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'");
-	string name = Trim(m_transport->ReadReply());
-
-	m_transport->SendCommand(string("VBS? '") + prefix + "." + mux + "." + name + ".AutoZero'");
+	auto mux = Trim(m_transport->SendCommandQueuedWithReply(
+		string("VBS? 'return = ") + prefix + ".ActiveInput'"));
+	auto name = Trim(m_transport->SendCommandQueuedWithReply(
+		string("VBS? 'return = ") + prefix + "." + mux + ".ProbeName'"));
+	m_transport->SendCommandQueued(string("VBS? '") + prefix + "." + mux + "." + name + ".AutoZero'");
 }
 
 bool LeCroyOscilloscope::HasInputMux(size_t i)
@@ -1703,12 +1668,9 @@ size_t LeCroyOscilloscope::GetInputMuxSetting(size_t i)
 	if(!HasInputMux(i))
 		return 0;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Get the active input and probe name
 	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
-	m_transport->SendCommand(string("VBS? 'return = ") + prefix + ".ActiveInput'");
-	string mux = Trim(m_transport->ReadReply());
+	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 	if(mux == "InputA")
 		return 0;
 	else if(mux == "InputB")
@@ -1740,16 +1702,14 @@ void LeCroyOscilloscope::SetInputMux(size_t i, size_t select)
 	if(!HasInputMux(i))
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	if(select == 0)
 	{
-		m_transport->SendCommand(
+		m_transport->SendCommandQueued(
 			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputA\"'");
 	}
 	else
 	{
-		m_transport->SendCommand(
+		m_transport->SendCommandQueued(
 			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputB\"'");
 	}
 }
@@ -1770,13 +1730,12 @@ void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)
 	}
 
 	//Update in hardware
-	lock_guard<recursive_mutex> lock(m_mutex);
 	if(i < m_analogChannelCount)
-		m_transport->SendCommand(string("VBS 'app.Acquisition.") + chan->GetHwname() + ".Alias = \"" + name + "\"");
+		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + chan->GetHwname() + ".Alias = \"" + name + "\"");
 
 	else
 	{
-		m_transport->SendCommand(string("VBS 'app.LogicAnalyzer.Digital1.CustomBitName") +
+		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.CustomBitName") +
 			to_string(i - m_digitalChannelBase) + " = \"" + name + "\"");
 	}
 }
@@ -1797,8 +1756,6 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 			return m_channelDisplayNames[chan];
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
 	string name;
@@ -1812,7 +1769,7 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 		//Default name, change it to the hwname for now
 		if(name.find("Custom.") == 0)
 		{
-			m_transport->SendCommand(string("VBS '") + prop + " = \"" + chan->GetHwname() + "\"'");
+			m_transport->SendCommandQueued(string("VBS '") + prop + " = \"" + chan->GetHwname() + "\"'");
 			name = "";
 		}
 	}
@@ -1833,13 +1790,11 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 string LeCroyOscilloscope::GetPossiblyEmptyString(const string& property)
 {
 	//Get string length first since reading empty strings is problematic over SCPI
-	m_transport->SendCommand(string("VBS? 'return = Len(") + property + ")'");
-	string slen = Trim(m_transport->ReadReply());
+	string slen = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = Len(") + property + ")'"));
 	if(slen == "0")
 		return "";
 
-	m_transport->SendCommand(string("VBS? 'return = ") + property + "'");
-	return Trim(m_transport->ReadReply());
+	return Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + property + "'"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1852,10 +1807,7 @@ int LeCroyOscilloscope::GetMeterDigits()
 
 bool LeCroyOscilloscope::GetMeterAutoRange()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.AutoRange'");
-	string str = m_transport->ReadReply();
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.AutoRange'");
 	int ret;
 	sscanf(str.c_str(), "%d", &ret);
 	return ret ? true : false;
@@ -1863,50 +1815,46 @@ bool LeCroyOscilloscope::GetMeterAutoRange()
 
 void LeCroyOscilloscope::SetMeterAutoRange(bool enable)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	if(enable)
-		m_transport->SendCommand("VBS 'app.acquisition.DVM.AutoRange = 1'");
+		m_transport->SendCommandQueued("VBS 'app.acquisition.DVM.AutoRange = 1'");
 	else
-		m_transport->SendCommand("VBS 'app.acquisition.DVM.AutoRange = 0'");
+		m_transport->SendCommandQueued("VBS 'app.acquisition.DVM.AutoRange = 0'");
 }
 
 void LeCroyOscilloscope::StartMeter()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 1'");
+	m_transport->SendCommandQueued("VBS 'app.acquisition.DVM.DvmEnable = 1'");
 }
 
 void LeCroyOscilloscope::StopMeter()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS 'app.acquisition.DVM.DvmEnable = 0'");
+	m_transport->SendCommandQueued("VBS 'app.acquisition.DVM.DvmEnable = 0'");
 }
 
 double LeCroyOscilloscope::GetMeterValue()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
+	string reply;
 
 	switch(GetMeterMode())
 	{
 		case Multimeter::DC_VOLTAGE:
-			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Voltage'");
+			reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.Voltage'");
 			break;
 
 		case Multimeter::DC_RMS_AMPLITUDE:
 		case Multimeter::AC_RMS_AMPLITUDE:
-			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Amplitude'");
+			reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.Amplitude'");
 			break;
 
 		case Multimeter::FREQUENCY:
-			m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.Frequency'");
+			reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.Frequency'");
 			break;
 
 		default:
 			return 0;
 	}
 
-	return stod(m_transport->ReadReply());
+	return stod(reply);
 }
 
 int LeCroyOscilloscope::GetMeterChannelCount()
@@ -1916,15 +1864,12 @@ int LeCroyOscilloscope::GetMeterChannelCount()
 
 string LeCroyOscilloscope::GetMeterChannelName(int chan)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	return m_channels[chan]->GetDisplayName();
 }
 
 int LeCroyOscilloscope::GetCurrentMeterChannel()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.DvmSource'");
-	string str = m_transport->ReadReply();
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.DvmSource'");
 	int i;
 	sscanf(str.c_str(), "C%d", &i);
 	return i - 1;	//scope channels are 1 based
@@ -1932,14 +1877,13 @@ int LeCroyOscilloscope::GetCurrentMeterChannel()
 
 void LeCroyOscilloscope::SetCurrentMeterChannel(int chan)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
 	snprintf(
 		cmd,
 		sizeof(cmd),
 		"VBS 'app.acquisition.DVM.DvmSource = \"C%d\"",
 		chan + 1);	//scope channels are 1 based
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
@@ -1947,9 +1891,7 @@ Multimeter::MeasurementTypes LeCroyOscilloscope::GetMeterMode()
 	if(m_meterModeValid)
 		return m_meterMode;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.acquisition.DVM.DvmMode'");
-	string str = m_transport->ReadReply();
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.acquisition.DVM.DvmMode'");
 
 	//trim off trailing whitespace
 	while(isspace(str[str.length()-1]))
@@ -2004,8 +1946,7 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("VBS 'app.acquisition.DVM.DvmMode = \"") + stype + "\"");
+	m_transport->SendCommandQueued(string("VBS 'app.acquisition.DVM.DvmMode = \"") + stype + "\"");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2039,11 +1980,10 @@ bool LeCroyOscilloscope::GetFunctionChannelActive(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	if(on)
-		m_transport->SendCommand("VBS 'app.wavesource.enable=True'");
+		m_transport->SendCommandQueued("VBS 'app.wavesource.enable=True'");
 	else
-		m_transport->SendCommand("VBS 'app.wavesource.enable=False'");
+		m_transport->SendCommandQueued("VBS 'app.wavesource.enable=False'");
 }
 
 float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
@@ -2091,10 +2031,9 @@ float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.frequency = %f'", hz);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*chan*/)
@@ -2119,10 +2058,9 @@ float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", sec);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
@@ -2134,10 +2072,9 @@ float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
 
 void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 FunctionGenerator::OutputImpedance LeCroyOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)
@@ -2161,16 +2098,8 @@ bool LeCroyOscilloscope::IsTriggerArmed()
 
 Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 {
-	//LogDebug("Polling trigger\n");
-
 	//Read the Internal State Change Register
-	string sinr;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("INR?");
-		sinr = m_transport->ReadReply();
-	}
-	//LogDebug("Got trigger state\n");
+	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
 	int inr = atoi(sinr.c_str());
 
 	//See if we got a waveform
@@ -2213,26 +2142,28 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
  */
 void LeCroyOscilloscope::BulkCheckChannelEnableState()
 {
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-
 	//Check enable state in the cache.
 	vector<int> uncached;
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelsEnabled.find(i) == m_channelsEnabled.end())
 			uncached.push_back(i);
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
-
 	//Batched implementation
 	if(m_transport->IsCommandBatchingSupported())
 	{
+		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 		for(auto i : uncached)
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TRACE?");
+		m_transport->FlushCommandQueue();
 		for(auto i : uncached)
 		{
-			string reply = m_transport->ReadReply();
+			auto reply = m_transport->ReadReply();
+
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
 			if(reply == "OFF")
 				m_channelsEnabled[i] = false;
 			else
@@ -2245,9 +2176,9 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	{
 		for(auto i : uncached)
 		{
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":TRACE?");
+			auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":TRACE?");
 
-			string reply = m_transport->ReadReply();
+			lock_guard<recursive_mutex> lock(m_cacheMutex);
 			if(reply == "OFF")
 				m_channelsEnabled[i] = false;
 			else
@@ -2258,7 +2189,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	/*
 	//Check digital status
 	//TODO: better per-lane queries
-	m_transport->SendCommand("Digital1:TRACE?");
+	m_transport->SendCommandQueued("Digital1:TRACE?");
 
 	string reply = m_transport->ReadReply();
 	if(reply == "OFF")
@@ -2279,6 +2210,8 @@ bool LeCroyOscilloscope::ReadWavedescs(
 	unsigned int& firstEnabledChannel,
 	bool& any_enabled)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	//(Note: with VICP framing we cannot use semicolons to separate commands)
 	BulkCheckChannelEnableState();
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
@@ -2297,9 +2230,11 @@ bool LeCroyOscilloscope::ReadWavedescs(
 		{
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DESC");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? DESC");
 		}
 	}
+
+	m_transport->FlushCommandQueue();
 	for(unsigned int i=0; i<m_analogChannelCount; i++)
 	{
 		if(enabled[i] || (!any_enabled && i==0))
@@ -2336,18 +2271,18 @@ void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences,
 			//If a multi-segment capture, ask for the trigger time data
 			if( (num_sequences > 1) && !sent_wavetime)
 			{
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? TIME");
+				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? TIME");
 				sent_wavetime = true;
 			}
 
 			//Ask for the data
-			m_transport->SendCommand(m_channels[i]->GetHwname() + ":WF? DAT1");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? DAT1");
 		}
 	}
 
 	//Ask for the digital waveforms
 	if(denabled)
-		m_transport->SendCommand("Digital1:WF?");
+		m_transport->SendCommandQueued("Digital1:WF?");
 }
 
 time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& basetime)
@@ -2667,7 +2602,7 @@ bool LeCroyOscilloscope::AcquireData()
 
 	//Acquire the data (but don't parse it)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
+		lock_guard<recursive_mutex> lock2(m_transport->GetMutex());
 
 		//Get the wavedescs for all channels
 		unsigned int firstEnabledChannel = UINT_MAX;
@@ -2724,6 +2659,7 @@ bool LeCroyOscilloscope::AcquireData()
 
 		//Ask for every enabled channel up front, so the scope can send us the next while we parse the first
 		RequestWaveforms(enabled, num_sequences, denabled);
+		m_transport->FlushCommandQueue();
 
 		if(pdesc)
 		{
@@ -2757,8 +2693,8 @@ bool LeCroyOscilloscope::AcquireData()
 	//Re-arm the trigger if not in one-shot mode
 	if(!m_triggerOneShot)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("TRIG_MODE SINGLE");
+		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
+		m_transport->FlushCommandQueue();
 		m_triggerArmed = true;
 	}
 
@@ -2833,39 +2769,35 @@ bool LeCroyOscilloscope::AcquireData()
 
 void LeCroyOscilloscope::Start()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand("TRIG_MODE NORM");
-	m_transport->SendCommand("TRIG_MODE SINGLE");	//always do single captures, just re-trigger
+	m_transport->SendCommandQueued("TRIG_MODE SINGLE");	//always do single captures, just re-trigger
+	m_transport->FlushCommandQueue();
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
 
 void LeCroyOscilloscope::StartSingleTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	//LogDebug("Start single trigger\n");
-	m_transport->SendCommand("TRIG_MODE SINGLE");
+	m_transport->SendCommandQueued("TRIG_MODE SINGLE");
+	m_transport->FlushCommandQueue();
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
 
 void LeCroyOscilloscope::Stop()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("TRIG_MODE STOP");
-
+	m_transport->SendCommandQueued("TRIG_MODE STOP");
+	m_transport->FlushCommandQueue();
 	m_triggerArmed = false;
 	m_triggerOneShot = true;
 }
 
 void LeCroyOscilloscope::ForceTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 
-	m_transport->SendCommand("FRTR");
+	m_transport->SendCommandQueued("FRTR");
+	m_transport->FlushCommandQueue();
 }
 
 float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
@@ -2881,11 +2813,8 @@ float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 			return m_channelOffsets[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFSET?");
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFSET?");
-
-	string reply = m_transport->ReadReply();
 	float offset;
 	sscanf(reply.c_str(), "%f", &offset);
 
@@ -2900,12 +2829,9 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float off
 	if(i > m_analogChannelCount)
 		return;
 
-	{
-		lock_guard<recursive_mutex> lock2(m_mutex);
-		char tmp[128];
-		snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", m_channels[i]->GetHwname().c_str(), offset);
-		m_transport->SendCommand(tmp);
-	}
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", m_channels[i]->GetHwname().c_str(), offset);
+	m_transport->SendCommandQueued(tmp);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_channelOffsets[i] = offset;
@@ -2923,11 +2849,8 @@ float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 			return m_channelVoltageRanges[i];
 	}
 
-	lock_guard<recursive_mutex> lock2(m_mutex);
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":VOLT_DIV?");
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":VOLT_DIV?");
-
-	string reply = m_transport->ReadReply();
 	double volts_per_div;
 	sscanf(reply.c_str(), "%lf", &volts_per_div);
 
@@ -2939,14 +2862,12 @@ float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	double vdiv = range / 8;
 	m_channelVoltageRanges[i] = range;
 
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), vdiv);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
@@ -3373,12 +3294,9 @@ uint64_t LeCroyOscilloscope::GetSampleRate()
 {
 	if(!m_sampleRateValid)
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SamplingRate'");
+		auto reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Horizontal.SamplingRate'");
 		//What's the difference between SampleRate and SamplingRate?
 		//Seems like at low speed we want to use SamplingRate, not SampleRate
-		string reply = m_transport->ReadReply();
-
 		sscanf(reply.c_str(), "%ld", &m_sampleRate);
 		m_sampleRateValid = true;
 	}
@@ -3395,9 +3313,8 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 		//This is the same as app.Acquisition.Horizontal.MaxSamples, which is also wrong.
 
 		//What you see below is the only observed method that seems to reliably get the *actual* memory depth.
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.AcquisitionDuration'");
-		string reply = m_transport->ReadReply();
+		auto reply = m_transport->SendCommandQueuedWithReply(
+			"VBS? 'return = app.Acquisition.Horizontal.AcquisitionDuration'");
 		int64_t capture_len_fs = Unit(Unit::UNIT_FS).ParseString(reply);
 		int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate();
 
@@ -3410,15 +3327,13 @@ uint64_t LeCroyOscilloscope::GetSampleDepth()
 
 void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Calculate the record length we need for this memory depth
 	int64_t fs_per_sample = FS_PER_SECOND / GetSampleRate();
 	int64_t fs_per_acquisition = depth * fs_per_sample;
 	float sec_per_acquisition = fs_per_acquisition * SECONDS_PER_FS;
 	float sec_per_div = sec_per_acquisition / 10;
 
-	m_transport->SendCommand(
+	m_transport->SendCommandQueued(
 		string("VBS? 'app.Acquisition.Horizontal.HorScale = ") +
 		to_string_sci(sec_per_div) + "'");
 
@@ -3429,8 +3344,7 @@ void LeCroyOscilloscope::SetSampleDepth(uint64_t depth)
 
 void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("VBS? 'app.Acquisition.Horizontal.SampleRate = ") + to_string(rate) + "'");
+	m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Horizontal.SampleRate = ") + to_string(rate) + "'");
 
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
@@ -3439,23 +3353,21 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 void LeCroyOscilloscope::EnableTriggerOutput()
 {
 	//Enable 400ns trigger-out pulse, 1V p-p
-	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.AuxMode=\"TriggerOut\"'");
-	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
-	m_transport->SendCommand("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.AuxMode=\"TriggerOut\"'");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
 }
 
 void LeCroyOscilloscope::SetUseExternalRefclk(bool external)
 {
 	if(external)
-		m_transport->SendCommand("RCLK EXTERNAL");
+		m_transport->SendCommandQueued("RCLK EXTERNAL");
 	else
-		m_transport->SendCommand("RCLK INTERNAL");
+		m_transport->SendCommandQueued("RCLK INTERNAL");
 }
 
 void LeCroyOscilloscope::SetTriggerOffset(int64_t offset)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//LeCroy's standard has the offset being from the midpoint of the capture.
 	//Scopehal has offset from the start.
 	int64_t rate = GetSampleRate();
@@ -3464,7 +3376,7 @@ void LeCroyOscilloscope::SetTriggerOffset(int64_t offset)
 
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "TRDL %e", (offset - halfwidth) * SECONDS_PER_FS);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 
 	//Don't update the cache because the scope is likely to round the offset we ask for.
 	//If we query the instrument later, the cache will be updated then.
@@ -3481,12 +3393,7 @@ int64_t LeCroyOscilloscope::GetTriggerOffset()
 			return m_triggerOffset;
 	}
 
-	string reply;
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("TRDL?");
-		reply = m_transport->ReadReply();
-	}
+	auto reply = m_transport->SendCommandQueuedWithReply("TRDL?");
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -3512,14 +3419,12 @@ void LeCroyOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 	if(channel >= m_analogChannelCount)
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS? 'app.Acquisition.%s.Deskew=%e'",
 		m_channels[channel]->GetHwname().c_str(),
 		skew * SECONDS_PER_FS
 		);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 
 	//Update cache
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -3540,11 +3445,9 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 	}
 
 	//Read the deskew
-	lock_guard<recursive_mutex> lock(m_mutex);
 	char tmp[128];
 	snprintf(tmp, sizeof(tmp), "VBS? 'return = app.Acquisition.%s.Deskew'", m_channels[channel]->GetHwname().c_str());
-	m_transport->SendCommand(tmp);
-	string reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply(tmp);
 
 	//Value comes back as floating point ps
 	float skew;
@@ -3566,10 +3469,7 @@ bool LeCroyOscilloscope::IsInterleaving()
 			return m_interleaving;
 	}
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("COMBINE_CHANNELS?");
-	auto reply = m_transport->ReadReply();
+	auto reply = m_transport->SendCommandQueuedWithReply("COMBINE_CHANNELS?");
 	if(reply[0] == '1')
 		m_interleaving = false;
 	else if(reply[0] == '2')
@@ -3578,7 +3478,7 @@ bool LeCroyOscilloscope::IsInterleaving()
 	//We don't support "auto" mode. Default to off for now
 	else
 	{
-		m_transport->SendCommand("COMBINE_CHANNELS 1");
+		m_transport->SendCommandQueued("COMBINE_CHANNELS 1");
 		m_interleaving = false;
 	}
 
@@ -3588,12 +3488,10 @@ bool LeCroyOscilloscope::IsInterleaving()
 
 bool LeCroyOscilloscope::SetInterleaving(bool combine)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Setting to "off" always is possible
 	if(!combine)
 	{
-		m_transport->SendCommand("COMBINE_CHANNELS 1");
+		m_transport->SendCommandQueued("COMBINE_CHANNELS 1");
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_interleaving = false;
@@ -3611,7 +3509,7 @@ bool LeCroyOscilloscope::SetInterleaving(bool combine)
 	//All good, turn it on for real
 	else
 	{
-		m_transport->SendCommand("COMBINE_CHANNELS 2");
+		m_transport->SendCommandQueued("COMBINE_CHANNELS 2");
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
 		m_interleaving = true;
@@ -3644,10 +3542,7 @@ bool LeCroyOscilloscope::IsSamplingModeAvailable(SamplingMode mode)
 
 LeCroyOscilloscope::SamplingMode LeCroyOscilloscope::GetSamplingMode()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.SampleMode'");
-	string reply = Trim(m_transport->ReadReply());
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Horizontal.SampleMode'"));
 
 	if(reply == "RealTime")
 		return REAL_TIME;
@@ -3663,21 +3558,20 @@ void LeCroyOscilloscope::SetSamplingMode(SamplingMode mode)
 {
 	//Send the command to the scope
 	{
-		lock_guard<recursive_mutex> lock(m_mutex);
 		switch(mode)
 		{
 			case REAL_TIME:
 
 				//Select 10ns/div
-				m_transport->SendCommand(
+				m_transport->SendCommandQueued(
 					string("VBS? 'app.Acquisition.Horizontal.HorScale = ") + to_string_sci(1e-8) + "'");
 
 				//Select sample mode after changing scale
-				m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RealTime\"'");
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RealTime\"'");
 				break;
 
 			case EQUIVALENT_TIME:
-				m_transport->SendCommand("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RIS\"'");
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Horizontal.SampleMode = \"RIS\"'");
 				break;
 		}
 	}
@@ -3728,21 +3622,20 @@ bool LeCroyOscilloscope::IsDBIEnabled(size_t channel)
 
 	//TODO: LabMaster scopes can have >4 channels. How do we figure out what acquisition modules are present?
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Ask scope for the DBI mode
 	//For now, no caching since we don't expect to be touching this too often.
 	//We can add caching in the future if there's performance issues.
+	string reply;
 	if(channel == 1)
-		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI2Mode'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.DBI2Mode'");
 	else if(channel == 2)
-		m_transport->SendCommand("VBS? 'return = app.Acquisition.DBI3Mode'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.DBI3Mode'");
 
 	//Can only enable DBI on center two channels
 	else
 		return false;
 
-	auto reply = Trim(m_transport->ReadReply().c_str());
+	reply = Trim(reply);
 	return (reply == "DBION");
 }
 
@@ -3768,9 +3661,8 @@ size_t LeCroyOscilloscope::GetADCMode(size_t /*channel*/)
 	if(m_modelid != MODEL_HDO_9K)
 		return 0;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Horizontal.HiResolutionModeActive'");
-	string reply = Trim(m_transport->ReadReply().c_str());
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Horizontal.HiResolutionModeActive'"));
 
 	if(reply == "HDOn")
 		return 1;
@@ -3783,18 +3675,16 @@ void LeCroyOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 	if(m_modelid != MODEL_HDO_9K)
 		return;
 
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	if(mode == 1)
-		m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOn\"'");
+		m_transport->SendCommandQueued("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOn\"'");
 	else
 	{
-		m_transport->SendCommand("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOff\"'");
+		m_transport->SendCommandQueued("VBS 'app.Acquisition.Horizontal.HiResolutionModeActive = \"HDOff\"'");
 
 		//Disable all interpolation
 		for(size_t i=0; i<m_analogChannelCount; i++)
 		{
-			m_transport->SendCommand(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() +
+			m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() +
 				".Interpolation = \"NONE\"'");
 		}
 	}
@@ -3854,50 +3744,44 @@ bool LeCroyOscilloscope::IsDigitalThresholdConfigurable()
 
 float LeCroyOscilloscope::GetDigitalHysteresis(size_t channel)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
+	string reply;
 	if(channel <= m_digitalChannels[7]->GetIndex() )
-		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis0'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis0'");
 	else
-		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis1'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxHysteresis1'");
 
-	return atof(m_transport->ReadReply().c_str());
+	return atof(reply.c_str());
 }
 
 float LeCroyOscilloscope::GetDigitalThreshold(size_t channel)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
+	string reply;
 	if(channel <= m_digitalChannels[7]->GetIndex() )
-		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxThreshold0'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxThreshold0'");
 	else
-		m_transport->SendCommand("VBS? 'return = app.LogicAnalyzer.MSxxThreshold1'");
+		reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.MSxxThreshold1'");
 
-	return atof(m_transport->ReadReply().c_str());
+	return atof(reply.c_str());
 }
 
 void LeCroyOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	char tmp[128];
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxHysteresis0 = %e'", level);
 	else
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxHysteresis1 = %e'", level);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	char tmp[128];
 	if(channel <= m_digitalChannels[7]->GetIndex() )
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold0 = %e'", level);
 	else
 		snprintf(tmp, sizeof(tmp), "VBS? 'app.LogicAnalyzer.MSxxThreshold1 = %e'", level);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3905,11 +3789,8 @@ void LeCroyOscilloscope::SetDigitalThreshold(size_t channel, float level)
 
 void LeCroyOscilloscope::PullTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Figure out what kind of trigger is active.
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Type'");
-	string reply = Trim(m_transport->ReadReply());
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'"));
 	if (reply == "C8B10B")
 		Pull8b10bTrigger();
 	else if (reply == "Dropout")
@@ -3948,8 +3829,9 @@ void LeCroyOscilloscope::PullTrigger()
  */
 void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 {
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Source'");		//not visible in XStream Browser?
-	string reply = Trim(m_transport->ReadReply());
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Source'"));		//not visible in XStream Browser?
+
 	auto chan = GetChannelByHwName(reply);
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
@@ -4186,24 +4068,24 @@ void LeCroyOscilloscope::PullDropoutTrigger()
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 
 	//Level
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
-	dt->SetLevel(stof(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Level'");
+	dt->SetLevel(stof(tmp));
 
 	//Dropout time
 	Unit fs(Unit::UNIT_FS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
-	dt->SetDropoutTime(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.DropoutTime'");
+	dt->SetDropoutTime(fs.ParseString(tmp));
 
 	//Edge type
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
-	if(Trim(m_transport->ReadReply()) == "Positive")
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.Slope'");
+	if(Trim(tmp) == "Positive")
 		dt->SetType(DropoutTrigger::EDGE_RISING);
 	else
 		dt->SetType(DropoutTrigger::EDGE_FALLING);
 
 	//Reset type
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
-	if(Trim(m_transport->ReadReply()) == "0")
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Dropout.IgnoreLastEdge'");
+	if(Trim(tmp) == "0")
 		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
 	else
 		dt->SetResetType(DropoutTrigger::RESET_NONE);
@@ -4227,14 +4109,14 @@ void LeCroyOscilloscope::PullEdgeTrigger()
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	//Level
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
-	et->SetLevel(stof(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Level'");
+	et->SetLevel(stof(tmp));
 
 	//TODO: OptimizeForHF (changes hysteresis for fast signals)
 
 	//Slope
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
-	GetTriggerSlope(et, Trim(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Edge.Slope'");
+	GetTriggerSlope(et, Trim(tmp));
 }
 
 /**
@@ -4255,25 +4137,25 @@ void LeCroyOscilloscope::PullGlitchTrigger()
 	GlitchTrigger* gt = dynamic_cast<GlitchTrigger*>(m_trigger);
 
 	//Level
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Level'");
-	gt->SetLevel(stof(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Glitch.Level'");
+	gt->SetLevel(stof(tmp));
 
 	//Slope
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Slope'");
-	GetTriggerSlope(gt, Trim(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Glitch.Slope'");
+	GetTriggerSlope(gt, Trim(tmp));
 
 	//Condition
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.Condition'");
-	gt->SetCondition(GetCondition(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Glitch.Condition'");
+	gt->SetCondition(GetCondition(tmp));
 
 	//Min range
 	Unit fs(Unit::UNIT_FS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeLow'");
-	gt->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeLow'");
+	gt->SetLowerBound(fs.ParseString(tmp));
 
 	//Max range
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeHigh'");
-	gt->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Glitch.TimeHigh'");
+	gt->SetUpperBound(fs.ParseString(tmp));
 }
 
 /**
@@ -4294,25 +4176,25 @@ void LeCroyOscilloscope::PullPulseWidthTrigger()
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 
 	//Level
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Level'");
-	pt->SetLevel(stof(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Width.Level'");
+	pt->SetLevel(stof(tmp));
 
 	//Condition
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Condition'");
-	pt->SetCondition(GetCondition(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Width.Condition'");
+	pt->SetCondition(GetCondition(tmp));
 
 	//Min range
 	Unit fs(Unit::UNIT_FS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeLow'");
-	pt->SetLowerBound(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Width.TimeLow'");
+	pt->SetLowerBound(fs.ParseString(tmp));
 
 	//Max range
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.TimeHigh'");
-	pt->SetUpperBound(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Width.TimeHigh'");
+	pt->SetUpperBound(fs.ParseString(tmp));
 
 	//Slope
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
-	GetTriggerSlope(pt, Trim(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Width.Slope'");
+	GetTriggerSlope(pt, Trim(tmp));
 }
 
 /**
@@ -4334,33 +4216,33 @@ void LeCroyOscilloscope::PullRuntTrigger()
 
 	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.LowerLevel'");
-	rt->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.LowerLevel'");
+	rt->SetLowerBound(v.ParseString(tmp));
 
 	//Upper bound
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.UpperLevel'");
-	rt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.UpperLevel'");
+	rt->SetUpperBound(v.ParseString(tmp));
 
 	//Lower interval
 	Unit fs(Unit::UNIT_FS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeLow'");
-	rt->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.TimeLow'");
+	rt->SetLowerInterval(fs.ParseString(tmp));
 
 	//Upper interval
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.TimeHigh'");
-	rt->SetUpperInterval(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.TimeHigh'");
+	rt->SetUpperInterval(fs.ParseString(tmp));
 
 	//Slope
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.Slope'");
-	auto reply = Trim(m_transport->ReadReply());
-	if(reply == "Positive")
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.Slope'");
+	tmp = Trim(tmp);
+	if(tmp == "Positive")
 		rt->SetSlope(RuntTrigger::EDGE_RISING);
-	else if(reply == "Negative")
+	else if(tmp == "Negative")
 		rt->SetSlope(RuntTrigger::EDGE_FALLING);
 
 	//Condition
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Runt.Condition'");
-	rt->SetCondition(GetCondition(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Runt.Condition'");
+	rt->SetCondition(GetCondition(tmp));
 }
 
 /**
@@ -4382,33 +4264,32 @@ void LeCroyOscilloscope::PullSlewRateTrigger()
 
 	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.LowerLevel'");
-	st->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.LowerLevel'");
+	st->SetLowerBound(v.ParseString(tmp));
 
 	//Upper bound
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.UpperLevel'");
-	st->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.UpperLevel'");
+	st->SetUpperBound(v.ParseString(tmp));
 
 	//Lower interval
 	Unit fs(Unit::UNIT_FS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeLow'");
-	st->SetLowerInterval(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeLow'");
+	st->SetLowerInterval(fs.ParseString(tmp));
 
 	//Upper interval
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeHigh'");
-	st->SetUpperInterval(fs.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.TimeHigh'");
+	st->SetUpperInterval(fs.ParseString(tmp));
 
 	//Slope
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.Slope'");
-	auto reply = Trim(m_transport->ReadReply());
-	if(reply == "Positive")
+	tmp = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.Slope'"));
+	if(tmp == "Positive")
 		st->SetSlope(SlewRateTrigger::EDGE_RISING);
-	else if(reply == "Negative")
+	else if(tmp == "Negative")
 		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
 
 	//Condition
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.SlewRate.Condition'");
-	st->SetCondition(GetCondition(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.SlewRate.Condition'");
+	st->SetCondition(GetCondition(tmp));
 }
 
 /**
@@ -4429,12 +4310,12 @@ void LeCroyOscilloscope::PullUartTrigger()
 	UartTrigger* ut = dynamic_cast<UartTrigger*>(m_trigger);
 
 	//Bit rate
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.BitRate'");
-	ut->SetBitRate(stoi(m_transport->ReadReply()));
+	auto reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Serial.UART.BitRate'");
+	ut->SetBitRate(stoi(reply));
 
 	//Level
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.LevelAbsolute'");
-	ut->SetLevel(stof(m_transport->ReadReply()));
+	reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Serial.LevelAbsolute'");
+	ut->SetLevel(stof(reply));
 
 	//Ignore ByteBitOrder, assume LSB for now
 	//Ignore NumDataBits, assume 8 for now
@@ -4460,8 +4341,8 @@ void LeCroyOscilloscope::PullUartTrigger()
 	*/
 
 	//Parity
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.ParityType'");
-	auto reply = Trim(m_transport->ReadReply());
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.ParityType'"));
 	if(reply == "None")
 		ut->SetParityType(UartTrigger::PARITY_NONE);
 	else if(reply == "Even")
@@ -4471,8 +4352,8 @@ void LeCroyOscilloscope::PullUartTrigger()
 
 	//Operator
 	bool ignore_p2 = true;
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternOperator'");
-	reply = Trim(m_transport->ReadReply());
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternOperator'"));
 	if(reply == "Equal")
 		ut->SetCondition(Trigger::CONDITION_EQUAL);
 	else if(reply == "NotEqual")
@@ -4497,30 +4378,30 @@ void LeCroyOscilloscope::PullUartTrigger()
 	}
 
 	//Idle polarity
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.Polarity'");
-	reply = Trim(m_transport->ReadReply());
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.Polarity'"));
 	if(reply == "IdleHigh")
 		ut->SetPolarity(UartTrigger::IDLE_HIGH);
 	else if(reply == "IdleLow")
 		ut->SetPolarity(UartTrigger::IDLE_LOW);
 
 	//Stop bits
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.StopBitLength'");
-	ut->SetStopBits(stof(Trim(m_transport->ReadReply())));
+	reply = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Serial.UART.StopBitLength'");
+	ut->SetStopBits(stof(Trim(reply)));
 
 	//Trigger type
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.TrigOnBadParity'");
-	reply = Trim(m_transport->ReadReply());
+	reply = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.TrigOnBadParity'"));
 	if(reply == "-1")
 		ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
 	else
 		ut->SetMatchType(UartTrigger::TYPE_DATA);
 
 	//PatternValue1 / 2
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue'");
-	string p1 = Trim(m_transport->ReadReply());
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue2'");
-	string p2 = Trim(m_transport->ReadReply());
+	auto p1 = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue'"));
+	auto p2 = Trim(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue2'"));
 	ut->SetPatterns(p1, p2, ignore_p2);
 }
 
@@ -4543,12 +4424,13 @@ void LeCroyOscilloscope::PullWindowTrigger()
 
 	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Window.LowerLevel'");
-	wt->SetLowerBound(v.ParseString(m_transport->ReadReply()));
+	auto tmp = m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Window.LowerLevel'");
+	wt->SetLowerBound(v.ParseString(tmp));
 
 	//Upper bound
-	m_transport->SendCommand("VBS? 'return = app.Acquisition.Trigger.Window.UpperLevel'");
-	wt->SetUpperBound(v.ParseString(m_transport->ReadReply()));
+	tmp = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Window.UpperLevel'");
+	wt->SetUpperBound(v.ParseString(tmp));
 }
 
 /**
@@ -4590,8 +4472,6 @@ Trigger::Condition LeCroyOscilloscope::GetCondition(string reply)
 
 void LeCroyOscilloscope::PushTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-
 	//Source is the same for every channel
 	char tmp[128];
 	snprintf(
@@ -4599,7 +4479,7 @@ void LeCroyOscilloscope::PushTrigger()
 		sizeof(tmp),
 		"VBS? 'app.Acquisition.Trigger.Source = \"%s\"'",
 		m_trigger->GetInput(0).m_channel->GetHwname().c_str());
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 
 	//The rest depends on the type
 	auto c8t = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
@@ -4613,47 +4493,47 @@ void LeCroyOscilloscope::PushTrigger()
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	if(c8t)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"C8B10B\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"C8B10B\"");
 		Push8b10bTrigger(c8t);
 	}
 	else if(dt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Dropout\"");
 		PushDropoutTrigger(dt);
 	}
 	else if(pt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Width\"");
 		PushPulseWidthTrigger(pt);
 	}
 	else if(gt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Glitch\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Glitch\"");
 		PushGlitchTrigger(gt);
 	}
 	else if(rt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Runt\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Runt\"");
 		PushRuntTrigger(rt);
 	}
 	else if(st)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"SlewRate\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"SlewRate\"");
 		PushSlewRateTrigger(st);
 	}
 	else if(ut)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"UART\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"UART\"");
 		PushUartTrigger(ut);
 	}
 	else if(wt)
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Window\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Window\"");
 		PushWindowTrigger(wt);
 	}
 	else if(et)	//must be last
 	{
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"Edge\"");
 		PushEdgeTrigger(et, "app.Acquisition.Trigger.Edge");
 	}
 
@@ -4669,26 +4549,26 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 	PushFloat("app.Acquisition.Trigger.Serial.Level", trig->GetLevel());
 
 	//Bit rate
-	m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.BitRate = ") +
+	m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.BitRate = ") +
 		to_string(trig->GetBitRate()) + "'");
 
 	//Equalizer mode
 	switch(trig->GetEqualizerMode())
 	{
 		case CDRTrigger::LECROY_EQ_NONE:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"None\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"None\"");
 			break;
 
 		case CDRTrigger::LECROY_EQ_LOW:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Low\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Low\"");
 			break;
 
 		case CDRTrigger::LECROY_EQ_MEDIUM:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Medium\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"Medium\"");
 			break;
 
 		case CDRTrigger::LECROY_EQ_HIGH:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"High\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.EqualizerMode = \"High\"");
 			break;
 	}
 
@@ -4696,11 +4576,11 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 	switch(trig->GetTriggerPosition())
 	{
 		case CDRTrigger::POSITION_START:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"Start\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"Start\"");
 			break;
 
 		case CDRTrigger::POSITION_END:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"End\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.TriggerPosition = \"End\"");
 			break;
 	}
 
@@ -4708,11 +4588,11 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 	switch(trig->GetPolarity())
 	{
 		case CDRTrigger::POLARITY_NORMAL:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"0\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"0\"");
 			break;
 
 		case CDRTrigger::POLARITY_INVERTED:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"1\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Invert = \"1\"");
 			break;
 	}
 
@@ -4720,11 +4600,11 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 	switch(trig->GetMatchMode())
 	{
 		case CDR8B10BTrigger::MATCH_INCLUDE:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Include\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Include\"");
 			break;
 
 		case CDR8B10BTrigger::MATCH_EXCLUDE:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Exclude\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.Operation = \"Exclude\"");
 			break;
 	}
 
@@ -4744,9 +4624,9 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 	{
 		case CDR8B10BTrigger::PATTERN_LIST:
 			{
-				m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolOR\"");
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolOR\"");
 
-				m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.SymbolCount = ") +
+				m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.SymbolCount = ") +
 					to_string(nsymbols) + "'");
 
 				for(size_t i=0; i<nsymbols; i++)
@@ -4760,17 +4640,17 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 					switch(pattern[i].disparity)
 					{
 						case T8B10BSymbol::ANY:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Rd = \"Either\"'");
 							break;
 
 						case T8B10BSymbol::POSITIVE:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Rd = \"Positive\"'");
 							break;
 
 						case T8B10BSymbol::NEGATIVE:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Rd = \"Negative\"'");
 							break;
 					}
@@ -4778,17 +4658,17 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 					switch(pattern[i].ktype)
 					{
 						case T8B10BSymbol::KSYMBOL:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Type = \"KSymbol\"'");
 
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.KSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.KSymbol") +
 								si + "ValueOR = \"K" + val + "\"'");
 							break;
 
 						case T8B10BSymbol::DSYMBOL:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.ORSymbol") +
 								si + "Type = \"DSymbol\"'");
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.DSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.DSymbol") +
 								si + "EightBitsValueOR = \"D" + val + "\"'");
 							break;
 
@@ -4802,7 +4682,7 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 
 		case CDR8B10BTrigger::PATTERN_SEQUENCE:
 			{
-				m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolString\"");
+				m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.PatternType = \"SymbolString\"");
 
 				//Sequence is always 8 elements long, but we may not actually have all 8 elements internally
 				//Only push the ones we have in our parameter
@@ -4817,17 +4697,17 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 					switch(pattern[i].disparity)
 					{
 						case T8B10BSymbol::ANY:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Rd = \"Either\"'");
 							break;
 
 						case T8B10BSymbol::POSITIVE:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Rd = \"Positive\"'");
 							break;
 
 						case T8B10BSymbol::NEGATIVE:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Rd = \"Negative\"'");
 							break;
 					}
@@ -4835,22 +4715,22 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 					switch(pattern[i].ktype)
 					{
 						case T8B10BSymbol::KSYMBOL:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Type = \"KSymbol\"'");
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrKSymbol") +
 								si + "Value = \"K" + val + "\"'");
 							break;
 
 						case T8B10BSymbol::DSYMBOL:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Type = \"DSymbol\"'");
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrDSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrDSymbol") +
 								si + "EightBitsValue = \"D" + val + "\"'");
 							break;
 
 						case T8B10BSymbol::DONTCARE:
 						default:
-							m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+							m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 								si + "Type = \"DontCare\"'");
 							break;
 					}
@@ -4859,7 +4739,7 @@ void LeCroyOscilloscope::Push8b10bTrigger(CDR8B10BTrigger* trig)
 				//Pad out extra space with dontcares
 				for(size_t i=nsymbols; i<8; i++)
 				{
-					m_transport->SendCommand(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
+					m_transport->SendCommandQueued(string("VBS? 'app.Acquisition.Trigger.Serial.C8B10B.StrSymbol") +
 						to_string(i) + "Type = \"DontCare\"'");
 				}
 
@@ -4877,14 +4757,14 @@ void LeCroyOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 	PushFloat("app.Acquisition.Trigger.Dropout.DropoutTime", trig->GetDropoutTime() * SECONDS_PER_FS);
 
 	if(trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = 0'");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.IgnoreLastEdge = -1'");
 
 	if(trig->GetType() == DropoutTrigger::EDGE_RISING)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Positive\"'");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Dropout.Slope = \"Negative\"'");
 }
 
 /**
@@ -4899,15 +4779,15 @@ void LeCroyOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const string& tree)
 	switch(trig->GetType())
 	{
 		case EdgeTrigger::EDGE_RISING:
-			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Positive\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Positive\"'");
 			break;
 
 		case EdgeTrigger::EDGE_FALLING:
-			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Negative\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Negative\"'");
 			break;
 
 		case EdgeTrigger::EDGE_ANY:
-			m_transport->SendCommand(string("VBS? '") + tree + ".Slope = \"Either\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + tree + ".Slope = \"Either\"'");
 			break;
 
 		default:
@@ -4950,9 +4830,9 @@ void LeCroyOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 	PushFloat("app.Acquisition.Trigger.Runt.LowerLevel", trig->GetLowerBound());
 
 	if(trig->GetSlope() == RuntTrigger::EDGE_RISING)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Positive\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Positive\"");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Negative\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Runt.Slope = \"Negative\"");
 }
 
 /**
@@ -4967,9 +4847,9 @@ void LeCroyOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
 	PushFloat("app.Acquisition.Trigger.SlewRate.LowerLevel", trig->GetLowerBound());
 
 	if(trig->GetSlope() == SlewRateTrigger::EDGE_RISING)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Positive\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Positive\"");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Negative\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.SlewRate.Slope = \"Negative\"");
 }
 
 /**
@@ -4983,7 +4863,7 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 	//AtPosition
 	//Bit9State
 	PushFloat("app.Acquisition.Trigger.Serial.UART.BitRate", trig->GetBitRate());
-	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ByteBitOrder = \"LSB\"");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.ByteBitOrder = \"LSB\"");
 	//DataBytesLenValue1
 	//DataBytesLenValue2
 	//DataCondition
@@ -4991,20 +4871,20 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 	//InterframeMinBits
 	//NeedDualLevels
 	//NeededSources
-	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.NumDataBits = \"8\"");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.NumDataBits = \"8\"");
 
 	switch(trig->GetParityType())
 	{
 		case UartTrigger::PARITY_NONE:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"None\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"None\"");
 			break;
 
 		case UartTrigger::PARITY_ODD:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Odd\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Odd\"");
 			break;
 
 		case UartTrigger::PARITY_EVEN:
-			m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Even\"");
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.ParityType = \"Even\"");
 			break;
 
 		case UartTrigger::PARITY_MARK:
@@ -5020,13 +4900,13 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 	snprintf(tmp, sizeof(tmp),
 		"VBS? 'app.Acquisition.Trigger.Serial.UART.PatternLength = \"%d\"",
 		(int)pattern1.length() / 8);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 
 	PushPatternCondition("app.Acquisition.Trigger.Serial.UART.PatternOperator", trig->GetCondition());
 
 	//PatternPosition
 
-	m_transport->SendCommand(
+	m_transport->SendCommandQueued(
 		string("VBS? 'app.Acquisition.Trigger.Serial.UART.PatternValue = \"") + pattern1 + " \"'");
 
 	//PatternValue2 only for Between/NotBetween
@@ -5034,7 +4914,7 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 	{
 		case Trigger::CONDITION_BETWEEN:
 		case Trigger::CONDITION_NOT_BETWEEN:
-			m_transport->SendCommand(
+			m_transport->SendCommandQueued(
 				string("VBS? 'app.Acquisition.Trigger.Serial.UART.PatternValue2 = \"") + trig->GetPattern2() + " \"'");
 			break;
 
@@ -5044,25 +4924,25 @@ void LeCroyOscilloscope::PushUartTrigger(UartTrigger* trig)
 
 	//Polarity
 	if(trig->GetPolarity() == UartTrigger::IDLE_HIGH)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleHigh\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleHigh\"");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleLow\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.Polarity = \"IdleLow\"");
 
-	m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.RS232Mode = \"0\" ");
+	m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.RS232Mode = \"0\" ");
 
 	auto nstop = trig->GetStopBits();
 	if(nstop == 1)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1bit\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1bit\"");
 	else if(nstop == 2)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"2bits\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"2bits\"");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1.5bit\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.StopBitLength = \"1.5bit\"");
 
 	//Match type
 	if(trig->GetMatchType() == UartTrigger::TYPE_DATA)
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"0\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"0\"");
 	else
-		m_transport->SendCommand("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"-1\"");
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Serial.UART.TrigOnBadParity = \"-1\"");
 
 	//UARTCondition
 	//ViewingMode
@@ -5085,19 +4965,19 @@ void LeCroyOscilloscope::PushCondition(const string& path, Trigger::Condition co
 	switch(cond)
 	{
 		case Trigger::CONDITION_LESS:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"LessThan\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"LessThan\"'");
 			break;
 
 		case Trigger::CONDITION_GREATER:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterThan\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"GreaterThan\"'");
 			break;
 
 		case Trigger::CONDITION_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"InRange\"'");
 			break;
 
 		case Trigger::CONDITION_NOT_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"OutOfRange\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"OutOfRange\"'");
 			break;
 
 		//Other values are not legal here, it seems
@@ -5116,35 +4996,35 @@ void LeCroyOscilloscope::PushPatternCondition(const string& path, Trigger::Condi
 	switch(cond)
 	{
 		case Trigger::CONDITION_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Equal\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"Equal\"'");
 			break;
 
 		case Trigger::CONDITION_NOT_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"NotEqual\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"NotEqual\"'");
 			break;
 
 		case Trigger::CONDITION_LESS:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Smaller\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"Smaller\"'");
 			break;
 
 		case Trigger::CONDITION_LESS_OR_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"SmallerOrEqual\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"SmallerOrEqual\"'");
 			break;
 
 		case Trigger::CONDITION_GREATER:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"Greater\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"Greater\"'");
 			break;
 
 		case Trigger::CONDITION_GREATER_OR_EQUAL:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"GreaterOrEqual\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"GreaterOrEqual\"'");
 			break;
 
 		case Trigger::CONDITION_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"InRange\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"InRange\"'");
 			break;
 
 		case Trigger::CONDITION_NOT_BETWEEN:
-			m_transport->SendCommand(string("VBS? '") + path + " = \"OutRange\"'");
+			m_transport->SendCommandQueued(string("VBS? '") + path + " = \"OutRange\"'");
 			break;
 
 		//CONDITION_ANY not supported by LeCroy scopes
@@ -5162,7 +5042,7 @@ void LeCroyOscilloscope::PushFloat(string path, float f)
 		"VBS? '%s = %e'",
 		path.c_str(),
 		f);
-	m_transport->SendCommand(tmp);
+	m_transport->SendCommandQueued(tmp);
 }
 
 vector<string> LeCroyOscilloscope::GetTriggerTypes()

@@ -146,7 +146,6 @@ string SCPISocketTransport::ReadReply(bool endOnSemicolon)
 }
 
 void SCPISocketTransport::FlushRXBuffer(void)
-
 {
 	m_socket.FlushRxBuffer();
 }

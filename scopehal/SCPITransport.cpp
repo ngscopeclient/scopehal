@@ -272,7 +272,6 @@ void* SCPITransport::SendCommandImmediateWithRawBlockReply(string cmd, size_t& l
 }
 
 void SCPITransport::FlushRXBuffer(void)
-
 {
 	LogError("SCPITransport::FlushRXBuffer is unimplemented");
 }
