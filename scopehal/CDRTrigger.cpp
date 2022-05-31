@@ -100,3 +100,16 @@ bool CDRTrigger::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 
 	return true;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PLL lock status
+
+bool CDRTrigger::IsCDRLocked()
+{
+	auto lscope = dynamic_cast<LeCroyOscilloscope*>(m_scope);
+	if(lscope != nullptr)
+		return lscope->IsCDRLocked();
+
+	//default: assume it's locked
+	return true;
+}

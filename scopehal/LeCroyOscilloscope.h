@@ -120,6 +120,7 @@ public:
 	virtual void PullTrigger();
 	virtual void EnableTriggerOutput();
 	virtual std::vector<std::string> GetTriggerTypes();
+	bool IsCDRLocked();
 
 	//DMM configuration
 	virtual int GetMeterChannelCount();

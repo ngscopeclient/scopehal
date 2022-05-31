@@ -69,6 +69,11 @@ public:
 	 */
 	bool IsAutomaticBitRateCalculationAvailable();
 
+	/**
+		@brief Queries hardware PLL lock status
+	 */
+	bool IsCDRLocked();
+
 	const std::string GetBitRateName()
 	{ return m_bitRateName; }
 

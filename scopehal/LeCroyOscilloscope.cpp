@@ -5063,3 +5063,22 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger
 	return ret;
 }
+
+/**
+	@brief Checks if the hardware CDR trigger is locked
+ */
+bool LeCroyOscilloscope::IsCDRLocked()
+{
+	auto trig8b10b = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
+	if(trig8b10b)
+	{
+		auto tmp = Trim(m_transport->SendCommandQueuedWithReply(
+			"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.PLLUnLocked'"));
+
+		return (tmp == "0");
+	}
+
+	//TODO: add other triggers here
+
+	return false;
+}
