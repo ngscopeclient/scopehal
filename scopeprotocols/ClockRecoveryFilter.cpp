@@ -119,6 +119,13 @@ void ClockRecoveryFilter::Refresh()
 	//Get nominal period used for the first cycle of the NCO
 	int64_t period = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
 
+	//Disallow frequencies higher than Nyquist of the input
+	if( period < 2*GetInputWaveform(0)->m_timescale)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
 	if(adin)
