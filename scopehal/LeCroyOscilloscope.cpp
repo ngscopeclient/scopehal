@@ -5072,6 +5072,8 @@ bool LeCroyOscilloscope::IsCDRLocked()
 	auto trig8b10b = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
 	if(trig8b10b)
 	{
+		//Undocumented / hidden property not visible in XStream Browser
+		//See TLC#00306073
 		auto tmp = Trim(m_transport->SendCommandQueuedWithReply(
 			"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.PLLUnLocked'"));
 
