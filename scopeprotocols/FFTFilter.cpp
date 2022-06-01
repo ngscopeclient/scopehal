@@ -179,11 +179,17 @@ FFTFilter::~FFTFilter()
 		delete m_rectangularWindowKernel;
 		delete m_cosineSumWindowKernel;
 		delete m_blackmanHarrisWindowKernel;
+		delete m_normalizeProgram;
+		delete m_normalizeLogMagnitudeKernel;
+		delete m_normalizeMagnitudeKernel;
 
 		m_windowProgram = NULL;
 		m_rectangularWindowKernel = NULL;
 		m_cosineSumWindowKernel = NULL;
 		m_blackmanHarrisWindowKernel = NULL;
+		m_normalizeProgram = NULL;
+		m_normalizeLogMagnitudeKernel = NULL;
+		m_normalizeMagnitudeKernel = NULL;
 
 		delete m_queue;
 
