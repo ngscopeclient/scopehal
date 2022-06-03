@@ -292,6 +292,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 				try
 				{
 					lock_guard<mutex> lock(g_clfftMutex);
+					cl_ok = true;
 
 					if(m_clfftForwardPlan != 0)
 						clfftDestroyPlan(&m_clfftForwardPlan);
@@ -304,6 +305,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
 					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
@@ -315,6 +317,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
 					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
@@ -328,9 +331,10 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts (len=%zu)\n", err, npoints);
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
@@ -338,6 +342,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 
 					//Need to block while mutex is still locked
@@ -349,8 +354,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					delete m_fftoutbuf;
 					m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
 					m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
-
-					cl_ok = true;
 				}
 				catch(const cl::Error& e)
 				{
