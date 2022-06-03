@@ -287,7 +287,13 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 		#ifdef HAVE_CLFFT
 
-			if(g_clContext)
+			if(npoints > 16777216)
+			{
+				LogWarning("Input is more than 16M points - GPU accelerated FFT unavailable. Falling back to CPU FFT\n");
+				//TODO: chunk based processing (see https://github.com/glscopeclient/scopehal/issues/625)
+			}
+
+			else if(g_clContext)
 			{
 				try
 				{
@@ -331,7 +337,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
 					{
-						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts (len=%zu)\n", err, npoints);
+						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
 						delete m_windowProgram;
 						m_windowProgram = 0;
 						cl_ok = false;
