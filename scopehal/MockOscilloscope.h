@@ -36,10 +36,20 @@
 #ifndef MockOscilloscope_h
 #define MockOscilloscope_h
 
+/**
+	@brief Fake oscilloscope driver used for offline waveform analysis
+ */
 class MockOscilloscope : public Oscilloscope
 {
 public:
-	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
+	MockOscilloscope(
+		const std::string& name,
+		const std::string& vendor,
+		const std::string& serial,
+		const std::string& transport,
+		const std::string& driver,
+		const std::string& args
+		);
 	virtual ~MockOscilloscope();
 
 	virtual bool IsOffline();
@@ -186,11 +196,18 @@ protected:
 
 	void AutoscaleVertical();
 
+	//Simulated transport information
+	std::string m_transport;
+	std::string m_driver;
+	std::string m_args;
+
+	uint64_t m_sampleRate;
+	uint64_t m_sampleDepth;
+
 public:
-	static std::string GetDriverNameInternal();
 
 	virtual std::string GetDriverName()
-	{ return GetDriverNameInternal(); }
+	{ return m_driver; }
 };
 
 #endif

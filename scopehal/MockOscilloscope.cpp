@@ -42,11 +42,20 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-MockOscilloscope::MockOscilloscope(const string& name, const string& vendor, const string& serial)
+MockOscilloscope::MockOscilloscope(
+	const string& name,
+	const string& vendor,
+	const string& serial,
+	const std::string& transport,
+	const std::string& driver,
+	const std::string& args)
 	: m_name(name)
 	, m_vendor(vendor)
 	, m_serial(serial)
 	, m_extTrigger(NULL)
+	, m_transport(transport)
+	, m_driver(driver)
+	, m_args(args)
 {
 }
 
@@ -70,17 +79,12 @@ string MockOscilloscope::IDPing()
 
 string MockOscilloscope::GetTransportName()
 {
-	return "null";
+	return m_transport;
 }
 
 string MockOscilloscope::GetTransportConnectionString()
 {
-	return "";
-}
-
-string MockOscilloscope::GetDriverNameInternal()
-{
-	return "mock";
+	return m_args;
 }
 
 unsigned int MockOscilloscope::GetInstrumentTypes()
@@ -311,23 +315,22 @@ vector<uint64_t> MockOscilloscope::GetSampleDepthsInterleaved()
 
 uint64_t MockOscilloscope::GetSampleRate()
 {
-	return 1;
+	return m_sampleRate;
 }
 
 uint64_t MockOscilloscope::GetSampleDepth()
 {
-	//FIXME
-	return 1;
+	return m_sampleDepth;
 }
 
-void MockOscilloscope::SetSampleDepth(uint64_t /*depth*/)
+void MockOscilloscope::SetSampleDepth(uint64_t depth)
 {
-	//no-op
+	m_sampleDepth = depth;
 }
 
-void MockOscilloscope::SetSampleRate(uint64_t /*rate*/)
+void MockOscilloscope::SetSampleRate(uint64_t rate)
 {
-	//no-op
+	m_sampleRate = rate;
 }
 
 void MockOscilloscope::SetTriggerOffset(int64_t /*offset*/)
