@@ -115,6 +115,11 @@ void UpsampleFilter::Refresh()
 	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
 	size_t window = 5;
 	size_t kernel = window*upsample_factor;
+	if(upsample_factor <= 0)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
 	//Create the interpolation filter
 	float frac_kernel = kernel * 1.0f / upsample_factor;
