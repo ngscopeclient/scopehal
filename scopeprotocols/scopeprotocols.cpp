@@ -133,6 +133,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
 	AddDecoderClass(ParallelBus);
+	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);
 	AddDecoderClass(PCIeGen2LogicalDecoder);
 	AddDecoderClass(PCIeTransportDecoder);

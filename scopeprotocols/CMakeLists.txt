@@ -85,6 +85,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	ParallelBus.cpp
+	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
 	PCIeTransportDecoder.cpp
