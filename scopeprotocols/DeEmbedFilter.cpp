@@ -291,6 +291,10 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			{
 				LogWarning("Input is more than 16M points - GPU accelerated FFT unavailable. Falling back to CPU FFT\n");
 				//TODO: chunk based processing (see https://github.com/glscopeclient/scopehal/issues/625)
+
+				delete m_windowProgram;
+				m_windowProgram = 0;
+				cl_ok = false;
 			}
 
 			else if(g_clContext)
@@ -432,7 +436,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		InterpolateSparameters(bin_hz, invert, nouts);
 
 		#ifdef HAVE_CLFFT
-			if(g_clContext)
+			if(g_clContext && (m_windowProgram != nullptr) )
 			{
 				delete m_sinbuf;
 				delete m_cosbuf;
