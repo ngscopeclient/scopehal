@@ -282,6 +282,11 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 					snprintf(tmp, sizeof(tmp), "                adcmode:     %ld\n", GetADCMode(i));
 					config += tmp;
 				}
+				if(chan->CanInvert())
+				{
+					snprintf(tmp, sizeof(tmp), "                invert:      %d\n", IsInverted(i));
+					config += tmp;
+				}
 				break;
 			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
 				config += "                type:        digital\n";
@@ -414,6 +419,8 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			chan->SetVoltageRange(cnode["vrange"].as<float>(), 0);
 		if(cnode["offset"])
 			chan->SetOffset(cnode["offset"].as<float>(), 0);
+		if(cnode["invert"])
+			chan->Invert(cnode["invert"].as<int>());
 
 		//Add multiple streams if present
 		auto snode = cnode["nstreams"];
