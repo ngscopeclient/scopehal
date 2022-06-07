@@ -88,6 +88,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
+	PCIeGen3LogicalDecoder.cpp
 	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp

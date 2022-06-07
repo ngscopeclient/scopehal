@@ -136,6 +136,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);
 	AddDecoderClass(PCIeGen2LogicalDecoder);
+	AddDecoderClass(PCIeGen3LogicalDecoder);
 	AddDecoderClass(PCIeTransportDecoder);
 	AddDecoderClass(PeakHoldFilter);
 	AddDecoderClass(PeriodMeasurement);

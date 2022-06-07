@@ -30,60 +30,22 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of PCIe2Gen2LogicalDecoder
+	@brief Declaration of PCIe2Gen3LogicalDecoder
  */
 
-#ifndef PCIe2Gen2LogicalDecoder_h
-#define PCIe2Gen2LogicalDecoder_h
+#ifndef PCIe2Gen3LogicalDecoder_h
+#define PCIe2Gen3LogicalDecoder_h
 
-class PCIeLogicalSymbol
-{
-public:
-
-	enum SymbolType
-	{
-		TYPE_NO_SCRAMBLER,		//unknown data before the scrambler seed is figured out
-		TYPE_LOGICAL_IDLE,		//nothing happening
-		TYPE_SKIP,				//rate matching character
-		TYPE_START_TLP,			//Begin an upper layer packet
-		TYPE_START_DLLP,
-		TYPE_END,				//End a TLP or DLLP
-		TYPE_END_BAD,			//End a packet, but mark it as to be ignored
-		TYPE_PAYLOAD_DATA,		//A byte of TLP or DLLP data
-		TYPE_END_DATA_STREAM,	//End of a data stream
-		TYPE_ERROR
-	} m_type;
-
-	uint8_t m_data;
-
-	PCIeLogicalSymbol()
-	{}
-
-	PCIeLogicalSymbol(SymbolType type, uint8_t data = 0)
-		: m_type(type)
-		, m_data(data)
-	{}
-
-
-	bool operator==(const PCIeLogicalSymbol& s) const
-	{
-		return (m_type == s.m_type) && (m_data == s.m_data);
-	}
-};
-
-typedef Waveform<PCIeLogicalSymbol> PCIeLogicalWaveform;
+#include "PCIeGen2LogicalDecoder.h"
 
 /**
-	@brief Decoder for PCIe gen 1/2 logical sub-block
+	@brief Decoder for PCIe gen 3/4/5 logical sub-block
  */
-class PCIeGen2LogicalDecoder : public Filter
+class PCIeGen3LogicalDecoder : public PCIeGen2LogicalDecoder
 {
 public:
-	PCIeGen2LogicalDecoder(const std::string& color);
-	virtual ~PCIeGen2LogicalDecoder();
-
-	virtual std::string GetText(int i);
-	virtual Gdk::Color GetColor(int i);
+	PCIeGen3LogicalDecoder(const std::string& color);
+	virtual ~PCIeGen3LogicalDecoder();
 
 	virtual void Refresh();
 
@@ -91,14 +53,10 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(PCIeGen2LogicalDecoder)
+	PROTOCOL_DECODER_INITPROC(PCIeGen3LogicalDecoder)
 
 protected:
-	uint8_t RunScrambler(uint16_t& state);
-
-	void RefreshPorts();
-
-	std::string m_portCountName;
+	void AddLogicalIdle(PCIeLogicalWaveform* cap, int64_t off, int64_t tend);
 };
 
 #endif

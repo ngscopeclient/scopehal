@@ -124,11 +124,19 @@ public:
 
 	virtual std::vector<std::string> GetHeaders();
 
+	enum FramingMode
+	{
+		MODE_GEN12,
+		MODE_GEN345
+	};
+
 	PROTOCOL_DECODER_INITPROC(PCIeDataLinkDecoder)
 
 protected:
 	uint16_t CalculateDllpCRC(uint8_t type, uint8_t* data);
 	uint32_t CalculateTlpCRC(Packet* pack);
+
+	std::string m_framingMode;
 };
 
 #endif

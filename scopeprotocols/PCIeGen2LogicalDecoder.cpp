@@ -354,6 +354,7 @@ Gdk::Color PCIeGen2LogicalDecoder::GetColor(int i)
 			case PCIeLogicalSymbol::TYPE_START_TLP:
 			case PCIeLogicalSymbol::TYPE_START_DLLP:
 			case PCIeLogicalSymbol::TYPE_END:
+			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
 				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
@@ -404,6 +405,9 @@ string PCIeGen2LogicalDecoder::GetText(int i)
 
 			case PCIeLogicalSymbol::TYPE_END_BAD:
 				return "End Bad";
+
+			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
+				return "End Data Stream";
 
 			case PCIeLogicalSymbol::TYPE_ERROR:
 			default:

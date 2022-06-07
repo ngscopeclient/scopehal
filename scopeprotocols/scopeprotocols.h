@@ -124,6 +124,7 @@
 #include "PCIe128b130bDecoder.h"
 #include "PCIeDataLinkDecoder.h"
 #include "PCIeGen2LogicalDecoder.h"
+#include "PCIeGen3LogicalDecoder.h"
 #include "PCIeTransportDecoder.h"
 #include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
