@@ -422,8 +422,8 @@ void FFTFilter::DoRefresh(
 
 					case WINDOW_HANN:
 						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(4, 0.5);
-						windowKernel->setArg(5, 0.5);
+						windowKernel->setArg(4, 0.5f);
+						windowKernel->setArg(5, 0.5f);
 						break;
 
 					case WINDOW_BLACKMAN_HARRIS:
