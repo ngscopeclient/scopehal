@@ -36,7 +36,8 @@ using namespace std;
 // Construction / destruction
 
 RemoteBridgeOscilloscope::RemoteBridgeOscilloscope(SCPITransport* transport, bool identify)
-	: SCPIOscilloscope(transport, identify)
+	: SCPIDevice(transport, identify)
+	, SCPIOscilloscope(transport, identify)
 	, m_triggerArmed(false)
 {
 

@@ -50,11 +50,6 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 {
 	CreateInput("in");
 
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	m_parameters[m_tapDelayName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_tapDelayName].SetIntVal(200000);
 
@@ -100,40 +95,9 @@ bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void TappedDelayLineFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
-
-void TappedDelayLineFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "TappedDelayLine(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string TappedDelayLineFilter::GetProtocolName()
 {
 	return "Tapped Delay Line";
-}
-
-bool TappedDelayLineFilter::NeedsConfig()
-{
-	return true;
-}
-
-float TappedDelayLineFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TappedDelayLineFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,45 +142,31 @@ void TappedDelayLineFilter::Refresh()
 	};
 
 	//Run the actual filter
-	float vmin;
-	float vmax;
-	DoFilterKernel(tap_delay, taps, din, cap, vmin, vmax);
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
+	DoFilterKernel(tap_delay, taps, din, cap);
 }
 
 void TappedDelayLineFilter::DoFilterKernel(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
 	if(g_hasAvx2)
-		DoFilterKernelAVX2(tap_delay, taps, din, cap, vmin, vmax);
+		DoFilterKernelAVX2(tap_delay, taps, din, cap);
 	else
-		DoFilterKernelGeneric(tap_delay, taps, din, cap, vmin, vmax);
+		DoFilterKernelGeneric(tap_delay, taps, din, cap);
 }
 
 void TappedDelayLineFilter::DoFilterKernelGeneric(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
 	//For now, no resampling. Assume tap delay is an integer number of samples.
 	int64_t samples_per_tap = tap_delay / cap->m_timescale;
 
 	//Setup
-	vmin = FLT_MAX;
-	vmax = -FLT_MAX;
 	size_t len = din->m_samples.size();
 	size_t filterlen = 8*samples_per_tap;
 	size_t end = len - filterlen;
@@ -227,10 +177,6 @@ void TappedDelayLineFilter::DoFilterKernelGeneric(
 		float v = 0;
 		for(int64_t j=0; j<8; j++)
 			v += din->m_samples[i + j*samples_per_tap] * taps[7 - j];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
-
 		cap->m_samples[i]	= v;
 	}
 }
@@ -240,16 +186,12 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 	int64_t tap_delay,
 	float* taps,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
 	//For now, no resampling. Assume tap delay is an integer number of samples.
 	int64_t samples_per_tap = tap_delay / cap->m_timescale;
 
 	//Setup
-	vmin = FLT_MAX;
-	vmax = -FLT_MAX;
 	size_t len = din->m_samples.size();
 	size_t filterlen = 8*samples_per_tap;
 	size_t end = len - filterlen;
@@ -263,9 +205,6 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 	float* pout = (float*)&cap->m_samples[0];
 	size_t end_rounded = end - (end % 8);
 	size_t i=0;
-
-	__m256 vmin_x8 = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-	__m256 vmax_x8 = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
 	//Vector loop.
 	//The filter is hard to vectorize because of striding.
@@ -319,21 +258,6 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 
 		//Store the output
 		_mm256_store_ps(pout + i, sum);
-
-		//Calculate min/max
-		vmin_x8 = _mm256_min_ps(vmin_x8, sum);
-		vmax_x8 = _mm256_max_ps(vmax_x8, sum);
-	}
-
-	//Horizontal reduction of vector min/max
-	float tmp_min[8] __attribute__((aligned(32)));
-	float tmp_max[8] __attribute__((aligned(32)));
-	_mm256_store_ps(tmp_min, vmin_x8);
-	_mm256_store_ps(tmp_max, vmax_x8);
-	for(int j=0; j<8; j++)
-	{
-		vmin = min(vmin, tmp_min[j]);
-		vmax = max(vmax, tmp_max[j]);
 	}
 
 	//Catch stragglers at the end
@@ -347,9 +271,6 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 		v += pin[i + 5*samples_per_tap] * taps_reversed[5];
 		v += pin[i + 6*samples_per_tap] * taps_reversed[6];
 		v += pin[i + 7*samples_per_tap] * taps_reversed[7];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
 
 		cap->m_samples[i]	= v;
 	}

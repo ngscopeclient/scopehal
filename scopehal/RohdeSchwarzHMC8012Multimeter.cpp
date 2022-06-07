@@ -37,8 +37,12 @@ using namespace std;
 
 RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* transport)
 	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
+	, m_modeValid(false)
+	, m_secmodeValid(false)
 {
-	m_mode = GetMeterMode();
+	//prefetch operating mode
+	GetMeterMode();
 }
 
 RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()
@@ -49,19 +53,9 @@ RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device info
 
-string RohdeSchwarzHMC8012Multimeter::GetName()
+string RohdeSchwarzHMC8012Multimeter::GetDriverNameInternal()
 {
-	return m_model;
-}
-
-string RohdeSchwarzHMC8012Multimeter::GetVendor()
-{
-	return m_vendor;
-}
-
-string RohdeSchwarzHMC8012Multimeter::GetSerial()
-{
-	return m_serial;
+	return "rs_hmc8012";
 }
 
 unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes()
@@ -71,7 +65,20 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes()
 
 unsigned int RohdeSchwarzHMC8012Multimeter::GetMeasurementTypes()
 {
-	return DC_VOLTAGE | FREQUENCY | DC_CURRENT | AC_CURRENT | TEMPERATURE;
+	return AC_RMS_AMPLITUDE | DC_VOLTAGE | DC_CURRENT | AC_CURRENT | TEMPERATURE;
+}
+
+unsigned int RohdeSchwarzHMC8012Multimeter::GetSecondaryMeasurementTypes()
+{
+	switch(m_mode)
+	{
+		case AC_RMS_AMPLITUDE:
+		case AC_CURRENT:
+			return FREQUENCY;
+
+		default:
+			return 0;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,10 +91,12 @@ int RohdeSchwarzHMC8012Multimeter::GetMeterDigits()
 
 bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 {
+	string reply;
+
 	switch(m_mode)
 	{
 		case DC_CURRENT:
-			m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO?");
+			reply = m_transport->SendCommandQueuedWithReply("SENSE:CURR:DC:RANGE:AUTO?");
 			break;
 
 		//TODO
@@ -96,8 +105,7 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 			return false;
 	}
 
-	string str = m_transport->ReadReply();
-	return (str == "1");
+	return (reply == "1");
 }
 
 void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
@@ -106,9 +114,9 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 	{
 		case DC_CURRENT:
 			if(enable)
-				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 1");
+				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 1");
 			else
-				m_transport->SendCommand("SENSE:CURR:DC:RANGE:AUTO 0");
+				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 0");
 			break;
 
 		default:
@@ -128,8 +136,14 @@ void RohdeSchwarzHMC8012Multimeter::StopMeter()
 
 double RohdeSchwarzHMC8012Multimeter::GetMeterValue()
 {
-	m_transport->SendCommand("READ?");
-	return stod(m_transport->ReadReply());
+	return stod(m_transport->SendCommandQueuedWithReply("FETCH?"));
+}
+
+double RohdeSchwarzHMC8012Multimeter::GetSecondaryMeterValue()
+{
+	//If we have a secondary value, this gets it
+	//If no secondary mode configured, returns primary value
+	return stod(m_transport->SendCommandQueuedWithReply("READ?"));
 }
 
 int RohdeSchwarzHMC8012Multimeter::GetMeterChannelCount()
@@ -154,52 +168,123 @@ void RohdeSchwarzHMC8012Multimeter::SetCurrentMeterChannel(int /*chan*/)
 
 Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetMeterMode()
 {
-	m_transport->SendCommand("CONF?");
-	string str = m_transport->ReadReply();
+	if(m_modeValid)
+		return m_mode;
+
+	auto str = m_transport->SendCommandQueuedWithReply("CONF?");
 
 	char mode[32];
 	sscanf(str.c_str(), "\"%31[^,]", mode);
 	string smode = mode;
 
+	//Default to no alternate mode
+	m_secmode = NONE;
+
 	if(smode == "CURR")
-		return DC_CURRENT;
+		m_mode = DC_CURRENT;
 	else if(smode == "CURR:AC")
-		return AC_CURRENT;
+		m_mode = AC_CURRENT;
 	else if(smode == "SENS")
-		return TEMPERATURE;
+		m_mode = TEMPERATURE;
+	else if(smode == "VOLT")
+		m_mode = DC_VOLTAGE;
+	else if(smode == "VOLT:AC")
+		m_mode = AC_RMS_AMPLITUDE;
+	else if(smode == "FREQ:VOLT")
+	{
+		m_mode = AC_RMS_AMPLITUDE;
+		m_secmode = FREQUENCY;
+	}
 
 	//unknown, pick something
 	else
-		return DC_VOLTAGE;
+	{
+		LogDebug("smode = %s\n", smode.c_str());
+		m_mode = DC_VOLTAGE;
+	}
+
+	m_modeValid = true;
+	m_secmodeValid = true;
+	return m_mode;
+}
+
+Multimeter::MeasurementTypes RohdeSchwarzHMC8012Multimeter::GetSecondaryMeterMode()
+{
+	if(m_secmodeValid)
+		return m_secmode;
+
+	GetMeterMode();
+	return m_secmode;
 }
 
 void RohdeSchwarzHMC8012Multimeter::SetMeterMode(Multimeter::MeasurementTypes type)
 {
+	m_secmode = NONE;
+
 	switch(type)
 	{
+		case AC_RMS_AMPLITUDE:
+			m_transport->SendCommandQueued("CONF:VOLT:AC");
+			break;
+
 		case DC_VOLTAGE:
-			m_transport->SendCommand("MEAS:VOLT:DC?");
+			m_transport->SendCommandQueued("CONF:VOLT:DC");
 			break;
 
 		case DC_CURRENT:
-			m_transport->SendCommand("MEAS:CURR:DC?");
+			m_transport->SendCommandQueued("CONF:CURR:DC");
 			break;
 
 		case AC_CURRENT:
-			m_transport->SendCommand("MEAS:CURR:AC?");
+			m_transport->SendCommandQueued("CONF:CURR:DC");
 			break;
 
-		case TEMPERATURE:
-			m_transport->SendCommand("MEAS:TEMP:?");
+		case TEMPERATURE:	//TODO: type of temp sensor
+			m_transport->SendCommandQueued("CONF:TEMP");
 			break;
 
 		//whatever it is, not supported
 		default:
-			break;
+			return;
 	}
 
 	m_mode = type;
+}
 
-	//Wait for, and discard, the reply to make sure the change took effect
-	m_transport->ReadReply();
+void RohdeSchwarzHMC8012Multimeter::SetSecondaryMeterMode(Multimeter::MeasurementTypes type)
+{
+	auto mode = GetMeterMode();
+
+	switch(type)
+	{
+		case FREQUENCY:
+			{
+				switch(mode)
+				{
+					case AC_RMS_AMPLITUDE:
+						m_transport->SendCommandQueued("CONF:FREQ:VOLT");
+						break;
+
+					case AC_CURRENT:
+						m_transport->SendCommandQueued("CONF:FREQ:CURR");
+						break;
+
+					//not supported
+					default:
+						return;
+				}
+			}
+			break;
+
+		case NONE:
+			SetMeterMode(mode);
+			break;
+
+		//not supported
+		default:
+			return;
+	}
+
+	m_secmode = type;
+	m_secmodeValid = true;
 }

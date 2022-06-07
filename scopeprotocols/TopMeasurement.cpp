@@ -40,9 +40,6 @@ TopMeasurement::TopMeasurement(const string& color)
 {
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,33 +58,9 @@ bool TopMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void TopMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Top(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string TopMeasurement::GetProtocolName()
 {
 	return "Top";
-}
-
-bool TopMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float TopMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TopMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,8 +86,8 @@ void TopMeasurement::Refresh()
 	vector<size_t> hist = MakeHistogram(din, min, max, nbins);
 
 	//Set temporary midpoint and range
-	m_range = (max - min);
-	m_midpoint = m_range/2 + min;
+	float range = (max - min);
+	float midpoint = range/2 + min;
 
 	//Find the highest peak in the last quarter of the histogram
 	//This is the peak for the entire waveform
@@ -129,7 +102,7 @@ void TopMeasurement::Refresh()
 		}
 	}
 	float fbin = (idx + 0.5f)/nbins;
-	float global_top = fbin*m_range + min;
+	float global_top = fbin*range + min;
 
 	//Create the output
 	auto cap = new AnalogWaveform;
@@ -138,10 +111,7 @@ void TopMeasurement::Refresh()
 	int64_t tedge = 0;
 	float sum = 0;
 	int64_t count = 0;
-	float delta = m_range * 0.1;
-
-	float fmax = -99999;
-	float fmin =  99999;
+	float delta = range * 0.1;
 
 	for(size_t i=0; i < len; i++)
 	{
@@ -149,20 +119,14 @@ void TopMeasurement::Refresh()
 		float cur = din->m_samples[i];
 		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
-		if( (cur > m_midpoint) && (last <= m_midpoint) )
+		if( (cur > midpoint) && (last <= midpoint) )
 		{
 			//Done, add the sample
 			if(count != 0)
 			{
-				float vavg = sum/count;
-				if(vavg > fmax)
-					fmax = vavg;
-				if(vavg < fmin)
-					fmin = vavg;
-
 				cap->m_offsets.push_back(tedge);
 				cap->m_durations.push_back(tnow - tedge);
-				cap->m_samples.push_back(vavg);
+				cap->m_samples.push_back(sum / count);
 			}
 			tedge = tnow;
 		}
@@ -177,11 +141,6 @@ void TopMeasurement::Refresh()
 
 		last = cur;
 	}
-
-	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
-	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap, 0);
 

@@ -44,11 +44,6 @@ EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
 {
 	CreateInput("in");
 
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	m_parameters[m_dataRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_dataRateName].SetIntVal(5e9);
 
@@ -78,42 +73,9 @@ bool EmphasisRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EmphasisRemovalFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
-
-void EmphasisRemovalFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EmphasisRemoval(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_emphasisAmountName].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EmphasisRemovalFilter::GetProtocolName()
 {
 	return "Emphasis Removal";
-}
-
-bool EmphasisRemovalFilter::NeedsConfig()
-{
-	return true;
-}
-
-float EmphasisRemovalFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float EmphasisRemovalFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +102,13 @@ void EmphasisRemovalFilter::Refresh()
 
 	//Set up output
 	const int64_t tap_count = 8;
-	int64_t tap_delay = round(FS_PER_SECOND / m_parameters[m_dataRateName].GetFloatVal());
+	auto dataRate = m_parameters[m_dataRateName].GetFloatVal();
+	if(dataRate < 1)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+	int64_t tap_delay = round(FS_PER_SECOND / dataRate);
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
 	auto cap = SetupOutputWaveform(din, 0, tap_count * samples_per_tap, 0);
 
@@ -167,13 +135,5 @@ void EmphasisRemovalFilter::Refresh()
 	}
 
 	//Run the actual filter
-	float vmin;
-	float vmax;
-	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap, vmin, vmax);
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
+	TappedDelayLineFilter::DoFilterKernel(tap_delay, taps, din, cap);
 }

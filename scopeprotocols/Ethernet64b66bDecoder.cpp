@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -52,24 +52,13 @@ Ethernet64b66bDecoder::Ethernet64b66bDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool Ethernet64b66bDecoder::NeedsConfig()
-{
-	//baud rate has to be set
-	return true;
-}
-
 bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-	)
-	{
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
-	}
 
 	return false;
 }
@@ -77,14 +66,6 @@ bool Ethernet64b66bDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string Ethernet64b66bDecoder::GetProtocolName()
 {
 	return "64b/66b";
-}
-
-void Ethernet64b66bDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "64b66b(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -105,20 +105,6 @@ string Waterfall::GetProtocolName()
 	return "Waterfall";
 }
 
-bool Waterfall::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
-void Waterfall::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Waterfall(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

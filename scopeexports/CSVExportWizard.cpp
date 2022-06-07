@@ -40,10 +40,179 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CSVExportChannelSelectionPage
 
-CSVExportChannelSelectionPage::CSVExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels)
+CSVExportReferenceChannelSelectionPage::CSVExportReferenceChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels)
 {
-//	m_grid.attach(m_timestampTypeLabel, 0, 0, 1, 1);
-//		m_timestampTypeLabel
+	m_grid.attach(m_captionLabel, 0, 0, 2, 1);
+		m_captionLabel.set_label(
+			"Select the timebase reference channel.\n"
+			"\n"
+			"This is the leftmost data column in the generated CSV, and its X axis sample interval maps\n"
+			"to the row interval for the exported data. On the next page, you will only be able to add\n"
+			"channels with the same X axis unit as this channel.\n"
+			"\n"
+			"Eye patterns, spectrograms, and other 2D datasets cannot be exported to CSV."
+			"\n"
+			);
+	m_grid.attach(m_referenceLabel, 0, 1, 1, 1);
+		m_referenceLabel.set_label("Reference Channel");
+	m_grid.attach(m_referenceBox, 1, 1, 1, 1);
+
+	//Populate the reference box with a list of all channels that are legal to use
+	for(auto c : channels)
+	{
+		//Can't export 2D density plots
+		auto type = c->GetType();
+		if( (type == OscilloscopeChannel::CHANNEL_TYPE_EYE) ||
+			(type == OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM) )
+		{
+			continue;
+		}
+
+		//Check each stream
+		for(size_t s=0; s<c->GetStreamCount(); s++)
+		{
+			StreamDescriptor stream(c, s);
+
+			//Must actually have data
+			if(stream.GetData() == NULL)
+				continue;
+
+			m_referenceBox.append(stream.GetName());
+			m_streams.push_back(stream);
+		}
+	}
+	m_referenceBox.set_active(0);
+
+	m_grid.show_all();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//CSVExportOtherChannelSelectionPage
+
+CSVExportOtherChannelSelectionPage::CSVExportOtherChannelSelectionPage(
+	const CSVExportReferenceChannelSelectionPage& ref)
+	: m_selectedChannels(1)
+	, m_availableChannels(1)
+	, m_ref(ref)
+{
+	m_grid.attach(m_selectedFrame, 0, 0, 1, 1);
+		m_selectedFrame.set_label("Selected Channels");
+		m_selectedFrame.set_margin_start(5);
+		m_selectedFrame.set_margin_end(5);
+		m_selectedFrame.add(m_selectedChannels);
+		m_selectedChannels.set_headers_visible(false);
+
+	m_grid.attach(m_availableFrame, 1, 0, 1, 1);
+		m_availableFrame.set_label("Available Channels");
+		m_availableFrame.add(m_availableChannels);
+		m_availableChannels.set_headers_visible(false);
+
+	m_grid.attach(m_removeButton, 0, 2, 1, 1);
+		m_removeButton.set_label(">");
+		m_removeButton.set_margin_start(5);
+		m_removeButton.set_margin_end(5);
+	m_grid.attach(m_addButton, 1, 2, 1, 1);
+		m_addButton.set_label("<");
+
+	m_grid.show_all();
+
+	m_addButton.signal_clicked().connect(sigc::mem_fun(*this, &CSVExportOtherChannelSelectionPage::OnAddChannel));
+	m_removeButton.signal_clicked().connect(sigc::mem_fun(*this, &CSVExportOtherChannelSelectionPage::OnRemoveChannel));
+}
+
+void CSVExportOtherChannelSelectionPage::UpdateChannelList()
+{
+	m_availableChannels.clear_items();
+	m_selectedChannels.clear_items();
+	m_targets.clear();
+
+	//Make a list of compatible streams
+	auto& streams = m_ref.GetStreams();
+	auto refStream = m_ref.GetActiveChannel();
+	for(auto s : streams)
+	{
+		//Reference channel can't be exported again in another column
+		if(s == refStream)
+			continue;
+
+		//Must be non-null
+		auto chan = s.m_channel;
+		if(!chan || !s.GetData())
+			continue;
+
+		//Can't export 2D density plots
+		auto type = chan->GetType();
+		if( (type == OscilloscopeChannel::CHANNEL_TYPE_EYE) ||
+			(type == OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM) )
+		{
+			continue;
+		}
+
+		//Must have same X axis unit as reference
+		if(chan->GetXAxisUnits() != refStream.GetXAxisUnits())
+			continue;
+
+		//Save in list of targets
+		auto name = s.GetName();
+		m_availableChannels.append(name);
+		m_targets[name] = s;
+	}
+}
+
+void CSVExportOtherChannelSelectionPage::OnAddChannel()
+{
+	//See what row we selected
+	auto sel = m_availableChannels.get_selected();
+	if(sel.empty())
+		return;
+	auto index = sel[0];
+	auto name = m_availableChannels.get_text(index);
+
+	//Add to the current channels list
+	m_selectedChannels.append(name);
+
+	//But also remove from the available channel list
+	auto store = Glib::RefPtr<Gtk::ListStore>::cast_dynamic(m_availableChannels.get_model());
+	auto selpath = m_availableChannels.get_selection()->get_selected_rows()[0];
+	store->erase(store->get_iter(selpath));
+}
+
+void CSVExportOtherChannelSelectionPage::OnRemoveChannel()
+{
+	//See what row we selected
+	auto sel = m_selectedChannels.get_selected();
+	if(sel.empty())
+		return;
+	auto index = sel[0];
+	auto name = m_selectedChannels.get_text(index);
+
+	//Add to the available channels list
+	m_availableChannels.append(name);
+
+	//But also remove from the selected channel list
+	auto store = Glib::RefPtr<Gtk::ListStore>::cast_dynamic(m_selectedChannels.get_model());
+	auto selpath = m_selectedChannels.get_selection()->get_selected_rows()[0];
+	store->erase(store->get_iter(selpath));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CSVExportFinalPage
+
+CSVExportFinalPage::CSVExportFinalPage()
+	: m_chooser(Gtk::FILE_CHOOSER_ACTION_SAVE)
+{
+	auto filter = Gtk::FileFilter::create();
+	filter->add_pattern("*.csv");
+	filter->set_name("Comma Separated Value (*.csv)");
+	m_chooser.add_filter(filter);
+
+	m_grid.attach(m_chooser, 0, 0, 1, 1);
+
+	m_grid.show_all();
+}
+
+CSVExportFinalPage::~CSVExportFinalPage()
+{
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,15 +220,221 @@ CSVExportChannelSelectionPage::CSVExportChannelSelectionPage(const std::vector<O
 
 CSVExportWizard::CSVExportWizard(const vector<OscilloscopeChannel*>& channels)
 	: ExportWizard(channels)
-	, m_channelSelectionPage(channels)
+	, m_referenceSelectionPage(channels)
+	, m_otherChannelSelectionPage(m_referenceSelectionPage)
 {
-	append_page(m_channelSelectionPage.m_grid);
-	set_page_type(m_channelSelectionPage.m_grid, Gtk::ASSISTANT_PAGE_INTRO);
-	set_page_title(m_channelSelectionPage.m_grid, "Select Export Channels");
+	append_page(m_referenceSelectionPage.m_grid);
+	set_page_type(m_referenceSelectionPage.m_grid, Gtk::ASSISTANT_PAGE_INTRO);
+	set_page_title(m_referenceSelectionPage.m_grid, "Select Timebase Reference Channel");
+
+	//a channel is always selected, so we can move on immediately
+	set_page_complete(m_referenceSelectionPage.m_grid);
+
+	append_page(m_otherChannelSelectionPage.m_grid);
+	set_page_type(m_otherChannelSelectionPage.m_grid, Gtk::ASSISTANT_PAGE_CONTENT);
+	set_page_title(m_otherChannelSelectionPage.m_grid, "Select Other Channels");
+
+	//can move on immediately, no requirement to select a channel
+	set_page_complete(m_otherChannelSelectionPage.m_grid);
+
+	append_page(m_finalPage.m_grid);
+	set_page_type(m_finalPage.m_grid, Gtk::ASSISTANT_PAGE_CONFIRM);
+	set_page_title(m_finalPage.m_grid, "File Path");
+	set_page_complete(m_finalPage.m_grid);
+
+	show_all();
 }
 
 CSVExportWizard::~CSVExportWizard()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Page sequencing
+
+void CSVExportWizard::on_prepare(Gtk::Widget* page)
+{
+	if(page == &m_otherChannelSelectionPage.m_grid)
+		m_otherChannelSelectionPage.UpdateChannelList();
+}
+
+void CSVExportWizard::on_apply()
+{
+	//Timebase reference channel
+	vector<StreamDescriptor> streams;
+	streams.push_back(m_referenceSelectionPage.GetActiveChannel());
+	auto timebaseUnit = streams[0].GetXAxisUnits();
+
+	//Other channels
+	size_t len = m_otherChannelSelectionPage.m_selectedChannels.size();
+	for(size_t i=0; i<len; i++)
+	{
+		auto name = m_otherChannelSelectionPage.m_selectedChannels.get_text(i);
+		streams.push_back(m_otherChannelSelectionPage.m_targets[name]);
+	}
+
+	//Write header row
+	auto fname = m_finalPage.m_chooser.get_filename();
+	FILE* fp = fopen(fname.c_str(), "w");
+	if(!fp)
+	{
+		LogError("Failed to open output file\n");
+		return;
+	}
+	if(timebaseUnit == Unit(Unit::UNIT_FS))
+		fprintf(fp, "Time (s)");
+	else if(timebaseUnit == Unit(Unit::UNIT_HZ))
+		fprintf(fp, "Frequency (Hz)");
+	else
+		fprintf(fp, "X Unit");
+	for(auto s : streams)
+		fprintf(fp, ",%s", s.GetName().c_str());
+	fprintf(fp, "\n");
+
+	//Prepare to generate output waveform
+	vector<WaveformBase*> waveforms;
+	vector<size_t> indexes;
+	for(auto s : streams)
+	{
+		waveforms.push_back(s.GetData());
+		indexes.push_back(0);
+	}
+	auto timebaseWaveform = waveforms[0];
+
+	//Write data
+	//TODO: lots of redundant casting, this can probably be optimized!
+	int64_t lastTimestamp = LONG_LONG_MIN;
+	for(size_t i=0; i<timebaseWaveform->m_offsets.size(); i++)
+	{
+		//Get current timestamp
+		auto timestamp =
+			(timebaseWaveform->m_offsets[i] * timebaseWaveform->m_timescale) +
+			timebaseWaveform->m_triggerPhase;
+
+		//Write timestamp
+		if(timebaseUnit == Unit(Unit::UNIT_FS))
+			fprintf(fp, "%e", timestamp / FS_PER_SECOND);
+		else if(timebaseUnit == Unit(Unit::UNIT_HZ))
+			fprintf(fp, "%ld", timestamp);
+		else
+			fprintf(fp, "%ld", timestamp);
+
+		//Write data from the reference channel as-is (no interpolation, it's the timebase by definition)
+		auto reftype = streams[0].m_channel->GetType();
+		switch(reftype)
+		{
+			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+				{
+					auto refan = dynamic_cast<AnalogWaveform*>(timebaseWaveform);
+					fprintf(fp, ",%f", refan->m_samples[i].m_value);
+				}
+				break;
+
+			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+				{
+					auto refdig = dynamic_cast<DigitalWaveform*>(timebaseWaveform);
+					fprintf(fp, ",%d", refdig->m_samples[i].m_value);
+				}
+				break;
+
+			case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+				{
+					auto reffilt = dynamic_cast<Filter*>(streams[0].m_channel);
+					fprintf(fp, ",%s", reffilt->GetText(i).c_str());
+				}
+				break;
+
+			default:
+				break;
+		}
+
+		//Write additional channel data
+		for(size_t j=1; j<waveforms.size(); j++)
+		{
+			//Find closest sample
+			size_t k = indexes[j];
+			auto w = waveforms[j];
+			int64_t sstart = 0;
+			int64_t send = 0;
+			for(; k < w->m_offsets.size(); k++)
+			{
+				sstart = (w->m_offsets[k] * w->m_timescale) + w->m_triggerPhase;
+				send = sstart + (w->m_durations[k] * w->m_timescale);
+
+				//If this sample ends in the future, we're good to go.
+				if(send > timestamp)
+				{
+					indexes[j] = k;
+					break;
+				}
+			}
+			k = indexes[j];
+
+			//See if this is the first time we've seen this sample
+			//(if our timestamp is within it, but the previous timestamp was not)
+			bool firstHit = (timestamp >= sstart) && (lastTimestamp < sstart);
+
+			//Separate processing is needed depending on the data type
+			auto type = streams[j].m_channel->GetType();
+			switch(type)
+			{
+				//Linear interpolation
+				case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+					{
+						//No interpolation for last sample since there's no next to lerp to
+						auto an = dynamic_cast<AnalogWaveform*>(w);
+						if(k+1 > w->m_offsets.size())
+							fprintf(fp, ",%f", an->m_samples[k].m_value);
+
+						//Interpolate
+						else
+						{
+							float vleft = an->m_samples[k].m_value;
+							float vright = an->m_samples[k+1].m_value;
+
+							int64_t tleft = sstart;
+							int64_t tright = (w->m_offsets[k+1] * w->m_timescale) + w->m_triggerPhase;
+
+							float frac = 1.0 * (timestamp - tleft) / (tright - tleft);
+
+							float flerp = vleft + frac * (vright-vleft);
+							fprintf(fp, ",%f", flerp);
+						}
+					}
+					break;
+
+				//Nearest neighbor interpolation
+				case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+					{
+						auto dig = dynamic_cast<DigitalWaveform*>(w);
+						fprintf(fp, ",%d", dig->m_samples[k].m_value);
+					}
+					break;
+
+				//First-hit "interpolation"
+				case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+					{
+						auto filt = dynamic_cast<Filter*>(streams[j].m_channel);
+						if(firstHit)
+							fprintf(fp, ",%s", filt->GetText(k).c_str());
+						else
+							fprintf(fp, ",");
+					}
+					break;
+
+				default:
+					break;
+			}
+
+		}
+
+		fprintf(fp, "\n");
+		lastTimestamp = timestamp;
+	}
+
+	fclose(fp);
+
+	hide();
 }
 
 string CSVExportWizard::GetExportName()

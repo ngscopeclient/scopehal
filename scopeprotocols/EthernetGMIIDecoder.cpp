@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -63,21 +63,18 @@ bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(chan == NULL)
 		return false;
 
-	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
-		return false;
-
 	switch(i)
 	{
 		case 0:
-			if(chan->GetWidth() == 8)
-				return true;
+			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL_BUS)
+		return false;
 			break;
 
 		case 1:
 		case 2:
 		case 3:
-			if(chan->GetWidth() == 1)
-				return true;
+			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
+				return false;
 			break;
 	}
 
@@ -86,14 +83,6 @@ bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void EthernetGMIIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "GMII(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
 
 void EthernetGMIIDecoder::Refresh()
 {

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,24 +59,13 @@ HyperRAMDecoder::HyperRAMDecoder(const string& color)
 	m_parameters[m_latencyname].SetIntVal(3);
 }
 
-bool HyperRAMDecoder::NeedsConfig()
-{
-	return true;
-}
-
 bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if(
-		(i < 11) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
-	{
+	if( (i < 11) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
-	}
 
 	return false;
 }
@@ -84,12 +73,6 @@ bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string HyperRAMDecoder::GetProtocolName()
 {
 	return "HyperRAM";
-}
-
-void HyperRAMDecoder::SetDefaultName()
-{
-	m_hwname = "HyperRAM(" + GetInputDisplayName(3) + ")";
-	m_displayname = m_hwname;
 }
 
 void HyperRAMDecoder::Refresh()
@@ -111,10 +94,10 @@ void HyperRAMDecoder::Refresh()
 
 	//Create the capture
 	auto cap = new HyperRAMWaveform;
-	cap->m_timescale = clk->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	cap->m_triggerPhase = clk->m_triggerPhase;
+	cap->m_triggerPhase = 0;
 
 	enum
 	{
@@ -132,7 +115,9 @@ void HyperRAMDecoder::Refresh()
 		EVENT_CS,
 		EVENT_CLK,
 		EVENT_RWDS,
-	} event_type;
+		EVENT_NONE
+	} event_type = EVENT_CLK;	//initialization not required for control flow, since we always write it before using
+								//but some gcc versions can't tell that and give a false warning
 
 	int64_t sym_start   = 0;
 	bool first			= false;
@@ -148,6 +133,7 @@ void HyperRAMDecoder::Refresh()
 	int64_t ca_byte     = 0;
 	int64_t clk_time    = 0;
 	int64_t last_clk    = 0;
+	bool last_clkval	= clk->m_samples[0].m_value;
 
 	size_t clklen = clk->m_samples.size();
 	size_t cslen = csn->m_samples.size();
@@ -278,8 +264,8 @@ void HyperRAMDecoder::Refresh()
 				{
 					// The symbol should continue until the next RWDS edge in this transaction, if available.
 					// The final symbol may not have an RWDS edge after it, so use clk_time in that case.
-					auto next_rwds = GetNextEventTimestamp(rwds, irwds, rwdslen, timestamp);
-					auto next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
+					auto next_rwds = GetNextEventTimestampScaled(rwds, irwds, rwdslen, timestamp);
+					auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
 					auto duration = next_rwds - timestamp;
 					if (next_rwds == timestamp || next_rwds > next_cs)
 						duration = clk_time;
@@ -300,8 +286,8 @@ void HyperRAMDecoder::Refresh()
 				}
 				else if (event_type == EVENT_CLK)
 				{
-					auto next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
-					auto next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
+					auto next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
+					auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
 					auto sym_end = timestamp + (next_clk - timestamp) / 2;
 					if (next_clk == timestamp || next_clk > next_cs)
 						sym_end = timestamp + clk_time/2;
@@ -316,9 +302,9 @@ void HyperRAMDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		auto next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
-		auto next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
-		auto next_rwds = GetNextEventTimestamp(rwds, irwds, rwdslen, timestamp);
+		auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
+		auto next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
+		auto next_rwds = GetNextEventTimestampScaled(rwds, irwds, rwdslen, timestamp);
 
 		// Find soonest event
 		auto next_timestamp = next_cs;
@@ -338,18 +324,25 @@ void HyperRAMDecoder::Refresh()
 		if(next_timestamp == timestamp)
 			break;
 
+		timestamp = next_timestamp;
+		AdvanceToTimestampScaled(csn, ics, cslen, timestamp);
+		AdvanceToTimestampScaled(clk, iclk, clklen, timestamp);
+		AdvanceToTimestampScaled(rwds, irwds, rwdslen, timestamp);
+
 		// Keep track of the time between clock edges
 		if (event_type == EVENT_CLK)
 		{
-			clk_time = next_clk - last_clk;
-			last_clk = next_clk;
+			//See if we actually have a toggle. If not, this is a no-op event
+			bool clkval = clk->m_samples[iclk];
+			if(clkval == last_clkval)
+				event_type = EVENT_NONE;
+			else
+			{
+				clk_time = next_clk - last_clk;
+				last_clk = next_clk;
+			}
+			last_clkval = clkval;
 		}
-
-		//All good, move on
-		timestamp = next_timestamp;
-		AdvanceToTimestamp(csn, ics, cslen, timestamp);
-		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
-		AdvanceToTimestamp(rwds, irwds, rwdslen, timestamp);
 
 		auto data_timestamp = timestamp;
 
@@ -359,7 +352,7 @@ void HyperRAMDecoder::Refresh()
 		if (state == STATE_READ && event_type == EVENT_RWDS)
 			data_timestamp += clk_time / 2;
 		for (int i = 0; i < 8; i++)
-			AdvanceToTimestamp(data[i], idata[i], data[i]->m_samples.size(), data_timestamp);
+			AdvanceToTimestampScaled(data[i], idata[i], data[i]->m_samples.size(), data_timestamp);
 	}
 
 	SetData(cap, 0);
@@ -368,7 +361,7 @@ void HyperRAMDecoder::Refresh()
 struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 {
 	return {
-		/*.address        = */(uint32_t)((data & 3) | ((data >> 16) & 0x3FFFFFFF)),
+		/*.address        = */(uint32_t)((data & 3) | ((data >> 13) & 0xFFFFFFF8)),
 		/*.read           = */(bool)(data & (1l << 47)),
 		/*.register_space = */(bool)(data & (1l << 46)),
 		/*.linear         = */(bool)(data & (1l << 45)),

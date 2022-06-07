@@ -45,16 +45,9 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void ClearSweeps();
 
 	enum InterpolationMode
 	{
@@ -75,9 +68,6 @@ protected:
 	std::string m_interpname;
 	std::string m_revname;
 	std::string m_debouncename;
-
-	float m_max;
-	float m_min;
 };
 
 #endif

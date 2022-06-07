@@ -43,12 +43,6 @@ OFDMDemodulator::OFDMDemodulator(const string& color)
 	CreateInput("I");
 	CreateInput("Q");
 
-	m_range = 1;
-	m_offset = 0;
-
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	//TODO: create outputs
 
 	m_symbolTimeName = "Symbol Time";
@@ -98,48 +92,13 @@ bool OFDMDemodulator::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float OFDMDemodulator::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float OFDMDemodulator::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
-
 string OFDMDemodulator::GetProtocolName()
 {
 	return "OFDM Demodulator";
 }
 
-bool OFDMDemodulator::NeedsConfig()
-{
-	return true;
-}
-
-void OFDMDemodulator::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "OFDM(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void OFDMDemodulator::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void OFDMDemodulator::Refresh()
 {

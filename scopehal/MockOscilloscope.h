@@ -36,18 +36,26 @@
 #ifndef MockOscilloscope_h
 #define MockOscilloscope_h
 
+/**
+	@brief Fake oscilloscope driver used for offline waveform analysis
+ */
 class MockOscilloscope : public Oscilloscope
 {
 public:
-	MockOscilloscope(const std::string& name, const std::string& vendor, const std::string& serial);
+	MockOscilloscope(
+		const std::string& name,
+		const std::string& vendor,
+		const std::string& serial,
+		const std::string& transport,
+		const std::string& driver,
+		const std::string& args
+		);
 	virtual ~MockOscilloscope();
 
 	virtual bool IsOffline();
 
 	//Capture file importing
-	bool LoadCSV(const std::string& path);
 	bool LoadBIN(const std::string& path);
-	bool LoadVCD(const std::string& path);
 
 	//Agilent/Keysight/Rigol binary capture structs
 	#pragma pack(push, 1)
@@ -186,14 +194,20 @@ protected:
 	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
 	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
 
-	void NormalizeTimebases();
 	void AutoscaleVertical();
 
+	//Simulated transport information
+	std::string m_transport;
+	std::string m_driver;
+	std::string m_args;
+
+	uint64_t m_sampleRate;
+	uint64_t m_sampleDepth;
+
 public:
-	static std::string GetDriverNameInternal();
 
 	virtual std::string GetDriverName()
-	{ return GetDriverNameInternal(); }
+	{ return m_driver; }
 };
 
 #endif

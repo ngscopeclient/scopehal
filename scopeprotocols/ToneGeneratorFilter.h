@@ -41,7 +41,6 @@ public:
 	ToneGeneratorFilter(const std::string& color);
 
 	virtual void Refresh();
-	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();

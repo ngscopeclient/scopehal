@@ -41,9 +41,6 @@ MultiplyFilter::MultiplyFilter(const string& color)
 	//Set up channels
 	CreateInput("a");
 	CreateInput("b");
-
-	m_range = 1;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,38 +60,12 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float MultiplyFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float MultiplyFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
-
 string MultiplyFilter::GetProtocolName()
 {
 	return "Multiply";
 }
 
-bool MultiplyFilter::NeedsConfig()
-{
-	return true;
-}
-
-void MultiplyFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Multiply(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void MultiplyFilter::Refresh()
@@ -125,10 +96,4 @@ void MultiplyFilter::Refresh()
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	for(size_t i=0; i<len; i++)
 		fdst[i] = fa[i] * fb[i];
-
-	//Calculate range of the output waveform
-	float x = GetMaxVoltage(cap);
-	float n = GetMinVoltage(cap);
-	m_range = x - n;
-	m_offset = (x+n)/2;
 }

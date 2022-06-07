@@ -40,11 +40,6 @@ PkPkMeasurement::PkPkMeasurement(const string& color)
 {
 	//Set up channels
 	CreateInput("din");
-
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,45 +59,13 @@ bool PkPkMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void PkPkMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PkPk(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string PkPkMeasurement::GetProtocolName()
 {
-	return "Peak-to-Peak";
-}
-
-bool PkPkMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float PkPkMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float PkPkMeasurement::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
+	return "Peak-To-Peak";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void PkPkMeasurement::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void PkPkMeasurement::Refresh()
 {
@@ -127,9 +90,6 @@ void PkPkMeasurement::Refresh()
 
 	//Create the output
 	auto cap = new AnalogWaveform;
-
-	float 		fmax = -FLT_MAX;
-	float		fmin =  FLT_MAX;
 
 	int64_t		tmin		= 0;
 	float		vmin		= FLT_MAX;
@@ -163,9 +123,6 @@ void PkPkMeasurement::Refresh()
 					first = false;
 				else
 				{
-					fmax = max(fmax, value);
-					fmin = min(fmin, value);
-
 					cap->m_offsets.push_back(tmin);
 					cap->m_durations.push_back(0);
 					cap->m_samples.push_back(value);
@@ -181,7 +138,7 @@ void PkPkMeasurement::Refresh()
 		}
 
 		//Accumulate the lowest peak of this cycle
-		//and save the
+		//and save it
 		else
 		{
 			if(!last_was_low)
@@ -198,12 +155,6 @@ void PkPkMeasurement::Refresh()
 			}
 		}
 	}
-
-	//Calculate bounds
-	m_max = max(m_max, fmax);
-	m_min = min(m_min, fmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 
 	SetData(cap, 0);
 

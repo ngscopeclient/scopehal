@@ -42,11 +42,6 @@ GroupDelayFilter::GroupDelayFilter(const string& color)
 	//Set up channels
 	CreateInput("Phase");
 
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-	m_range = 1;
-	m_offset = 0;
-
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 }
@@ -71,50 +66,9 @@ bool GroupDelayFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void GroupDelayFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "GroupDelay(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string GroupDelayFilter::GetProtocolName()
 {
 	return "Group Delay";
-}
-
-bool GroupDelayFilter::NeedsConfig()
-{
-	return false;
-}
-
-void GroupDelayFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
-
-float GroupDelayFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-float GroupDelayFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-void GroupDelayFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void GroupDelayFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,8 +101,6 @@ void GroupDelayFilter::Refresh()
 	float* vang = (float*)&ang->m_samples[0];
 
 	//Main output loop
-	float vmin = FLT_MAX;
-	float vmax = -FLT_MAX;
 	for(size_t i=0; i<len; i++)
 	{
 		//Subtract phase angles, wrapping correctly around singularities
@@ -171,14 +123,5 @@ void GroupDelayFilter::Refresh()
 		//Calculate final group delay
 		float delay = (-dphase / dfreq) * FS_PER_SECOND;
 		cap->m_samples[i] = delay;
-
-		vmin = min(delay, vmin);
-		vmax = max(delay, vmax);
 	}
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 }

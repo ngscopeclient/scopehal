@@ -41,9 +41,6 @@ AutocorrelationFilter::AutocorrelationFilter(const string& color)
 	//Set up inputs
 	CreateInput("din");
 
-	m_range = 1;
-	m_offset = 0;
-
 	m_maxDeltaName = "Max offset";
 	m_parameters[m_maxDeltaName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_maxDeltaName].SetIntVal(1000);
@@ -66,33 +63,9 @@ bool AutocorrelationFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float AutocorrelationFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float AutocorrelationFilter::GetOffset(size_t /*stream*/)
-{
-	return -m_offset;
-}
-
 string AutocorrelationFilter::GetProtocolName()
 {
 	return "Autocorrelation";
-}
-
-bool AutocorrelationFilter::NeedsConfig()
-{
-	return true;
-}
-
-void AutocorrelationFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Autocorrelation(%s)", GetInputDisplayName(0).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,12 +107,6 @@ void AutocorrelationFilter::Refresh()
 		cap->m_offsets.push_back(delta);
 		cap->m_durations.push_back(1);
 	}
-
-	//Calculate range of the output waveform
-	float x = GetMaxVoltage(cap);
-	float n = GetMinVoltage(cap);
-	m_range = x - n;
-	m_offset = (x+n)/2;
 
 	//Copy our time scales from the input
 	cap->m_timescale 		= din->m_timescale;

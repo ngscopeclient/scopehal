@@ -59,22 +59,9 @@ bool USB2PCSDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void USB2PCSDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "USB2PCS(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string USB2PCSDecoder::GetProtocolName()
 {
 	return "USB 1.x/2.0 PCS";
-}
-
-bool USB2PCSDecoder::NeedsConfig()
-{
-	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

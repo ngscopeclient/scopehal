@@ -65,38 +65,9 @@ bool CurrentShuntFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float CurrentShuntFilter::GetVoltageRange(size_t /*stream*/)
-{
-	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
-	return m_inputs[0].GetVoltageRange() / rshunt;
-}
-
-float CurrentShuntFilter::GetOffset(size_t /*stream*/)
-{
-	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
-	return m_inputs[0].GetOffset() / rshunt;
-}
-
 string CurrentShuntFilter::GetProtocolName()
 {
 	return "Current Shunt";
-}
-
-bool CurrentShuntFilter::NeedsConfig()
-{
-	//need to specify shunt value
-	return true;
-}
-
-void CurrentShuntFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Shunt(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_resistanceName].ToString().c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

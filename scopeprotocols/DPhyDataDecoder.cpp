@@ -65,20 +65,6 @@ string DPhyDataDecoder::GetProtocolName()
 	return "MIPI D-PHY Data";
 }
 
-bool DPhyDataDecoder::NeedsConfig()
-{
-	return true;
-}
-
-void DPhyDataDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DPhyData(%s, %s)",
-		GetInputDisplayName(0).c_str(), GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

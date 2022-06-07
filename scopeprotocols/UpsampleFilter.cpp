@@ -91,40 +91,9 @@ bool UpsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void UpsampleFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Upsample(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string UpsampleFilter::GetProtocolName()
 {
 	return "Upsample";
-}
-
-bool UpsampleFilter::NeedsConfig()
-{
-	return true;
-}
-
-float UpsampleFilter::GetOffset(size_t /*stream*/)
-{
-	auto chan = m_inputs[0].m_channel;
-	if(chan == NULL)
-		return 0;
-	else
-		return m_inputs[0].GetOffset();
-}
-
-float UpsampleFilter::GetVoltageRange(size_t /*stream*/)
-{
-	auto chan = m_inputs[0].m_channel;
-	if(chan == NULL)
-		return 0;
-	else
-		return m_inputs[0].GetVoltageRange();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -146,6 +115,11 @@ void UpsampleFilter::Refresh()
 	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
 	size_t window = 5;
 	size_t kernel = window*upsample_factor;
+	if(upsample_factor <= 0)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
 	//Create the interpolation filter
 	float frac_kernel = kernel * 1.0f / upsample_factor;

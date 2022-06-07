@@ -40,9 +40,6 @@ UndershootMeasurement::UndershootMeasurement(const string& color)
 {
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,33 +59,9 @@ bool UndershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void UndershootMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Undershoot(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string UndershootMeasurement::GetProtocolName()
 {
 	return "Undershoot";
-}
-
-bool UndershootMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float UndershootMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float UndershootMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,9 +88,6 @@ void UndershootMeasurement::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	float 		fmax = -FLT_MAX;
-	float		fmin =  FLT_MAX;
-
 	int64_t		tmin = 0;
 	float		vmin = FLT_MAX;
 
@@ -136,14 +106,10 @@ void UndershootMeasurement::Refresh()
 				if(off > 0)
 					cap->m_durations[off-1] = tmin - cap->m_offsets[off-1];
 
-				float value = base - vmin;
-				fmax = max(fmax, value);
-				fmin = min(fmin, value);
-
 				//Add the new sample
 				cap->m_offsets.push_back(tmin);
 				cap->m_durations.push_back(0);
-				cap->m_samples.push_back(value);
+				cap->m_samples.push_back(base - vmin);
 			}
 
 			//Reset
@@ -161,11 +127,6 @@ void UndershootMeasurement::Refresh()
 			}
 		}
 	}
-
-	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
-	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap, 0);
 

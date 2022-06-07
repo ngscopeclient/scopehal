@@ -42,22 +42,13 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(TachometerFilter)
 
 protected:
-	float m_midpoint;
-	float m_range;
-
 	std::string m_ticksname;
 };
 

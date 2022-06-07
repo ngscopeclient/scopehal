@@ -77,10 +77,8 @@ public:
 	Gdk::Color GetColor(int i) override;
 
 	void Refresh() override;
-	bool NeedsConfig() override;
 
 	static std::string GetProtocolName();
-	void SetDefaultName() override;
 
 	bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 

@@ -42,9 +42,6 @@ DramRefreshActivateMeasurement::DramRefreshActivateMeasurement(const string& col
 	CreateInput("din");
 
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,32 +61,9 @@ bool DramRefreshActivateMeasurement::ValidateChannel(size_t i, StreamDescriptor 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DramRefreshActivateMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Trfc(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DramRefreshActivateMeasurement::GetProtocolName()
 {
 	return "DRAM Trfc";
-}
-
-bool DramRefreshActivateMeasurement::NeedsConfig()
-{
-	return false;
-}
-
-float DramRefreshActivateMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float DramRefreshActivateMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,9 +85,6 @@ void DramRefreshActivateMeasurement::Refresh()
 
 	//Measure delay from refreshing a bank until an activation to the same bank
 	int64_t lastRef[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-	float fmax = -1e20;
-	float fmin =  1e20;
 
 	int64_t tlast = 0;
 	size_t len = din->m_samples.size();
@@ -141,15 +112,9 @@ void DramRefreshActivateMeasurement::Refresh()
 				continue;
 
 			//Valid access, measure the latency
-			int64_t latency = tact - tref;
-			if(fmin > latency)
-				fmin = latency;
-			if(fmax < latency)
-				fmax = latency;
-
 			cap->m_offsets.push_back(tlast);
 			cap->m_durations.push_back(tnow - tlast);
-			cap->m_samples.push_back(latency);
+			cap->m_samples.push_back(tact - tref);
 			tlast = tnow;
 
 			//Purge the last-refresh timestamp so we don't report false times for the next activate
@@ -163,11 +128,6 @@ void DramRefreshActivateMeasurement::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-
-	m_range = fmax - fmin + 5000;
-	if(m_range < 5)
-		m_range = 5;
-	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap, 0);
 

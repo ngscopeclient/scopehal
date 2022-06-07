@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -85,6 +85,7 @@ public:
 		, m_startFemtoseconds(0)
 		, m_triggerPhase(0)
 		, m_densePacked(false)
+		, m_flags(0)
 	{}
 
 	//empty virtual destructor in case any derived classes need one
@@ -126,6 +127,18 @@ public:
 		Most oscilloscopes output dense packed waveforms natively.
 	 */
 	bool m_densePacked;
+
+	/**
+		@brief Flags that apply to this waveform. Bitfield.
+
+		WAVEFORM_CLIPPING: Scope indicated that this waveform is clipped.
+	 */
+	uint8_t m_flags;
+
+	enum
+	{
+		WAVEFORM_CLIPPING = 1
+	};
 
 	///@brief Start timestamps of each sample
 	std::vector<

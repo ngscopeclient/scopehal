@@ -41,13 +41,8 @@ public:
 	StepGeneratorFilter(const std::string& color);
 
 	virtual void Refresh();
-	virtual bool NeedsConfig();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

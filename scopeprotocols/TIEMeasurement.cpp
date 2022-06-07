@@ -45,8 +45,6 @@ TIEMeasurement::TIEMeasurement(const string& color)
 	CreateInput("Clock");
 	CreateInput("Golden");
 
-	ClearSweeps();
-
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
 
@@ -75,47 +73,13 @@ bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void TIEMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "TIE(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string TIEMeasurement::GetProtocolName()
 {
 	return "Clock Jitter (TIE)";
 }
 
-bool TIEMeasurement::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
-float TIEMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float TIEMeasurement::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void TIEMeasurement::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void TIEMeasurement::Refresh()
 {
@@ -144,9 +108,6 @@ void TIEMeasurement::Refresh()
 
 	//Ignore edges before things have stabilized
 	int64_t skip_time = m_parameters[m_skipname].GetIntVal();
-
-	int64_t vmin = FS_PER_SECOND;
-	int64_t vmax = -FS_PER_SECOND;
 
 	//For each input clock edge, find the closest recovered clock edge
 	size_t iedge = 0;
@@ -212,9 +173,6 @@ void TIEMeasurement::Refresh()
 			if(end)
 				cap->m_durations[end-1] = atime - tlast;
 
-			vmax = max(vmax, tie);
-			vmin = min(vmin, tie);
-
 			cap->m_offsets.push_back(golden_center);
 			cap->m_durations.push_back(0);
 			cap->m_samples.push_back(tie);
@@ -230,10 +188,4 @@ void TIEMeasurement::Refresh()
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
-
-	//Calculate bounds
-	m_max = max(m_max, (float)vmax);
-	m_min = min(m_min, (float)vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 }

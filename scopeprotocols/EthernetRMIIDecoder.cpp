@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -65,8 +65,6 @@ bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
 		return false;
-	if(chan->GetWidth() != 1)
-		return false;
 
 	if(i < 4)
 		return true;
@@ -76,14 +74,6 @@ bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void EthernetRMIIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "RMII(%s)", GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
 
 void EthernetRMIIDecoder::Refresh()
 {

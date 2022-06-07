@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -62,19 +62,16 @@ bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(chan == NULL)
 		return false;
 
-	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
-		return false;
-
 	switch(i)
 	{
 		case 0:
-			if(chan->GetWidth() == 4)
+			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL_BUS)
 				return true;
 			break;
 
 		case 1:
 		case 2:
-			if(chan->GetWidth() == 1)
+			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
 				return true;
 			break;
 	}
@@ -84,14 +81,6 @@ bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void EthernetRGMIIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "RGMII(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
 
 void EthernetRGMIIDecoder::Refresh()
 {
@@ -176,7 +165,7 @@ void EthernetRGMIIDecoder::Refresh()
 		//TODO: alert if clock isn't close to one of the three legal frequencies
 		int64_t clkperiod = dctl.m_offsets[i] - dctl.m_offsets[i-2];
 		bool ddr = false;		//Default to 2.5/25 MHz SDR.
-		if(clkperiod < 10000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
+		if(clkperiod < 10000000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
 			ddr = true;
 
 		//Set of recovered bytes and timestamps
@@ -230,7 +219,6 @@ void EthernetRGMIIDecoder::Refresh()
 				i += 4;
 			}
 		}
-
 		//Crunch the data
 		BytesToFrames(bytes, starts, ends, cap);
 	}

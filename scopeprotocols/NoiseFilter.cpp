@@ -66,33 +66,9 @@ bool NoiseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float NoiseFilter::GetVoltageRange(size_t /*stream*/)
-{
-	//add 3 sigma above and below the mean
-	return m_inputs[0].GetVoltageRange() + 6*m_parameters[m_stdevname].GetFloatVal();
-}
-
-float NoiseFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string NoiseFilter::GetProtocolName()
 {
 	return "Noise";
-}
-
-bool NoiseFilter::NeedsConfig()
-{
-	return true;
-}
-
-void NoiseFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Noise(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

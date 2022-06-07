@@ -85,6 +85,16 @@ public:
 		(for display purposes if multiple similar devices are in use)
 	 */
 	std::string m_nickname;
+
+	/**
+		@brief Gets the connection string for our transport
+	 */
+	virtual std::string GetTransportConnectionString() =0;
+
+	/**
+		@brief Gets the name of our transport
+	 */
+	virtual std::string GetTransportName() =0;
 };
 
 #endif

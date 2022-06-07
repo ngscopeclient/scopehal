@@ -42,14 +42,9 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 
 	PROTOCOL_DECODER_INITPROC(ParallelBus)
 

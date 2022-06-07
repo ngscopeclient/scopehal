@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,10 +42,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-OSCILLOSCOPE_INITPROC_CPP(TektronixOscilloscope)
-
 TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
-	: SCPIOscilloscope(transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 	, m_sampleRateValid(false)
 	, m_sampleRate(0)
 	, m_sampleDepthValid(false)
@@ -65,6 +64,14 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_triggerOneShot(false)
 	, m_maxBandwidth(1000)
 	, m_hasDVM(false)
+	, m_hasAFG(false)
+	, m_afgEnabled(false)
+	, m_afgAmplitude(0.5)
+	, m_afgOffset(0)
+	, m_afgFrequency(100000)
+	, m_afgDutyCycle(0.5)
+	, m_afgShape(FunctionGenerator::SHAPE_SINE)
+	, m_afgImpedance(FunctionGenerator::IMPEDANCE_HIGH_Z)
 {
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
@@ -149,7 +156,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			string("CH") + to_string(i+1),
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			1,
 			i,
 			true));
 	}
@@ -195,7 +201,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 						m_channels[i]->GetHwname() + "_D" + to_string(j),
 						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 						m_channels[i]->m_displaycolor,
-						1,
 						m_channels.size(),
 						true);
 
@@ -226,7 +231,6 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				"AUX",
 				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				1,
 				m_channels.size(),
 				true);
 			m_channels.push_back(m_extTrigChannel);
@@ -238,182 +242,40 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 				"EX",
 				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				1,
 				m_channels.size(),
 				true);
 			m_channels.push_back(m_extTrigChannel);
 			break;
 	}
 
-	//See what options we have
-	vector<string> options;
-	string reply = m_transport->SendCommandQueuedWithReply("*OPT?", false) + ',';
-	switch(m_family)
-	{
-		case FAMILY_MSO5:
-		case FAMILY_MSO6:
-			{
-				/*
-					Seems like we have blocks divided by commas
-					Each block contains three semicolon delimited fields: code, text description, license type
-					Option code has is further divided into code:type, e.g. BW6-1000:License
-					For extra fun, there can be commas inside the internal fields!
-
-					So ultimately what we expect is:
-						Option code
-						Colon
-						Option type
-						Semicolon
-						Description
-						Semicolon
-						License type
-						Comma
-				*/
-
-				size_t pos = 0;
-				while(pos < reply.length())
-				{
-
-					//Read option code (the only part we care about)
-					string optcode;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ':')
-							break;
-						optcode += reply[pos];
-					}
-					options.push_back(optcode);
-
-					//Skip the colon
-					pos++;
-
-					//Read and discard option type
-					string opttype;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ';')
-							break;
-						opttype += reply[pos];
-					}
-
-					//Skip the semicolon
-					pos++;
-
-					//Read and discard option description (commas are legal here... thanks Tek)
-					string optdesc;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ';')
-							break;
-						optdesc += reply[pos];
-					}
-
-					//Skip the semicolon
-					pos ++;
-
-					//Read and discard license type
-					string lictype;
-					for( ; pos < reply.length(); pos++)
-					{
-						if(reply[pos] == ',')
-							break;
-						lictype += reply[pos];
-					}
-
-					//Skip the comma
-					pos ++;
-				}
-			}
-			break;
-
-		default:
-			{
-
-
-				for (std::string::size_type prev_pos=0, pos=0;
-					 (pos = reply.find(',', pos)) != std::string::npos;
-					 prev_pos=++pos)
-				{
-					std::string opt( reply.substr(prev_pos, pos-prev_pos) );
-					if (opt == "0")
-						continue;
-					if (opt.substr(opt.length()-3, 3) == "(d)")
-						opt.erase(opt.length()-3);
-
-					options.push_back(opt);
-				}
-			}
-			break;
+	string reply = m_transport->SendCommandQueuedWithReply("LICENSE:APPID?", false);
+	reply = reply.substr(1, reply.size() - 2); // Chop off quotes
+	vector<string> apps;
+	stringstream s_stream(reply);
+	while(s_stream.good()) {
+		string substr;
+		getline(s_stream, substr, ',');
+		apps.push_back(substr);
 	}
 
-	//Print out the option list and do processing for each
-	LogDebug("Installed options:\n");
-	if(options.empty())
-		LogDebug("* None\n");
-	for(auto opt : options)
+	for (auto app : apps)
 	{
-		if(opt == "BW6-1000")
+		if (app == "DVM")
 		{
-			LogDebug("* BW6-1000 (1 GHz bandwidth)\n");
-			//Don't touch m_maxBandwidth, we already got it from CONFIG:ANALO:BANDWIDTH
-		}
-		else if(opt == "SUP6-DVM")
-		{
-			LogDebug("* SUP6-DVM (Digital voltmeter)\n");
 			m_hasDVM = true;
+			LogDebug(" * Tek has DVM\n");
 		}
-		else if(opt == "SUP6-DEMO")
+		else if (app == "AFG")
 		{
-			LogDebug("* SUP6-DEMO (Arbitrary function generator)\n");
+			m_hasAFG = true;
+			LogDebug(" * Tek has AFG\n");
 		}
-		else if(opt == "LIC6-SREMBD")
-		{
-			LogDebug("* LIC6-SREMBD (I2C/SPI trigger/decode)\n");
-		}
-		else if(opt == "LIC6-DDU")
-		{
-			/*
-				This is a bundle code that unlocks lots of stuff:
-					* 8 GHZ bandwidth
-					* Function generator
-					* Multimeter
-					* I3C (decode only, no trigger)
-					* 100baseT1 (decode only, no trigger)
-					* SpaceWire (decode only, no trigger)
-
-				Trigger/decode types:
-					* Parallel bus
-					* I2C
-					* SPI
-					* RS232
-					* CAN
-					* LIN
-					* FlexRay
-					* SENT
-					* USB
-					* 10/100 Ethernet
-					* SPMI
-					* MIL-STD-1553
-					* ARINC 429
-					* I2S/LJ/RJ/TDM audio
-
-				This is in addition to the probably-standard trigger types:
-					* Edge
-					* Pulse width
-					* Timeout
-					* Runt
-					* Window
-					* Logic pattern
-					* Setup/hold
-					* Slew rate
-					* Sequence
-			 */
-			 LogDebug("* LIC6-DDU (6 series distribution demo)\n");
-			 m_hasDVM = true;
-		}
-
 		else
-			LogDebug("* %s (unknown)\n", opt.c_str());
+		{
+			LogDebug("(* Tek also has '%s' (ignored))\n", app.c_str());
+		}
+
+		// Bandwidth expanding options reflected in earlier query for max B/W
 	}
 
 	//Figure out what probes we have connected
@@ -437,6 +299,8 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 	unsigned int mask = Instrument::INST_OSCILLOSCOPE;
 	if(m_hasDVM)
 		mask |= Instrument::INST_DMM;
+	if(m_hasAFG)
+		mask |= Instrument::INST_FUNCTION;
 	return mask;
 }
 
@@ -445,6 +309,12 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 
 void TektronixOscilloscope::DetectProbes()
 {
+	std::vector<bool> currentlyEnabled;
+	for (size_t i = 0; i < m_analogChannelCount; i++)
+	{
+		currentlyEnabled.push_back(IsChannelEnabled(i));
+	}
+
 	switch(m_family)
 	{
 		case FAMILY_MSO5:
@@ -475,6 +345,12 @@ void TektronixOscilloscope::DetectProbes()
 
 		default:
 			break;
+	}
+
+	for (size_t i = 0; i < m_analogChannelCount; i++)
+	{
+		if (currentlyEnabled[i]) EnableChannel(i);
+		else                     DisableChannel(i);
 	}
 }
 
@@ -511,36 +387,33 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
 		return false;
 
-	//Pre-checks based on type
-	if(IsDigital(i))
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
-		//If the parent analog channel doesn't have a digital probe, we're disabled
-		size_t parent = m_flexChannelParents[m_channels[i]];
-		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-	else if(IsAnalog(i))
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeTypes.find(i) != m_probeTypes.end())
+		{
+			//Pre-checks based on type
+			if(IsDigital(i))
+			{
+				//If the parent analog channel doesn't have a digital probe, we're disabled
+				size_t parent = m_flexChannelParents[m_channels[i]];
+				if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+			else if(IsAnalog(i))
+			{
+				//If we're an analog channel with a digital probe connected, the analog channel is unusable
+				if(m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+			else if(IsSpectrum(i))
+			{
+				//If we're an analog channel with a digital probe connected, the analog channel is unusable
+				if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
+					return false;
+			}
+		}
 
-		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i] == PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-	else if(IsSpectrum(i))
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-
-		//If we're an analog channel with a digital probe connected, the analog channel is unusable
-		if(m_probeTypes[i - m_spectrumChannelBase] == PROBE_TYPE_DIGITAL_8BIT)
-			return false;
-	}
-
-	//Check the cache
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_channelsEnabled.find(i) != m_channelsEnabled.end())
 			return m_channelsEnabled[i];
 	}
@@ -559,7 +432,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			}
 			else
 			{
-				m_transport->SendCommandQueuedWithReply(
+				reply = m_transport->SendCommandQueuedWithReply(
 					string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
 			}
 			break;
@@ -1005,7 +878,7 @@ vector<unsigned int> TektronixOscilloscope::GetChannelBandwidthLimiters(size_t i
 			//TODO: Behavior copied from MSO6. Appropriate?
 			if (!is_1m)
 				ret.push_back(0);
-			
+
 			break;
 
 		case FAMILY_MSO6:
@@ -1533,6 +1406,64 @@ bool TektronixOscilloscope::AcquireData()
 	return true;
 }
 
+bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& preamble_out)
+{
+	size_t semicolons = std::count(preamble_in.begin(), preamble_in.end(), ';');
+
+	int read = 0;
+	mso56_preamble& p = preamble_out;
+
+	if (semicolons == 23)
+	{
+		read = sscanf(preamble_in.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order, p.wfid,
+			&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+			&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+
+		if (read == 22) return true;
+	}
+	else if (semicolons == 22)
+	{
+		read = sscanf(preamble_in.c_str(),
+			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%d;%c;%31[^;];" // wfid missing
+			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+			&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order,
+			&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+			&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+		strcpy(p.wfid, "<missing (Tek bug)>");
+
+		LogDebug("!!Tek decided to not send the WFId in WFMO? preamble. Compensating!!\n");
+
+		if (read == 21) return true;
+	}
+	
+	LogWarning("Preamble error (read only %d fields)\n", read);
+	LogDebug(" -> Failed preamble: %s\n", preamble_in.c_str());
+	return false;
+}
+
+void TektronixOscilloscope::ResynchronizeSCPI()
+{
+	//Resynchronize
+	LogWarning("SCPI out of sync, attempting to recover\n");
+	while(1)
+	{
+		m_transport->SendCommandImmediate("\n*CLS");
+		// The manual has very confusing things to say about this needing to follow an "<EOI>" which
+		// appears to be a holdover from IEEE488 that IDK how is supposed to work (or not) over socket
+		// transport. Who knows. Another option: set Protocol to Terminal in socket server settings and
+		// use '!d' which issues the "DCL (Device CLear) control message" but this means dealing with
+		// prompts and stuff like that.
+
+		m_transport->FlushRXBuffer();
+
+		if (IDPing() != "")
+			break;
+	}
+}
+
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
 {
 	//Seems like we might need a command before reading data after the trigger?
@@ -1541,33 +1472,8 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 	//Make sure record length is valid
 	GetSampleDepth();
 
-	//Preamble fields (not all are used)
-	int byte_num;
-	int bit_num;
-	char encoding[32];
-	char bin_format[32];
-	char asc_format[32];
-	char byte_order[32];
-	char wfid[256];
-	int nr_pt;
-	char pt_fmt[32];
-	char pt_order[32];
-	char xunit[32];
-	double xincrement;
-	double xzero;
-	int pt_off;
-	char yunit[32];
-	double ymult;
-	double yoff;
-	double yzero;
-	char domain[32];
-	char wfmtype[32];
-	double centerfreq;
-	double span;
-
 	//Ask for the analog data
-	m_transport->SendCommandImmediate("DAT:WID 1");					//8-bit data in NORMAL mode
-	m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+	bool firstAnalog = true;
 	size_t timebase = 0;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -1581,67 +1487,96 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		// Set source & get preamble+data
-		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-
-		//Process it (grab the whole block, semicolons and all)
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-
-		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
-		m_channelOffsets[i] = -yoff;
-
-		//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
-		LogIndenter li2;
-
-		//Read the data block
-		size_t nsamples;
-		int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
-		if(samples == NULL)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			//Resynchronize
-			LogWarning("Timeout, attempting to recover\n");
-			while(IDPing() == "")
-			{}
+			// Set source (before setting format)
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
 
-			return false;
+			if (firstAnalog || retry) // set again on retry
+			{
+				m_transport->SendCommandImmediate("DAT:WID 1");					//8-bit data in NORMAL mode
+				m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+				firstAnalog = false;
+			}
+
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			//Process it (grab the whole block, semicolons and all)
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			timebase = preamble.xincrement * FS_PER_SECOND;	//scope gives sec, not fs
+			m_channelOffsets[i] = -preamble.yoff;
+
+			//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+			LogIndenter li2;
+
+			//Read the data block
+			size_t nsamples;
+			int8_t* samples = (int8_t*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", nsamples);
+			if(samples == NULL)
+			{
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
+			}
+
+			if (nsamples != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Set up the capture we're going to store our data into
+			//(no TDC data or fine timestamping available on Tektronix scopes?)
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->m_densePacked = true;
+			cap->m_timescale = timebase;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time(NULL);
+			double t = GetTime();
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+			cap->Resize(nsamples);
+
+			Convert8BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				samples,
+				preamble.ymult,
+				-preamble.yoff,
+				nsamples,
+				0);
+
+			//Done, update the data
+			pending_waveforms[i].push_back(cap);
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			if (m_transport->ReadReply() != "")
+				LogWarning("Tek has junk after CURV? reply\n");
+
+			succeeded = true;
+			break;
 		}
 
-		//Set up the capture we're going to store our data into
-		//(no TDC data or fine timestamping available on Tektronix scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_densePacked = true;
-		cap->m_timescale = timebase;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-		cap->Resize(nsamples);
-
-		Convert8BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
-			samples,
-			ymult,
-			-yoff,
-			nsamples,
-			0);
-
-		//Done, update the data
-		pending_waveforms[i].push_back(cap);
-
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
+			return false;
+		}
 	}
 
 	//Get the spectrum stuff
@@ -1659,73 +1594,101 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		//Select mode
-		if(firstSpectrum)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			m_transport->SendCommandImmediate("DAT:WID 8");					//double precision floating point data
-			m_transport->SendCommandImmediate("DAT:ENC SFPB");				//IEEE754 float
-			firstSpectrum = false;
+			// Set source (before setting format)
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
+
+			//Select mode
+			if(firstSpectrum || retry) // set again on retry
+			{
+				m_transport->SendCommandImmediate("DAT:WID 8");					//double precision floating point data
+				m_transport->SendCommandImmediate("DAT:ENC SFPB");				//IEEE754 float
+				firstSpectrum = false;
+			}
+
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
+			//LogIndenter li2;
+
+			//Process it
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			m_channelOffsets[i] = -preamble.yoff;
+
+			//Read the data block
+			size_t msglen;
+			double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
+			if(samples == NULL)
+			{
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
+			}
+
+			size_t nsamples = msglen/8;
+
+			if (nsamples != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Set up the capture we're going to store our data into
+			//(no TDC data or fine timestamping available on Tektronix scopes?)
+			AnalogWaveform* cap = new AnalogWaveform;
+			cap->m_timescale = preamble.hzbase;
+			cap->m_triggerPhase = 0;
+			cap->m_startTimestamp = time(NULL);
+			cap->m_densePacked = true;
+			double t = GetTime();
+			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+			cap->Resize(nsamples);
+
+			//We get dBm from the instrument, so just have to convert double to single precision
+			//TODO: are other units possible here?
+			int64_t ibase = preamble.hzoff / preamble.hzbase;
+			for(size_t j=0; j<nsamples; j++)
+			{
+				cap->m_offsets[j] = j + ibase;
+				cap->m_durations[j] = 1;
+				cap->m_samples[j] = preamble.ymult*samples[j] + preamble.yoff;
+			}
+
+			//Done, update the data
+			pending_waveforms[nchan].push_back(cap);
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			m_transport->ReadReply();
+
+			//Look for peaks
+			//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
+			dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000);
+
+			succeeded = true;
+			break;
 		}
 
-		// Set source & get preamble+data
-		m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-
-		//LogDebug("Channel %zu (%s)\n", nchan, m_channels[nchan]->GetHwname().c_str());
-		//LogIndenter li2;
-
-		//Process it
-		double hzbase = 0;
-		double hzoff = 0;
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &hzbase, &hzoff,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-		m_channelOffsets[i] = -yoff;
-
-		//Read the data block
-		size_t msglen;
-		double* samples = (double*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
-		if(samples == NULL)
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
 			return false;
-		size_t nsamples = msglen/8;
-
-		//Set up the capture we're going to store our data into
-		//(no TDC data or fine timestamping available on Tektronix scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
-		cap->m_timescale = hzbase;
-		cap->m_triggerPhase = 0;
-		cap->m_startTimestamp = time(NULL);
-		cap->m_densePacked = true;
-		double t = GetTime();
-		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-		cap->Resize(nsamples);
-
-		//We get dBm from the instrument, so just have to convert double to single precision
-		//TODO: are other units possible here?
-		int64_t ibase = hzoff / hzbase;
-		for(size_t j=0; j<nsamples; j++)
-		{
-			cap->m_offsets[j] = j + ibase;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = ymult*samples[j] + yoff;
 		}
-
-		//Done, update the data
-		pending_waveforms[nchan].push_back(cap);
-
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
-
-		//Look for peaks
-		//TODO: make this configurable, for now 1 MHz spacing and up to 10 peaks
-		dynamic_cast<SpectrumChannel*>(m_channels[nchan])->FindPeaks(cap, 10, 1000000);
 	}
 
 	//Get the digital stuff
@@ -1762,64 +1725,123 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			continue;
 		}
 
-		//Configuration
-		if(firstDigital)
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			m_transport->SendCommandImmediate("DAT:WID 1");					//8 data bits per channel
-			m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
-			firstDigital = false;
-		}
+			//Set source (before setting format); Ask for all of the data
+			m_transport->SendCommandImmediate(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
 
-		//Ask for all of the data
-		m_transport->SendCommandImmediate(string("DAT:SOU CH") + to_string(i+1) + "_DALL");
-
-		//Ask for the waveform preamble
-		string preamble = m_transport->SendCommandImmediateWithReply("WFMO?", false);
-		sscanf(preamble.c_str(),
-			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
-			"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
-			&byte_num, &bit_num, encoding, bin_format, asc_format, byte_order, wfid, &nr_pt, pt_fmt, pt_order,
-			xunit, &xincrement, &xzero,	&pt_off, yunit, &ymult, &yoff, &yzero, domain, wfmtype, &centerfreq, &span);
-		timebase = xincrement * FS_PER_SECOND;	//scope gives sec, not fs
-
-		//And the acutal data
-		size_t msglen;
-		char* samples = (char*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
-		if(samples == NULL)
-			return false;
-
-		//Process the data for each channel
-		for(int j=0; j<8; j++)
-		{
-			//Set up the capture we're going to store our data into
-			//(no TDC data or fine timestamping available on Tektronix scopes?)
-			DigitalWaveform* cap = new DigitalWaveform;
-			cap->m_timescale = timebase;
-			cap->m_triggerPhase = 0;
-			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
-			double t = GetTime();
-			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
-			cap->Resize(msglen);
-
-			//Extract sample data
-			int mask = (1 << j);
-			for(size_t k=0; k<msglen; k++)
+			//Configuration
+			if(firstDigital || retry) // set again on retry
 			{
-				cap->m_offsets[k] = k;
-				cap->m_durations[k] = 1;
-				cap->m_samples[k] = (samples[k] & mask) ? true : false;
+				m_transport->SendCommandImmediate("DAT:WID 1");					//8 data bits per channel
+				m_transport->SendCommandImmediate("DAT:ENC SRI");				//signed, little endian binary
+				firstDigital = false;
 			}
 
-			//Done, update the data
-			pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
+			//Ask for the waveform preamble
+			string preamble_str = m_transport->SendCommandImmediateWithReply("WFMO?", false);
+			mso56_preamble preamble;
+
+			if (!ReadPreamble(preamble_str, preamble))
+				continue; // retry
+
+			timebase = preamble.xincrement * FS_PER_SECOND;	//scope gives sec, not fs
+
+			//And the acutal data
+			size_t msglen;
+			char* samples = (char*)m_transport->SendCommandImmediateWithRawBlockReply("CURV?", msglen);
+			if(samples == NULL)
+			{
+				LogWarning("Didn't get any samples (timeout?)\n");
+
+				ResynchronizeSCPI();
+
+				continue; // retry
+			}
+
+			if (msglen != (size_t)preamble.nr_pt)
+			{
+				LogWarning("Didn't get the right number of points\n");
+
+				ResynchronizeSCPI();
+
+				delete[] samples;
+
+				continue; // retry
+			}
+
+			//Process the data for each channel
+			for(int j=0; j<8; j++)
+			{
+				//Set up the capture we're going to store our data into
+				//(no TDC data or fine timestamping available on Tektronix scopes?)
+				DigitalWaveform* cap = new DigitalWaveform;
+				cap->m_timescale = timebase;
+				cap->m_triggerPhase = 0;
+				cap->m_startTimestamp = time(NULL);
+				cap->m_densePacked = true;
+				double t = GetTime();
+				cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+				cap->Resize(msglen);
+
+				//Extract sample data
+				int mask = (1 << j);
+
+				bool last = (samples[0] & mask) ? true : false;
+
+				cap->m_offsets[0] = 0;
+				cap->m_durations[0] = 1;
+				cap->m_samples[0] = last;
+
+				size_t k = 0;
+
+				for(size_t m=1; m<msglen; m++)
+				{
+					bool sample = (samples[m] & mask) ? true : false;
+
+					//Deduplicate consecutive samples with same value
+					//FIXME: temporary workaround for rendering bugs
+					//if(last == sample)
+					if( (last == sample) && ((m+5) < msglen) && (m > 5))
+						cap->m_durations[k] ++;
+
+					//Nope, it toggled - store the new value
+					else
+					{
+						k++;
+						cap->m_offsets[k] = m;
+						cap->m_durations[k] = 1;
+						cap->m_samples[k] = sample;
+						last = sample;
+					}
+				}
+
+				//Free space reclaimed by deduplication
+				cap->Resize(k);
+				cap->m_offsets.shrink_to_fit();
+				cap->m_durations.shrink_to_fit();
+				cap->m_samples.shrink_to_fit();
+
+				//Done, update the data
+				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);
+			}
+
+			//Done
+			delete[] samples;
+
+			//Throw out garbage at the end of the message (why is this needed?)
+			m_transport->ReadReply();
+
+			succeeded = true;
+			break;
 		}
 
-		//Done
-		delete[] samples;
-
-		//Throw out garbage at the end of the message (why is this needed?)
-		m_transport->ReadReply();
+		if (!succeeded)
+		{
+			LogError("Retried too many times acquiring channel\n");
+			return false;
+		}
 	}
 	return true;
 }
@@ -1987,7 +2009,7 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 	vector<uint64_t> ret;
 
 	const int64_t k = 1000;
-	//const int64_t m = k*k;
+	const int64_t m = k*k;
 
 	switch(m_family)
 	{
@@ -2008,9 +2030,6 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(200 * k);
 				ret.push_back(500 * k);
 
-				//Deeper memory is disabled because using it seems to crash the scope firmware. Not sure why yet.
-
-				/*
 				ret.push_back(1 * m);
 				ret.push_back(2 * m);
 				ret.push_back(5 * m);
@@ -2018,7 +2037,8 @@ vector<uint64_t> TektronixOscilloscope::GetSampleDepthsNonInterleaved()
 				ret.push_back(20 * m);
 				ret.push_back(50 * m);
 				ret.push_back(62500 * k);
-				*/
+				ret.push_back(100 * m);
+				ret.push_back(125 * m);
 			}
 			break;
 
@@ -2089,6 +2109,17 @@ void TektronixOscilloscope::SetSampleDepth(uint64_t depth)
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		m_sampleDepth = depth;
 		m_sampleDepthValid = true;
+
+		for (size_t i = 0; i < m_analogChannelCount; i++)
+		{
+			if (IsChannelEnabled(m_spectrumChannelBase + i))
+			{
+				depth = min<size_t>(depth, 62500 * 1000);
+				// Having a spectrum channel enabled silently caps the depth to 62.5Mpts.
+				// Setting it higher via SCPI "works" but does really weird stuff to the
+				// hdiv that breaks us, so cap.
+			}
+		}
 	}
 
 	//Send it
@@ -3574,3 +3605,234 @@ int TektronixOscilloscope::GetMeterDigits()
 {
 	return 4;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator
+
+int TektronixOscilloscope::GetFunctionChannelCount()
+{
+	return m_hasAFG ? 1 : 0;
+}
+
+string TektronixOscilloscope::GetFunctionChannelName(int /*chan*/)
+{
+	return "AWG";
+}
+
+vector<FunctionGenerator::WaveShape> TektronixOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> ret;
+	ret.push_back(FunctionGenerator::SHAPE_SINE);
+	ret.push_back(FunctionGenerator::SHAPE_SQUARE);
+	ret.push_back(FunctionGenerator::SHAPE_PULSE); // TODO: Support set width (default: 1us)
+	ret.push_back(FunctionGenerator::SHAPE_TRIANGLE); // TODO: Support set symmetry (default: 50%)
+	ret.push_back(FunctionGenerator::SHAPE_DC);
+	ret.push_back(FunctionGenerator::SHAPE_NOISE);
+	ret.push_back(FunctionGenerator::SHAPE_SINC);
+	ret.push_back(FunctionGenerator::SHAPE_GAUSSIAN);
+	ret.push_back(FunctionGenerator::SHAPE_LORENTZ);
+	ret.push_back(FunctionGenerator::SHAPE_EXPONENTIAL_RISE);
+	ret.push_back(FunctionGenerator::SHAPE_EXPONENTIAL_DECAY);
+	ret.push_back(FunctionGenerator::SHAPE_HAVERSINE);
+	ret.push_back(FunctionGenerator::SHAPE_CARDIAC);
+	return ret;
+}
+
+bool TektronixOscilloscope::GetFunctionChannelActive(int /*chan*/)
+{
+	return m_afgEnabled;
+}
+
+void TektronixOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
+{
+	m_afgEnabled = on;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	if(on)
+	{
+		m_transport->SendCommand("AFG:OUTPUT:STATE 1");
+		m_transport->SendCommand("AFG:OUTPUT:MODE CONTINUOUS");
+	}
+	else
+	{
+		m_transport->SendCommand("AFG:OUTPUT:STATE 0");
+	}
+}
+
+float TektronixOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
+{
+	return m_afgShape == SHAPE_SQUARE ? m_afgDutyCycle : 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty)
+{
+	m_afgDutyCycle = duty;
+
+	if (m_afgShape != SHAPE_SQUARE)
+		return;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:SQUARE:DUTY ") + to_string(duty * 100));
+}
+
+float TektronixOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
+{
+	return m_afgAmplitude;
+}
+
+void TektronixOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+{
+	m_afgAmplitude = amplitude;
+
+	//Rescale if load is not high-Z
+	if(m_afgImpedance == IMPEDANCE_50_OHM)
+		amplitude *= 2;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:AMPLITUDE ") + to_string(amplitude));
+}
+
+float TektronixOscilloscope::GetFunctionChannelOffset(int /*chan*/)
+{
+	return m_afgOffset;
+}
+
+void TektronixOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
+{
+	m_afgOffset = offset;
+
+	//Rescale if load is not high-Z
+	if(m_afgImpedance == IMPEDANCE_50_OHM)
+		offset *= 2;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:OFFSET ") + to_string(offset));
+}
+
+float TektronixOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
+{
+	return m_afgFrequency;
+}
+
+void TektronixOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
+{
+	m_afgFrequency = hz;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand(string("AFG:FREQUENCY ") + to_string(hz));
+}
+
+FunctionGenerator::WaveShape TektronixOscilloscope::GetFunctionChannelShape(int /*chan*/)
+{
+	return m_afgShape;
+}
+
+void TektronixOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+{
+	m_afgShape = shape;
+
+	lock_guard<recursive_mutex> lock(m_mutex);
+	switch(shape)
+	{
+		case SHAPE_SINE:
+			m_transport->SendCommand(string("AFG:FUNCTION SINE"));
+			break;
+
+		case SHAPE_SQUARE:
+			m_transport->SendCommand(string("AFG:FUNCTION SQUARE"));
+			break;
+
+		case SHAPE_PULSE:
+			m_transport->SendCommand(string("AFG:FUNCTION PULSE"));
+			break;
+
+		case SHAPE_TRIANGLE:
+			m_transport->SendCommand(string("AFG:FUNCTION RAMP"));
+			break;
+
+		case SHAPE_DC:
+			m_transport->SendCommand(string("AFG:FUNCTION DC"));
+			break;
+
+		case SHAPE_NOISE:
+			m_transport->SendCommand(string("AFG:FUNCTION NOISE"));
+			break;
+
+		case SHAPE_SINC:
+			m_transport->SendCommand(string("AFG:FUNCTION SINC")); // Called Sin(x)/x in scope UI
+			break;
+
+		case SHAPE_GAUSSIAN:
+			m_transport->SendCommand(string("AFG:FUNCTION GAUSSIAN"));
+			break;
+
+		case SHAPE_LORENTZ:
+			m_transport->SendCommand(string("AFG:FUNCTION LORENTZ"));
+			break;
+
+		case SHAPE_EXPONENTIAL_RISE:
+			m_transport->SendCommand(string("AFG:FUNCTION ERISE"));
+			break;
+
+		case SHAPE_EXPONENTIAL_DECAY:
+			m_transport->SendCommand(string("AFG:FUNCTION EDECAY"));
+			break;
+
+		case SHAPE_HAVERSINE:
+			m_transport->SendCommand(string("AFG:FUNCTION HAVERSINE"));
+			break;
+
+		case SHAPE_CARDIAC:
+			m_transport->SendCommand(string("AFG:FUNCTION CARDIAC"));
+			break;
+
+		// TODO: ARB
+
+		default:
+			break;
+	}
+}
+
+float TektronixOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
+{
+	//not supported
+}
+
+float TektronixOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
+{
+	//not supported
+	return 0;
+}
+
+void TektronixOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
+{
+}
+
+FunctionGenerator::OutputImpedance TektronixOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)
+{
+	return m_afgImpedance;
+}
+
+void TektronixOscilloscope::SetFunctionChannelOutputImpedance(int chan, OutputImpedance z)
+{
+	//Save old offset/amplitude
+	float off = GetFunctionChannelOffset(chan);
+	float amp = GetFunctionChannelAmplitude(chan);
+
+	m_afgImpedance = z;
+	if (z == IMPEDANCE_50_OHM)
+		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE FIFTY"));
+	else
+		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE HIGHZ"));
+
+	//Restore with new impedance
+	SetFunctionChannelAmplitude(chan, amp);
+	SetFunctionChannelOffset(chan, off);
+}
+

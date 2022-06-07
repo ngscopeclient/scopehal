@@ -10,6 +10,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
+	CSVImportFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
 	DCDMeasurement.cpp
@@ -36,6 +37,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DVIDecoder.cpp
 	EmphasisFilter.cpp
 	EmphasisRemovalFilter.cpp
+	EnhancedResolutionFilter.cpp
 	ESPIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
 	Ethernet100BaseTDecoder.cpp
@@ -76,14 +78,17 @@ set(SCOPEPROTOCOLS_SOURCES
 	MDIODecoder.cpp
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
+	MultimeterTrendFilter.cpp
 	MultiplyFilter.cpp
 	NoiseFilter.cpp
 	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
 	ParallelBus.cpp
+	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
+	PCIeGen3LogicalDecoder.cpp
 	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
@@ -126,6 +131,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	USB2PacketDecoder.cpp
 	USB2PCSDecoder.cpp
 	USB2PMADecoder.cpp
+	VCDImportFilter.cpp
 	VectorFrequencyFilter.cpp
 	VectorPhaseFilter.cpp
 	VerticalBathtub.cpp

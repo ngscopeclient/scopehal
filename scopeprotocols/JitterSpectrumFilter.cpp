@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,9 +43,6 @@ JitterSpectrumFilter::JitterSpectrumFilter(const string& color)
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 	m_category = CAT_ANALYSIS;
-
-	m_range = 1000;
-	m_offset = -500;
 }
 
 JitterSpectrumFilter::~JitterSpectrumFilter()
@@ -78,14 +75,6 @@ bool JitterSpectrumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string JitterSpectrumFilter::GetProtocolName()
 {
 	return "Jitter Spectrum";
-}
-
-void JitterSpectrumFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "JitterSpectrum(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

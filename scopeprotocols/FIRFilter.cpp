@@ -51,11 +51,6 @@ FIRFilter::FIRFilter(const string& color)
 {
 	CreateInput("in");
 
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	m_parameters[m_filterTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_filterTypeName].AddEnumValue("Low pass", FILTER_TYPE_LOWPASS);
 	m_parameters[m_filterTypeName].AddEnumValue("High pass", FILTER_TYPE_HIGHPASS);
@@ -92,14 +87,6 @@ bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-void FIRFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void FIRFilter::SetDefaultName()
 {
@@ -141,21 +128,6 @@ void FIRFilter::SetDefaultName()
 string FIRFilter::GetProtocolName()
 {
 	return "FIR Filter";
-}
-
-bool FIRFilter::NeedsConfig()
-{
-	return true;
-}
-
-float FIRFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float FIRFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,6 +185,13 @@ void FIRFilter::Refresh()
 		return;
 	}
 
+	//Don't allow filters with more than 4096 taps (probably means something went wrong)
+	if(filterlen > 4096)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the filter coefficients (TODO: cache this)
 	vector<float> coeffs;
 	coeffs.resize(filterlen);
@@ -231,48 +210,36 @@ void FIRFilter::Refresh()
 	auto cap = SetupOutputWaveform(din, 0, 0, filterlen);
 
 	//Run the actual filter
-	float vmin;
-	float vmax;
-	DoFilterKernel(coeffs, din, cap, vmin, vmax);
+	DoFilterKernel(coeffs, din, cap);
 
 	//Shift output to compensate for filter group delay
 	cap->m_triggerPhase = (radius * fs_per_sample) + din->m_triggerPhase;
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 }
 
 void FIRFilter::DoFilterKernel(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
 	#ifdef HAVE_OPENCL
 	if(g_clContext && m_kernel)
-		DoFilterKernelOpenCL(coefficients, din, cap, vmin, vmax);
+		DoFilterKernelOpenCL(coefficients, din, cap);
 	else
 	#endif
 
 	if(g_hasAvx512F)
-		DoFilterKernelAVX512F(coefficients, din, cap, vmin, vmax);
+		DoFilterKernelAVX512F(coefficients, din, cap);
 	else if(g_hasAvx2)
-		DoFilterKernelAVX2(coefficients, din, cap, vmin, vmax);
+		DoFilterKernelAVX2(coefficients, din, cap);
 	else
-		DoFilterKernelGeneric(coefficients, din, cap, vmin, vmax);
+		DoFilterKernelGeneric(coefficients, din, cap);
 }
 
 #ifdef HAVE_OPENCL
 void FIRFilter::DoFilterKernelOpenCL(
 		std::vector<float>& coefficients,
 		AnalogWaveform* din,
-		AnalogWaveform* cap,
-		float& vmin,
-		float& vmax)
+		AnalogWaveform* cap)
 {
 	//Setup
 	size_t len = din->m_samples.size();
@@ -319,15 +286,6 @@ void FIRFilter::DoFilterKernelOpenCL(
 	{
 		LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
 	}
-
-	//Final reduction stage CPU-side
-	vmin = FLT_MAX;
-	vmax = -FLT_MAX;
-	for(size_t i=0; i<nblocks; i++)
-	{
-		vmin = min(vmin, minmax[i*2]);
-		vmax = max(vmax, minmax[i*2 + 1]);
-	}
 }
 #endif
 
@@ -338,13 +296,9 @@ void FIRFilter::DoFilterKernelOpenCL(
 void FIRFilter::DoFilterKernelGeneric(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
 	//Setup
-	vmin = FLT_MAX;
-	vmax = -FLT_MAX;
 	size_t len = din->m_samples.size();
 	size_t filterlen = coefficients.size();
 	size_t end = len - filterlen;
@@ -355,9 +309,6 @@ void FIRFilter::DoFilterKernelGeneric(
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
 			v += din->m_samples[i + j] * coefficients[j];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
 
 		cap->m_samples[i]	= v;
 	}
@@ -372,13 +323,8 @@ __attribute__((target("avx2")))
 void FIRFilter::DoFilterKernelAVX2(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
-	__m256 vmin_x8 = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
-	__m256 vmax_x8 = { -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
-
 	//Save some pointers and sizes
 	size_t len = din->m_samples.size();
 	size_t filterlen = coefficients.size();
@@ -456,42 +402,6 @@ void FIRFilter::DoFilterKernelAVX2(
 		_mm256_store_ps(pout + i + 40, v_f);
 		_mm256_store_ps(pout + i + 48, v_g);
 		_mm256_store_ps(pout + i + 56, v_h);
-
-		//Calculate min/max: First level
-		__m256 min_ab	= _mm256_min_ps(v_a, v_b);
-		__m256 min_cd	= _mm256_min_ps(v_c, v_d);
-		__m256 min_ef	= _mm256_min_ps(v_e, v_f);
-		__m256 min_gh	= _mm256_min_ps(v_g, v_h);
-
-		__m256 max_ab	= _mm256_max_ps(v_a, v_b);
-		__m256 max_cd	= _mm256_max_ps(v_c, v_d);
-		__m256 max_ef	= _mm256_max_ps(v_e, v_f);
-		__m256 max_gh	= _mm256_max_ps(v_g, v_h);
-
-		//Min/max: second level
-		__m256 min_abcd	= _mm256_min_ps(min_ab, min_cd);
-		__m256 min_efgh	= _mm256_min_ps(min_ef, min_gh);
-		__m256 max_abcd	= _mm256_max_ps(max_ab, max_cd);
-		__m256 max_efgh	= _mm256_max_ps(max_ef, max_gh);
-
-		//Min/max: third level
-		__m256 min_l3	= _mm256_min_ps(min_abcd, min_efgh);
-		__m256 max_l3	= _mm256_max_ps(max_abcd, max_efgh);
-
-		//Min/max: final reduction
-		vmin_x8 = _mm256_min_ps(vmin_x8, min_l3);
-		vmax_x8 = _mm256_max_ps(vmax_x8, max_l3);
-	}
-
-	//Horizontal reduction of vector min/max
-	float tmp_min[8] __attribute__((aligned(32)));
-	float tmp_max[8] __attribute__((aligned(32)));
-	_mm256_store_ps(tmp_min, vmin_x8);
-	_mm256_store_ps(tmp_max, vmax_x8);
-	for(int j=0; j<8; j++)
-	{
-		vmin = min(vmin, tmp_min[j]);
-		vmax = max(vmax, tmp_max[j]);
 	}
 
 	//Catch any stragglers
@@ -500,9 +410,6 @@ void FIRFilter::DoFilterKernelAVX2(
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
 			v += din->m_samples[i + j] * coefficients[j];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
 
 		cap->m_samples[i]	= v;
 	}
@@ -515,13 +422,8 @@ __attribute__((target("avx512f")))
 void FIRFilter::DoFilterKernelAVX512F(
 	vector<float>& coefficients,
 	AnalogWaveform* din,
-	AnalogWaveform* cap,
-	float& vmin,
-	float& vmax)
+	AnalogWaveform* cap)
 {
-	__m512 vmin_x16 = _mm512_set1_ps(FLT_MAX);
-	__m512 vmax_x16 = _mm512_set1_ps(-FLT_MAX);
-
 	//Save some pointers and sizes
 	size_t len = din->m_samples.size();
 	size_t filterlen = coefficients.size();
@@ -570,32 +472,6 @@ void FIRFilter::DoFilterKernelAVX512F(
 		_mm512_store_ps(pout + i + 16,  v_b);
 		_mm512_store_ps(pout + i + 32, v_c);
 		_mm512_store_ps(pout + i + 48, v_d);
-
-		//Calculate min/max: First level
-		__m512 min_ab	= _mm512_min_ps(v_a, v_b);
-		__m512 min_cd	= _mm512_min_ps(v_c, v_d);
-
-		__m512 max_ab	= _mm512_max_ps(v_a, v_b);
-		__m512 max_cd	= _mm512_max_ps(v_c, v_d);
-
-		//Min/max: second level
-		__m512 min_abcd	= _mm512_min_ps(min_ab, min_cd);
-		__m512 max_abcd	= _mm512_max_ps(max_ab, max_cd);
-
-		//Min/max: final reduction
-		vmin_x16 = _mm512_min_ps(vmin_x16, min_abcd);
-		vmax_x16 = _mm512_max_ps(vmax_x16, max_abcd);
-	}
-
-	//Horizontal reduction of vector min/max
-	float tmp_min[16] __attribute__((aligned(64)));
-	float tmp_max[16] __attribute__((aligned(64)));
-	_mm512_store_ps(tmp_min, vmin_x16);
-	_mm512_store_ps(tmp_max, vmax_x16);
-	for(int j=0; j<16; j++)
-	{
-		vmin = min(vmin, tmp_min[j]);
-		vmax = max(vmax, tmp_max[j]);
 	}
 
 	//Catch any stragglers
@@ -604,9 +480,6 @@ void FIRFilter::DoFilterKernelAVX512F(
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
 			v += din->m_samples[i + j] * coefficients[j];
-
-		vmin = min(vmin, v);
-		vmax = max(vmax, v);
 
 		cap->m_samples[i]	= v;
 	}

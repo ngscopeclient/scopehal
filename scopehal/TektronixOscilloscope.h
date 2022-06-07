@@ -58,8 +58,9 @@ class WindowTrigger;
 		Prints the error log in a somewhat confusing and not-human-readable format
  */
 class TektronixOscilloscope
-	: public SCPIOscilloscope
-	, public Multimeter
+	: public virtual SCPIOscilloscope
+	, public FunctionGenerator
+	, public virtual SCPIMultimeter
 {
 public:
 	TektronixOscilloscope(SCPITransport* transport);
@@ -160,6 +161,43 @@ public:
 	virtual int GetMeterDigits();
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Function generator
+
+	//Channel info
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Spectrum analyzer configuration
 
 	virtual bool HasFrequencyControls();
@@ -173,7 +211,43 @@ public:
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
+	struct mso56_preamble
+	{
+		int byte_num;
+		int bit_num;
+		char encoding[32];
+		char bin_format[32];
+		char asc_format[32];
+		char byte_order[32];
+		char wfid[256];
+		int nr_pt;
+		char pt_fmt[32];
+		char pt_order[32];
+		char xunit[32];
+		union
+		{
+			double xincrement;
+			double hzbase;
+		};
+		union
+		{
+			double xzero;
+			double hzoff;
+		};
+		int pt_off;
+		char yunit[32];
+		double ymult;
+		double yoff;
+		double yzero;
+		char domain[32];
+		char wfmtype[32];
+		double centerfreq;
+		double span;
+	};
+
 	//acquisition
+	void ResynchronizeSCPI();
+	bool ReadPreamble(std::string& preamble_in, mso56_preamble& preamble_out);
 	bool AcquireDataMSO56(std::map<int, std::vector<WaveformBase*> >& pending_waveforms);
 	void DetectProbes();
 
@@ -297,9 +371,19 @@ protected:
 	bool IsEnableStateDirty(size_t chan);
 	void FlushChannelEnableStates();
 
+	//Function generator state
+	bool m_hasAFG;
+	bool m_afgEnabled;
+	float m_afgAmplitude;
+	float m_afgOffset;
+	float m_afgFrequency;
+	float m_afgDutyCycle;
+	FunctionGenerator::WaveShape m_afgShape;
+	FunctionGenerator::OutputImpedance m_afgImpedance;
+
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC_H(TektronixOscilloscope)
+	OSCILLOSCOPE_INITPROC(TektronixOscilloscope)
 };
 
 #endif

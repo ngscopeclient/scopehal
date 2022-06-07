@@ -77,29 +77,6 @@ string CTLEFilter::GetProtocolName()
 	return "CTLE";
 }
 
-bool CTLEFilter::NeedsConfig()
-{
-	return true;
-}
-
-void CTLEFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"CTLE(%s, %s, %s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_dcGainName].ToString().c_str(),
-		m_parameters[m_zeroFreqName].ToString().c_str(),
-		m_parameters[m_poleFreq1Name].ToString().c_str(),
-		m_parameters[m_poleFreq2Name].ToString().c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

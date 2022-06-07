@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,7 +57,8 @@ class WindowTrigger;
 
 #define c_digiChannelsPerBus 8
 
-class SiglentSCPIOscilloscope : public SCPIOscilloscope
+class SiglentSCPIOscilloscope 	: public virtual SCPIOscilloscope
+								, public FunctionGenerator
 {
 public:
 	SiglentSCPIOscilloscope(SCPITransport* transport);
@@ -77,7 +78,6 @@ protected:
 	virtual void DetectAnalogChannels();
 	void AddDigitalChannels(unsigned int count);
 	void DetectOptions();
-	std::chrono::system_clock::time_point next_tx;
 
 public:
 	//Device information
@@ -131,6 +131,7 @@ public:
 	enum Model
 	{
 		MODEL_SIGLENT_SDS1000,
+		MODEL_SIGLENT_SDS2000XE,
 		MODEL_SIGLENT_SDS2000XP,
 		MODEL_SIGLENT_SDS5000X,
 		MODEL_UNKNOWN
@@ -158,6 +159,43 @@ public:
 	virtual int64_t GetDeskewForChannel(size_t channel);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Function generator
+
+	//Channel info
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float sec);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Logic analyzer configuration
 
 	virtual std::vector<DigitalBank> GetDigitalBanks();
@@ -174,6 +212,12 @@ public:
 
 	//All currently supported Sig2 scopes have only one analog bank (same ADC config for all channels)
 	//so no need to override those
+
+	enum ADCMode
+	{
+		ADC_MODE_8BIT	= 0,
+		ADC_MODE_10BIT	= 1
+	};
 
 	virtual bool IsADCModeConfigurable();
 	virtual std::vector<std::string> GetADCModeNames(size_t channel);
@@ -210,7 +254,7 @@ protected:
 	std::string GetPossiblyEmptyString(const std::string& property);
 
 	//  bool ReadWaveformBlock(std::string& data);
-	int ReadWaveformBlock(uint32_t maxsize, char* data);
+	int ReadWaveformBlock(uint32_t maxsize, char* data, bool hdSizeWorkaround = false);
 	//  	bool ReadWavedescs(
 	//		std::vector<std::string>& wavedescs,
 	//		bool* enabled,
@@ -274,11 +318,20 @@ protected:
 	bool m_triggerOffsetValid;
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
-	bool m_interleaving;
-	bool m_interleavingValid;
 	Multimeter::MeasurementTypes m_meterMode;
 	bool m_meterModeValid;
 	std::map<size_t, bool> m_probeIsActive;
+	std::map<size_t, bool> m_awgEnabled;
+	std::map<size_t, float> m_awgDutyCycle;
+	std::map<size_t, float> m_awgRange;
+	std::map<size_t, float> m_awgOffset;
+	std::map<size_t, float> m_awgFrequency;
+	std::map<size_t, FunctionGenerator::WaveShape> m_awgShape;
+	std::map<size_t, FunctionGenerator::OutputImpedance> m_awgImpedance;
+	ADCMode m_adcMode;
+	bool m_adcModeValid;
+
+	std::map<std::string, std::string> ParseCommaSeparatedNameValueList(std::string str, bool forwardMap = true);
 
 	int64_t m_timeDiv;
 

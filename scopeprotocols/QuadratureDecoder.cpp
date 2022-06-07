@@ -62,9 +62,6 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	m_parameters[m_debouncename].ParseString("1 ms");
 
 	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
-
-	m_max = 10;
-	m_min = -10;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,46 +81,9 @@ bool QuadratureDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void QuadratureDecoder::ClearSweeps()
-{
-	m_max = 10;
-	m_min = -10;
-	SetData(NULL, 0);
-}
-
-float QuadratureDecoder::GetVoltageRange(size_t /*stream*/)
-{
-	return (m_max - m_min) + 20;
-}
-
-float QuadratureDecoder::GetOffset(size_t /*stream*/)
-{
-	return -( (m_max - m_min)/2 + m_min );
-}
-
 string QuadratureDecoder::GetProtocolName()
 {
 	return "Quadrature";
-}
-
-bool QuadratureDecoder::NeedsConfig()
-{
-	return true;
-}
-
-void QuadratureDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"Quadrature(%s,%s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -305,10 +265,6 @@ void QuadratureDecoder::Refresh()
 				cap->m_samples.push_back(phase);
 			}
 		}
-
-		//Store phase limits
-		m_min = min(m_min, phase);
-		m_max = max(m_max, phase);
 
 		//Get timestamps of next event on each channel.
 		//If we can't move forward, stop.

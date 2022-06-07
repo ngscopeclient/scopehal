@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,8 +34,8 @@
 	@brief A Rohde & Schwarz HMC804x power supply
  */
 class RohdeSchwarzHMC804xPowerSupply
-	: public virtual PowerSupply
-	, public SCPIDevice
+	: public virtual SCPIPowerSupply
+	, public virtual SCPIDevice
 {
 public:
 	RohdeSchwarzHMC804xPowerSupply(SCPITransport* transport);
@@ -83,6 +83,10 @@ protected:
 	int m_channelCount;
 
 	int m_activeChannel;
+
+public:
+	static std::string GetDriverNameInternal();
+	POWER_INITPROC(RohdeSchwarzHMC804xPowerSupply)
 };
 
 #endif

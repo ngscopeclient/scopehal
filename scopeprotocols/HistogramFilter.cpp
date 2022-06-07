@@ -81,12 +81,6 @@ string HistogramFilter::GetProtocolName()
 	return "Histogram";
 }
 
-bool HistogramFilter::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
 float HistogramFilter::GetVoltageRange(size_t /*stream*/)
 {
 	return m_range;

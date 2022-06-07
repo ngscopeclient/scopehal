@@ -217,6 +217,11 @@ size_t VICPSocketTransport::ReadRawData(size_t len, unsigned char* buf)
 	return len;
 }
 
+void VICPSocketTransport::FlushRXBuffer(void)
+{
+	m_socket.FlushRxBuffer();
+}
+
 bool VICPSocketTransport::IsCommandBatchingSupported()
 {
 	return true;

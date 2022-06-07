@@ -49,6 +49,13 @@
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
+#include "RohdeSchwarzHMC8012Multimeter.h"
+
+#include "RohdeSchwarzHMC804xPowerSupply.h"
+
+#include "SiglentVectorSignalGenerator.h"
+
+#include "CDR8B10BTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -357,7 +364,7 @@ void ScopehalStaticCleanup()
 }
 
 /**
-	@brief Static initialization for oscilloscopes
+	@brief Static initialization for instrument drivers
  */
 void DriverStaticInit()
 {
@@ -367,7 +374,7 @@ void DriverStaticInit()
 
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);
-	AddDriverClass(AntikernelLogicAnalyzer);
+	//AddDriverClass(AntikernelLogicAnalyzer);
 	AddDriverClass(DemoOscilloscope);
 	AddDriverClass(DigilentOscilloscope);
 	AddDriverClass(DSLabsOscilloscope);
@@ -378,6 +385,13 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 
+	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
+
+	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
+
+	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
+
+	AddTriggerClass(CDR8B10BTrigger);
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(GlitchTrigger);
@@ -882,4 +896,27 @@ void GetTimestampOfFile(string path, time_t& timestamp, int64_t& fs)
 			fs = st.st_mtim.tv_nsec * 1000L * 1000L;
 		}
 	#endif
+}
+
+/**
+	@brief Splits a string up into an array separated by delimiters
+ */
+vector<string> explode(const string& str, char separator)
+{
+	vector<string> ret;
+	string tmp;
+	for(auto c : str)
+	{
+		if(c == separator)
+		{
+			if(!tmp.empty())
+				ret.push_back(tmp);
+			tmp = "";
+		}
+		else
+			tmp += c;
+	}
+	if(!tmp.empty())
+		ret.push_back(tmp);
+	return ret;
 }

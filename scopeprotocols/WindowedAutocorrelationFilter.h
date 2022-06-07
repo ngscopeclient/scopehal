@@ -42,25 +42,13 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
-	virtual void ClearSweeps();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(WindowedAutocorrelationFilter)
 
 protected:
-	float m_range;
-	float m_offset;
-	float m_min;
-	float m_max;
-
 	std::string m_windowName;
 	std::string m_periodName;
 };

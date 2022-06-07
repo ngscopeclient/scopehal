@@ -37,16 +37,69 @@
 #define CSVExportWizard_h
 
 /**
-	@brief Select channels to export to CSV
+	@brief Select reference channel
  */
-class CSVExportChannelSelectionPage
+class CSVExportReferenceChannelSelectionPage
 {
 public:
-	CSVExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
+	CSVExportReferenceChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
 
 	Gtk::Grid m_grid;
-		Gtk::Label m_timestampTypeLabel;
-		Gtk::ComboBoxText m_timestampTypeBox;
+		Gtk::Label m_captionLabel;
+		Gtk::Label m_referenceLabel;
+		Gtk::ComboBoxText m_referenceBox;
+
+	StreamDescriptor GetActiveChannel() const
+	{ return m_streams[m_referenceBox.get_active_row_number()]; }
+
+	const std::vector<StreamDescriptor>& GetStreams() const
+	{ return m_streams; }
+
+protected:
+	std::vector<StreamDescriptor> m_streams;
+};
+
+/**
+	@brief Select other channels
+ */
+class CSVExportOtherChannelSelectionPage
+{
+public:
+	CSVExportOtherChannelSelectionPage(const CSVExportReferenceChannelSelectionPage& ref);
+
+	Gtk::Grid m_grid;
+		Gtk::Frame m_selectedFrame;
+			Gtk::ListViewText m_selectedChannels;
+		Gtk::Frame m_availableFrame;
+			Gtk::ListViewText m_availableChannels;
+
+		Gtk::Button m_removeButton;
+		Gtk::Button m_addButton;
+
+	void UpdateChannelList();
+
+	std::map<std::string, StreamDescriptor> m_targets;
+
+protected:
+	const CSVExportReferenceChannelSelectionPage& m_ref;
+
+	void OnAddChannel();
+	void OnRemoveChannel();
+};
+
+/**
+	@brief Final configuration and output path
+ */
+class CSVExportFinalPage
+{
+public:
+	CSVExportFinalPage();
+	virtual ~CSVExportFinalPage();
+
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+
+protected:
 };
 
 /**
@@ -63,7 +116,12 @@ public:
 	EXPORT_WIZARD_INITPROC(CSVExportWizard)
 
 protected:
-	CSVExportChannelSelectionPage m_channelSelectionPage;
+	virtual void on_prepare(Gtk::Widget* page);
+	virtual void on_apply();
+
+	CSVExportReferenceChannelSelectionPage m_referenceSelectionPage;
+	CSVExportOtherChannelSelectionPage m_otherChannelSelectionPage;
+	CSVExportFinalPage m_finalPage;
 };
 
 #endif

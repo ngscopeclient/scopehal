@@ -65,8 +65,6 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	m_parameters[m_cornerName].SetIntVal(CORNER_TYP);
 
 	m_parameters[m_termName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-
-	ClearSweeps();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,13 +75,8 @@ bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
-	{
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
-	}
 
 	return false;
 }
@@ -94,37 +87,6 @@ bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 string IBISDriverFilter::GetProtocolName()
 {
 	return "IBIS Driver";
-}
-
-void IBISDriverFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "IBIS(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-float IBISDriverFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float IBISDriverFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-bool IBISDriverFilter::NeedsConfig()
-{
-	return true;
-}
-
-void IBISDriverFilter::ClearSweeps()
-{
-	m_vmax = FLT_MIN;
-	m_vmin = FLT_MAX;
-	m_range = 1;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,17 +124,11 @@ void IBISDriverFilter::OnFnameChanged()
 		m_parameters[m_modelName].AddEnumValue(names[i], i);
 
 	//TODO: update enum models etc
-
-	//Min/max are likely invalid now
-	ClearSweeps();
 }
 
 void IBISDriverFilter::OnModelChanged()
 {
 	m_model = m_parser.m_models[m_parameters[m_modelName].ToString()];
-
-	//For now, assume rising and falling waveforms have terminations in the same order
-	//TODO: check if spec requires this to be the case
 
 	//Recreate list of terminations
 	Unit ohms(Unit::UNIT_OHMS);
@@ -184,9 +140,6 @@ void IBISDriverFilter::OnModelChanged()
 		auto ename = ohms.PrettyPrint(w.m_fixtureResistance) + " to " + volts.PrettyPrint(w.m_fixtureVoltage);
 		m_parameters[m_termName].AddEnumValue(ename, i);
 	}
-
-	//Min/max are likely invalid now
-	ClearSweeps();
 }
 
 void IBISDriverFilter::Refresh()
@@ -228,10 +181,22 @@ void IBISDriverFilter::Refresh()
 	size_t caplen = (samples.m_offsets[len-1] + samples.m_durations[len-1] - capstart) / samplePeriod;
 	cap->Resize(caplen);
 
-	//Find the rising and falling edge waveform
-	auto term = m_parameters[m_termName].GetIntVal();
-	VTCurves& rising = m_model->m_rising[term];
-	VTCurves& falling = m_model->m_falling[term];
+	//Find the rising edge waveform - easy
+	auto risingTerm = m_parameters[m_termName].GetIntVal();
+	VTCurves& rising = m_model->m_rising[risingTerm];
+
+	//Find the falling edge waveform. We have to search all of them because they might not be in the same order!!
+	size_t fallingTerm=0;
+	for(; fallingTerm < m_model->m_falling.size(); fallingTerm ++)
+	{
+		if(
+			( (m_model->m_falling[fallingTerm].m_fixtureResistance - rising.m_fixtureResistance) < 0.01) &&
+			( (m_model->m_falling[fallingTerm].m_fixtureVoltage - rising.m_fixtureVoltage) < 0.01) )
+		{
+			break;
+		}
+	}
+	VTCurves& falling = m_model->m_falling[fallingTerm];
 	auto corner = static_cast<IBISCorner>(m_parameters[m_cornerName].GetIntVal());
 
 	//Figure out the propagation delay of the buffers for rising and falling edges
@@ -251,6 +216,13 @@ void IBISDriverFilter::Refresh()
 			edgeDirections.push_back(b);
 			edgeTimestamps.push_back(samples.m_offsets[i]);
 		}
+	}
+
+	//Sanity check that we actually have some data
+	if(edgeTimestamps.empty())
+	{
+		SetData(NULL, 0);
+		return;
 	}
 
 	//Generate output samples at uniform intervals
@@ -291,11 +263,5 @@ void IBISDriverFilter::Refresh()
 		else
 			v = falling.InterpolateVoltage(corner, rel_sec);
 		cap->m_samples[i] = v;
-
-		m_vmax = max(m_vmax, v);
-		m_vmin = min(m_vmin, v);
 	}
-
-	m_range = (m_vmax - m_vmin) * 1.05;
-	m_offset = -( (m_vmax - m_vmin)/2 + m_vmin );
 }

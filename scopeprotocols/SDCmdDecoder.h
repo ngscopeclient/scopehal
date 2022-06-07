@@ -93,9 +93,6 @@ public:
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool NeedsConfig();
 
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);

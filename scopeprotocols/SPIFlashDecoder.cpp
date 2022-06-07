@@ -94,19 +94,6 @@ string SPIFlashDecoder::GetProtocolName()
 	return "SPI Flash";
 }
 
-bool SPIFlashDecoder::NeedsConfig()
-{
-	return true;
-}
-
-void SPIFlashDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "SPIFlash(%s)",	GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 vector<string> SPIFlashDecoder::GetHeaders()
 {
 	vector<string> ret;

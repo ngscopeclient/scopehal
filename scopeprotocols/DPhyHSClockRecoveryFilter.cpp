@@ -61,24 +61,9 @@ bool DPhyHSClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor strea
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DPhyHSClockRecoveryFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DPhyHSClockRec(%s, %s)",
-		GetInputDisplayName(0).c_str(), GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DPhyHSClockRecoveryFilter::GetProtocolName()
 {
 	return "Clock Recovery (D-PHY HS Mode)";
-}
-
-bool DPhyHSClockRecoveryFilter::NeedsConfig()
-{
-	//we have more than one input
-	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

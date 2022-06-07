@@ -60,6 +60,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ChannelEmulationFilter);
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(ComplexImportFilter);
+	AddDecoderClass(CSVImportFilter);
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
 	AddDecoderClass(DCDMeasurement);
@@ -86,6 +87,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DVIDecoder);
 	AddDecoderClass(EmphasisFilter);
 	AddDecoderClass(EmphasisRemovalFilter);
+	AddDecoderClass(EnhancedResolutionFilter);
 	AddDecoderClass(ESPIDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
 	AddDecoderClass(Ethernet100BaseTDecoder);
@@ -124,14 +126,17 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
+	AddDecoderClass(MultimeterTrendFilter);
 	AddDecoderClass(MultiplyFilter);
 	AddDecoderClass(NoiseFilter);
 	//AddDecoderClass(OFDMDemodulator);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
 	AddDecoderClass(ParallelBus);
+	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);
 	AddDecoderClass(PCIeGen2LogicalDecoder);
+	AddDecoderClass(PCIeGen3LogicalDecoder);
 	AddDecoderClass(PCIeTransportDecoder);
 	AddDecoderClass(PeakHoldFilter);
 	AddDecoderClass(PeriodMeasurement);
@@ -173,6 +178,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(USB2PacketDecoder);
 	AddDecoderClass(USB2PCSDecoder);
 	AddDecoderClass(USB2PMADecoder);
+	AddDecoderClass(VCDImportFilter);
 	AddDecoderClass(VectorFrequencyFilter);
 	AddDecoderClass(VectorPhaseFilter);
 	AddDecoderClass(VerticalBathtub);

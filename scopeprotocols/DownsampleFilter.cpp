@@ -67,35 +67,9 @@ bool DownsampleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DownsampleFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float DownsampleFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string DownsampleFilter::GetProtocolName()
 {
 	return "Downsample";
-}
-
-bool DownsampleFilter::NeedsConfig()
-{
-	return true;
-}
-
-void DownsampleFilter::SetDefaultName()
-{
-	char hwname[256];
-	Unit hz(Unit::UNIT_HZ);
-	snprintf(hwname, sizeof(hwname), "Downsample(%s, %ld)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_factorname].GetIntVal());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

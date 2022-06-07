@@ -83,23 +83,9 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void ClockRecoveryFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ClockRec(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string ClockRecoveryFilter::GetProtocolName()
 {
 	return "Clock Recovery (PLL)";
-}
-
-bool ClockRecoveryFilter::NeedsConfig()
-{
-	//we have need the base symbol rate configured
-	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,6 +119,14 @@ void ClockRecoveryFilter::Refresh()
 	//Get nominal period used for the first cycle of the NCO
 	int64_t period = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
 
+	//Disallow frequencies higher than Nyquist of the input
+	auto fnyquist = 2*GetInputWaveform(0)->m_timescale;
+	if( period < fnyquist)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Create the output waveform and copy our timescales
 	auto cap = new DigitalWaveform;
 	if(adin)
@@ -156,14 +150,14 @@ void ClockRecoveryFilter::Refresh()
 	else
 		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale;
 	size_t nedge = 1;
-	//LogDebug("n, delta, period, freq_ghz\n");
+	//LogDebug("n, delta, period, freq_ghz, cycles_open_loop\n");
 	int64_t edgepos = edges[0];
 	bool value = false;
 	int64_t total_error = 0;
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 	bool gating = false;
-	int cycles_open_loop = 0;
+	int64_t cycles_open_loop = 0;
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -229,10 +223,17 @@ void ClockRecoveryFilter::Refresh()
 				}
 			}
 
-			cycles_open_loop = 0;
+			//LogDebug("%10ld, %10ld, %10ld, %10.4f, %10ld\n", nedge, delta, period, 1e6f / period, cycles_open_loop);
 
-			//LogDebug("%ld,%f,%.2f, %.4f\n", nedge, delta, period, 1e3f / period);
+			cycles_open_loop = 0;
 			tnext = edges[++nedge];
+
+			if(period < fnyquist)
+			{
+				LogWarning("PLL attempted to lock to frequency near or above Nyquist - invalid config or undersampled data?\n");
+				nedge = edges.size();
+				break;
+			}
 		}
 
 		//Add the sample

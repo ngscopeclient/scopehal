@@ -65,20 +65,6 @@ bool MilStd1553Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	return false;
 }
 
-void MilStd1553Decoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "MIL-STD-1553(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-bool MilStd1553Decoder::NeedsConfig()
-{
-	//Everything is specified by the protocol, nothing to configure
-	return false;
-}
-
 vector<string> MilStd1553Decoder::GetHeaders()
 {
 	vector<string> ret;

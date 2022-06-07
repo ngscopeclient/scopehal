@@ -39,9 +39,6 @@ BaseMeasurement::BaseMeasurement(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
 {
 	CreateInput("din");
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,33 +58,9 @@ bool BaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void BaseMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Base(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string BaseMeasurement::GetProtocolName()
 {
 	return "Base";
-}
-
-bool BaseMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float BaseMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float BaseMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +85,8 @@ void BaseMeasurement::Refresh()
 	vector<size_t> hist = MakeHistogram(din, vmin, vmax, nbins);
 
 	//Set temporary midpoint and range
-	m_range = (vmax - vmin);
-	m_midpoint = m_range/2 + vmin;
+	float range = (vmax - vmin);
+	float mid = range/2 + vmin;
 
 	//Find the highest peak in the first quarter of the histogram
 	//This is the base for the entire waveform
@@ -128,14 +101,14 @@ void BaseMeasurement::Refresh()
 		}
 	}
 	float fbin = (idx + 0.5f)/nbins;
-	float global_base = fbin*m_range + vmin;
+	float global_base = fbin*range + vmin;
 
 	//Create the output
 	auto cap = new AnalogWaveform;
 
 	float last = vmin;
 	int64_t tfall = 0;
-	float delta = m_range * 0.1;
+	float delta = range * 0.1;
 
 	float fmax = -FLT_MAX;
 	float fmin =  FLT_MAX;
@@ -151,11 +124,11 @@ void BaseMeasurement::Refresh()
 		int64_t tnow = din->m_offsets[i] * din->m_timescale;
 
 		//Find falling edge
-		if( (cur < m_midpoint) && (last >= m_midpoint) )
+		if( (cur < mid) && (last >= mid) )
 			tfall = tnow;
 
 		//Find rising edge
-		if( (cur > m_midpoint) && (last <= m_midpoint) )
+		if( (cur > mid) && (last <= mid) )
 		{
 			//Done, add the sample
 			if(!samples.empty())
@@ -204,11 +177,6 @@ void BaseMeasurement::Refresh()
 
 		last = cur;
 	}
-
-	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
-	m_midpoint = (fmax + fmin) / 2;
 
 	SetData(cap, 0);
 

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,6 +47,46 @@ public:
 		SHAPE_PULSE,
 		SHAPE_DC,
 		SHAPE_NOISE,
+		SHAPE_SAWTOOTH_UP,
+		SHAPE_SAWTOOTH_DOWN,
+		SHAPE_SINC,
+		SHAPE_GAUSSIAN,
+		SHAPE_LORENTZ,
+		SHAPE_HALF_SINE,
+		SHAPE_PRBS_NONSTANDARD,
+		SHAPE_EXPONENTIAL_RISE,
+		SHAPE_EXPONENTIAL_DECAY,
+		SHAPE_HAVERSINE,
+		SHAPE_CARDIAC,
+
+		SHAPE_STAIRCASE_UP,
+		SHAPE_STAIRCASE_DOWN,
+		SHAPE_STAIRCASE_UP_DOWN,
+		SHAPE_NEGATIVE_PULSE,
+		SHAPE_LOG_RISE,
+		SHAPE_LOG_DECAY,
+		SHAPE_SQUARE_ROOT,
+		SHAPE_CUBE_ROOT,
+		SHAPE_QUADRATIC,
+		SHAPE_CUBIC,
+		SHAPE_DLORENTZ,
+		SHAPE_GAUSSIAN_PULSE,
+		SHAPE_HAMMING,
+		SHAPE_HANNING,
+		SHAPE_KAISER,
+		SHAPE_BLACKMAN,
+		SHAPE_GAUSSIAN_WINDOW,
+		SHAPE_HARRIS,
+		SHAPE_BARTLETT,
+		SHAPE_TAN,
+		SHAPE_COT,
+		SHAPE_SEC,
+		SHAPE_CSC,
+		SHAPE_ASIN,
+		SHAPE_ACOS,
+		SHAPE_ATAN,
+		SHAPE_ACOT,
+
 		SHAPE_ARB
 	};
 
@@ -78,6 +118,18 @@ public:
 
 	virtual float GetFunctionChannelFallTime(int chan) =0;
 	virtual void SetFunctionChannelFallTime(int chan, float sec) =0;
+
+	enum OutputImpedance
+	{
+		IMPEDANCE_HIGH_Z,
+		IMPEDANCE_50_OHM
+	};
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) =0;
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) =0;
+
+	//Query the set of available pre-defined waveforms for this generator
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) =0;
 };
 
 #endif

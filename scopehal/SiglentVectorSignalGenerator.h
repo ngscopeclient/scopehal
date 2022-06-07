@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,9 +35,7 @@
 
 	Tested on SSG5000X-V series. May also support 3000X but not tested.
  */
-class SiglentVectorSignalGenerator
-	: public RFSignalGenerator
-	, public virtual SCPIDevice
+class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
 {
 public:
 	SiglentVectorSignalGenerator(SCPITransport* transport);
@@ -58,6 +56,10 @@ public:
 	virtual void SetChannelOutputPower(int chan, float power);
 	virtual float GetChannelCenterFrequency(int chan);
 	virtual void SetChannelCenterFrequency(int chan, float freq);
+
+public:
+	static std::string GetDriverNameInternal();
+	VSG_INITPROC(SiglentVectorSignalGenerator)
 };
 
 #endif

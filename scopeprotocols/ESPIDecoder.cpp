@@ -55,14 +55,8 @@ bool ESPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if(
-		(i < 6) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
-	{
+	if( (i < 6) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 		return true;
-	}
 
 	return false;
 }
@@ -73,24 +67,6 @@ bool ESPIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string ESPIDecoder::GetProtocolName()
 {
 	return "Intel eSPI";
-}
-
-bool ESPIDecoder::NeedsConfig()
-{
-	return true;
-}
-
-void ESPIDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "eSPI(%s, %s, %s, %s)",
-		GetInputDisplayName(2).c_str(),
-		GetInputDisplayName(3).c_str(),
-		GetInputDisplayName(4).c_str(),
-		GetInputDisplayName(5).c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 vector<string> ESPIDecoder::GetHeaders()

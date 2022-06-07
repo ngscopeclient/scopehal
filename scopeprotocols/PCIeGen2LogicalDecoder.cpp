@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -45,9 +45,13 @@ using namespace std;
 
 PCIeGen2LogicalDecoder::PCIeGen2LogicalDecoder(const string& color)
 	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	, m_portCountName("Lane Count")
 {
-	//Set up channels
-	CreateInput("data");
+	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_portCountName].SetIntVal(1);
+	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPorts));
+
+	RefreshPorts();
 }
 
 PCIeGen2LogicalDecoder::~PCIeGen2LogicalDecoder()
@@ -58,18 +62,13 @@ PCIeGen2LogicalDecoder::~PCIeGen2LogicalDecoder()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool PCIeGen2LogicalDecoder::NeedsConfig()
-{
-	//No config for now (might need it when we have multiple lanes etc)
-	return false;
-}
-
 bool PCIeGen2LogicalDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	if( (i <= nports) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
 		return true;
 
 	return false;
@@ -80,16 +79,24 @@ string PCIeGen2LogicalDecoder::GetProtocolName()
 	return "PCIe Gen 1/2 Logical";
 }
 
-void PCIeGen2LogicalDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PCIE2Logical(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+void PCIeGen2LogicalDecoder::RefreshPorts()
+{
+	//Create new inputs
+	size_t nports = m_parameters[m_portCountName].GetIntVal();
+	for(size_t i=m_inputs.size(); i<nports; i++)
+		CreateInput(string("Lane") + to_string(i+1));
+
+	//Delete extra inputs
+	for(size_t i=nports; i<m_inputs.size(); i++)
+		SetInput(i, NULL, true);
+	m_inputs.resize(nports);
+	m_signalNames.resize(nports);
+
+	m_inputsChangedSignal.emit();
+}
 
 void PCIeGen2LogicalDecoder::Refresh()
 {
@@ -98,213 +105,213 @@ void PCIeGen2LogicalDecoder::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-	auto data = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
+
+	//Get all of the inputs
+	ssize_t nports = m_parameters[m_portCountName].GetIntVal();
+	vector<IBM8b10bWaveform*> inputs;
+	for(ssize_t i=0; i<nports; i++)
+		inputs.push_back(dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(i)));
+
+	if(nports == 0)
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
 	//Create the capture
+	//Output is time aligned with the input
 	auto cap = new PCIeLogicalWaveform;
-	cap->m_timescale = data->m_timescale;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	auto in0 = inputs[0];
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = in0->m_startTimestamp;
+	cap->m_startFemtoseconds = in0->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 
-	size_t len = data->m_samples.size();
-	bool synced = false;
-	uint16_t scrambler = 0;
-	bool in_packet = true;			//Assume we're in a partial packet at time zero
-									//(safer than assuming link is idle)
-	for(size_t i=0; i<len; i++)
+	//Find the first comma symbol in each lane so we can synchronize them to each other
+	//TODO: this might fail if we have a partial set of commas right at the start of the capture and there's a few symbols
+	//worth of skew between the probes.
+	//We can improve reliability by searching for the second comma in this case.
+	vector<size_t> indexes;
+	vector<uint16_t> scramblers;
+	for(ssize_t i=0; i<nports; i++)
 	{
-		auto sym = data->m_samples[i];
-		int64_t off = data->m_offsets[i];
-		int64_t dur = data->m_durations[i];
-		int64_t end = off + dur;
+		auto in = inputs[i];
 
-		//Figure out previous symbol type
-		size_t outlen = cap->m_samples.size();
-		size_t ilast = outlen - 1;
-		bool last_was_skip = false;
-		bool last_was_idle = false;
-		bool last_was_no_scramble = false;
-		if(outlen)
+		size_t len = in->m_samples.size();
+		size_t j=0;
+		for(; j<len; j++)
 		{
-			last_was_skip = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_SKIP);
-			last_was_idle = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_LOGICAL_IDLE);
-			last_was_no_scramble = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_NO_SCRAMBLER);
+			auto sym = in->m_samples[j];
+			if(sym.m_control && (sym.m_data == 0xbc) )
+				break;
 		}
 
-		//Update the scrambler UNLESS we have a SKP character K28.0 (k.1c)
-		uint8_t scrambler_out = 0;
-		if(sym.m_control && (sym.m_data == 0x1c) )
-		{}
-		else
-			scrambler_out = RunScrambler(scrambler);
+		indexes.push_back(j);
+		scramblers.push_back(0xffff);
+	}
 
-		//Control characters
-		if(sym.m_control)
+	//Add "scrambler desynced" symbol from start of waveform until the first comma in lane 0
+	cap->m_offsets.push_back(0);
+	cap->m_durations.push_back(
+		(in0->m_offsets[indexes[0]] + in0->m_durations[indexes[0]]) * in0->m_timescale +
+		in0->m_triggerPhase);
+	cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_NO_SCRAMBLER));
+
+	//Process the input, one striped symbol at a time
+	bool in_packet = false;
+	while(true)
+	{
+		//Get bounds of each logical sub-symbol within the stream
+		size_t i0 = indexes[0];
+		int64_t symstart = (in0->m_offsets[i0] * in0->m_timescale) + in0->m_triggerPhase;
+		int64_t symlen = (in0->m_durations[i0] * in0->m_timescale);
+		int64_t sublen = symlen / nports;
+
+		//Process data
+		for(ssize_t j=0; j<nports; j++)
 		{
-			switch(sym.m_data)
+			auto data = inputs[j];
+			auto i = indexes[j];
+
+			//Figure out bounds of sub-symbol
+			auto sym = data->m_samples[i];
+			int64_t off = symstart + sublen*j;
+			int64_t dur = sublen;
+			int64_t end = off + sublen;
+			if(nports*sublen > symlen)
 			{
-				//K28.5 COM
-				case 0xbc:
-					scrambler = 0xffff;
-					synced = true;
-					break;
+				dur = symlen - (nports-1)*sublen;
+				end = symstart + symlen;
+			}
 
-				//K28.0 SKP
-				case 0x1c:
-					{
-						//Prefer to extend an existing symbol
-						if(last_was_skip)
-							cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
+			//Figure out previous symbol type
+			size_t outlen = cap->m_samples.size();
+			size_t ilast = outlen - 1;
+			bool last_was_skip = false;
+			bool last_was_idle = false;
+			if(outlen)
+			{
+				last_was_skip = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_SKIP);
+				last_was_idle = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_LOGICAL_IDLE);
+			}
 
-						//Nope, need to make a new symbol
-						else
+			//Update the scrambler UNLESS we have a SKP character K28.0 (k.1c)
+			uint8_t scrambler_out = 0;
+			if(sym.m_control && (sym.m_data == 0x1c) )
+			{}
+			else
+				scrambler_out = RunScrambler(scramblers[j]);
+
+			//Control characters
+			if(sym.m_control)
+			{
+				switch(sym.m_data)
+				{
+					//K28.5 COM
+					case 0xbc:
+						scramblers[j] = 0xffff;
+						break;
+
+					//K28.0 SKP
+					case 0x1c:
 						{
-							//If we had a gap from a COM character, stretch rearwards into it
-							int64_t start = off;
-							if(outlen)
-								start = cap->m_offsets[ilast] + cap->m_durations[ilast];
+							//Prefer to extend an existing symbol
+							if(last_was_skip)
+								cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
 
-							cap->m_offsets.push_back(start);
-							cap->m_durations.push_back(end - start);
-							cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_SKIP));
+							//Nope, need to make a new symbol
+							else
+							{
+								//If we had a gap from a COM character, stretch rearwards into it
+								int64_t start = off;
+								if(outlen)
+									start = cap->m_offsets[ilast] + cap->m_durations[ilast];
+
+								cap->m_offsets.push_back(start);
+								cap->m_durations.push_back(end - start);
+								cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_SKIP));
+							}
+
+							in_packet = false;
 						}
+						break;
 
+					//K28.2 SDP
+					case 0x5c:
+						cap->m_offsets.push_back(off);
+						cap->m_durations.push_back(dur);
+						cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_START_DLLP));
+						in_packet = true;
+						break;
+
+					//K27.7 STP
+					case 0xfb:
+						cap->m_offsets.push_back(off);
+						cap->m_durations.push_back(dur);
+						cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_START_TLP));
+						in_packet = true;
+						break;
+
+					//K29.7 END
+					case 0xfd:
+						cap->m_offsets.push_back(off);
+						cap->m_durations.push_back(dur);
+						cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_END));
 						in_packet = false;
+						break;
+
+				}
+			}
+
+			//Upper layer payload
+			else
+			{
+				//Payload data
+				if(in_packet)
+				{
+					cap->m_offsets.push_back(off);
+					cap->m_durations.push_back(dur);
+					cap->m_samples.push_back(PCIeLogicalSymbol(
+						PCIeLogicalSymbol::TYPE_PAYLOAD_DATA, sym.m_data ^ scrambler_out));
+				}
+
+				//Logical idle
+				else if( (sym.m_data ^ scrambler_out) == 0)
+				{
+					//Prefer to extend an existing symbol
+					if(last_was_idle)
+						cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+
+					//Nope, need to make a new symbol
+					else
+					{
+						cap->m_offsets.push_back(off);
+						cap->m_durations.push_back(dur);
+						cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_LOGICAL_IDLE));
 					}
-					break;
+				}
 
-				//K28.2 SDP
-				case 0x5c:
-					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_START_DLLP));
-					in_packet = true;
-					break;
-
-				//K27.7 STP
-				case 0xfb:
-					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_START_TLP));
-					in_packet = true;
-					break;
-
-				//K29.7 END
-				case 0xfd:
-					cap->m_offsets.push_back(off);
-					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_END));
-					in_packet = false;
-					break;
-
-			}
-		}
-
-		//Upper layer payload
-		else if(synced)
-		{
-			//Payload data
-			if(in_packet)
-			{
-				cap->m_offsets.push_back(off);
-				cap->m_durations.push_back(dur);
-				cap->m_samples.push_back(PCIeLogicalSymbol(
-					PCIeLogicalSymbol::TYPE_PAYLOAD_DATA, sym.m_data ^ scrambler_out));
-			}
-
-			//Logical idle
-			else if( (sym.m_data ^ scrambler_out) == 0)
-			{
-				//Prefer to extend an existing symbol
-				if(last_was_idle)
-					cap->m_durations[ilast] = end - cap->m_offsets[ilast];
-
-				//Nope, need to make a new symbol
+				//Garbage: data not inside packet framing
 				else
 				{
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_LOGICAL_IDLE));
+					cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_ERROR));
 				}
-			}
-
-			//Garbage: data not inside packet framing
-			else
-			{
-				cap->m_offsets.push_back(off);
-				cap->m_durations.push_back(dur);
-				cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_ERROR));
 			}
 		}
 
-		//If we get a Dx.x character and aren't synced, create a "no scrambler" symbol on the output
-		else
+		//Increment indexes and check if we went off the end of any of the input streams
+		bool done = false;
+		for(ssize_t j=0; j<nports; j++)
 		{
-			//Prefer to extend an existing symbol
-			if(last_was_no_scramble)
-				cap->m_durations[ilast] = end - cap->m_offsets[ilast];
+			indexes[j] ++;
 
-			//Not in a packet? It's an idle
-			else if(!in_packet)
-			{
-				//See if we have a symbol after this
-				if( (i+1 < len) && !data->m_samples[i+1].m_control)
-				{
-					//At sample i, we know the data is 0x00 00.
-					//Therefore, the LFSR output and the scrambled data should be equal.
-					//We want to recover the LFSR *state* at time i.
-
-					//Bits 15:8 of state at time i.
-					//Great, this is unmodified state! Use it as is
-					uint8_t lfsr_hi = data->m_samples[i].m_data;
-					bool b[16] = {0};
-					b[15] = (lfsr_hi >> 0) & 1;
-					b[14] = (lfsr_hi >> 1) & 1;
-					b[13] = (lfsr_hi >> 2) & 1;
-					b[12] = (lfsr_hi >> 3) & 1;
-					b[11] = (lfsr_hi >> 4) & 1;
-					b[10] = (lfsr_hi >> 5) & 1;
-					b[9]  = (lfsr_hi >> 6) & 1;
-					b[8]  = (lfsr_hi >> 7) & 1;
-
-					//Bits 15:8 of the state at time i+1
-					uint8_t next = data->m_samples[i+1].m_data;
-
-					//We need to unroll the LFSR to calculate what the state of bits 7:0 were at time i.
-					//The first 3 bits are easy, since they're before any XORs.
-					b[7] =   (next >> 0) & 1;
-					b[6] =   (next >> 1) & 1;
-					b[5] =   (next >> 2) & 1;
-
-					//Then we have to start backing out stuff.
-					b[4] = ( (next >> 3) & 1 ) ^ b[15];
-					b[3] = ( (next >> 4) & 1 ) ^ b[15] ^ b[14];
-					b[2] = ( (next >> 5) & 1 ) ^ b[15] ^ b[14] ^ b[13];
-					b[1] = ( (next >> 6) & 1 ) ^ b[14] ^ b[13] ^ b[12];
-					b[0] = ( (next >> 7) & 1 ) ^ b[13] ^ b[12] ^ b[11];
-
-					//Patch it all back up
-					scrambler = 0;
-					for(int j=0; j<16; j++)
-					{
-						if(b[j])
-							scrambler |= (1 << j);
-					}
-					synced = true;
-
-					//Back up one cycle and re-process this as a logical idle
-					i--;
-					continue;
-				}
-			}
-
-			else
-			{
-				cap->m_offsets.push_back(off);
-				cap->m_durations.push_back(end - off);
-				cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_NO_SCRAMBLER));
-			}
+			if(indexes[j] >= inputs[j]->m_samples.size())
+				done = true;
 		}
+		if(done)
+			break;
 	}
 
 	SetData(cap, 0);
@@ -347,6 +354,7 @@ Gdk::Color PCIeGen2LogicalDecoder::GetColor(int i)
 			case PCIeLogicalSymbol::TYPE_START_TLP:
 			case PCIeLogicalSymbol::TYPE_START_DLLP:
 			case PCIeLogicalSymbol::TYPE_END:
+			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
 				return m_standardColors[COLOR_CONTROL];
 
 			case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
@@ -397,6 +405,9 @@ string PCIeGen2LogicalDecoder::GetText(int i)
 
 			case PCIeLogicalSymbol::TYPE_END_BAD:
 				return "End Bad";
+
+			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
+				return "End Data Stream";
 
 			case PCIeLogicalSymbol::TYPE_ERROR:
 			default:

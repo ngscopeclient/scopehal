@@ -52,11 +52,6 @@ DSIFrameDecoder::DSIFrameDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool DSIFrameDecoder::NeedsConfig()
-{
-	return false;
-}
-
 bool DSIFrameDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
@@ -71,14 +66,6 @@ bool DSIFrameDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string DSIFrameDecoder::GetProtocolName()
 {
 	return "MIPI DSI Frame";
-}
-
-void DSIFrameDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DSIFrame(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 vector<string> DSIFrameDecoder::GetHeaders()

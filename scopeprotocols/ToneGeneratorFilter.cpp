@@ -90,11 +90,6 @@ void ToneGeneratorFilter::SetDefaultName()
 	m_displayname = m_hwname;
 }
 
-bool ToneGeneratorFilter::NeedsConfig()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

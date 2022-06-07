@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,6 +36,8 @@
 #ifndef SCPITransport_h
 #define SCPITransport_h
 
+#include <chrono>
+
 /**
 	@brief Abstraction of a transport layer for moving SCPI data between endpoints
  */
@@ -48,7 +50,16 @@ public:
 	virtual std::string GetConnectionString() =0;
 	virtual std::string GetName() =0;
 
-	//Queued command API
+	/*
+		Queued command API
+
+		Note that glscopeclient flushes the command queue in ScopeThread.
+		Headless applications will need to do this manually after performing a write-only application, otherwise
+		the command will remain queued indefinitely.
+
+		TODO: look into a background thread or something that's automatically launched by the transport to do this
+		after some kind of fixed timeout?
+	 */
 	void SendCommandQueued(const std::string& cmd);
 	std::string SendCommandQueuedWithReply(std::string cmd, bool endOnSemicolon = true);
 	void SendCommandImmediate(std::string cmd);
@@ -70,6 +81,43 @@ public:
 	virtual bool IsCommandBatchingSupported() =0;
 	virtual bool IsConnected() =0;
 
+	/**
+		@brief Enables rate limiting. Rate limiting is only applied to the queued command API.
+
+		The rate limiting feature ensures a minimum delay between SCPI commands. This severely degrades performance and
+		is intended to be used as a crutch to work around instrument firmware bugs. Other synchronization mechanisms
+		should be used if at all possible.
+
+		Once rate limiting is enabled on a transport, it cannot be disabled.
+	 */
+	void EnableRateLimiting(std::chrono::milliseconds interval)
+	{
+		m_rateLimitingEnabled = true;
+		m_rateLimitingInterval = interval;
+		m_nextCommandReady = std::chrono::system_clock::now();
+	}
+
+	/**
+		@brief Adds a command to the set of commands which may be deduplicated in the queue.
+
+		If SendCommandQueued() is called with a command in this list, and a second instance of the same command is
+		already present in the queue, then the redundant instance will be removed.
+
+		The command subject, if present, must match. For example, if "OFFS" is in the deduplication set, then
+
+		C2:OFFS 1.1
+		C2:OFFS 1.2
+
+		will be deduplicated, while
+
+		C1:OFFS 1.1
+		C2:OFFS 1.2
+
+		will not be.
+	 */
+	void DeduplicateCommand(const std::string& cmd)
+	{ m_dedupCommands.emplace(cmd); }
+
 public:
 	typedef SCPITransport* (*CreateProcType)(const std::string& args);
 	static void DoAddTransportClass(std::string name, CreateProcType proc);
@@ -78,6 +126,7 @@ public:
 	static SCPITransport* CreateTransport(const std::string& transport, const std::string& args);
 
 protected:
+	void RateLimitingWait();
 
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
@@ -87,6 +136,14 @@ protected:
 	std::mutex m_queueMutex;
 	std::recursive_mutex m_netMutex;
 	std::list<std::string> m_txQueue;
+
+	//Set of commands that are OK to deduplicate
+	std::set<std::string> m_dedupCommands;
+
+	//Rate limiting (send max of one command per X time)
+	bool m_rateLimitingEnabled;
+	std::chrono::system_clock::time_point m_nextCommandReady;
+	std::chrono::milliseconds m_rateLimitingInterval;
 };
 
 #define TRANSPORT_INITPROC(T) \

@@ -36,22 +36,14 @@ using namespace std;
 // Construction / destruction
 
 WAVImportFilter::WAVImportFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
-	, m_fpname("WAV File")
+	: ImportFilter(color)
 {
+	m_fpname = "WAV File";
+
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.wav";
 	m_parameters[m_fpname].m_fileFilterName = "WAV files (*.wav)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &WAVImportFilter::OnFileNameChanged));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool WAVImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
-{
-	//no inputs
-	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,52 +54,8 @@ string WAVImportFilter::GetProtocolName()
 	return "WAV Import";
 }
 
-void WAVImportFilter::SetDefaultName()
-{
-	auto fname = m_parameters[m_fpname].ToString();
-
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool WAVImportFilter::NeedsConfig()
-{
-	return true;
-}
-
-float WAVImportFilter::GetOffset(size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return 0;
-	return m_offsets[stream];
-}
-
-float WAVImportFilter::GetVoltageRange(size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return 1;
-	return m_ranges[stream];
-}
-
-void WAVImportFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return;
-	m_ranges[stream] = range;
-}
-
-void WAVImportFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return;
-	m_offsets[stream] = offset;
-}
 
 void WAVImportFilter::OnFileNameChanged()
 {
@@ -310,11 +258,6 @@ void WAVImportFilter::OnFileNameChanged()
 
 	//Done, clean up
 	delete[] buf;
-}
-
-void WAVImportFilter::Refresh()
-{
-	//everything happens in OnFileNameChanged
 }
 
 void WAVImportFilter::SetupStreams(size_t chans)

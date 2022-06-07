@@ -36,15 +36,11 @@ using namespace std;
 // Construction / destruction
 
 ComplexImportFilter::ComplexImportFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
-	, m_fpname("Complex File")
+	: ImportFilter(color)
 	, m_formatname("File Format")
 	, m_sratename("Sample Rate")
-	, m_irange(2)
-	, m_qrange(2)
-	, m_ioff(0)
-	, m_qoff(0)
 {
+	m_fpname = "Complex File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.complex";
 	m_parameters[m_fpname].m_fileFilterName = "Complex files (*.complex)";
@@ -69,15 +65,6 @@ ComplexImportFilter::ComplexImportFilter(const string& color)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool ComplexImportFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
-{
-	//no inputs
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
 string ComplexImportFilter::GetProtocolName()
@@ -85,55 +72,8 @@ string ComplexImportFilter::GetProtocolName()
 	return "Complex Import";
 }
 
-void ComplexImportFilter::SetDefaultName()
-{
-	auto fname = m_parameters[m_fpname].ToString();
-
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s", BaseName(fname).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-bool ComplexImportFilter::NeedsConfig()
-{
-	return true;
-}
-
-float ComplexImportFilter::GetOffset(size_t stream)
-{
-	if(stream == 1)
-		return m_qoff;
-	else
-		return m_ioff;
-}
-
-float ComplexImportFilter::GetVoltageRange(size_t stream)
-{
-	if(stream == 1)
-		return m_qrange;
-	else
-		return m_irange;
-}
-
-void ComplexImportFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream == 1)
-		m_qrange = range;
-	else
-		m_irange = range;
-}
-
-void ComplexImportFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream == 1)
-		m_qoff = offset;
-	else
-		m_ioff = offset;
-}
 
 void ComplexImportFilter::Reload()
 {
@@ -291,9 +231,4 @@ void ComplexImportFilter::Reload()
 
 	//Done, clean up
 	delete[] buf;
-}
-
-void ComplexImportFilter::Refresh()
-{
-	//everything happens in Reload
 }

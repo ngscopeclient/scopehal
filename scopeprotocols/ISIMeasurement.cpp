@@ -60,14 +60,6 @@ bool ISIMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void ISIMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ISI(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string ISIMeasurement::GetProtocolName()
 {
 	return "ISI";
@@ -76,21 +68,6 @@ string ISIMeasurement::GetProtocolName()
 bool ISIMeasurement::IsScalarOutput()
 {
 	return true;
-}
-
-bool ISIMeasurement::NeedsConfig()
-{
-	return false;
-}
-
-float ISIMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 1;
-}
-
-float ISIMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

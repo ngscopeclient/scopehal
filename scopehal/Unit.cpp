@@ -92,7 +92,7 @@ Unit::Unit(const string& rhs)
 /**
 	@brief Converts this unit to a string
  */
-string Unit::ToString()
+string Unit::ToString() const
 {
 	switch(m_type)
 	{
@@ -167,7 +167,7 @@ string Unit::ToString()
 /**
 	@brief Gets the appropriate SI scaling factor for a number.
  */
-void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix)
+void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix) const
 {
 	scaleFactor = 1;
 	prefix = "";
@@ -220,7 +220,7 @@ void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix)
 
 	Note that this function may modify the SI scale factor and prefix
  */
-void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string& prefix, string& suffix)
+void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string& prefix, string& suffix) const
 {
 	switch(type)
 	{
@@ -368,7 +368,7 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 	@param useDisplayLocale		True if the string is formatted for display (user's locale)
 								False if the string is formatted for serialization ("C" locale regardless of user pref)
  */
-string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale)
+string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 {
 	if(useDisplayLocale)
 		SetPrintingLocale();
@@ -451,7 +451,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale)
 	@param rangeMin		Value at the lowest end of the channel range
 	@param rangeMax		Value at the highest end of the channel range
  */
-string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax)
+string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax) const
 {
 	SetPrintingLocale();
 

@@ -40,9 +40,6 @@ OvershootMeasurement::OvershootMeasurement(const string& color)
 {
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,33 +59,9 @@ bool OvershootMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void OvershootMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Overshoot(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string OvershootMeasurement::GetProtocolName()
 {
 	return "Overshoot";
-}
-
-bool OvershootMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float OvershootMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float OvershootMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,9 +88,6 @@ void OvershootMeasurement::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	float 		fmax = -FLT_MAX;
-	float		fmin =  FLT_MAX;
-
 	int64_t		tmax = 0;
 	float		vmax = 0;
 
@@ -136,14 +106,10 @@ void OvershootMeasurement::Refresh()
 				if(off > 0)
 					cap->m_durations[off-1] = tmax - cap->m_offsets[off-1];
 
-				float value = vmax - top;
-				fmax = max(fmax, value);
-				fmin = min(fmin, value);
-
 				//Add the new sample
 				cap->m_offsets.push_back(tmax);
 				cap->m_durations.push_back(0);
-				cap->m_samples.push_back(value);
+				cap->m_samples.push_back(vmax - top);
 			}
 
 			//Reset
@@ -161,12 +127,6 @@ void OvershootMeasurement::Refresh()
 			}
 		}
 	}
-
-	m_range = fmax - fmin;
-	if(m_range < 0.025)
-		m_range = 0.025;
-	m_midpoint = (fmax + fmin) / 2;
-
 	SetData(cap, 0);
 
 	//Copy start time etc from the input.

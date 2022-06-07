@@ -42,11 +42,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 protected:

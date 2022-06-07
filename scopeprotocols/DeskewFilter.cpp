@@ -63,52 +63,9 @@ bool DeskewFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DeskewFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float DeskewFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string DeskewFilter::GetProtocolName()
 {
 	return "Deskew";
-}
-
-bool DeskewFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
-void DeskewFilter::SetDefaultName()
-{
-	char hwname[256];
-	float offset = m_parameters[m_skewname].GetFloatVal();
-	if(offset >= 0)
-	{
-		snprintf(
-			hwname,
-			sizeof(hwname),
-			"%s + %s",
-			GetInputDisplayName(0).c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
-			);
-	}
-	else
-	{
-		snprintf(
-			hwname,
-			sizeof(hwname),
-			"%s %s",
-			GetInputDisplayName(0).c_str(), m_xAxisUnit.PrettyPrint(offset).c_str()
-			);
-	}
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

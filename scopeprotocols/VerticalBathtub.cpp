@@ -66,37 +66,9 @@ bool VerticalBathtub::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void VerticalBathtub::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "VBathtub(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_timeName].ToString().c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string VerticalBathtub::GetProtocolName()
 {
 	return "Vert Bathtub";
-}
-
-bool VerticalBathtub::NeedsConfig()
-{
-	return true;
-}
-
-float VerticalBathtub::GetVoltageRange(size_t /*stream*/)
-{
-	//1e12 total height
-	return 12;
-}
-
-float VerticalBathtub::GetOffset(size_t /*stream*/)
-{
-	//1e-6 is the midpoint
-	return 6;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

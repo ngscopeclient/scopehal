@@ -95,7 +95,11 @@
 #include "SParameterChannel.h"
 #include "PowerSupply.h"
 #include "RFSignalGenerator.h"
+#include "SCPIInstrument.h"
+#include "SCPIMultimeter.h"
 #include "SCPIOscilloscope.h"
+#include "SCPIRFSignalGenerator.h"
+#include "SCPIPowerSupply.h"
 
 #include "SParameters.h"
 #include "TouchstoneParser.h"
@@ -104,6 +108,7 @@
 #include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
+#include "ImportFilter.h"
 #include "PeakDetectionFilter.h"
 #include "SpectrumChannel.h"
 #include "SParameterSourceFilter.h"
@@ -141,6 +146,8 @@ float FreqToPhase(float hz);
 
 uint64_t next_pow2(uint64_t v);
 uint64_t prev_pow2(uint64_t v);
+
+std::vector<std::string> explode(const std::string& str, char separator);
 
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;

@@ -57,9 +57,6 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	m_posname = "Midpoint Voltage";
 	m_parameters[m_posname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_posname].SetFloatVal(0);
-
-	m_min = 0;
-	m_max = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,36 +76,9 @@ bool EyeHeightMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeHeightMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyeHeight(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_startname].ToString().c_str(),
-		m_parameters[m_endname].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EyeHeightMeasurement::GetProtocolName()
 {
 	return "Eye Height";
-}
-
-bool EyeHeightMeasurement::NeedsConfig()
-{
-	//need manual config
-	return true;
-}
-
-float EyeHeightMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_max - m_min;
-}
-
-float EyeHeightMeasurement::GetOffset(size_t /*stream*/)
-{
-	return - (m_min + m_max)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,9 +128,6 @@ void EyeHeightMeasurement::Refresh()
 	size_t mid_bin = round( (vmid - volts_at_bottom) / volts_per_row);
 	mid_bin = min(mid_bin, din->GetHeight()-1);
 
-	m_min = FLT_MAX;
-	m_max = 0;
-
 	float* data = din->GetData();
 	int64_t w = din->GetWidth();
 	float ber_max = FLT_EPSILON;
@@ -189,13 +156,7 @@ void EyeHeightMeasurement::Refresh()
 		cap->m_offsets.push_back(round( (x*fs_per_bin) - din->m_uiWidth ));
 		cap->m_durations.push_back(round(fs_per_bin));
 		cap->m_samples.push_back(height_volts);
-		m_min = min(height_volts, m_min);
-		m_max = max(height_volts, m_max);
 	}
-
-	//Add some margin to the graph
-	m_min -= 0.025;
-	m_max += 0.025;
 
 	SetData(cap, 0);
 

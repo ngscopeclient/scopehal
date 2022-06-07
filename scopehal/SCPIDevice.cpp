@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -34,32 +34,42 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIDevice::SCPIDevice()
-{
-	//mostly used by not-quite-really-scpi devices that use SCPITransport but don't implement *IDN?
-}
-
 SCPIDevice::SCPIDevice(SCPITransport* transport, bool identify)
 	: m_transport(transport)
 {
 	if(identify)
 	{
-		//Ask for the ID
-		m_transport->SendCommand("*IDN?");
-		string reply = m_transport->ReadReply();
-		char vendor[128] = "";
-		char model[128] = "";
-		char serial[128] = "";
-		char version[128] = "";
-		if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+		bool succeeded = false;
+		for (int retry = 0; retry < 3; retry++)
 		{
-			LogError("Bad IDN response %s\n", reply.c_str());
+			//Ask for the ID
+			m_transport->SendCommand("*IDN?");
+			string reply = m_transport->ReadReply();
+			char vendor[128] = "";
+			char model[128] = "";
+			char serial[128] = "";
+			char version[128] = "";
+			if(4 != sscanf(reply.c_str(), "%127[^,],%127[^,],%127[^,],%127s", vendor, model, serial, version))
+			{
+				LogWarning("Bad IDN response %s\n", reply.c_str());
+				m_transport->FlushRXBuffer();
+				continue; // retry
+			}
+			m_vendor = vendor;
+			m_model = model;
+			m_serial = serial;
+			m_fwVersion = version;
+
+			succeeded = true;
+			m_transport->FlushRXBuffer(); // In case our *IDNs got queued behind each other (Tek...)
+			break; // success
+		}
+
+		if (!succeeded)
+		{
+			LogError("Persistent bad IDN response, giving up\n");
 			return;
 		}
-		m_vendor = vendor;
-		m_model = model;
-		m_serial = serial;
-		m_fwVersion = version;
 	}
 }
 

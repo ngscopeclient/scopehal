@@ -74,32 +74,9 @@ bool PhaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void PhaseMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Phase(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string PhaseMeasurement::GetProtocolName()
 {
 	return "Phase";
-}
-
-bool PhaseMeasurement::NeedsConfig()
-{
-	return true;
-}
-
-float PhaseMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 370;
-}
-
-float PhaseMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

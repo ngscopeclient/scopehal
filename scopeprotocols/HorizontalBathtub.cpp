@@ -65,37 +65,9 @@ bool HorizontalBathtub::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void HorizontalBathtub::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "HBathtub(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_voltageName].ToString().c_str()
-		);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string HorizontalBathtub::GetProtocolName()
 {
 	return "Horz Bathtub";
-}
-
-bool HorizontalBathtub::NeedsConfig()
-{
-	return true;
-}
-
-float HorizontalBathtub::GetVoltageRange(size_t /*stream*/)
-{
-	//1e12 total height
-	return 12;
-}
-
-float HorizontalBathtub::GetOffset(size_t /*stream*/)
-{
-	//1e-6 is the midpoint
-	return 6;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

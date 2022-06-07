@@ -60,6 +60,8 @@ public:
 	virtual bool IsCommandBatchingSupported();
 	virtual bool IsConnected();
 
+	virtual void FlushRXBuffer();
+
 	//VICP constant helpers
 	enum HEADER_OPS
 	{

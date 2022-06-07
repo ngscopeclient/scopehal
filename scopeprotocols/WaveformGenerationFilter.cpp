@@ -58,10 +58,7 @@ bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) &&
-		(stream.m_channel->GetWidth() == 1)
-		)
+	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
 	{
 		return true;
 	}
@@ -71,21 +68,6 @@ bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-bool WaveformGenerationFilter::NeedsConfig()
-{
-	return true;
-}
-
-float WaveformGenerationFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return (GetMaxLevel() - GetMinLevel()) * 1.05;
-}
-
-float WaveformGenerationFilter::GetOffset(size_t /*stream*/)
-{
-	return -(GetMaxLevel() + GetMinLevel())/2;
-}
 
 float WaveformGenerationFilter::GetMaxLevel()
 {

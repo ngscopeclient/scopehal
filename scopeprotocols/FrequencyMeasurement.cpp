@@ -42,9 +42,6 @@ FrequencyMeasurement::FrequencyMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("din");
-
-	m_midpoint = 0.5;
-	m_range = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,33 +67,9 @@ bool FrequencyMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void FrequencyMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "Frequency(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string FrequencyMeasurement::GetProtocolName()
 {
 	return "Frequency";
-}
-
-bool FrequencyMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float FrequencyMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float FrequencyMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_midpoint;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,8 +107,6 @@ void FrequencyMeasurement::Refresh()
 	//Create the output
 	auto cap = new AnalogWaveform;
 
-	double rmin = FLT_MAX;
-	double rmax = 0;
 	size_t elen = edges.size();
 	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
@@ -149,17 +120,7 @@ void FrequencyMeasurement::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(round(delta));
 		cap->m_samples.push_back(freq);
-
-		rmin = min(rmin, freq);
-		rmax = max(rmax, freq);
 	}
-
-	m_range = rmax - rmin;
-	m_midpoint = rmin + m_range/2;
-
-	//minimum scale
-	if(m_range < 0.001*m_midpoint)
-		m_range = 0.001*m_midpoint;
 
 	SetData(cap, 0);
 

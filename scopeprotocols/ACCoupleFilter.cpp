@@ -58,28 +58,9 @@ bool ACCoupleFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float ACCoupleFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
 string ACCoupleFilter::GetProtocolName()
 {
 	return "AC Couple";
-}
-
-bool ACCoupleFilter::NeedsConfig()
-{
-	//we auto-select the midpoint as our threshold
-	return false;
-}
-
-void ACCoupleFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "AC(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

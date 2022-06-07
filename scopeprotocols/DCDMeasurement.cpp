@@ -60,14 +60,6 @@ bool DCDMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void DCDMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DCD(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string DCDMeasurement::GetProtocolName()
 {
 	return "DCD";
@@ -76,21 +68,6 @@ string DCDMeasurement::GetProtocolName()
 bool DCDMeasurement::IsScalarOutput()
 {
 	return true;
-}
-
-bool DCDMeasurement::NeedsConfig()
-{
-	return false;
-}
-
-float DCDMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 1;
-}
-
-float DCDMeasurement::GetOffset(size_t /*stream*/)
-{
-	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

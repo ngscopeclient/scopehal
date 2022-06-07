@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -40,6 +40,7 @@ class RuntTrigger;
 class SlewRateTrigger;
 class UartTrigger;
 class WindowTrigger;
+class CDR8B10BTrigger;
 
 /**
 	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
@@ -47,8 +48,8 @@ class WindowTrigger;
 	May not work on lower-end instruments that are rebranded third-party hardware.
  */
 class LeCroyOscilloscope
-	: public SCPIOscilloscope
-	, public Multimeter
+	: public virtual SCPIOscilloscope
+	, public virtual SCPIMultimeter
 	, public FunctionGenerator
 {
 public:
@@ -119,6 +120,7 @@ public:
 	virtual void PullTrigger();
 	virtual void EnableTriggerOutput();
 	virtual std::vector<std::string> GetTriggerTypes();
+	bool IsCDRLocked();
 
 	//DMM configuration
 	virtual int GetMeterChannelCount();
@@ -137,6 +139,7 @@ public:
 	//Function generator
 	virtual int GetFunctionChannelCount();
 	virtual std::string GetFunctionChannelName(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 	virtual bool GetFunctionChannelActive(int chan);
 	virtual void SetFunctionChannelActive(int chan, bool on);
 	virtual float GetFunctionChannelDutyCycle(int chan);
@@ -153,6 +156,8 @@ public:
 	virtual void SetFunctionChannelRiseTime(int chan, float sec);
 	virtual float GetFunctionChannelFallTime(int chan);
 	virtual void SetFunctionChannelFallTime(int chan, float sec);
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 
 	//Scope models.
 	//We only distinguish down to the series of scope, exact SKU is mostly irrelevant.
@@ -241,6 +246,9 @@ public:
 	virtual void SetADCMode(size_t channel, size_t mode);
 
 protected:
+
+	//Trigger config
+	void Pull8b10bTrigger();
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();
 	void PullGlitchTrigger();
@@ -254,6 +262,7 @@ protected:
 	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
 	Trigger::Condition GetCondition(std::string reply);
 
+	void Push8b10bTrigger(CDR8B10BTrigger* trig);
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& tree);
 	void PushGlitchTrigger(GlitchTrigger* trig);
@@ -265,6 +274,8 @@ protected:
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushUartTrigger(UartTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
+
+	void OnCDRTriggerAutoBaud();
 
 	void BulkCheckChannelEnableState();
 
@@ -305,7 +316,7 @@ protected:
 	bool m_hasI2cTrigger;
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
-	bool m_hasSerdesTrigger;
+	bool m_has8b10bTrigger;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;

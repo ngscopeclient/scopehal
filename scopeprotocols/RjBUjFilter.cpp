@@ -44,8 +44,6 @@ RjBUjFilter::RjBUjFilter(const string& color)
 	CreateInput("Threshold");
 	CreateInput("Clock");
 	CreateInput("DDJ");
-
-	ClearSweeps();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,43 +67,9 @@ bool RjBUjFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void RjBUjFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "RjBUj(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string RjBUjFilter::GetProtocolName()
 {
 	return "Rj + BUj";
-}
-
-bool RjBUjFilter::NeedsConfig()
-{
-	//we have more than one input
-	return true;
-}
-
-float RjBUjFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float RjBUjFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void RjBUjFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,9 +104,6 @@ void RjBUjFilter::Refresh()
 	size_t samplen = samples.m_samples.size();
 
 	size_t itie = 0;
-
-	float vmax = -FLT_MAX;
-	float vmin = FLT_MAX;
 
 	//Main processing loop
 	size_t nbits = 0;
@@ -185,14 +146,5 @@ void RjBUjFilter::Refresh()
 		//We've got a good sample. Subtract the averaged DDJ from TIE to get the uncorrelated jitter (Rj + BUj).
 		float uj = tie->m_samples[itie] - table[window];
 		cap->m_samples[itie] = uj;
-
-		vmax = max(vmax, uj);
-		vmin = min(vmin, uj);
 	}
-
-	//Calculate bounds
-	m_max = max(m_max, (float)vmax);
-	m_min = min(m_min, (float)vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 }

@@ -53,9 +53,6 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	m_endname = "End Voltage";
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_endname].SetFloatVal(0);
-
-	m_min = 0;
-	m_max = 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,36 +72,9 @@ bool EyeJitterMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyeJitterMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyePPJitter(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_startname].ToString().c_str(),
-		m_parameters[m_endname].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EyeJitterMeasurement::GetProtocolName()
 {
 	return "Eye P-P Jitter";
-}
-
-bool EyeJitterMeasurement::NeedsConfig()
-{
-	//need manual config
-	return true;
-}
-
-float EyeJitterMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return m_max - m_min;
-}
-
-float EyeJitterMeasurement::GetOffset(size_t /*stream*/)
-{
-	return - (m_min + m_max)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,9 +115,6 @@ void EyeJitterMeasurement::Refresh()
 	end_bin = min(end_bin, din->GetHeight()-1);
 	float duration_mv = volts_per_row * 1000;
 	float base_mv = volts_at_bottom * 1000;
-
-	m_min = FLT_MAX;
-	m_max = 0;
 
 	float* data = din->GetData();
 	int64_t w = din->GetWidth();
@@ -193,13 +160,7 @@ void EyeJitterMeasurement::Refresh()
 		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
 		cap->m_durations.push_back(round(duration_mv));
 		cap->m_samples.push_back(value);
-		m_max = max(m_max, value);
-		m_min = min(m_min, value);
 	}
-
-	//Padding on edges of plot
-	m_min -= 10;
-	m_max += 10;
 
 	SetData(cap, 0);
 

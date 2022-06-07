@@ -72,10 +72,7 @@ public:
 
 	virtual void Refresh();
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	std::vector<std::string> GetHeaders();
 

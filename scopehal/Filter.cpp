@@ -35,6 +35,7 @@
 
 #include "scopehal.h"
 #include "Filter.h"
+#include <immintrin.h>
 
 using namespace std;
 
@@ -43,6 +44,8 @@ set<Filter*> Filter::m_filters;
 
 mutex Filter::m_cacheMutex;
 map<pair<WaveformBase*, float>, vector<int64_t> > Filter::m_zeroCrossingCache;
+
+map<string, unsigned int> Filter::m_instanceCount;
 
 Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 {
@@ -71,7 +74,12 @@ Filter::Filter(
 	, m_usingDefault(true)
 {
 	m_physical = false;
+	m_instanceNum = 0;
 	m_filters.emplace(this);
+
+	//Create default stream gain/offset
+	m_ranges.push_back(0);
+	m_offsets.push_back(0);
 
 	//Load our OpenCL kernel, if we have one
 	#ifdef HAVE_OPENCL
@@ -200,7 +208,11 @@ void Filter::EnumProtocols(vector<string>& names)
 Filter* Filter::CreateFilter(const string& protocol, const string& color)
 {
 	if(m_createprocs.find(protocol) != m_createprocs.end())
-		return m_createprocs[protocol](color);
+	{
+		auto f = m_createprocs[protocol](color);
+		f->m_instanceNum = (m_instanceCount[protocol] ++);
+		return f;
+	}
 
 	LogError("Invalid filter name: %s\n", protocol.c_str());
 	return NULL;
@@ -296,6 +308,49 @@ bool Filter::VerifyAllInputsOKAndDigital()
 // Sampling helpers
 
 /**
+	@brief Computes durations of samples based on offsets, assuming the capture is gapless.
+
+	The last sample has a duration of 1 unit.
+ */
+void Filter::FillDurationsGeneric(WaveformBase& wfm)
+{
+	size_t len = wfm.m_offsets.size();
+	wfm.m_durations.resize(len);
+	for(size_t i=1; i<len; i++)
+		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
+
+	//Constant duration of last sample
+	wfm.m_durations[len-1] = 1;
+}
+
+/**
+	@brief AVX2 optimized version of FillDurationsGeneric()
+ */
+__attribute__((target("avx2")))
+void Filter::FillDurationsAVX2(WaveformBase& wfm)
+{
+	size_t len = wfm.m_offsets.size();
+	wfm.m_durations.resize(len);
+
+	size_t end = len - (len % 4);
+	int64_t* po = reinterpret_cast<int64_t*>(&wfm.m_offsets[0]);
+	int64_t* pd = reinterpret_cast<int64_t*>(&wfm.m_durations[0]);
+	for(size_t i=1; i<end; i+=4)
+	{
+		__m256i a 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i));
+		__m256i b 		= _mm256_loadu_si256(reinterpret_cast<__m256i*>(po + i - 1));
+		__m256i delta	= _mm256_sub_epi64(a, b);
+		_mm256_storeu_si256(reinterpret_cast<__m256i*>(pd + i - 1), delta);
+	}
+
+	for(size_t i=end; i<len; i++)
+		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
+
+	//Constant duration of last sample
+	wfm.m_durations[len-1] = 1;
+}
+
+/**
 	@brief Samples a digital waveform on the rising edges of a clock
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
@@ -326,19 +381,16 @@ void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, 
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -372,19 +424,16 @@ void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* cloc
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -418,19 +467,16 @@ void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock,
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -448,35 +494,67 @@ void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, Dig
 {
 	samples.clear();
 
-	size_t ndata = 0;
+	//TODO: split up into blocks and multithread?
+	//TODO: AVX vcompress
+
 	size_t len = clock->m_offsets.size();
 	size_t dlen = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
+
+	//Optimizations for dense packed data
+	//Clock is typically generated from a CDR PLL and is thus rarely, if ever, dense packed.
+	//Not worth special casing there, but data coming from a scope etc is typically dense packed.
+	if(data->m_densePacked)
 	{
-		//Throw away clock samples until we find an edge
-		if(clock->m_samples[i] == clock->m_samples[i-1])
-			continue;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-			ndata ++;
-		if(ndata >= dlen)
-			break;
-
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
+		int64_t ndata = 0;
+		for(size_t i=1; i<len; i++)
 		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
 
-		//Add the new sample
-		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
-		samples.m_samples.push_back(data->m_samples[ndata]);
+			//Throw away data samples until the data is synced with us
+			//This is a bit more math but is often faster than a division
+			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+			int64_t clkstart2 = clkstart - data->m_triggerPhase;
+			while(((ndata+1) * data->m_timescale) < clkstart2)
+				ndata ++;
+			if((size_t)ndata >= dlen)
+				break;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(data->m_samples[ndata]);
+		}
 	}
+
+	//Generic implementation
+	else
+	{
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+			while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(data->m_samples[ndata]);
+		}
+	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -510,19 +588,16 @@ void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, 
 		if(ndata >= dlen)
 			break;
 
-		//Extend the previous sample's duration (if any) to our start
-		size_t ssize = samples.m_samples.size();
-		if(ssize)
-		{
-			size_t last = ssize - 1;
-			samples.m_durations[last] = clkstart - samples.m_offsets[last];
-		}
-
 		//Add the new sample
 		samples.m_offsets.push_back(clkstart);
-		samples.m_durations.push_back(1);
 		samples.m_samples.push_back(data->m_samples[ndata]);
 	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
 }
 
 /**
@@ -1346,4 +1421,265 @@ uint32_t Filter::CRC32(vector<uint8_t>& bytes, size_t start, size_t end)
 				((crc & 0x0000ff00) << 8) |
 				((crc & 0x00ff0000) >> 8) |
 				 (crc >> 24) );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Event driven filter processing
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in timescale units
+ */
+int64_t Filter::GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return wfm->m_offsets[i+1];
+	else
+		return timestamp;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in timescale units
+ */
+void Filter::AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+{
+	while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
+		i ++;
+}
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in native X axis units
+ */
+int64_t Filter::GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return (wfm->m_offsets[i+1] * wfm->m_timescale) + wfm->m_triggerPhase;
+	else
+		return timestamp;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in native X axis units
+ */
+void Filter::AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+{
+	timestamp -= wfm->m_triggerPhase;
+
+	while( ((i+1) < len) && ( (wfm->m_offsets[i+1] * wfm->m_timescale) <= timestamp) )
+		i ++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Naming and other info
+
+/**
+	@brief Sets the name of a filter based on its inputs
+
+	This method may be overridden in derived classes for specialized applications, but there is no need to do so in
+	typical filters.
+ */
+void Filter::SetDefaultName()
+{
+	//Start with our immediate inputs
+	set<StreamDescriptor> inputs;
+	for(auto i : m_inputs)
+		inputs.emplace(i);
+
+	//If we're a measurement, stop
+	//We want to see the full list of inputs as-is
+	if(m_category == CAT_MEASUREMENT)
+	{
+	}
+
+	//Walk filter graph back to find source nodes
+	else
+	{
+		//Replace each input with its ancestor
+		while(true)
+		{
+			bool changed = false;
+			set<StreamDescriptor> next;
+
+			for(auto i : inputs)
+			{
+				//If the channel is not a filter, it's a scope channel.
+				//Pass through unchanged.
+				auto f = dynamic_cast<Filter*>(i.m_channel);
+				if(!f)
+					next.emplace(i);
+
+				//It's a filter. Does it have any inputs?
+				//If not, it's an import or waveform generation filter. Pass through unchanged.
+				else if(f->GetInputCount() == 0)
+					next.emplace(i);
+
+				//Filter that has inputs. Use them.
+				else
+				{
+					for(size_t j=0; j<f->GetInputCount(); j++)
+						next.emplace(f->GetInput(j));
+					changed = true;
+				}
+			}
+
+			if(!changed)
+				break;
+			inputs = next;
+		}
+	}
+
+	//If we have any non-import inputs, hide all import inputs
+	//This prevents e.g. s-parameter filenames propagating into all dependent filter names
+	bool hasNonImportInputs = false;
+	set<StreamDescriptor> imports;
+	for(auto i : inputs)
+	{
+		auto f = dynamic_cast<Filter*>(i.m_channel);
+		if((f != nullptr) && (f->GetInputCount() == 0) )
+			imports.emplace(i);
+		else
+			hasNonImportInputs = true;
+	}
+	if(hasNonImportInputs)
+	{
+		for(auto i : imports)
+			inputs.erase(i);
+	}
+
+	//Sort the inputs alphabetically (up to now, they're sorted by the std::set)
+	vector<string> sorted;
+	for(auto i : inputs)
+		sorted.push_back(i.GetName());
+	sort(sorted.begin(), sorted.end());
+
+	string inames = "";
+	for(auto s : sorted)
+	{
+		if(s == "NULL")
+			continue;
+		if(inames.empty())
+		{
+			inames = s;
+			continue;
+		}
+
+		if(inames.length() + s.length() > 25)
+		{
+			inames += ", ...";
+			break;
+		}
+
+		if(inames != "")
+			inames += ",";
+		inames += s;
+	}
+
+	//Format final output: remove spaces from display name, add instance number
+	auto pname = GetProtocolDisplayName();
+	string pname2;
+	for(auto c : pname)
+	{
+		if(isalnum(c))
+			pname2 += c;
+	}
+	string name = pname2 + +"_" + to_string(m_instanceNum + 1);
+	if(!inames.empty())
+		name += "(" + inames + ")";
+
+	m_hwname = name;
+	m_displayname = name;
+
+}
+
+/**
+	@brief Determines if we need to display the configuration / setup dialog
+
+	The default implementation returns true if we have more than one input or any parameters, and false otherwise.
+ */
+bool Filter::NeedsConfig()
+{
+	if(m_parameters.size())
+		return true;
+	if(m_inputs.size() > 1)
+		return true;
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Vertical scaling
+
+void Filter::ClearStreams()
+{
+	OscilloscopeChannel::ClearStreams();
+	m_ranges.clear();
+	m_offsets.clear();
+}
+
+void Filter::AddStream(Unit yunit, const string& name)
+{
+	OscilloscopeChannel::AddStream(yunit, name);
+	m_ranges.push_back(0);
+	m_offsets.push_back(0);
+}
+
+/**
+	@brief Adjusts gain and offset such that the active waveform occupies the entire vertical area of the plot
+ */
+void Filter::AutoscaleVertical(size_t stream)
+{
+	//Autoscaling anything but an analog waveform makes no sense
+	auto waveform = dynamic_cast<AnalogWaveform*>(GetData(stream));
+	if(!waveform)
+		return;
+
+	//Find extrema of the waveform
+	//TODO: vectorize?
+	float vmin = FLT_MAX;
+	float vmax = -FLT_MAX;
+	for(auto s : waveform->m_samples)
+	{
+		float v = s;
+		vmin = min(v, vmin);
+		vmax = max(v, vmax);
+	}
+
+	float range = vmax - vmin;
+	if(IsScalarOutput())
+		range = vmax * 0.05;
+
+	SetVoltageRange(range * 1.05, stream);
+	SetOffset(-(vmin + vmax) / 2, stream);
+}
+
+float Filter::GetVoltageRange(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+		AutoscaleVertical(stream);
+
+	return m_ranges[stream];
+}
+
+void Filter::SetVoltageRange(float range, size_t stream)
+{
+	m_ranges[stream] = range;
+}
+
+float Filter::GetOffset(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+		AutoscaleVertical(stream);
+
+	return m_offsets[stream];
+}
+
+void Filter::SetOffset(float offset, size_t stream)
+{
+	m_offsets[stream] = offset;
 }

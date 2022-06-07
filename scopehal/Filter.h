@@ -46,6 +46,9 @@ class Filter	: public OscilloscopeChannel
 {
 public:
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Construction and enumeration
+
 	//Add new categories to the end of this list to maintain ABI compatibility with existing plugins
 	enum Category
 	{
@@ -70,6 +73,18 @@ public:
 		const std::string& kernelName = "");
 	virtual ~Filter();
 
+	//Get all currently existing filters
+	static std::set<Filter*> GetAllInstances()
+	{ return m_filters; }
+
+	virtual void ClearStreams();
+	virtual void AddStream(Unit yunit, const std::string& name);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Name generation
+
+	virtual void SetDefaultName();
+
 	/**
 		@brief Specifies whether we're using an auto-generated name or not
 	 */
@@ -83,9 +98,8 @@ public:
 	bool IsUsingDefaultName()
 	{ return m_usingDefault; }
 
-	virtual bool IsScalarOutput();
-
-	virtual void Refresh() =0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Reference counting
 
 	virtual void AddRef();
 	virtual void Release();
@@ -93,9 +107,25 @@ public:
 	size_t GetRefCount()
 	{ return m_refcount; }
 
-	//Get all currently existing filters
-	static std::set<Filter*> GetAllInstances()
-	{ return m_filters; }
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Accessors
+
+	virtual bool IsScalarOutput();
+
+	Category GetCategory()
+	{ return m_category; }
+
+	virtual bool NeedsConfig();
+
+	/**
+		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
+	 */
+	virtual std::string GetProtocolDisplayName() =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Evaluation
+
+	virtual void Refresh() =0;
 
 	//Set all currently existing filters to the dirty state
 	static void SetAllFiltersDirty()
@@ -111,23 +141,30 @@ public:
 	 */
 	virtual void ClearSweeps();
 
-	virtual void SetDefaultName() =0;
-
-	Category GetCategory()
-	{ return m_category; }
-
-	virtual bool NeedsConfig() =0;	//false if we can automatically do the decode from the signal w/ no configuration
-
 	void RefreshIfDirty();
 	void RefreshInputsIfDirty();
 
 	void SetDirty()
 	{ m_dirty = true; }
 
-	/**
-		@brief Gets the display name of this protocol (for use in menus, save files, etc). Must be unique.
-	 */
-	virtual std::string GetProtocolDisplayName() =0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Vertical scaling
+
+	virtual void AutoscaleVertical(size_t stream);
+
+	virtual float GetVoltageRange(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
+
+	virtual float GetOffset(size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
+
+protected:
+	std::vector<float> m_ranges;
+	std::vector<float> m_offsets;
+
+public:
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Serialization
 
 	/**
 		@brief Serialize this decoder's configuration to a string
@@ -135,6 +172,9 @@ public:
 	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Color table (TODO: probably should be refactored)
 
 	/**
 		@brief Standard colors for protocol decode overlays.
@@ -173,21 +213,10 @@ protected:
 	bool VerifyAllInputsOKAndAnalog();
 	bool VerifyAllInputsOKAndDigital();
 
-	///Gets the timestamp of the next event (if any) on a waveform
-	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
-	{
-		if(i+1 < len)
-			return wfm->m_offsets[i+1];
-		else
-			return timestamp;
-	}
-
-	///Advance the waveform to a given timestamp
-	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
-	{
-		while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
-			i ++;
-	}
+	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
 	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
 	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
@@ -236,6 +265,11 @@ public:
 	//Checksum helpers
 	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
 
+protected:
+	//Helpers for sampling
+	static void FillDurationsGeneric(WaveformBase& wfm);
+	static void FillDurationsAVX2(WaveformBase& wfm);
+
 public:
 	sigc::signal<void> signal_outputsChanged()
 	{ return m_outputsChangedSignal; }
@@ -243,6 +277,13 @@ public:
 protected:
 	///@brief Signal emitted when the set of output streams changes
 	sigc::signal<void> m_outputsChangedSignal;
+
+	/**
+		@brief Instance number (for auto naming)
+
+		Starts at 0 for the first filter of a given class type created, then increments
+	 */
+	unsigned int m_instanceNum;
 
 protected:
 	//Common text formatting
@@ -270,6 +311,9 @@ protected:
 
 	//Object enumeration
 	static std::set<Filter*> m_filters;
+
+	//Instance naming
+	static std::map<std::string, unsigned int> m_instanceCount;
 
 	//Caching
 	static std::mutex m_cacheMutex;

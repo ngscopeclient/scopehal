@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,9 +43,15 @@ using namespace std;
 
 PCIeDataLinkDecoder::PCIeDataLinkDecoder(const string& color)
 	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	, m_framingMode("Framing Mode")
 {
 	//Set up channels
 	CreateInput("logical");
+
+	m_parameters[m_framingMode] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_framingMode].AddEnumValue("Gen 1/2", MODE_GEN12);
+	m_parameters[m_framingMode].AddEnumValue("Gen 3/4/5", MODE_GEN345);
+	m_parameters[m_framingMode].SetIntVal(MODE_GEN12);
 }
 
 PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
@@ -55,12 +61,6 @@ PCIeDataLinkDecoder::~PCIeDataLinkDecoder()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
-
-bool PCIeDataLinkDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
 
 bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 {
@@ -76,14 +76,6 @@ bool PCIeDataLinkDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 string PCIeDataLinkDecoder::GetProtocolName()
 {
 	return "PCIe Data Link";
-}
-
-void PCIeDataLinkDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PCIEDataLink(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,6 +124,8 @@ void PCIeDataLinkDecoder::Refresh()
 	uint8_t dllp_data[3] = {0};
 
 	Packet* pack = NULL;
+
+	auto mode = static_cast<FramingMode>(m_parameters[m_framingMode].GetIntVal());
 
 	for(size_t i=0; i<len; i++)
 	{
@@ -448,11 +442,17 @@ void PCIeDataLinkDecoder::Refresh()
 					if(expected_crc != actual_crc)
 						cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD;
 
-					state = STATE_END;
-
 					//Finalize the packet
 					pack->m_headers["Length"] = "4";
 					pack->m_len = (end * cap->m_timescale) - pack->m_offset;
+
+					//Gen 1/2 mode has END token at end of packet
+					if(mode == MODE_GEN12)
+						state = STATE_END;
+
+					//Gen3/4/5 mode goes straight to idle
+					else
+						state = STATE_IDLE;
 				}
 
 				break;	//end STATE_DLLP_CRC2
@@ -487,11 +487,27 @@ void PCIeDataLinkDecoder::Refresh()
 
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
-					cap->m_samples.push_back(PCIeDataLinkSymbol(
-						PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE, sym.m_data));
 
-					//Sequence number is covered by the LCRC so it's considered part of the TLP data
-					pack->m_data.push_back(sym.m_data);
+					if(mode == MODE_GEN12)
+					{
+						cap->m_samples.push_back(PCIeDataLinkSymbol(
+							PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE, sym.m_data));
+
+						//Sequence number is covered by the LCRC so it's considered part of the TLP data
+						pack->m_data.push_back(sym.m_data);
+					}
+
+					//In gen 3/4/5 mode, high 4 bits are frame header CRC
+					//TODO: verify it (this will require pushing length up from logical layer)
+					else
+					{
+						cap->m_samples.push_back(PCIeDataLinkSymbol(
+							PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE, sym.m_data & 0xf));
+
+						//Sequence number is covered by the LCRC so it's considered part of the TLP data
+						//(but we need to mask off the frame CRC)
+						pack->m_data.push_back(sym.m_data & 0xf);
+					}
 
 					state = STATE_TLP_SEQUENCE_LO;
 				}
@@ -568,6 +584,12 @@ void PCIeDataLinkDecoder::Refresh()
 					state = STATE_IDLE;
 				}
 
+				//A skip sequence is legal mid-packet in gen3 mode
+				else if((mode == MODE_GEN345) && (sym.m_type == PCIeLogicalSymbol::TYPE_SKIP) )
+				{
+					//nothing to output, but keep going
+				}
+
 				//Abort if we have garbage
 				else if(sym.m_type != PCIeLogicalSymbol::TYPE_PAYLOAD_DATA)
 				{
@@ -594,6 +616,7 @@ void PCIeDataLinkDecoder::Refresh()
 			case STATE_END:
 				if(sym.m_type != PCIeLogicalSymbol::TYPE_END)
 					cap->m_samples[ilast].m_type = PCIeDataLinkSymbol::TYPE_ERROR;
+
 				state = STATE_IDLE;
 				break;	//end STATE_END
 		}

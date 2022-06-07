@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 ParallelBus::ParallelBus(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_BUS)
+	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL_BUS, color, CAT_BUS)
 {
 	//Set up channels
 	char tmp[32];
@@ -73,39 +73,17 @@ string ParallelBus::GetProtocolName()
 	return "Parallel Bus";
 }
 
-void ParallelBus::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "ParallelBus(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-bool ParallelBus::NeedsConfig()
-{
-	return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Serialization
-
-void ParallelBus::LoadParameters(const YAML::Node& node, IDTable& table)
-{
-	Filter::LoadParameters(node, table);
-	m_width = m_parameters[m_widthname].GetIntVal();
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void ParallelBus::Refresh()
 {
 	//Figure out how wide our input is
-	m_width = m_parameters[m_widthname].GetIntVal();
+	int width = m_parameters[m_widthname].GetIntVal();
 
 	//Make sure we have an input for each channel in use
 	vector<DigitalWaveform*> inputs;
-	for(int i=0; i<m_width; i++)
+	for(int i=0; i<width; i++)
 	{
 		auto din = GetDigitalInputWaveform(i);
 		if(din == NULL)
@@ -123,7 +101,7 @@ void ParallelBus::Refresh()
 
 	//Figure out length of the output
 	size_t len = inputs[0]->m_samples.size();
-	for(int j=1; j<m_width; j++)
+	for(int j=1; j<width; j++)
 		len = min(len, inputs[j]->m_samples.size());
 
 	//Merge all of our samples
@@ -134,7 +112,7 @@ void ParallelBus::Refresh()
 	#pragma omp parallel for
 	for(size_t i=0; i<len; i++)
 	{
-		for(int j=0; j<m_width; j++)
+		for(int j=0; j<width; j++)
 			cap->m_samples[i].push_back(inputs[j]->m_samples[i]);
 	}
 	SetData(cap, 0);
@@ -145,7 +123,7 @@ void ParallelBus::Refresh()
 	cap->m_startFemtoseconds = inputs[0]->m_startFemtoseconds;
 
 	//Set all unused channels to NULL
-	for(size_t i=m_width; i < 16; i++)
+	for(size_t i=width; i < 16; i++)
 	{
 		auto chan = m_inputs[i].m_channel;
 		if(chan != NULL)

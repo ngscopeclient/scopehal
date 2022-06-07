@@ -61,32 +61,9 @@ bool PeakHoldFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float PeakHoldFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float PeakHoldFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string PeakHoldFilter::GetProtocolName()
 {
 	return "Peak Hold";
-}
-
-bool PeakHoldFilter::NeedsConfig()
-{
-	return true;
-}
-
-void PeakHoldFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "PeakHold(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 void PeakHoldFilter::ClearSweeps()

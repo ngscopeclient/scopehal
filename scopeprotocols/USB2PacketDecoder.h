@@ -107,10 +107,7 @@ public:
 	virtual std::string GetText(int i);
 	virtual Gdk::Color GetColor(int i);
 
-	virtual bool NeedsConfig();
-
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual std::vector<std::string> GetHeaders();
 	virtual bool GetShowDataColumn();

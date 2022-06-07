@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,12 +76,6 @@ bool EthernetProtocolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
-
-bool EthernetProtocolDecoder::NeedsConfig()
-{
-	//No config needed
-	return false;
-}
 
 vector<string> EthernetProtocolDecoder::GetHeaders()
 {
@@ -535,8 +529,11 @@ Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 		case EthernetFrameSegment::TYPE_FCS_BAD:
 			return m_standardColors[COLOR_CHECKSUM_BAD];
 
-		//Signal has entirely disappeared
+		//Signal has entirely disappeared, or fault condition reported
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
+		case EthernetFrameSegment::TYPE_REMOTE_FAULT:
+		case EthernetFrameSegment::TYPE_LOCAL_FAULT:
+		case EthernetFrameSegment::TYPE_LINK_INTERRUPTION:
 			return m_standardColors[COLOR_ERROR];
 
 		//Payload
@@ -720,6 +717,13 @@ string EthernetProtocolDecoder::GetText(int i)
 					sample.m_data[3]);
 				return tmp;
 			}
+
+		case EthernetFrameSegment::TYPE_LOCAL_FAULT:
+			return "Local Fault";
+		case EthernetFrameSegment::TYPE_REMOTE_FAULT:
+			return "Remote Fault";
+		case EthernetFrameSegment::TYPE_LINK_INTERRUPTION:
+			return "Link Interruption";
 
 		default:
 			break;

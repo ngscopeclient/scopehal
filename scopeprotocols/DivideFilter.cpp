@@ -43,11 +43,6 @@ DivideFilter::DivideFilter(const string& color)
 	CreateInput("a");
 	CreateInput("b");
 
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-
 	m_parameters[m_formatName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_formatName].AddEnumValue("Ratio", FORMAT_RATIO);
 	m_parameters[m_formatName].AddEnumValue("dB", FORMAT_DB);
@@ -71,47 +66,13 @@ bool DivideFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DivideFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float DivideFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
 string DivideFilter::GetProtocolName()
 {
 	return "Divide";
 }
 
-bool DivideFilter::NeedsConfig()
-{
-	return true;
-}
-
-void DivideFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "(%s / %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
-
-void DivideFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
-}
 
 void DivideFilter::Refresh()
 {
@@ -153,14 +114,4 @@ void DivideFilter::Refresh()
 		for(size_t i=0; i<len; i++)
 			fdst[i] = 20 * log10(fa[i] / fb[i]);
 	}
-
-	//Calculate range of the output waveform
-	float vmax = GetMaxVoltage(cap);
-	float vmin = GetMinVoltage(cap);
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
 }

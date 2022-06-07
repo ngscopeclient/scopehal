@@ -68,35 +68,9 @@ bool DownconvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DownconvertFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_inputs[0].GetVoltageRange();
-}
-
-float DownconvertFilter::GetOffset(size_t /*stream*/)
-{
-	return m_inputs[0].GetOffset();
-}
-
 string DownconvertFilter::GetProtocolName()
 {
 	return "Downconvert";
-}
-
-bool DownconvertFilter::NeedsConfig()
-{
-	return true;
-}
-
-void DownconvertFilter::SetDefaultName()
-{
-	char hwname[256];
-	Unit hz(Unit::UNIT_HZ);
-	snprintf(hwname, sizeof(hwname), "Downconvert(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_freqname].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

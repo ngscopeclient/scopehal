@@ -111,19 +111,6 @@ string I2CEepromDecoder::GetProtocolName()
 	return "I2C EEPROM";
 }
 
-bool I2CEepromDecoder::NeedsConfig()
-{
-	return true;
-}
-
-void I2CEepromDecoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "I2CEeprom(%s)",	GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

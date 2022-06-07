@@ -43,9 +43,6 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 	m_depthname = "Depth";
 	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_depthname].SetFloatVal(0);
-
-	m_range = 0;
-	m_offset = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,45 +62,9 @@ bool MovingAverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float MovingAverageFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float MovingAverageFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
-void MovingAverageFilter::SetVoltageRange(float range, size_t /*stream*/)
-{
-	m_range = range;
-}
-
-void MovingAverageFilter::SetOffset(float offset, size_t /*stream*/)
-{
-	m_offset = offset;
-}
-
 string MovingAverageFilter::GetProtocolName()
 {
 	return "Moving average";
-}
-
-bool MovingAverageFilter::NeedsConfig()
-{
-	//we need the depth to be specified, duh
-	return true;
-}
-
-void MovingAverageFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "MovingAvg(%s, %s)",
-		GetInputDisplayName(0).c_str(),
-		m_parameters[m_depthname].ToString().c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,21 +109,6 @@ void MovingAverageFilter::Refresh()
 		cap->m_samples[i] = v;
 	}
 	SetData(cap, 0);
-
-	//Calculate bounds
-	if(m_range == 0)
-	{
-		float vmin = FLT_MAX;
-		float vmax = -FLT_MAX;
-		for(size_t i=0; i<nsamples; i++)
-		{
-			float v = cap->m_samples[i];
-			vmin = min(vmin, v);
-			vmax = max(vmax, v);
-		}
-		m_range = (vmax - vmin) * 1.05;
-		m_offset = -( (vmax - vmin)/2 + m_min );
-	}
 
 	//Copy our time scales from the input
 	cap->m_timescale = din->m_timescale;

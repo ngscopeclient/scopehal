@@ -65,20 +65,6 @@ string IPv4Decoder::GetProtocolName()
 	return "IPv4";
 }
 
-bool IPv4Decoder::NeedsConfig()
-{
-	//we just work on the provided ethernet link
-	return false;
-}
-
-void IPv4Decoder::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "IPv4(%s)", GetInputDisplayName(0).c_str() );
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 

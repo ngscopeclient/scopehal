@@ -68,6 +68,8 @@ set(SCOPEHAL_SOURCES
 
 	FlowGraphNode.cpp
 	Trigger.cpp
+	CDRTrigger.cpp
+	CDR8B10BTrigger.cpp
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	GlitchTrigger.cpp
@@ -87,7 +89,11 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	PowerSupply.cpp
 	RFSignalGenerator.cpp
+	SCPIInstrument.cpp
+	SCPIMultimeter.cpp
 	SCPIOscilloscope.cpp
+	SCPIPowerSupply.cpp
+	SCPIRFSignalGenerator.cpp
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp
@@ -109,6 +115,7 @@ set(SCOPEHAL_SOURCES
 
 	Filter.cpp
 	FilterParameter.cpp
+	ImportFilter.cpp
 	PacketDecoder.cpp
 	PeakDetectionFilter.cpp
 	Statistic.cpp

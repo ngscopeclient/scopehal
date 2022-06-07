@@ -43,8 +43,6 @@ EyePeriodMeasurement::EyePeriodMeasurement(const string& color)
 
 	//Set up channels
 	CreateInput("Eye");
-
-	m_value = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,14 +62,6 @@ bool EyePeriodMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void EyePeriodMeasurement::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "EyePeriod(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string EyePeriodMeasurement::GetProtocolName()
 {
 	return "Eye Period";
@@ -81,22 +71,6 @@ bool EyePeriodMeasurement::IsScalarOutput()
 {
 	//single point
 	return true;
-}
-
-bool EyePeriodMeasurement::NeedsConfig()
-{
-	//automatic configuration
-	return false;
-}
-
-float EyePeriodMeasurement::GetVoltageRange(size_t /*stream*/)
-{
-	return 10;
-}
-
-float EyePeriodMeasurement::GetOffset(size_t /*stream*/)
-{
-	return -m_value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,8 +91,7 @@ void EyePeriodMeasurement::Refresh()
 	auto cap = new AnalogWaveform;
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(2 * din->m_uiWidth);
-	m_value = din->m_uiWidth;
-	cap->m_samples.push_back(m_value);
+	cap->m_samples.push_back(din->m_uiWidth);
 
 	SetData(cap, 0);
 

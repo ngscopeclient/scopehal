@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -53,30 +53,6 @@ DigitalToNRZFilter::DigitalToNRZFilter(const string& color)
 string DigitalToNRZFilter::GetProtocolName()
 {
 	return "Digital to NRZ";
-}
-
-void DigitalToNRZFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "DigitalToNRZ(%s)", GetInputDisplayName(0).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
-float DigitalToNRZFilter::GetVoltageRange(size_t /*stream*/)
-{
-	float v0 = m_parameters[m_level0].GetFloatVal();
-	float v1 = m_parameters[m_level1].GetFloatVal();
-
-	return fabs(v1 - v0) * 1.05;
-}
-
-float DigitalToNRZFilter::GetOffset(size_t /*stream*/)
-{
-	float v0 = m_parameters[m_level0].GetFloatVal();
-	float v1 = m_parameters[m_level1].GetFloatVal();
-
-	return -(v0+v1)/2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

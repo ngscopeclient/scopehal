@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,6 +39,7 @@ using namespace std;
 ChannelEmulationFilter::ChannelEmulationFilter(const string& color)
 	: DeEmbedFilter(color)
 {
+	m_parameters[m_maxGainName].MarkHidden();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,22 +48,6 @@ ChannelEmulationFilter::ChannelEmulationFilter(const string& color)
 string ChannelEmulationFilter::GetProtocolName()
 {
 	return "Channel Emulation";
-}
-
-void ChannelEmulationFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"ChannelEmulation(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str(),
-		GetInputDisplayName(2).c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

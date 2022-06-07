@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -50,6 +50,7 @@ public:
 		TYPE_END,				//End a TLP or DLLP
 		TYPE_END_BAD,			//End a packet, but mark it as to be ignored
 		TYPE_PAYLOAD_DATA,		//A byte of TLP or DLLP data
+		TYPE_END_DATA_STREAM,	//End of a data stream
 		TYPE_ERROR
 	} m_type;
 
@@ -85,10 +86,8 @@ public:
 	virtual Gdk::Color GetColor(int i);
 
 	virtual void Refresh();
-	virtual bool NeedsConfig();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -96,6 +95,10 @@ public:
 
 protected:
 	uint8_t RunScrambler(uint16_t& state);
+
+	void RefreshPorts();
+
+	std::string m_portCountName;
 };
 
 #endif

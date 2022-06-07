@@ -30,7 +30,7 @@
 #ifndef AntikernelLabsOscilloscope_h
 #define AntikernelLabsOscilloscope_h
 
-class AntikernelLabsOscilloscope : public SCPIOscilloscope
+class AntikernelLabsOscilloscope : public virtual SCPIOscilloscope
 {
 public:
 	AntikernelLabsOscilloscope(SCPITransport* transport);

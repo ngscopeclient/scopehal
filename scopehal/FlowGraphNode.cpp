@@ -80,7 +80,7 @@ void FlowGraphNode::DetachInputs()
 FilterParameter& FlowGraphNode::GetParameter(string s)
 {
 	if(m_parameters.find(s) == m_parameters.end())
-		LogError("Invalid parameter name\n");
+		LogError("Invalid parameter name \"%s\"\n", s.c_str());
 
 	return m_parameters[s];
 }
@@ -261,6 +261,7 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				break;
 
 			case FilterParameter::TYPE_FILENAME:
+			case FilterParameter::TYPE_8B10B_PATTERN:
 			default:
 				snprintf(
 					tmp,

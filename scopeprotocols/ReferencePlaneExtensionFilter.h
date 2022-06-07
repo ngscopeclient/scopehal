@@ -42,7 +42,6 @@ public:
 	~ReferencePlaneExtensionFilter();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual void Refresh();
 

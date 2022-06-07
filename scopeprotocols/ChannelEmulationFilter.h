@@ -45,7 +45,6 @@ public:
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	PROTOCOL_DECODER_INITPROC(ChannelEmulationFilter)
 };

@@ -60,10 +60,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 	m_parameters[m_groupDelayTruncModeName].AddEnumValue("Manual", TRUNC_MANUAL);
 	m_parameters[m_groupDelayTruncModeName].SetIntVal(TRUNC_AUTO);
 
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
 	m_cachedBinSize = 0;
 
 	m_forwardPlan = NULL;
@@ -228,41 +224,9 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-float DeEmbedFilter::GetVoltageRange(size_t /*stream*/)
-{
-	return m_range;
-}
-
-float DeEmbedFilter::GetOffset(size_t /*stream*/)
-{
-	return m_offset;
-}
-
 string DeEmbedFilter::GetProtocolName()
 {
 	return "De-Embed";
-}
-
-bool DeEmbedFilter::NeedsConfig()
-{
-	//we need the offset to be specified, duh
-	return true;
-}
-
-void DeEmbedFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(
-		hwname,
-		sizeof(hwname),
-		"DeEmbed(%s, %s, %s)",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str(),
-		GetInputDisplayName(2).c_str()
-		);
-
-	m_hwname = hwname;
-	m_displayname = m_hwname;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -271,14 +235,6 @@ void DeEmbedFilter::SetDefaultName()
 void DeEmbedFilter::Refresh()
 {
 	DoRefresh(true);
-}
-
-void DeEmbedFilter::ClearSweeps()
-{
-	m_range = 1;
-	m_offset = 0;
-	m_min = FLT_MAX;
-	m_max = -FLT_MAX;
 }
 
 /**
@@ -310,12 +266,17 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	if(m_cachedNumPoints != npoints)
 	{
 		if(m_forwardPlan)
+		{
 			ffts_free(m_forwardPlan);
-		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
+			m_forwardPlan = nullptr;
+		}
 		if(m_reversePlan)
+		{
 			ffts_free(m_reversePlan);
-		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+			m_reversePlan = nullptr;
+		}
+
+		bool cl_ok = false;
 
 		m_forwardInBuf.resize(npoints);
 		m_forwardOutBuf.resize(2 * nouts);
@@ -326,11 +287,22 @@ void DeEmbedFilter::DoRefresh(bool invert)
 
 		#ifdef HAVE_CLFFT
 
-			if(g_clContext)
+			if(npoints > 16777216)
+			{
+				LogWarning("Input is more than 16M points - GPU accelerated FFT unavailable. Falling back to CPU FFT\n");
+				//TODO: chunk based processing (see https://github.com/glscopeclient/scopehal/issues/625)
+
+				delete m_windowProgram;
+				m_windowProgram = 0;
+				cl_ok = false;
+			}
+
+			else if(g_clContext)
 			{
 				try
 				{
 					lock_guard<mutex> lock(g_clfftMutex);
+					cl_ok = true;
 
 					if(m_clfftForwardPlan != 0)
 						clfftDestroyPlan(&m_clfftForwardPlan);
@@ -343,6 +315,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
 					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
@@ -354,6 +327,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
 					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
@@ -370,6 +344,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
 					if(CLFFT_SUCCESS != err)
@@ -377,6 +352,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
 						delete m_windowProgram;
 						m_windowProgram = 0;
+						cl_ok = false;
 					}
 
 					//Need to block while mutex is still locked
@@ -396,6 +372,12 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			}
 
 		#endif
+
+		if(!cl_ok)
+		{
+			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+		}
 	}
 
 	//Calculate size of each bin
@@ -454,7 +436,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		InterpolateSparameters(bin_hz, invert, nouts);
 
 		#ifdef HAVE_CLFFT
-			if(g_clContext)
+			if(g_clContext && (m_windowProgram != nullptr) )
 			{
 				delete m_sinbuf;
 				delete m_cosbuf;
@@ -591,23 +573,11 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		cap->m_triggerPhase = groupdelay_fs;
 
 	//Copy waveform data after rescaling
+	//TODO: vectorize this
 	float scale = 1.0f / npoints;
-	float vmin = FLT_MAX;
-	float vmax = -FLT_MAX;
 	size_t outlen = iend - istart;
 	for(size_t i=0; i<outlen; i++)
-	{
-		float v = m_reverseOutBuf[i+istart] * scale;
-		vmin = min(v, vmin);
-		vmax = max(v, vmax);
-		cap->m_samples[i] = v;
-	}
-
-	//Calculate bounds
-	m_max = max(m_max, vmax);
-	m_min = min(m_min, vmin);
-	m_range = (m_max - m_min) * 1.05;
-	m_offset = -( (m_max - m_min)/2 + m_min );
+		cap->m_samples[i] = m_reverseOutBuf[i+istart] * scale;
 }
 
 /**
@@ -644,30 +614,41 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
 		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
 
-	for(size_t i=0; i<nouts; i++)
+	m_resampledSparamSines.resize(nouts);
+	m_resampledSparamCosines.resize(nouts);
+
+	//De-embedding
+	if(invert)
 	{
-		float freq = bin_hz * i;
-
-		float mag = m_cachedSparams.InterpolateMagnitude(freq);
-		float ang = m_cachedSparams.InterpolateAngle(freq);
-
-		//De-embedding
-		if(invert)
+		for(size_t i=0; i<nouts; i++)
 		{
+			float freq = bin_hz * i;
+			auto pt = m_cachedSparams.InterpolatePoint(freq);
+			float mag = pt.m_amplitude;
+			float ang = pt.m_phase;
+
 			float amp = 0;
 			if(fabs(mag) > FLT_EPSILON)
 				amp = 1.0f / mag;
 			amp = min(amp, maxGain);
 
-			m_resampledSparamSines.push_back(sin(-ang) * amp);
-			m_resampledSparamCosines.push_back(cos(-ang) * amp);
+			m_resampledSparamSines[i] = sin(-ang) * amp;
+			m_resampledSparamCosines[i] = cos(-ang) * amp;
 		}
+	}
 
-		//Channel emulation
-		else
+	//Channel emulation
+	else
+	{
+		for(size_t i=0; i<nouts; i++)
 		{
-			m_resampledSparamSines.push_back(sin(ang) * mag);
-			m_resampledSparamCosines.push_back(cos(ang) * mag);
+			float freq = bin_hz * i;
+			auto pt = m_cachedSparams.InterpolatePoint(freq);
+			float mag = pt.m_amplitude;
+			float ang = pt.m_phase;
+
+			m_resampledSparamSines[i] = sin(ang) * mag;
+			m_resampledSparamCosines[i] = cos(ang) * mag;
 		}
 	}
 }
@@ -676,8 +657,8 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 {
 	for(size_t i=0; i<nouts; i++)
 	{
-		float cosval = m_resampledSparamSines[i];
-		float sinval = m_resampledSparamCosines[i];
+		float sinval = m_resampledSparamSines[i];
+		float cosval = m_resampledSparamCosines[i];
 
 		//Uncorrected complex value
 		float real_orig = m_forwardOutBuf[i*2 + 0];
