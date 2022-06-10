@@ -289,6 +289,7 @@ void MDIODecoder::Refresh()
 
 			snprintf(tmp, sizeof(tmp), "%04x", value);
 			pack->m_headers["Value"] = tmp;
+			pack->m_len = (start + len) - pack->m_offset;
 
 			//Add extra information to the decode if it's a known register
 			//TODO: share this between clause 22 and 45 decoders
@@ -749,6 +750,9 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 		auto p = m_packets[j];
 		unsigned int pvalue = strtol(p->m_headers["Value"].c_str(), NULL, 16);
 
+		//Extend us
+		ret->m_len = (p->m_offset + p->m_len) - ret->m_offset;
+
 		//Decode address info
 		if(p->m_headers["Reg"] == "0d")
 		{
@@ -839,6 +843,5 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 	}
 
 	ret->m_headers["Info"] = info;
-
 	return ret;
 }
