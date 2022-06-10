@@ -413,6 +413,9 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
+		if(cnode["attenuation"])
+			chan->SetAttenuation(cnode["attenuation"].as<float>());
+
 		if(cnode["yunit"])
 			chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
 		if(cnode["vrange"])
@@ -461,7 +464,6 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		switch(chan->GetType())
 		{
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
-				chan->SetAttenuation(cnode["attenuation"].as<float>());
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
 
 				if(cnode["xunit"])
