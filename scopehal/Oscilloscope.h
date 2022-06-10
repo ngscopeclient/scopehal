@@ -795,6 +795,11 @@ public:
 	 */
 	virtual bool HasFrequencyControls();
 
+	/**
+		@brief Returns true if the instrument has at least one time-domain channel
+	 */
+	virtual bool HasTimebaseControls();
+
 	//TODO: window controls
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
