@@ -344,6 +344,20 @@ string OscilloscopeChannel::GetProbeName()
 		return "";
 }
 
+bool OscilloscopeChannel::HasInputMux()
+{
+	if(m_scope)
+		return m_scope->HasInputMux(m_index);
+	return false;
+}
+
+size_t OscilloscopeChannel::GetInputMuxSetting()
+{
+	if(m_scope)
+		return m_scope->GetInputMuxSetting(m_index);
+	return 0;
+}
+
 void OscilloscopeChannel::SetInputMux(size_t select)
 {
 	if(m_scope)

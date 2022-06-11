@@ -273,6 +273,13 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		config += tmp;
 		snprintf(tmp, sizeof(tmp), "                name:        \"%s\"\n", chan->GetHwname().c_str());
 		config += tmp;
+
+		if(chan->HasInputMux())
+		{
+			snprintf(tmp, sizeof(tmp), "                inmux:       %zu\n", chan->GetInputMuxSetting());
+			config += tmp;
+		}
+
 		switch(chan->GetType())
 		{
 			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
@@ -413,6 +420,9 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		else
 			chan->Disable();
 
+		//Input mux and attenuation control a bunch of the other parameters, so must be changed first
+		if(cnode["inmux"])
+			chan->SetInputMux(cnode["inmux"].as<int>());
 		if(cnode["attenuation"])
 			chan->SetAttenuation(cnode["attenuation"].as<float>());
 

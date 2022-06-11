@@ -240,6 +240,8 @@ public:
 	virtual void Invert(bool invert);
 	virtual bool IsInverted();
 
+	virtual bool HasInputMux();
+	virtual size_t GetInputMuxSetting();
 	virtual void SetInputMux(size_t select);
 
 	void SetDefaultDisplayName();
