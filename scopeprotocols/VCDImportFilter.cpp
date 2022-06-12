@@ -232,7 +232,7 @@ void VCDImportFilter::OnFileNameChanged()
 					int width;
 					char symbol[16];
 					char name[128];
-					if(4 != sscanf(buf, "$var %15[^ ] %d %15[^ ] %127[^ ]", vtype, &width, symbol, name))
+					if(4 != sscanf(buf, " $var %15[^ ] %d %15[^ ] %127[^ ]", vtype, &width, symbol, name))
 						continue;
 
 					//If the symbol is already in use, skip it.
