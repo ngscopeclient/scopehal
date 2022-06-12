@@ -213,11 +213,13 @@ protected:
 	bool VerifyAllInputsOKAndAnalog();
 	bool VerifyAllInputsOKAndDigital();
 
-	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
-	int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+public:
+	static int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	static int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
+protected:
 	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
 	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
 	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);

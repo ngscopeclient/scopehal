@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeexports                                                                                                      *
+* libscopeexports                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,20 +30,70 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Scope exporter initialization
+	@brief Declaration of VCDExportWizard
  */
 
-#include "scopeexports.h"
-#include "CSVExportWizard.h"
-#include "VCDExportWizard.h"
-#include "TouchstoneExportWizard.h"
+#ifndef VCDExportWizard_h
+#define VCDExportWizard_h
 
 /**
-	@brief Static initialization for exporter list
+	@brief Select other channels
  */
-void ScopeExportStaticInit()
+class VCDExportChannelSelectionPage
 {
-	AddExportWizardClass(CSVExportWizard);
-	AddExportWizardClass(VCDExportWizard);
-	AddExportWizardClass(TouchstoneExportWizard);
-}
+public:
+	VCDExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
+
+	Gtk::Grid m_grid;
+		Gtk::Frame m_selectedFrame;
+			Gtk::ListViewText m_selectedChannels;
+		Gtk::Frame m_availableFrame;
+			Gtk::ListViewText m_availableChannels;
+
+		Gtk::Button m_removeButton;
+		Gtk::Button m_addButton;
+
+	std::map<std::string, StreamDescriptor> m_targets;
+
+protected:
+	void OnAddChannel();
+	void OnRemoveChannel();
+};
+
+/**
+	@brief Final configuration and output path
+ */
+class VCDExportFinalPage
+{
+public:
+	VCDExportFinalPage();
+	virtual ~VCDExportFinalPage();
+
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+
+protected:
+};
+
+/**
+	@brief VCD exporter
+ */
+class VCDExportWizard : public ExportWizard
+{
+public:
+	VCDExportWizard(const std::vector<OscilloscopeChannel*>& channels);
+	virtual ~VCDExportWizard();
+
+	static std::string GetExportName();
+
+	EXPORT_WIZARD_INITPROC(VCDExportWizard)
+
+protected:
+	virtual void on_prepare(Gtk::Widget* page);
+	virtual void on_apply();
+
+	VCDExportChannelSelectionPage m_channelSelectionPage;
+	VCDExportFinalPage m_finalPage;
+};
+
+#endif
