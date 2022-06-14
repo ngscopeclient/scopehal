@@ -157,7 +157,7 @@ void ClockRecoveryFilter::Refresh()
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 	bool gating = false;
-	int64_t cycles_open_loop = 0;
+
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -195,7 +195,6 @@ void ClockRecoveryFilter::Refresh()
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		cycles_open_loop ++;
 		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
 			//Find phase error
@@ -207,10 +206,9 @@ void ClockRecoveryFilter::Refresh()
 				edgepos = tnext + period;
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
-			//If we skipped some edges, apply a larger correction
 			else
 			{
-				int64_t cperiod = period * cycles_open_loop;
+				int64_t cperiod = period;
 				if(delta > 0)
 				{
 					period  -= cperiod / 40000;
@@ -223,9 +221,6 @@ void ClockRecoveryFilter::Refresh()
 				}
 			}
 
-			//LogDebug("%10ld, %10ld, %10ld, %10.4f, %10ld\n", nedge, delta, period, 1e6f / period, cycles_open_loop);
-
-			cycles_open_loop = 0;
 			tnext = edges[++nedge];
 
 			if(period < fnyquist)
