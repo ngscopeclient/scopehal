@@ -118,6 +118,8 @@ uint8_t VICPSocketTransport::GetNextSequenceNumber()
 
 bool VICPSocketTransport::SendCommand(const string& cmd)
 {
+	LogTrace("Send: %s\n", cmd.c_str());
+
 	//Operation and flags header
 	string payload;
 	uint8_t op 	= OP_DATA | OP_EOI;
@@ -202,6 +204,7 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSem
 
 	//make sure there's a null terminator
 	payload += "\0";
+	LogTrace("Got: %s\n", payload.c_str());
 	return payload;
 }
 
