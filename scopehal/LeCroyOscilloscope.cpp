@@ -1089,10 +1089,19 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	//Digital
 	else
 	{
+		//If the digital channel *group* is off, don't show anything
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.Digital1.UseGrid'"));
+		if(reply == "NotOnGrid")
+		{
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			m_channelsEnabled[i] = false;
+			return false;
+		}
+
 		//See if the channel is on
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
 		size_t nchan = i - (m_analogChannelCount+1);
-		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
 			string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'"));
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
