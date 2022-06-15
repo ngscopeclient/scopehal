@@ -516,10 +516,10 @@ bool DemoOscilloscope::AcquireData()
 		s[m_channels[i]] = waveforms[i];
 
 	//Timestamp the waveform(s)
-	float now = GetTime();
-	float tfrac = fmodf(now, 1);
-	time_t start = round(now - tfrac);
-	int64_t fs = round(tfrac * FS_PER_SECOND);
+	double now = GetTime();
+	time_t start = now;
+	double tfrac = now - start;
+	int64_t fs = tfrac * FS_PER_SECOND;
 	for(auto it : s)
 	{
 		auto wfm = it.second;
