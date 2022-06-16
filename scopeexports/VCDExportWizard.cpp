@@ -279,7 +279,7 @@ void VCDExportWizard::on_apply()
 		//Print signal values
 		fprintf(fp, "#%ld\n", timestamp);
 		for(size_t i=0; i<streams.size(); i++)
-			fprintf(fp,"%d%s\n", waveforms[i]->m_samples[indexes[i]], ids[i].c_str());
+			fprintf(fp,"%d%s\n", (bool)waveforms[i]->m_samples[indexes[i]], ids[i].c_str());
 
 		//Get timestamp of next event on any channel
 		int64_t next = timestamp;
