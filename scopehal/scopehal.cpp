@@ -920,3 +920,28 @@ vector<string> explode(const string& str, char separator)
 		ret.push_back(tmp);
 	return ret;
 }
+
+/**
+	@brief Replaces all occurrences of the search string with "replace" in the given string
+ */
+string str_replace(const string& search, const string& replace, const string& subject)
+{
+	string ret;
+
+	//This can probably be made more efficient, but for now we only call it on very short strings
+	for(size_t i=0; i<subject.length(); i++)
+	{
+		//Match?
+		if(0 == strncmp(&subject[i], &search[0], search.length()))
+		{
+			ret += replace;
+			i += search.length() - 1;
+		}
+
+		//No, just copy
+		else
+			ret += subject[i];
+	}
+
+	return ret;
+}
