@@ -375,6 +375,11 @@ bool MockOscilloscope::LoadBIN(const string& path)
 	LogTrace("Importing BIN file \"%s\"\n", path.c_str());
 	LogIndenter li_f;
 
+	//Set waveform timestamp to file timestamp
+	time_t timestamp = 0;
+	int64_t fs = 0;
+	GetTimestampOfFile(path, timestamp, fs);
+
 	string f = ReadFile(path);
 	uint32_t fpos = 0;
 
@@ -442,12 +447,17 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		LogDebug("Holdoff:      %.*f ms\n", 2, wh.holdoff * 1e3);
 		LogDebug("Sample Rate:  %.*f Msps\n", 2, (1 / wh.interval) / 1e6);
 		LogDebug("Frame:        %s\n", m_name.c_str());
+		LogDebug("Label:        %s\n", wh.label);
 		LogDebug("Serial:       %s\n\n", m_serial.c_str());
+
+		string label = wh.label;
+		if(label == "")
+			label = string("CH") + to_string(i+1);
 
 		// Create new channel
 		auto chan = new OscilloscopeChannel(
 			this,			//Parent scope
-			wh.label,		//Channel name
+			label,			//Channel name
 			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetDefaultChannelColor(i),
 			units[wh.x],
@@ -461,9 +471,10 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		//Create new waveform for channel
 		auto wfm = new AnalogWaveform;
 		wfm->m_timescale = wh.interval * 1e15;
-		wfm->m_startTimestamp = 0;
-		wfm->m_startFemtoseconds = 0;
+		wfm->m_startTimestamp = timestamp;
+		wfm->m_startFemtoseconds = fs;
 		wfm->m_triggerPhase = 0;
+		wfm->m_densePacked = true;
 		chan->SetData(wfm, 0);
 
 		//Loop through waveform buffers
