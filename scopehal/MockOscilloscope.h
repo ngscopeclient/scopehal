@@ -170,13 +170,6 @@ public:
 
 protected:
 
-	void LoadComplexCommon(
-		const std::string& path,
-		AnalogWaveform*& iwfm,
-		AnalogWaveform*& qwfm,
-		int64_t samplerate,
-		size_t numSamples);
-
 	void ArmTrigger();
 
 	//standard *IDN? fields
