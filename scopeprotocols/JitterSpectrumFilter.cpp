@@ -59,7 +59,7 @@ bool JitterSpectrumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i == 0) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 		(stream.GetYAxisUnits() == Unit::UNIT_FS)
 		)
 	{

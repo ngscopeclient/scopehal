@@ -41,12 +41,12 @@ using namespace std;
 // Construction / destruction
 
 FFTFilter::FFTFilter(const string& color)
-	: PeakDetectionFilter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: PeakDetectionFilter(color, CAT_RF)
 	, m_windowName("Window")
 	, m_roundingName("Length Rounding")
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	SetYAxisUnits(Unit(Unit::UNIT_DBM), 0);
+	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -204,7 +204,7 @@ bool FFTFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

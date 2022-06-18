@@ -37,9 +37,9 @@ using namespace std;
 // Construction / destruction
 
 USB2PMADecoder::USB2PMADecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("D+");
 	CreateInput("D-");
 
@@ -60,7 +60,7 @@ bool USB2PMADecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

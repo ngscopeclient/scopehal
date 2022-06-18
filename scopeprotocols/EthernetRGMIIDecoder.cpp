@@ -65,13 +65,13 @@ bool EthernetRGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	switch(i)
 	{
 		case 0:
-			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL_BUS)
+			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL_BUS)
 				return true;
 			break;
 
 		case 1:
 		case 2:
-			if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
+			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
 				return true;
 			break;
 	}

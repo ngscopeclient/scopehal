@@ -43,7 +43,7 @@ using namespace std;
 // Construction / destruction
 
 SDCmdDecoder::SDCmdDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(color, CAT_MEMORY)
 	, m_cardtypename("Card Type")
 {
 	CreateInput("CMD");
@@ -68,7 +68,7 @@ bool SDCmdDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 6) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 6) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

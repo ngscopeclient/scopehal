@@ -71,10 +71,11 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetChannelColor(i),
-			i,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 
 		string nicename = "ch" + chname;
@@ -98,10 +99,11 @@ DSLabsOscilloscope::DSLabsOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetChannelColor(i),
-			chnum,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			chnum);
 		m_channels.push_back(chan);
 
 		string nicename = "d" + to_string(i);

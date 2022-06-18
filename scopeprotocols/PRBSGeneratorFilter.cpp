@@ -36,15 +36,13 @@ using namespace std;
 // Construction / destruction
 
 PRBSGeneratorFilter::PRBSGeneratorFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_GENERATION)
+	: Filter(color, CAT_GENERATION)
 	, m_baudname("Data Rate")
 	, m_polyname("Polynomial")
 	, m_depthname("Depth")
 {
-	//Set up streams
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_COUNTS), "Data");
-	AddStream(Unit(Unit::UNIT_COUNTS), "Clock");
+	AddStream(Unit(Unit::UNIT_COUNTS), "Data", Stream::STREAM_TYPE_DIGITAL);
+	AddStream(Unit(Unit::UNIT_COUNTS), "Clock", Stream::STREAM_TYPE_DIGITAL);
 
 	m_parameters[m_baudname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
 	m_parameters[m_baudname].SetIntVal(103125L * 100L * 1000L);

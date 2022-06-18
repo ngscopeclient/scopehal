@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 MultiplyFilter::MultiplyFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(color, CAT_MATH)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("a");
 	CreateInput("b");
 }
@@ -51,7 +51,7 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

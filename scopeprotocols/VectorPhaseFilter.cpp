@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 VectorPhaseFilter::VectorPhaseFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: Filter(color, CAT_RF)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("I");
 	CreateInput("Q");
 }
@@ -54,7 +54,7 @@ bool VectorPhaseFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(i > 1)
 		return false;
 
-	if(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
 		return true;
 
 	return false;
@@ -100,8 +100,6 @@ void VectorPhaseFilter::Refresh()
 	cap->m_timescale 		= a->m_timescale;
 	cap->m_startTimestamp 	= a->m_startTimestamp;
 	cap->m_startFemtoseconds = a->m_startFemtoseconds;
-
-	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 
 	SetData(cap, 0);
 }

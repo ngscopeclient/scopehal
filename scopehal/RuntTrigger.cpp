@@ -112,8 +112,8 @@ bool RuntTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//It has to be analog or external trigger, digital inputs make no sense
-	if((stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER))
+	if((stream.GetType() != Stream::STREAM_TYPE_ANALOG) &&
+		(stream.GetType() != Stream::STREAM_TYPE_TRIGGER))
 	{
 		return false;
 	}

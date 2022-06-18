@@ -169,21 +169,23 @@ void MockOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			m_channels.resize(index+1);
 
 		//Configure the channel
-		OscilloscopeChannel::ChannelType type = OscilloscopeChannel::CHANNEL_TYPE_COMPLEX;
+		Stream::StreamType type = Stream::STREAM_TYPE_PROTOCOL;
 		string stype = cnode["type"].as<string>();
 		if(stype == "analog")
-			type = OscilloscopeChannel::CHANNEL_TYPE_ANALOG;
+			type = Stream::STREAM_TYPE_ANALOG;
 		else if(stype == "digital")
-			type = OscilloscopeChannel::CHANNEL_TYPE_DIGITAL;
+			type = Stream::STREAM_TYPE_DIGITAL;
 		else if(stype == "trigger")
-			type = OscilloscopeChannel::CHANNEL_TYPE_TRIGGER;
+			type = Stream::STREAM_TYPE_TRIGGER;
+
 		auto chan = new OscilloscopeChannel(
 			this,
 			cnode["name"].as<string>(),
-			type,
 			cnode["color"].as<string>(),
-			index,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			type,
+			index);
 		m_channels[index] = chan;
 
 		//Create the channel ID
@@ -458,12 +460,11 @@ bool MockOscilloscope::LoadBIN(const string& path)
 		auto chan = new OscilloscopeChannel(
 			this,			//Parent scope
 			label,			//Channel name
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetDefaultChannelColor(i),
 			units[wh.x],
 			units[wh.y],
-			i,				//Channel index
-			true			//Is physical channel
+			Stream::STREAM_TYPE_ANALOG,
+			i				//Channel index
 		);
 		AddChannel(chan);
 		chan->SetDefaultDisplayName();

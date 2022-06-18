@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 IBISDriverFilter::IBISDriverFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	: Filter(color, CAT_GENERATION)
 	, m_model(NULL)
 	, m_sampleRate("Sample Rate")
 	, m_fname("File Path")
@@ -44,6 +44,7 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	, m_cornerName("Corner")
 	, m_termName("Termination")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("data");
 	CreateInput("clk");
 
@@ -75,7 +76,7 @@ bool IBISDriverFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

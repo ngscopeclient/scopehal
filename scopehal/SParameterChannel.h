@@ -44,14 +44,12 @@ class SParameterChannel : public OscilloscopeChannel
 public:
 	SParameterChannel(Oscilloscope* scope,
 		const std::string& hwname,
-		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
 		size_t index)
-		: OscilloscopeChannel(scope, hwname, type, color, index, true)
+		: OscilloscopeChannel(scope, hwname, color, Unit(Unit::UNIT_HZ), index)
 	{
-		ClearStreams();
-		AddStream(Unit(Unit::UNIT_DB), "mag");
-		AddStream(Unit(Unit::UNIT_DEGREES), "angle");
+		AddStream(Unit(Unit::UNIT_DB), "mag", Stream::STREAM_TYPE_ANALOG);
+		AddStream(Unit(Unit::UNIT_DEGREES), "angle", Stream::STREAM_TYPE_ANALOG);
 	}
 };
 

@@ -201,6 +201,8 @@ void CSVImportFilter::OnFileNameChanged()
 			else
 				tmp += s[i];
 		}
+		if(tmp != "")
+			fields.push_back(tmp);
 
 		//Header row gets special treatment
 		if(headerRow)
@@ -245,7 +247,7 @@ void CSVImportFilter::OnFileNameChanged()
 		LogIndenter li;
 
 		//Assume digital, then change to analog if we see anything other than a 0/1 in the first 10 lines
-		/*bool digital = true;
+		bool digital = true;
 		for(size_t j=0; j<lines.size() && j<10; j++)
 		{
 			string field = lines[j][i];
@@ -255,16 +257,11 @@ void CSVImportFilter::OnFileNameChanged()
 				break;
 			}
 		}
-		*/
-
-		//Import as all analog for now!
-		//We cannot currently mix analog and digital channels in the same filter
-		bool digital = false;
 
 		//Create the output stream
 		if(digital)
 		{
-			AddStream(Unit(Unit::UNIT_COUNTS), names[i]);
+			AddStream(Unit(Unit::UNIT_COUNTS), names[i], Stream::STREAM_TYPE_DIGITAL);
 
 			auto wfm = new DigitalWaveform;
 			wfm->m_timescale = 1;
@@ -281,7 +278,7 @@ void CSVImportFilter::OnFileNameChanged()
 		}
 		else
 		{
-			AddStream(Unit(Unit::UNIT_VOLTS), names[i]);
+			AddStream(Unit(Unit::UNIT_VOLTS), names[i], Stream::STREAM_TYPE_ANALOG);
 
 			auto wfm = new AnalogWaveform;
 			wfm->m_timescale = 1;
@@ -307,12 +304,24 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			auto wfm = digwaves[i];
 
-			//DEBUG: fill with 0s
+			//Read the sample data
 			for(size_t j=0; j<lines.size(); j++)
 			{
-				wfm->m_offsets[j] = 100000*j;
-				wfm->m_durations[j] = 100000;
-				wfm->m_samples[j] = false;
+				wfm->m_offsets[j] = timestamps[j];
+
+				//Last one? copy previous sample duration
+				if(j+1 == lines.size())
+					wfm->m_durations[j] = wfm->m_durations[j-1];
+
+				//Set sample duration of previous sample
+				if(j > 0)
+					wfm->m_durations[j-1] = wfm->m_offsets[j] - wfm->m_offsets[j-1];
+
+				//Read waveform data
+				if(lines[j][i] == "1")
+					wfm->m_samples[j] = true;
+				else
+					wfm->m_samples[j] = false;
 			}
 
 			NormalizeTimebase(wfm);

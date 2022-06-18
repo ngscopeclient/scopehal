@@ -38,9 +38,6 @@ using namespace std;
 VCDImportFilter::VCDImportFilter(const string& color)
 	: ImportFilter(color)
 {
-	//Override since ImportFilter defaults to analog
-	m_type = CHANNEL_TYPE_DIGITAL;
-
 	m_fpname = "VCD File";
 	m_parameters[m_fpname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fpname].m_fileFilterMask = "*.vcd";
@@ -241,7 +238,7 @@ void VCDImportFilter::OnFileNameChanged()
 						continue;
 
 					//Create the stream
-					AddStream(Unit(Unit::UNIT_COUNTS), sscope + name);
+					AddDigitalStream(sscope + name);
 
 					//Create the waveform
 					WaveformBase* wfm;

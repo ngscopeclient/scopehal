@@ -37,9 +37,9 @@ using namespace std;
 // Construction / destruction
 
 USB2ActivityDecoder::USB2ActivityDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("din");
 }
 

@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 EthernetProtocolDecoder::EthernetProtocolDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
 	CreateInput("din");
@@ -68,7 +68,7 @@ bool EthernetProtocolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

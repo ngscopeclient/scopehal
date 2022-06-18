@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 DSIPacketDecoder::DSIPacketDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
 	CreateInput("data");
 }

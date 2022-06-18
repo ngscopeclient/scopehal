@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 MDIODecoder::MDIODecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
 	CreateInput("mdio");
@@ -63,7 +63,7 @@ bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

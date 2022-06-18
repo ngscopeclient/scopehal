@@ -42,9 +42,9 @@ using namespace std;
 // Construction / destruction
 
 EthernetAutonegotiationDecoder::EthernetAutonegotiationDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("din");
 }
 
@@ -56,7 +56,7 @@ bool EthernetAutonegotiationDecoder::ValidateChannel(size_t i, StreamDescriptor 
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

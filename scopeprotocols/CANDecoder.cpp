@@ -42,10 +42,10 @@ using namespace std;
 // Construction / destruction
 
 CANDecoder::CANDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 	, m_baudrateName("Bit Rate")
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_PROTOCOL);
 	CreateInput("CANH");
 
 	m_parameters[m_baudrateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
@@ -60,7 +60,7 @@ bool CANDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

@@ -59,9 +59,8 @@ ComplexImportFilter::ComplexImportFilter(const string& color)
 	m_parameters[m_sratename].SetIntVal(1e6);
 	m_parameters[m_sratename].signal_changed().connect(sigc::mem_fun(*this, &ComplexImportFilter::Reload));
 
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "I");
-	AddStream(Unit(Unit::UNIT_VOLTS), "Q");
+	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

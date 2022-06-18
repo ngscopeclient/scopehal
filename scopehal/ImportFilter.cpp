@@ -35,8 +35,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ImportFilter::ImportFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+ImportFilter::ImportFilter(const string& color, Unit xunit)
+	: Filter(color, CAT_GENERATION, xunit)
 {
 }
 

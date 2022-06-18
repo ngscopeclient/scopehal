@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 FSKDecoder::FSKDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_RF)
+	: Filter(color, CAT_RF)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("Frequency");
 
 	/*
@@ -60,7 +60,7 @@ bool FSKDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i == 0) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 		(stream.GetYAxisUnits() == Unit(Unit::UNIT_HZ)) )
 	{
 		return true;

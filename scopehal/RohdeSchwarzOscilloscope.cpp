@@ -87,10 +87,11 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			i,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -103,10 +104,11 @@ RohdeSchwarzOscilloscope::RohdeSchwarzOscilloscope(SCPITransport* transport)
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"EX",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
-		m_channels.size(),
-		true);
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 

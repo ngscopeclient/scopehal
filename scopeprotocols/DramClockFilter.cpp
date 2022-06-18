@@ -36,12 +36,11 @@ using namespace std;
 // Construction / destruction
 
 DramClockFilter::DramClockFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
 	//Set up channels
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_COUNTS), "RD");
-	AddStream(Unit(Unit::UNIT_COUNTS), "WR");
+	AddStream(Unit(Unit::UNIT_COUNTS), "RD", Stream::STREAM_TYPE_DIGITAL);
+	AddStream(Unit(Unit::UNIT_COUNTS), "WR", Stream::STREAM_TYPE_DIGITAL);
 
 	//Set up channels
 	CreateInput("CMD");

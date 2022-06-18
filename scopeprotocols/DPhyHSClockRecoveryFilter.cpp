@@ -37,9 +37,9 @@ using namespace std;
 // Construction / destruction
 
 DPhyHSClockRecoveryFilter::DPhyHSClockRecoveryFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("clk");
 	CreateInput("data");
 }

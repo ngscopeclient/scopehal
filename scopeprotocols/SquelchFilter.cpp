@@ -36,14 +36,14 @@ using namespace std;
 // Construction / destruction
 
 SquelchFilter::SquelchFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: Filter(color, CAT_RF)
 {
 	//Set up channels
 	CreateInput("I");
 	CreateInput("Q");
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "I");
-	AddStream(Unit(Unit::UNIT_VOLTS), "Q");
+	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
 	m_thresholdname = "Threshold";
 	m_parameters[m_thresholdname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
@@ -62,7 +62,7 @@ bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

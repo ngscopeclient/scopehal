@@ -36,12 +36,10 @@ using namespace std;
 // Construction / destruction
 
 DramRefreshActivateMeasurement::DramRefreshActivateMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	: Filter(color, CAT_MEASUREMENT)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
-
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

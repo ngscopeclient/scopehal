@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -85,7 +85,7 @@ bool WindowTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//There has to be a signal to trigger on
-	if(stream.m_channel == NULL)
+	if(stream.m_channel == nullptr)
 		return false;
 
 	//It has to be from the same instrument we're trying to trigger on
@@ -93,11 +93,8 @@ bool WindowTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	//It has to be analog or external trigger, digital inputs make no sense
-	if( (stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
-		(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_TRIGGER) )
-	{
+	if( (stream.GetType() != Stream::STREAM_TYPE_ANALOG) && (stream.GetType() != Stream::STREAM_TYPE_TRIGGER) )
 		return false;
-	}
 
 	return true;
 }

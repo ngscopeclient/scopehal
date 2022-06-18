@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("IN");
 	CreateInput("Gate");
 
@@ -66,14 +66,14 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 			if(stream.m_channel == NULL)
 				return false;
 			return
-				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) ||
-				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL);
+				(stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
+				(stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
 
 		case 1:
 			if(stream.m_channel == NULL)	//null is legal for gate
 				return true;
 
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL);
+			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
 
 		default:
 			return false;

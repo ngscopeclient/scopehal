@@ -37,13 +37,12 @@ using namespace std;
 // Construction / destruction
 
 GroupDelayFilter::GroupDelayFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: Filter(color, CAT_RF)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("Phase");
 
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +52,7 @@ bool GroupDelayFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
-	if(stream.m_channel->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
 		return false;
 	if(stream.m_channel->GetXAxisUnits().GetType() != Unit::UNIT_HZ)
 		return false;

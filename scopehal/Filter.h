@@ -66,9 +66,9 @@ public:
 	};
 
 	Filter(
-		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
 		Category cat,
+		Unit xunit = Unit::UNIT_FS,
 		const std::string& kernelPath = "",
 		const std::string& kernelName = "");
 	virtual ~Filter();
@@ -78,7 +78,13 @@ public:
 	{ return m_filters; }
 
 	virtual void ClearStreams();
-	virtual void AddStream(Unit yunit, const std::string& name);
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype);
+
+	void AddProtocolStream(const std::string& name)
+	{ AddStream(Unit(Unit::UNIT_COUNTS), name, Stream::STREAM_TYPE_PROTOCOL); }
+
+	void AddDigitalStream(const std::string& name)
+	{ AddStream(Unit(Unit::UNIT_COUNTS), name, Stream::STREAM_TYPE_DIGITAL); }
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Name generation

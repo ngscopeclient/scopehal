@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 CurrentShuntFilter::CurrentShuntFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_POWER)
+	: Filter(color, CAT_POWER)
 {
-	SetYAxisUnits(Unit(Unit::UNIT_AMPS), 0);
+	AddStream(Unit(Unit::UNIT_AMPS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -56,7 +56,7 @@ bool CurrentShuntFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

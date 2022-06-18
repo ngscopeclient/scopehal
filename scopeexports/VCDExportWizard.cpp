@@ -70,10 +70,6 @@ VCDExportChannelSelectionPage::VCDExportChannelSelectionPage(const vector<Oscill
 
 	for(auto c : channels)
 	{
-		//Can't export anything but digital data
-		if(c->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
-			continue;
-
 		//Must be a time domain waveform, nothing else makes sense for VCD
 		if(c->GetXAxisUnits() != Unit(Unit::UNIT_FS))
 			continue;
@@ -82,6 +78,10 @@ VCDExportChannelSelectionPage::VCDExportChannelSelectionPage(const vector<Oscill
 		for(size_t s=0; s<c->GetStreamCount(); s++)
 		{
 			StreamDescriptor stream(c, s);
+
+			//Can't export anything but digital data
+			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
+				continue;
 
 			//Must actually have data
 			if(stream.GetData() == nullptr)

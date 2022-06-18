@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 UartClockRecoveryFilter::UartClockRecoveryFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("din");
 
 	m_baudname = "Baud rate";
@@ -58,7 +58,7 @@ bool UartClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

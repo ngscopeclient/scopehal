@@ -36,8 +36,10 @@ using namespace std;
 // Construction / destruction
 
 ParallelBus::ParallelBus(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL_BUS, color, CAT_BUS)
+	: Filter(color, CAT_BUS)
 {
+	AddStream( Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_DIGITAL_BUS);
+
 	//Set up channels
 	char tmp[32];
 	for(size_t i=0; i<16; i++)
@@ -59,7 +61,7 @@ bool ParallelBus::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 16) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 16) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

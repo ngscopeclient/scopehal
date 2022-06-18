@@ -43,7 +43,7 @@ using namespace std;
 // Construction / destruction
 
 SDDataDecoder::SDDataDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(color, CAT_MEMORY)
 {
 	CreateInput("clk");
 	CreateInput("dat3");
@@ -66,7 +66,7 @@ bool SDDataDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 5) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 5) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	if( (i == 5) && (dynamic_cast<SDCmdDecoder*>(stream.m_channel) != NULL) )

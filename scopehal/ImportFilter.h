@@ -43,7 +43,7 @@
 class ImportFilter : public Filter
 {
 public:
-	ImportFilter(const std::string& color);
+	ImportFilter(const std::string& color, Unit xunit = Unit(Unit::UNIT_FS));
 
 	virtual void Refresh();
 

@@ -91,10 +91,11 @@ void LeCroyOscilloscope::SharedCtorInit()
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"Ext",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
-		m_channels.size(),
-		true);
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 
 	//Desired format for waveform data
@@ -805,10 +806,11 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chn,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
-			m_channels.size(),
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			m_channels.size());
 		m_channels.push_back(chan);
 		m_digitalChannels.push_back(chan);
 	}
@@ -958,10 +960,11 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 			new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			i,
-			true));
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i));
 	}
 	m_analogChannelCount = nchans;
 }

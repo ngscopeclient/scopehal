@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,79 +27,68 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "MagnitudeFilter.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of Stream
+ */
+#ifndef Stream_h
+#define Stream_h
 
-using namespace std;
+/**
+	@brief Information associated with a single stream
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-MagnitudeFilter::MagnitudeFilter(const string& color)
-	: Filter(color, CAT_RF)
+	Each channel contains one or more streams, which represent a single element of a complex-valued waveform.
+	For example, the waveform from an RTSA might have a stream for I and a stream for Q within a single channel.
+	The waveform from a VNA might have a stream for magnitude and another for angle data on each path.
+ */
+class Stream
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("I");
-	CreateInput("Q");
-}
+public:
+	Stream();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	/**
+		@brief General data type stored in a stream
 
-bool MagnitudeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string MagnitudeFilter::GetProtocolName()
-{
-	return "Vector Magnitude";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void MagnitudeFilter::Refresh()
-{
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+		This type is always valid even if m_waveform is null.
+	 */
+	enum StreamType
 	{
-		SetData(NULL, 0);
-		return;
-	}
+		//Conventional time-series waveforms (or similar graphs like a FFT)
+		STREAM_TYPE_ANALOG,
+		STREAM_TYPE_DIGITAL,
+		STREAM_TYPE_DIGITAL_BUS,
 
-	//Get the input data
-	auto a = GetAnalogInputWaveform(0);
-	auto b = GetAnalogInputWaveform(1);
-	auto len = min(a->m_samples.size(), b->m_samples.size());
+		//2D density plots
+		STREAM_TYPE_EYE,
+		STREAM_TYPE_SPECTROGRAM,
+		STREAM_TYPE_WATERFALL,
 
-	//Copy Y axis units from input
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
+		//Special channels not used for display
+		STREAM_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
 
-	//Set up the output waveform
-	auto cap = new AnalogWaveform;
-	cap->Resize(len);
-	cap->CopyTimestamps(a);
+		//Class datatype from a protocol decoder
+		STREAM_TYPE_PROTOCOL
+	};
 
-	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
-	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
-	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	for(size_t i=0; i<len; i++)
-		fdst[i] = sqrtf(fa[i]*fa[i] + fb[i]*fb[i]);
+	Stream(Unit yunit, std::string name, StreamType type)
+	: m_yAxisUnit(yunit)
+	, m_name(name)
+	, m_waveform(nullptr)
+	, m_stype(type)
+	{}
 
-	//Copy our time scales from the input
-	cap->m_timescale 		= a->m_timescale;
-	cap->m_startTimestamp 	= a->m_startTimestamp;
-	cap->m_startFemtoseconds = a->m_startFemtoseconds;
+	///Unit of measurement for our vertical axis
+	Unit m_yAxisUnit;
 
-	SetData(cap, 0);
-}
+	///@brief Name of the stream
+	std::string m_name;
+
+	///@brief The current waveform (or null if nothing here)
+	WaveformBase* m_waveform;
+
+	///@brief General datatype stored in the stream
+	StreamType m_stype;
+};
+
+#endif

@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 I2CEepromDecoder::I2CEepromDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: PacketDecoder(color, CAT_MEMORY)
 {
 	CreateInput("i2c");
 

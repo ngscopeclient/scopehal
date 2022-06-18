@@ -90,10 +90,11 @@ AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
 			new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			i,
-			true));
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i));
 
 		//Request all points when we download
 		//m_transport->SendCommand(chname + ":DATA:POIN MAX");
@@ -105,7 +106,7 @@ AntikernelLabsOscilloscope::AntikernelLabsOscilloscope(SCPITransport* transport)
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"EX",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
+		Stream::STREAM_TYPE_TRIGGER,
 		"",
 		m_channels.size(),
 		true);

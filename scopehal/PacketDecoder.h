@@ -68,7 +68,7 @@ public:
 class PacketDecoder : public Filter
 {
 public:
-	PacketDecoder(OscilloscopeChannel::ChannelType type, const std::string& color, Filter::Category cat);
+	PacketDecoder(const std::string& color, Filter::Category cat);
 	virtual ~PacketDecoder();
 
 	const std::vector<Packet*>& GetPackets()

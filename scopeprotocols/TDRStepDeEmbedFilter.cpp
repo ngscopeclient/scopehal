@@ -37,10 +37,10 @@ using namespace std;
 // Construction / destruction
 
 TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
-	SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
+	AddStream(Unit(Unit::UNIT_DB), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("step");
@@ -65,7 +65,7 @@ bool TDRStepDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

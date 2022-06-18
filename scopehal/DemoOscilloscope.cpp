@@ -60,7 +60,6 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	m_serial = "12345";
 
 	//Create a bunch of channels
-
 	static const char* colors[8] =
 	{ "#ffff00", "#ff6abc", "#00ffff", "#00c100", "#d7ffd7", "#8482ff", "#ff0000", "#ff8000" };
 
@@ -68,12 +67,13 @@ DemoOscilloscope::DemoOscilloscope(SCPITransport* transport)
 	{
 		m_channels.push_back(
 			new OscilloscopeChannel(
-			this,
-			string("CH")+to_string(i+1),
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-			colors[i],
-			i,
-			true));
+				this,
+				string("CH") + to_string(i+1),
+				colors[i],
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_ANALOG,
+				i));
 
 		//initial configuration is 1V p-p for each
 		m_channelsEnabled[i] = true;
@@ -191,21 +191,22 @@ void DemoOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			m_channels.resize(index+1);
 
 		//Configure the channel
-		OscilloscopeChannel::ChannelType type = OscilloscopeChannel::CHANNEL_TYPE_COMPLEX;
+		Stream::StreamType type = Stream::STREAM_TYPE_PROTOCOL;
 		string stype = cnode["type"].as<string>();
 		if(stype == "analog")
-			type = OscilloscopeChannel::CHANNEL_TYPE_ANALOG;
+			type = Stream::STREAM_TYPE_ANALOG;
 		else if(stype == "digital")
-			type = OscilloscopeChannel::CHANNEL_TYPE_DIGITAL;
+			type = Stream::STREAM_TYPE_DIGITAL;
 		else if(stype == "trigger")
-			type = OscilloscopeChannel::CHANNEL_TYPE_TRIGGER;
+			type = Stream::STREAM_TYPE_TRIGGER;
 		auto chan = new OscilloscopeChannel(
 			this,
 			cnode["name"].as<string>(),
-			type,
 			cnode["color"].as<string>(),
-			index,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			type,
+			index);
 		m_channels[index] = chan;
 
 		//Create the channel ID

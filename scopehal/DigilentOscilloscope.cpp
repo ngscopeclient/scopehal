@@ -61,10 +61,11 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetChannelColor(i),
-			i,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -92,7 +93,7 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			Stream::STREAM_TYPE_DIGITAL,
 			GetChannelColor(ichan),
 			chnum,
 			true);
@@ -114,7 +115,7 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	/*
 	//Add the external trigger input
 	m_extTrigChannel =
-		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", m_channels.size(), true);
+		new OscilloscopeChannel(this, "EX", Stream::STREAM_TYPE_TRIGGER, "", m_channels.size(), true);
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 	*/

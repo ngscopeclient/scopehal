@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -191,7 +191,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 	auto chan = new OscilloscopeChannel(
 		this,
 		"clk",
-		OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+		Stream::STREAM_TYPE_DIGITAL,
 		GetDefaultChannelColor(m_channels.size()),
 		m_channels.size(),
 		false);	//not a physical channel
@@ -225,7 +225,7 @@ void AntikernelLogicAnalyzer::LoadChannels()
 		chan = new OscilloscopeChannel(
 			this,
 			realname,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
+			Stream::STREAM_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
 			width,
 			m_channels.size(),

@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 PCIeDataLinkDecoder::PCIeDataLinkDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 	, m_framingMode("Framing Mode")
 {
 	//Set up channels

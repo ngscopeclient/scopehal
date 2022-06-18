@@ -63,17 +63,16 @@ Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
 // Construction / destruction
 
 Filter::Filter(
-	OscilloscopeChannel::ChannelType type,
 	const string& color,
 	Category cat,
+	Unit xunit,
 	const string& kernelPath,
 	const string& kernelName)
-	: OscilloscopeChannel(NULL, "", type, color, 1)	//TODO: handle this better?
+	: OscilloscopeChannel(NULL, "", color, xunit, 0)	//TODO: handle this better?
 	, m_category(cat)
 	, m_dirty(true)
 	, m_usingDefault(true)
 {
-	m_physical = false;
 	m_instanceNum = 0;
 	m_filters.emplace(this);
 
@@ -1622,9 +1621,9 @@ void Filter::ClearStreams()
 	m_offsets.clear();
 }
 
-void Filter::AddStream(Unit yunit, const string& name)
+void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
 {
-	OscilloscopeChannel::AddStream(yunit, name);
+	OscilloscopeChannel::AddStream(yunit, name, stype);
 	m_ranges.push_back(0);
 	m_offsets.push_back(0);
 }

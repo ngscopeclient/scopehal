@@ -56,12 +56,13 @@ WaterfallWaveform::~WaterfallWaveform()
 // Construction / destruction
 
 Waterfall::Waterfall(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_RF)
+	: Filter(color, CAT_RF)
 	, m_pixelsPerHz(0.001)
 	, m_offsetHz(0)
 	, m_width(1)
 	, m_height(1)
 {
+	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_WATERFALL);
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 
 	//Set up channels
@@ -77,7 +78,7 @@ bool Waterfall::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i == 0) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+		(stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 		(stream.m_channel->GetXAxisUnits() == Unit::UNIT_HZ)
 		)
 	{

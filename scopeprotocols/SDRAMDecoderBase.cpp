@@ -37,9 +37,9 @@ using namespace std;
 // SDRAMDecoderBase
 
 SDRAMDecoderBase::SDRAMDecoderBase(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MEMORY)
+	: Filter(color, CAT_MEMORY)
 {
-
+	AddProtocolStream("data");
 }
 
 SDRAMDecoderBase::~SDRAMDecoderBase()

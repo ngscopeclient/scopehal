@@ -60,18 +60,19 @@ CSVExportReferenceChannelSelectionPage::CSVExportReferenceChannelSelectionPage(c
 	//Populate the reference box with a list of all channels that are legal to use
 	for(auto c : channels)
 	{
-		//Can't export 2D density plots
-		auto type = c->GetType();
-		if( (type == OscilloscopeChannel::CHANNEL_TYPE_EYE) ||
-			(type == OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM) )
-		{
-			continue;
-		}
-
 		//Check each stream
 		for(size_t s=0; s<c->GetStreamCount(); s++)
 		{
 			StreamDescriptor stream(c, s);
+
+			//Can't export 2D density plots
+			auto type = stream.GetType();
+			if( (type == Stream::STREAM_TYPE_EYE) ||
+				(type == Stream::STREAM_TYPE_SPECTROGRAM) )
+			{
+				continue;
+			}
+
 
 			//Must actually have data
 			if(stream.GetData() == NULL)
@@ -135,18 +136,18 @@ void CSVExportOtherChannelSelectionPage::UpdateChannelList()
 		if(s == refStream)
 			continue;
 
+		//Can't export 2D density plots
+		auto type = s.GetType();
+		if( (type == Stream::STREAM_TYPE_EYE) ||
+			(type == Stream::STREAM_TYPE_SPECTROGRAM) )
+		{
+			continue;
+		}
+
 		//Must be non-null
 		auto chan = s.m_channel;
 		if(!chan || !s.GetData())
 			continue;
-
-		//Can't export 2D density plots
-		auto type = chan->GetType();
-		if( (type == OscilloscopeChannel::CHANNEL_TYPE_EYE) ||
-			(type == OscilloscopeChannel::CHANNEL_TYPE_SPECTROGRAM) )
-		{
-			continue;
-		}
 
 		//Must have same X axis unit as reference
 		if(chan->GetXAxisUnits() != refStream.GetXAxisUnits())
@@ -320,24 +321,24 @@ void CSVExportWizard::on_apply()
 			fprintf(fp, "%ld", timestamp);
 
 		//Write data from the reference channel as-is (no interpolation, it's the timebase by definition)
-		auto reftype = streams[0].m_channel->GetType();
+		auto reftype = streams[0].GetType();
 		switch(reftype)
 		{
-			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+			case Stream::STREAM_TYPE_ANALOG:
 				{
 					auto refan = dynamic_cast<AnalogWaveform*>(timebaseWaveform);
 					fprintf(fp, ",%f", refan->m_samples[i].m_value);
 				}
 				break;
 
-			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+			case Stream::STREAM_TYPE_DIGITAL:
 				{
 					auto refdig = dynamic_cast<DigitalWaveform*>(timebaseWaveform);
 					fprintf(fp, ",%d", refdig->m_samples[i].m_value);
 				}
 				break;
 
-			case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+			case Stream::STREAM_TYPE_PROTOCOL:
 				{
 					auto reffilt = dynamic_cast<Filter*>(streams[0].m_channel);
 					fprintf(fp, ",%s", reffilt->GetText(i).c_str());
@@ -375,11 +376,11 @@ void CSVExportWizard::on_apply()
 			bool firstHit = (timestamp >= sstart) && (lastTimestamp < sstart);
 
 			//Separate processing is needed depending on the data type
-			auto type = streams[j].m_channel->GetType();
+			auto type = streams[j].GetType();
 			switch(type)
 			{
 				//Linear interpolation
-				case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+				case Stream::STREAM_TYPE_ANALOG:
 					{
 						//No interpolation for last sample since there's no next to lerp to
 						auto an = dynamic_cast<AnalogWaveform*>(w);
@@ -404,7 +405,7 @@ void CSVExportWizard::on_apply()
 					break;
 
 				//Nearest neighbor interpolation
-				case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+				case Stream::STREAM_TYPE_DIGITAL:
 					{
 						auto dig = dynamic_cast<DigitalWaveform*>(w);
 						fprintf(fp, ",%d", dig->m_samples[k].m_value);
@@ -412,7 +413,7 @@ void CSVExportWizard::on_apply()
 					break;
 
 				//First-hit "interpolation"
-				case OscilloscopeChannel::CHANNEL_TYPE_COMPLEX:
+				case Stream::STREAM_TYPE_PROTOCOL:
 					{
 						auto filt = dynamic_cast<Filter*>(streams[j].m_channel);
 						if(firstHit)

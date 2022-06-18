@@ -36,10 +36,10 @@ using namespace std;
 // Construction / destruction
 
 VerticalBathtub::VerticalBathtub(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	SetYAxisUnits(Unit(Unit::UNIT_LOG_BER), 0);
+	AddStream(Unit(Unit::UNIT_LOG_BER), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -57,7 +57,7 @@ bool VerticalBathtub::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_EYE) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_EYE) )
 		return true;
 
 	return false;

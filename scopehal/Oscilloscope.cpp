@@ -280,9 +280,10 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			config += tmp;
 		}
 
-		switch(chan->GetType())
+		//All *hardware* channels have the same type for all streams for now
+		switch(chan->GetType(0))
 		{
-			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+			case Stream::STREAM_TYPE_ANALOG:
 				config += "                type:        analog\n";
 				if(IsADCModeConfigurable())
 				{
@@ -295,14 +296,14 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 					config += tmp;
 				}
 				break;
-			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+			case Stream::STREAM_TYPE_DIGITAL:
 				config += "                type:        digital\n";
 				snprintf(tmp, sizeof(tmp), "                thresh:      %f\n", GetDigitalThreshold(i));
 				config += tmp;
 				snprintf(tmp, sizeof(tmp), "                hys:         %f\n", GetDigitalHysteresis(i));
 				config += tmp;
 				break;
-			case OscilloscopeChannel::CHANNEL_TYPE_TRIGGER:
+			case Stream::STREAM_TYPE_TRIGGER:
 				config += "                type:        trigger\n";
 				break;
 
@@ -323,7 +324,7 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		config += tmp;
 
 		size_t nstreams = chan->GetStreamCount();
-		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		if(chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 		{
 			snprintf(tmp, sizeof(tmp), "                attenuation: %f\n", chan->GetAttenuation());
 			config += tmp;
@@ -426,8 +427,9 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		if(cnode["attenuation"])
 			chan->SetAttenuation(cnode["attenuation"].as<float>());
 
+		Unit yunit = chan->GetYAxisUnits(0);
 		if(cnode["yunit"])
-			chan->SetYAxisUnits(cnode["yunit"].as<string>(), 0);
+			yunit = Unit(cnode["yunit"].as<string>());
 		if(cnode["vrange"])
 			chan->SetVoltageRange(cnode["vrange"].as<float>(), 0);
 		if(cnode["offset"])
@@ -442,6 +444,8 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 			size_t nstreams = snode.as<size_t>();
 			if(nstreams > 1)
 			{
+				auto stype = chan->GetType(0);
+
 				chan->ClearStreams();
 
 				//We have to keep track of indexes because streams might show up out of order
@@ -467,13 +471,13 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 				}
 
 				for(size_t j=0; j<nstreams; j++)
-					chan->AddStream(Unit(yunits[j]), names[j]);
+					chan->AddStream(yunit, names[j], stype);
 			}
 		}
 
-		switch(chan->GetType())
+		switch(chan->GetType(0))
 		{
-			case OscilloscopeChannel::CHANNEL_TYPE_ANALOG:
+			case Stream::STREAM_TYPE_ANALOG:
 				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
 
 				if(cnode["xunit"])
@@ -495,7 +499,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 					SetADCMode(chan->GetIndex(), cnode["adcmode"].as<int>());
 				break;
 
-			case OscilloscopeChannel::CHANNEL_TYPE_DIGITAL:
+			case Stream::STREAM_TYPE_DIGITAL:
 				if(cnode["thresh"])
 					chan->SetDigitalThreshold(cnode["thresh"].as<float>());
 				if(cnode["hys"])
@@ -689,7 +693,7 @@ Oscilloscope::AnalogBank Oscilloscope::GetAnalogBank(size_t /*channel*/)
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
 		auto chan = m_channels[i];
-		if(chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+		if(chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 			ret.push_back(chan);
 	}
 	return ret;
