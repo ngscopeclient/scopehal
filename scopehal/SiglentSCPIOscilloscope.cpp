@@ -1511,7 +1511,7 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	time_t ttime,
 	double basetime,
 	double* wavetime,
-	int /* ch */)
+	int ch)
 {
 	vector<WaveformBase*> ret;
 
@@ -1550,9 +1550,34 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	int16_t* wdata = (int16_t*)&data[0];
 	int8_t* bdata = (int8_t*)&data[0];
 
-	// SDS2000X+ and SDS5000X have 30 codes per div. Todo; SDS6000X has 425.
-	// We also need to accomodate probe attenuation here.
-	v_gain = v_gain * v_probefactor / 30;
+	float codes_per_div;
+
+	//Codes per div varies with vertical scale on SDS6000A!
+	//500 uV/div: 63.75 codes per div
+	//1 mV - 10 mV/div: 127.5 codes per div
+	//Larger scales: 170 codes per div
+	if(m_modelid == MODEL_SIGLENT_SDS6000A)
+	{
+		float volts_per_div = GetChannelVoltageRange(ch, 0) / 8;
+
+		if(volts_per_div < 0.001)
+			codes_per_div = 63.75;
+		else if(volts_per_div < 0.011)
+			codes_per_div = 127.5;
+		else
+			codes_per_div = 170;
+
+		//Codes per div from datasheet assume 12 bit ADC resolution
+		//Rescale to 8 bit for US-market SDS6000A scopes
+		//TODO: remove this for Asia-market 10/12 bit models
+		codes_per_div /= 16;
+	}
+
+	//SDS2000X+ and SDS5000X have 30 codes per div.
+	else
+		codes_per_div = 30;
+
+	v_gain = v_gain * v_probefactor / codes_per_div;
 
 	//in word mode, we have 256x as many codes
 	if(m_highDefinition)
