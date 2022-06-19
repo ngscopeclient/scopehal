@@ -206,6 +206,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 
 			//This is the default behavior, but it's safer to explicitly specify it
 			//TODO: save bandwidth and simplify parsing by doing OFF
@@ -236,6 +237,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			m_transport->DeduplicateCommand("OFFSET");
 			m_transport->DeduplicateCommand("SCALE");
 			break;
@@ -321,6 +323,16 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 500;
 			if(m_model.compare(5, 1, "0") == 0)
 				m_maxBandwidth = 1000;
+		}
+		else if(m_model.compare(0, 4, "SDS6") == 0)
+		{
+			m_modelid = MODEL_SIGLENT_SDS6000A;
+
+			m_maxBandwidth = 500;
+			if(m_model.compare(4, 1, "1") == 0)
+				m_maxBandwidth = 1000;
+			if(m_model.compare(4, 2, "2") == 0)
+				m_maxBandwidth = 2000;
 		}
 		else
 		{
@@ -549,6 +561,7 @@ bool SiglentSCPIOscilloscope::IsChannelEnabled(size_t i)
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				reply = converse(":CHANNEL%d:SWITCH?", i + 1);
 				{
 					lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -597,6 +610,7 @@ void SiglentSCPIOscilloscope::EnableChannel(size_t i)
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				sendOnly(":CHANNEL%d:SWITCH ON", i + 1);
 				break;
 			// --------------------------------------------------
@@ -654,6 +668,7 @@ void SiglentSCPIOscilloscope::DisableChannel(size_t i)
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				//If this is an analog channel, just toggle it
 				if(i < m_analogChannelCount)
 					sendOnly(":CHANNEL%d:SWITCH OFF", i + 1);
@@ -716,6 +731,15 @@ vector<OscilloscopeChannel::CouplingType> SiglentSCPIOscilloscope::GetAvailableC
 			ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
 			ret.push_back(OscilloscopeChannel::COUPLE_GND);
 			break;
+
+		//SDS6000A does not support 50 ohm AC coupling
+		case MODEL_SIGLENT_SDS6000A:
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			ret.push_back(OscilloscopeChannel::COUPLE_GND);
+			break;
+
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -755,6 +779,7 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			replyType = Trim(converse(":CHANNEL%d:COUPLING?", i + 1).substr(0, 2));
 			replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
 
@@ -825,6 +850,7 @@ void SiglentSCPIOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_AC_1M:
@@ -883,6 +909,7 @@ double SiglentSCPIOscilloscope::GetChannelAttenuation(size_t i)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = converse(":CHANNEL%d:PROBE?", i + 1);
 			break;
 		// --------------------------------------------------
@@ -933,6 +960,7 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":CHANNEL%d:PROBE %lf", i + 1, atten);
 			break;
 
@@ -963,6 +991,7 @@ vector<unsigned int> SiglentSCPIOscilloscope::GetChannelBandwidthLimiters(size_t
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			//"no limit"
 			ret.push_back(0);
 
@@ -1003,6 +1032,7 @@ int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = converse(":CHANNEL%d:BWLIMIT?", i + 1);
 			if(reply == "FULL")
 				return 0;
@@ -1046,6 +1076,7 @@ void SiglentSCPIOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int li
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			switch(limit_mhz)
 			{
 				case 0:
@@ -1120,6 +1151,7 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = Trim(converse(":CHANNEL%d:INVERT?", i + 1));
 			break;
 		// --------------------------------------------------
@@ -1157,6 +1189,7 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if(i < m_analogChannelCount)
 			{
 				sendOnly(":CHANNEL%ld:LABEL:TEXT \"%s\"", i + 1, name.c_str());
@@ -1205,6 +1238,7 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if(i < m_analogChannelCount)
 			{
 				name = converse(":CHANNEL%d:LABEL:TEXT?", i + 1);
@@ -1269,6 +1303,7 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sinr = converse(":TRIGGER:STATUS?");
 			break;
 		// --------------------------------------------------
@@ -1845,6 +1880,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if(!ReadWavedescs(m_wavedescs, enabled, firstEnabledChannel, any_enabled))
 				return false;
 
@@ -2022,6 +2058,7 @@ void SiglentSCPIOscilloscope::Start()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TRIGGER:MODE STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");	 //always do single captures, just re-trigger
 			break;
@@ -2052,6 +2089,7 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TRIGGER:MODE STOP");
 			sendOnly(":TRIGGER:MODE SINGLE");
 			break;
@@ -2079,6 +2117,7 @@ void SiglentSCPIOscilloscope::Stop()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TRIGGER:MODE STOP");
 			break;
 		// --------------------------------------------------
@@ -2115,6 +2154,7 @@ void SiglentSCPIOscilloscope::ForceTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TRIGGER:MODE SINGLE");
 			if(!m_triggerArmed)
 				sendOnly(":TRIGGER:MODE SINGLE");
@@ -2155,6 +2195,7 @@ float SiglentSCPIOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = converse(":CHANNEL%ld:OFFSET?", i + 1);
 			break;
 		// --------------------------------------------------
@@ -2189,6 +2230,7 @@ void SiglentSCPIOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, floa
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				sendOnly(":CHANNEL%ld:OFFSET %1.2E", i + 1, offset);
 				break;
 			// --------------------------------------------------
@@ -2227,6 +2269,7 @@ float SiglentSCPIOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = converse(":CHANNEL%d:SCALE?", i + 1);
 			break;
 		// --------------------------------------------------
@@ -2260,6 +2303,7 @@ void SiglentSCPIOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":CHANNEL%ld:SCALE %.4f", i + 1, vdiv);
 			break;
 		// --------------------------------------------------
@@ -2301,6 +2345,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			ret = {10 * 1000,
 				20 * 1000,
 				50 * 1000,
@@ -2352,6 +2397,7 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
 		// --------------------------------------------------
@@ -2401,6 +2447,7 @@ uint64_t SiglentSCPIOscilloscope::GetSampleRate()
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				reply = converse(":ACQUIRE:SRATE?");
 				break;
 			// --------------------------------------------------
@@ -2437,6 +2484,7 @@ uint64_t SiglentSCPIOscilloscope::GetSampleDepth()
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				reply = converse(":ACQUIRE:MDEPTH?");
 				break;
 			// --------------------------------------------------
@@ -2512,6 +2560,7 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
@@ -2599,6 +2648,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TIMEBASE:SCALE %1.2E", sampletime / 10);
 			break;
 		// --------------------------------------------------
@@ -2638,6 +2688,7 @@ void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":TIMEBASE:DELAY %1.2E", (halfwidth - offset) * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
@@ -2673,6 +2724,7 @@ int64_t SiglentSCPIOscilloscope::GetTriggerOffset()
 			// --------------------------------------------------
 			case MODEL_SIGLENT_SDS2000XP:
 			case MODEL_SIGLENT_SDS5000X:
+			case MODEL_SIGLENT_SDS6000A:
 				reply = converse(":TIMEBASE:DELAY?");
 				break;
 			// --------------------------------------------------
@@ -2717,6 +2769,7 @@ void SiglentSCPIOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":CHANNEL%ld:SKEW %1.2E", channel, skew * SECONDS_PER_FS);
 			break;
 		// --------------------------------------------------
@@ -2757,6 +2810,7 @@ int64_t SiglentSCPIOscilloscope::GetDeskewForChannel(size_t channel)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			reply = converse(":CHANNEL%ld:SKEW?", channel + 1);
 			break;
 		// --------------------------------------------------
@@ -2802,6 +2856,7 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if((m_channelsEnabled[0] == true) && (m_channelsEnabled[1] == true))
 			{
 				// Channel 1 and 2
@@ -3060,6 +3115,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			//Figure out what kind of trigger is active.
 			reply = Trim(converse(":TRIGGER:TYPE?"));
 			if(reply == "DROPout")
@@ -3183,6 +3239,7 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			//Level
 			et->SetLevel(stof(converse(":TRIGGER:EDGE:LEVEL?")));
 
@@ -3437,6 +3494,7 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if(reply == "RISing")
 				trig->SetType(EdgeTrigger::EDGE_RISING);
 			else if(reply == "FALLing")
@@ -3525,6 +3583,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			if(dt)
 			{
 				sendOnly(":TRIGGER:TYPE DROPOUT");
@@ -3641,6 +3700,7 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			switch(trig->GetType())
 			{
 				case EdgeTrigger::EDGE_RISING:
@@ -3853,6 +3913,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			ret.push_back(DropoutTrigger::GetTriggerName());
 			ret.push_back(EdgeTrigger::GetTriggerName());
 			ret.push_back(PulseWidthTrigger::GetTriggerName());
