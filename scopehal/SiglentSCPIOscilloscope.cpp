@@ -205,8 +205,6 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
-		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
 
 			//This is the default behavior, but it's safer to explicitly specify it
 			//TODO: save bandwidth and simplify parsing by doing OFF
@@ -216,12 +214,21 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			//Only use increased bit depth if the scope actually puts content there!
 			sendOnly(":WAVEFORM:WIDTH %s", m_highDefinition ? "WORD" : "BYTE");
 			break;
+
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			sendOnly("CHDR SHORT");
+			break;
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
 			break;
 			// --------------------------------------------------
 	}
+
+	//Controlled memory depth, adjust sample rate based on this
+	if(m_modelid == MODEL_SIGLENT_SDS6000A)
+		sendOnly("ACQ:MMAN FMDepth");
 
 	//Clear the state-change register to we get rid of any history we don't care about
 	PollTrigger();
@@ -2370,7 +2377,6 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
 			ret = {10 * 1000,
 				20 * 1000,
 				50 * 1000,
@@ -2388,6 +2394,27 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 				500 * 1000 * 1000,
 				1 * 1000 * 1000 * 1000};
 			break;
+
+		case MODEL_SIGLENT_SDS6000A:
+			ret = {10 * 1000,
+				20 * 1000,
+				50 * 1000,
+				100 * 1000,
+				200 * 1000,
+				500 * 1000,
+				1 * 1000 * 1000,
+				2 * 1000 * 1000,
+				5 * 1000 * 1000,
+				10 * 1000 * 1000,
+				20 * 1000 * 1000,
+				50 * 1000 * 1000,
+				100 * 1000 * 1000,
+				200 * 1000 * 1000,
+				500 * 1000 * 1000,
+				1 * 1000 * 1000 * 1000L,
+				5 * 1000 * 1000 * 1000L,
+				10 * 1000 * 1000 * 1000L};
+			break;
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -2400,6 +2427,10 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleRatesInterleaved()
 {
+	//no interleaving on SDS6000A
+	if(m_modelid == MODEL_SIGLENT_SDS6000A)
+		return GetSampleRatesNonInterleaved();
+
 	vector<uint64_t> ret = GetSampleRatesNonInterleaved();
 	for(size_t i=0; i<ret.size(); i++)
 		ret[i] *= 2;
@@ -2422,9 +2453,60 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
 			ret = {10 * 1000, 100 * 1000, 1000 * 1000, 10 * 1000 * 1000};
 			break;
+
+		case MODEL_SIGLENT_SDS6000A:
+
+			if(m_maxBandwidth == 2000)
+			{
+				ret =
+				{
+					2500,
+					5000,
+					25 * 1000,
+					50 * 1000,
+					250 * 1000,
+					500 * 1000,
+					2500 * 1000L,
+					5000 * 1000L,
+					12500 * 1000L
+
+					//these depths need chunked download?? TODO
+					/*,
+					25000 * 1000L,
+					50000 * 1000L,
+					125000 * 1000L,
+					250000 * 1000L,
+					500000 * 1000L
+					*/
+				};
+			}
+			else
+			{
+				ret =
+				{
+					1250,
+					2500,
+					5000,
+					25 * 1000,
+					50 * 1000,
+					250 * 1000,
+					500 * 1000,
+					2500 * 1000L,
+					5000 * 1000L,
+					12500 * 1000L
+
+					//these depths need chunked download?? TODO
+					/*,
+					25000 * 1000L,
+					50000 * 1000L,
+					125000 * 1000L
+					*/
+				};
+			}
+			break;
+
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -2436,6 +2518,10 @@ vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsNonInterleaved()
 
 vector<uint64_t> SiglentSCPIOscilloscope::GetSampleDepthsInterleaved()
 {
+	//no interleaving on SDS6000A 2 GHz SKU
+	if( (m_modelid == MODEL_SIGLENT_SDS6000A) && (m_maxBandwidth == 2000) )
+		return GetSampleDepthsNonInterleaved();
+
 	vector<uint64_t> ret = GetSampleDepthsNonInterleaved();
 	for(size_t i=0; i<ret.size(); i++)
 		ret[i] *= 2;
@@ -2585,7 +2671,6 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
 
 			// we can not change memory size in Run/Stop mode
 			sendOnly("TRIG_MODE AUTO");
@@ -2641,6 +2726,87 @@ void SiglentSCPIOscilloscope::SetSampleDepth(uint64_t depth)
 				// change to stop mode
 				sendOnly("TRIG_MODE STOP");
 			}
+			break;
+
+		case MODEL_SIGLENT_SDS6000A:
+
+			// we can not change memory size in Run/Stop mode
+			sendOnly("TRIG_MODE AUTO");
+
+			switch(depth)
+			{
+				case 1250:
+					sendOnly("ACQUIRE:MDEPTH 1.25k");
+					break;
+				case 2500:
+					sendOnly("ACQUIRE:MDEPTH 2.5k");
+					break;
+				case 5000:
+					sendOnly("ACQUIRE:MDEPTH 5k");
+					break;
+				case 12500:
+					sendOnly("ACQUIRE:MDEPTH 12.5k");
+					break;
+				case 25000:
+					sendOnly("ACQUIRE:MDEPTH 25k");
+					break;
+				case 50000:
+					sendOnly("ACQUIRE:MDEPTH 50k");
+					break;
+				case 125000:
+					sendOnly("ACQUIRE:MDEPTH 125k");
+					break;
+				case 250000:
+					sendOnly("ACQUIRE:MDEPTH 250k");
+					break;
+				case 500000:
+					sendOnly("ACQUIRE:MDEPTH 500k");
+					break;
+				case 1250000:
+					sendOnly("ACQUIRE:MDEPTH 1.25M");
+					break;
+				case 2500000:
+					sendOnly("ACQUIRE:MDEPTH 2.5M");
+					break;
+				case 5000000:
+					sendOnly("ACQUIRE:MDEPTH 5M");
+					break;
+				case 12500000:
+					sendOnly("ACQUIRE:MDEPTH 12.5M");
+					break;
+				case 25000000:
+					sendOnly("ACQUIRE:MDEPTH 25M");
+					break;
+				case 50000000:
+					sendOnly("ACQUIRE:MDEPTH 50M");
+					break;
+				case 62500000:
+					sendOnly("ACQUIRE:MDEPTH 62.5M");
+					break;
+				case 125000000:
+					sendOnly("ACQUIRE:MDEPTH 125M");
+					break;
+				case 250000000:
+					sendOnly("ACQUIRE:MDEPTH 250M");
+					break;
+				case 500000000:
+					sendOnly("ACQUIRE:MDEPTH 500M");
+					break;
+			}
+
+			if(IsTriggerArmed())
+			{
+				// restart trigger
+				sendOnly("TRIG_MODE SINGLE");
+			}
+			else
+			{
+				// change to stop mode
+				sendOnly("TRIG_MODE STOP");
+			}
+
+			//Force sample rate to be correct, adjusting time/div if needed
+			SetSampleRate(GetSampleRate());
 
 			break;
 		// --------------------------------------------------
@@ -2663,6 +2829,7 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_memoryDepthValid = false;
 	double sampletime = GetSampleDepth() / (double)rate;
+	double scale = sampletime / 10;
 
 	switch(m_modelid)
 	{
@@ -2673,9 +2840,20 @@ void SiglentSCPIOscilloscope::SetSampleRate(uint64_t rate)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TIMEBASE:SCALE %1.2E", sampletime / 10);
+			sendOnly(":TIMEBASE:SCALE %1.2E", scale);
 			break;
+
+		//Timebase must be multiples of 1-2-5 so truncate any fractional component
+		case MODEL_SIGLENT_SDS6000A:
+			{
+				char tmp[128];
+				snprintf(tmp, sizeof(tmp), "%1.0E", scale);
+				if(tmp[0] == '3')
+					tmp[0] = '2';
+				sendOnly(":TIMEBASE:SCALE %s", tmp);
+			}
+			break;
+
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -2881,7 +3059,6 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
-		case MODEL_SIGLENT_SDS6000A:
 			if((m_channelsEnabled[0] == true) && (m_channelsEnabled[1] == true))
 			{
 				// Channel 1 and 2
@@ -2893,6 +3070,9 @@ bool SiglentSCPIOscilloscope::IsInterleaving()
 				return false;
 			}
 			return true;
+		case MODEL_SIGLENT_SDS6000A:
+			return false;
+
 		// --------------------------------------------------
 		default:
 			LogError("Unknown scope type\n");
@@ -2930,6 +3110,10 @@ vector<string> SiglentSCPIOscilloscope::GetADCModeNames(size_t /*channel*/)
 
 size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 {
+	//Only SDS2000X+ has settable ADC resolution
+	if(m_modelid != MODEL_SIGLENT_SDS2000XP)
+		return 0;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 		if(m_adcModeValid)
@@ -2958,6 +3142,10 @@ size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 
 void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 {
+	//Only SDS2000X+ has settable ADC resolution
+	if(m_modelid != MODEL_SIGLENT_SDS2000XP)
+		return;
+
 	//Update cache first
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
