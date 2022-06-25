@@ -40,7 +40,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EnhancedResolutionFilter.cpp
 	ESPIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
-	Ethernet100BaseTDecoder.cpp
+	Ethernet100BaseTXDecoder.cpp
 	Ethernet1000BaseXDecoder.cpp
 	Ethernet10GBaseRDecoder.cpp
 	Ethernet64b66bDecoder.cpp

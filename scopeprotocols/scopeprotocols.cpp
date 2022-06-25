@@ -90,7 +90,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EnhancedResolutionFilter);
 	AddDecoderClass(ESPIDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
+	AddDecoderClass(Ethernet100BaseTXDecoder);
 	AddDecoderClass(Ethernet1000BaseXDecoder);
 	AddDecoderClass(Ethernet10GBaseRDecoder);
 	AddDecoderClass(Ethernet64b66bDecoder);

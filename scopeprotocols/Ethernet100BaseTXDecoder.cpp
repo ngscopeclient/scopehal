@@ -29,14 +29,14 @@
 
 #include "../scopehal/scopehal.h"
 #include "EthernetProtocolDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
+#include "Ethernet100BaseTXDecoder.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(const string& color)
+Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
 }
@@ -44,7 +44,7 @@ Ethernet100BaseTDecoder::Ethernet100BaseTDecoder(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string Ethernet100BaseTDecoder::GetProtocolName()
+string Ethernet100BaseTXDecoder::GetProtocolName()
 {
 	return "Ethernet - 100baseTX";
 }
@@ -52,7 +52,7 @@ string Ethernet100BaseTDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void Ethernet100BaseTDecoder::Refresh()
+void Ethernet100BaseTXDecoder::Refresh()
 {
 	ClearPackets();
 
@@ -220,7 +220,7 @@ void Ethernet100BaseTDecoder::Refresh()
 		}
 		if(!synced)
 		{
-			LogTrace("Ethernet100BaseTDecoder: Unable to sync RX LFSR\n");
+			LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
 			descrambled_bits.clear();
 			continue;
 		}
@@ -383,7 +383,7 @@ void Ethernet100BaseTDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-bool Ethernet100BaseTDecoder::TrySync(
+bool Ethernet100BaseTXDecoder::TrySync(
 	DigitalWaveform& bits,
 	DigitalWaveform& descrambled_bits,
 	size_t idle_offset,
@@ -440,7 +440,7 @@ bool Ethernet100BaseTDecoder::TrySync(
 	return true;
 }
 
-int Ethernet100BaseTDecoder::GetState(float voltage)
+int Ethernet100BaseTXDecoder::GetState(float voltage)
 {
 	if(voltage > 0.3)
 		return 1;

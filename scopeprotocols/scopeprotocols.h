@@ -82,7 +82,7 @@
 #include "EthernetRGMIIDecoder.h"
 #include "EthernetRMIIDecoder.h"
 #include "Ethernet10BaseTDecoder.h"
-#include "Ethernet100BaseTDecoder.h"
+#include "Ethernet100BaseTXDecoder.h"
 #include "Ethernet1000BaseXDecoder.h"
 #include "Ethernet10GBaseRDecoder.h"
 #include "Ethernet64b66bDecoder.h"

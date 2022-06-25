@@ -30,20 +30,20 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTDecoder
+	@brief Declaration of Ethernet100BaseTXDecoder
  */
-#ifndef Ethernet100BaseTDecoder_h
-#define Ethernet100BaseTDecoder_h
+#ifndef Ethernet100BaseTXDecoder_h
+#define Ethernet100BaseTXDecoder_h
 
-class Ethernet100BaseTDecoder : public EthernetProtocolDecoder
+class Ethernet100BaseTXDecoder : public EthernetProtocolDecoder
 {
 public:
-	Ethernet100BaseTDecoder(const std::string& color);
+	Ethernet100BaseTXDecoder(const std::string& color);
 
 	virtual void Refresh();
 	static std::string GetProtocolName();
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTDecoder)
+	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
 
 protected:
 	int GetState(float voltage);
