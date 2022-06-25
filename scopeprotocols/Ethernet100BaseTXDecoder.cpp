@@ -39,6 +39,11 @@ using namespace std;
 Ethernet100BaseTXDecoder::Ethernet100BaseTXDecoder(const string& color)
 	: EthernetProtocolDecoder(color)
 {
+	m_signalNames.clear();
+	m_inputs.clear();
+
+	CreateInput("data");
+	CreateInput("clk");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +54,20 @@ string Ethernet100BaseTXDecoder::GetProtocolName()
 	return "Ethernet - 100baseTX";
 }
 
+bool Ethernet100BaseTXDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+		return true;
+
+	return false;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -56,7 +75,7 @@ void Ethernet100BaseTXDecoder::Refresh()
 {
 	ClearPackets();
 
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
@@ -64,323 +83,199 @@ void Ethernet100BaseTXDecoder::Refresh()
 
 	//Get the input data
 	auto din = GetAnalogInputWaveform(0);
+	auto clk = GetDigitalInputWaveform(1);
 
-	//Copy our time scales from the input
-	EthernetWaveform* cap = new EthernetWaveform;
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-
-	const int64_t ui_width 			= 8000000;
-	const int64_t ui_width_samples	= ui_width / din->m_timescale;
-	//const int64_t ui_halfwidth 		= 4000000;
-	//const int64_t jitter_tol 		= 1500000;
-
-	//Logical voltage of each point after some hysteresis
-	vector<EmptyConstructorWrapper<int>> voltages;
-	size_t ilen = din->m_samples.size();
-	voltages.resize(ilen);
-	int oldstate = GetState(din->m_samples[0]);
-	voltages[0] = 0;
-	for(size_t i=1; i<ilen; i++)
-	{
-		int newstate = oldstate;
-		float voltage = din->m_samples[i];
-		switch(oldstate)
-		{
-			//At the middle? Need significant motion either way to change state
-			case 0:
-				if(voltage > 0.6)
-					newstate = 1;
-				else if(voltage < -0.6)
-					newstate = -1;
-				break;
-
-			//High? Move way low to change
-			case 1:
-				if(voltage < 0.2)
-					newstate = 0;
-				break;
-
-			//Low? Move way high to change
-			case -1:
-				if(voltage > -0.2)
-					newstate = 0;
-				break;
-		}
-
-		voltages[i] = newstate;
-		oldstate = newstate;
-	}
+	//Sample the input on the edges of the recovered clock
+	AnalogWaveform samples;
+	SampleOnAnyEdges(din, clk, samples);
+	size_t ilen = samples.m_samples.size();
 
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
-	int old_voltage = voltages[0];
+	int oldstate = GetState(samples.m_samples[0]);
 	DigitalWaveform bits;
-	bool signal_ok = false;
-	vector<size_t> carrier_starts;
-	vector<size_t> carrier_stops;
-	size_t losslen = 20*ui_width;
-	size_t old_offset = 0;
-	float ui_inverse = 1.0f / ui_width;
-	for(size_t i=0; i<ilen; i++)
+	for(size_t i=1; i<ilen; i++)
 	{
-		if(voltages[i] != old_voltage)
-		{
-			if(!signal_ok)
-			{
-				signal_ok = true;
-				LogTrace("Carrier found at index %zu\n", i);
-				carrier_starts.push_back(i);
-			}
+		int nstate = GetState(samples.m_samples[i]);
 
-			//Don't actually process the first bit since it's truncated
-			if(old_offset != 0)
-			{
-				//See how long the voltage stayed constant.
-				//For each UI, add a "0" bit, then a "1" bit for the current state
-				int64_t tchange = din->m_offsets[i];
-				int64_t dt = (tchange - old_offset) * din->m_timescale;
-				int num_uis = round(dt * ui_inverse);
+		bits.m_offsets.push_back(samples.m_offsets[i]);
+		bits.m_durations.push_back(samples.m_durations[i]);
 
-				//Add zero bits for each UI without a transition
-				int64_t tnext;
-				for(int j=0; j<(num_uis - 1); j++)
-				{
-					tnext = old_offset + ui_width_samples*j;
-					bits.m_offsets.push_back(tnext);
-					bits.m_durations.push_back(ui_width_samples);
-					bits.m_samples.push_back(0);
-				}
-				tnext = old_offset + ui_width_samples*(num_uis - 1);
+		//No transition? Add a "0" bit
+		if(nstate == oldstate)
+			bits.m_samples.push_back(false);
 
-				//and then a 1 bit
-				bits.m_offsets.push_back(tnext);
-				bits.m_durations.push_back(ui_width_samples);
-				bits.m_samples.push_back(1);
-			}
+		//Transition? Add a "1" bit
+		else
+			bits.m_samples.push_back(true);
 
-			old_offset = din->m_offsets[i];
-			old_voltage = voltages[i];
-		}
-
-		//Look for complete loss of signal.
-		//We define this as more than 20 "0" symbols in a row.
-		if( (old_offset + losslen) < (size_t)din->m_offsets[i])
-		{
-			if(signal_ok)
-			{
-				signal_ok = false;
-				carrier_stops.push_back(i);
-				LogTrace("Carrier lost at index %zu\n", i);
-			}
-		}
+		oldstate = nstate;
 	}
 
-	//carrier stops at end of capture to simplify processing
-	bool lost_before_end = true;
-	if(carrier_stops.size() < carrier_starts.size())
+	//RX LFSR sync
+	size_t nbits = bits.m_samples.size();
+	DigitalWaveform descrambled_bits;
+	bool synced = false;
+	for(size_t idle_offset = 0; idle_offset<15000; idle_offset++)
 	{
-		lost_before_end = false;
-		carrier_stops.push_back(bits.m_offsets[bits.m_offsets.size()-1]);
-	}
-
-	//Run all remaining decode steps in blocks of valid signal
-	for(size_t nblock=0; nblock<carrier_starts.size(); nblock ++)
-	{
-		LogTrace("nblock = %zu\n", nblock);
-		size_t istart = carrier_starts[nblock];
-		size_t istop = carrier_stops[nblock];
-
-		//If we have multiple blocks of valid signal, add a [NO CARRIER] symbol between them
-		if(nblock > 0)
+		if(TrySync(bits, descrambled_bits, idle_offset, nbits))
 		{
-			size_t ilost = carrier_stops[nblock-1];
-			size_t tstart = din->m_offsets[ilost];
-			size_t tend = din->m_offsets[istart];
-			LogTrace("No carrier from %zu to %zu\n", tstart, tend);
-			EthernetFrameSegment seg;
-			seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;
-			cap->m_offsets.push_back(tstart);
-			cap->m_durations.push_back(tend - tstart);
-			cap->m_samples.push_back(seg);
-		}
-
-		//RX LFSR sync
-		DigitalWaveform descrambled_bits;
-		bool synced = false;
-		for(size_t idle_offset = istart; idle_offset<istart+15000 && idle_offset<istop; idle_offset++)
-		{
-			if(TrySync(bits, descrambled_bits, idle_offset, istop))
-			{
-				LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
-				synced = true;
-				break;
-			}
-		}
-		if(!synced)
-		{
-			LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
-			descrambled_bits.clear();
-			continue;
-		}
-
-		//Search until we find a 1100010001 (J-K, start of stream) sequence
-		bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
-		size_t i = 0;
-		bool hit = true;
-		size_t des10 = descrambled_bits.m_samples.size() - 10;
-		for(i=0; i<des10; i++)
-		{
-			hit = true;
-			for(int j=0; j<10; j++)
-			{
-				bool b = descrambled_bits.m_samples[i+j];
-				if(b != ssd[j])
-				{
-					hit = false;
-					break;
-				}
-			}
-
-			if(hit)
-				break;
-		}
-		if(!hit)
-		{
-			LogTrace("No SSD found\n");
-			continue;
-		}
-		LogTrace("Found SSD at %zu\n", i);
-
-		//Skip the J-K as we already parsed it
-		i += 10;
-
-		//4b5b decode table
-		static const unsigned int code_5to4[]=
-		{
-			0, //0x00 unused
-			0, //0x01 unused
-			0, //0x02 unused
-			0, //0x03 unused
-			0, //0x04 = /H/, tx error
-			0, //0x05 unused
-			0, //0x06 unused
-			0, //0x07 = /R/, second half of ESD
-			0, //0x08 unused
-			0x1,
-			0x4,
-			0x5,
-			0, //0x0c unused
-			0, //0x0d = /T/, first half of ESD
-			0x6,
-			0x7,
-			0, //0x10 unused
-			0, //0x11 = /K/, second half of SSD
-			0x8,
-			0x9,
-			0x2,
-			0x3,
-			0xa,
-			0xb,
-			0, //0x18 = /J/, first half of SSD
-			0, //0x19 unused
-			0xc,
-			0xd,
-			0xe,
-			0xf,
-			0x0,
-			0, //0x1f = idle
-		};
-
-		//Set of recovered bytes and timestamps
-		vector<uint8_t> bytes;
-		vector<uint64_t> starts;
-		vector<uint64_t> ends;
-
-		//Grab 5 bits at a time and decode them
-		bool first = true;
-		uint8_t current_byte = 0;
-		uint64_t current_start = 0;
-		size_t deslen = descrambled_bits.m_samples.size()-5;
-		for(; i<deslen; i+=5)
-		{
-			unsigned int code =
-				(descrambled_bits.m_samples[i+0] ? 16 : 0) |
-				(descrambled_bits.m_samples[i+1] ? 8 : 0) |
-				(descrambled_bits.m_samples[i+2] ? 4 : 0) |
-				(descrambled_bits.m_samples[i+3] ? 2 : 0) |
-				(descrambled_bits.m_samples[i+4] ? 1 : 0);
-
-			//Handle special stuff
-			if(code == 0x18)
-			{
-				//This is a /J/. Next code should be 0x11, /K/ - start of frame.
-				//Don't check it for now, just jump ahead 5 bits and get ready to read data
-				i += 5;
-				continue;
-			}
-			else if(code == 0x0d)
-			{
-				//This is a /T/. Next code should be 0x07, /R/ - end of frame.
-				//Crunch this frame
-				BytesToFrames(bytes, starts, ends, cap);
-
-				//Skip the /R/
-				i += 5;
-
-				//and reset for the next one
-				starts.clear();
-				ends.clear();
-				bytes.clear();
-				continue;
-			}
-
-			//TODO: process /H/ - 0x04 (error in the middle of a packet)
-
-			//Ignore idles
-			else if(code == 0x1f)
-				continue;
-
-			//Nope, normal nibble.
-			unsigned int decoded = code_5to4[code];
-			if(first)
-			{
-				current_start = descrambled_bits.m_offsets[i];
-				current_byte = decoded;
-			}
-			else
-			{
-				current_byte |= decoded << 4;
-
-				bytes.push_back(current_byte);
-				starts.push_back(current_start * cap->m_timescale);
-				uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
-				ends.push_back(end * cap->m_timescale);
-			}
-
-			first = !first;
+			LogTrace("Got good LFSR sync at offset %zu\n", idle_offset);
+			synced = true;
+			break;
 		}
 	}
-
-	LogTrace("%zu samples\n", cap->m_samples.size());
-
-	//If we lost the signal before the end of the capture, add a sample for that
-	if(lost_before_end)
+	if(!synced)
 	{
-		size_t nindex = carrier_stops[carrier_stops.size()-1];
-		size_t tstart = din->m_offsets[nindex];
-		size_t tend = din->m_offsets[din->m_samples.size()-1];
-		LogTrace("No carrier from index %zu (time %zu) to %zu (end of capture)\n",
-			nindex, tstart, tend);
-		EthernetFrameSegment seg;
-		seg.m_type = EthernetFrameSegment::TYPE_NO_CARRIER;
-		cap->m_offsets.push_back(tstart);
-		cap->m_durations.push_back(tend - tstart);
-		cap->m_samples.push_back(seg);
+		LogTrace("Ethernet100BaseTXDecoder: Unable to sync RX LFSR\n");
+		descrambled_bits.clear();
+		SetData(nullptr, 0);
+		return;
 	}
 
+	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
+	EthernetWaveform* cap = new EthernetWaveform;
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
+
+	//Search until we find a 1100010001 (J-K, start of stream) sequence
+	bool ssd[10] = {1, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+	size_t i = 0;
+	bool hit = true;
+	size_t des10 = descrambled_bits.m_samples.size() - 10;
+	for(i=0; i<des10; i++)
+	{
+		hit = true;
+		for(int j=0; j<10; j++)
+		{
+			bool b = descrambled_bits.m_samples[i+j];
+			if(b != ssd[j])
+			{
+				hit = false;
+				break;
+			}
+		}
+
+		if(hit)
+			break;
+	}
+	if(!hit)
+	{
+		LogTrace("No SSD found\n");
+		return;
+	}
+	LogTrace("Found SSD at %zu\n", i);
+
+	//Skip the J-K as we already parsed it
+	i += 10;
+
+	//4b5b decode table
+	static const unsigned int code_5to4[]=
+	{
+		0, //0x00 unused
+		0, //0x01 unused
+		0, //0x02 unused
+		0, //0x03 unused
+		0, //0x04 = /H/, tx error
+		0, //0x05 unused
+		0, //0x06 unused
+		0, //0x07 = /R/, second half of ESD
+		0, //0x08 unused
+		0x1,
+		0x4,
+		0x5,
+		0, //0x0c unused
+		0, //0x0d = /T/, first half of ESD
+		0x6,
+		0x7,
+		0, //0x10 unused
+		0, //0x11 = /K/, second half of SSD
+		0x8,
+		0x9,
+		0x2,
+		0x3,
+		0xa,
+		0xb,
+		0, //0x18 = /J/, first half of SSD
+		0, //0x19 unused
+		0xc,
+		0xd,
+		0xe,
+		0xf,
+		0x0,
+		0, //0x1f = idle
+	};
+
+	//Set of recovered bytes and timestamps
+	vector<uint8_t> bytes;
+	vector<uint64_t> starts;
+	vector<uint64_t> ends;
+
+	//Grab 5 bits at a time and decode them
+	bool first = true;
+	uint8_t current_byte = 0;
+	uint64_t current_start = 0;
+	size_t deslen = descrambled_bits.m_samples.size()-5;
+	for(; i<deslen; i+=5)
+	{
+		unsigned int code =
+			(descrambled_bits.m_samples[i+0] ? 16 : 0) |
+			(descrambled_bits.m_samples[i+1] ? 8 : 0) |
+			(descrambled_bits.m_samples[i+2] ? 4 : 0) |
+			(descrambled_bits.m_samples[i+3] ? 2 : 0) |
+			(descrambled_bits.m_samples[i+4] ? 1 : 0);
+
+		//Handle special stuff
+		if(code == 0x18)
+		{
+			//This is a /J/. Next code should be 0x11, /K/ - start of frame.
+			//Don't check it for now, just jump ahead 5 bits and get ready to read data
+			i += 5;
+			continue;
+		}
+		else if(code == 0x0d)
+		{
+			//This is a /T/. Next code should be 0x07, /R/ - end of frame.
+			//Crunch this frame
+			BytesToFrames(bytes, starts, ends, cap);
+
+			//Skip the /R/
+			i += 5;
+
+			//and reset for the next one
+			starts.clear();
+			ends.clear();
+			bytes.clear();
+			continue;
+		}
+
+		//TODO: process /H/ - 0x04 (error in the middle of a packet)
+
+		//Ignore idles
+		else if(code == 0x1f)
+			continue;
+
+		//Nope, normal nibble.
+		unsigned int decoded = code_5to4[code];
+		if(first)
+		{
+			current_start = descrambled_bits.m_offsets[i];
+			current_byte = decoded;
+		}
+		else
+		{
+			current_byte |= decoded << 4;
+
+			bytes.push_back(current_byte);
+			starts.push_back(current_start * cap->m_timescale);
+			uint64_t end = descrambled_bits.m_offsets[i+4] + descrambled_bits.m_durations[i+4];
+			ends.push_back(end * cap->m_timescale);
+		}
+
+		first = !first;
+	}
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(

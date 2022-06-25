@@ -43,6 +43,8 @@ public:
 	virtual void Refresh();
 	static std::string GetProtocolName();
 
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
 	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTXDecoder)
 
 protected:

@@ -251,8 +251,9 @@ public:
 	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
 	static std::vector<size_t> MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins);
 
-	//Samples a digital channel on the edges of another channel.
+	//Samples a channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
+	static void SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
 	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
 	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
