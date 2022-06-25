@@ -115,6 +115,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SWDMemAPDecoder.cpp
 	TachometerFilter.cpp
 	TappedDelayLineFilter.cpp
+	TCPDecoder.cpp
 	TDRFilter.cpp
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp

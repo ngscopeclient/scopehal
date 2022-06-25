@@ -162,6 +162,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SWDMemAPDecoder);
 	AddDecoderClass(TachometerFilter);
 	AddDecoderClass(TappedDelayLineFilter);
+	AddDecoderClass(TCPDecoder);
 	AddDecoderClass(TDRFilter);
 	//AddDecoderClass(TDRStepDeEmbedFilter);
 	AddDecoderClass(ThresholdFilter);

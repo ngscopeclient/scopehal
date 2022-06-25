@@ -150,6 +150,7 @@
 #include "SWDMemAPDecoder.h"
 #include "TachometerFilter.h"
 #include "TappedDelayLineFilter.h"
+#include "TCPDecoder.h"
 #include "TDRFilter.h"
 #include "TDRStepDeEmbedFilter.h"
 #include "ThresholdFilter.h"
