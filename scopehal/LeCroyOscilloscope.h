@@ -110,6 +110,7 @@ public:
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool PeekTriggerArmed();
 	virtual bool AcquireData();
 	virtual void Start();
 	virtual void StartSingleTrigger();

@@ -2135,6 +2135,19 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 		return TRIGGER_MODE_STOP;
 }
 
+bool LeCroyOscilloscope::PeekTriggerArmed()
+{
+	//Read the Internal State Change Register
+	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
+	int inr = atoi(sinr.c_str());
+
+	if(inr & 0x2000)
+		return true;
+
+	else
+		return false;
+}
+
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 {
 	//Prefix "DESC,\n" or "DAT1,\n". Always seems to be 6 chars and start with a D.

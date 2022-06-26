@@ -400,10 +400,15 @@ public:
 	virtual Oscilloscope::TriggerMode PollTrigger() =0;
 
 	/**
-		@brief Checks if the trigger is armed, without altering internal state or checking caches.
+		@brief Checks if the trigger is armed directly on the instrument, without altering internal state or touching caches.
 
 		The default implementation of this function simply calls PollTrigger(). This function should be overridden by
-		the driver class if PollTrigger() changes any internal driver state or updates caches.
+		the driver class if PollTrigger() changes any internal driver state or accesses cached state (including a
+		clientside "trigger armed" flag).
+
+		In particular, the multi-scope synchronization feature requires that this function not return true until the
+		instment has confirmed the arm command has completely executed. Otherwise we risk losing trigger events
+		by arming the primary before the secondary is ready to accept a trigger.
 	 */
 	virtual bool PeekTriggerArmed();
 
