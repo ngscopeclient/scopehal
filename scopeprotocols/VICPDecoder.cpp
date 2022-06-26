@@ -232,6 +232,8 @@ void VICPDecoder::Refresh()
 				//Discard all headers
 				case 2:
 
+					continuing = false;
+
 					//Anything but data? We don't care, ignore it
 					if(sym.m_type != TCPSymbol::TYPE_DATA)
 						i++;
@@ -465,9 +467,8 @@ void VICPDecoder::Refresh()
 			{
 				state = 0;
 				continuing = true;
+				done = false;
 			}
-			else
-				continuing = false;
 		}
 	}
 }
