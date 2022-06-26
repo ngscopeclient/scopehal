@@ -171,6 +171,7 @@
 #include "VectorFrequencyFilter.h"
 #include "VectorPhaseFilter.h"
 #include "VerticalBathtub.h"
+#include "VICPDecoder.h"
 #include "Waterfall.h"
 #include "WAVImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"

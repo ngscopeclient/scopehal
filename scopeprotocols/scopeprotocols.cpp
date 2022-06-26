@@ -183,6 +183,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(VectorFrequencyFilter);
 	AddDecoderClass(VectorPhaseFilter);
 	AddDecoderClass(VerticalBathtub);
+	AddDecoderClass(VICPDecoder);
 	AddDecoderClass(Waterfall);
 	AddDecoderClass(WAVImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
