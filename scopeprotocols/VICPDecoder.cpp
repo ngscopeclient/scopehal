@@ -158,7 +158,10 @@ void VICPDecoder::Refresh()
 
 			//Try continuing an existing TCP segment as a new frame.
 			if(continuing && (sym.m_type != TCPSymbol::TYPE_DATA) )
+			{
+				continuing = false;
 				break;
+			}
 
 			//Unexpected source port? This packet is over, move on to the next one
 			if( (state != 0) && (state != 11) && (sym.m_type == TCPSymbol::TYPE_SOURCE_PORT) )
