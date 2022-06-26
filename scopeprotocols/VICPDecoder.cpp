@@ -95,6 +95,11 @@ void VICPDecoder::Refresh()
 
 	auto tx = dynamic_cast<TCPWaveform*>(GetInputWaveform(0));
 	auto rx = dynamic_cast<TCPWaveform*>(GetInputWaveform(1));
+	if( (tx == nullptr) || (rx == nullptr) )
+	{
+		SetData(nullptr, 0);
+		return;
+	}
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
 	auto cap = new VICPWaveform;
@@ -130,8 +135,12 @@ void VICPDecoder::Refresh()
 		size_t len = nextIsTx ? txlen : rxlen;
 		TCPWaveform* p = nextIsTx ? tx : rx;
 
+		int payloadBytesLeft = 0;
+
 		//Process it
 		int state = 0;
+		bool done = false;
+		bool continuing = false;
 		while(i < len)
 		{
 			auto& sym = p->m_samples[i];
@@ -147,8 +156,12 @@ void VICPDecoder::Refresh()
 				break;
 			}
 
+			//Try continuing an existing TCP segment as a new frame.
+			if(continuing && (sym.m_type != TCPSymbol::TYPE_DATA) )
+				break;
+
 			//Unexpected source port? This packet is over, move on to the next one
-			if( (state != 0) && (sym.m_type == TCPSymbol::TYPE_SOURCE_PORT) )
+			if( (state != 0) && (state != 11) && (sym.m_type == TCPSymbol::TYPE_SOURCE_PORT) )
 				break;
 
 			switch(state)
@@ -156,29 +169,33 @@ void VICPDecoder::Refresh()
 				//Start of a new TCP segment (source port)
 				case 0:
 
+					//If we see "data" we might be continuing an existing TCP segment with a new VICP frame.
+					if( (sym.m_type == TCPSymbol::TYPE_DATA) && continuing)
+						state = 2;
+
 					//Expect "source port", abort if we see anything else
-					if(sym.m_type != TCPSymbol::TYPE_SOURCE_PORT)
-					{
+					else if(sym.m_type != TCPSymbol::TYPE_SOURCE_PORT)
 						err = true;
-						break;
-					}
 
-					//All good, we have a source port.
-					//If we are on the TX side, it should be 1861 (VICP), 0x0745.
-					//Don't care about RX.
-					if(nextIsTx)
+					else
 					{
-						if( (sym.m_data[0] != 0x07) || (sym.m_data[1] != 0x45) )
+						//All good, we have a source port.
+						//If we are on the TX side, it should be 1861 (VICP), 0x0745.
+						//Don't care about RX.
+						if(nextIsTx)
 						{
-							err = true;
-							break;
+							if( (sym.m_data[0] != 0x07) || (sym.m_data[1] != 0x45) )
+							{
+								err = true;
+								break;
+							}
 						}
-					}
 
-					//If we get here, port number is valid or dontcare.
-					//Move on to destination port.
-					state = 1;
-					i++;
+						//If we get here, port number is valid or dontcare.
+						//Move on to destination port.
+						state = 1;
+						i++;
+					}
 					break;
 
 				//Destination port
@@ -341,7 +358,8 @@ void VICPDecoder::Refresh()
 						cap->m_durations[clen-1] = (start+dur) - cap->m_offsets[clen-1];
 						cap->m_samples[clen-1].m_data = (cap->m_samples[clen-1].m_data << 8) | sym.m_data[0];
 
-						pack->m_headers["Length"] = to_string(cap->m_samples[clen-1].m_data);
+						payloadBytesLeft = cap->m_samples[clen-1].m_data;
+						pack->m_headers["Length"] = to_string(payloadBytesLeft);
 
 						state++;
 						i++;
@@ -366,6 +384,8 @@ void VICPDecoder::Refresh()
 
 						state = 11;
 						i++;
+
+						payloadBytesLeft --;
 					}
 
 					break;
@@ -373,28 +393,60 @@ void VICPDecoder::Refresh()
 				//Additional payload data
 				case 11:
 
-					//Should be data
-					if(sym.m_type != TCPSymbol::TYPE_DATA)
+					//Start of a new TCP segment before we've hit the end of the frame?
+					//Skip headers then go back here
+					if(sym.m_type == TCPSymbol::TYPE_SOURCE_PORT)
+					{
+						i++;
+						state = 12;
+					}
+
+					//Should be data, abort if we see something else
+					else if(sym.m_type != TCPSymbol::TYPE_DATA)
 						err = true;
 
 					else
 					{
 						size_t clen = cap->m_offsets.size();
 						cap->m_durations[clen-1] = (start+dur) - cap->m_offsets[clen-1];
-						char ch = sym.m_data[0];
 
-						if(ch == '\r')
-							cap->m_samples[clen-1].m_str += "\\r";
-						else if(ch == '\n')
-							cap->m_samples[clen-1].m_str += "\\n";
+						//Truncate displayed content to keep the UI size reasonable
+						if(cap->m_samples[clen-1].m_str.length() > 256)
+						{
+						}
+
 						else
-							cap->m_samples[clen-1].m_str += ch;
+						{
+							char ch = sym.m_data[0];
+							if(ch == '\r')
+								cap->m_samples[clen-1].m_str += "\\r";
+							else if(ch == '\n')
+								cap->m_samples[clen-1].m_str += "\\n";
+							else if(!isprint(ch))
+								cap->m_samples[clen-1].m_str += ".";
+							else
+								cap->m_samples[clen-1].m_str += ch;
 
-						pack->m_headers["Data"] = cap->m_samples[clen-1].m_str;
+							pack->m_headers["Data"] = cap->m_samples[clen-1].m_str;
+						}
 
 						i++;
+						payloadBytesLeft --;
+
+						if(payloadBytesLeft == 0)
+							done = true;
 					}
 
+					break;
+
+				//Discard extra headers for data split across multiple TCP segments
+				case 12:
+					if(sym.m_type == TCPSymbol::TYPE_DATA)
+					{
+						state = 11;
+					}
+					else
+						i++;
 					break;
 
 			}
@@ -405,6 +457,14 @@ void VICPDecoder::Refresh()
 				i++;
 				break;
 			}
+
+			if(done)
+			{
+				state = 0;
+				continuing = true;
+			}
+			else
+				continuing = false;
 		}
 	}
 }
