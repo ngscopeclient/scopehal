@@ -70,34 +70,6 @@ bool ImportFilter::NeedsConfig()
 	return true;
 }
 
-float ImportFilter::GetOffset(size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return 0;
-	return m_offsets[stream];
-}
-
-float ImportFilter::GetVoltageRange(size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return 1;
-	return m_ranges[stream];
-}
-
-void ImportFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream >= m_ranges.size())
-		return;
-	m_ranges[stream] = range;
-}
-
-void ImportFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream >= m_offsets.size())
-		return;
-	m_offsets[stream] = offset;
-}
-
 void ImportFilter::Refresh()
 {
 	//everything happens in OnFileNameChanged
