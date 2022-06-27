@@ -100,6 +100,7 @@ void ComplexImportFilter::Reload()
 	{
 		LogError("Failed to read complex data\n");
 		fclose(fp);
+		delete[] buf;
 		return;
 	}
 	fclose(fp);
@@ -108,7 +109,10 @@ void ComplexImportFilter::Reload()
 	//Create new waveforms
 	int64_t samplerate = m_parameters[m_sratename].GetIntVal();
 	if(samplerate == 0)
+	{
+		delete[] buf;
 		return;
+	}
 	int64_t interval = FS_PER_SECOND / samplerate;
 
 	auto iwfm = new AnalogWaveform;
