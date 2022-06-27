@@ -261,6 +261,15 @@ string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
 				break;
 
 			case FilterParameter::TYPE_FILENAME:
+				{
+					string escaped = str_replace("\\", "\\\\", it.second.ToString(false));
+					snprintf(
+						tmp,
+						sizeof(tmp),
+						"    %-20s \"%s\"\n", (it.first+":").c_str(), escaped.c_str());
+				}
+				break;
+
 			case FilterParameter::TYPE_8B10B_PATTERN:
 			default:
 				snprintf(
