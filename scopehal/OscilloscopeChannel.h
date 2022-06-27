@@ -75,7 +75,12 @@ public:
 
 	//Stuff here is set once at init and can't be changed
 	Stream::StreamType GetType(size_t stream)
-	{ return m_streams[stream].m_stype; }
+	{
+		if(stream < m_streams.size())
+			return m_streams[stream].m_stype;
+		else
+			return Stream::STREAM_TYPE_UNDEFINED;
+	}
 
 	std::string GetHwname()
 	{ return m_hwname; }

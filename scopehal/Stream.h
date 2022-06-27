@@ -68,7 +68,10 @@ public:
 		STREAM_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
 
 		//Class datatype from a protocol decoder
-		STREAM_TYPE_PROTOCOL
+		STREAM_TYPE_PROTOCOL,
+
+		//Other / unspecified
+		STREAM_TYPE_UNDEFINED
 	};
 
 	Stream(Unit yunit, std::string name, StreamType type)
