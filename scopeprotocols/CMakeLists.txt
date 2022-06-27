@@ -6,6 +6,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ADL5205Decoder.cpp
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
+	BINImportFilter.cpp
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp

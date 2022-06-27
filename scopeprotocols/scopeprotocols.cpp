@@ -56,6 +56,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurement);
+	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
 	AddDecoderClass(ClockRecoveryFilter);

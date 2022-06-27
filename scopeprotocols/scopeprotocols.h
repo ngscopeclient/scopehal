@@ -43,6 +43,7 @@
 #include "ADL5205Decoder.h"
 #include "AutocorrelationFilter.h"
 #include "BaseMeasurement.h"
+#include "BINImportFilter.h"
 #include "CANDecoder.h"
 #include "ChannelEmulationFilter.h"
 #include "ClockRecoveryFilter.h"
