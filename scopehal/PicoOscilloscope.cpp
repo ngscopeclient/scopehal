@@ -38,10 +38,10 @@
 
 using namespace std;
 
-#define RATE_5GSPS		(5000L * 1000L * 1000L)
-#define RATE_2P5GSPS	(2500L * 1000L * 1000L)
-#define RATE_1P25GSPS	(1250L * 1000L * 1000L)
-#define RATE_625MSPS	(625L * 1000L * 1000L)
+#define RATE_5GSPS		(INT64_C(5000) * INT64_C(1000) * INT64_C(1000))
+#define RATE_2P5GSPS	(INT64_C(2500) * INT64_C(1000) * INT64_C(1000))
+#define RATE_1P25GSPS	(INT64_C(1250) * INT64_C(1000) * INT64_C(1000))
+#define RATE_625MSPS	(INT64_C(625)  * INT64_C(1000) * INT64_C(1000))
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
