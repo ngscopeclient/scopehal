@@ -47,10 +47,10 @@ ToneGeneratorFilter::ToneGeneratorFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	m_parameters[m_ratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_ratename].SetIntVal(100 * 1000L * 1000L * 1000L);
+	m_parameters[m_ratename].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
 
 	m_parameters[m_freqname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
-	m_parameters[m_freqname].SetIntVal(100 * 1000L * 1000L);
+	m_parameters[m_freqname].SetIntVal(100 * INT64_C(1000) * INT64_C(1000));
 
 	m_parameters[m_biasname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_biasname].SetFloatVal(0);

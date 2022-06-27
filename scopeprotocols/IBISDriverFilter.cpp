@@ -49,7 +49,7 @@ IBISDriverFilter::IBISDriverFilter(const string& color)
 	CreateInput("clk");
 
 	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
+	m_parameters[m_sampleRate].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
 
 	m_parameters[m_fname] = FilterParameter(FilterParameter::TYPE_FILENAME, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_fname].m_fileFilterMask = "*.ibs";
