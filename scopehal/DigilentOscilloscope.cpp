@@ -274,6 +274,9 @@ bool DigilentOscilloscope::AcquireData()
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
+	if(numChannels == 0)
+		return false;
+
 	//Analog channels get processed separately
 	vector<double*> abufs;
 	vector<AnalogWaveform*> awfms;
