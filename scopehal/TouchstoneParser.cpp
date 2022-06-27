@@ -74,6 +74,7 @@ bool TouchstoneParser::Load(string fname, SParameters& params)
 	if(nports <= 0)
 	{
 		LogError("Unable to determine port count for S-parameter file %s\n", fname.c_str());
+		fclose(fp);
 		return false;
 	}
 	params.Allocate(nports);
