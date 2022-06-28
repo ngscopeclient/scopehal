@@ -2154,6 +2154,8 @@ bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 	//Next is the length header. Looks like #9000000346. #9 followed by nine ASCII length digits.
 	//Ignore that too.
 	string tmp = m_transport->ReadReply();
+	if(tmp.empty())
+		return false;
 	size_t offset = tmp.find("D");
 
 	//Copy the rest of the block
@@ -2810,6 +2812,9 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
+	if(!m_triggerArmed)
+		return;
+
 	m_transport->SendCommandQueued("TRIG_MODE STOP");
 	m_transport->FlushCommandQueue();
 	m_triggerArmed = false;
@@ -3379,8 +3384,20 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 {
 	//Enable 400ns trigger-out pulse, 1V p-p
 	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.AuxMode=\"TriggerOut\"'");
-	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
 	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
+
+	//Pulse width setting is not supported on older scopes
+	switch(m_modelid)
+	{
+		case MODEL_DDA_5K:
+		case MODEL_SDA_3K:
+		case MODEL_SDA_8ZI:
+			break;
+
+		default:
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
+			break;
+	}
 }
 
 void LeCroyOscilloscope::SetUseExternalRefclk(bool external)
