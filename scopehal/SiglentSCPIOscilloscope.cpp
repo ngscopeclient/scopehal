@@ -1131,6 +1131,7 @@ void SiglentSCPIOscilloscope::Invert(size_t i, bool invert)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 			sendOnly(":CHANNEL%d:INVERT %s", i + 1, invert ? "ON" : "OFF");
 			break;
 		// --------------------------------------------------
