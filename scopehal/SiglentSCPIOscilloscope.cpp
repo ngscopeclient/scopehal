@@ -174,7 +174,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 	m_extTrigChannel =
 		new OscilloscopeChannel(
 			this,
-			"Ext",
+			"EX",
 			"",
 			Unit(Unit::UNIT_FS),
 			Unit(Unit::UNIT_VOLTS),
@@ -412,8 +412,7 @@ void SiglentSCPIOscilloscope::DetectAnalogChannels()
 	for(int i = 0; i < nchans; i++)
 	{
 		//Hardware name of the channel
-		string chname = string("C1");
-		chname[1] += i;
+		string chname = string("C") + to_string(i+1);
 
 		//Color the channels based on Siglents standard color sequence
 		//yellow-pink-cyan-green-lightgreen
@@ -3821,39 +3820,39 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			if(dt)
 			{
 				sendOnly(":TRIGGER:TYPE DROPOUT");
-				sendOnly(":TRIGGER:DROPOUT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:DROPOUT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushDropoutTrigger(dt);
 			}
 			else if(pt)
 			{
 				sendOnly(":TRIGGER:TYPE INTERVAL");
-				sendOnly(":TRIGGER:INTERVAL:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:INTERVAL:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushPulseWidthTrigger(pt);
 			}
 			else if(rt)
 			{
 				sendOnly(":TRIGGER:TYPE RUNT");
-				sendOnly(":TRIGGER:RUNT:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:RUNT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushRuntTrigger(rt);
 			}
 			else if(st)
 			{
 				sendOnly(":TRIGGER:TYPE SLOPE");
-				sendOnly(":TRIGGER:SLOPE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:SLOPE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushSlewRateTrigger(st);
 			}
 			else if(ut)
 			{
 				sendOnly(":TRIGGER:TYPE UART");
 				// TODO: Validate these trigger allocations
-				sendOnly(":TRIGGER:UART:RXSOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
-				sendOnly(":TRIGGER:UART:TXSOURCE C%d", m_trigger->GetInput(1).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:UART:RXSOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+				sendOnly(":TRIGGER:UART:TXSOURCE %s", m_trigger->GetInput(1).m_channel->GetHwname().c_str());
 				PushUartTrigger(ut);
 			}
 			else if(wt)
 			{
 				sendOnly(":TRIGGER:TYPE WINDOW");
-				sendOnly(":TRIGGER:WINDOW:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:WINDOW:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushWindowTrigger(wt);
 			}
 
@@ -3862,7 +3861,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			else if(et)	   //must be last
 			{
 				sendOnly(":TRIGGER:TYPE EDGE");
-				sendOnly(":TRIGGER:EDGE:SOURCE C%d", m_trigger->GetInput(0).m_channel->GetIndex() + 1);
+				sendOnly(":TRIGGER:EDGE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushEdgeTrigger(et, "EDGE");
 			}
 
