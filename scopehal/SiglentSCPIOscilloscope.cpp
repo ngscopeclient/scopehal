@@ -2140,6 +2140,9 @@ void SiglentSCPIOscilloscope::StartSingleTrigger()
 
 void SiglentSCPIOscilloscope::Stop()
 {
+	if(!m_triggerArmed)
+		return;
+
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -2871,7 +2874,24 @@ void SiglentSCPIOscilloscope::EnableTriggerOutput()
 
 void SiglentSCPIOscilloscope::SetUseExternalRefclk(bool /*external*/)
 {
-	LogWarning("SetUseExternalRefclk not implemented\n");
+	switch(m_modelid)
+	{
+		//Silently ignore request on models that do not have external refclk input
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS6000A:
+			break;
+
+		case MODEL_SIGLENT_SDS5000X:
+			LogWarning("SetUseExternalRefclk not implemented\n");
+			break;
+
+		default:
+			LogError("Unknown scope type\n");
+			break;
+	}
+
 }
 
 void SiglentSCPIOscilloscope::SetTriggerOffset(int64_t offset)
