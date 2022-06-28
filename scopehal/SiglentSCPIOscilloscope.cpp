@@ -791,9 +791,9 @@ OscilloscopeChannel::CouplingType SiglentSCPIOscilloscope::GetChannelCoupling(si
 			replyImp = Trim(converse(":CHANNEL%d:IMPEDANCE?", i + 1).substr(0, 3));
 
 			if(replyType == "AC")
-				return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
+				return (replyImp.find("FIF") == 0) ? OscilloscopeChannel::COUPLE_AC_50 : OscilloscopeChannel::COUPLE_AC_1M;
 			else if(replyType == "DC")
-				return (replyImp == "FIFT") ? OscilloscopeChannel::COUPLE_DC_50 : OscilloscopeChannel::COUPLE_DC_1M;
+				return (replyImp.find("FIF") == 0) ? OscilloscopeChannel::COUPLE_DC_50 : OscilloscopeChannel::COUPLE_DC_1M;
 			else if(replyType == "GN")
 				return OscilloscopeChannel::COUPLE_GND;
 			break;
