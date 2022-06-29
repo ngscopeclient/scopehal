@@ -146,9 +146,9 @@ void ClockRecoveryFilter::Refresh()
 	//TODO: use the real fibre channel PLL.
 	int64_t tend;
 	if(adin)
-		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale;
+		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale + adin->m_triggerPhase;
 	else
-		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale;
+		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale + ddin->m_triggerPhase;
 	size_t nedge = 1;
 	//LogDebug("n, delta, period, freq_ghz, cycles_open_loop\n");
 	int64_t edgepos = edges[0];
