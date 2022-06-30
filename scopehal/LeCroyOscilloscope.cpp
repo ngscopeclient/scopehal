@@ -34,6 +34,7 @@
 #include <omp.h>
 
 #include "CDR8B10BTrigger.h"
+#include "CDRNRZPatternTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -60,6 +61,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
 	, m_has8b10bTrigger(false)
+	, m_hasNrzTrigger(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -456,6 +458,7 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "Serial Pattern (8b10b/64b66b/NRZ)";
 				action = "Enabling trigger";
 				m_has8b10bTrigger = true;
+				m_hasNrzTrigger = true;
 			}
 
 			//Currently unsupported protocol decode with trigger capability, but no _TD in the option code
@@ -3835,6 +3838,8 @@ void LeCroyOscilloscope::PullTrigger()
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'"));
 	if (reply == "C8B10B")
 		Pull8b10bTrigger();
+	else if(reply == "NRZPattern")
+		PullNRZTrigger();
 	else if (reply == "Dropout")
 		PullDropoutTrigger();
 	else if (reply == "Edge")
@@ -3878,6 +3883,31 @@ void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+/**
+	@brief Reads settings for an NRZ pattern trigger from the instrument
+ */
+void LeCroyOscilloscope::PullNRZTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != nullptr) && (dynamic_cast<CDRNRZPatternTrigger*>(m_trigger) != nullptr) )
+	{
+		delete m_trigger;
+		m_trigger = nullptr;
+	}
+
+	//Create a new trigger if necessary
+	auto trig = dynamic_cast<CDRNRZPatternTrigger*>(m_trigger);
+	if(trig == nullptr)
+	{
+		trig = new CDRNRZPatternTrigger(this);
+		m_trigger = trig;
+
+		trig->signal_calculateBitRate().connect(sigc::mem_fun(*this, &LeCroyOscilloscope::OnCDRTriggerAutoBaud));
+	}
+
+	LogWarning("LeCroyOscilloscope::Pull8b10bTrigger unimplemented\n");
 }
 
 /**
@@ -4525,6 +4555,7 @@ void LeCroyOscilloscope::PushTrigger()
 
 	//The rest depends on the type
 	auto c8t = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
+	auto cnt = dynamic_cast<CDRNRZPatternTrigger*>(m_trigger);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
@@ -4537,6 +4568,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"C8B10B\"");
 		Push8b10bTrigger(c8t);
+	}
+	else if(cnt)
+	{
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"NRZPattern\"");
+		PushNRZTrigger(cnt);
 	}
 	else if(dt)
 	{
@@ -4581,6 +4617,15 @@ void LeCroyOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for a NRZ pattern trigger to the instrument
+ */
+void LeCroyOscilloscope::PushNRZTrigger(CDRNRZPatternTrigger* trig)
+{
+	//FIXME
+	LogWarning("LeCroyOscilloscope::PushNRZTrigger unimplemented\n");
 }
 
 /**
@@ -5100,6 +5145,8 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 		ret.push_back(UartTrigger::GetTriggerName());
 	if(m_has8b10bTrigger)
 		ret.push_back(CDR8B10BTrigger::GetTriggerName());
+	if(m_hasNrzTrigger)
+		ret.push_back(CDRNRZPatternTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger

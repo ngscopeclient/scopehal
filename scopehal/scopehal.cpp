@@ -56,6 +56,7 @@
 #include "SiglentVectorSignalGenerator.h"
 
 #include "CDR8B10BTrigger.h"
+#include "CDRNRZPatternTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -392,6 +393,7 @@ void DriverStaticInit()
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
 	AddTriggerClass(CDR8B10BTrigger);
+	AddTriggerClass(CDRNRZPatternTrigger);
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(GlitchTrigger);

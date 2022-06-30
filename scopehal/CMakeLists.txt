@@ -70,6 +70,7 @@ set(SCOPEHAL_SOURCES
 	Trigger.cpp
 	CDRTrigger.cpp
 	CDR8B10BTrigger.cpp
+	CDRNRZPatternTrigger.cpp
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	GlitchTrigger.cpp
