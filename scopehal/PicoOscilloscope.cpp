@@ -328,6 +328,9 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
+	if(GetChannel(i) == m_extTrigChannel)
+		return 1;
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelAttenuations[i];
 }

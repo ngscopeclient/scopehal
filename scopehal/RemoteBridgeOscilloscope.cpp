@@ -181,6 +181,16 @@ void RemoteBridgeOscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 	}
 }
 
+bool RemoteBridgeOscilloscope::PeekTriggerArmed()
+{
+	lock_guard<recursive_mutex> lock(m_mutex);
+	m_transport->SendCommand("ARMED?");
+	auto reply = m_transport->ReadReply();
+	if(stoi(reply) == 1)
+		return true;
+	return false;
+}
+
 bool RemoteBridgeOscilloscope::IsTriggerArmed()
 {
 	return m_triggerArmed;
