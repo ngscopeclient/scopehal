@@ -89,10 +89,10 @@ void SPIDecoder::Refresh()
 
 	//Create the capture
 	auto cap = new SPIWaveform;
-	cap->m_timescale = clk->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	cap->m_triggerPhase = clk->m_triggerPhase;
+	cap->m_triggerPhase = 0;
 
 	//TODO: different cpha/cpol modes
 
@@ -230,8 +230,8 @@ void SPIDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
-		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
+		int64_t next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
 
 		//If we can't move forward, stop (don't bother looking for glitches on data)
 		int64_t next_timestamp = min(next_clk, next_cs);
@@ -240,9 +240,9 @@ void SPIDecoder::Refresh()
 
 		//All good, move on
 		timestamp = next_timestamp;
-		AdvanceToTimestamp(csn, ics, cslen, timestamp);
-		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
-		AdvanceToTimestamp(data, idata, datalen, timestamp);
+		AdvanceToTimestampScaled(csn, ics, cslen, timestamp);
+		AdvanceToTimestampScaled(clk, iclk, clklen, timestamp);
+		AdvanceToTimestampScaled(data, idata, datalen, timestamp);
 	}
 
 	SetData(cap, 0);

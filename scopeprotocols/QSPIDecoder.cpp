@@ -98,10 +98,10 @@ void QSPIDecoder::Refresh()
 
 	//Create the capture
 	auto cap = new SPIWaveform;
-	cap->m_timescale = clk->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	cap->m_triggerPhase = clk->m_triggerPhase;
+	cap->m_triggerPhase = 0;
 
 	//TODO: packets based on CS# pulses
 
@@ -244,8 +244,8 @@ void QSPIDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
-		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
+		int64_t next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
 
 		//If we can't move forward, stop (don't bother looking for glitches on data)
 		int64_t next_timestamp = min(next_clk, next_cs);
@@ -254,12 +254,12 @@ void QSPIDecoder::Refresh()
 
 		//All good, move on
 		timestamp = next_timestamp;
-		AdvanceToTimestamp(csn, ics, cslen, timestamp);
-		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
-		AdvanceToTimestamp(data0, idata[0], datalen[0], timestamp);
-		AdvanceToTimestamp(data1, idata[1], datalen[1], timestamp);
-		AdvanceToTimestamp(data2, idata[2], datalen[2], timestamp);
-		AdvanceToTimestamp(data3, idata[3], datalen[3], timestamp);
+		AdvanceToTimestampScaled(csn, ics, cslen, timestamp);
+		AdvanceToTimestampScaled(clk, iclk, clklen, timestamp);
+		AdvanceToTimestampScaled(data0, idata[0], datalen[0], timestamp);
+		AdvanceToTimestampScaled(data1, idata[1], datalen[1], timestamp);
+		AdvanceToTimestampScaled(data2, idata[2], datalen[2], timestamp);
+		AdvanceToTimestampScaled(data3, idata[3], datalen[3], timestamp);
 	}
 
 	SetData(cap, 0);
