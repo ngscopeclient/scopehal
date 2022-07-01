@@ -251,6 +251,8 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	config += tmp;
 	snprintf(tmp, sizeof(tmp), "        interleave:     %d\n", IsInterleaving());
 	config += tmp;
+	snprintf(tmp, sizeof(tmp), "        triggerpos:     %ld\n", GetTriggerOffset());
+	config += tmp;
 
 	//Save channels
 	config += "        channels:\n";
@@ -522,6 +524,8 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 		SetSampleRate(node["rate"].as<unsigned long>());
 	if(node["depth"])
 		SetSampleDepth(node["depth"].as<unsigned long>());
+	if(node["triggerpos"])
+		SetTriggerOffset(node["triggerpos"].as<int64_t>());
 
 	auto tnode = node["trigger"];
 	if(tnode)
