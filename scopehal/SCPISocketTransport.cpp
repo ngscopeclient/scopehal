@@ -122,7 +122,7 @@ string SCPISocketTransport::GetConnectionString()
 
 bool SCPISocketTransport::SendCommand(const string& cmd)
 {
-	LogTrace("Sending %s\n", cmd.c_str());
+	LogTrace("[%s] Sending %s\n", m_hostname.c_str(), cmd.c_str());
 	string tempbuf = cmd + "\n";
 	return m_socket.SendLooped((unsigned char*)tempbuf.c_str(), tempbuf.length());
 }
@@ -141,7 +141,7 @@ string SCPISocketTransport::ReadReply(bool endOnSemicolon)
 		else
 			ret += tmp;
 	}
-	LogTrace("Got %s\n", ret.c_str());
+	LogTrace("[%s] Got %s\n", m_hostname.c_str(), ret.c_str());
 	return ret;
 }
 

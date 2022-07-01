@@ -2147,13 +2147,13 @@ void SiglentSCPIOscilloscope::Stop()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			sendOnly("STOP");
+			m_transport->SendCommandImmediate("STOP");
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":TRIGGER:MODE STOP");
+			m_transport->SendCommandImmediate(":TRIGGER:MODE STOP");
 			break;
 		// --------------------------------------------------
 		default:
