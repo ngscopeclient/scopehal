@@ -1372,7 +1372,12 @@ Oscilloscope::TriggerMode SiglentSCPIOscilloscope::PollTrigger()
 	{
 		if(m_triggerArmed)
 		{
-			m_triggerArmed = false;
+			//Only mark the trigger as disarmed if this was a one-shot trigger.
+			//If this is a repeating trigger, we're still armed from the client's perspective,
+			//since AcquireData() will reset the trigger for the next acquisition.
+			if(m_triggerOneShot)
+				m_triggerArmed = false;
+
 			return TRIGGER_MODE_TRIGGERED;
 		}
 		else

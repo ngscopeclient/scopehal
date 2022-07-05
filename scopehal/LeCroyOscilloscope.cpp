@@ -2120,7 +2120,11 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	//See if we got a waveform
 	if(inr & 0x0001)
 	{
-		m_triggerArmed = false;
+		//Only mark the trigger as disarmed if this was a one-shot trigger.
+		//If this is a repeating trigger, we're still armed from the client's perspective,
+		//since AcquireData() will reset the trigger for the next acquisition.
+		if(m_triggerOneShot)
+			m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
