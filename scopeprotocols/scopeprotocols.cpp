@@ -187,6 +187,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(VICPDecoder);
 	AddDecoderClass(Waterfall);
 	AddDecoderClass(WAVImportFilter);
+	AddDecoderClass(WFMImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
 
 	AddStatisticClass(AverageStatistic);

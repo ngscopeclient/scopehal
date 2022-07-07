@@ -175,6 +175,7 @@
 #include "VICPDecoder.h"
 #include "Waterfall.h"
 #include "WAVImportFilter.h"
+#include "WFMImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
 
 #include "AverageStatistic.h"

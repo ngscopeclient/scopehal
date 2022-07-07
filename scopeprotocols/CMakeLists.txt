@@ -141,6 +141,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	WaveformGenerationFilter.cpp
 	Waterfall.cpp
 	WAVImportFilter.cpp
+	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 
 	AverageStatistic.cpp
