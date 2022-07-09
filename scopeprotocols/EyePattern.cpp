@@ -100,7 +100,7 @@ void EyeWaveform::Normalize()
 // Construction / destruction
 
 EyePattern::EyePattern(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_EYE, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 	, m_height(1)
 	, m_width(1)
 	, m_xoff(0)
@@ -116,7 +116,7 @@ EyePattern::EyePattern(const string& color)
 	, m_rateModeName("Bit Rate Mode")
 	, m_rateName("Bit Rate")
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_EYE);
 	CreateInput("din");
 	CreateInput("clk");
 
@@ -166,9 +166,9 @@ bool EyePattern::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
-	if( (i == 1) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -739,7 +739,7 @@ void EyePattern::DensePackedInnerLoop(
 		float nominal_voltage = waveform->m_samples[i] + dv*dx_frac;
 		float nominal_pixel_y = nominal_voltage*yscale + yoff;
 		int32_t y1 = static_cast<int32_t>(nominal_pixel_y);
-		if(y1 >= ymax)
+		if( (y1 >= ymax) || (y1 < 0) )
 			continue;
 
 		//Calculate how much of the pixel's intensity to put in each row

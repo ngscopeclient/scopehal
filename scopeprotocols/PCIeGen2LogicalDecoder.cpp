@@ -44,9 +44,10 @@ using namespace std;
 // Construction / destruction
 
 PCIeGen2LogicalDecoder::PCIeGen2LogicalDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(color, CAT_BUS)
 	, m_portCountName("Lane Count")
 {
+	AddProtocolStream("data");
 	m_parameters[m_portCountName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_portCountName].SetIntVal(1);
 	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &PCIeGen2LogicalDecoder::RefreshPorts));

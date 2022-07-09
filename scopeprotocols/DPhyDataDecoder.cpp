@@ -37,8 +37,9 @@ using namespace std;
 // Construction / destruction
 
 DPhyDataDecoder::DPhyDataDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
+	AddProtocolStream("data");
 	CreateInput("Clock");
 	CreateInput("Data");
 }

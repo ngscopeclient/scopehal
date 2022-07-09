@@ -39,9 +39,9 @@ using namespace std;
 // Construction / destruction
 
 DeEmbedFilter::DeEmbedFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("signal");
 	CreateInput("mag");
 	CreateInput("angle");
@@ -202,16 +202,16 @@ bool DeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	{
 		//signal
 		case 0:
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
 
 		//mag
 		case 1:
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 					(stream.GetYAxisUnits() == Unit::UNIT_DB);
 
 		//angle
 		case 2:
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) &&
+			return (stream.GetType() == Stream::STREAM_TYPE_ANALOG) &&
 					(stream.GetYAxisUnits() == Unit::UNIT_DEGREES);
 
 		default:

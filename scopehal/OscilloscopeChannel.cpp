@@ -44,51 +44,36 @@ using namespace std;
 OscilloscopeChannel::OscilloscopeChannel(
 	Oscilloscope* scope,
 	const string& hwname,
-	OscilloscopeChannel::ChannelType type,
 	const string& color,
-	size_t index,
-	bool physical)
+	Unit xunit,
+	size_t index)
 	: m_displaycolor(color)
 	, m_displayname(hwname)
 	, m_scope(scope)
-	, m_type(type)
 	, m_hwname(hwname)
 	, m_index(index)
-	, m_physical(physical)
 	, m_refcount(0)
-	, m_xAxisUnit(Unit::UNIT_FS)
+	, m_xAxisUnit(xunit)
 {
-	SharedCtorInit(Unit::UNIT_VOLTS);
 }
 
 OscilloscopeChannel::OscilloscopeChannel(
 	Oscilloscope* scope,
 	const string& hwname,
-	OscilloscopeChannel::ChannelType type,
 	const string& color,
 	Unit xunit,
 	Unit yunit,
-	size_t index,
-	bool physical)
+	Stream::StreamType stype,
+	size_t index)
 	: m_displaycolor(color)
 	, m_displayname(hwname)
 	, m_scope(scope)
-	, m_type(type)
 	, m_hwname(hwname)
 	, m_index(index)
-	, m_physical(physical)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
 {
-	SharedCtorInit(yunit);
-}
-
-void OscilloscopeChannel::SharedCtorInit(Unit unit)
-{
-	//Create a stream for our output.
-	//Normal channels only have one stream.
-	//Special instruments like SDRs with complex output, or filters/decodes, can have arbitrarily many.
-	AddStream(unit, "data");
+	AddStream(yunit, "data", stype);
 }
 
 /**
@@ -129,9 +114,9 @@ void OscilloscopeChannel::ClearStreams()
 /**
 	@brief Adds a new data stream to the channel
  */
-void OscilloscopeChannel::AddStream(Unit yunit, const std::string& name)
+void OscilloscopeChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
 {
-	m_streams.push_back(Stream(yunit, name));
+	m_streams.push_back(Stream(yunit, name, stype));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -342,6 +327,20 @@ string OscilloscopeChannel::GetProbeName()
 		return m_scope->GetProbeName(m_index);
 	else
 		return "";
+}
+
+bool OscilloscopeChannel::HasInputMux()
+{
+	if(m_scope)
+		return m_scope->HasInputMux(m_index);
+	return false;
+}
+
+size_t OscilloscopeChannel::GetInputMuxSetting()
+{
+	if(m_scope)
+		return m_scope->GetInputMuxSetting(m_index);
+	return 0;
 }
 
 void OscilloscopeChannel::SetInputMux(size_t select)

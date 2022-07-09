@@ -6,6 +6,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ADL5205Decoder.cpp
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
+	BINImportFilter.cpp
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp
@@ -40,7 +41,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EnhancedResolutionFilter.cpp
 	ESPIDecoder.cpp
 	Ethernet10BaseTDecoder.cpp
-	Ethernet100BaseTDecoder.cpp
+	Ethernet100BaseTXDecoder.cpp
 	Ethernet1000BaseXDecoder.cpp
 	Ethernet10GBaseRDecoder.cpp
 	Ethernet64b66bDecoder.cpp
@@ -115,6 +116,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SWDMemAPDecoder.cpp
 	TachometerFilter.cpp
 	TappedDelayLineFilter.cpp
+	TCPDecoder.cpp
 	TDRFilter.cpp
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
@@ -135,9 +137,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	VectorFrequencyFilter.cpp
 	VectorPhaseFilter.cpp
 	VerticalBathtub.cpp
+	VICPDecoder.cpp
 	WaveformGenerationFilter.cpp
 	Waterfall.cpp
 	WAVImportFilter.cpp
+	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 
 	AverageStatistic.cpp

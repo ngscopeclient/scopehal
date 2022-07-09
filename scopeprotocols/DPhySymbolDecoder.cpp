@@ -42,9 +42,9 @@ using namespace std;
 // Construction / destruction
 
 DPhySymbolDecoder::DPhySymbolDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("IN+");
 	CreateInput("IN-");
 }
@@ -59,7 +59,7 @@ bool DPhySymbolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	{
 		if(stream.m_channel == NULL)
 			return false;
-		return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
 	}
 
 	//IN- can be omitted, but if not specified we can't decode all line states.
@@ -68,7 +68,7 @@ bool DPhySymbolDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	{
 		if(stream.m_channel == NULL)
 			return true;
-		return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG);
+		return (stream.GetType() == Stream::STREAM_TYPE_ANALOG);
 	}
 
 	return false;

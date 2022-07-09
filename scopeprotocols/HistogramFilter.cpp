@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 HistogramFilter::HistogramFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(color, CAT_MATH)
 {
-	SetYAxisUnits(Unit(Unit::UNIT_COUNTS_SCI), 0);
+	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("data");
@@ -59,7 +59,7 @@ bool HistogramFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if(i > 0)
 		return false;
-	if(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
 		return true;
 
 	return false;

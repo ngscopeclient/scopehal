@@ -4,6 +4,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEEXPORTS_SOURCES
 	CSVExportWizard.cpp
 	TouchstoneExportWizard.cpp
+	VCDExportWizard.cpp
 
 	scopeexports.cpp
 	)

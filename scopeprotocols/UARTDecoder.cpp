@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 UARTDecoder::UARTDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	//Set up channels
 	CreateInput("din");
@@ -72,7 +72,7 @@ bool UARTDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 	return false;
 }

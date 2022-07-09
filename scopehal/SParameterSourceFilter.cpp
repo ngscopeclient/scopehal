@@ -36,10 +36,9 @@ using namespace std;
 // Construction / destruction
 
 SParameterSourceFilter::SParameterSourceFilter(const string& color, Category cat)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, cat)
+	: Filter(color, cat, Unit(Unit::UNIT_HZ))
 {
 	SetupStreams();
-	SetXAxisUnits(Unit(Unit::UNIT_HZ));
 }
 
 SParameterSourceFilter::~SParameterSourceFilter()
@@ -96,8 +95,8 @@ void SParameterSourceFilter::SetupStreams()
 		{
 			string param = string("S") + to_string(to+1) + to_string(from+1);
 
-			AddStream(Unit(Unit::UNIT_DB), param + "_mag");
-			AddStream(Unit(Unit::UNIT_DEGREES), param + "_ang");
+			AddStream(Unit(Unit::UNIT_DB), param + "_mag", Stream::STREAM_TYPE_ANALOG);
+			AddStream(Unit(Unit::UNIT_DEGREES), param + "_ang", Stream::STREAM_TYPE_ANALOG);
 		}
 	}
 

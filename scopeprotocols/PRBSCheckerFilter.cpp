@@ -37,9 +37,11 @@ using namespace std;
 // Construction / destruction
 
 PRBSCheckerFilter::PRBSCheckerFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 	, m_polyname("Polynomial")
 {
+	AddDigitalStream("data");
+
 	CreateInput("Data");
 	CreateInput("Clock");
 
@@ -61,7 +63,7 @@ bool PRBSCheckerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

@@ -37,11 +37,12 @@ using namespace std;
 // Construction / destruction
 
 EmphasisRemovalFilter::EmphasisRemovalFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_ANALYSIS)
+	: Filter(color, CAT_ANALYSIS)
 	, m_dataRateName("Data Rate")
 	, m_emphasisTypeName("Emphasis Type")
 	, m_emphasisAmountName("Emphasis Amount")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
 	m_parameters[m_dataRateName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_BITRATE));
@@ -64,7 +65,7 @@ bool EmphasisRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

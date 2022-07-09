@@ -43,9 +43,9 @@ using namespace std;
 // Construction / destruction
 
 I2CDecoder::I2CDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(color, CAT_BUS)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("sda");
 	CreateInput("scl");
 }
@@ -58,7 +58,7 @@ bool I2CDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -86,9 +86,10 @@ void I2CDecoder::Refresh()
 
 	//Create the capture
 	auto cap = new I2CWaveform;
-	cap->m_timescale = sda->m_timescale;
+	cap->m_timescale = 1;
 	cap->m_startTimestamp = sda->m_startTimestamp;
 	cap->m_startFemtoseconds = sda->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
 
 	//Loop over the data and look for transactions
 	//For now, assume equal sample rate
@@ -127,8 +128,8 @@ void I2CDecoder::Refresh()
 				(cur_sda || !cur_scl) )
 		{
 			auto tstart = sda->m_offsets[symbol_start];
-			cap->m_offsets.push_back(tstart);
-			cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+			cap->m_offsets.push_back(tstart * sda->m_timescale + sda->m_triggerPhase);
+			cap->m_durations.push_back( (sda->m_offsets[i] - tstart) * sda->m_timescale );
 			cap->m_samples.push_back(I2CSymbol(current_type, 0));
 
 			last_was_start	= true;
@@ -145,8 +146,8 @@ void I2CDecoder::Refresh()
 			LogTrace("found i2c stop at time %zu\n", (size_t)sda->m_offsets[i]);
 
 			auto tstart = sda->m_offsets[symbol_start];
-			cap->m_offsets.push_back(tstart);
-			cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+			cap->m_offsets.push_back(tstart * sda->m_timescale + sda->m_triggerPhase);
+			cap->m_durations.push_back((sda->m_offsets[i] - tstart) * sda->m_timescale);
 			cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_STOP, 0));
 
 			last_was_start	= false;
@@ -169,8 +170,8 @@ void I2CDecoder::Refresh()
 				if(bitcount == 8)
 				{
 					auto tstart = sda->m_offsets[symbol_start];
-					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+					cap->m_offsets.push_back(tstart * sda->m_timescale + sda->m_triggerPhase);
+					cap->m_durations.push_back((sda->m_offsets[i] - tstart) * sda->m_timescale);
 					if(last_was_start)
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ADDRESS, current_byte));
 					else
@@ -190,8 +191,8 @@ void I2CDecoder::Refresh()
 			else if(current_type == I2CSymbol::TYPE_ACK)
 			{
 				auto tstart = sda->m_offsets[symbol_start];
-				cap->m_offsets.push_back(tstart);
-				cap->m_durations.push_back(sda->m_offsets[i] - tstart);
+				cap->m_offsets.push_back(tstart * sda->m_timescale + sda->m_triggerPhase);
+				cap->m_durations.push_back((sda->m_offsets[i] - tstart) * sda->m_timescale);
 				cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ACK, cur_sda));
 
 				last_was_start	= false;

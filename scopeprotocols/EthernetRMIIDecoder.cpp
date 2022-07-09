@@ -63,7 +63,7 @@ bool EthernetRMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(chan == NULL)
 		return false;
 
-	if(chan->GetType() != OscilloscopeChannel::CHANNEL_TYPE_DIGITAL)
+	if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
 		return false;
 
 	if(i < 4)

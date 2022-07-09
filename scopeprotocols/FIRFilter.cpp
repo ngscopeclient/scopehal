@@ -38,9 +38,9 @@ using namespace std;
 
 FIRFilter::FIRFilter(const string& color)
 	: Filter(
-		OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 		color,
 		CAT_MATH,
+		Unit(Unit::UNIT_FS),
 		"kernels/FIRFilter.cl",
 		"FIRFilter")
 	, m_filterTypeName("Filter Type")
@@ -49,6 +49,7 @@ FIRFilter::FIRFilter(const string& color)
 	, m_freqLowName("Frequency Low")
 	, m_freqHighName("Frequency High")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
 	m_parameters[m_filterTypeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -79,7 +80,7 @@ bool FIRFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

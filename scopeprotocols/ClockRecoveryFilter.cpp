@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("IN");
 	CreateInput("Gate");
 
@@ -66,14 +66,14 @@ bool ClockRecoveryFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 			if(stream.m_channel == NULL)
 				return false;
 			return
-				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) ||
-				(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL);
+				(stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
+				(stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
 
 		case 1:
 			if(stream.m_channel == NULL)	//null is legal for gate
 				return true;
 
-			return (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL);
+			return (stream.GetType() == Stream::STREAM_TYPE_DIGITAL);
 
 		default:
 			return false;
@@ -146,9 +146,9 @@ void ClockRecoveryFilter::Refresh()
 	//TODO: use the real fibre channel PLL.
 	int64_t tend;
 	if(adin)
-		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale;
+		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale + adin->m_triggerPhase;
 	else
-		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale;
+		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale + ddin->m_triggerPhase;
 	size_t nedge = 1;
 	//LogDebug("n, delta, period, freq_ghz, cycles_open_loop\n");
 	int64_t edgepos = edges[0];
@@ -157,7 +157,7 @@ void ClockRecoveryFilter::Refresh()
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
 	bool gating = false;
-	int64_t cycles_open_loop = 0;
+
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -195,7 +195,6 @@ void ClockRecoveryFilter::Refresh()
 		//If not, just run the NCO open loop.
 		//Allow multiple edges in the UI if the frequency is way off.
 		int64_t tnext = edges[nedge];
-		cycles_open_loop ++;
 		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
 			//Find phase error
@@ -207,10 +206,9 @@ void ClockRecoveryFilter::Refresh()
 				edgepos = tnext + period;
 
 			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
-			//If we skipped some edges, apply a larger correction
 			else
 			{
-				int64_t cperiod = period * cycles_open_loop;
+				int64_t cperiod = period;
 				if(delta > 0)
 				{
 					period  -= cperiod / 40000;
@@ -223,9 +221,6 @@ void ClockRecoveryFilter::Refresh()
 				}
 			}
 
-			//LogDebug("%10ld, %10ld, %10ld, %10.4f, %10ld\n", nedge, delta, period, 1e6f / period, cycles_open_loop);
-
-			cycles_open_loop = 0;
 			tnext = edges[++nedge];
 
 			if(period < fnyquist)

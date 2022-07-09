@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 PCIeTransportDecoder::PCIeTransportDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	//Set up channels
 	CreateInput("link");

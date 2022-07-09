@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopeexports                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,28 +30,70 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Ethernet100BaseTDecoder
+	@brief Declaration of VCDExportWizard
  */
-#ifndef Ethernet100BaseTDecoder_h
-#define Ethernet100BaseTDecoder_h
 
-class Ethernet100BaseTDecoder : public EthernetProtocolDecoder
+#ifndef VCDExportWizard_h
+#define VCDExportWizard_h
+
+/**
+	@brief Select other channels
+ */
+class VCDExportChannelSelectionPage
 {
 public:
-	Ethernet100BaseTDecoder(const std::string& color);
+	VCDExportChannelSelectionPage(const std::vector<OscilloscopeChannel*>& channels);
 
-	virtual void Refresh();
-	static std::string GetProtocolName();
+	Gtk::Grid m_grid;
+		Gtk::Frame m_selectedFrame;
+			Gtk::ListViewText m_selectedChannels;
+		Gtk::Frame m_availableFrame;
+			Gtk::ListViewText m_availableChannels;
 
-	PROTOCOL_DECODER_INITPROC(Ethernet100BaseTDecoder)
+		Gtk::Button m_removeButton;
+		Gtk::Button m_addButton;
+
+	std::map<std::string, StreamDescriptor> m_targets;
 
 protected:
-	int GetState(float voltage);
-	bool TrySync(
-		DigitalWaveform& bits,
-		DigitalWaveform& descrambled_bits,
-		size_t idle_offset,
-		size_t stop);
+	void OnAddChannel();
+	void OnRemoveChannel();
+};
+
+/**
+	@brief Final configuration and output path
+ */
+class VCDExportFinalPage
+{
+public:
+	VCDExportFinalPage();
+	virtual ~VCDExportFinalPage();
+
+	Gtk::Grid m_grid;
+		Gtk::FileChooserWidget m_chooser;
+
+protected:
+};
+
+/**
+	@brief VCD exporter
+ */
+class VCDExportWizard : public ExportWizard
+{
+public:
+	VCDExportWizard(const std::vector<OscilloscopeChannel*>& channels);
+	virtual ~VCDExportWizard();
+
+	static std::string GetExportName();
+
+	EXPORT_WIZARD_INITPROC(VCDExportWizard)
+
+protected:
+	virtual void on_prepare(Gtk::Widget* page);
+	virtual void on_apply();
+
+	VCDExportChannelSelectionPage m_channelSelectionPage;
+	VCDExportFinalPage m_finalPage;
 };
 
 #endif

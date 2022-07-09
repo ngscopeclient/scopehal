@@ -152,12 +152,13 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		//Create the channel
 		m_channels.push_back(
 			new OscilloscopeChannel(
-			this,
-			string("CH") + to_string(i+1),
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
-			color,
-			i,
-			true));
+				this,
+				string("CH") + to_string(i+1),
+				color,
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_ANALOG,
+				i));
 	}
 	m_analogChannelCount = nchans;
 
@@ -173,10 +174,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					new SpectrumChannel(
 					this,
 					string("CH") + to_string(i+1) + "_SPECTRUM",
-					OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 					m_channels[i]->m_displaycolor,
-					m_channels.size(),
-					true));
+					m_channels.size()));
 			}
 			break;
 
@@ -199,10 +198,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					auto chan = new OscilloscopeChannel(
 						this,
 						m_channels[i]->GetHwname() + "_D" + to_string(j),
-						OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 						m_channels[i]->m_displaycolor,
-						m_channels.size(),
-						true);
+						Unit(Unit::UNIT_FS),
+						Unit(Unit::UNIT_COUNTS),
+						Stream::STREAM_TYPE_DIGITAL,
+						m_channels.size());
 
 					m_flexChannelParents[chan] = i;
 					m_flexChannelLanes[chan] = j;
@@ -229,10 +229,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_extTrigChannel = new OscilloscopeChannel(
 				this,
 				"AUX",
-				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				m_channels.size(),
-				true);
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_TRIGGER,
+				m_channels.size());
 			m_channels.push_back(m_extTrigChannel);
 			break;
 
@@ -240,10 +241,11 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 			m_extTrigChannel = new OscilloscopeChannel(
 				this,
 				"EX",
-				OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 				"",
-				m_channels.size(),
-				true);
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_TRIGGER,
+				m_channels.size());
 			m_channels.push_back(m_extTrigChannel);
 			break;
 	}
@@ -1438,7 +1440,7 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 
 		if (read == 21) return true;
 	}
-	
+
 	LogWarning("Preamble error (read only %d fields)\n", read);
 	LogDebug(" -> Failed preamble: %s\n", preamble_in.c_str());
 	return false;

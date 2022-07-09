@@ -35,9 +35,9 @@ using namespace std;
 // Construction / destruction
 
 RjBUjFilter::RjBUjFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 {
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("TIE");
@@ -54,9 +54,9 @@ bool RjBUjFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
-	if( (i <= 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i <= 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 	if( (i == 3) && (dynamic_cast<DDJMeasurement*>(stream.m_channel) != NULL) )
 		return true;

@@ -265,7 +265,7 @@ void WAVImportFilter::SetupStreams(size_t chans)
 	ClearStreams();
 
 	for(size_t i=0; i<chans; i++)
-		AddStream(Unit(Unit::UNIT_VOLTS), string("CH") + to_string(i+1));
+		AddStream(Unit(Unit::UNIT_VOLTS), string("CH") + to_string(i+1), Stream::STREAM_TYPE_ANALOG);
 
 	//Resize port arrays
 	size_t oldsize = m_ranges.size();

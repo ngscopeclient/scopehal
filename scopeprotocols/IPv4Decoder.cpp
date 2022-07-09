@@ -37,9 +37,9 @@ using namespace std;
 // Construction / destruction
 
 IPv4Decoder::IPv4Decoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("eth");
 }
 

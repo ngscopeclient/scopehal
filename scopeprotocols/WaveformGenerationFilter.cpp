@@ -36,10 +36,11 @@ using namespace std;
 // Construction / destruction
 
 WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	: Filter(color, CAT_GENERATION)
 	, m_sampleRate("Sample Rate")
 	, m_edgeTime("Transition Time")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("data");
 	CreateInput("clk");
 
@@ -47,7 +48,7 @@ WaveformGenerationFilter::WaveformGenerationFilter(const string& color)
 	m_parameters[m_edgeTime].SetIntVal(10 * 1000);
 
 	m_parameters[m_sampleRate] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_sampleRate].SetIntVal(100 * 1000L * 1000L * 1000L);	//100 Gsps
+	m_parameters[m_sampleRate].SetIntVal(100 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));	//100 Gsps
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@ bool WaveformGenerationFilter::ValidateChannel(size_t i, StreamDescriptor stream
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 	{
 		return true;
 	}

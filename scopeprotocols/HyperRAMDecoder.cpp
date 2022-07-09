@@ -40,8 +40,9 @@
 using namespace std;
 
 HyperRAMDecoder::HyperRAMDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(color, CAT_BUS)
 {
+	AddProtocolStream("data");
 	CreateInput("clk");
 	CreateInput("cs#");
 	CreateInput("rwds");
@@ -64,7 +65,7 @@ bool HyperRAMDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 11) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 11) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -362,9 +363,9 @@ struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 {
 	return {
 		/*.address        = */(uint32_t)((data & 3) | ((data >> 13) & 0xFFFFFFF8)),
-		/*.read           = */(bool)(data & (1l << 47)),
-		/*.register_space = */(bool)(data & (1l << 46)),
-		/*.linear         = */(bool)(data & (1l << 45)),
+		/*.read           = */(bool)(data & (INT64_C(1) << 47)),
+		/*.register_space = */(bool)(data & (INT64_C(1) << 46)),
+		/*.linear         = */(bool)(data & (INT64_C(1) << 45)),
 	};
 }
 

@@ -108,13 +108,13 @@ TouchstoneExportChannelGroup::TouchstoneExportChannelGroup(
 	//Populate channel list
 	for(auto c : channels)
 	{
-		//Not analog? Skip it
-		if(c->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
-			continue;
-
 		for(size_t i=0; i<c->GetStreamCount(); i++)
 		{
 			StreamDescriptor stream(c, i);
+
+			//Not analog? Skip it
+			if(stream.GetType() != Stream::STREAM_TYPE_ANALOG)
+				continue;
 
 			//X axis should be frequency
 			if(stream.GetXAxisUnits() != Unit(Unit::UNIT_HZ))

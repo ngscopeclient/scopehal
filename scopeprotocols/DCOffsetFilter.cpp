@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 DCOffsetFilter::DCOffsetFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(color, CAT_MATH, Unit(Unit::UNIT_FS))
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
 
 	m_offsetname = "Offset";
@@ -54,7 +54,7 @@ bool DCOffsetFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

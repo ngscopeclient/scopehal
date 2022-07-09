@@ -37,13 +37,13 @@ using namespace std;
 // Construction / destruction
 
 JitterFilter::JitterFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_DIGITAL, color, CAT_GENERATION)
+	: Filter(color, CAT_GENERATION)
 	, m_stdevname("Rj Stdev")
 	, m_pjfreqname("Pj Frequency")
 	, m_pjamplitudename("Pj Amplitude")
 
 {
-	//Set up channels
+	AddDigitalStream("data");
 	CreateInput("din");
 
 	m_parameters[m_stdevname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
@@ -64,7 +64,7 @@ bool JitterFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

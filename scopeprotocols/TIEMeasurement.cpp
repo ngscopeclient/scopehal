@@ -35,11 +35,11 @@ using namespace std;
 // Construction / destruction
 
 TIEMeasurement::TIEMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_CLOCK)
+	: Filter(color, CAT_CLOCK)
 	, m_threshname("Threshold")
 	, m_skipname("Skip Start")
 {
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("Clock");
@@ -60,11 +60,11 @@ bool TIEMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )//allow digital clocks
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )//allow digital clocks
 		return true;
-	if( (i == 1) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;

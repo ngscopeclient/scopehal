@@ -148,6 +148,7 @@ uint64_t next_pow2(uint64_t v);
 uint64_t prev_pow2(uint64_t v);
 
 std::vector<std::string> explode(const std::string& str, char separator);
+std::string str_replace(const std::string& search, const std::string& replace, const std::string& subject);
 
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;

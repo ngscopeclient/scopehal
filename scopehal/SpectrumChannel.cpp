@@ -37,13 +37,11 @@ using namespace std;
 SpectrumChannel::SpectrumChannel(
 	Oscilloscope* scope,
 	const string& hwname,
-	OscilloscopeChannel::ChannelType type,
 	const string& color,
-	size_t index,
-	bool physical
-	)
-	: OscilloscopeChannel(scope, hwname, type, color, Unit(Unit::UNIT_HZ), Unit(Unit::UNIT_DBM), index, physical)
+	size_t index)
+	: OscilloscopeChannel(scope, hwname, color, Unit(Unit::UNIT_HZ), index)
 {
+	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
 }
 
 SpectrumChannel::~SpectrumChannel()

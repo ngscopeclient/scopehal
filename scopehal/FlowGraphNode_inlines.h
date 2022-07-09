@@ -51,4 +51,11 @@ inline WaveformBase* FlowGraphNode::GetInputWaveform(size_t i)
 	return chan->GetData(m_inputs[i].m_stream);
 }
 
+inline Stream::StreamType StreamDescriptor::GetType()
+{
+	if(m_channel == nullptr)
+		return Stream::STREAM_TYPE_ANALOG;
+	return m_channel->GetType(m_stream);
+}
+
 #endif

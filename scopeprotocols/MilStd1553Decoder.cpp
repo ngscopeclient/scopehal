@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 MilStd1553Decoder::MilStd1553Decoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	CreateInput("in");
 }
@@ -59,7 +59,7 @@ bool MilStd1553Decoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG))
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG))
 		return true;
 
 	return false;

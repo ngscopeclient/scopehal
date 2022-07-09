@@ -37,8 +37,9 @@ using namespace std;
 // Construction / destruction
 
 ADL5205Decoder::ADL5205Decoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_MISC)
+	: Filter(color, CAT_MISC)
 {
+	AddProtocolStream("data");
 	CreateInput("spi");
 }
 

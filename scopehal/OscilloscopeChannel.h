@@ -38,33 +38,7 @@
 
 class Oscilloscope;
 
-/**
-	@brief Information associated with a single stream
-
-	Each channel contains one or more streams, which represent a single element of a complex-valued waveform.
-	For example, the waveform from an RTSA might have a stream for I and a stream for Q within a single channel.
-	The waveform from a VNA might have a stream for magnitude and another for angle data on each path.
- */
-class Stream
-{
-public:
-	Stream();
-
-	Stream(Unit yunit, std::string name)
-	: m_yAxisUnit(yunit)
-	, m_name(name)
-	, m_waveform(nullptr)
-	{}
-
-	///Unit of measurement for our vertical axis
-	Unit m_yAxisUnit;
-
-	///@brief Name of the stream
-	std::string m_name;
-
-	///@brief The current waveform (or null if nothing here)
-	WaveformBase* m_waveform;
-};
+#include "Stream.h"
 
 /**
 	@brief A single channel on the oscilloscope.
@@ -79,48 +53,34 @@ public:
 	friend class Oscilloscope;
 	friend class MockOscilloscope;
 
-	enum ChannelType
-	{
-		//Conventional time-series waveforms (or similar graphs like a FFT)
-		CHANNEL_TYPE_ANALOG,
-		CHANNEL_TYPE_DIGITAL,
-		CHANNEL_TYPE_DIGITAL_BUS,
-
-		//2D density plots
-		CHANNEL_TYPE_EYE,
-		CHANNEL_TYPE_SPECTROGRAM,
-
-		//Special channels not used for display
-		CHANNEL_TYPE_TRIGGER,	//external trigger input, doesn't have data capture
-
-		//Complex datatype from a protocol decoder
-		CHANNEL_TYPE_COMPLEX
-	};
+	OscilloscopeChannel(
+		Oscilloscope* scope,
+		const std::string& hwname,
+		const std::string& color,
+		Unit xunit = Unit(Unit::UNIT_FS),
+		size_t index = 0);
 
 	OscilloscopeChannel(
 		Oscilloscope* scope,
 		const std::string& hwname,
-		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
-		size_t index = 0,
-		bool physical = false);
-	OscilloscopeChannel(
-		Oscilloscope* scope,
-		const std::string& hwname,
-		OscilloscopeChannel::ChannelType type,
-		const std::string& color,
-		Unit xunit,
-		Unit yunit,
-		size_t index = 0,
-		bool physical = false);
+		Unit xunit = Unit(Unit::UNIT_FS),
+		Unit yunit = Unit(Unit::UNIT_VOLTS),
+		Stream::StreamType stype = Stream::STREAM_TYPE_ANALOG,
+		size_t index = 0);
 	virtual ~OscilloscopeChannel();
 
 	///Display color (any valid GDK format)
 	std::string m_displaycolor;
 
 	//Stuff here is set once at init and can't be changed
-	ChannelType GetType()
-	{ return m_type; }
+	Stream::StreamType GetType(size_t stream)
+	{
+		if(stream < m_streams.size())
+			return m_streams[stream].m_stype;
+		else
+			return Stream::STREAM_TYPE_UNDEFINED;
+	}
 
 	std::string GetHwname()
 	{ return m_hwname; }
@@ -207,7 +167,7 @@ public:
 	virtual int64_t GetDeskew();
 
 	bool IsPhysicalChannel()
-	{ return m_physical; }
+	{ return (m_scope != nullptr); }
 
 	virtual float GetVoltageRange(size_t stream);
 	virtual void SetVoltageRange(float range, size_t stream);
@@ -240,6 +200,8 @@ public:
 	virtual void Invert(bool invert);
 	virtual bool IsInverted();
 
+	virtual bool HasInputMux();
+	virtual size_t GetInputMuxSetting();
 	virtual void SetInputMux(size_t select);
 
 	void SetDefaultDisplayName();
@@ -254,7 +216,7 @@ protected:
 	/**
 		@brief Adds a new data stream to the channel
 	 */
-	virtual void AddStream(Unit yunit, const std::string& name);
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype);
 
 	/**
 		@brief Display name (user defined, defaults to m_hwname)
@@ -270,17 +232,11 @@ protected:
 	 */
 	Oscilloscope* m_scope;
 
-	///Channel type
-	ChannelType m_type;
-
 	///Hardware name as labeled on the scope
 	std::string m_hwname;
 
 	///Channel index
 	size_t m_index;
-
-	///true if this is a real physical input on the scope and not a math or other output
-	bool m_physical;
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;

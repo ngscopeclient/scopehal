@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 TachometerFilter::TachometerFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
+	: Filter(color, CAT_MISC)
 {
-	SetYAxisUnits(Unit(Unit::UNIT_RPM), 0);
+	AddStream(Unit(Unit::UNIT_RPM), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -56,7 +56,7 @@ bool TachometerFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

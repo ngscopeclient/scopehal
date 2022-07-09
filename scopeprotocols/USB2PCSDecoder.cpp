@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 USB2PCSDecoder::USB2PCSDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: Filter(color, CAT_SERIAL)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("PMA");
 }
 

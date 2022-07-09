@@ -66,9 +66,9 @@ public:
 	};
 
 	Filter(
-		OscilloscopeChannel::ChannelType type,
 		const std::string& color,
 		Category cat,
+		Unit xunit = Unit::UNIT_FS,
 		const std::string& kernelPath = "",
 		const std::string& kernelName = "");
 	virtual ~Filter();
@@ -78,7 +78,13 @@ public:
 	{ return m_filters; }
 
 	virtual void ClearStreams();
-	virtual void AddStream(Unit yunit, const std::string& name);
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype);
+
+	void AddProtocolStream(const std::string& name)
+	{ AddStream(Unit(Unit::UNIT_COUNTS), name, Stream::STREAM_TYPE_PROTOCOL); }
+
+	void AddDigitalStream(const std::string& name)
+	{ AddStream(Unit(Unit::UNIT_COUNTS), name, Stream::STREAM_TYPE_DIGITAL); }
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Name generation
@@ -213,11 +219,13 @@ protected:
 	bool VerifyAllInputsOKAndAnalog();
 	bool VerifyAllInputsOKAndDigital();
 
-	int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
-	int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+public:
+	static int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	static int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
+protected:
 	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
 	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
 	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
@@ -243,8 +251,9 @@ public:
 	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
 	static std::vector<size_t> MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins);
 
-	//Samples a digital channel on the edges of another channel.
+	//Samples a channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
+	static void SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
 	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
 	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);

@@ -38,10 +38,10 @@
 
 using namespace std;
 
-#define RATE_5GSPS		(5000L * 1000L * 1000L)
-#define RATE_2P5GSPS	(2500L * 1000L * 1000L)
-#define RATE_1P25GSPS	(1250L * 1000L * 1000L)
-#define RATE_625MSPS	(625L * 1000L * 1000L)
+#define RATE_5GSPS		(INT64_C(5000) * INT64_C(1000) * INT64_C(1000))
+#define RATE_2P5GSPS	(INT64_C(2500) * INT64_C(1000) * INT64_C(1000))
+#define RATE_1P25GSPS	(INT64_C(1250) * INT64_C(1000) * INT64_C(1000))
+#define RATE_625MSPS	(INT64_C(625)  * INT64_C(1000) * INT64_C(1000))
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Construction / destruction
@@ -69,10 +69,11 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			GetChannelColor(i),
-			i,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -99,10 +100,11 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetChannelColor(ichan),
-			chnum,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			chnum);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -127,7 +129,14 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	//Add the external trigger input
 	m_extTrigChannel =
-		new OscilloscopeChannel(this, "EX", OscilloscopeChannel::CHANNEL_TYPE_TRIGGER, "", m_channels.size(), true);
+		new OscilloscopeChannel(
+			this,
+			"EX",
+			"",
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_TRIGGER,
+			m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 
@@ -328,6 +337,9 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
+	if(GetChannel(i) == m_extTrigChannel)
+		return 1;
+
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	return m_channelAttenuations[i];
 }

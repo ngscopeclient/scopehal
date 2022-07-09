@@ -40,6 +40,7 @@ class WaveformBase;
 
 #include "FilterParameter.h"
 #include "Waveform.h"
+#include "Stream.h"
 
 class OscilloscopeChannel;
 
@@ -79,6 +80,7 @@ public:
 	float GetOffset();
 	void SetVoltageRange(float v);
 	void SetOffset(float v);
+	Stream::StreamType GetType();
 };
 
 /**

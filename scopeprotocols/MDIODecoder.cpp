@@ -42,7 +42,7 @@ using namespace std;
 // Construction / destruction
 
 MDIODecoder::MDIODecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
 	//Set up channels
 	CreateInput("mdio");
@@ -63,7 +63,7 @@ bool MDIODecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
@@ -289,6 +289,7 @@ void MDIODecoder::Refresh()
 
 			snprintf(tmp, sizeof(tmp), "%04x", value);
 			pack->m_headers["Value"] = tmp;
+			pack->m_len = (start + len) - pack->m_offset;
 
 			//Add extra information to the decode if it's a known register
 			//TODO: share this between clause 22 and 45 decoders
@@ -749,6 +750,9 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 		auto p = m_packets[j];
 		unsigned int pvalue = strtol(p->m_headers["Value"].c_str(), NULL, 16);
 
+		//Extend us
+		ret->m_len = (p->m_offset + p->m_len) - ret->m_offset;
+
 		//Decode address info
 		if(p->m_headers["Reg"] == "0d")
 		{
@@ -839,6 +843,5 @@ Packet* MDIODecoder::CreateMergedHeader(Packet* pack, size_t i)
 	}
 
 	ret->m_headers["Info"] = info;
-
 	return ret;
 }

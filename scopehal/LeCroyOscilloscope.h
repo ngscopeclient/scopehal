@@ -41,6 +41,7 @@ class SlewRateTrigger;
 class UartTrigger;
 class WindowTrigger;
 class CDR8B10BTrigger;
+class CDRNRZPatternTrigger;
 
 /**
 	@brief A Teledyne LeCroy oscilloscope using the MAUI/XStream command set.
@@ -110,6 +111,7 @@ public:
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool PeekTriggerArmed();
 	virtual bool AcquireData();
 	virtual void Start();
 	virtual void StartSingleTrigger();
@@ -249,6 +251,7 @@ protected:
 
 	//Trigger config
 	void Pull8b10bTrigger();
+	void PullNRZTrigger();
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();
 	void PullGlitchTrigger();
@@ -263,6 +266,7 @@ protected:
 	Trigger::Condition GetCondition(std::string reply);
 
 	void Push8b10bTrigger(CDR8B10BTrigger* trig);
+	void PushNRZTrigger(CDRNRZPatternTrigger* trig);
 	void PushDropoutTrigger(DropoutTrigger* trig);
 	void PushEdgeTrigger(EdgeTrigger* trig, const std::string& tree);
 	void PushGlitchTrigger(GlitchTrigger* trig);
@@ -317,6 +321,7 @@ protected:
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
 	bool m_has8b10bTrigger;
+	bool m_hasNrzTrigger;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;

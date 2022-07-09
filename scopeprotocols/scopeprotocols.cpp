@@ -56,6 +56,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurement);
+	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
 	AddDecoderClass(ClockRecoveryFilter);
@@ -90,7 +91,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(EnhancedResolutionFilter);
 	AddDecoderClass(ESPIDecoder);
 	AddDecoderClass(Ethernet10BaseTDecoder);
-	AddDecoderClass(Ethernet100BaseTDecoder);
+	AddDecoderClass(Ethernet100BaseTXDecoder);
 	AddDecoderClass(Ethernet1000BaseXDecoder);
 	AddDecoderClass(Ethernet10GBaseRDecoder);
 	AddDecoderClass(Ethernet64b66bDecoder);
@@ -162,6 +163,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SWDMemAPDecoder);
 	AddDecoderClass(TachometerFilter);
 	AddDecoderClass(TappedDelayLineFilter);
+	AddDecoderClass(TCPDecoder);
 	AddDecoderClass(TDRFilter);
 	//AddDecoderClass(TDRStepDeEmbedFilter);
 	AddDecoderClass(ThresholdFilter);
@@ -182,8 +184,10 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(VectorFrequencyFilter);
 	AddDecoderClass(VectorPhaseFilter);
 	AddDecoderClass(VerticalBathtub);
+	AddDecoderClass(VICPDecoder);
 	AddDecoderClass(Waterfall);
 	AddDecoderClass(WAVImportFilter);
+	AddDecoderClass(WFMImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
 
 	AddStatisticClass(AverageStatistic);

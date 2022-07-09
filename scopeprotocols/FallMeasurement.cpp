@@ -36,10 +36,11 @@ using namespace std;
 // Construction / destruction
 
 FallMeasurement::FallMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	: Filter(color, CAT_MEASUREMENT)
 {
 	//Set up channels
 	CreateInput("din");
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	m_startname = "Start Fraction";
 	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
@@ -48,8 +49,6 @@ FallMeasurement::FallMeasurement(const string& color)
 	m_endname = "End Fraction";
 	m_parameters[m_endname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
 	m_parameters[m_endname].SetFloatVal(0.2);
-
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +59,7 @@ bool FallMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

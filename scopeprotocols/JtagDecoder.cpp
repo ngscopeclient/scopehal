@@ -75,7 +75,7 @@ const char* JtagSymbol::GetName(JtagSymbol::JtagState state)
 // Construction / destruction
 
 JtagDecoder::JtagDecoder(const string& color)
-	: PacketDecoder(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	//Set up channels
 	CreateInput("TDI");
@@ -93,7 +93,7 @@ bool JtagDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i < 4) &&
-		(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 	{
 		return true;
 	}

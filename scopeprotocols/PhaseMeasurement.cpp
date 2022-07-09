@@ -36,11 +36,11 @@ using namespace std;
 // Construction / destruction
 
 PhaseMeasurement::PhaseMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	: Filter(color, CAT_MEASUREMENT)
 	, m_freqModeName("Frequency Mode")
 	, m_freqName("Center Frequency")
 {
-	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
+	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -65,7 +65,7 @@ bool PhaseMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(i > 0)
 		return false;
 
-	if(stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
 		return true;
 
 	return false;

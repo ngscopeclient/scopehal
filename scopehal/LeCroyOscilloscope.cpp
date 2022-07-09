@@ -34,6 +34,7 @@
 #include <omp.h>
 
 #include "CDR8B10BTrigger.h"
+#include "CDRNRZPatternTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -60,6 +61,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasSpiTrigger(false)
 	, m_hasUartTrigger(false)
 	, m_has8b10bTrigger(false)
+	, m_hasNrzTrigger(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -91,10 +93,11 @@ void LeCroyOscilloscope::SharedCtorInit()
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"Ext",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
-		m_channels.size(),
-		true);
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 
 	//Desired format for waveform data
@@ -455,6 +458,7 @@ void LeCroyOscilloscope::DetectOptions()
 				desc = "Serial Pattern (8b10b/64b66b/NRZ)";
 				action = "Enabling trigger";
 				m_has8b10bTrigger = true;
+				m_hasNrzTrigger = true;
 			}
 
 			//Currently unsupported protocol decode with trigger capability, but no _TD in the option code
@@ -805,10 +809,11 @@ void LeCroyOscilloscope::AddDigitalChannels(unsigned int count)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chn,
-			OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 			GetDefaultChannelColor(m_channels.size()),
-			m_channels.size(),
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			m_channels.size());
 		m_channels.push_back(chan);
 		m_digitalChannels.push_back(chan);
 	}
@@ -958,10 +963,11 @@ void LeCroyOscilloscope::DetectAnalogChannels()
 			new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			i,
-			true));
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i));
 	}
 	m_analogChannelCount = nchans;
 }
@@ -1089,10 +1095,19 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	//Digital
 	else
 	{
+		//If the digital channel *group* is off, don't show anything
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.Digital1.UseGrid'"));
+		if(reply == "NotOnGrid")
+		{
+			lock_guard<recursive_mutex> lock2(m_cacheMutex);
+			m_channelsEnabled[i] = false;
+			return false;
+		}
+
 		//See if the channel is on
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
 		size_t nchan = i - (m_analogChannelCount+1);
-		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		reply = Trim(m_transport->SendCommandQueuedWithReply(
 			string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'"));
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -2105,7 +2120,11 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	//See if we got a waveform
 	if(inr & 0x0001)
 	{
-		m_triggerArmed = false;
+		//Only mark the trigger as disarmed if this was a one-shot trigger.
+		//If this is a repeating trigger, we're still armed from the client's perspective,
+		//since AcquireData() will reset the trigger for the next acquisition.
+		if(m_triggerOneShot)
+			m_triggerArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
@@ -2123,12 +2142,27 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 		return TRIGGER_MODE_STOP;
 }
 
+bool LeCroyOscilloscope::PeekTriggerArmed()
+{
+	//Read the Internal State Change Register
+	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
+	int inr = atoi(sinr.c_str());
+
+	if(inr & 0x2000)
+		return true;
+
+	else
+		return false;
+}
+
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
 {
 	//Prefix "DESC,\n" or "DAT1,\n". Always seems to be 6 chars and start with a D.
 	//Next is the length header. Looks like #9000000346. #9 followed by nine ASCII length digits.
 	//Ignore that too.
 	string tmp = m_transport->ReadReply();
+	if(tmp.empty())
+		return false;
 	size_t offset = tmp.find("D");
 
 	//Copy the rest of the block
@@ -2785,6 +2819,9 @@ void LeCroyOscilloscope::StartSingleTrigger()
 
 void LeCroyOscilloscope::Stop()
 {
+	if(!m_triggerArmed)
+		return;
+
 	m_transport->SendCommandQueued("TRIG_MODE STOP");
 	m_transport->FlushCommandQueue();
 	m_triggerArmed = false;
@@ -3354,8 +3391,20 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 {
 	//Enable 400ns trigger-out pulse, 1V p-p
 	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.AuxMode=\"TriggerOut\"'");
-	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
 	m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.Amplitude=1'");
+
+	//Pulse width setting is not supported on older scopes
+	switch(m_modelid)
+	{
+		case MODEL_DDA_5K:
+		case MODEL_SDA_3K:
+		case MODEL_SDA_8ZI:
+			break;
+
+		default:
+			m_transport->SendCommandQueued("VBS? 'app.Acquisition.AuxOutput.TrigOutPulseWidth=4e-7'");
+			break;
+	}
 }
 
 void LeCroyOscilloscope::SetUseExternalRefclk(bool external)
@@ -3793,6 +3842,8 @@ void LeCroyOscilloscope::PullTrigger()
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.Trigger.Type'"));
 	if (reply == "C8B10B")
 		Pull8b10bTrigger();
+	else if(reply == "NRZPattern")
+		PullNRZTrigger();
 	else if (reply == "Dropout")
 		PullDropoutTrigger();
 	else if (reply == "Edge")
@@ -3836,6 +3887,31 @@ void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());
+}
+
+/**
+	@brief Reads settings for an NRZ pattern trigger from the instrument
+ */
+void LeCroyOscilloscope::PullNRZTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if( (m_trigger != nullptr) && (dynamic_cast<CDRNRZPatternTrigger*>(m_trigger) != nullptr) )
+	{
+		delete m_trigger;
+		m_trigger = nullptr;
+	}
+
+	//Create a new trigger if necessary
+	auto trig = dynamic_cast<CDRNRZPatternTrigger*>(m_trigger);
+	if(trig == nullptr)
+	{
+		trig = new CDRNRZPatternTrigger(this);
+		m_trigger = trig;
+
+		trig->signal_calculateBitRate().connect(sigc::mem_fun(*this, &LeCroyOscilloscope::OnCDRTriggerAutoBaud));
+	}
+
+	LogWarning("LeCroyOscilloscope::Pull8b10bTrigger unimplemented\n");
 }
 
 /**
@@ -4483,6 +4559,7 @@ void LeCroyOscilloscope::PushTrigger()
 
 	//The rest depends on the type
 	auto c8t = dynamic_cast<CDR8B10BTrigger*>(m_trigger);
+	auto cnt = dynamic_cast<CDRNRZPatternTrigger*>(m_trigger);
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
 	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
@@ -4495,6 +4572,11 @@ void LeCroyOscilloscope::PushTrigger()
 	{
 		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"C8B10B\"");
 		Push8b10bTrigger(c8t);
+	}
+	else if(cnt)
+	{
+		m_transport->SendCommandQueued("VBS? 'app.Acquisition.Trigger.Type = \"NRZPattern\"");
+		PushNRZTrigger(cnt);
 	}
 	else if(dt)
 	{
@@ -4539,6 +4621,15 @@ void LeCroyOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+}
+
+/**
+	@brief Pushes settings for a NRZ pattern trigger to the instrument
+ */
+void LeCroyOscilloscope::PushNRZTrigger(CDRNRZPatternTrigger* trig)
+{
+	//FIXME
+	LogWarning("LeCroyOscilloscope::PushNRZTrigger unimplemented\n");
 }
 
 /**
@@ -5058,6 +5149,8 @@ vector<string> LeCroyOscilloscope::GetTriggerTypes()
 		ret.push_back(UartTrigger::GetTriggerName());
 	if(m_has8b10bTrigger)
 		ret.push_back(CDR8B10BTrigger::GetTriggerName());
+	if(m_hasNrzTrigger)
+		ret.push_back(CDRNRZPatternTrigger::GetTriggerName());
 	ret.push_back(WindowTrigger::GetTriggerName());
 
 	//TODO m_hasI2cTrigger m_hasSpiTrigger m_hasUartTrigger

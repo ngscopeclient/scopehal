@@ -54,8 +54,9 @@ const uint8_t SWDDecoder::c_wakeup[16] = {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SWDDecoder::SWDDecoder(const string& color) : Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+SWDDecoder::SWDDecoder(const string& color) : Filter(color, CAT_BUS)
 {
+	AddProtocolStream("data");
 	CreateInput("SWCLK");
 	CreateInput("SWDIO");
 }
@@ -68,7 +69,7 @@ bool SWDDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if((i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if((i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 	{
 		return true;
 	}

@@ -87,10 +87,11 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 		auto chan = new OscilloscopeChannel(
 			this,
 			chname,
-			OscilloscopeChannel::CHANNEL_TYPE_ANALOG,
 			color,
-			i,
-			true);
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 		ConfigureWaveform(chname);
@@ -101,10 +102,11 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"EX",
-		OscilloscopeChannel::CHANNEL_TYPE_TRIGGER,
 		"",
-		m_channels.size(),
-		true);
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 
@@ -149,10 +151,11 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			auto chan = new OscilloscopeChannel(
 				this,
 				"DIG" + to_string(i),
-				OscilloscopeChannel::CHANNEL_TYPE_DIGITAL,
 				"#00ffff",
-				m_channels.size(),
-				true);
+				Unit(Unit::UNIT_FS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_DIGITAL,
+				m_channels.size());
 			m_channels.push_back(chan);
 			chan->SetDefaultDisplayName();
 		}
@@ -212,7 +215,7 @@ void AgilentOscilloscope::FlushConfigCache()
 
 bool AgilentOscilloscope::IsAnalogChannel(size_t i)
 {
-	return m_channels[i]->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG;
+	return m_channels[i]->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
 bool AgilentOscilloscope::IsChannelEnabled(size_t i)
@@ -422,7 +425,7 @@ void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*
 
 float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
-	if(m_channels[i]->GetType() != OscilloscopeChannel::CHANNEL_TYPE_ANALOG)
+	if(m_channels[i]->GetType(0) != Stream::STREAM_TYPE_ANALOG)
 		return 1;
 
 	{
@@ -872,8 +875,10 @@ void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	PushFloat("TIMEBASE:RANGE", duration);
-	for (auto chan: m_channels) {
-		if (chan->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) {
+	for (auto chan: m_channels)
+	{
+		if (chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+		{
 			m_transport->SendCommand(":WAV:SOUR " + chan->GetHwname());
 
 			// This will downsample the capture in case we ended up with a sample rate much higher than requested

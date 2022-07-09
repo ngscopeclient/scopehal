@@ -35,9 +35,9 @@ using namespace std;
 // Construction / destruction
 
 DCDMeasurement::DCDMeasurement(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	: Filter(color, CAT_MEASUREMENT)
 {
-	SetYAxisUnits(Unit(Unit::UNIT_FS), 0);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("DDJ");

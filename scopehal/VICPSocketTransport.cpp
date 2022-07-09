@@ -118,6 +118,8 @@ uint8_t VICPSocketTransport::GetNextSequenceNumber()
 
 bool VICPSocketTransport::SendCommand(const string& cmd)
 {
+	LogTrace("Send (%s): %s\n", m_hostname.c_str(), cmd.c_str());
+
 	//Operation and flags header
 	string payload;
 	uint8_t op 	= OP_DATA | OP_EOI;
@@ -202,6 +204,10 @@ string VICPSocketTransport::ReadReply(bool /*endOnSemicolon*/)	//ignore endOnSem
 
 	//make sure there's a null terminator
 	payload += "\0";
+	if(payload.size() > 256)
+		LogTrace("Got (%s): large data block, not printing\n", m_hostname.c_str());
+	else
+		LogTrace("Got (%s): %s\n", m_hostname.c_str(), payload.c_str());
 	return payload;
 }
 

@@ -64,6 +64,7 @@ public:
 	virtual void PushTrigger();
 	virtual void PullTrigger();
 	virtual bool IsTriggerArmed();
+	virtual bool PeekTriggerArmed();
 
 	// Timebase
 	virtual void SetTriggerOffset(int64_t offset);

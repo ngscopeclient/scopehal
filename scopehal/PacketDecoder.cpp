@@ -62,9 +62,10 @@ Packet::~Packet()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-PacketDecoder::PacketDecoder(OscilloscopeChannel::ChannelType type, const std::string& color, Category cat)
-	: Filter(type, color, cat)
+PacketDecoder::PacketDecoder(const std::string& color, Category cat)
+	: Filter(color, cat, Unit(Unit::UNIT_FS))
 {
+	AddProtocolStream("data");
 }
 
 PacketDecoder::~PacketDecoder()

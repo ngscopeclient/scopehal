@@ -36,12 +36,12 @@ using namespace std;
 // Construction / destruction
 
 MultimeterTrendFilter::MultimeterTrendFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MEASUREMENT)
+	: Filter(color, CAT_MEASUREMENT)
 	, m_meter(NULL)
 {
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "Primary");
-	AddStream(Unit(Unit::UNIT_VOLTS), "Secondary");
+	AddStream(Unit(Unit::UNIT_VOLTS), "Primary", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "Secondary", Stream::STREAM_TYPE_ANALOG);
 
 	//initial default config until we have data
 	SetVoltageRange(1, 0);

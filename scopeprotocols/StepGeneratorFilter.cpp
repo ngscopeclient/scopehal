@@ -36,13 +36,15 @@ using namespace std;
 // Construction / destruction
 
 StepGeneratorFilter::StepGeneratorFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_GENERATION)
+	: Filter(color, CAT_GENERATION)
 	, m_lowname("Beginning Level")
 	, m_highname("Ending Level")
 	, m_ratename("Sample Rate")
 	, m_depthname("Memory Depth")
 	, m_steptimename("Step Position")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+
 	m_parameters[m_lowname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_lowname].SetFloatVal(0);
 
@@ -50,7 +52,7 @@ StepGeneratorFilter::StepGeneratorFilter(const string& color)
 	m_parameters[m_highname].SetFloatVal(1);
 
 	m_parameters[m_ratename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLERATE));
-	m_parameters[m_ratename].SetIntVal(500 * 1000L * 1000L * 1000L);
+	m_parameters[m_ratename].SetIntVal(500 * INT64_C(1000) * INT64_C(1000) * INT64_C(1000));
 
 	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_depthname].SetIntVal(100 * 1000);

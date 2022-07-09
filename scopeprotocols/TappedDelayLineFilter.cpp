@@ -37,7 +37,7 @@ using namespace std;
 // Construction / destruction
 
 TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MATH)
+	: Filter(color, CAT_MATH)
 	, m_tapDelayName("Tap Delay")
 	, m_tap0Name("Tap Value 0")
 	, m_tap1Name("Tap Value 1")
@@ -48,6 +48,7 @@ TappedDelayLineFilter::TappedDelayLineFilter(const string& color)
 	, m_tap6Name("Tap Value 6")
 	, m_tap7Name("Tap Value 7")
 {
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
 
 	m_parameters[m_tapDelayName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
@@ -86,7 +87,7 @@ bool TappedDelayLineFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_ANALOG) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;

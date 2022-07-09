@@ -35,6 +35,7 @@
 
 #include "scopeexports.h"
 #include "CSVExportWizard.h"
+#include "VCDExportWizard.h"
 #include "TouchstoneExportWizard.h"
 
 /**
@@ -43,5 +44,6 @@
 void ScopeExportStaticInit()
 {
 	AddExportWizardClass(CSVExportWizard);
+	AddExportWizardClass(VCDExportWizard);
 	AddExportWizardClass(TouchstoneExportWizard);
 }

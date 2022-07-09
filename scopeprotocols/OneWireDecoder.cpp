@@ -42,9 +42,9 @@ using namespace std;
 // Construction / destruction
 
 OneWireDecoder::OneWireDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_COMPLEX, color, CAT_BUS)
+	: Filter(color, CAT_BUS)
 {
-	//Set up channels
+	AddProtocolStream("data");
 	CreateInput("data");
 }
 
@@ -60,7 +60,7 @@ bool OneWireDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 	return false;
 }

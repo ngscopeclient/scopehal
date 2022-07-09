@@ -36,9 +36,9 @@ using namespace std;
 // Construction / destruction
 
 QuadratureDecoder::QuadratureDecoder(const string& color)
-	: Filter(OscilloscopeChannel::CHANNEL_TYPE_ANALOG, color, CAT_MISC)
+	: Filter(color, CAT_MISC)
 {
-	//Set up channels
+	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("A");
 	CreateInput("B");
 	//CreateInput("Reset");
@@ -60,8 +60,6 @@ QuadratureDecoder::QuadratureDecoder(const string& color)
 	m_debouncename = "Debounce Cooldown";
 	m_parameters[m_debouncename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
 	m_parameters[m_debouncename].ParseString("1 ms");
-
-	SetYAxisUnits(Unit(Unit::UNIT_DEGREES), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,7 +70,7 @@ bool QuadratureDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.m_channel->GetType() == OscilloscopeChannel::CHANNEL_TYPE_DIGITAL) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
 	return false;
