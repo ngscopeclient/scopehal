@@ -749,6 +749,10 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 {
 	switch(m_series)
 	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+			return false;
+
 		case SERIES_6x0xE:
 		case SERIES_6403E:
 			return false;
@@ -993,6 +997,11 @@ bool PicoOscilloscope::CanEnableChannel(size_t i)
 	//Fall back to the main path if we get here
 	switch(m_series)
 	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+			return CanEnableChannel6000Series8Bit(i);
+		break;
+
 		//6000 series
 		case SERIES_6403E:
 		case SERIES_6x0xE:
