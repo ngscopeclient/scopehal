@@ -118,9 +118,9 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		case SERIES_3x0xD:
 		case SERIES_3x0xDMSO:
 		{
-			//125 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
-			SetSampleRate(125000000L);
-			SetSampleDepth(1000000);
+			//62.5 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
+			SetSampleRate(62500000L);
+			SetSampleDepth(100000);
 		}
 		break;
 
@@ -221,6 +221,9 @@ void PicoOscilloscope::IdentifyHardware()
 			m_digitalChannelCount = 16;
 			m_series = SERIES_3x0xDMSO;
 			LogWarning("SERIES_3x0xDMSO PicoScope model \"%s\"\n", m_model.c_str());
+		}else
+		{
+			LogWarning("SERIES_3x0xD PicoScope model \"%s\"\n", m_model.c_str());
 		}
 	}
 	else if(m_model[0] == '6')
