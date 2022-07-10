@@ -113,10 +113,27 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
-	//TODO: pick reasonable default for other families
-	SetSampleRate(625000000L);
-	SetSampleDepth(1000000);
+	switch(m_series)
+	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+		{
+			//125 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
+			SetSampleRate(125000000L);
+			SetSampleDepth(1000000);
+		}
+		break;
+
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+		{
+			//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
+			SetSampleRate(625000000L);
+			SetSampleDepth(1000000);
+		}
+		break;
+	}
 
 	//Set initial AWG configuration
 	SetFunctionChannelAmplitude(0, 0.1);
@@ -197,11 +214,13 @@ void PicoOscilloscope::IdentifyHardware()
 	}
 	else if(m_model[0] == '3')
 	{
+		m_series = SERIES_3x0xD;
 		if(m_model.find("MSO") > 0)
 		{
 			// PicoScope3000 support 16 Digital Channels for MSO (or nothing)
 			m_digitalChannelCount = 16;
-			m_series = SERIES_UNKNOWN;
+			m_series = SERIES_3x0xDMSO;
+			LogWarning("SERIES_3x0xDMSO PicoScope model \"%s\"\n", m_model.c_str());
 		}
 	}
 	else if(m_model[0] == '6')
@@ -251,7 +270,8 @@ unsigned int PicoOscilloscope::GetInstrumentTypes()
 	switch(m_series)
 	{
 		//has function generator
-		case SERIES_6403E:
+		case SERIES_3x0xD:		
+		case SERIES_3x0xDMSO:
 		case SERIES_6x0xE:
 		case SERIES_6x2xE:
 			return Instrument::INST_OSCILLOSCOPE | Instrument::INST_FUNCTION;
@@ -1270,6 +1290,8 @@ int PicoOscilloscope::GetFunctionChannelCount()
 	switch(m_series)
 	{
 		//has function generator
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
 		case SERIES_6403E:
 		case SERIES_6x0xE:
 		case SERIES_6x2xE:
