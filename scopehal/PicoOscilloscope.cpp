@@ -351,10 +351,26 @@ void PicoOscilloscope::DisableChannel(size_t i)
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	switch(m_series)
+	{
+		case SERIES_3x0xD:		
+		case SERIES_3x0xDMSO:
+		{
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+		}
+		break;
+		
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+		default:
+		{
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			ret.push_back(OscilloscopeChannel::COUPLE_GND);
+		}
+	}
 	return ret;
 }
 
