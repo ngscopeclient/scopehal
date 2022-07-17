@@ -80,6 +80,9 @@ string IBM8b10bDecoder::GetProtocolName()
 
 void IBM8b10bDecoder::Refresh()
 {
+	LogTrace("IBM8b10bDecoder::Refresh\n");
+	LogIndenter li;
+
 	m_cachedDisplayFormat = (DisplayFormat) m_parameters[m_displayformat].GetIntVal();
 
 	if(!VerifyAllInputsOK())
@@ -111,9 +114,14 @@ void IBM8b10bDecoder::Refresh()
 	{
 		size_t num_commas = 0;
 		size_t dlen = data.m_samples.size() - 20;
+		size_t num_errors = 0;
+
+		//Only check the first 100K UIs (10K symbols) for alignment
+		//to avoid wasting a ton of time repeatedly decoding a huge capture
+		dlen = min(dlen, (size_t)100000);
+
 		for(size_t i=0; i<dlen; i += 10)
 		{
-			/*
 			//Check if we have a comma (five identical bits) anywhere in the data stream
 			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
 			bool comma = true;
@@ -125,46 +133,35 @@ void IBM8b10bDecoder::Refresh()
 					break;
 				}
 			}
-			*/
 
-			//Look for K28.5 symbols only.
-			bool comma = false;
-			if(	!data.m_samples[i+offset+0] &&
-				!data.m_samples[i+offset+1] &&
-				data.m_samples[i+offset+2] &&
-				data.m_samples[i+offset+3] &&
-				data.m_samples[i+offset+4] &&
-				data.m_samples[i+offset+5] &&
-				data.m_samples[i+offset+6] &&
-				!data.m_samples[i+offset+7] &&
-				data.m_samples[i+offset+8] &&
-				!data.m_samples[i+offset+9])
-			{
-				comma = true;
-			}
-			if(	data.m_samples[i+offset+0] &&
-				data.m_samples[i+offset+1] &&
-				!data.m_samples[i+offset+2] &&
-				!data.m_samples[i+offset+3] &&
-				!data.m_samples[i+offset+4] &&
-				!data.m_samples[i+offset+5] &&
-				!data.m_samples[i+offset+6] &&
-				data.m_samples[i+offset+7] &&
-				!data.m_samples[i+offset+8] &&
-				data.m_samples[i+offset+9])
-			{
-				comma = true;
-			}
+			//Comma is always exactly five identical bits (so 1 and 7 must be different)
+			if(data.m_samples[i+offset+1] == data.m_samples[i+offset+2])
+				comma = false;
+			if(data.m_samples[i+offset+7] == data.m_samples[i+offset+2])
+				comma = false;
+
+			//Count number of 0s and 1s in the symbol
+			//Should always be equal (5/5) or two greater (4/6 or 6/4)
+			int nones = 0;
+			for(int j=0; j<10; j++)
+				nones += data.m_samples[i+offset+j];
+			if( (nones != 4) && (nones != 5) && (nones != 6) )
+				num_errors ++;
 
 			if(comma)
 				num_commas ++;
 		}
-		if(num_commas > max_commas)
+
+		//Allow a *few* errors, but discard any potential alignment with more errors than commas
+		if(num_errors > num_commas)
+		{}
+
+		else if(num_commas > max_commas)
 		{
 			max_commas = num_commas;
 			max_offset = offset;
 		}
-		//LogTrace("Found %zu commas at offset %zu\n", num_commas, offset);
+		LogTrace("Found %zu commas and %zu errors at offset %zu\n", num_commas, num_errors, offset);
 	}
 
 	//Decode the actual data
