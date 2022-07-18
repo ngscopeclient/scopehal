@@ -363,8 +363,11 @@ void I2CEepromDecoder::Refresh()
 
 			//Expect restart before moving to data for reads.
 			//For writes, this is the first data byte.
+			//Stop/start pair is also legal.
 			case 5:
-				if(s.m_stype == I2CSymbol::TYPE_RESTART)
+				if(s.m_stype == I2CSymbol::TYPE_STOP)
+				{}
+				else if( (s.m_stype == I2CSymbol::TYPE_RESTART) || (s.m_stype == I2CSymbol::TYPE_START) )
 				{
 					cap->m_samples[ntype].m_type = I2CEepromSymbol::TYPE_SELECT_READ;
 					state = 6;
