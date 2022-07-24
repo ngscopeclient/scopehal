@@ -67,13 +67,13 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 		//Create the channel
 		auto chan = new OscilloscopeChannel(
-		    this,
-		    chname,
-		    GetChannelColor(i),
-		    Unit(Unit::UNIT_FS),
-		    Unit(Unit::UNIT_VOLTS),
-		    Stream::STREAM_TYPE_ANALOG,
-		    i);
+			this,
+			chname,
+			GetChannelColor(i),
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_ANALOG,
+			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -98,13 +98,13 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		//Create the channel
 		size_t chnum = i + m_digitalChannelBase;
 		auto chan = new OscilloscopeChannel(
-		    this,
-		    chname,
-		    GetChannelColor(ichan),
-		    Unit(Unit::UNIT_FS),
-		    Unit(Unit::UNIT_COUNTS),
-		    Stream::STREAM_TYPE_DIGITAL,
-		    chnum);
+			this,
+			chname,
+			GetChannelColor(ichan),
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_COUNTS),
+			Stream::STREAM_TYPE_DIGITAL,
+			chnum);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
 
@@ -146,14 +146,14 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 
 	//Add the external trigger input
 	m_extTrigChannel =
-	    new OscilloscopeChannel(
-	    this,
-	    "EX",
-	    "",
-	    Unit(Unit::UNIT_FS),
-	    Unit(Unit::UNIT_COUNTS),
-	    Stream::STREAM_TYPE_TRIGGER,
-	    m_channels.size());
+		new OscilloscopeChannel(
+		this,
+		"EX",
+		"",
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_COUNTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 
@@ -502,7 +502,7 @@ bool PicoOscilloscope::AcquireData()
 			if(podnum > 2)
 			{
 				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
-				         chnum);
+						 chnum);
 				return false;
 			}
 
@@ -579,14 +579,14 @@ bool PicoOscilloscope::AcquireData()
 	{
 		auto cap = awfms[i];
 		Convert16BitSamples(
-		    (int64_t*)&cap->m_offsets[0],
-		    (int64_t*)&cap->m_durations[0],
-		    (float*)&cap->m_samples[0],
-		    abufs[i],
-		    scales[i],
-		    -offsets[i],
-		    cap->m_offsets.size(),
-		    0);
+			(int64_t*)&cap->m_offsets[0],
+			(int64_t*)&cap->m_durations[0],
+			(float*)&cap->m_samples[0],
+			abufs[i],
+			scales[i],
+			-offsets[i],
+			cap->m_offsets.size(),
+			0);
 		delete[] abufs[i];
 	}
 
