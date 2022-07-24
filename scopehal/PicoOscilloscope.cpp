@@ -626,7 +626,7 @@ vector<uint64_t> PicoOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto fs = stol(block);
+		uint64_t fs = stoull(block);
 		auto hz = FS_PER_SECOND / fs;
 		ret.push_back(hz);
 
@@ -670,7 +670,8 @@ vector<uint64_t> PicoOscilloscope::GetSampleDepthsNonInterleaved()
 		if(i == string::npos)
 			break;
 
-		ret.push_back(stol(depths.substr(istart, i-istart)));
+		uint64_t sampleDepth = stoull(depths.substr(istart, i-istart));
+		ret.push_back(sampleDepth);
 
 		//skip the comma
 		i++;
