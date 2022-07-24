@@ -622,7 +622,7 @@ vector<uint64_t> PicoOscilloscope::GetSampleDepthsNonInterleaved()
 		if(i == string::npos)
 			break;
 
-		uint64_t sampleDepth = stoull(depths.substr(istart, i-istart))
+		uint64_t sampleDepth = stoull(depths.substr(istart, i-istart));
 		ret.push_back(sampleDepth);
 
 		//skip the comma
