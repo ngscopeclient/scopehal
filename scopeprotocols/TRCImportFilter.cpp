@@ -63,7 +63,7 @@ void TRCImportFilter::OnFileNameChanged()
 	if(fname.empty())
 		return;
 
-	LogDebug("Loading TRC waveform %s\n", fname.c_str());
+	LogTrace("Loading TRC waveform %s\n", fname.c_str());
 	LogIndenter li;
 
 	FILE* fp = fopen(fname.c_str(), "r");
@@ -75,7 +75,7 @@ void TRCImportFilter::OnFileNameChanged()
 
 	//Read the SCPI file length header
 	//Expect #9 followed by 9 digit ASCII length
-	char header[12] = {0};
+	char header[13] = {0};
 	if(11 != fread(header, 1, 11, fp))
 	{
 		LogError("Failed to read file length header\n");
@@ -84,12 +84,26 @@ void TRCImportFilter::OnFileNameChanged()
 	}
 	if((header[0] != '#') || (header[1] != '9') )
 	{
-		LogError("Invalid file length header\n");
-		fclose(fp);
-		return;
+		//Really long files are #A followed by 10 digit length
+		if( (header[0] == '#') && (header[1] == 'A') )
+		{
+			if(1 != fread(&header[11], 1, 1, fp))
+			{
+				LogError("Failed to read file length header\n");
+				fclose(fp);
+				return;
+			}
+		}
+
+		else
+		{
+			LogError("Invalid file length header\n");
+			fclose(fp);
+			return;
+		}
 	}
 	size_t len = stoull(header+2);
-	LogDebug("File length from header: %zu bytes\n", len);
+	LogTrace("File length from header: %zu bytes\n", len);
 	const size_t wavedescSize = 346;
 	if(len < wavedescSize)
 	{
@@ -119,16 +133,16 @@ void TRCImportFilter::OnFileNameChanged()
 	//Figure out sample resolution
 	bool hdMode = (buf[32] != 0);
 	if(hdMode)
-		LogDebug("Sample format:           int16_t\n");
+		LogTrace("Sample format:           int16_t\n");
 	else
-		LogDebug("Sample format:           int8_t\n");
+		LogTrace("Sample format:           int8_t\n");
 
 	//Assume little endian for now
 
 	//Get instrument format
 	char instName[17] = {0};
 	memcpy(instName, buf + 76, 16);
-	LogDebug("Instrument name:         %s\n", instName);
+	LogTrace("Instrument name:         %s\n", instName);
 
 	//cppcheck-suppress invalidPointerCast
 	float v_gain = *reinterpret_cast<float*>(buf + 156);
