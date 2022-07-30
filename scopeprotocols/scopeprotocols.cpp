@@ -172,6 +172,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
 	AddDecoderClass(TouchstoneImportFilter);
+	AddDecoderClass(TRCImportFilter);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);

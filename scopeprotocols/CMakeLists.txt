@@ -121,10 +121,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
-	ToneGeneratorFilter.cpp
-	TouchstoneImportFilter.cpp
 	TMDSDecoder.cpp
+	ToneGeneratorFilter.cpp
 	TopMeasurement.cpp
+	TouchstoneImportFilter.cpp
+	TRCImportFilter.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryFilter.cpp
 	UndershootMeasurement.cpp

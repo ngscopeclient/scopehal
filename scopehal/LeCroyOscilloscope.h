@@ -247,6 +247,9 @@ public:
 	virtual size_t GetADCMode(size_t channel);
 	virtual void SetADCMode(size_t channel, size_t mode);
 
+	//public so it can be called by TRCImportFilter
+	static time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
+
 protected:
 
 	//Trigger config
@@ -292,7 +295,6 @@ protected:
 		unsigned int& firstEnabledChannel,
 		bool& any_enabled);
 	void RequestWaveforms(bool* enabled, uint32_t num_sequences, bool denabled);
-	time_t ExtractTimestamp(unsigned char* wavedesc, double& basetime);
 	std::vector<WaveformBase*> ProcessAnalogWaveform(
 		const char* data,
 		size_t datalen,

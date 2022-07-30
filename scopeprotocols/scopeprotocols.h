@@ -160,6 +160,7 @@
 #include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
 #include "TouchstoneImportFilter.h"
+#include "TRCImportFilter.h"
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
 #include "UndershootMeasurement.h"
