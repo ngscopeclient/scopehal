@@ -116,8 +116,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(HyperRAMDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IBISDriverFilter);
+	AddDecoderClass(IBM8b10bDecoder);
+	AddDecoderClass(InvertFilter);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(ISIMeasurement);
 	AddDecoderClass(JitterFilter);

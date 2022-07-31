@@ -70,6 +70,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	I2CEepromDecoder.cpp
 	IBISDriverFilter.cpp
 	IBM8b10bDecoder.cpp
+	InvertFilter.cpp
 	IPv4Decoder.cpp
 	ISIMeasurement.cpp
 	JitterFilter.cpp
