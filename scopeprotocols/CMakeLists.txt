@@ -86,6 +86,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
+	PAM4DemodulatorFilter.cpp
 	ParallelBus.cpp
 	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp

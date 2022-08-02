@@ -254,6 +254,7 @@ public:
 	//Samples a channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
 	static void SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
+	static void SampleOnAnyEdgesWithInterpolation(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
 	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
 	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
