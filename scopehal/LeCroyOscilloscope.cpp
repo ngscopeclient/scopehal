@@ -4621,6 +4621,8 @@ void LeCroyOscilloscope::PushTrigger()
 
 	else
 		LogWarning("Unknown trigger type (not an edge)\n");
+
+	m_transport->FlushCommandQueue();
 }
 
 /**
