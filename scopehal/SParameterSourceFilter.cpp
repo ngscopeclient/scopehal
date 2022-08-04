@@ -50,38 +50,6 @@ bool SParameterSourceFilter::NeedsConfig()
 	return true;
 }
 
-float SParameterSourceFilter::GetOffset(size_t stream)
-{
-	if(stream & 1)
-		return m_angoffset[stream/2];
-	else
-		return m_magoffset[stream/2];
-}
-
-float SParameterSourceFilter::GetVoltageRange(size_t stream)
-{
-	if(stream & 1)
-		return m_angrange[stream/2];
-	else
-		return m_magrange[stream/2];
-}
-
-void SParameterSourceFilter::SetVoltageRange(float range, size_t stream)
-{
-	if(stream & 1)
-		m_magrange[stream/2] = range;
-	else
-		m_angrange[stream/2] = range;
-}
-
-void SParameterSourceFilter::SetOffset(float offset, size_t stream)
-{
-	if(stream & 1)
-		m_magoffset[stream/2] = offset;
-	else
-		m_angoffset[stream/2] = offset;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -100,27 +68,5 @@ void SParameterSourceFilter::SetupStreams()
 		}
 	}
 
-	SetupInitialPortScales();
-
 	m_outputsChangedSignal.emit();
-}
-
-void SParameterSourceFilter::SetupInitialPortScales()
-{
-	//Resize port arrays
-	size_t oldsize = m_magrange.size();
-	size_t len = m_params.GetNumPorts() * m_params.GetNumPorts();
-	m_magrange.resize(len);
-	m_magoffset.resize(len);
-	m_angrange.resize(len);
-	m_angoffset.resize(len);
-
-	//If growing, fill new cells with reasonable default values
-	for(size_t i=oldsize; i<len; i++)
-	{
-		m_magrange[i] = 80;
-		m_magoffset[i] = 40;
-		m_angrange[i] = 370;
-		m_angoffset[i] = 0;
-	}
 }
