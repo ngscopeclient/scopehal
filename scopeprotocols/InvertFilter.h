@@ -30,26 +30,24 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterFilter
+	@brief Declaration of InvertFilter
  */
-#ifndef SParameterFilter_h
-#define SParameterFilter_h
+#ifndef InvertFilter_h
+#define InvertFilter_h
 
-/**
-	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
- */
-class SParameterFilter : public SParameterSourceFilter
+class InvertFilter : public Filter
 {
 public:
-	SParameterFilter(const std::string& color, Category cat);
-	~SParameterFilter();
+	InvertFilter(const std::string& color);
+
+	virtual void Refresh();
+
+	static std::string GetProtocolName();
+	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-protected:
-	virtual void RefreshPorts();
-
-	std::string m_portCountName;
+	PROTOCOL_DECODER_INITPROC(InvertFilter)
 };
 
 #endif

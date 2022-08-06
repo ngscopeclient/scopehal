@@ -67,13 +67,6 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
-	m_cachedMag = nullptr;
-	m_cachedAngle = nullptr;
-
-	m_magStartFemtoseconds = 0;
-	m_magStartTimestamp = 0;
-	m_angleStartFemtoseconds = 0;
-	m_angleStartTimestamp = 0;
 
 	#ifdef HAVE_CLFFT
 
@@ -403,27 +396,13 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	{
 		auto dmag = GetInput(1).GetData();
 		auto dang = GetInput(2).GetData();
-		if( (dmag != m_cachedMag) ||
-			(dang != m_cachedAngle) )
+		if( (m_magKey != dmag) ||
+			(m_angleKey != dang) )
 		{
 			inchange = true;
 
-			m_cachedMag = dmag;
-			m_cachedAngle = dang;
-
-			m_magStartTimestamp = dmag->m_startTimestamp;
-			m_magStartFemtoseconds = dmag->m_startFemtoseconds;
-			m_angleStartTimestamp = dang->m_startTimestamp;
-			m_angleStartFemtoseconds = dang->m_startFemtoseconds;
-		}
-
-		//Timestamp changed? Input parameters are no longer valid
-		if( (dmag->m_startFemtoseconds != m_magStartFemtoseconds) ||
-			(dmag->m_startTimestamp != m_magStartTimestamp) ||
-			(dang->m_startFemtoseconds != m_angleStartFemtoseconds) ||
-			(dang->m_startTimestamp != m_angleStartTimestamp))
-		{
-			inchange = true;
+			m_magKey = dmag;
+			m_angleKey = dang;
 		}
 	}
 

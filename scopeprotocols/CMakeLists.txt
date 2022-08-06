@@ -70,6 +70,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	I2CEepromDecoder.cpp
 	IBISDriverFilter.cpp
 	IBM8b10bDecoder.cpp
+	InvertFilter.cpp
 	IPv4Decoder.cpp
 	ISIMeasurement.cpp
 	JitterFilter.cpp
@@ -85,6 +86,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	OFDMDemodulator.cpp
 	OneWireDecoder.cpp
 	OvershootMeasurement.cpp
+	PAM4DemodulatorFilter.cpp
 	ParallelBus.cpp
 	PCIe128b130bDecoder.cpp
 	PCIeDataLinkDecoder.cpp
@@ -106,6 +108,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
+	SParameterCascadeFilter.cpp
 	SpectrogramFilter.cpp
 	SPIDecoder.cpp
 	SPIFlashDecoder.cpp
@@ -121,10 +124,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
-	ToneGeneratorFilter.cpp
-	TouchstoneImportFilter.cpp
 	TMDSDecoder.cpp
+	ToneGeneratorFilter.cpp
 	TopMeasurement.cpp
+	TouchstoneImportFilter.cpp
+	TRCImportFilter.cpp
 	UARTDecoder.cpp
 	UartClockRecoveryFilter.cpp
 	UndershootMeasurement.cpp

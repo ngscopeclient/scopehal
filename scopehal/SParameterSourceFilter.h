@@ -46,22 +46,12 @@ public:
 
 	virtual bool NeedsConfig();
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
-
 	const SParameters& GetParams() const
 	{ return m_params; }
 
 protected:
 	void SetupStreams();
 	void SetupInitialPortScales();
-
-	std::vector<float> m_magrange;
-	std::vector<float> m_magoffset;
-	std::vector<float> m_angrange;
-	std::vector<float> m_angoffset;
 
 	SParameters m_params;
 };

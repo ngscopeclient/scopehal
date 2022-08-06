@@ -86,6 +86,7 @@ public:
 		, m_triggerPhase(0)
 		, m_densePacked(false)
 		, m_flags(0)
+		, m_revision(0)
 	{}
 
 	//empty virtual destructor in case any derived classes need one
@@ -134,6 +135,15 @@ public:
 		WAVEFORM_CLIPPING: Scope indicated that this waveform is clipped.
 	 */
 	uint8_t m_flags;
+
+	/**
+		@brief Revision number
+
+		This is a monotonically increasing counter that indicates waveform data has changed. Filters may choose to
+		cache pre-processed versions of input data (for example, resampled versions of raw input) as long as the
+		pointer and revision number have not changed.
+	 */
+	uint64_t m_revision;
 
 	enum
 	{

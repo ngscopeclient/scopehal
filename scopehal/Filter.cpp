@@ -557,6 +557,94 @@ void Filter::SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, Anal
 }
 
 /**
+	@brief Samples an analog waveform on all edges of a clock, interpolating linearly to get sub-sample accuracy.
+
+	The sampling rate of the data and clock signals need not be equal or uniform.
+
+	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
+
+	@param data		The data signal to sample
+	@param clock	The clock signal to use
+	@param samples	Output waveform
+ */
+void Filter::SampleOnAnyEdgesWithInterpolation(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples)
+{
+	samples.clear();
+
+	//TODO: split up into blocks and multithread?
+	//TODO: AVX vcompress
+
+	size_t len = clock->m_offsets.size();
+	size_t dlen = data->m_samples.size();
+
+	//Optimizations for dense packed data
+	//Clock is typically generated from a CDR PLL and is thus rarely, if ever, dense packed.
+	//Not worth special casing there, but data coming from a scope etc is typically dense packed.
+	if(data->m_densePacked)
+	{
+		int64_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			//This is a bit more math but is often faster than a division
+			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+			int64_t clkstart2 = clkstart - data->m_triggerPhase;
+			while(((ndata+1) * data->m_timescale) < clkstart2)
+				ndata ++;
+			if((size_t)ndata >= dlen)
+				break;
+
+			//Find the fractional position of the clock edge
+			int64_t tsample = ndata * data->m_timescale + data->m_triggerPhase;
+			int64_t delta = clkstart - tsample;
+			float frac = delta * 1.0 / data->m_timescale;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(InterpolateValue(data, ndata, frac));
+		}
+	}
+
+	//Generic implementation
+	else
+	{
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
+			while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Find the fractional position of the clock edge
+			int64_t tsample = data->m_offsets[ndata] * data->m_timescale + data->m_triggerPhase;
+			int64_t delta = clkstart - tsample;
+			float frac = delta * 1.0 / data->m_timescale;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(InterpolateValue(data, ndata, frac));
+		}
+	}
+
+	//Compute sample durations
+	if(g_hasAvx2)
+		FillDurationsAVX2(samples);
+	else
+		FillDurationsGeneric(samples);
+}
+
+/**
 	@brief Samples a digital waveform on all edges of a clock
 
 	The sampling rate of the data and clock signals need not be equal or uniform.
@@ -1090,6 +1178,9 @@ float Filter::InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, fl
  */
 float Filter::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks)
 {
+	if(index+1 > cap->m_offsets.size())
+		return cap->m_samples[index];
+
 	float frac = frac_ticks / (cap->m_offsets[index+1] - cap->m_offsets[index]);
 	float v1 = cap->m_samples[index];
 	float v2 = cap->m_samples[index+1];
@@ -1298,6 +1389,9 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 
+	//Bump rev number
+	cap->m_revision ++;
+
 	//Clear output
 	if(clear)
 	{
@@ -1332,6 +1426,9 @@ DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size
 	//Copy configuration
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Bump rev number
+	cap->m_revision ++;
 
 	//Clear output
 	cap->m_samples.clear();

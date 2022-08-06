@@ -27,29 +27,70 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterFilter
- */
-#ifndef SParameterFilter_h
-#define SParameterFilter_h
+#include "../scopehal/scopehal.h"
+#include "InvertFilter.h"
 
-/**
-	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
- */
-class SParameterFilter : public SParameterSourceFilter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+InvertFilter::InvertFilter(const string& color)
+	: Filter(color, CAT_MATH)
 {
-public:
-	SParameterFilter(const std::string& color, Category cat);
-	~SParameterFilter();
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput("din");
+}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-protected:
-	virtual void RefreshPorts();
+bool InvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	std::string m_portCountName;
-};
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
 
-#endif
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string InvertFilter::GetProtocolName()
+{
+	return "Invert";
+}
+
+void InvertFilter::SetDefaultName()
+{
+	char hwname[256];
+	snprintf(hwname, sizeof(hwname), "-%s", GetInputDisplayName(0).c_str());
+	m_hwname = hwname;
+	m_displayname = m_hwname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void InvertFilter::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOKAndAnalog())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	auto din = GetAnalogInputWaveform(0);
+	size_t len = din->m_samples.size();
+
+	//Negate each sample
+	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
+	for(size_t i=0; i<len; i++)
+		out[i] = -a[i];
+}

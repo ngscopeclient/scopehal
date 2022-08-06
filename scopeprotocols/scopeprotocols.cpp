@@ -116,8 +116,9 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(HyperRAMDecoder);
 	AddDecoderClass(I2CDecoder);
 	AddDecoderClass(I2CEepromDecoder);
-	AddDecoderClass(IBM8b10bDecoder);
 	AddDecoderClass(IBISDriverFilter);
+	AddDecoderClass(IBM8b10bDecoder);
+	AddDecoderClass(InvertFilter);
 	AddDecoderClass(IPv4Decoder);
 	AddDecoderClass(ISIMeasurement);
 	AddDecoderClass(JitterFilter);
@@ -133,6 +134,7 @@ void ScopeProtocolStaticInit()
 	//AddDecoderClass(OFDMDemodulator);
 	AddDecoderClass(OneWireDecoder);
 	AddDecoderClass(OvershootMeasurement);
+	AddDecoderClass(PAM4DemodulatorFilter);
 	AddDecoderClass(ParallelBus);
 	AddDecoderClass(PCIe128b130bDecoder);
 	AddDecoderClass(PCIeDataLinkDecoder);
@@ -153,6 +155,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
+	AddDecoderClass(SParameterCascadeFilter);
 	AddDecoderClass(SpectrogramFilter);
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
@@ -172,6 +175,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
 	AddDecoderClass(TouchstoneImportFilter);
+	AddDecoderClass(TRCImportFilter);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);

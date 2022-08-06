@@ -27,122 +27,156 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of ReferencePlaneExtensionFilter
- */
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "PAM4DemodulatorFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ReferencePlaneExtensionFilter::ReferencePlaneExtensionFilter(const string& color)
-	: SParameterFilter(color, CAT_RF)
+PAM4DemodulatorFilter::PAM4DemodulatorFilter(const string& color)
+	: Filter(color, CAT_SERIAL)
+	, m_lowerThreshName("Lower Threshold")
+	, m_midThreshName("Middle Threshold")
+	, m_upperThreshName("Upper Threshold")
 {
-	m_parameters[m_portCountName].signal_changed().connect(sigc::mem_fun(*this, &ReferencePlaneExtensionFilter::OnPortCountChanged));
-	OnPortCountChanged();
+	AddDigitalStream("data");
+	AddDigitalStream("clk");
+	CreateInput("data");
+	CreateInput("clk");
+
+	m_parameters[m_lowerThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_lowerThreshName].SetFloatVal(-0.07);
+
+	m_parameters[m_midThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_midThreshName].SetFloatVal(0.005);
+
+	m_parameters[m_upperThreshName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_upperThreshName].SetFloatVal(0.09);
 }
 
-ReferencePlaneExtensionFilter::~ReferencePlaneExtensionFilter()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
+
+bool PAM4DemodulatorFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
+	if(stream.m_channel == NULL)
+		return false;
+
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+		return true;
+
+	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string ReferencePlaneExtensionFilter::GetProtocolName()
+string PAM4DemodulatorFilter::GetProtocolName()
 {
-	return "Reference Plane Extension";
+	return "PAM4 Demodulator";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Main filter processing
+// Actual decoder logic
 
-/**
-	@brief Update the set of active parameters
- */
-void ReferencePlaneExtensionFilter::OnPortCountChanged()
+void PAM4DemodulatorFilter::Refresh()
 {
-	size_t nports_cur = m_parameters[m_portCountName].GetIntVal();
-	size_t nports_old = m_portParamNames.size();
-
-	//Delete old parameters
-	vector<string> paramsToDelete;
-	for(size_t i=nports_cur; i<nports_old; i++)
-		paramsToDelete.push_back(m_portParamNames[i]);
-	for(auto p : paramsToDelete)
-		m_parameters.erase(p);
-	m_portParamNames.resize(nports_cur);
-
-	//Add new ones
-	for(size_t i=nports_old; i<nports_cur; i++)
-	{
-		string name = string("Port ") + to_string(i+1) + " extension";
-		m_portParamNames[i] = name;
-		m_parameters[name] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-		m_parameters[name].SetIntVal(0);
-	}
-
-	//Notify dialogs etc that we have new parameters
-	m_parametersChangedSignal.emit();
-}
-
-void ReferencePlaneExtensionFilter::Refresh()
-{
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	size_t nports = m_parameters[m_portCountName].GetIntVal();
-	for(size_t to=0; to<nports; to++)
+	//Sample the input data
+	auto din = GetAnalogInputWaveform(0);
+	auto clk = GetDigitalInputWaveform(1);
+	AnalogWaveform samples;
+	SampleOnAnyEdgesWithInterpolation(din, clk, samples);
+	size_t len = samples.m_samples.size();
+
+	//Get the thresholds
+	float thresholds[3] =
 	{
-		for(size_t from=0; from<nports; from++)
+		m_parameters[m_lowerThreshName].GetFloatVal(),
+		m_parameters[m_midThreshName].GetFloatVal(),
+		m_parameters[m_upperThreshName].GetFloatVal()
+	};
+
+	//Create the captures
+	auto dcap = new DigitalWaveform;
+	dcap->m_timescale = 1;
+	dcap->m_startTimestamp = din->m_startTimestamp;
+	dcap->m_startFemtoseconds = din->m_startFemtoseconds;
+	dcap->m_triggerPhase = 0;
+	dcap->m_densePacked = false;
+	SetData(dcap, 0);
+
+	auto ccap = new DigitalWaveform;
+	ccap->m_timescale = 1;
+	ccap->m_startTimestamp = din->m_startTimestamp;
+	ccap->m_startFemtoseconds = din->m_startFemtoseconds;
+	ccap->m_triggerPhase = 0;
+	ccap->m_densePacked = false;
+	SetData(ccap, 1);
+
+	//Decode the input data, one symbol (two output bits) at a time
+	dcap->Resize(len*2);
+	ccap->Resize(len*2);
+	for(size_t i=0; i<len; i++)
+	{
+		//Duration and offset get split in half
+		int64_t dur = samples.m_durations[i];
+		int64_t off = samples.m_offsets[i];
+		int64_t halfdur = dur / 2;
+		int64_t qdur = halfdur / 2;
+
+		//First bit: first half of the symbol
+		dcap->m_offsets[i*2] = off;
+		dcap->m_durations[i*2] = halfdur;
+
+		ccap->m_offsets[i*2] = off + qdur;
+		if(i > 0)
+			ccap->m_durations[i*2] = ccap->m_offsets[i*2] - (ccap->m_offsets[i*2 - 1] + ccap->m_durations[i*2 - 1]);
+		else
+			ccap->m_durations[i*2] = halfdur;
+
+		//Second bit: other half of the symbol
+		dcap->m_offsets[i*2 + 1] = off + halfdur;
+		dcap->m_durations[i*2 + 1] = dur - halfdur;
+
+		ccap->m_offsets[i*2 + 1] = off + halfdur + qdur;
+		ccap->m_durations[i*2 + 1] = halfdur;
+
+		//Fill clock
+		ccap->m_samples[i*2] = 0;
+		ccap->m_samples[i*2 + 1] = 1;
+
+		//Fill data bits
+		//(note gray coding, levels are 00, 01, 11, 10)
+		float v = samples.m_samples[i];
+		if(v < thresholds[0])
 		{
-			//Copy magnitude channel as-is
-			size_t imag = (to*nports + from) * 2;
-			auto mag_in = GetAnalogInputWaveform(imag);
-			auto mag_out = SetupOutputWaveform(mag_in, imag, 0, 0);
-			memcpy(&mag_out->m_samples[0], &mag_in->m_samples[0], sizeof(float) * mag_in->m_samples.size());
-
-			//TODO: Copy magnitude data to parameters
-
-			//Copy magnitude gain/offset
-			SetVoltageRange(imag, GetInput(imag).GetVoltageRange());
-			SetOffset(imag, GetInput(imag).GetOffset());
-
-			//Shift the angle data
-			size_t iang = imag + 1;
-			auto ang_in = GetAnalogInputWaveform(iang);
-			auto ang_out = SetupOutputWaveform(ang_in, iang, 0, 0);
-			size_t alen = ang_in->m_samples.size();
-			for(size_t i=0; i<alen; i++)
-			{
-				//Frequency of this point
-				int64_t freq = (ang_in->m_timescale * ang_in->m_offsets[i]) + ang_in->m_triggerPhase;
-				double period_fs = FS_PER_SECOND / freq;
-
-				int64_t phase_fs =
-					m_parameters[m_portParamNames[to]].GetIntVal() +
-					m_parameters[m_portParamNames[from]].GetIntVal();
-
-				double phase_frac = fmodf(phase_fs / period_fs, 1);
-				double phase_deg = phase_frac * 360;
-
-				double phase_shifted = ang_in->m_samples[i] + phase_deg;
-				ang_out->m_samples[i] = phase_shifted;
-			}
-
-			//TODO: Copy angle data to parameters
-
-			//Copy angle gain/offset
-			SetVoltageRange(iang, GetInput(iang).GetVoltageRange());
-			SetOffset(iang, GetInput(iang).GetOffset());
+			dcap->m_samples[i*2] = 0;
+			dcap->m_samples[i*2 + 1] = 0;
+		}
+		else if(v < thresholds[1])
+		{
+			dcap->m_samples[i*2] = 0;
+			dcap->m_samples[i*2 + 1] = 1;
+		}
+		else if(v < thresholds[2])
+		{
+			dcap->m_samples[i*2] = 1;
+			dcap->m_samples[i*2 + 1] = 1;
+		}
+		else
+		{
+			dcap->m_samples[i*2] = 1;
+			dcap->m_samples[i*2 + 1] = 0;
 		}
 	}
 }

@@ -40,6 +40,40 @@
 #include "FlowGraphNode.h"
 
 /**
+	@brief Describes a particular revision of a waveform
+
+	Used to determine whether a filter input has changed, and thus cached state should be invalidated
+ */
+class WaveformCacheKey
+{
+public:
+	WaveformCacheKey()
+	: m_wfm(nullptr)
+	, m_rev(0)
+	{}
+
+	WaveformCacheKey(WaveformBase* wfm)
+	: m_wfm(wfm)
+	, m_rev(wfm->m_revision)
+	{}
+
+	bool operator==(WaveformBase* wfm)
+	{ return (m_wfm == wfm) && (m_rev == wfm->m_revision); }
+
+	bool operator==(WaveformCacheKey wfm)
+	{ return (m_wfm == wfm.m_wfm) && (m_rev == wfm.m_rev); }
+
+	bool operator!=(WaveformBase* wfm)
+	{ return (m_wfm != wfm) || (m_rev != wfm->m_revision); }
+
+	bool operator!=(WaveformCacheKey wfm)
+	{ return (m_wfm != wfm.m_wfm) || (m_rev != wfm.m_rev); }
+
+	WaveformBase* m_wfm;
+	uint64_t m_rev;
+};
+
+/**
 	@brief Abstract base class for all filters and protocol decoders
  */
 class Filter	: public OscilloscopeChannel
@@ -254,6 +288,7 @@ public:
 	//Samples a channel on the edges of another channel.
 	//The two channels need not be the same sample rate.
 	static void SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
+	static void SampleOnAnyEdgesWithInterpolation(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
 	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
 	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
 	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);

@@ -30,26 +30,22 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterFilter
+	@brief Declaration of TRCImportFilter
  */
-#ifndef SParameterFilter_h
-#define SParameterFilter_h
+#ifndef TRCImportFilter_h
+#define TRCImportFilter_h
 
-/**
-	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
- */
-class SParameterFilter : public SParameterSourceFilter
+class TRCImportFilter : public ImportFilter
 {
 public:
-	SParameterFilter(const std::string& color, Category cat);
-	~SParameterFilter();
+	TRCImportFilter(const std::string& color);
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	static std::string GetProtocolName();
+
+	PROTOCOL_DECODER_INITPROC(TRCImportFilter)
 
 protected:
-	virtual void RefreshPorts();
-
-	std::string m_portCountName;
+	void OnFileNameChanged();
 };
 
 #endif

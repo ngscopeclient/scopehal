@@ -30,26 +30,28 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterFilter
+	@brief Declaration of PAM4DemodulatorFilter
  */
-#ifndef SParameterFilter_h
-#define SParameterFilter_h
+#ifndef PAM4DemodulatorFilter_h
+#define PAM4DemodulatorFilter_h
 
-/**
-	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
- */
-class SParameterFilter : public SParameterSourceFilter
+class PAM4DemodulatorFilter : public Filter
 {
 public:
-	SParameterFilter(const std::string& color, Category cat);
-	~SParameterFilter();
+	PAM4DemodulatorFilter(const std::string& color);
+
+	virtual void Refresh();
+
+	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-protected:
-	virtual void RefreshPorts();
+	PROTOCOL_DECODER_INITPROC(PAM4DemodulatorFilter)
 
-	std::string m_portCountName;
+protected:
+	std::string m_lowerThreshName;
+	std::string m_midThreshName;
+	std::string m_upperThreshName;
 };
 
 #endif
