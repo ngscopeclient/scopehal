@@ -529,7 +529,7 @@ void CANDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color CANDecoder::GetColor(int i)
+Gdk::Color CANDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -589,7 +589,7 @@ Gdk::Color CANDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string CANDecoder::GetText(int i)
+string CANDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
 	if(capture != NULL)

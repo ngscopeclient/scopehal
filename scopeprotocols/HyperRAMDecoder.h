@@ -73,8 +73,8 @@ class HyperRAMDecoder : public Filter
 public:
 	HyperRAMDecoder(const std::string& color);
 
-	std::string GetText(int i) override;
-	Gdk::Color GetColor(int i) override;
+	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
+	virtual std::string GetText(size_t i, size_t stream) override;
 
 	void Refresh() override;
 

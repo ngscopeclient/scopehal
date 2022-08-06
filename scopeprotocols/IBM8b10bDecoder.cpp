@@ -367,7 +367,7 @@ void IBM8b10bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color IBM8b10bDecoder::GetColor(int i)
+Gdk::Color IBM8b10bDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -386,7 +386,7 @@ Gdk::Color IBM8b10bDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string IBM8b10bDecoder::GetText(int i)
+string IBM8b10bDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
 	if(capture != NULL)

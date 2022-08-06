@@ -500,7 +500,7 @@ void I2CEepromDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color I2CEepromDecoder::GetColor(int i)
+Gdk::Color I2CEepromDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<I2CEepromWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -533,7 +533,7 @@ Gdk::Color I2CEepromDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string I2CEepromDecoder::GetText(int i)
+string I2CEepromDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	int raw_bits = m_parameters[m_memtypename].GetIntVal();
 

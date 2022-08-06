@@ -375,7 +375,7 @@ void ESPIDecoder::Refresh()
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, current_byte));
-					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1);
+					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1, 0);
 
 					//Decide what to do based on the opcode
 					count = 0;
@@ -526,7 +526,7 @@ void ESPIDecoder::Refresh()
 					{
 						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, addr));
-						pack->m_headers["Address"] = GetText(cap->m_samples.size()-1);
+						pack->m_headers["Address"] = GetText(cap->m_samples.size()-1, 0);
 
 						if(current_cmd == ESPISymbol::COMMAND_SET_CONFIGURATION)
 						{
@@ -566,17 +566,17 @@ void ESPIDecoder::Refresh()
 								{
 									case 0x10:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									case 0x20:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									case 0x30:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									default:
@@ -627,7 +627,7 @@ void ESPIDecoder::Refresh()
 						if(completion_type != ESPISymbol::COMPLETION_NONE)
 							LogWarning("Appended completions not implemented yet\n");
 
-						pack->m_headers["Response"] = GetText(cap->m_samples.size()-1);
+						pack->m_headers["Response"] = GetText(cap->m_samples.size()-1, 0);
 
 						count = 0;
 						data = 0;
@@ -689,22 +689,22 @@ void ESPIDecoder::Refresh()
 								{
 									case 0x8:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									case 0x10:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									case 0x20:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									case 0x30:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1));
+										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
 										break;
 
 									default:
@@ -1388,7 +1388,7 @@ uint8_t ESPIDecoder::UpdateCRC8(uint8_t crc, uint8_t data)
 	return crc;
 }
 
-Gdk::Color ESPIDecoder::GetColor(int i)
+Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<ESPIWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -1470,7 +1470,7 @@ Gdk::Color ESPIDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string ESPIDecoder::GetText(int i)
+string ESPIDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<ESPIWaveform*>(GetData(0));
 	if(capture != NULL)

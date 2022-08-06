@@ -252,7 +252,7 @@ void SDDataDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SDDataDecoder::GetColor(int i)
+Gdk::Color SDDataDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SDDataWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -281,7 +281,7 @@ Gdk::Color SDDataDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SDDataDecoder::GetText(int i)
+string SDDataDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SDDataWaveform*>(GetData(0));
 	if(capture != NULL)

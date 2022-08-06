@@ -213,7 +213,7 @@ void SDCmdDecoder::Refresh()
 
 					cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_COMMAND, data));
 
-					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1);
+					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1, 0);
 
 					if(last_cmd >= 100)
 						pack->m_headers["Code"] = string("ACMD") + to_string(last_cmd - 100);
@@ -272,7 +272,7 @@ void SDCmdDecoder::Refresh()
 					tstart = end;
 					state = STATE_CRC;
 
-					pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+					pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
 				}
 				break;
 
@@ -301,7 +301,7 @@ void SDCmdDecoder::Refresh()
 							cap->m_samples.push_back(SDCmdSymbol(SDCmdSymbol::TYPE_RESPONSE_ARGS,
 								extdata[0], extdata[1], extdata[2], extdata[3]));
 
-							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
 
 							//no CRC
 							//stop bit is parsed as last data bit
@@ -323,7 +323,7 @@ void SDCmdDecoder::Refresh()
 						tstart = end;
 						state = STATE_CRC;
 
-						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
 					}
 
 				}
@@ -375,7 +375,7 @@ bool SDCmdDecoder::GetShowDataColumn()
 	return false;
 }
 
-Gdk::Color SDCmdDecoder::GetColor(int i)
+Gdk::Color SDCmdDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SDCmdWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -407,7 +407,7 @@ Gdk::Color SDCmdDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SDCmdDecoder::GetText(int i)
+string SDCmdDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[128];
 
@@ -534,7 +534,7 @@ string SDCmdDecoder::GetText(int i)
 							//Should be a command at i-4
 							if(i < 4)
 								return "ERROR";
-							return GetText(i-4);
+							return GetText(i-4, 0);
 						}
 
 						//ACMD1-5 reserved

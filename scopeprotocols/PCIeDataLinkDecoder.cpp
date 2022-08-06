@@ -215,7 +215,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(
 								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, sym.m_data));
-							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1);
+							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1, 0);
 							break;
 
 						//Split flow control into two symbols: type and VC
@@ -226,7 +226,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_durations.push_back(halfdur);
 							cap->m_samples.push_back(
 								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, dllp_type));
-							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1);
+							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1, 0);
 
 							cap->m_offsets.push_back(off + halfdur);
 							cap->m_durations.push_back(dur - halfdur);
@@ -667,7 +667,7 @@ uint32_t PCIeDataLinkDecoder::CalculateTlpCRC(Packet* pack)
 		return CRC32(pack->m_data, 0, len - 1);
 }
 
-Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
+Gdk::Color PCIeDataLinkDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<PCIeDataLinkWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -707,7 +707,7 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string PCIeDataLinkDecoder::GetText(int i)
+string PCIeDataLinkDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[64];
 

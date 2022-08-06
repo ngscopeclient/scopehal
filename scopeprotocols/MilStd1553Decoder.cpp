@@ -673,7 +673,7 @@ void MilStd1553Decoder::Refresh()
 	}
 }
 
-Gdk::Color MilStd1553Decoder::GetColor(int i)
+Gdk::Color MilStd1553Decoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<MilStd1553Waveform*>(GetData(0));
 	if(capture != NULL)
@@ -718,7 +718,7 @@ Gdk::Color MilStd1553Decoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string MilStd1553Decoder::GetText(int i)
+string MilStd1553Decoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[128] = "";
 	auto capture = dynamic_cast<MilStd1553Waveform*>(GetData(0));

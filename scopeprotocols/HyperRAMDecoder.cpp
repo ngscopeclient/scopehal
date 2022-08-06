@@ -369,7 +369,7 @@ struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 	};
 }
 
-Gdk::Color HyperRAMDecoder::GetColor(int i)
+Gdk::Color HyperRAMDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<HyperRAMWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -398,7 +398,7 @@ Gdk::Color HyperRAMDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string HyperRAMDecoder::GetText(int i)
+string HyperRAMDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<HyperRAMWaveform*>(GetData(0));
 	if(capture != NULL)

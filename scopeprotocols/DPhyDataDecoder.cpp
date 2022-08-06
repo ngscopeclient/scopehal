@@ -367,7 +367,7 @@ void DPhyDataDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DPhyDataDecoder::GetColor(int i)
+Gdk::Color DPhyDataDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<DPhyDataWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -394,7 +394,7 @@ Gdk::Color DPhyDataDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string DPhyDataDecoder::GetText(int i)
+string DPhyDataDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<DPhyDataWaveform*>(GetData(0));
 	char tmp[32];

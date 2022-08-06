@@ -157,17 +157,17 @@ void EthernetAutonegotiationDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color EthernetAutonegotiationDecoder::GetColor(int /*i*/)
+Gdk::Color EthernetAutonegotiationDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
 {
 	return m_standardColors[COLOR_DATA];
 }
 
-string EthernetAutonegotiationDecoder::GetText(int i)
+string EthernetAutonegotiationDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<EthernetAutonegotiationWaveform*>(GetData(0));
 	if(data == NULL)
 		return "";
-	if(i >= (int)data->m_samples.size())
+	if(i >= data->m_samples.size())
 		return "";
 
 	auto s = data->m_samples[i];

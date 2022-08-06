@@ -402,12 +402,12 @@ void IPv4Decoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color IPv4Decoder::GetColor(int i)
+Gdk::Color IPv4Decoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
-	if(i >= (int)data->m_samples.size())
+	if(i >= data->m_samples.size())
 		return m_standardColors[COLOR_ERROR];
 
 	switch(data->m_samples[i].m_type)
@@ -443,12 +443,12 @@ Gdk::Color IPv4Decoder::GetColor(int i)
 	}
 }
 
-string IPv4Decoder::GetText(int i)
+string IPv4Decoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
 	if(data == NULL)
 		return "";
-	if(i >= (int)data->m_samples.size())
+	if(i >= data->m_samples.size())
 		return "";
 
 	char tmp[128];

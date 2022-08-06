@@ -338,7 +338,7 @@ uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)
 	return ret;
 }
 
-Gdk::Color PCIeGen2LogicalDecoder::GetColor(int i)
+Gdk::Color PCIeGen2LogicalDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<PCIeLogicalWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -371,7 +371,7 @@ Gdk::Color PCIeGen2LogicalDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string PCIeGen2LogicalDecoder::GetText(int i)
+string PCIeGen2LogicalDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[16];
 

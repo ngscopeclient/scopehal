@@ -49,7 +49,7 @@ SDRAMDecoderBase::~SDRAMDecoderBase()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Pretty printing
 
-Gdk::Color SDRAMDecoderBase::GetColor(int i)
+Gdk::Color SDRAMDecoderBase::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -82,7 +82,7 @@ Gdk::Color SDRAMDecoderBase::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SDRAMDecoderBase::GetText(int i)
+string SDRAMDecoderBase::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SDRAMWaveform*>(GetData(0));
 	if(capture != NULL)

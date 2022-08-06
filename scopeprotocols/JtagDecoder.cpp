@@ -327,7 +327,7 @@ void JtagDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color JtagDecoder::GetColor(int i)
+Gdk::Color JtagDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -359,7 +359,7 @@ Gdk::Color JtagDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string JtagDecoder::GetText(int i)
+string JtagDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
 	if(capture != NULL)

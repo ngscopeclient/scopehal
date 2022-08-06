@@ -619,7 +619,7 @@ vector<string> MDIODecoder::GetHeaders()
 	return ret;
 }
 
-Gdk::Color MDIODecoder::GetColor(int i)
+Gdk::Color MDIODecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -655,7 +655,7 @@ Gdk::Color MDIODecoder::GetColor(int i)
 	return Gdk::Color("red");
 }
 
-string MDIODecoder::GetText(int i)
+string MDIODecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
 	if(capture != NULL)

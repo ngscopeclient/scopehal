@@ -135,7 +135,13 @@ void QSGMIIDecoder::Refresh()
 		size_t nlane = (i - phase) & 3;
 
 		caps[nlane]->m_offsets.push_back(din->m_offsets[i]);
-		caps[nlane]->m_samples.push_back(din->m_samples[i]);
+
+		//Copy sample unless it's a K28.1. if so, convert to K28.5
+		auto s = din->m_samples[i];
+		if(s.m_control && (s.m_data == 0x3c) )
+			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, 0xbc, s.m_disparity));
+		else
+			caps[nlane]->m_samples.push_back(din->m_samples[i]);
 
 		//Last sample?
 		if(i+4 >= len)
@@ -147,9 +153,9 @@ void QSGMIIDecoder::Refresh()
 	}
 }
 
-Gdk::Color QSGMIIDecoder::GetColor(int i)
+Gdk::Color QSGMIIDecoder::GetColor(size_t i, size_t stream)
 {
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
+	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
 	if(capture != NULL)
 	{
 		const IBM8b10bSymbol& s = capture->m_samples[i];
@@ -167,9 +173,9 @@ Gdk::Color QSGMIIDecoder::GetColor(int i)
 }
 
 //TODO: this is pulled directly from the 8B10B decode, can we figure out how to refactor so this is cleaner?
-string QSGMIIDecoder::GetText(int i)
+string QSGMIIDecoder::GetText(size_t i, size_t stream)
 {
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
+	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
 	if(capture != NULL)
 	{
 		const IBM8b10bSymbol& s = capture->m_samples[i];

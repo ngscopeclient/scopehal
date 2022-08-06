@@ -338,7 +338,7 @@ void SWDMemAPDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SWDMemAPDecoder::GetColor(int /*i*/)
+Gdk::Color SWDMemAPDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SWDMemAPWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -350,7 +350,7 @@ Gdk::Color SWDMemAPDecoder::GetColor(int /*i*/)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SWDMemAPDecoder::GetText(int i)
+string SWDMemAPDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SWDMemAPWaveform*>(GetData(0));
 	char tmp[128] = "";

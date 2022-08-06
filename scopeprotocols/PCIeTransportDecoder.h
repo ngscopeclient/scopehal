@@ -121,8 +121,8 @@ public:
 	PCIeTransportDecoder(const std::string& color);
 	virtual ~PCIeTransportDecoder();
 
-	virtual std::string GetText(int i);
-	virtual Gdk::Color GetColor(int i);
+	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
+	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

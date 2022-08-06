@@ -252,7 +252,7 @@ void VICPDecoder::Refresh()
 						m_packets.push_back(pack);
 
 						//Save the opcode
-						pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1);
+						pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1, 0);
 
 						//Set color to reflect direction of the packet
 						if(!nextIsTx)
@@ -473,7 +473,7 @@ void VICPDecoder::Refresh()
 	}
 }
 
-Gdk::Color VICPDecoder::GetColor(int i)
+Gdk::Color VICPDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<VICPWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -514,7 +514,7 @@ Gdk::Color VICPDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string VICPDecoder::GetText(int i)
+string VICPDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<VICPWaveform*>(GetData(0));
 	if(capture != NULL)

@@ -1086,12 +1086,12 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Complex protocol decodes
 
-Gdk::Color Filter::GetColor(int /*i*/)
+Gdk::Color Filter::GetColor(size_t /*i*/, size_t /*stream*/)
 {
 	return m_standardColors[COLOR_ERROR];
 }
 
-string Filter::GetText(int /*i*/)
+string Filter::GetText(size_t /*i*/, size_t /*stream*/)
 {
 	return "(unimplemented)";
 }

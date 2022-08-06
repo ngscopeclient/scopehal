@@ -309,7 +309,7 @@ void DPhySymbolDecoder::Refresh()
 }
 
 
-Gdk::Color DPhySymbolDecoder::GetColor(int i)
+Gdk::Color DPhySymbolDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -333,7 +333,7 @@ Gdk::Color DPhySymbolDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string DPhySymbolDecoder::GetText(int i)
+string DPhySymbolDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
 	if(capture != NULL)

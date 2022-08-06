@@ -267,8 +267,8 @@ protected:
 
 public:
 	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
-	virtual Gdk::Color GetColor(int i);
-	virtual std::string GetText(int i);
+	virtual Gdk::Color GetColor(size_t i, size_t stream);
+	virtual std::string GetText(size_t i, size_t stream);
 
 	//Helpers for sub-sample interoplation
 	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);

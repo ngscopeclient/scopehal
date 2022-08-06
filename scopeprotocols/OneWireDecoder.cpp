@@ -265,7 +265,7 @@ void OneWireDecoder::Refresh()
 	}
 }
 
-Gdk::Color OneWireDecoder::GetColor(int i)
+Gdk::Color OneWireDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<OneWireWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -295,7 +295,7 @@ Gdk::Color OneWireDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string OneWireDecoder::GetText(int i)
+string OneWireDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[32];
 

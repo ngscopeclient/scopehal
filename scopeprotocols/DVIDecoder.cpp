@@ -270,7 +270,7 @@ void DVIDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DVIDecoder::GetColor(int i)
+Gdk::Color DVIDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -302,7 +302,7 @@ Gdk::Color DVIDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string DVIDecoder::GetText(int i)
+string DVIDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
 	if(capture != NULL)

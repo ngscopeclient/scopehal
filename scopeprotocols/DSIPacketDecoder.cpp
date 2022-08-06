@@ -203,7 +203,7 @@ void DSIPacketDecoder::Refresh()
 					pack->m_offset = off * din->m_timescale;
 					pack->m_len = 0;
 					pack->m_headers["VC"] = to_string(current_vc);
-					pack->m_headers["Type"] = GetText(cap->m_offsets.size() - 1);
+					pack->m_headers["Type"] = GetText(cap->m_offsets.size() - 1, 0);
 					m_packets.push_back(pack);
 
 					//Set the color for the packet
@@ -503,7 +503,7 @@ void DSIPacketDecoder::Refresh()
 	}
 }
 
-Gdk::Color DSIPacketDecoder::GetColor(int i)
+Gdk::Color DSIPacketDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<DSIWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -536,7 +536,7 @@ Gdk::Color DSIPacketDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string DSIPacketDecoder::GetText(int i)
+string DSIPacketDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[128] = "";
 	auto capture = dynamic_cast<DSIWaveform*>(GetData(0));

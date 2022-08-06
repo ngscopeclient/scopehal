@@ -217,7 +217,7 @@ void PCIe128b130bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color PCIe128b130bDecoder::GetColor(int i)
+Gdk::Color PCIe128b130bDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<PCIe128b130bWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -245,7 +245,7 @@ Gdk::Color PCIe128b130bDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string PCIe128b130bDecoder::GetText(int i)
+string PCIe128b130bDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	string ret;
 

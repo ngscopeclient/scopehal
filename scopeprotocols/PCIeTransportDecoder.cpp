@@ -319,7 +319,7 @@ void PCIeTransportDecoder::Refresh()
 					cap->m_durations.push_back(dur);
 					cap->m_samples.push_back(PCIeTransportSymbol(PCIeTransportSymbol::TYPE_TLP_TYPE, type));
 
-					pack->m_headers["Type"] = GetText(cap->m_samples.size()-1);
+					pack->m_headers["Type"] = GetText(cap->m_samples.size()-1, 0);
 
 					state = STATE_HEADER_1;
 				}
@@ -907,7 +907,7 @@ void PCIeTransportDecoder::Refresh()
 	}
 }
 
-Gdk::Color PCIeTransportDecoder::GetColor(int i)
+Gdk::Color PCIeTransportDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<PCIeTransportWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -950,7 +950,7 @@ Gdk::Color PCIeTransportDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string PCIeTransportDecoder::GetText(int i)
+string PCIeTransportDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	char tmp[64];
 

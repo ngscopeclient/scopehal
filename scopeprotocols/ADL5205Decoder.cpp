@@ -154,12 +154,12 @@ void ADL5205Decoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color ADL5205Decoder::GetColor(int /*i*/)
+Gdk::Color ADL5205Decoder::GetColor(size_t /*i*/, size_t /*stream*/)
 {
 	return Gdk::Color(m_displaycolor);
 }
 
-string ADL5205Decoder::GetText(int i)
+string ADL5205Decoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<ADL5205Waveform*>(GetData(0));
 	if(capture != NULL)

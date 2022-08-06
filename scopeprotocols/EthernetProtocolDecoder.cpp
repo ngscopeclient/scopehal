@@ -498,12 +498,12 @@ void EthernetProtocolDecoder::BytesToFrames(
 	delete pack;
 }
 
-Gdk::Color EthernetProtocolDecoder::GetColor(int i)
+Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
 	if(data == NULL)
 		return m_standardColors[COLOR_ERROR];
-	if(i >= (int)data->m_samples.size())
+	if(i >= data->m_samples.size())
 		return m_standardColors[COLOR_ERROR];
 
 	switch(data->m_samples[i].m_type)
@@ -542,12 +542,12 @@ Gdk::Color EthernetProtocolDecoder::GetColor(int i)
 	}
 }
 
-string EthernetProtocolDecoder::GetText(int i)
+string EthernetProtocolDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
 	if(data == NULL)
 		return "";
-	if(i >= (int)data->m_samples.size())
+	if(i >= data->m_samples.size())
 		return "";
 
 	char tmp[128];

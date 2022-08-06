@@ -176,7 +176,7 @@ void Ethernet64b66bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color Ethernet64b66bDecoder::GetColor(int i)
+Gdk::Color Ethernet64b66bDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -200,7 +200,7 @@ Gdk::Color Ethernet64b66bDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string Ethernet64b66bDecoder::GetText(int i)
+string Ethernet64b66bDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
 	if(capture != NULL)

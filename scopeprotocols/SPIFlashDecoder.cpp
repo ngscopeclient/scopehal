@@ -609,7 +609,7 @@ void SPIFlashDecoder::Refresh()
 					cap->m_durations.push_back(din->m_durations[iin]);
 					cap->m_samples.push_back(SPIFlashSymbol(SPIFlashSymbol::TYPE_COMMAND, current_cmd, 0));
 
-					pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1);
+					pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1, 0);
 				}
 				break;
 
@@ -833,7 +833,7 @@ void SPIFlashDecoder::Refresh()
 							pack->m_headers["Address"] = tmp;
 						}
 						else
-							pack->m_headers["Address"] = GetText(cap->m_samples.size() - 1);
+							pack->m_headers["Address"] = GetText(cap->m_samples.size() - 1, 0);
 					}
 				}
 
@@ -850,12 +850,12 @@ void SPIFlashDecoder::Refresh()
 						if(data_type == SPIFlashSymbol::TYPE_PART_ID)
 						{
 							pack->m_headers["Info"] +=
-								GetText(cap->m_samples.size()-2) +
+								GetText(cap->m_samples.size()-2, 0) +
 								" " +
-								GetText(cap->m_samples.size()-1);
+								GetText(cap->m_samples.size()-1, 0);
 						}
 						else
-							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
 					}
 
 					//Only write to the output for actual flash data!
@@ -976,7 +976,7 @@ void SPIFlashDecoder::Refresh()
 
 					//At the end of a write command, crack status registers if needed
 					if(data_type != SPIFlashSymbol::TYPE_DATA)
-						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1);
+						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
 				}
 				else
 				{
@@ -998,7 +998,7 @@ void SPIFlashDecoder::Refresh()
 	}
 }
 
-Gdk::Color SPIFlashDecoder::GetColor(int i)
+Gdk::Color SPIFlashDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SPIFlashWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -1034,7 +1034,7 @@ Gdk::Color SPIFlashDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SPIFlashDecoder::GetText(int i)
+string SPIFlashDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SPIFlashWaveform*>(GetData(0));
 	if(capture != NULL)

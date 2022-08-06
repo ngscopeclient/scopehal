@@ -62,8 +62,8 @@ class ADL5205Decoder : public Filter
 public:
 	ADL5205Decoder(const std::string& color);
 
-	virtual std::string GetText(int i);
-	virtual Gdk::Color GetColor(int i);
+	virtual std::string GetText(size_t i, size_t stream);
+	virtual Gdk::Color GetColor(size_t i, size_t stream);
 
 	virtual void Refresh();
 

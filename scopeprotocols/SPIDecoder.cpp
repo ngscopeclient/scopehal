@@ -248,7 +248,7 @@ void SPIDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SPIDecoder::GetColor(int i)
+Gdk::Color SPIDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -271,7 +271,7 @@ Gdk::Color SPIDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SPIDecoder::GetText(int i)
+string SPIDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
 	if(capture != NULL)

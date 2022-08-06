@@ -279,7 +279,7 @@ void DSIFrameDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DSIFrameDecoder::GetColor(int i)
+Gdk::Color DSIFrameDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	DSIFrameWaveform* capture = dynamic_cast<DSIFrameWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -308,7 +308,7 @@ Gdk::Color DSIFrameDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string DSIFrameDecoder::GetText(int i)
+string DSIFrameDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	DSIFrameWaveform* capture = dynamic_cast<DSIFrameWaveform*>(GetData(0));
 	if(capture != NULL)

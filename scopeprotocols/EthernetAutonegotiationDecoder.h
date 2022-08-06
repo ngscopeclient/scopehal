@@ -43,8 +43,8 @@ class EthernetAutonegotiationDecoder : public Filter
 public:
 	EthernetAutonegotiationDecoder(const std::string& color);
 
-	virtual std::string GetText(int i);
-	virtual Gdk::Color GetColor(int i);
+	virtual Gdk::Color GetColor(size_t i, size_t stream);
+	virtual std::string GetText(size_t i, size_t stream);
 
 	virtual void Refresh();
 

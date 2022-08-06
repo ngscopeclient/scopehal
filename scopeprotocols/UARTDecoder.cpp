@@ -223,12 +223,12 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-Gdk::Color UARTDecoder::GetColor(int /*i*/)
+Gdk::Color UARTDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
 {
 	return Gdk::Color(m_displaycolor);
 }
 
-string UARTDecoder::GetText(int i)
+string UARTDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	return Filter::GetTextForAsciiChannel(i, 0);
 }

@@ -247,7 +247,7 @@ void TMDSDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color TMDSDecoder::GetColor(int i)
+Gdk::Color TMDSDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -275,7 +275,7 @@ Gdk::Color TMDSDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string TMDSDecoder::GetText(int i)
+string TMDSDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
 	if(capture != NULL)

@@ -434,7 +434,7 @@ void SWDDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SWDDecoder::GetColor(int i)
+Gdk::Color SWDDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SWDWaveform*>(GetData(0));
 	if(capture != NULL)
@@ -489,7 +489,7 @@ Gdk::Color SWDDecoder::GetColor(int i)
 	return m_standardColors[COLOR_ERROR];
 }
 
-string SWDDecoder::GetText(int i)
+string SWDDecoder::GetText(size_t i, size_t /*stream*/)
 {
 	auto capture = dynamic_cast<SWDWaveform*>(GetData(0));
 	if(capture != NULL)
