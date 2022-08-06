@@ -137,6 +137,7 @@
 #include "PRBSGeneratorFilter.h"
 #include "ReferencePlaneExtensionFilter.h"
 #include "RjBUjFilter.h"
+#include "QSGMIIDecoder.h"
 #include "QSPIDecoder.h"
 #include "QuadratureDecoder.h"
 #include "RiseMeasurement.h"

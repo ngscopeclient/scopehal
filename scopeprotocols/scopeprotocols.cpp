@@ -149,6 +149,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PRBSGeneratorFilter);
 	AddDecoderClass(ReferencePlaneExtensionFilter);
 	AddDecoderClass(RjBUjFilter);
+	AddDecoderClass(QSGMIIDecoder);
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
 	AddDecoderClass(RiseMeasurement);

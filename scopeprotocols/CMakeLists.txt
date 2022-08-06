@@ -102,6 +102,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ReferencePlaneExtensionFilter.cpp
 	RjBUjFilter.cpp
 	QuadratureDecoder.cpp
+	QSGMIIDecoder.cpp
 	QSPIDecoder.cpp
 	RiseMeasurement.cpp
     ScaleFilter.cpp
