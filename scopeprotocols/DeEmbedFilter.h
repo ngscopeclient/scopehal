@@ -72,8 +72,6 @@ protected:
 	};
 
 	float m_cachedMaxGain;
-	WaveformBase* m_cachedMag;
-	WaveformBase* m_cachedAngle;
 
 	double m_cachedBinSize;
 	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
@@ -106,10 +104,8 @@ protected:
 	cl::Buffer* m_fftoutbuf;
 	#endif
 
-	time_t	m_magStartTimestamp;
-	int64_t m_magStartFemtoseconds;
-	time_t	m_angleStartTimestamp;
-	int64_t m_angleStartFemtoseconds;
+	WaveformCacheKey m_magKey;
+	WaveformCacheKey m_angleKey;
 
 	SParameterVector m_cachedSparams;
 };

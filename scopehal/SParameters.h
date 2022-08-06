@@ -35,6 +35,8 @@
 #ifndef SParameters_h
 #define SParameters_h
 
+#include <complex>
+
 /**
 	@brief A single point in an S-parameter dataset
  */
@@ -51,9 +53,19 @@ public:
 	{
 	}
 
+	SParameterPoint(float f, std::complex<float> c)
+	: m_frequency(f)
+	, m_amplitude(abs(c))
+	, m_phase(arg(c))
+	{
+	}
+
 	float	m_frequency;	//Hz
 	float	m_amplitude;	//magnitude
 	float	m_phase;		//radians from -pi to +pi
+
+	std::complex<float> ToComplex()
+	{ return std::polar(m_amplitude, m_phase); }
 };
 
 /**
@@ -67,12 +79,16 @@ public:
 	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
 
 	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
+	void ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* wang);
 
 	SParameterPoint InterpolatePoint(float frequency) const;
 	float InterpolateMagnitude(float frequency) const;
 	float InterpolateAngle(float frequency) const;
 
 	std::vector<SParameterPoint> m_points;
+
+	void resize(size_t nsize)
+	{ m_points.resize(nsize); }
 
 	float GetGroupDelay(size_t bin) const;
 

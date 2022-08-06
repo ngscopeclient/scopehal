@@ -50,6 +50,12 @@ SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWavef
 
 void SParameterVector::ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang)
 {
+	if( (wmag == nullptr) || (wang == nullptr) )
+	{
+		LogError("Null input supplied to SParameterVector::ConvertFromWaveforms\n");
+		return;
+	}
+
 	m_points.clear();
 
 	size_t len = min(wmag->m_samples.size(), wang->m_samples.size());
@@ -62,6 +68,56 @@ void SParameterVector::ConvertFromWaveforms(const AnalogWaveform* wmag, const An
 			wmag->m_timescale*wmag->m_offsets[i].m_value + wmag->m_triggerPhase,
 			pow(10, wmag->m_samples[i].m_value / 20),
 			wang->m_samples[i].m_value * ascale);
+	}
+}
+
+/**
+	@brief Copy our state to analog mag/angle waveforms
+ */
+void SParameterVector::ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* wang)
+{
+	size_t len = m_points.size();
+
+	//Resize outputs as needed
+	wmag->Resize(len);
+	wmag->m_triggerPhase = 0;
+	wmag->m_timescale = 1;
+	wmag->m_densePacked = false;
+
+	wang->Resize(len);
+	wang->m_triggerPhase = 0;
+	wang->m_timescale = 1;
+	wang->m_densePacked = false;
+
+	float ascale = 180 / M_PI;
+
+	for(size_t i=0; i<len; i++)
+	{
+		auto freq = m_points[i].m_frequency;
+
+		//Magnitude
+		wmag->m_offsets[i] = freq;
+		wmag->m_samples[i].m_value = 20 * log10(m_points[i].m_amplitude);
+
+		//Angle
+		wang->m_offsets[i] = freq;
+		wang->m_samples[i].m_value = m_points[i].m_phase * ascale;
+
+		//Last sample?
+		if(i+1 == len)
+		{
+			wang->m_durations[i] = 1;
+			wmag->m_durations[i] = 1;
+		}
+
+		//No, valid duration
+		else
+		{
+			auto dur = m_points[i+1].m_frequency - freq;
+
+			wang->m_durations[i] = dur;
+			wmag->m_durations[i] = dur;
+		}
 	}
 }
 

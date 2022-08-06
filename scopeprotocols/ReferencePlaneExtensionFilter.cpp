@@ -99,11 +99,6 @@ void ReferencePlaneExtensionFilter::Refresh()
 		return;
 	}
 
-	//Update timestamp to our *current* timestamp
-	double tnow = GetTime();
-	int64_t sec = floor(tnow);
-	int64_t fs = (tnow - sec) * FS_PER_SECOND;
-
 	size_t nports = m_parameters[m_portCountName].GetIntVal();
 	for(size_t to=0; to<nports; to++)
 	{
@@ -141,11 +136,6 @@ void ReferencePlaneExtensionFilter::Refresh()
 
 				double phase_shifted = ang_in->m_samples[i] + phase_deg;
 				ang_out->m_samples[i] = phase_shifted;
-
-				mag_out->m_startTimestamp = tnow;
-				mag_out->m_startFemtoseconds = fs;
-				ang_out->m_startTimestamp = tnow;
-				ang_out->m_startFemtoseconds = fs;
 			}
 
 			//TODO: Copy angle data to parameters

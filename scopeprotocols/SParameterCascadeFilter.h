@@ -30,26 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SParameterFilter
+	@brief Declaration of SParameterCascadeFilter
  */
-#ifndef SParameterFilter_h
-#define SParameterFilter_h
+#ifndef SParameterCascadeFilter_h
+#define SParameterCascadeFilter_h
 
-/**
-	@brief A filter that takes a set of S-parameters as input and outputs another set of S-parameters
- */
-class SParameterFilter : public SParameterSourceFilter
+class SParameterCascadeFilter : public SParameterFilter
 {
 public:
-	SParameterFilter(const std::string& color, Category cat);
-	~SParameterFilter();
+	SParameterCascadeFilter(const std::string& color);
+	~SParameterCascadeFilter();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	static std::string GetProtocolName();
+
+	virtual void Refresh();
+
+	PROTOCOL_DECODER_INITPROC(SParameterCascadeFilter)
 
 protected:
 	virtual void RefreshPorts();
-
-	std::string m_portCountName;
 };
 
 #endif

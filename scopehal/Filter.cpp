@@ -1389,6 +1389,9 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 
+	//Bump rev number
+	cap->m_revision ++;
+
 	//Clear output
 	if(clear)
 	{
@@ -1423,6 +1426,9 @@ DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size
 	//Copy configuration
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Bump rev number
+	cap->m_revision ++;
 
 	//Clear output
 	cap->m_samples.clear();

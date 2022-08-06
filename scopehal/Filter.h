@@ -40,6 +40,40 @@
 #include "FlowGraphNode.h"
 
 /**
+	@brief Describes a particular revision of a waveform
+
+	Used to determine whether a filter input has changed, and thus cached state should be invalidated
+ */
+class WaveformCacheKey
+{
+public:
+	WaveformCacheKey()
+	: m_wfm(nullptr)
+	, m_rev(0)
+	{}
+
+	WaveformCacheKey(WaveformBase* wfm)
+	: m_wfm(wfm)
+	, m_rev(wfm->m_revision)
+	{}
+
+	bool operator==(WaveformBase* wfm)
+	{ return (m_wfm == wfm) && (m_rev == wfm->m_revision); }
+
+	bool operator==(WaveformCacheKey wfm)
+	{ return (m_wfm == wfm.m_wfm) && (m_rev == wfm.m_rev); }
+
+	bool operator!=(WaveformBase* wfm)
+	{ return (m_wfm != wfm) || (m_rev != wfm->m_revision); }
+
+	bool operator!=(WaveformCacheKey wfm)
+	{ return (m_wfm != wfm.m_wfm) || (m_rev != wfm.m_rev); }
+
+	WaveformBase* m_wfm;
+	uint64_t m_rev;
+};
+
+/**
 	@brief Abstract base class for all filters and protocol decoders
  */
 class Filter	: public OscilloscopeChannel
