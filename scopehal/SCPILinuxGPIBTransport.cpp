@@ -69,6 +69,7 @@ SCPILinuxGPIBTransport::SCPILinuxGPIBTransport(const string& args)
 		LogError("Couldn't open %s\n", m_devicePath.c_str());
 		return;
 	}
+	ibclr(m_handle);
 }
 
 SCPILinuxGPIBTransport::~SCPILinuxGPIBTransport()
