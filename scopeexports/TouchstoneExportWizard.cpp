@@ -120,23 +120,26 @@ TouchstoneExportChannelGroup::TouchstoneExportChannelGroup(
 			if(stream.GetXAxisUnits() != Unit(Unit::UNIT_HZ))
 				continue;
 
+			auto sname = stream.GetName();
+			auto search = sname.rfind(paramname) + paramname.size() + 4;	//_mag or _ang
+			bool match = search == sname.size();
+
 			//Y axis dB is good for magnitude
 			if(stream.GetYAxisUnits() == Unit(Unit::UNIT_DB))
 			{
-				auto sname = stream.GetName();
 				m_magBox.append(sname);
 				m_magStreams.push_back(stream);
-				if(sname.find(paramname) != string::npos)
+
+				if(match)
 					m_magBox.set_active_text(sname);
 			}
 
 			//Y axis degrees is good for angle
 			if(stream.GetYAxisUnits() == Unit(Unit::UNIT_DEGREES))
 			{
-				auto sname = stream.GetName();
 				m_angBox.append(sname);
 				m_angStreams.push_back(stream);
-				if(sname.find(paramname) != string::npos)
+				if(match)
 					m_angBox.set_active_text(sname);
 			}
 		}
