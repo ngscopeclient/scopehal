@@ -113,10 +113,27 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial memory configuration.
-	//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
-	//TODO: pick reasonable default for other families
-	SetSampleRate(625000000L);
-	SetSampleDepth(1000000);
+	switch(m_series)
+	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+		{
+			//62.5 Msps is the highest rate the 3000 series supports with all channels, including MSO, active.
+			SetSampleRate(62500000L);
+			SetSampleDepth(100000);
+		}
+		break;
+
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+		{
+			//625 Msps is the highest rate the 6000 series supports with all channels, including MSO, active.
+			SetSampleRate(625000000L);
+			SetSampleDepth(1000000);
+		}
+		break;
+	}
 
 	//Set initial AWG configuration
 	SetFunctionChannelAmplitude(0, 0.1);
@@ -130,13 +147,13 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	//Add the external trigger input
 	m_extTrigChannel =
 		new OscilloscopeChannel(
-			this,
-			"EX",
-			"",
-			Unit(Unit::UNIT_FS),
-			Unit(Unit::UNIT_COUNTS),
-			Stream::STREAM_TYPE_TRIGGER,
-			m_channels.size());
+		this,
+		"EX",
+		"",
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_COUNTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 	m_extTrigChannel->SetDefaultDisplayName();
 
@@ -195,6 +212,21 @@ void PicoOscilloscope::IdentifyHardware()
 		LogWarning("Unknown PicoScope model \"%s\"\n", m_model.c_str());
 		m_series = SERIES_UNKNOWN;
 	}
+	else if(m_model[0] == '3')
+	{
+		m_series = SERIES_3x0xD;
+		if(m_model.find("MSO") > 0)
+		{
+			// PicoScope3000 support 16 Digital Channels for MSO (or nothing)
+			m_digitalChannelCount = 16;
+			m_series = SERIES_3x0xDMSO;
+			LogWarning("SERIES_3x0xDMSO PicoScope model \"%s\"\n", m_model.c_str());
+		}
+		else
+		{
+			LogWarning("SERIES_3x0xD PicoScope model \"%s\"\n", m_model.c_str());
+		}
+	}
 	else if(m_model[0] == '6')
 	{
 		//We have two MSO pod connectors
@@ -242,7 +274,8 @@ unsigned int PicoOscilloscope::GetInstrumentTypes()
 	switch(m_series)
 	{
 		//has function generator
-		case SERIES_6403E:
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
 		case SERIES_6x0xE:
 		case SERIES_6x2xE:
 			return Instrument::INST_OSCILLOSCOPE | Instrument::INST_FUNCTION;
@@ -319,10 +352,26 @@ void PicoOscilloscope::DisableChannel(size_t i)
 vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
-	ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
-	ret.push_back(OscilloscopeChannel::COUPLE_GND);
+	switch(m_series)
+	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+		{
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+		}
+		break;
+
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+		default:
+		{
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_AC_1M);
+			ret.push_back(OscilloscopeChannel::COUPLE_DC_50);
+			ret.push_back(OscilloscopeChannel::COUPLE_GND);
+		}
+	}
 	return ret;
 }
 
@@ -453,7 +502,7 @@ bool PicoOscilloscope::AcquireData()
 			if(podnum > 2)
 			{
 				LogError("Digital pod number was >2 (chnum = %zu). Possible protocol desync or data corruption?\n",
-					chnum);
+						 chnum);
 				return false;
 			}
 
@@ -721,6 +770,10 @@ bool PicoOscilloscope::IsADCModeConfigurable()
 {
 	switch(m_series)
 	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+			return false;
+
 		case SERIES_6x0xE:
 		case SERIES_6403E:
 			return false;
@@ -965,6 +1018,11 @@ bool PicoOscilloscope::CanEnableChannel(size_t i)
 	//Fall back to the main path if we get here
 	switch(m_series)
 	{
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+			return CanEnableChannel6000Series8Bit(i);
+			break;
+
 		//6000 series
 		case SERIES_6403E:
 		case SERIES_6x0xE:
@@ -1262,6 +1320,8 @@ int PicoOscilloscope::GetFunctionChannelCount()
 	switch(m_series)
 	{
 		//has function generator
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
 		case SERIES_6403E:
 		case SERIES_6x0xE:
 		case SERIES_6x2xE:

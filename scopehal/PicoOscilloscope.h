@@ -147,6 +147,8 @@ public:
 
 	enum Series
 	{
+		SERIES_3x0xD,   //3000 series (first x=2 or 4 Chan, 2nd x is BW)
+		SERIES_3x0xDMSO,//3000 series+16bits MSO(first x=2 or 4 Chan, 2nd x is BW)
 		SERIES_6403E,	//Lowest end 6000E model has less ADCs
 		SERIES_6x0xE,	//6000 series with 8 bit resolution only
 		SERIES_6x2xE,	//6000 series with FlexRes
