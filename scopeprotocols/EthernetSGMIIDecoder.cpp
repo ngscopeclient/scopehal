@@ -27,193 +27,127 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Implementation of QSGMIIDecoder
- */
-#include "../scopehal/scopehal.h"
-#include "../scopehal/Filter.h"
-#include "IBM8b10bDecoder.h"
-#include "QSGMIIDecoder.h"
-
+#include "scopeprotocols.h"
+#include <algorithm>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-QSGMIIDecoder::QSGMIIDecoder(const string& color)
-	: Filter(color, CAT_SERIAL)
+EthernetSGMIIDecoder::EthernetSGMIIDecoder(const string& color)
+	: Ethernet1000BaseXDecoder(color)
+	, m_speedName("Speed")
 {
-	CreateInput("data");
-
-	AddProtocolStream("Lane 0");
-	AddProtocolStream("Lane 1");
-	AddProtocolStream("Lane 2");
-	AddProtocolStream("Lane 3");
-}
-
-QSGMIIDecoder::~QSGMIIDecoder()
-{
-
+	m_parameters[m_speedName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_speedName].AddEnumValue("10 Mbps", SPEED_10M);
+	m_parameters[m_speedName].AddEnumValue("100 Mbps", SPEED_100M);
+	m_parameters[m_speedName].AddEnumValue("1000 Mbps", SPEED_1000M);
+	m_parameters[m_speedName].SetIntVal(SPEED_1000M);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+// Accessors
 
-bool QSGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
+string EthernetSGMIIDecoder::GetProtocolName()
 {
-	if(stream.m_channel == NULL)
-		return false;
-
-	if( (i == 0) && (dynamic_cast<IBM8b10bWaveform*>(stream.m_channel->GetData(0)) != NULL) )
-		return true;
-
-	return false;
-}
-
-string QSGMIIDecoder::GetProtocolName()
-{
-	return "Ethernet - QSGMII";
+	return "Ethernet - SGMII";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void QSGMIIDecoder::Refresh()
+void EthernetSGMIIDecoder::Refresh()
 {
+	ClearPackets();
+
+	//Get the input data
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
+	auto data = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
 
-	//Get the input waveform
-	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
-	size_t len = din->m_offsets.size();
+	//Create the output capture
+	auto cap = new EthernetWaveform;
+	cap->m_timescale = data->m_timescale;
+	cap->m_startTimestamp = data->m_startTimestamp;
+	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->m_triggerPhase = data->m_triggerPhase;
+	cap->m_densePacked = false;
 
-	//Create the captures
-	//Output is time aligned with the input
-	vector<IBM8b10bWaveform*> caps;
-	for(size_t i=0; i<4; i++)
+	size_t delta = 1;
+	switch(m_parameters[m_speedName].GetIntVal())
 	{
-		auto cap = new IBM8b10bWaveform;
-
-		cap->m_timescale = 1;
-		cap->m_startTimestamp = din->m_startTimestamp;
-		cap->m_startFemtoseconds = din->m_startFemtoseconds;
-		cap->m_triggerPhase = 0;
-		cap->m_densePacked = false;
-
-		caps.push_back(cap);
-
-		SetData(cap, i);
-	}
-
-	//Find the first K28.1 (control 0x3c)
-	size_t phase = 0;
-	bool found = false;
-	for(size_t i=0; i<len; i++)
-	{
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
-		{
-			phase = i & 3;
-			found = true;
+		case SPEED_10M:
+			delta = 100;
 			break;
-		}
+
+		case SPEED_100M:
+			delta = 10;
+			break;
+
+		case SPEED_1000M:
+		default:
+			delta = 1;
 	}
 
-	//If no K28.1, give up
-	if(!found)
-		return;
-
-	//Go through the list of symbols and round-robin them out to each lane
-	for(size_t i=0; i<len; i++)
+	size_t len = data->m_samples.size();
+	for(size_t i=0; i < len; i++)
 	{
-		size_t nlane = (i - phase) & 3;
+		//Ignore idles and autonegotiation for now
 
-		caps[nlane]->m_offsets.push_back(din->m_offsets[i]);
+		auto symbol = data->m_samples[i];
 
-		//Copy sample unless it's a K28.1. if so, convert to K28.5
-		auto s = din->m_samples[i];
-		if(s.m_control && (s.m_data == 0x3c) )
-			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, 0xbc, s.m_disparity));
-		else
-			caps[nlane]->m_samples.push_back(din->m_samples[i]);
+		//Set of recovered bytes and timestamps
+		vector<uint8_t> bytes;
+		vector<uint64_t> starts;
+		vector<uint64_t> ends;
 
-		//Last sample?
-		if(i+4 >= len)
-			caps[nlane]->m_durations.push_back(din->m_durations[i]);
-
-		//No, use duration of this to next one
-		else
-			caps[nlane]->m_durations.push_back(din->m_offsets[i+4] - din->m_offsets[i]);
-	}
-}
-
-Gdk::Color QSGMIIDecoder::GetColor(size_t i, size_t stream)
-{
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
-	if(capture != NULL)
-	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
-
-		if(s.m_error)
-			return m_standardColors[COLOR_ERROR];
-		else if(s.m_control)
-			return m_standardColors[COLOR_CONTROL];
-		else
-			return m_standardColors[COLOR_DATA];
-	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
-}
-
-//TODO: this is pulled directly from the 8B10B decode, can we figure out how to refactor so this is cleaner?
-string QSGMIIDecoder::GetText(size_t i, size_t stream)
-{
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
-	if(capture != NULL)
-	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
-
-		unsigned int right = s.m_data >> 5;
-		unsigned int left = s.m_data & 0x1F;
-
-		char tmp[32];
-		if(s.m_error)
-			return "ERROR";
-		else
+		//K27.7 is a start-of-frame
+		if(symbol.m_control && (symbol.m_data == 0xfb) )
 		{
-			//Dotted format
-			//if(m_cachedDisplayFormat == FORMAT_DOTTED)
-			if(true)
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
-				else
-					snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
-
-				if(s.m_disparity < 0)
-					return string(tmp) + "-";
-				else
-					return string(tmp) + "+";
-			}
-
-			//Hex format
-			else
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
-				else
-					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
-			}
+			bytes.push_back(0x55);
+			starts.push_back(data->m_offsets[i]);
+			ends.push_back(data->m_offsets[i] + data->m_durations[i]);
 		}
-	}
-	return "";
-}
 
+		//Discard anything else
+		else
+			continue;
+
+		i++;
+
+		//Decode frame data until we see a control or error character.
+		//Any control character would mean end-of-frame or error.
+		bool error = false;
+		while(i+delta < len)
+		{
+			symbol = data->m_samples[i];
+
+			//Expect K29.7 end of frame
+			if(symbol.m_control)
+			{
+				//Can also be K29.7 K23.7, with the K23.7 at the end position
+				if( (symbol.m_data != 0xfd) && (symbol.m_data != 0xf7) )
+					error = true;
+				break;
+			}
+
+			bytes.push_back(symbol.m_data);
+			starts.push_back(data->m_offsets[i]);
+			ends.push_back(data->m_offsets[i+delta]);
+
+			i += delta;
+		}
+
+		//TODO: if error, create a single giant "ERROR" frame block? or what
+
+		//Crunch the data
+		if(!error)
+			BytesToFrames(bytes, starts, ends, cap);
+	}
+
+	SetData(cap, 0);
+}

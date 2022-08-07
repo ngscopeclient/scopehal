@@ -49,6 +49,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetGMIIDecoder.cpp
 	EthernetRGMIIDecoder.cpp
 	EthernetRMIIDecoder.cpp
+	EthernetSGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
 	EyeBitRateMeasurement.cpp
 	EyePattern.cpp

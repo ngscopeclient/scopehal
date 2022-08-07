@@ -443,14 +443,14 @@ void EthernetProtocolDecoder::BytesToFrames(
 				segment.m_data.push_back(bytes[i]);
 				cap->m_samples.push_back(segment);
 
+				pack->m_data.push_back(bytes[i]);
+
 				//If almost at end of packet, next 4 bytes are FCS
 				if(i == bytes.size() - 5)
 				{
 					segment.m_data.clear();
 					segment.m_type = EthernetFrameSegment::TYPE_FCS_GOOD;
 				}
-				else
-					pack->m_data.push_back(bytes[i]);
 				break;
 
 			case EthernetFrameSegment::TYPE_FCS_GOOD:
