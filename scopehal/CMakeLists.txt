@@ -2,6 +2,7 @@ include_directories(SYSTEM ${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
+find_library(LINUXGPIB_LIB gpib)
 
 
 # Additional Windows/Linux libraries
@@ -27,6 +28,14 @@ if(LXI_LIB)
 else()
 	set(HAS_LXI false)
 	set(LXI_LIBRARIES "")
+endif()
+
+if(LINUXGPIB_LIB)
+	set(HAS_LINUXGPIB true)
+	set(LINUXGPIB_LIBRARIES ${LINUXGPIB_LIB})
+else()
+	set(HAS_LINUXGPIB false)
+	set(LINUXGPIB_LIBRARIES "")
 endif()
 
 if(OpenCL_FOUND)
@@ -56,6 +65,7 @@ set(SCOPEHAL_SOURCES
 	SCPISocketTransport.cpp
 	SCPITwinLanTransport.cpp
 	VICPSocketTransport.cpp
+	SCPILinuxGPIBTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
 	SCPITMCTransport.cpp
@@ -134,7 +144,7 @@ configure_file(config.h.in config.h)
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget ${YAML_LIBRARIES}
-	${LXI_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} ${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
+	${LXI_LIBRARIES} ${LINUXGPIB_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} ${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
 
 target_include_directories(scopehal
 PUBLIC
@@ -152,6 +162,10 @@ PUBLIC SYSTEM
 
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
+endif()
+
+if(${HAS_LINUXGPIB})
+	target_compile_definitions(scopehal PUBLIC HAS_LINUXGPIB)
 endif()
 
 install(TARGETS scopehal LIBRARY)

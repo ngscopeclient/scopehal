@@ -112,6 +112,9 @@ void TransportStaticInit()
 #ifdef HAS_LXI
 	AddTransportClass(SCPILxiTransport);
 #endif
+#ifdef HAS_LINUXGPIB
+	AddTransportClass(SCPILinuxGPIBTransport);
+#endif
 }
 
 /**
