@@ -760,7 +760,7 @@ bool AgilentOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
-std::map<uint64_t, double> sampleRateToDuration {
+static std::map<uint64_t, double> sampleRateToDuration {
 	// Map sample rates to corresponding maximum on-screen time duration setting
 	{8000      , 500},
 	{20000     , 200},
