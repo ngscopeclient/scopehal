@@ -173,7 +173,12 @@ void Unit::GetSIScalingFactor(double num, double& scaleFactor, string& prefix) c
 	prefix = "";
 	num = fabs(num);
 
-	if(num >= 1e9f)
+	if(num >= 1e12f)
+	{
+		scaleFactor = 1e-12;
+		prefix = "T";
+	}
+	else if(num >= 1e9f)
 	{
 		scaleFactor = 1e-9;
 		prefix = "G";
@@ -635,14 +640,16 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 		if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
 			continue;
 
-		if(c == 'G')
-			scale = 1000000000.0;
+		if(c == 'T')
+			scale = 1e12;
+		else if(c == 'G')
+			scale = 1e9;
 		else if(c == 'M')
-			scale = 1000000.0;
+			scale = 1e6;
 		else if(c == 'K' || c == 'k')
-			scale = 1000.0;
+			scale = 1e3;
 		else if(c == 'm')
-			scale = 0.001;
+			scale = 1e-3;
 		else if( (c == 'u') || (str.find("μ", i) == i) )
 			scale = 1e-6;
 		else if(c == 'n')
