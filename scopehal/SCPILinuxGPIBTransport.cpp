@@ -69,6 +69,7 @@ SCPILinuxGPIBTransport::SCPILinuxGPIBTransport(const string& args)
 		LogError("Couldn't open %s\n", m_devicePath.c_str());
 		return;
 	}
+	ibclr(m_handle);
 }
 
 SCPILinuxGPIBTransport::~SCPILinuxGPIBTransport()
@@ -127,7 +128,6 @@ string SCPILinuxGPIBTransport::ReadReply(bool endOnSemicolon)
 	while(true)
 	{
 		ibrd(m_handle, buf, 1024);
-		LogTrace("Got %d\n", ibcnt);
 		ret.append(buf, ibcnt);
 		if (ret.back() == '\n' || (endOnSemicolon && (ret.back() == ';'))) {
 			ret.pop_back();
