@@ -42,6 +42,7 @@
 #include "DemoOscilloscope.h"
 #include "DigilentOscilloscope.h"
 #include "DSLabsOscilloscope.h"
+#include "KeysightDCA.h"
 #include "LeCroyOscilloscope.h"
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
@@ -57,6 +58,7 @@
 
 #include "CDR8B10BTrigger.h"
 #include "CDRNRZPatternTrigger.h"
+#include "DCAEdgeTrigger.h"
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
 #include "GlitchTrigger.h"
@@ -382,6 +384,7 @@ void DriverStaticInit()
 	AddDriverClass(DemoOscilloscope);
 	AddDriverClass(DigilentOscilloscope);
 	AddDriverClass(DSLabsOscilloscope);
+	AddDriverClass(KeysightDCA);
 	AddDriverClass(PicoOscilloscope);
 	AddDriverClass(RigolOscilloscope);
 	AddDriverClass(RohdeSchwarzOscilloscope);
@@ -397,6 +400,7 @@ void DriverStaticInit()
 
 	AddTriggerClass(CDR8B10BTrigger);
 	AddTriggerClass(CDRNRZPatternTrigger);
+	AddTriggerClass(DCAEdgeTrigger);
 	AddTriggerClass(DropoutTrigger);
 	AddTriggerClass(EdgeTrigger);
 	AddTriggerClass(GlitchTrigger);

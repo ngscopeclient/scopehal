@@ -81,6 +81,7 @@ set(SCOPEHAL_SOURCES
 	CDRTrigger.cpp
 	CDR8B10BTrigger.cpp
 	CDRNRZPatternTrigger.cpp
+	DCAEdgeTrigger.cpp
 	DropoutTrigger.cpp
 	EdgeTrigger.cpp
 	GlitchTrigger.cpp
@@ -113,6 +114,7 @@ set(SCOPEHAL_SOURCES
 	DemoOscilloscope.cpp
 	DigilentOscilloscope.cpp
 	DSLabsOscilloscope.cpp
+	KeysightDCA.cpp
 	LeCroyOscilloscope.cpp
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
