@@ -77,6 +77,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
 	AddDecoderClass(DPhyDataDecoder);
+	AddDecoderClass(DPhyEscapeModeDecoder);
 	AddDecoderClass(DPhyHSClockRecoveryFilter);
 	AddDecoderClass(DPhySymbolDecoder);
 	AddDecoderClass(DramClockFilter);

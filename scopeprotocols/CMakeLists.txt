@@ -27,6 +27,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
 	DPhyDataDecoder.cpp
+	DPhyEscapeModeDecoder.cpp
 	DPhyHSClockRecoveryFilter.cpp
 	DPhySymbolDecoder.cpp
 	DramClockFilter.cpp

@@ -64,6 +64,7 @@
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
 #include "DPhyDataDecoder.h"
+#include "DPhyEscapeModeDecoder.h"
 #include "DPhyHSClockRecoveryFilter.h"
 #include "DPhySymbolDecoder.h"
 #include "DramClockFilter.h"

@@ -30,24 +30,25 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DPhyDataDecoder
+	@brief Declaration of DPhyEscapeModeDecoder
  */
-#ifndef DPhyDataDecoder_h
-#define DPhyDataDecoder_h
+#ifndef DPhyEscapeModeDecoder_h
+#define DPhyEscapeModeDecoder_h
 
-class DPhyDataSymbol
+#include "PacketDecoder.h"
+
+class DPhyEscapeModeSymbol
 {
 public:
 	enum SymbolType
 	{
-		TYPE_SOT,
-		TYPE_TURNAROUND_REQUEST,
-		TYPE_HS_DATA,
-		TYPE_EOT,
+		TYPE_ESCAPE_ENTRY,
+		TYPE_ENTRY_COMMAND,
+		TYPE_ESCAPE_DATA,
 		TYPE_ERROR
 	};
 
-	DPhyDataSymbol(SymbolType t=DPhyDataSymbol::TYPE_ERROR, uint8_t data=0)
+	DPhyEscapeModeSymbol(SymbolType t=DPhyEscapeModeSymbol::TYPE_ERROR, uint8_t data=0)
 	 : m_type(t)
 	 , m_data(data)
 	{}
@@ -55,21 +56,23 @@ public:
 	SymbolType m_type;
 	uint8_t m_data;
 
-	bool operator== (const DPhyDataSymbol& s) const
+	bool operator== (const DPhyEscapeModeSymbol& s) const
 	{
 		return (m_type == s.m_type) && (m_data == s.m_data);
 	}
 };
 
-typedef Waveform<DPhyDataSymbol> DPhyDataWaveform;
+typedef Waveform<DPhyEscapeModeSymbol> DPhyEscapeModeWaveform;
 
-class DPhyDataDecoder : public Filter
+class DPhyEscapeModeDecoder : public PacketDecoder
 {
 public:
-	DPhyDataDecoder(const std::string& color);
+	DPhyEscapeModeDecoder(const std::string& color);
 
 	virtual Gdk::Color GetColor(size_t i, size_t stream);
 	virtual std::string GetText(size_t i, size_t stream);
+
+	std::vector<std::string> GetHeaders();
 
 	virtual void Refresh();
 
@@ -77,7 +80,7 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(DPhyDataDecoder)
+	PROTOCOL_DECODER_INITPROC(DPhyEscapeModeDecoder)
 };
 
 #endif
