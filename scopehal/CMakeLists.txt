@@ -146,7 +146,8 @@ configure_file(config.h.in config.h)
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget ${YAML_LIBRARIES}
-	${LXI_LIBRARIES} ${LINUXGPIB_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES} ${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
+	${LXI_LIBRARIES} ${LINUXGPIB_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES}
+	${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES} ${Vulkan_LIBRARIES})
 
 target_include_directories(scopehal
 PUBLIC
@@ -156,6 +157,7 @@ PUBLIC
 	${OpenCL_INCLUDE_DIR}
 	${CLFFT_INCLUDE_DIR}
 	${YAML_INCLUDES}
+	${Vuklkan_INCLUDE_DIRS}
 	)
 
 target_include_directories(scopehal

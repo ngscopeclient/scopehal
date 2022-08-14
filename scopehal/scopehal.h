@@ -68,6 +68,9 @@
 #pragma GCC diagnostic pop
 #endif
 
+//Vulkan is now a mandatory dependency, so no compile time enable flag
+#include <vulkan/vulkan.hpp>
+
 #include "Unit.h"
 #include "Bijection.h"
 #include "IDTable.h"
