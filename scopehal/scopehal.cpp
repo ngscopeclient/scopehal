@@ -365,6 +365,8 @@ void DetectGPUFeatures()
 
 void ScopehalStaticCleanup()
 {
+	g_vkInstance = nullptr;
+
 	#ifdef HAVE_OPENCL
 	#ifdef HAVE_CLFFT
 	clfftTeardown();
