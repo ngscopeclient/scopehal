@@ -10,3 +10,9 @@
 [submodule "OpenCL-CLHPP"]
 	path = OpenCL-CLHPP
 	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git
+[submodule "Vulkan-Hpp"]
+	path = Vulkan-Hpp
+	url = https://github.com/KhronosGroup/Vulkan-Hpp
+[submodule "Vulkan-Headers"]
+	path = Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers

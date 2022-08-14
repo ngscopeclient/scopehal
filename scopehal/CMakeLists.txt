@@ -157,12 +157,15 @@ PUBLIC
 	${OpenCL_INCLUDE_DIR}
 	${CLFFT_INCLUDE_DIR}
 	${YAML_INCLUDES}
-	${Vuklkan_INCLUDE_DIRS}
 	)
 
+# Use our local copies of the Vulkan headers
 target_include_directories(scopehal
 PUBLIC SYSTEM
-	${CMAKE_CURRENT_SOURCE_DIR}/../OpenCL-CLHPP/include)
+	${CMAKE_CURRENT_SOURCE_DIR}/../OpenCL-CLHPP/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../Vulkan-Hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../Vulkan-Headers/include
+	)
 
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)

@@ -70,7 +70,11 @@
 #endif
 
 //Vulkan is now a mandatory dependency, so no compile time enable flag
+//(disable some warnings in Vulkan headers that we can't do anything about)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
 #include <vulkan/vulkan_raii.hpp>
+#pragma GCC diagnostic pop
 
 #include "Unit.h"
 #include "Bijection.h"
