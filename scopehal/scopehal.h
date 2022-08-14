@@ -44,6 +44,7 @@
 #include <stdint.h>
 #include <chrono>
 #include <thread>
+#include <memory>
 
 #include <sigc++/sigc++.h>
 #include <cairomm/context.h>
@@ -69,7 +70,7 @@
 #endif
 
 //Vulkan is now a mandatory dependency, so no compile time enable flag
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_raii.hpp>
 
 #include "Unit.h"
 #include "Bijection.h"
@@ -139,6 +140,7 @@ std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
 void TransportStaticInit();
 void DriverStaticInit();
 
+bool VulkanInit();
 void InitializeSearchPaths();
 void InitializePlugins();
 void DetectCPUFeatures();
@@ -180,5 +182,9 @@ extern cl::Context* g_clContext;
 extern std::vector<cl::Device> g_contextDevices;
 extern size_t g_maxClLocalSizeX;
 #endif
+
+//Vulkan config
+extern vk::raii::Context g_vkContext;
+extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
 
 #endif

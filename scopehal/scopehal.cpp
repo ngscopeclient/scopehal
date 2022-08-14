@@ -99,6 +99,9 @@ size_t g_maxClLocalSizeX = 0;
 
 AlignedAllocator<float, 32> g_floatVectorAllocator;
 
+vk::raii::Context g_vkContext;
+unique_ptr<vk::raii::Instance> g_vkInstance;
+
 /**
 	@brief Static initialization for SCPI transports
  */
@@ -953,4 +956,202 @@ string str_replace(const string& search, const string& replace, const string& su
 	}
 
 	return ret;
+}
+
+/**
+	@brief Initialize a Vulkan context for compute
+ */
+bool VulkanInit()
+{
+	LogDebug("Initializing Vulkan\n");
+	LogIndenter li;
+
+	try
+	{
+		//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
+		//If we want to support llvmpipe, we need to stick to 1.0
+		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, VK_API_VERSION_1_1);
+		vk::InstanceCreateInfo instanceInfo({}, &appInfo);
+
+		//Create the instance
+		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
+
+		//Look at our physical devices and print info out for each one
+		LogDebug("Physical devices:\n");
+		{
+			LogIndenter li2;
+
+			vk::raii::PhysicalDevices devices(*g_vkInstance);
+			for(size_t i=0; i<devices.size(); i++)
+			{
+				auto device = devices[i];
+				auto features = device.getFeatures();
+				auto properties = device.getProperties();
+				auto memProperties = device.getMemoryProperties();
+				auto limits = properties.limits;
+
+				//TODO: sparse properties
+
+				LogDebug("Device %zu: %s\n", i, &properties.deviceName[0]);
+				LogIndenter li3;
+
+				LogDebug("API version:            0x%08x (%d.%d.%d.%d)\n",
+					properties.apiVersion,
+					(properties.apiVersion >> 29),
+					(properties.apiVersion >> 22) & 0x7f,
+					(properties.apiVersion >> 12) & 0x3ff,
+					(properties.apiVersion >> 0) & 0xfff
+					);
+
+				//Driver version is NOT guaranteed to be encoded the same way as the API version.
+				if(properties.vendorID == 0x10de)	//NVIDIA
+				{
+					LogDebug("Driver version:         0x%08x (%d.%d.%d.%d)\n",
+						properties.driverVersion,
+						(properties.driverVersion >> 22),
+						(properties.driverVersion >> 14) & 0xff,
+						(properties.driverVersion >> 6) & 0xff,
+						(properties.driverVersion >> 0) & 0x3f
+						);
+				}
+
+				//By default, assume it's the same as API
+				else
+				{
+					LogDebug("Driver version:         0x%08x (%d.%d.%d.%d)\n",
+						properties.driverVersion,
+						(properties.driverVersion >> 29),
+						(properties.driverVersion >> 22) & 0x7f,
+						(properties.driverVersion >> 12) & 0x3ff,
+						(properties.driverVersion >> 0) & 0xfff
+						);
+				}
+
+				LogDebug("Vendor ID:              %04x\n", properties.vendorID);
+				LogDebug("Device ID:              %04x\n", properties.deviceID);
+				switch(properties.deviceType)
+				{
+					case vk::PhysicalDeviceType::eIntegratedGpu:
+						LogDebug("Device type:            Integrated GPU\n");
+						break;
+
+					case vk::PhysicalDeviceType::eDiscreteGpu:
+						LogDebug("Device type:            Discrete GPU\n");
+						break;
+
+					case vk::PhysicalDeviceType::eVirtualGpu:
+						LogDebug("Device type:            Virtual GPU\n");
+						break;
+
+					case vk::PhysicalDeviceType::eCpu:
+						LogDebug("Device type:            CPU\n");
+						break;
+
+					default:
+					case vk::PhysicalDeviceType::eOther:
+						LogDebug("Device type:            Other\n");
+						break;
+				}
+
+				if(features.shaderInt64)
+					LogDebug("int64:                  yes\n");
+				else
+					LogDebug("int64:                  no\n");
+
+				const size_t k = 1024LL;
+				const size_t m = k*k;
+				const size_t g = k*m;
+
+				LogDebug("Max image dim 2D:       %u\n", limits.maxImageDimension2D);
+				LogDebug("Max storage buf range:  %lu MB\n", limits.maxStorageBufferRange / m);
+				LogDebug("Max mem alloc:          %lu MB\n", limits.maxMemoryAllocationCount / m);
+				LogDebug("Max compute shared mem: %lu KB\n", limits.maxComputeSharedMemorySize / k);
+				LogDebug("Max compute grp count:  %u x %u x %u\n",
+					limits.maxComputeWorkGroupCount[0],
+					limits.maxComputeWorkGroupCount[1],
+					limits.maxComputeWorkGroupCount[2]);
+				LogDebug("Max compute invocs:     %u\n", limits.maxComputeWorkGroupInvocations);
+				LogDebug("Max compute grp size:   %u x %u x %u\n",
+					limits.maxComputeWorkGroupSize[0],
+					limits.maxComputeWorkGroupSize[1],
+					limits.maxComputeWorkGroupSize[2]);
+
+				LogDebug("Memory types:\n");
+				for(size_t j=0; j<memProperties.memoryTypeCount; j++)
+				{
+					auto mtype = memProperties.memoryTypes[j];
+
+					LogIndenter li4;
+					LogDebug("Type %zu\n", j);
+					LogIndenter li5;
+
+					LogDebug("Heap index: %u\n", mtype.heapIndex);
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
+						LogDebug("Device local\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible)
+						LogDebug("Host visible\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent)
+						LogDebug("Host coherent\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostCached)
+						LogDebug("Host cached\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eLazilyAllocated)
+						LogDebug("Lazily allocated\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eProtected)
+						LogDebug("Protected\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceCoherentAMD)
+						LogDebug("Device coherent\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceUncachedAMD)
+						LogDebug("Device uncached\n");
+					if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eRdmaCapableNV)
+						LogDebug("RDMA capable\n");
+				}
+
+				LogDebug("Memory heaps:\n");
+				for(size_t j=0; j<memProperties.memoryHeapCount; j++)
+				{
+					LogIndenter li4;
+					LogDebug("Heap %zu\n", j);
+					LogIndenter li5;
+					auto heap = memProperties.memoryHeaps[j];
+
+					if(heap.size > g)
+						LogDebug("Size: %zu GB\n", heap.size / g);
+					else if(heap.size > m)
+						LogDebug("Size: %zu MB\n", heap.size / m);
+					else if(heap.size > k)
+						LogDebug("Size: %zu kB\n", heap.size / k);
+					else
+						LogDebug("Size: %zu B\n", heap.size);
+
+					if(heap.flags & vk::MemoryHeapFlagBits::eDeviceLocal)
+						LogDebug("Device local\n");
+					if(heap.flags & vk::MemoryHeapFlagBits::eMultiInstance)
+						LogDebug("Multi instance\n");
+					if(heap.flags & vk::MemoryHeapFlagBits::eMultiInstanceKHR)
+						LogDebug("Multi instance (KHR)\n");
+				}
+			}
+		}
+
+		//TODO: pipeline caching etc?
+	}
+	catch ( vk::SystemError & err )
+	{
+		LogError("vk::SystemError: %s\n", err.what());
+		return false;
+	}
+	catch ( std::exception & err )
+	{
+		LogError("std::exception: %s\n", err.what());
+		return false;
+	}
+	catch(...)
+	{
+		LogError("unknown exception\n");
+		return false;
+	}
+
+	LogDebug("\n");
+
+	return true;
 }
