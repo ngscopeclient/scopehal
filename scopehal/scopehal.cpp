@@ -101,6 +101,10 @@ AlignedAllocator<float, 32> g_floatVectorAllocator;
 
 vk::raii::Context g_vkContext;
 unique_ptr<vk::raii::Instance> g_vkInstance;
+unique_ptr<vk::raii::Device> g_vkComputeDevice;
+unique_ptr<vk::raii::CommandPool> g_vkComputeCommandPool;
+
+bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 /**
 	@brief Static initialization for SCPI transports
@@ -365,6 +369,8 @@ void DetectGPUFeatures()
 
 void ScopehalStaticCleanup()
 {
+	g_vkComputeCommandPool = nullptr;
+	g_vkComputeDevice = nullptr;
 	g_vkInstance = nullptr;
 
 	#ifdef HAVE_OPENCL
@@ -983,6 +989,8 @@ bool VulkanInit()
 		{
 			LogIndenter li2;
 
+			size_t bestDevice = 0;
+
 			vk::raii::PhysicalDevices devices(*g_vkInstance);
 			for(size_t i=0; i<devices.size(); i++)
 			{
@@ -991,6 +999,11 @@ bool VulkanInit()
 				auto properties = device.getProperties();
 				auto memProperties = device.getMemoryProperties();
 				auto limits = properties.limits;
+
+				//See what device to use
+				//TODO: preference to override this
+				if(IsDevicePreferred(devices[bestDevice].getProperties(), devices[i].getProperties()))
+					bestDevice = i;
 
 				//TODO: sparse properties
 
@@ -1133,6 +1146,54 @@ bool VulkanInit()
 						LogDebug("Multi instance (KHR)\n");
 				}
 			}
+
+			LogDebug("Selected device %zu\n", bestDevice);
+			{
+				LogIndenter li3;
+
+				//Look at queue families
+				auto families = devices[bestDevice].getQueueFamilyProperties();
+				LogDebug("Queue families\n");
+				LogIndenter li4;
+				size_t computeQueueType = 0;
+				for(size_t j=0; j<families.size(); j++)
+				{
+					LogDebug("Queue type %zu\n", j);
+					LogIndenter li5;
+
+					auto f = families[j];
+					LogDebug("Queue count:          %d\n", f.queueCount);
+					LogDebug("Timestamp valid bits: %d\n", f.timestampValidBits);
+					if(f.queueFlags & vk::QueueFlagBits::eGraphics)
+						LogDebug("Graphics\n");
+					if(f.queueFlags & vk::QueueFlagBits::eCompute)
+						LogDebug("Compute\n");
+					if(f.queueFlags & vk::QueueFlagBits::eTransfer)
+						LogDebug("Transfer\n");
+					if(f.queueFlags & vk::QueueFlagBits::eSparseBinding)
+						LogDebug("Sparse binding\n");
+					if(f.queueFlags & vk::QueueFlagBits::eProtected)
+						LogDebug("Protected\n");
+					//TODO: VIDEO_DECODE_BIT_KHR, VIDEO_ENCODE_BIT_KHR
+
+					//Pick the first type that supports compute and transfers
+					if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
+					{
+						computeQueueType = j;
+						break;
+					}
+				}
+
+				//Initialize the device
+				float queuePriority = 0;
+				vk::DeviceQueueCreateInfo qinfo( {}, computeQueueType, 1, &queuePriority);
+				vk::DeviceCreateInfo devinfo( {}, qinfo);
+				g_vkComputeDevice = make_unique<vk::raii::Device>(devices[bestDevice], devinfo);
+
+				//Make a CommandPool
+				vk::CommandPoolCreateInfo poolInfo( {}, computeQueueType );
+				g_vkComputeCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+			}
 		}
 
 		//TODO: pipeline caching etc?
@@ -1156,4 +1217,31 @@ bool VulkanInit()
 	LogDebug("\n");
 
 	return true;
+}
+
+/**
+	@brief Checks if a given Vulkan device is "better" than another
+
+	True if we should use device B over A
+ */
+bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b)
+{
+	//If B is a discrete GPU, always prefer it
+	//TODO: prefer one of multiple
+	if(b.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+		return true;
+
+	//Integrated GPUs beat anything but a discrete GPU
+	if( (b.deviceType == vk::PhysicalDeviceType::eIntegratedGpu) &&
+		(a.deviceType != vk::PhysicalDeviceType::eDiscreteGpu) )
+	{
+		return true;
+	}
+
+	//Anything is better than a CPU
+	if(a.deviceType == vk::PhysicalDeviceType::eCpu)
+		return false;
+
+	//By default, assume A is good enough
+	return false;
 }
