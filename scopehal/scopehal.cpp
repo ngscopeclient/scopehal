@@ -1194,6 +1194,8 @@ bool VulkanInit()
 				vk::CommandPoolCreateInfo poolInfo( {}, computeQueueType );
 				g_vkComputeCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 			}
+
+			//Test stuff
 		}
 
 		//TODO: pipeline caching etc?
