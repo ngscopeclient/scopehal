@@ -249,19 +249,38 @@ public:
 	{ return m_capacity; }
 
 	/**
+		@brief Returns the total reserved CPU memory, in bytes
+	 */
+	size_t GetCpuMemoryBytes()
+	{
+		if(m_cpuMemoryType == MEM_TYPE_NULL)
+			return 0;
+		else
+			return m_capacity * sizeof(T);
+	}
+
+	/**
+		@brief Returns the total reserved GPU memory, in bytes
+	 */
+	size_t GetGpuMemoryBytes()
+	{
+		if(m_gpuMemoryType == MEM_TYPE_NULL)
+			return 0;
+		else
+			return m_capacity * sizeof(T);
+	}
+
+	/**
 		@brief Returns true if the container is empty
 	 */
 	bool empty()
 	{ return (m_size == 0); }
 
 	/**
-		@brief Resize the buffer
+		@brief Change the usable size of the container
 	 */
 	void resize(size_t size)
 	{
-		LogVerbose("resize(%zu): size=%zu, capacity=%zu\n", size, m_size, m_capacity);
-		LogIndenter li;
-
 		//Need to grow?
 		if(size > m_capacity)
 		{
@@ -277,18 +296,38 @@ public:
 	}
 
 	/**
-		@brief Allocates memory without changing m_size
+		@brief Reallocates buffers so that at least size elements of storage are available
 	 */
-	__attribute__((noinline))
 	void reserve(size_t size)
 	{
-		LogVerbose("reserve(%zu)\n", size);
-		LogIndenter li;
+		if(size >= m_capacity)
+			Reallocate(size);
+	}
 
+	/**
+		@brief Frees unused memory so that m_size == m_capacity
+
+		This also ensures that the buffer is stored in the best location described by the current hint flags
+	 */
+	void shrink_to_fit()
+	{
+		Reallocate(m_size);
+	}
+
+protected:
+
+	/**
+		@brief Reallocates the buffer so that it contains exactly size elements
+	 */
+	__attribute__((noinline))
+	void Reallocate(size_t size)
+	{
 		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM
 		if(m_cpuAccessHint == HINT_NEVER)
 		{
 			LogFatal("reserve for GPU-only buffers not implemented\n");
+
+			FreeCpuBuffer();
 		}
 
 		else
@@ -331,7 +370,7 @@ public:
 
 		}
 
-		//If we do not anticipate using the data on the GPU, don't allocate memory there
+		//We're expecting to use data on the GPU, so prepare to do stuff with it
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
 			//If GPU access is unlikely, we probably want to just use pinned memory.
@@ -348,9 +387,9 @@ public:
 				LogFatal("reserve for GPU buffers not implemented\n");
 		}
 
-		//Existing GPU buffer has to be enlarged
+		//Existing GPU buffer we never expect to use again - needs to be freed
 		else if(m_gpuPtr != nullptr)
-			LogFatal("reserve(): resize GPU memory not implemented\n");
+			FreeGpuBuffer();
 
 		//We are never going to use the buffer on the GPU, but don't have any existing GPU memory
 		//so no action required
@@ -360,13 +399,8 @@ public:
 
 		//Update our capacity
 		m_capacity = size;
-	}
 
-	/**
-		@brief Frees unused memory so that m_size == m_capacity
-	 */
-	void shrink_to_fit()
-	{
+		//TODO: are buffers always in sync after this call?
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -402,21 +436,23 @@ public:
 	/**
 		@brief Sets a hint to the buffer on how often we expect to use it on the CPU in the future
 	 */
-	void SetCpuAccessHint(UsageHint hint)
+	void SetCpuAccessHint(UsageHint hint, bool reallocateImmediately = false)
 	{
 		m_cpuAccessHint = hint;
 
-		//TODO: actually change current storage
+		if(reallocateImmediately)
+			Reallocate(m_capacity);
 	}
 
 	/**
-		@brief Sets a hint to the buffer on how often we expect to use it on the CPU in the future
+		@brief Sets a hint to the buffer on how often we expect to use it on the GPU in the future
 	 */
-	void SetGpuAccessHint(UsageHint hint)
+	void SetGpuAccessHint(UsageHint hint, bool reallocateImmediately = false)
 	{
 		m_gpuAccessHint = hint;
 
-		//TODO: actually change current storage
+		if(reallocateImmediately)
+			Reallocate(m_capacity);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -494,6 +530,34 @@ protected:
 	 */
 	void FreeCpuBuffer()
 	{
+		//Early out if buffer is already null
+		if(m_cpuPtr == nullptr)
+			return;
+
+		//If we have shared CPU/GPU buffers, we need to allocate a GPU-only buffer and move our data there
+		if(m_buffersAreSame)
+			LogFatal("FreeCpuBuffer: same buffer not supported\n");
+
+		//We have a buffer on the GPU.
+		//If it's stale, need to push our updated content there before freeing the CPU-side copy
+		else if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPtrIsStale)
+			CopyToGpu();
+
+		//Free the buffer and unmap any memory
+		FreeCpuPointer(m_cpuPtr, m_cpuPinnedBuffer, m_cpuMemoryType, m_capacity);
+
+		//Mark CPU-side buffer as empty
+		m_cpuPtr = nullptr;
+		m_cpuPinnedBuffer = nullptr;
+		m_cpuMemoryType = MEM_TYPE_NULL;
+		m_buffersAreSame = false;
+
+		//If we have no GPU-side buffer either, we're empty
+		if(m_gpuMemoryType == MEM_TYPE_NULL)
+		{
+			m_size = 0;
+			m_capacity = 0;
+		}
 	}
 
 	/**
@@ -606,6 +670,10 @@ protected:
 	{
 		switch(type)
 		{
+			case MEM_TYPE_NULL:
+				//legal no-op
+				break;
+
 			case MEM_TYPE_CPU_DMA_CAPABLE:
 				LogFatal("FreeCpuPointer for MEM_TYPE_CPU_DMA_CAPABLE requires the vk::raii::DeviceMemory\n");
 				break;
