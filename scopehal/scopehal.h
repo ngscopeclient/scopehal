@@ -192,7 +192,6 @@ extern size_t g_maxClLocalSizeX;
 //Vulkan config
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
-extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
 extern std::unique_ptr<vk::raii::CommandPool> g_vkComputeCommandPool;
 
 #endif

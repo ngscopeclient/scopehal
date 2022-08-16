@@ -103,6 +103,7 @@ vk::raii::Context g_vkContext;
 unique_ptr<vk::raii::Instance> g_vkInstance;
 unique_ptr<vk::raii::Device> g_vkComputeDevice;
 unique_ptr<vk::raii::CommandPool> g_vkComputeCommandPool;
+size_t g_vkPinnedMemoryType;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
@@ -1149,10 +1150,12 @@ bool VulkanInit()
 
 			LogDebug("Selected device %zu\n", bestDevice);
 			{
+				auto device = devices[bestDevice];
+
 				LogIndenter li3;
 
 				//Look at queue families
-				auto families = devices[bestDevice].getQueueFamilyProperties();
+				auto families = device.getQueueFamilyProperties();
 				LogDebug("Queue families\n");
 				LogIndenter li4;
 				size_t computeQueueType = 0;
@@ -1188,7 +1191,28 @@ bool VulkanInit()
 				float queuePriority = 0;
 				vk::DeviceQueueCreateInfo qinfo( {}, computeQueueType, 1, &queuePriority);
 				vk::DeviceCreateInfo devinfo( {}, qinfo);
-				g_vkComputeDevice = make_unique<vk::raii::Device>(devices[bestDevice], devinfo);
+				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
+
+				//Figure out what memory types to use for various purposes
+				g_vkPinnedMemoryType = 0;
+				auto memProperties = device.getMemoryProperties();
+				for(size_t j=0; j<memProperties.memoryTypeCount; j++)
+				{
+					auto mtype = memProperties.memoryTypes[j];
+
+					//Pinned memory is host visible, host coherent, and not device local
+					//Use the first type we found
+					if(
+						(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) &&
+						(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent) &&
+						!(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) )
+					{
+						if(g_vkPinnedMemoryType == 0)
+							g_vkPinnedMemoryType = j;
+					}
+				}
+
+				LogDebug("Using type %zu for pinned host memory\n", g_vkPinnedMemoryType);
 
 				//Make a CommandPool
 				vk::CommandPoolCreateInfo poolInfo( {}, computeQueueType );

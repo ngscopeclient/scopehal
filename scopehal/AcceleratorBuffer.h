@@ -41,6 +41,9 @@
 #include <sys/mman.h>
 #endif
 
+extern size_t g_vkPinnedMemoryType;
+extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
+
 /**
 	@brief A buffer of memory which may be used by GPU acceleration
 
@@ -153,6 +156,9 @@ protected:
 
 	///@brief CPU-side buffer
 	T* m_cpuPtr;
+
+	///@brief CPU-side pinned buffer
+	std::unique_ptr<vk::raii::DeviceMemory> m_cpuPinnedBuffer;
 
 	///@brief GPU-side buffer
 	std::unique_ptr<vk::raii::DeviceMemory> m_gpuPtr;
@@ -297,6 +303,7 @@ public:
 			{
 				//Save the old pointer
 				auto pOld = m_cpuPtr;
+				auto pOldPin = std::move(m_cpuPinnedBuffer);
 				auto type = m_cpuMemoryType;
 
 				//Allocate the new buffer
@@ -311,7 +318,7 @@ public:
 				//TODO: copy from GPU if GPU side pointer is valid??
 
 				//Now we're done with the old pointer so get rid of it
-				FreeCpuPointer(pOld, type, m_capacity);
+				FreeCpuPointer(pOld, pOldPin, type, m_capacity);
 			}
 
 			//Allocate new CPU memory, replacing our current (null) pointer
@@ -327,7 +334,18 @@ public:
 		//If we do not anticipate using the data on the GPU, don't allocate memory there
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
-			LogFatal("reserve for GPU buffers not implemented\n");
+			//If GPU access is unlikely, we probably want to just use pinned memory.
+			//If available, mark buffers as the same, and free any existing GPU buffer we might have
+			if( (m_gpuAccessHint == HINT_UNLIKELY) && (m_cpuMemoryType == MEM_TYPE_CPU_DMA_CAPABLE) )
+			{
+				m_buffersAreSame = true;
+				m_gpuMemoryType = MEM_TYPE_CPU_DMA_CAPABLE;
+				m_gpuPtr = nullptr;
+			}
+
+			//Nope, we need to allocate dedicated GPU memory
+			else
+				LogFatal("reserve for GPU buffers not implemented\n");
 		}
 
 		//Existing GPU buffer has to be enlarged
@@ -500,7 +518,15 @@ protected:
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
 			LogVerbose("Allocating CPU buffer (%zu elements, pinned)\n", size);
-			LogFatal("AllocateCpuBuffer: pinned memory not implemented\n");
+
+			//Allocate the buffer
+			vk::MemoryAllocateInfo info(size, g_vkPinnedMemoryType);
+			m_cpuPinnedBuffer = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+
+			//Map it
+			m_cpuPtr = reinterpret_cast<T*>(m_cpuPinnedBuffer->mapMemory(0, size));
+
+			//We now have pinned memory
 			m_cpuMemoryType = MEM_TYPE_CPU_DMA_CAPABLE;
 		}
 
@@ -580,6 +606,10 @@ protected:
 	{
 		switch(type)
 		{
+			case MEM_TYPE_CPU_DMA_CAPABLE:
+				LogFatal("FreeCpuPointer for MEM_TYPE_CPU_DMA_CAPABLE requires the vk::raii::DeviceMemory\n");
+				break;
+
 			case MEM_TYPE_CPU_PAGED:
 				munmap(ptr, size * sizeof(T));
 				close(m_tempFileHandle);
@@ -592,6 +622,27 @@ protected:
 
 			default:
 				LogFatal("FreeCpuPointer: invalid type %x\n", type);
+		}
+	}
+
+	/**
+		@brief Frees a CPU-side buffer
+
+		An explicit type is passed here because if we're reallocating we might change memory type.
+		By this point AllocateCpuBuffer() has been called so m_cpuMemoryType points to the type of the new buffer,
+		not the one we're getting rid of.
+	 */
+	__attribute__((noinline))
+	void FreeCpuPointer(T* ptr, std::unique_ptr<vk::raii::DeviceMemory>& buf, MemoryType type, size_t size)
+	{
+		switch(type)
+		{
+			case MEM_TYPE_CPU_DMA_CAPABLE:
+				buf->unmapMemory();
+				break;
+
+			default:
+				FreeCpuPointer(ptr, type, size);
 		}
 	}
 };
