@@ -42,6 +42,7 @@
 #endif
 
 extern size_t g_vkPinnedMemoryType;
+extern size_t g_vkLocalMemoryType;
 extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
 
 /**
@@ -332,9 +333,6 @@ protected:
 
 		else
 		{
-			if(m_gpuPtr != nullptr)
-				LogFatal("reserve: need to handle existing GPU data\n");
-
 			//Resize CPU memory
 			//TODO: optimization, when expanding a MEM_TYPE_CPU_PAGED we can just enlarge the file
 			//and not have to make a new temp file and copy the content
@@ -353,8 +351,8 @@ protected:
 				if(!m_cpuPtrIsStale)
 					memcpy(m_cpuPtr, pOld, sizeof(T) * m_size);
 
-				//Otherwise no copy here
-				//TODO: copy from GPU if GPU side pointer is valid??
+				//If CPU-side data is stale, just allocate the new buffer but leave it as stale
+				//(don't do a potentially unnecessary copy from the GPU)
 
 				//Now we're done with the old pointer so get rid of it
 				FreeCpuPointer(pOld, pOldPin, type, m_capacity);
@@ -363,11 +361,6 @@ protected:
 			//Allocate new CPU memory, replacing our current (null) pointer
 			else
 				AllocateCpuBuffer(size);
-
-			//Update flags
-			m_buffersAreSame = false;
-			m_cpuPtrIsStale = false;
-
 		}
 
 		//We're expecting to use data on the GPU, so prepare to do stuff with it
@@ -376,15 +369,28 @@ protected:
 			//If GPU access is unlikely, we probably want to just use pinned memory.
 			//If available, mark buffers as the same, and free any existing GPU buffer we might have
 			if( (m_gpuAccessHint == HINT_UNLIKELY) && (m_cpuMemoryType == MEM_TYPE_CPU_DMA_CAPABLE) )
-			{
-				m_buffersAreSame = true;
-				m_gpuMemoryType = MEM_TYPE_CPU_DMA_CAPABLE;
-				m_gpuPtr = nullptr;
-			}
+				FreeGpuBuffer();
 
 			//Nope, we need to allocate dedicated GPU memory
 			else
-				LogFatal("reserve for GPU buffers not implemented\n");
+			{
+				//If we have an existing buffer with valid content, save it and copy content over
+				if( (m_gpuPtr != nullptr) && !m_gpuPtrIsStale)
+				{
+					auto pOld = std::move(m_gpuPtr);
+					auto type = m_gpuMemoryType;
+
+					AllocateGpuBuffer(size);
+
+					LogFatal("Move old GPU buffer to new not implemented\n");
+
+					//pOld will be freed when it goes out of scope, no action needed
+				}
+
+				//Nope, just allocate a new buffer
+				else
+					AllocateGpuBuffer(size);
+			}
 		}
 
 		//Existing GPU buffer we never expect to use again - needs to be freed
@@ -400,7 +406,10 @@ protected:
 		//Update our capacity
 		m_capacity = size;
 
-		//TODO: are buffers always in sync after this call?
+		//If we have a pinned buffer and nothing on the other side, there's a single shared physical memory region
+		m_buffersAreSame =
+			( (m_cpuMemoryType == MEM_TYPE_CPU_DMA_CAPABLE) && (m_gpuMemoryType == MEM_TYPE_NULL) ) ||
+			( (m_cpuMemoryType == MEM_TYPE_NULL) && (m_gpuMemoryType == MEM_TYPE_GPU_DMA_CAPABLE) );
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,6 +435,8 @@ public:
 		size_t cursize = m_size;
 		resize(m_size + 1);
 		m_cpuPtr[cursize] = value;
+
+		MarkModifiedFromCpu();
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -496,6 +507,8 @@ public:
 	 */
 	void PrepareForCpuAccess()
 	{
+		if(m_cpuPtrIsStale)
+			CopyToCpu();
 	}
 
 	/**
@@ -505,6 +518,8 @@ public:
 	 */
 	void PrepareForGpuAccess()
 	{
+		if(m_gpuPtrIsStale)
+			CopyToGpu();
 	}
 
 protected:
@@ -517,6 +532,9 @@ protected:
 	 */
 	void CopyToCpu()
 	{
+		LogFatal("CopyToCpu unimplemented\n");
+
+		m_cpuPtrIsStale = false;
 	}
 
 	/**
@@ -524,6 +542,9 @@ protected:
 	 */
 	void CopyToGpu()
 	{
+		LogFatal("CopyToGpu unimplemented\n");
+
+		m_gpuPtrIsStale = false;
 	}
 
 protected:
@@ -571,6 +592,16 @@ protected:
 	 */
 	void FreeGpuBuffer()
 	{
+		//Early out if buffer is already null
+		if(m_gpuPtr == nullptr)
+			return;
+
+		//If we have a CPU-side buffer, and it's stale, move our about-to-be-deleted content over before we free it
+		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPtrIsStale )
+			CopyToCpu();
+
+		m_gpuPtr = nullptr;
+		m_gpuMemoryType = MEM_TYPE_NULL;
 	}
 
 protected:
@@ -718,6 +749,20 @@ protected:
 			default:
 				FreeCpuPointer(ptr, type, size);
 		}
+	}
+
+	/**
+		@brief Allocates a buffer for GPU access
+	 */
+	__attribute__((noinline))
+	void AllocateGpuBuffer(size_t size)
+	{
+		LogVerbose("Allocating GPU buffer (%zu elements, local)\n", size);
+
+		//For now, always use local memory
+		vk::MemoryAllocateInfo info(size, g_vkLocalMemoryType);
+		m_gpuPtr = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
 	}
 };
 
