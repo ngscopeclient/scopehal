@@ -127,6 +127,7 @@ void OneWireDecoder::Refresh()
 	len = starts.size();
 	int bitcount = 0;
 	uint8_t current_byte = 0;
+	bool current_byte_bad_timings = false;
 	for(size_t i=0; i<len; i++)
 	{
 		//Get the length of this pulse in us
@@ -150,7 +151,7 @@ void OneWireDecoder::Refresh()
 				{
 					cap->m_offsets.push_back(starts[i]);
 					cap->m_durations.push_back(lens[i]);
-					cap->m_samples.push_back(OneWireSymbol(OneWireSymbol::TYPE_RESET, 1));
+					cap->m_samples.push_back(OneWireSymbol(OneWireSymbol::TYPE_RESET, 0, true));
 
 					state = STATE_DETECT;
 				}
@@ -207,6 +208,7 @@ void OneWireDecoder::Refresh()
 
 					bitcount = 0;
 					current_byte = 0;
+					current_byte_bad_timings = false;
 				}
 
 				break;
@@ -231,8 +233,11 @@ void OneWireDecoder::Refresh()
 					current_byte >>= 1;
 					current_byte |= 0x80;
 				}
-				else if(pulselen > 60)
+				else if(pulselen > 25)
+				{
 					current_byte >>= 1;
+					current_byte_bad_timings |= pulselen <= 60;
+				}
 
 				//Invalid pulse length
 				else
@@ -251,10 +256,11 @@ void OneWireDecoder::Refresh()
 				{
 					cap->m_offsets.push_back(tstart);
 					cap->m_durations.push_back(tend - tstart);
-					cap->m_samples.push_back(OneWireSymbol(OneWireSymbol::TYPE_DATA, current_byte));
+					cap->m_samples.push_back(OneWireSymbol(OneWireSymbol::TYPE_DATA, current_byte, current_byte_bad_timings));
 
 					bitcount = 0;
 					current_byte = 0;
+					current_byte_bad_timings = false;
 				}
 
 				break;
@@ -275,7 +281,7 @@ Gdk::Color OneWireDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_stype)
 		{
 			case OneWireSymbol::TYPE_RESET:
-				if(s.m_data == 1)
+				if(s.m_tooShort == 1)
 					return m_standardColors[COLOR_ERROR];
 				else
 					return m_standardColors[COLOR_CONTROL];
@@ -284,7 +290,10 @@ Gdk::Color OneWireDecoder::GetColor(size_t i, size_t /*stream*/)
 				return m_standardColors[COLOR_CONTROL];
 
 			case OneWireSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				if(s.m_tooShort == 1)
+					return m_standardColors[COLOR_ERROR];
+				else
+					return m_standardColors[COLOR_DATA];
 
 			case OneWireSymbol::TYPE_ERROR:
 			default:
@@ -307,13 +316,13 @@ string OneWireDecoder::GetText(size_t i, size_t /*stream*/)
 		switch(s.m_stype)
 		{
 			case OneWireSymbol::TYPE_RESET:
-				if(s.m_data == 1)
+				if(s.m_tooShort == 1)
 					return "RESET (too short)";
 				else
 					return "RESET";
 
 			case OneWireSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+				snprintf(tmp, sizeof(tmp), "%02x%s", s.m_data, s.m_tooShort?" (?)":"");
 				return string(tmp);
 
 			case OneWireSymbol::TYPE_PRESENCE:
