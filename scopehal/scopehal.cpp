@@ -1200,13 +1200,25 @@ bool VulkanInit()
 				{
 					auto mtype = memProperties.memoryTypes[j];
 
-					//Pinned memory is host visible, host coherent, and not device local
+					//Pinned memory is host visible, host coherent, host cached, and usually not device local
 					//Use the first type we found
 					if(
 						(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostVisible) &&
 						(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostCoherent) &&
-						!(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) )
+						(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eHostCached) )
 					{
+						//Device local? This is a disqualifier UNLESS we are an integrated card or CPU
+						//(in which case we have shared memory)
+						if(mtype.propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
+						{
+							auto devtype = device.getProperties().deviceType;
+							if( (devtype != vk::PhysicalDeviceType::eIntegratedGpu) &&
+								(devtype != vk::PhysicalDeviceType::eCpu ) )
+							{
+								continue;
+							}
+						}
+
 						if(g_vkPinnedMemoryType == 0)
 							g_vkPinnedMemoryType = j;
 					}

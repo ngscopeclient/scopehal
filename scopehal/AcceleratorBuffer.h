@@ -435,24 +435,30 @@ public:
 
 	/**
 		@brief Sets a hint to the buffer on how often we expect to use it on the CPU in the future
+
+		If reallocateImmediately is set, the buffer is reallocated with the specified settings to fit the current
+		buffer size (shrinking to fit if needed)
 	 */
 	void SetCpuAccessHint(UsageHint hint, bool reallocateImmediately = false)
 	{
 		m_cpuAccessHint = hint;
 
 		if(reallocateImmediately)
-			Reallocate(m_capacity);
+			Reallocate(m_size);
 	}
 
 	/**
 		@brief Sets a hint to the buffer on how often we expect to use it on the GPU in the future
+
+		If reallocateImmediately is set, the buffer is reallocated with the specified settings to fit the current
+		buffer size (shrinking to fit if needed)
 	 */
 	void SetGpuAccessHint(UsageHint hint, bool reallocateImmediately = false)
 	{
 		m_gpuAccessHint = hint;
 
 		if(reallocateImmediately)
-			Reallocate(m_capacity);
+			Reallocate(m_size);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
