@@ -36,11 +36,49 @@
 
 using namespace std;
 
+/**
+	@brief Global Vulkan context
+ */
 vk::raii::Context g_vkContext;
-unique_ptr<vk::raii::Instance> g_vkInstance;
-unique_ptr<vk::raii::Device> g_vkComputeDevice;
-unique_ptr<vk::raii::CommandPool> g_vkComputeCommandPool;
 
+/**
+	@brief Global Vulkan instance
+ */
+unique_ptr<vk::raii::Instance> g_vkInstance;
+
+/**
+	@brief The Vulkan device selected for compute operations (may or may not be same device as rendering)
+ */
+unique_ptr<vk::raii::Device> g_vkComputeDevice;
+
+/**
+	@brief Command pool for AcceleratorBuffer transfers
+
+	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
+	when parallelism isn't that important.
+ */
+unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
+
+/**
+	@brief Command buffer for AcceleratorBuffer transfers
+
+	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
+	when parallelism isn't that important.
+ */
+std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
+
+/**
+	@brief Queue for AcceleratorBuffer transfers
+
+	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
+	when parallelism isn't that important.
+ */
+std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
+
+/**
+	@brief Mutex for interlocking access to g_vkTransferCommandBuffer and g_vkTransferCommandPool
+ */
+std::mutex g_vkTransferMutex;
 
 /**
 	@brief Vulkan memory type for CPU-based memory that is also GPU-readable
@@ -51,6 +89,11 @@ size_t g_vkPinnedMemoryType;
 	@brief Vulkan memory type for GPU-based memory (generally not CPU-readable, except on integrated cards)
  */
 size_t g_vkLocalMemoryType;
+
+/**
+	@brief Vulkan queue type for submitting compute operations (may or may not be render capable)
+ */
+size_t g_computeQueueType;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
@@ -245,7 +288,7 @@ bool VulkanInit()
 				auto families = device.getQueueFamilyProperties();
 				LogDebug("Queue families\n");
 				LogIndenter li4;
-				size_t computeQueueType = 0;
+				g_computeQueueType = 0;
 				for(size_t j=0; j<families.size(); j++)
 				{
 					LogDebug("Queue type %zu\n", j);
@@ -269,14 +312,14 @@ bool VulkanInit()
 					//Pick the first type that supports compute and transfers
 					if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
 					{
-						computeQueueType = j;
+						g_computeQueueType = j;
 						break;
 					}
 				}
 
 				//Initialize the device
 				float queuePriority = 0;
-				vk::DeviceQueueCreateInfo qinfo( {}, computeQueueType, 1, &queuePriority);
+				vk::DeviceQueueCreateInfo qinfo( {}, g_computeQueueType, 1, &queuePriority);
 				vk::DeviceCreateInfo devinfo( {}, qinfo);
 				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
 
@@ -340,11 +383,19 @@ bool VulkanInit()
 				LogDebug("Using type %zu for card-local memory\n", g_vkLocalMemoryType);
 
 				//Make a CommandPool
-				vk::CommandPoolCreateInfo poolInfo( {}, computeQueueType );
-				g_vkComputeCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-			}
+				vk::CommandPoolCreateInfo poolInfo(
+					vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+					g_computeQueueType );
+				g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
-			//Test stuff
+				//Make a CommandBuffer for memory transfers that we can use implicitly during buffer management
+				vk::CommandBufferAllocateInfo bufinfo(**g_vkTransferCommandPool, vk::CommandBufferLevel::ePrimary, 1);
+				g_vkTransferCommandBuffer = make_unique<vk::raii::CommandBuffer>(
+					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+				//Make a Queue for memory trasnfers that we can use implicitly during buffer management
+				g_vkTransferQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
+			}
 		}
 
 		//TODO: pipeline caching etc?

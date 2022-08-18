@@ -362,7 +362,9 @@ void DetectGPUFeatures()
 
 void ScopehalStaticCleanup()
 {
-	g_vkComputeCommandPool = nullptr;
+	g_vkTransferQueue = nullptr;
+	g_vkTransferCommandBuffer = nullptr;
+	g_vkTransferCommandPool = nullptr;
 	g_vkComputeDevice = nullptr;
 	g_vkInstance = nullptr;
 

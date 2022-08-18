@@ -44,6 +44,9 @@
 extern size_t g_vkPinnedMemoryType;
 extern size_t g_vkLocalMemoryType;
 extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
+extern std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
+extern std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
+extern std::mutex g_vkTransferMutex;
 
 /**
 	@brief A buffer of memory which may be used by GPU acceleration
@@ -155,23 +158,29 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// The actual memory buffers
 
-	///@brief CPU-side buffer
+	///@brief CPU-side mapped pointer
 	T* m_cpuPtr;
 
-	///@brief CPU-side pinned buffer
-	std::unique_ptr<vk::raii::DeviceMemory> m_cpuPinnedBuffer;
+	///@brief CPU-side physical memory
+	std::unique_ptr<vk::raii::DeviceMemory> m_cpuPhysMem;
 
-	///@brief GPU-side buffer
-	std::unique_ptr<vk::raii::DeviceMemory> m_gpuPtr;
+	///@brief GPU-side physical memory
+	std::unique_ptr<vk::raii::DeviceMemory> m_gpuPhysMem;
 
-	///@brief True if m_cpuPtr and m_gpuPtr point to the same physical memory location
+	///@brief Buffer object for CPU-side memory
+	std::unique_ptr<vk::raii::Buffer> m_cpuBuffer;
+
+	///@brief Buffer object for GPU-side memory
+	std::unique_ptr<vk::raii::Buffer> m_gpuBuffer;
+
+	///@brief True if we have only one piece of physical memory accessible from both sides
 	bool m_buffersAreSame;
 
-	///@brief True if m_cpuPtr contains stale data (m_gpuPtr has been modified and they point to different memory)
-	bool m_cpuPtrIsStale;
+	///@brief True if m_cpuPtr contains stale data (m_gpuPhysMem has been modified and they point to different memory)
+	bool m_cpuPhysMemIsStale;
 
-	///@brief True if m_gpuPtr contains stale data (m_cpuPtr has been modified and they point to different memory)
-	bool m_gpuPtrIsStale;
+	///@brief True if m_gpuPhysMem contains stale data (m_cpuPtr has been modified and they point to different memory)
+	bool m_gpuPhysMemIsStale;
 
 	///@brief File handle used for MEM_TYPE_CPU_PAGED
 #ifndef _WIN32
@@ -215,10 +224,10 @@ public:
 		: m_cpuMemoryType(MEM_TYPE_NULL)
 		, m_gpuMemoryType(MEM_TYPE_NULL)
 		, m_cpuPtr(nullptr)
-		, m_gpuPtr(nullptr)
+		, m_gpuPhysMem(nullptr)
 		, m_buffersAreSame(false)
-		, m_cpuPtrIsStale(false)
-		, m_gpuPtrIsStale(false)
+		, m_cpuPhysMemIsStale(false)
+		, m_gpuPhysMemIsStale(false)
 		#ifndef _WIN32
 		, m_tempFileHandle(0)
 		#endif
@@ -278,6 +287,36 @@ public:
 	{ return (m_size == 0); }
 
 	/**
+		@brief Returns true if the CPU-side buffer is stale
+	 */
+	bool IsCpuBufferStale()
+	{ return m_cpuPhysMemIsStale; }
+
+	/**
+		@brief Returns true if the GPU-side buffer is stale
+	 */
+	bool IsGpuBufferStale()
+	{ return m_gpuPhysMemIsStale; }
+
+	/**
+		@brief Returns true if there is currently a CPU-side buffer
+	 */
+	bool HasCpuBuffer()
+	{ return (m_cpuPtr != nullptr); }
+
+	/**
+		@brief Returns true if there is currently a GPU-side buffer
+	 */
+	bool HasGpuBuffer()
+	{ return (m_gpuPhysMem != nullptr); }
+
+	/**
+		@brief Returns true if the object contains only a single buffer
+	 */
+	bool IsSingleSharedBuffer()
+	{ return m_buffersAreSame; }
+
+	/**
 		@brief Change the usable size of the container
 	 */
 	void resize(size_t size)
@@ -323,11 +362,11 @@ protected:
 	__attribute__((noinline))
 	void Reallocate(size_t size)
 	{
-		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM
+		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM.
+		//Allocate a GPU-local buffer, copy data to it, then free the CPU-side buffer
 		if(m_cpuAccessHint == HINT_NEVER)
 		{
-			LogFatal("reserve for GPU-only buffers not implemented\n");
-
+			PrepareForGpuAccess();
 			FreeCpuBuffer();
 		}
 
@@ -340,7 +379,7 @@ protected:
 			{
 				//Save the old pointer
 				auto pOld = m_cpuPtr;
-				auto pOldPin = std::move(m_cpuPinnedBuffer);
+				auto pOldPin = std::move(m_cpuPhysMem);
 				auto type = m_cpuMemoryType;
 
 				//Allocate the new buffer
@@ -348,7 +387,7 @@ protected:
 
 				//If CPU-side data is valid, copy existing data over.
 				//New pointer is still valid in this case.
-				if(!m_cpuPtrIsStale)
+				if(!m_cpuPhysMemIsStale)
 					memcpy(m_cpuPtr, pOld, sizeof(T) * m_size);
 
 				//If CPU-side data is stale, just allocate the new buffer but leave it as stale
@@ -360,7 +399,14 @@ protected:
 
 			//Allocate new CPU memory, replacing our current (null) pointer
 			else
+			{
 				AllocateCpuBuffer(size);
+
+				//If we already had GPU-side memory containing data, then the new CPU-side buffer is stale
+				//until we copy stuff over to it
+				if(m_gpuPhysMem != nullptr)
+					m_cpuPhysMemIsStale = true;
+			}
 		}
 
 		//We're expecting to use data on the GPU, so prepare to do stuff with it
@@ -375,26 +421,49 @@ protected:
 			else
 			{
 				//If we have an existing buffer with valid content, save it and copy content over
-				if( (m_gpuPtr != nullptr) && !m_gpuPtrIsStale)
+				if( (m_gpuPhysMem != nullptr) && !m_gpuPhysMemIsStale)
 				{
-					auto pOld = std::move(m_gpuPtr);
-					auto type = m_gpuMemoryType;
+					auto pOld = std::move(m_gpuPhysMem);
+					//auto type = m_gpuMemoryType;
+					auto bOld = std::move(m_gpuBuffer);
 
 					AllocateGpuBuffer(size);
 
-					LogFatal("Move old GPU buffer to new not implemented\n");
+					std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
-					//pOld will be freed when it goes out of scope, no action needed
+					//Make the transfer request
+					g_vkTransferCommandBuffer->begin({});
+					vk::BufferCopy region(0, 0, m_size * sizeof(T));
+					g_vkTransferCommandBuffer->copyBuffer(**bOld, **m_gpuBuffer, {region});
+					g_vkTransferCommandBuffer->end();
+
+					//Submit the request and block until it completes
+					vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+					vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
+					g_vkTransferQueue->submit(info, *fence);
+					while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+					{}
+
+					//make sure buffer is freed before underlying physical memory (pOld) goes out of scope
+					bOld = nullptr;
 				}
 
 				//Nope, just allocate a new buffer
 				else
+				{
 					AllocateGpuBuffer(size);
+
+					//If we already had CPU-side memory containing data, then the new GPU-side buffer is stale
+					//until we copy stuff over to it.
+					//Special case: if m_size is 0 (newly allocated buffer) we're not stale yet
+					if( (m_cpuPhysMem != nullptr) && (m_size != 0) )
+						m_gpuPhysMemIsStale = true;
+				}
 			}
 		}
 
 		//Existing GPU buffer we never expect to use again - needs to be freed
-		else if(m_gpuPtr != nullptr)
+		else if(m_gpuPhysMem != nullptr)
 			FreeGpuBuffer();
 
 		//We are never going to use the buffer on the GPU, but don't have any existing GPU memory
@@ -454,7 +523,7 @@ public:
 	{
 		m_cpuAccessHint = hint;
 
-		if(reallocateImmediately)
+		if(reallocateImmediately && (m_size != 0))
 			Reallocate(m_size);
 	}
 
@@ -468,7 +537,7 @@ public:
 	{
 		m_gpuAccessHint = hint;
 
-		if(reallocateImmediately)
+		if(reallocateImmediately && (m_size != 0))
 			Reallocate(m_size);
 	}
 
@@ -483,7 +552,7 @@ public:
 	void MarkModifiedFromCpu()
 	{
 		if(!m_buffersAreSame)
-			m_gpuPtrIsStale = true;
+			m_gpuPhysMemIsStale = true;
 	}
 
 	/**
@@ -494,7 +563,7 @@ public:
 	void MarkModifiedFromGpu()
 	{
 		if(!m_buffersAreSame)
-			m_cpuPtrIsStale = true;
+			m_cpuPhysMemIsStale = true;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -507,18 +576,36 @@ public:
 	 */
 	void PrepareForCpuAccess()
 	{
-		if(m_cpuPtrIsStale)
+		//Early out if no content
+		if(m_capacity == 0)
+			return;
+
+		//If there's no buffer at all on the CPU, allocate one
+		if(!HasCpuBuffer() && (m_gpuMemoryType != MEM_TYPE_GPU_DMA_CAPABLE))
+			AllocateCpuBuffer(m_capacity);
+
+		if(m_cpuPhysMemIsStale)
 			CopyToCpu();
 	}
 
 	/**
 		@brief Prepares the buffer to be accessed from the GPU
 
-		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPtr is valid and up to date.
+		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPhysMem is valid and up to date.
 	 */
 	void PrepareForGpuAccess()
 	{
-		if(m_gpuPtrIsStale)
+		//Early out if no content
+		if(m_capacity == 0)
+			return;
+
+		LogVerbose("PrepareForGpuAccess\n");
+
+		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
+		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
+			AllocateGpuBuffer(m_capacity);
+
+		if(m_gpuPhysMemIsStale)
 			CopyToGpu();
 	}
 
@@ -528,23 +615,53 @@ protected:
 	// Copying of buffer content
 
 	/**
-		@brief Copy the buffer contents from GPU to CPU
+		@brief Copy the buffer contents from GPU to CPU and blocks until the transfer completes.
 	 */
 	void CopyToCpu()
 	{
-		LogFatal("CopyToCpu unimplemented\n");
+		LogVerbose("CopyToCPU\n");
 
-		m_cpuPtrIsStale = false;
+		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+
+		//Make the transfer request
+		g_vkTransferCommandBuffer->begin({});
+		vk::BufferCopy region(0, 0, m_size * sizeof(T));
+		g_vkTransferCommandBuffer->copyBuffer(**m_gpuBuffer, **m_cpuBuffer, {region});
+		g_vkTransferCommandBuffer->end();
+
+		//Submit the request and block until it completes
+		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+		vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
+		g_vkTransferQueue->submit(info, *fence);
+		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+		{}
+
+		m_cpuPhysMemIsStale = false;
 	}
 
 	/**
-		@brief Copy the buffer contents from CPU to GPU
+		@brief Copy the buffer contents from CPU to GPU and blocks until the transfer completes.
 	 */
 	void CopyToGpu()
 	{
-		LogFatal("CopyToGpu unimplemented\n");
+		LogVerbose("CopyToGPU\n");
 
-		m_gpuPtrIsStale = false;
+		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+
+		//Make the transfer request
+		g_vkTransferCommandBuffer->begin({});
+		vk::BufferCopy region(0, 0, m_size * sizeof(T));
+		g_vkTransferCommandBuffer->copyBuffer(**m_cpuBuffer, **m_gpuBuffer, {region});
+		g_vkTransferCommandBuffer->end();
+
+		//Submit the request and block until it completes
+		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+		vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
+		g_vkTransferQueue->submit(info, *fence);
+		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+		{}
+
+		m_gpuPhysMemIsStale = false;
 	}
 
 protected:
@@ -553,7 +670,7 @@ protected:
 	// Cleanup
 
 	/**
-		@brief Free the CPU-side buffer
+		@brief Free the CPU-side buffer and underlying physical memory
 	 */
 	void FreeCpuBuffer()
 	{
@@ -567,15 +684,18 @@ protected:
 
 		//We have a buffer on the GPU.
 		//If it's stale, need to push our updated content there before freeing the CPU-side copy
-		else if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPtrIsStale)
+		else if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale)
 			CopyToGpu();
 
+		//Free the Vulkan buffer object
+		m_cpuBuffer = nullptr;
+
 		//Free the buffer and unmap any memory
-		FreeCpuPointer(m_cpuPtr, m_cpuPinnedBuffer, m_cpuMemoryType, m_capacity);
+		FreeCpuPointer(m_cpuPtr, m_cpuPhysMem, m_cpuMemoryType, m_capacity);
 
 		//Mark CPU-side buffer as empty
 		m_cpuPtr = nullptr;
-		m_cpuPinnedBuffer = nullptr;
+		m_cpuPhysMem = nullptr;
 		m_cpuMemoryType = MEM_TYPE_NULL;
 		m_buffersAreSame = false;
 
@@ -588,19 +708,20 @@ protected:
 	}
 
 	/**
-		@brief Free the GPU-side buffer
+		@brief Free the GPU-side buffer and underlying physical memory
 	 */
 	void FreeGpuBuffer()
 	{
 		//Early out if buffer is already null
-		if(m_gpuPtr == nullptr)
+		if(m_gpuPhysMem == nullptr)
 			return;
 
 		//If we have a CPU-side buffer, and it's stale, move our about-to-be-deleted content over before we free it
-		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPtrIsStale )
+		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPhysMemIsStale )
 			CopyToCpu();
 
-		m_gpuPtr = nullptr;
+		m_gpuBuffer = nullptr;
+		m_gpuPhysMem = nullptr;
 		m_gpuMemoryType = MEM_TYPE_NULL;
 	}
 
@@ -615,6 +736,9 @@ protected:
 	__attribute__((noinline))
 	void AllocateCpuBuffer(size_t size)
 	{
+		if(size == 0)
+			LogFatal("AllocateCpuBuffer with size zero (invalid)\n");
+
 		//If any GPU access is expected, use pinned memory so we don't have to move things around
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
@@ -622,10 +746,20 @@ protected:
 
 			//Allocate the buffer
 			vk::MemoryAllocateInfo info(size, g_vkPinnedMemoryType);
-			m_cpuPinnedBuffer = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+			m_cpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
 
 			//Map it
-			m_cpuPtr = reinterpret_cast<T*>(m_cpuPinnedBuffer->mapMemory(0, size));
+			m_cpuPtr = reinterpret_cast<T*>(m_cpuPhysMem->mapMemory(0, size));
+
+			//Make a Vulkan buffer for it
+			vk::BufferCreateInfo bufinfo(
+				{},
+				size * sizeof(T),
+				vk::BufferUsageFlagBits::eTransferSrc |
+					vk::BufferUsageFlagBits::eTransferDst |
+					vk::BufferUsageFlagBits::eStorageBuffer);
+			m_cpuBuffer = std::make_unique<vk::raii::Buffer>(*g_vkComputeDevice, bufinfo);
+			m_cpuBuffer->bindMemory(**m_cpuPhysMem, 0);
 
 			//We now have pinned memory
 			m_cpuMemoryType = MEM_TYPE_CPU_DMA_CAPABLE;
@@ -635,6 +769,7 @@ protected:
 		else if(m_cpuAccessHint == HINT_LIKELY)
 		{
 			LogVerbose("Allocating CPU buffer (%zu elements, not pinned)\n", size);
+			m_cpuBuffer = nullptr;
 			m_cpuMemoryType = MEM_TYPE_CPU_ONLY;
 			m_cpuPtr = m_cpuAllocator.allocate(size);
 		}
@@ -647,12 +782,14 @@ protected:
 				//On Windows, use normal memory for now
 				//until we figure out how to do this there
 				LogVerbose("Allocating CPU buffer (%zu elements, not pinned)\n", size);
+				m_cpuBuffer = nullptr;
 				m_cpuMemoryType = MEM_TYPE_CPU_ONLY;
 				m_cpuPtr = m_cpuAllocator.allocate(size);
 
 			#else
 
 				LogVerbose("Allocating CPU buffer (%zu elements, paged)\n", size);
+				m_cpuBuffer = nullptr;
 				m_cpuMemoryType = MEM_TYPE_CPU_PAGED;
 
 				//Make the temp file
@@ -683,6 +820,7 @@ protected:
 				if(m_cpuPtr == MAP_FAILED)
 				{
 					LogError("Failed to map temporary file %s\n", fname);
+					perror("mmap failed: ");
 					abort();
 				}
 				m_cpuMemoryType = MEM_TYPE_CPU_PAGED;
@@ -731,7 +869,7 @@ protected:
 	}
 
 	/**
-		@brief Frees a CPU-side buffer
+		@brief Frees a CPU-side physical memory block
 
 		An explicit type is passed here because if we're reallocating we might change memory type.
 		By this point AllocateCpuBuffer() has been called so m_cpuMemoryType points to the type of the new buffer,
@@ -752,7 +890,7 @@ protected:
 	}
 
 	/**
-		@brief Allocates a buffer for GPU access
+		@brief Allocates physical memory for GPU access
 	 */
 	__attribute__((noinline))
 	void AllocateGpuBuffer(size_t size)
@@ -761,8 +899,18 @@ protected:
 
 		//For now, always use local memory
 		vk::MemoryAllocateInfo info(size, g_vkLocalMemoryType);
-		m_gpuPtr = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+		m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
+
+		//Make a Vulkan buffer for it
+		vk::BufferCreateInfo bufinfo(
+			{},
+			size * sizeof(T),
+			vk::BufferUsageFlagBits::eTransferSrc |
+				vk::BufferUsageFlagBits::eTransferDst |
+				vk::BufferUsageFlagBits::eStorageBuffer);
+		m_gpuBuffer = std::make_unique<vk::raii::Buffer>(*g_vkComputeDevice, bufinfo);
+		m_gpuBuffer->bindMemory(**m_gpuPhysMem, 0);
 	}
 };
 
