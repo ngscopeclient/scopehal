@@ -854,9 +854,11 @@ protected:
 				break;
 
 			case MEM_TYPE_CPU_PAGED:
-				munmap(ptr, size * sizeof(T));
-				close(m_tempFileHandle);
-				m_tempFileHandle = -1;
+				#ifndef _WIN32
+					munmap(ptr, size * sizeof(T));
+					close(m_tempFileHandle);
+					m_tempFileHandle = -1;
+				#endif
 				break;
 
 			case MEM_TYPE_CPU_ONLY:
