@@ -513,27 +513,27 @@ Gdk::Color DSIPacketDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case DSISymbol::TYPE_VC:
 			case DSISymbol::TYPE_IDENTIFIER:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case DSISymbol::TYPE_LEN:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case DSISymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case DSISymbol::TYPE_ECC_OK:
 			case DSISymbol::TYPE_CHECKSUM_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case DSISymbol::TYPE_ECC_BAD:
 			case DSISymbol::TYPE_CHECKSUM_BAD:
 			case DSISymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DSIPacketDecoder::GetText(size_t i, size_t /*stream*/)

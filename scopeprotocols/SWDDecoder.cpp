@@ -448,7 +448,7 @@ Gdk::Color SWDDecoder::GetColor(size_t i, size_t /*stream*/)
 			case SWDSymbol::TYPE_PARK:
 			case SWDSymbol::TYPE_TURNAROUND:
 			case SWDSymbol::TYPE_LINERESET:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case SWDSymbol::TYPE_SWDTOJTAG:
 			case SWDSymbol::TYPE_JTAGTOSWD:
@@ -456,37 +456,37 @@ Gdk::Color SWDDecoder::GetColor(size_t i, size_t /*stream*/)
 			case SWDSymbol::TYPE_LEAVEDORMANT:
 			case SWDSymbol::TYPE_AP_NDP:
 			case SWDSymbol::TYPE_R_NW:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case SWDSymbol::TYPE_ACK:
 				switch(s.m_data)
 				{
 					case 1:
 					case 2:
-						return m_standardColors[COLOR_CONTROL];
+						return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 					case 4:
 					default:
-						return m_standardColors[COLOR_ERROR];
+						return StandardColors::colors[StandardColors::COLOR_ERROR];
 				}
 
 			case SWDSymbol::TYPE_ADDRESS:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case SWDSymbol::TYPE_PARITY_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 			case SWDSymbol::TYPE_PARITY_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case SWDSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case SWDSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SWDDecoder::GetText(size_t i, size_t /*stream*/)

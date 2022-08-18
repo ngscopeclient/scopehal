@@ -924,30 +924,30 @@ Gdk::Color PCIeTransportDecoder::GetColor(size_t i, size_t /*stream*/)
 			case PCIeTransportSymbol::TYPE_FIRST_BYTE_ENABLE:
 			case PCIeTransportSymbol::TYPE_LAST_BYTE_ENABLE:
 			case PCIeTransportSymbol::TYPE_COMPLETION_STATUS:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case PCIeTransportSymbol::TYPE_FLAGS:
 				if(s.m_data & PCIeTransportSymbol::FLAG_POISONED)
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 				else
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case PCIeTransportSymbol::TYPE_REQUESTER_ID:
 			case PCIeTransportSymbol::TYPE_COMPLETER_ID:
 			case PCIeTransportSymbol::TYPE_ADDRESS_X32:
 			case PCIeTransportSymbol::TYPE_ADDRESS_X64:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case PCIeTransportSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case PCIeTransportSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string PCIeTransportDecoder::GetText(size_t i, size_t /*stream*/)

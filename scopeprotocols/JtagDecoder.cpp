@@ -342,21 +342,21 @@ Gdk::Color JtagDecoder::GetColor(size_t i, size_t /*stream*/)
 			case JtagSymbol::UNKNOWN_2:
 			case JtagSymbol::UNKNOWN_3:
 			case JtagSymbol::UNKNOWN_4:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			//Data characters
 			case JtagSymbol::SHIFT_IR:
 			case JtagSymbol::SHIFT_DR:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			//intermediate states
 			default:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string JtagDecoder::GetText(size_t i, size_t /*stream*/)

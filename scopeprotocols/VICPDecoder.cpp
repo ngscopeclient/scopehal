@@ -484,34 +484,34 @@ Gdk::Color VICPDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case VICPSymbol::TYPE_RESERVED:
 				if(s.m_data == 0)
-					return m_standardColors[COLOR_PREAMBLE];
+					return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case VICPSymbol::TYPE_OPCODE:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case VICPSymbol::TYPE_VERSION:
 				if(s.m_data == 1)
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case VICPSymbol::TYPE_SEQ:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case VICPSymbol::TYPE_LENGTH:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case VICPSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string VICPDecoder::GetText(size_t i, size_t /*stream*/)

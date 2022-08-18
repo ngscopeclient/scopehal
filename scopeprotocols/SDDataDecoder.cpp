@@ -262,23 +262,23 @@ Gdk::Color SDDataDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case SDDataSymbol::TYPE_START:
 			case SDDataSymbol::TYPE_END:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case SDDataSymbol::TYPE_CRC_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case SDDataSymbol::TYPE_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case SDDataSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case SDDataSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SDDataDecoder::GetText(size_t i, size_t /*stream*/)

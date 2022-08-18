@@ -375,15 +375,15 @@ Gdk::Color IBM8b10bDecoder::GetColor(size_t i, size_t /*stream*/)
 		const IBM8b10bSymbol& s = capture->m_samples[i];
 
 		if(s.m_error)
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 		else if(s.m_control)
-			return m_standardColors[COLOR_CONTROL];
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 		else
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string IBM8b10bDecoder::GetText(size_t i, size_t /*stream*/)

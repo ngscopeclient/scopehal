@@ -1008,15 +1008,15 @@ Gdk::Color SPIFlashDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case SPIFlashSymbol::TYPE_DUMMY:
-				return m_standardColors[COLOR_IDLE];
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 			case SPIFlashSymbol::TYPE_COMMAND:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case SPIFlashSymbol::TYPE_ADDRESS:
 			case SPIFlashSymbol::TYPE_W25N_SR_ADDR:
 			case SPIFlashSymbol::TYPE_W25N_BLOCK_ADDR:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case SPIFlashSymbol::TYPE_DATA:
 			case SPIFlashSymbol::TYPE_VENDOR_ID:
@@ -1024,14 +1024,14 @@ Gdk::Color SPIFlashDecoder::GetColor(size_t i, size_t /*stream*/)
 			case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
 			case SPIFlashSymbol::TYPE_W25N_SR_PROT:
 			case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SPIFlashDecoder::GetText(size_t i, size_t /*stream*/)

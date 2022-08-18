@@ -539,54 +539,54 @@ Gdk::Color CANDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_stype)
 		{
 			case CANSymbol::TYPE_SOF:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case CANSymbol::TYPE_R0:
 				if(!s.m_data)
-					return m_standardColors[COLOR_PREAMBLE];
+					return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case CANSymbol::TYPE_ID:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case CANSymbol::TYPE_RTR:
 			case CANSymbol::TYPE_FD:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case CANSymbol::TYPE_DLC:
 				if(s.m_data > 8)
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 				else
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case CANSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case CANSymbol::TYPE_CRC_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case CANSymbol::TYPE_CRC_DELIM:
 			case CANSymbol::TYPE_ACK_DELIM:
 			case CANSymbol::TYPE_EOF:
 				if(s.m_data)
-					return m_standardColors[COLOR_PREAMBLE];
+					return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case CANSymbol::TYPE_ACK:
 				if(!s.m_data)
-					return m_standardColors[COLOR_CHECKSUM_OK];
+					return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 				else
-					return m_standardColors[COLOR_CHECKSUM_BAD];
+					return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case CANSymbol::TYPE_CRC_BAD:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string CANDecoder::GetText(size_t i, size_t /*stream*/)

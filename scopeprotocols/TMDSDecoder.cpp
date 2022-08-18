@@ -257,22 +257,22 @@ Gdk::Color TMDSDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case TMDSSymbol::TMDS_TYPE_CONTROL:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case TMDSSymbol::TMDS_TYPE_GUARD:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case TMDSSymbol::TMDS_TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case TMDSSymbol::TMDS_TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string TMDSDecoder::GetText(size_t i, size_t /*stream*/)

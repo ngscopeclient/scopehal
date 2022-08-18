@@ -502,9 +502,9 @@ Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
 	if(data == NULL)
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	if(i >= data->m_samples.size())
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 	switch(data->m_samples[i].m_type)
 	{
@@ -512,33 +512,33 @@ Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
 		case EthernetFrameSegment::TYPE_INBAND_STATUS:
 		case EthernetFrameSegment::TYPE_PREAMBLE:
 		case EthernetFrameSegment::TYPE_SFD:
-			return m_standardColors[COLOR_PREAMBLE];
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		//MAC addresses (src or dest)
 		case EthernetFrameSegment::TYPE_DST_MAC:
 		case EthernetFrameSegment::TYPE_SRC_MAC:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		//Control codes
 		case EthernetFrameSegment::TYPE_ETHERTYPE:
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
-			return m_standardColors[COLOR_CONTROL];
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case EthernetFrameSegment::TYPE_FCS_GOOD:
-			return m_standardColors[COLOR_CHECKSUM_OK];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 		case EthernetFrameSegment::TYPE_FCS_BAD:
-			return m_standardColors[COLOR_CHECKSUM_BAD];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 		//Signal has entirely disappeared, or fault condition reported
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
 		case EthernetFrameSegment::TYPE_REMOTE_FAULT:
 		case EthernetFrameSegment::TYPE_LOCAL_FAULT:
 		case EthernetFrameSegment::TYPE_LINK_INTERRUPTION:
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 		//Payload
 		default:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 	}
 }
 

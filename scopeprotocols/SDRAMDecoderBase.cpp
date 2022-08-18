@@ -63,23 +63,23 @@ Gdk::Color SDRAMDecoderBase::GetColor(size_t i, size_t /*stream*/)
 			case SDRAMSymbol::TYPE_PRE:
 			case SDRAMSymbol::TYPE_PREA:
 			case SDRAMSymbol::TYPE_STOP:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case SDRAMSymbol::TYPE_ACT:
 			case SDRAMSymbol::TYPE_WR:
 			case SDRAMSymbol::TYPE_WRA:
 			case SDRAMSymbol::TYPE_RD:
 			case SDRAMSymbol::TYPE_RDA:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case SDRAMSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SDRAMDecoderBase::GetText(size_t i, size_t /*stream*/)

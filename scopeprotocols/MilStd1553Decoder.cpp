@@ -684,38 +684,38 @@ Gdk::Color MilStd1553Decoder::GetColor(size_t i, size_t /*stream*/)
 			case MilStd1553Symbol::TYPE_SYNC_CTRL_STAT:
 			case MilStd1553Symbol::TYPE_SYNC_DATA:
 			case MilStd1553Symbol::TYPE_TURNAROUND:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case MilStd1553Symbol::TYPE_RT_ADDR:
 			case MilStd1553Symbol::TYPE_SUB_ADDR:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case MilStd1553Symbol::TYPE_DIRECTION:
 			case MilStd1553Symbol::TYPE_LENGTH:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case MilStd1553Symbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case MilStd1553Symbol::TYPE_PARITY_OK:
 			case MilStd1553Symbol::TYPE_MSG_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case MilStd1553Symbol::TYPE_STATUS:
 				if(s.m_data & MilStd1553Symbol::STATUS_ANY_FAULT)
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 				else
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case MilStd1553Symbol::TYPE_PARITY_BAD:
 			case MilStd1553Symbol::TYPE_MSG_ERR:
 			case MilStd1553Symbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string MilStd1553Decoder::GetText(size_t i, size_t /*stream*/)

@@ -320,17 +320,17 @@ Gdk::Color DPhySymbolDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case DPhySymbol::STATE_HS0:
 			case DPhySymbol::STATE_HS1:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case DPhySymbol::STATE_LP00:
 			case DPhySymbol::STATE_LP11:
 			case DPhySymbol::STATE_LP01:
 			case DPhySymbol::STATE_LP10:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DPhySymbolDecoder::GetText(size_t i, size_t /*stream*/)

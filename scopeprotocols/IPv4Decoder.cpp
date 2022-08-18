@@ -406,15 +406,15 @@ Gdk::Color IPv4Decoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
 	if(data == NULL)
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	if(i >= data->m_samples.size())
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 	switch(data->m_samples[i].m_type)
 	{
 		case IPv4Symbol::TYPE_VERSION:
 		case IPv4Symbol::TYPE_HEADER_LEN:
-			return m_standardColors[COLOR_PREAMBLE];
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		case IPv4Symbol::TYPE_FLAGS:
 		case IPv4Symbol::TYPE_DIFFSERV:
@@ -424,22 +424,22 @@ Gdk::Color IPv4Decoder::GetColor(size_t i, size_t /*stream*/)
 		case IPv4Symbol::TYPE_TTL:
 		case IPv4Symbol::TYPE_PROTOCOL:
 		case IPv4Symbol::TYPE_OPTIONS:
-			return m_standardColors[COLOR_CONTROL];
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		//TODO: properly verify checksum
 		case IPv4Symbol::TYPE_HEADER_CHECKSUM:
-			return m_standardColors[COLOR_CHECKSUM_OK];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 		case IPv4Symbol::TYPE_SOURCE_IP:
 		case IPv4Symbol::TYPE_DEST_IP:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case IPv4Symbol::TYPE_DATA:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
 		case IPv4Symbol::TYPE_ERROR:
 		default:
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 }
 

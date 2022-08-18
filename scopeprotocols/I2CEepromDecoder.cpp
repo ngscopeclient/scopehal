@@ -511,26 +511,26 @@ Gdk::Color I2CEepromDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case I2CEepromSymbol::TYPE_SELECT_READ:
 			case I2CEepromSymbol::TYPE_SELECT_WRITE:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case I2CEepromSymbol::TYPE_POLL_BUSY:
-				return m_standardColors[COLOR_IDLE];
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 			case I2CEepromSymbol::TYPE_POLL_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case I2CEepromSymbol::TYPE_ADDRESS:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case I2CEepromSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string I2CEepromDecoder::GetText(size_t i, size_t /*stream*/)

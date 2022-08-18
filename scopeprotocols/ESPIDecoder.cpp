@@ -1402,10 +1402,10 @@ Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
 			case ESPISymbol::TYPE_RESPONSE_STATUS:
 			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
 			case ESPISymbol::TYPE_REQUEST_LEN:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case ESPISymbol::TYPE_WAIT:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case ESPISymbol::TYPE_CAPS_ADDR:
 			case ESPISymbol::TYPE_VWIRE_COUNT:
@@ -1414,14 +1414,14 @@ Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
 			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
 			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
 			case ESPISymbol::TYPE_IO_ADDR:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
 			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
 			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case ESPISymbol::TYPE_GENERAL_CAPS:
 			case ESPISymbol::TYPE_CH0_CAPS_RD:
@@ -1437,13 +1437,13 @@ Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
 			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
 			case ESPISymbol::TYPE_IO_DATA:
 			case ESPISymbol::TYPE_COMPLETION_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
 				if(s.m_data == ESPISymbol::CYCLE_SMBUS)
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case ESPISymbol::TYPE_COMPLETION_TYPE:
 				switch(s.m_data)
@@ -1453,21 +1453,21 @@ Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
 					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
 					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
 					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
-						return m_standardColors[COLOR_CONTROL];
+						return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 					case ESPISymbol::CYCLE_FAIL_LAST:
 					case ESPISymbol::CYCLE_FAIL_ONLY:
 					default:
-						return m_standardColors[COLOR_ERROR];
+						return StandardColors::colors[StandardColors::COLOR_ERROR];
 				};
 				break;
 
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string ESPIDecoder::GetText(size_t i, size_t /*stream*/)

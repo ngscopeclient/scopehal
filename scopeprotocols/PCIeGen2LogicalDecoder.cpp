@@ -350,25 +350,25 @@ Gdk::Color PCIeGen2LogicalDecoder::GetColor(size_t i, size_t /*stream*/)
 			case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
 			case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
 			case PCIeLogicalSymbol::TYPE_SKIP:
-				return m_standardColors[COLOR_IDLE];
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 			case PCIeLogicalSymbol::TYPE_START_TLP:
 			case PCIeLogicalSymbol::TYPE_START_DLLP:
 			case PCIeLogicalSymbol::TYPE_END:
 			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case PCIeLogicalSymbol::TYPE_END_BAD:
 			case PCIeLogicalSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string PCIeGen2LogicalDecoder::GetText(size_t i, size_t /*stream*/)

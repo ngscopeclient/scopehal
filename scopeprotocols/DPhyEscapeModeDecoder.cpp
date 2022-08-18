@@ -318,21 +318,21 @@ Gdk::Color DPhyEscapeModeDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case DPhyEscapeModeSymbol::TYPE_ESCAPE_ENTRY:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case DPhyEscapeModeSymbol::TYPE_ESCAPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case DPhyEscapeModeSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DPhyEscapeModeDecoder::GetText(size_t i, size_t /*stream*/)

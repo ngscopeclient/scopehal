@@ -279,11 +279,11 @@ Gdk::Color DVIDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case DVISymbol::DVI_TYPE_PREAMBLE:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case DVISymbol::DVI_TYPE_HSYNC:
 			case DVISymbol::DVI_TYPE_VSYNC:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case DVISymbol::DVI_TYPE_VIDEO:
 				{
@@ -294,12 +294,12 @@ Gdk::Color DVIDecoder::GetColor(size_t i, size_t /*stream*/)
 
 			case DVISymbol::DVI_TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DVIDecoder::GetText(size_t i, size_t /*stream*/)

@@ -186,18 +186,18 @@ Gdk::Color Ethernet64b66bDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_header)
 		{
 			case 1:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case 2:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string Ethernet64b66bDecoder::GetText(size_t i, size_t /*stream*/)

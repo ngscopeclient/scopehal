@@ -396,9 +396,9 @@ Gdk::Color TCPDecoder::GetColor(size_t i, size_t /*stream*/)
 {
 	auto data = dynamic_cast<TCPWaveform*>(GetData(0));
 	if(data == NULL)
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	if(i >= data->m_samples.size())
-		return m_standardColors[COLOR_ERROR];
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 	switch(data->m_samples[i].m_type)
 	{
@@ -409,22 +409,22 @@ Gdk::Color TCPDecoder::GetColor(size_t i, size_t /*stream*/)
 		case TCPSymbol::TYPE_WINDOW:
 		case TCPSymbol::TYPE_URGENT:
 		case TCPSymbol::TYPE_OPTIONS:
-			return m_standardColors[COLOR_CONTROL];
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		//TODO: properly verify checksum
 		case TCPSymbol::TYPE_CHECKSUM:
-			return m_standardColors[COLOR_CHECKSUM_OK];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 		case TCPSymbol::TYPE_SOURCE_PORT:
 		case TCPSymbol::TYPE_DEST_PORT:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case TCPSymbol::TYPE_DATA:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
 		case TCPSymbol::TYPE_ERROR:
 		default:
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 }
 

@@ -344,10 +344,10 @@ Gdk::Color SWDMemAPDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
 	if(capture != NULL)
 	{
 		//const SWDMemAPSymbol& s = capture->m_samples[i];
-		return m_standardColors[COLOR_DATA];
+		return StandardColors::colors[StandardColors::COLOR_DATA];
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SWDMemAPDecoder::GetText(size_t i, size_t /*stream*/)

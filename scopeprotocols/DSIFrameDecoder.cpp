@@ -289,7 +289,7 @@ Gdk::Color DSIFrameDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case DSIFrameSymbol::TYPE_HSYNC:
 			case DSIFrameSymbol::TYPE_VSYNC:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case DSIFrameSymbol::TYPE_VIDEO:
 				{
@@ -300,12 +300,12 @@ Gdk::Color DSIFrameDecoder::GetColor(size_t i, size_t /*stream*/)
 
 			case DSIFrameSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DSIFrameDecoder::GetText(size_t i, size_t /*stream*/)

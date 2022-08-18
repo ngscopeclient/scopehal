@@ -82,8 +82,8 @@ public:
 	PCIeGen2LogicalDecoder(const std::string& color);
 	virtual ~PCIeGen2LogicalDecoder();
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
+	virtual Gdk::Color GetColor(size_t i, size_t stream);
+	virtual std::string GetText(size_t i, size_t stream);
 
 	virtual void Refresh();
 

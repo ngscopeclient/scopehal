@@ -213,30 +213,6 @@ public:
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Color table (TODO: probably should be refactored)
-
-	/**
-		@brief Standard colors for protocol decode overlays.
-
-		Do not change ordering, add new items to the end only.
-	 */
-	enum FilterColor
-	{
-		COLOR_DATA,			//protocol data
-		COLOR_CONTROL,		//generic control sequences
-		COLOR_ADDRESS,		//addresses or device IDs
-		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
-		COLOR_CHECKSUM_OK,	//valid CRC/checksum
-		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
-		COLOR_ERROR,		//malformed traffic
-		COLOR_IDLE,			//downtime between frames
-
-		STANDARD_COLOR_COUNT
-	};
-
-	static Gdk::Color m_standardColors[STANDARD_COLOR_COUNT];
-
 protected:
 
 	///Group used for the display menu
@@ -266,9 +242,9 @@ protected:
 	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
 public:
-	//Text formatting for CHANNEL_TYPE_COMPLEX decodes
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
+	// //Text formatting for CHANNEL_TYPE_COMPLEX decodes
+	// virtual Gdk::Color GetColor(size_t i, size_t stream);
+	// virtual std::string GetText(size_t i, size_t stream);
 
 	//Helpers for sub-sample interoplation
 	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
@@ -330,8 +306,6 @@ protected:
 	unsigned int m_instanceNum;
 
 protected:
-	//Common text formatting
-	virtual std::string GetTextForAsciiChannel(int i, size_t stream);
 
 #ifdef HAVE_OPENCL
 

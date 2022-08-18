@@ -384,27 +384,27 @@ Gdk::Color SDCmdDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_stype)
 		{
 			case SDCmdSymbol::TYPE_HEADER:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case SDCmdSymbol::TYPE_COMMAND:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case SDCmdSymbol::TYPE_COMMAND_ARGS:
 			case SDCmdSymbol::TYPE_RESPONSE_ARGS:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case SDCmdSymbol::TYPE_CRC_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case SDCmdSymbol::TYPE_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case SDCmdSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SDCmdDecoder::GetText(size_t i, size_t /*stream*/)

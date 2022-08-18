@@ -27,74 +27,20 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of I2CEepromDecoder
- */
-#ifndef I2CEepromDecoder_h
-#define I2CEepromDecoder_h
+#include "../scopehal/scopehal.h"
+#include "Waveform.h"
 
-#include "../scopehal/PacketDecoder.h"
-
-class I2CEepromSymbol
+namespace StandardColors
 {
-public:
-
-	enum EepromType
+	Gdk::Color colors[StandardColors::STANDARD_COLOR_COUNT] =
 	{
-		TYPE_SELECT_READ,		//select with read bit, ack'd
-		TYPE_SELECT_WRITE,		//select with write bit, ack'd
-		TYPE_POLL_BUSY,			//select with read or write bit, nak'd
-		TYPE_POLL_OK,			//poll success
-		TYPE_ADDRESS,
-		TYPE_DATA
+		Gdk::Color("#336699"),	//COLOR_DATA
+		Gdk::Color("#c000a0"),	//COLOR_CONTROL
+		Gdk::Color("#ffff00"),	//COLOR_ADDRESS
+		Gdk::Color("#808080"),	//COLOR_PREAMBLE
+		Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
+		Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
+		Gdk::Color("#ff0000"),	//COLOR_ERROR
+		Gdk::Color("#404040")	//COLOR_IDLE
 	};
-
-	I2CEepromSymbol()
-	{}
-
-	I2CEepromSymbol(EepromType type, uint32_t data)
-	 : m_type(type)
-	 , m_data(data)
-	{}
-
-	EepromType m_type;
-	uint32_t m_data;
-
-	bool operator== (const I2CEepromSymbol& s) const
-	{
-		return (m_type == s.m_type) && (m_data == s.m_data);
-	}
-};
-
-typedef Waveform<I2CEepromSymbol> I2CEepromWaveform;
-
-class I2CEepromDecoder : public PacketDecoder
-{
-public:
-	I2CEepromDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	std::vector<std::string> GetHeaders();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	bool CanMerge(Packet* first, Packet* cur, Packet* next);
-	Packet* CreateMergedHeader(Packet* pack, size_t i);
-
-	PROTOCOL_DECODER_INITPROC(I2CEepromDecoder)
-
-protected:
-	std::string m_memtypename;
-	std::string m_baseaddrname;
-	std::string m_addrpinname;
-};
-
-#endif
+}

@@ -227,22 +227,22 @@ Gdk::Color PCIe128b130bDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case PCIe128b130bSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case PCIe128b130bSymbol::TYPE_ORDERED_SET:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case PCIe128b130bSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string PCIe128b130bDecoder::GetText(size_t i, size_t /*stream*/)

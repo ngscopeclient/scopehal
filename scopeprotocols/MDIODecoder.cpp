@@ -631,23 +631,23 @@ Gdk::Color MDIODecoder::GetColor(size_t i, size_t /*stream*/)
 			case MDIOSymbol::TYPE_PREAMBLE:
 			case MDIOSymbol::TYPE_START:
 			case MDIOSymbol::TYPE_TURN:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case MDIOSymbol::TYPE_OP:
 				if( (s.m_data == 1) || (s.m_data == 2) )
-					return m_standardColors[COLOR_CONTROL];
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 				else
-					return m_standardColors[COLOR_ERROR];
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 			case MDIOSymbol::TYPE_PHYADDR:
 			case MDIOSymbol::TYPE_REGADDR:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case MDIOSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case MDIOSymbol::TYPE_ERROR:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 

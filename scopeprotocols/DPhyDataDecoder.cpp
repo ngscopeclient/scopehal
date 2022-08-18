@@ -377,21 +377,21 @@ Gdk::Color DPhyDataDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_type)
 		{
 			case DPhyDataSymbol::TYPE_SOT:
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 			case DPhyDataSymbol::TYPE_EOT:
-				return m_standardColors[COLOR_IDLE];
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 			case DPhyDataSymbol::TYPE_HS_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case DPhyDataSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string DPhyDataDecoder::GetText(size_t i, size_t /*stream*/)

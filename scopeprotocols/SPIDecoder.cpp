@@ -258,17 +258,17 @@ Gdk::Color SPIDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case SPISymbol::TYPE_SELECT:
 			case SPISymbol::TYPE_DESELECT:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case SPISymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case SPISymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string SPIDecoder::GetText(size_t i, size_t /*stream*/)

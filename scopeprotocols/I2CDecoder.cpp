@@ -220,25 +220,25 @@ Gdk::Color I2CDecoder::GetColor(size_t i, size_t /*stream*/)
 		switch(s.m_stype)
 		{
 			case I2CSymbol::TYPE_ERROR:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 			case I2CSymbol::TYPE_ADDRESS:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 			case I2CSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case I2CSymbol::TYPE_ACK:
 				if(s.m_data)
-					return m_standardColors[COLOR_IDLE];
+					return StandardColors::colors[StandardColors::COLOR_IDLE];
 				else
-					return m_standardColors[COLOR_CHECKSUM_OK];
+					return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			default:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 		}
 	}
 
 	//error
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string I2CDecoder::GetText(size_t i, size_t /*stream*/)

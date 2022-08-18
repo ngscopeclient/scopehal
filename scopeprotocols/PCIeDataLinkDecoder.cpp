@@ -678,33 +678,33 @@ Gdk::Color PCIeDataLinkDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
 			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
 			case PCIeDataLinkSymbol::TYPE_TLP_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
 			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
 			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
 			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
 			case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
 			case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 			case PCIeDataLinkSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
 
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string PCIeDataLinkDecoder::GetText(size_t i, size_t /*stream*/)

@@ -379,23 +379,23 @@ Gdk::Color HyperRAMDecoder::GetColor(size_t i, size_t /*stream*/)
 		{
 			case HyperRAMSymbol::TYPE_SELECT:
 			case HyperRAMSymbol::TYPE_DESELECT:
-				return m_standardColors[COLOR_CONTROL];
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 			case HyperRAMSymbol::TYPE_CA:
-				return m_standardColors[COLOR_ADDRESS];
+				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 			case HyperRAMSymbol::TYPE_WAIT:
-				return m_standardColors[COLOR_IDLE];
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 			case HyperRAMSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+				return StandardColors::colors[StandardColors::COLOR_DATA];
 
 			case HyperRAMSymbol::TYPE_ERROR:
 			default:
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 		}
 	}
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
 string HyperRAMDecoder::GetText(size_t i, size_t /*stream*/)
