@@ -56,7 +56,13 @@ public:
 	}
 };
 
-typedef Waveform<Ethernet64b66bSymbol> Ethernet64b66bWaveform;
+class Ethernet64b66bWaveform : public Waveform<Ethernet64b66bSymbol>
+{
+public:
+	Ethernet64b66bWaveform () : Waveform<Ethernet64b66bSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class Ethernet64b66bDecoder : public Filter
 {

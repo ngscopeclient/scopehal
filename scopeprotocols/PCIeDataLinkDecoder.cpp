@@ -215,7 +215,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_durations.push_back(dur);
 							cap->m_samples.push_back(
 								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, sym.m_data));
-							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1, 0);
+							pack->m_headers["Type"] = cap->GetText(cap->m_samples.size() - 1);
 							break;
 
 						//Split flow control into two symbols: type and VC
@@ -226,7 +226,7 @@ void PCIeDataLinkDecoder::Refresh()
 							cap->m_durations.push_back(halfdur);
 							cap->m_samples.push_back(
 								PCIeDataLinkSymbol(PCIeDataLinkSymbol::TYPE_DLLP_TYPE, dllp_type));
-							pack->m_headers["Type"] = GetText(cap->m_samples.size() - 1, 0);
+							pack->m_headers["Type"] = cap->GetText(cap->m_samples.size() - 1);
 
 							cap->m_offsets.push_back(off + halfdur);
 							cap->m_durations.push_back(dur - halfdur);
@@ -667,118 +667,107 @@ uint32_t PCIeDataLinkDecoder::CalculateTlpCRC(Packet* pack)
 		return CRC32(pack->m_data, 0, len - 1);
 }
 
-Gdk::Color PCIeDataLinkDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color PCIeDataLinkWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<PCIeDataLinkWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
+		case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
+		case PCIeDataLinkSymbol::TYPE_DLLP_VC:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-		switch(s.m_type)
-		{
-			case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
-			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
+		case PCIeDataLinkSymbol::TYPE_TLP_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
-			case PCIeDataLinkSymbol::TYPE_TLP_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
+		case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
+		case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
+		case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+		case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
-			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
-			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
+		case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
-			case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+		case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
+		case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
-			case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
-
-			case PCIeDataLinkSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case PCIeDataLinkSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string PCIeDataLinkDecoder::GetText(size_t i, size_t /*stream*/)
+string PCIeDataLinkWaveform::GetText(size_t i)
 {
 	char tmp[64];
 
-	auto capture = dynamic_cast<PCIeDataLinkWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
+		case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
+			switch(s.m_data)
+			{
+				case PCIeDataLinkSymbol::DLLP_TYPE_ACK:							return "ACK";
+				case PCIeDataLinkSymbol::DLLP_TYPE_NAK:							return "NAK";
+				case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:					return "PM_Enter_L1";
+				case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:				return "PM_Enter_L23";
+				case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:	return "PM_Active_State_Request_L1";
+				case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:				return "PM_Request_Ack";
+				case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:				return "Vendor Specific";
 
-		switch(s.m_type)
-		{
-			case PCIeDataLinkSymbol::TYPE_DLLP_TYPE:
-				switch(s.m_data)
-				{
-					case PCIeDataLinkSymbol::DLLP_TYPE_ACK:							return "ACK";
-					case PCIeDataLinkSymbol::DLLP_TYPE_NAK:							return "NAK";
-					case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L1:					return "PM_Enter_L1";
-					case PCIeDataLinkSymbol::DLLP_TYPE_PM_ENTER_L23:				return "PM_Enter_L23";
-					case PCIeDataLinkSymbol::DLLP_TYPE_PM_ACTIVE_STATE_REQUEST_L1:	return "PM_Active_State_Request_L1";
-					case PCIeDataLinkSymbol::DLLP_TYPE_PM_REQUEST_ACK:				return "PM_Request_Ack";
-					case PCIeDataLinkSymbol::DLLP_TYPE_VENDOR_SPECIFIC:				return "Vendor Specific";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_P:					return "InitFC1-P";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_NP:					return "InitFC1-NP";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_CPL:					return "InitFC1-CPL";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_P:					return "InitFC2-P";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_NP:					return "InitFC2-NP";
+				case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_CPL:					return "InitFC2-CPL";
+				case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_P:					return "UpdateFC-P";
+				case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_NP:					return "UpdateFC-NP";
+				case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_CPL:				return "UpdateFC-CPL";
 
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_P:					return "InitFC1-P";
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_NP:					return "InitFC1-NP";
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC1_CPL:					return "InitFC1-CPL";
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_P:					return "InitFC2-P";
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_NP:					return "InitFC2-NP";
-					case PCIeDataLinkSymbol::DLLP_TYPE_INITFC2_CPL:					return "InitFC2-CPL";
-					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_P:					return "UpdateFC-P";
-					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_NP:					return "UpdateFC-NP";
-					case PCIeDataLinkSymbol::DLLP_TYPE_UPDATEFC_CPL:				return "UpdateFC-CPL";
+				default:
+					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+					return string("Reserved ") + tmp;
+			}
 
-					default:
-						snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-						return string("Reserved ") + tmp;
-				}
+		case PCIeDataLinkSymbol::TYPE_DLLP_VC:
+			return string("VC ") + to_string(s.m_data);
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_VC:
-				return string("VC ") + to_string(s.m_data);
+		case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
+		case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
+			snprintf(tmp, sizeof(tmp), "Seq: %d", s.m_data);
+			return tmp;
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_SEQUENCE:
-			case PCIeDataLinkSymbol::TYPE_TLP_SEQUENCE:
-				snprintf(tmp, sizeof(tmp), "Seq: %d", s.m_data);
-				return tmp;
+		case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
+		case PCIeDataLinkSymbol::TYPE_TLP_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return tmp;
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA:
-			case PCIeDataLinkSymbol::TYPE_TLP_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return tmp;
+		case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
+			return to_string(s.m_data) + " headers";
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_HEADER_CREDITS:
-				return to_string(s.m_data) + " headers";
+		case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
+			return to_string(16*s.m_data) + " data bytes";
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_DATA_CREDITS:
-				return to_string(16*s.m_data) + " data bytes";
+		case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
+		case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
+			snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
+			return tmp;
 
-			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_OK:
-			case PCIeDataLinkSymbol::TYPE_DLLP_CRC_BAD:
-				snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
-				return tmp;
+		case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
+		case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
+			snprintf(tmp, sizeof(tmp), "CRC: %08x", s.m_data);
+			return tmp;
 
-			case PCIeDataLinkSymbol::TYPE_TLP_CRC_OK:
-			case PCIeDataLinkSymbol::TYPE_TLP_CRC_BAD:
-				snprintf(tmp, sizeof(tmp), "CRC: %08x", s.m_data);
-				return tmp;
-
-			case PCIeDataLinkSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case PCIeDataLinkSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }
 
 vector<string> PCIeDataLinkDecoder::GetHeaders()

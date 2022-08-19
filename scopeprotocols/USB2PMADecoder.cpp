@@ -189,16 +189,9 @@ void USB2PMADecoder::Refresh()
 	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
 }
 
-Gdk::Color USB2PMADecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color USB2PMAWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<USB2PMAWaveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	//TODO: have a set of standard colors we use everywhere?
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PMASymbol::TYPE_J:
@@ -215,15 +208,9 @@ Gdk::Color USB2PMADecoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string USB2PMADecoder::GetText(size_t i, size_t /*stream*/)
+string USB2PMAWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<USB2PMAWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PMASymbol::TYPE_J:

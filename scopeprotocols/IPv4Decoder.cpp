@@ -402,15 +402,9 @@ void IPv4Decoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color IPv4Decoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color IPv4Waveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	switch(data->m_samples[i].m_type)
+	switch(m_samples[i].m_type)
 	{
 		case IPv4Symbol::TYPE_VERSION:
 		case IPv4Symbol::TYPE_HEADER_LEN:
@@ -443,17 +437,11 @@ Gdk::Color IPv4Decoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string IPv4Decoder::GetText(size_t i, size_t /*stream*/)
+string IPv4Waveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<IPv4Waveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[128];
 
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case IPv4Symbol::TYPE_VERSION:

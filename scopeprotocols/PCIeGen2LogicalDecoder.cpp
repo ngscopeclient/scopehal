@@ -338,82 +338,71 @@ uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)
 	return ret;
 }
 
-Gdk::Color PCIeGen2LogicalDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color PCIeLogicalWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<PCIeLogicalWaveform*>(GetData(0));
-	if(capture != NULL)
+	const PCIeLogicalSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const PCIeLogicalSymbol& s = capture->m_samples[i];
+		case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
+		case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
+		case PCIeLogicalSymbol::TYPE_SKIP:
+			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-		switch(s.m_type)
-		{
-			case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
-			case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
-			case PCIeLogicalSymbol::TYPE_SKIP:
-				return StandardColors::colors[StandardColors::COLOR_IDLE];
+		case PCIeLogicalSymbol::TYPE_START_TLP:
+		case PCIeLogicalSymbol::TYPE_START_DLLP:
+		case PCIeLogicalSymbol::TYPE_END:
+		case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case PCIeLogicalSymbol::TYPE_START_TLP:
-			case PCIeLogicalSymbol::TYPE_START_DLLP:
-			case PCIeLogicalSymbol::TYPE_END:
-			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case PCIeLogicalSymbol::TYPE_END_BAD:
-			case PCIeLogicalSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case PCIeLogicalSymbol::TYPE_END_BAD:
+		case PCIeLogicalSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string PCIeGen2LogicalDecoder::GetText(size_t i, size_t /*stream*/)
+string PCIeLogicalWaveform::GetText(size_t i)
 {
 	char tmp[16];
 
-	auto capture = dynamic_cast<PCIeLogicalWaveform*>(GetData(0));
-	if(capture != NULL)
+	const PCIeLogicalSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const PCIeLogicalSymbol& s = capture->m_samples[i];
+		case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
+			return "Scrambler desynced";
 
-		switch(s.m_type)
-		{
-			case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
-				return "Scrambler desynced";
+		case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
+			return "Logical Idle";
 
-			case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
-				return "Logical Idle";
+		case PCIeLogicalSymbol::TYPE_SKIP:
+			return "Skip";
 
-			case PCIeLogicalSymbol::TYPE_SKIP:
-				return "Skip";
+		case PCIeLogicalSymbol::TYPE_START_TLP:
+			return "TLP";
 
-			case PCIeLogicalSymbol::TYPE_START_TLP:
-				return "TLP";
+		case PCIeLogicalSymbol::TYPE_START_DLLP:
+			return "DLLP";
 
-			case PCIeLogicalSymbol::TYPE_START_DLLP:
-				return "DLLP";
+		case PCIeLogicalSymbol::TYPE_END:
+			return "End";
 
-			case PCIeLogicalSymbol::TYPE_END:
-				return "End";
+		case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return tmp;
 
-			case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return tmp;
+		case PCIeLogicalSymbol::TYPE_END_BAD:
+			return "End Bad";
 
-			case PCIeLogicalSymbol::TYPE_END_BAD:
-				return "End Bad";
+		case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
+			return "End Data Stream";
 
-			case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
-				return "End Data Stream";
-
-			case PCIeLogicalSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case PCIeLogicalSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }

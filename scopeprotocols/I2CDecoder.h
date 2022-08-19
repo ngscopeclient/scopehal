@@ -68,7 +68,13 @@ public:
 	}
 };
 
-typedef Waveform<I2CSymbol> I2CWaveform;
+class I2CWaveform : public Waveform<I2CSymbol>
+{
+public:
+	I2CWaveform () : Waveform<I2CSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class I2CDecoder : public Filter
 {

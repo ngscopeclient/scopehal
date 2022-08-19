@@ -63,7 +63,15 @@ public:
 	}
 };
 
-typedef Waveform<IBM8b10bSymbol> IBM8b10bWaveform;
+class IBM8b10bWaveform : public Waveform<IBM8b10bSymbol>
+{
+public:
+	IBM8b10bWaveform (FilterParameter& displayformat) : Waveform<IBM8b10bSymbol>(), m_displayformat(displayformat) {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+
+	FilterParameter& m_displayformat;
+};
 
 class IBM8b10bDecoder : public Filter
 {
@@ -80,7 +88,7 @@ public:
 	{
 		FORMAT_DOTTED,
 		FORMAT_HEX
-	} m_cachedDisplayFormat;
+	};
 
 	PROTOCOL_DECODER_INITPROC(IBM8b10bDecoder)
 

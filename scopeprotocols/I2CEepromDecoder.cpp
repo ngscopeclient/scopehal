@@ -140,7 +140,7 @@ void I2CEepromDecoder::Refresh()
 	int pointer_bits = min(16, raw_bits);
 
 	//Set up output
-	auto cap = new I2CEepromWaveform;
+	auto cap = new I2CEepromWaveform(m_parameters[m_memtypename]);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -500,86 +500,74 @@ void I2CEepromDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color I2CEepromDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color I2CEepromWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<I2CEepromWaveform*>(GetData(0));
-	if(capture != NULL)
+	const I2CEepromSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const I2CEepromSymbol& s = capture->m_samples[i];
+		case I2CEepromSymbol::TYPE_SELECT_READ:
+		case I2CEepromSymbol::TYPE_SELECT_WRITE:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-		switch(s.m_type)
-		{
-			case I2CEepromSymbol::TYPE_SELECT_READ:
-			case I2CEepromSymbol::TYPE_SELECT_WRITE:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case I2CEepromSymbol::TYPE_POLL_BUSY:
+			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-			case I2CEepromSymbol::TYPE_POLL_BUSY:
-				return StandardColors::colors[StandardColors::COLOR_IDLE];
+		case I2CEepromSymbol::TYPE_POLL_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case I2CEepromSymbol::TYPE_POLL_OK:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+		case I2CEepromSymbol::TYPE_ADDRESS:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case I2CEepromSymbol::TYPE_ADDRESS:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case I2CEepromSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case I2CEepromSymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string I2CEepromDecoder::GetText(size_t i, size_t /*stream*/)
+string I2CEepromWaveform::GetText(size_t i)
 {
-	int raw_bits = m_parameters[m_memtypename].GetIntVal();
-
-	auto capture = dynamic_cast<I2CEepromWaveform*>(GetData(0));
 	char tmp[128] = "";
-	if(capture != NULL)
+	const I2CEepromSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const I2CEepromSymbol& s = capture->m_samples[i];
+		case I2CEepromSymbol::TYPE_SELECT_READ:
+			return "Read";
 
-		switch(s.m_type)
-		{
-			case I2CEepromSymbol::TYPE_SELECT_READ:
-				return "Read";
+		case I2CEepromSymbol::TYPE_SELECT_WRITE:
+			return "Write";
 
-			case I2CEepromSymbol::TYPE_SELECT_WRITE:
-				return "Write";
+		case I2CEepromSymbol::TYPE_POLL_BUSY:
+			return "Busy";
 
-			case I2CEepromSymbol::TYPE_POLL_BUSY:
-				return "Busy";
+		case I2CEepromSymbol::TYPE_POLL_OK:
+			return "Ready";
 
-			case I2CEepromSymbol::TYPE_POLL_OK:
-				return "Ready";
+		case I2CEepromSymbol::TYPE_ADDRESS:
+			if(m_raw_bits.GetIntVal() > 16)
+				snprintf(tmp, sizeof(tmp), "Addr: %05x", s.m_data);
+			else if(m_raw_bits.GetIntVal() > 12)
+				snprintf(tmp, sizeof(tmp), "Addr: %04x", s.m_data);
+			else if(m_raw_bits.GetIntVal() > 8)
+				snprintf(tmp, sizeof(tmp), "Addr: %03x", s.m_data);
+			else if(m_raw_bits.GetIntVal() > 4)
+				snprintf(tmp, sizeof(tmp), "Addr: %02x", s.m_data);
+			else
+				snprintf(tmp, sizeof(tmp), "Addr: %01x", s.m_data);
+			break;
 
-			case I2CEepromSymbol::TYPE_ADDRESS:
-				if(raw_bits > 16)
-					snprintf(tmp, sizeof(tmp), "Addr: %05x", s.m_data);
-				else if(raw_bits > 12)
-					snprintf(tmp, sizeof(tmp), "Addr: %04x", s.m_data);
-				else if(raw_bits > 8)
-					snprintf(tmp, sizeof(tmp), "Addr: %03x", s.m_data);
-				else if(raw_bits > 4)
-					snprintf(tmp, sizeof(tmp), "Addr: %02x", s.m_data);
-				else
-					snprintf(tmp, sizeof(tmp), "Addr: %01x", s.m_data);
-				break;
+		case I2CEepromSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
 
-			case I2CEepromSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
-
-			default:
-				return "";
-		}
+		default:
+			return "";
 	}
 
-	return string(tmp);
+	return tmp;
 }
 
 bool I2CEepromDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)

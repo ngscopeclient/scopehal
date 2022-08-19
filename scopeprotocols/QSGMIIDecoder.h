@@ -52,6 +52,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(QSGMIIDecoder)
+
+protected:
+	std::string m_displayformat;
 };
 
 #endif

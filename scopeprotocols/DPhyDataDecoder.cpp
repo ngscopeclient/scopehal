@@ -367,60 +367,47 @@ void DPhyDataDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DPhyDataDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DPhyDataWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<DPhyDataWaveform*>(GetData(0));
-	if(capture != NULL)
+	const DPhyDataSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const DPhyDataSymbol& s = capture->m_samples[i];
+		case DPhyDataSymbol::TYPE_SOT:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_type)
-		{
-			case DPhyDataSymbol::TYPE_SOT:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case DPhyDataSymbol::TYPE_EOT:
+			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-			case DPhyDataSymbol::TYPE_EOT:
-				return StandardColors::colors[StandardColors::COLOR_IDLE];
+		case DPhyDataSymbol::TYPE_HS_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case DPhyDataSymbol::TYPE_HS_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case DPhyDataSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case DPhyDataSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string DPhyDataDecoder::GetText(size_t i, size_t /*stream*/)
+string DPhyDataWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<DPhyDataWaveform*>(GetData(0));
 	char tmp[32];
+	const DPhyDataSymbol& s = m_samples[i];
 
-	if(capture != NULL)
+	switch(s.m_type)
 	{
-		const DPhyDataSymbol& s = capture->m_samples[i];
+		case DPhyDataSymbol::TYPE_SOT:
+			return "SOT";
 
-		switch(s.m_type)
-		{
-			case DPhyDataSymbol::TYPE_SOT:
-				return "SOT";
+		case DPhyDataSymbol::TYPE_EOT:
+			return "EOT";
 
-			case DPhyDataSymbol::TYPE_EOT:
-				return "EOT";
+		case DPhyDataSymbol::TYPE_HS_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return tmp;
 
-			case DPhyDataSymbol::TYPE_HS_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return tmp;
-
-			case DPhyDataSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case DPhyDataSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-
-	return "ERROR";
 }
 

@@ -217,54 +217,43 @@ void PCIe128b130bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color PCIe128b130bDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color PCIe128b130bWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<PCIe128b130bWaveform*>(GetData(0));
-	if(capture != NULL)
+	const PCIe128b130bSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const PCIe128b130bSymbol& s = capture->m_samples[i];
+		case PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_type)
-		{
-			case PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case PCIe128b130bSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case PCIe128b130bSymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
+		case PCIe128b130bSymbol::TYPE_ORDERED_SET:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case PCIe128b130bSymbol::TYPE_ORDERED_SET:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
-
-			case PCIe128b130bSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case PCIe128b130bSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	//error
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string PCIe128b130bDecoder::GetText(size_t i, size_t /*stream*/)
+string PCIe128b130bWaveform::GetText(size_t i)
 {
 	string ret;
 
-	auto capture = dynamic_cast<PCIe128b130bWaveform*>(GetData(0));
-	if(capture != NULL)
+	const PCIe128b130bSymbol& s = m_samples[i];
+
+	if(s.m_type == PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED)
+		return "Scrambler desynced";
+	else if(s.m_type == PCIe128b130bSymbol::TYPE_ERROR)
+		return "ERROR";
+
+	char tmp[32];
+	for(size_t j=0; j<s.m_len; j++)
 	{
-		const PCIe128b130bSymbol& s = capture->m_samples[i];
-
-		if(s.m_type == PCIe128b130bSymbol::TYPE_SCRAMBLER_DESYNCED)
-			return "Scrambler desynced";
-		else if(s.m_type == PCIe128b130bSymbol::TYPE_ERROR)
-			return "ERROR";
-
-		char tmp[32];
-		for(size_t j=0; j<s.m_len; j++)
-		{
-			snprintf(tmp, sizeof(tmp), "%02x", s.m_data[j]);
-			ret += tmp;
-		}
+		snprintf(tmp, sizeof(tmp), "%02x", s.m_data[j]);
+		ret += tmp;
 	}
 
 	return ret;

@@ -61,7 +61,13 @@ public:
 	}
 };
 
-typedef Waveform<DPhyDataSymbol> DPhyDataWaveform;
+class DPhyDataWaveform : public Waveform<DPhyDataSymbol>
+{
+public:
+	DPhyDataWaveform () : Waveform<DPhyDataSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class DPhyDataDecoder : public Filter
 {

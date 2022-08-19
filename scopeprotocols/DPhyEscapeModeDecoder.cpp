@@ -229,7 +229,7 @@ void DPhyEscapeModeDecoder::Refresh()
 						cap->m_durations.push_back(end - start);
 						cap->m_samples.push_back(DPhyEscapeModeSymbol(DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND, tmp));
 
-						pack->m_headers["Operation"] = GetText(cap->m_offsets.size() - 1, 0);
+						pack->m_headers["Operation"] = cap->GetText(cap->m_offsets.size() - 1);
 
 						//Low power data?
 						if(tmp == 0xe1)
@@ -308,81 +308,68 @@ void DPhyEscapeModeDecoder::Refresh()
 	}
 }
 
-Gdk::Color DPhyEscapeModeDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DPhyEscapeModeWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<DPhyEscapeModeWaveform*>(GetData(0));
-	if(capture != nullptr)
+	const DPhyEscapeModeSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const DPhyEscapeModeSymbol& s = capture->m_samples[i];
+		case DPhyEscapeModeSymbol::TYPE_ESCAPE_ENTRY:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_type)
-		{
-			case DPhyEscapeModeSymbol::TYPE_ESCAPE_ENTRY:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case DPhyEscapeModeSymbol::TYPE_ESCAPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case DPhyEscapeModeSymbol::TYPE_ESCAPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case DPhyEscapeModeSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case DPhyEscapeModeSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string DPhyEscapeModeDecoder::GetText(size_t i, size_t /*stream*/)
+string DPhyEscapeModeWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<DPhyEscapeModeWaveform*>(GetData(0));
 	char tmp[32];
+	const DPhyEscapeModeSymbol& s = m_samples[i];
 
-	if(capture != nullptr)
+	switch(s.m_type)
 	{
-		const DPhyEscapeModeSymbol& s = capture->m_samples[i];
+		case DPhyEscapeModeSymbol::TYPE_ESCAPE_ENTRY:
+			return "Escape Entry";
 
-		switch(s.m_type)
-		{
-			case DPhyEscapeModeSymbol::TYPE_ESCAPE_ENTRY:
-				return "Escape Entry";
+		case DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND:
+			switch(s.m_data)
+			{
+				case 0xe1:
+					return "Low Power Data";
+				case 0x1e:
+					return "Ultra-Low Power";
+				case 0x9f:
+					return "Undefined-1";
+				case 0xde:
+					return "Undefined-2";
+				case 0x62:
+					return "Reset-Trigger";
+				case 0x5d:
+					return "HS Test Mode";
+				case 0x21:
+					return "Unknown-4";
+				case 0xa0:
+					return "Unknown-5";
+				default:
+					snprintf(tmp, sizeof(tmp), "Invalid (%02x)", s.m_data);
+					return tmp;
+			}
 
-			case DPhyEscapeModeSymbol::TYPE_ENTRY_COMMAND:
-				switch(s.m_data)
-				{
-					case 0xe1:
-						return "Low Power Data";
-					case 0x1e:
-						return "Ultra-Low Power";
-					case 0x9f:
-						return "Undefined-1";
-					case 0xde:
-						return "Undefined-2";
-					case 0x62:
-						return "Reset-Trigger";
-					case 0x5d:
-						return "HS Test Mode";
-					case 0x21:
-						return "Unknown-4";
-					case 0xa0:
-						return "Unknown-5";
-					default:
-						snprintf(tmp, sizeof(tmp), "Invalid (%02x)", s.m_data);
-						return tmp;
-				}
+		case DPhyEscapeModeSymbol::TYPE_ESCAPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return tmp;
 
-			case DPhyEscapeModeSymbol::TYPE_ESCAPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return tmp;
-
-			case DPhyEscapeModeSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case DPhyEscapeModeSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-
-	return "ERROR";
 }
 

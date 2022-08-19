@@ -79,7 +79,15 @@ public:
 	}
 };
 
-typedef Waveform<SDCmdSymbol> SDCmdWaveform;
+class SDCmdWaveform : public Waveform<SDCmdSymbol>
+{
+public:
+	SDCmdWaveform (FilterParameter& cardTypeParam) : Waveform<SDCmdSymbol>(), m_cardTypeParam(cardTypeParam) {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+
+	FilterParameter& m_cardTypeParam;
+};
 
 
 /**

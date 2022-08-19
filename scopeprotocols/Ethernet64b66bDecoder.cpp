@@ -176,42 +176,29 @@ void Ethernet64b66bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color Ethernet64b66bDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color Ethernet64b66bWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
-	if(capture != NULL)
+	const Ethernet64b66bSymbol& s = m_samples[i];
+
+	switch(s.m_header)
 	{
-		const Ethernet64b66bSymbol& s = capture->m_samples[i];
+		case 1:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-		switch(s.m_header)
-		{
-			case 1:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
+		case 2:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case 2:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
-
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	//error
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string Ethernet64b66bDecoder::GetText(size_t i, size_t /*stream*/)
+string Ethernet64b66bWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<Ethernet64b66bWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const Ethernet64b66bSymbol& s = capture->m_samples[i];
+	const Ethernet64b66bSymbol& s = m_samples[i];
 
-		char tmp[32];
-		snprintf(tmp, sizeof(tmp), "%016lx", s.m_data);
-		return string(tmp);
-	}
-
-	return "";
+	char tmp[32];
+	snprintf(tmp, sizeof(tmp), "%016lx", s.m_data);
+	return string(tmp);
 }
 

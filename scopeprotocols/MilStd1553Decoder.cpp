@@ -673,128 +673,117 @@ void MilStd1553Decoder::Refresh()
 	}
 }
 
-Gdk::Color MilStd1553Decoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color MilStd1553Waveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<MilStd1553Waveform*>(GetData(0));
-	if(capture != NULL)
+	const MilStd1553Symbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const MilStd1553Symbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case MilStd1553Symbol::TYPE_SYNC_CTRL_STAT:
-			case MilStd1553Symbol::TYPE_SYNC_DATA:
-			case MilStd1553Symbol::TYPE_TURNAROUND:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case MilStd1553Symbol::TYPE_SYNC_CTRL_STAT:
+		case MilStd1553Symbol::TYPE_SYNC_DATA:
+		case MilStd1553Symbol::TYPE_TURNAROUND:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-			case MilStd1553Symbol::TYPE_RT_ADDR:
-			case MilStd1553Symbol::TYPE_SUB_ADDR:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case MilStd1553Symbol::TYPE_RT_ADDR:
+		case MilStd1553Symbol::TYPE_SUB_ADDR:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case MilStd1553Symbol::TYPE_DIRECTION:
-			case MilStd1553Symbol::TYPE_LENGTH:
+		case MilStd1553Symbol::TYPE_DIRECTION:
+		case MilStd1553Symbol::TYPE_LENGTH:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
+
+		case MilStd1553Symbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
+
+		case MilStd1553Symbol::TYPE_PARITY_OK:
+		case MilStd1553Symbol::TYPE_MSG_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+
+		case MilStd1553Symbol::TYPE_STATUS:
+			if(s.m_data & MilStd1553Symbol::STATUS_ANY_FAULT)
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+			else
 				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case MilStd1553Symbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case MilStd1553Symbol::TYPE_PARITY_OK:
-			case MilStd1553Symbol::TYPE_MSG_OK:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
-
-			case MilStd1553Symbol::TYPE_STATUS:
-				if(s.m_data & MilStd1553Symbol::STATUS_ANY_FAULT)
-					return StandardColors::colors[StandardColors::COLOR_ERROR];
-				else
-					return StandardColors::colors[StandardColors::COLOR_CONTROL];
-
-			case MilStd1553Symbol::TYPE_PARITY_BAD:
-			case MilStd1553Symbol::TYPE_MSG_ERR:
-			case MilStd1553Symbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case MilStd1553Symbol::TYPE_PARITY_BAD:
+		case MilStd1553Symbol::TYPE_MSG_ERR:
+		case MilStd1553Symbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string MilStd1553Decoder::GetText(size_t i, size_t /*stream*/)
+string MilStd1553Waveform::GetText(size_t i)
 {
 	char tmp[128] = "";
-	auto capture = dynamic_cast<MilStd1553Waveform*>(GetData(0));
-	if(capture != NULL)
+	const MilStd1553Symbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const MilStd1553Symbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case MilStd1553Symbol::TYPE_SYNC_CTRL_STAT:
-				return "Sync: Ctl/Stat";
+		case MilStd1553Symbol::TYPE_SYNC_CTRL_STAT:
+			return "Sync: Ctl/Stat";
 
-			case MilStd1553Symbol::TYPE_SYNC_DATA:
-				return "Sync: Data";
+		case MilStd1553Symbol::TYPE_SYNC_DATA:
+			return "Sync: Data";
 
-			case MilStd1553Symbol::TYPE_RT_ADDR:
-				snprintf(tmp, sizeof(tmp), "RT %d", s.m_data);
-				return tmp;
+		case MilStd1553Symbol::TYPE_RT_ADDR:
+			snprintf(tmp, sizeof(tmp), "RT %d", s.m_data);
+			return tmp;
 
-			case MilStd1553Symbol::TYPE_SUB_ADDR:
-				snprintf(tmp, sizeof(tmp), "SA %d", s.m_data);
-				return tmp;
+		case MilStd1553Symbol::TYPE_SUB_ADDR:
+			snprintf(tmp, sizeof(tmp), "SA %d", s.m_data);
+			return tmp;
 
-			case MilStd1553Symbol::TYPE_DIRECTION:
-				if(s.m_data)
-					return "RT to BC";
-				else
-					return "BC to RT";
+		case MilStd1553Symbol::TYPE_DIRECTION:
+			if(s.m_data)
+				return "RT to BC";
+			else
+				return "BC to RT";
 
-			case MilStd1553Symbol::TYPE_LENGTH:
-				return string("Len: ") + to_string(s.m_data);
+		case MilStd1553Symbol::TYPE_LENGTH:
+			return string("Len: ") + to_string(s.m_data);
 
-			case MilStd1553Symbol::TYPE_PARITY_BAD:
-			case MilStd1553Symbol::TYPE_PARITY_OK:
-				return string("Parity: ") + to_string(s.m_data);
+		case MilStd1553Symbol::TYPE_PARITY_BAD:
+		case MilStd1553Symbol::TYPE_PARITY_OK:
+			return string("Parity: ") + to_string(s.m_data);
 
-			case MilStd1553Symbol::TYPE_MSG_OK:
-				return "Msg OK";
-			case MilStd1553Symbol::TYPE_MSG_ERR:
-				return "Msg error";
+		case MilStd1553Symbol::TYPE_MSG_OK:
+			return "Msg OK";
+		case MilStd1553Symbol::TYPE_MSG_ERR:
+			return "Msg error";
 
-			case MilStd1553Symbol::TYPE_TURNAROUND:
-				return "Turnaround";
+		case MilStd1553Symbol::TYPE_TURNAROUND:
+			return "Turnaround";
 
-			case MilStd1553Symbol::TYPE_STATUS:
-				{
-					string stmp;
+		case MilStd1553Symbol::TYPE_STATUS:
+			{
+				string stmp;
 
-					if(s.m_data & MilStd1553Symbol::STATUS_SERVICE_REQUEST)
-						stmp += "ServiceReq ";
-					if(s.m_data & MilStd1553Symbol::STATUS_MALFORMED)
-						stmp += "(MALFORMED) ";
-					if(s.m_data & MilStd1553Symbol::STATUS_BROADCAST_ACK)
-						stmp += "BroadcastAck ";
-					if(s.m_data & MilStd1553Symbol::STATUS_BUSY)
-						stmp += "Busy ";
-					if(s.m_data & MilStd1553Symbol::STATUS_SUBSYS_FAULT)
-						stmp += "SubsystemFault ";
-					if(s.m_data & MilStd1553Symbol::STATUS_DYN_ACCEPT)
-						stmp += "DynAccept ";
-					if(s.m_data & MilStd1553Symbol::STATUS_RT_FAULT)
-						stmp += "RtFault ";
+				if(s.m_data & MilStd1553Symbol::STATUS_SERVICE_REQUEST)
+					stmp += "ServiceReq ";
+				if(s.m_data & MilStd1553Symbol::STATUS_MALFORMED)
+					stmp += "(MALFORMED) ";
+				if(s.m_data & MilStd1553Symbol::STATUS_BROADCAST_ACK)
+					stmp += "BroadcastAck ";
+				if(s.m_data & MilStd1553Symbol::STATUS_BUSY)
+					stmp += "Busy ";
+				if(s.m_data & MilStd1553Symbol::STATUS_SUBSYS_FAULT)
+					stmp += "SubsystemFault ";
+				if(s.m_data & MilStd1553Symbol::STATUS_DYN_ACCEPT)
+					stmp += "DynAccept ";
+				if(s.m_data & MilStd1553Symbol::STATUS_RT_FAULT)
+					stmp += "RtFault ";
 
-					if(stmp.empty())
-						return "NoStatus";
+				if(stmp.empty())
+					return "NoStatus";
 
-					return stmp;
-				}
+				return stmp;
+			}
 
-			case MilStd1553Symbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
-				return tmp;
+		case MilStd1553Symbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
+			return tmp;
 
-			case MilStd1553Symbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case MilStd1553Symbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }

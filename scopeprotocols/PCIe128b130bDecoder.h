@@ -68,7 +68,13 @@ public:
 	}
 };
 
-typedef Waveform<PCIe128b130bSymbol> PCIe128b130bWaveform;
+class PCIe128b130bWaveform : public Waveform<PCIe128b130bSymbol>
+{
+public:
+	PCIe128b130bWaveform () : Waveform<PCIe128b130bSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class PCIe128b130bDecoder : public Filter
 {

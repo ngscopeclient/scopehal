@@ -63,7 +63,13 @@ public:
 	}
 };
 
-typedef Waveform<DPhySymbol> DPhySymbolWaveform;
+class DPhySymbolWaveform : public Waveform<DPhySymbol>
+{
+public:
+	DPhySymbolWaveform () : Waveform<DPhySymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decoder for MIPI D-PHY symbols.

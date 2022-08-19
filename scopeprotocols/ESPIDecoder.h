@@ -184,7 +184,13 @@ public:
 	}
 };
 
-typedef Waveform<ESPISymbol> ESPIWaveform;
+class ESPIWaveform : public Waveform<ESPISymbol>
+{
+public:
+	ESPIWaveform () : Waveform<ESPISymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decoder for Intel Enhanced Serial Peripheral Interface (eSPI)

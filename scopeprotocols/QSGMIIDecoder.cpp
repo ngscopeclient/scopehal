@@ -52,6 +52,13 @@ QSGMIIDecoder::QSGMIIDecoder(const string& color)
 	AddProtocolStream("Lane 1");
 	AddProtocolStream("Lane 2");
 	AddProtocolStream("Lane 3");
+
+
+	m_displayformat = "Display Format";
+	m_parameters[m_displayformat] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_displayformat].AddEnumValue("Dotted (K28.5 D21.5)", IBM8b10bDecoder::FORMAT_DOTTED);
+	m_parameters[m_displayformat].AddEnumValue("Hex (K.bc b5)", IBM8b10bDecoder::FORMAT_HEX);
+	m_parameters[m_displayformat].SetIntVal(IBM8b10bDecoder::FORMAT_DOTTED);
 }
 
 QSGMIIDecoder::~QSGMIIDecoder()
@@ -98,7 +105,7 @@ void QSGMIIDecoder::Refresh()
 	vector<IBM8b10bWaveform*> caps;
 	for(size_t i=0; i<4; i++)
 	{
-		auto cap = new IBM8b10bWaveform;
+		auto cap = new IBM8b10bWaveform(m_parameters[m_displayformat]);
 
 		cap->m_timescale = 1;
 		cap->m_startTimestamp = din->m_startTimestamp;
@@ -152,68 +159,3 @@ void QSGMIIDecoder::Refresh()
 			caps[nlane]->m_durations.push_back(din->m_offsets[i+4] - din->m_offsets[i]);
 	}
 }
-
-Gdk::Color QSGMIIDecoder::GetColor(size_t i, size_t stream)
-{
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
-	if(capture != NULL)
-	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
-
-		if(s.m_error)
-			return StandardColors::colors[StandardColors::COLOR_ERROR];
-		else if(s.m_control)
-			return StandardColors::colors[StandardColors::COLOR_CONTROL];
-		else
-			return StandardColors::colors[StandardColors::COLOR_DATA];
-	}
-
-	//error
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
-}
-
-//TODO: this is pulled directly from the 8B10B decode, can we figure out how to refactor so this is cleaner?
-string QSGMIIDecoder::GetText(size_t i, size_t stream)
-{
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(stream));
-	if(capture != NULL)
-	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
-
-		unsigned int right = s.m_data >> 5;
-		unsigned int left = s.m_data & 0x1F;
-
-		char tmp[32];
-		if(s.m_error)
-			return "ERROR";
-		else
-		{
-			//Dotted format
-			//if(m_cachedDisplayFormat == FORMAT_DOTTED)
-			if(true)
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
-				else
-					snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
-
-				if(s.m_disparity < 0)
-					return string(tmp) + "-";
-				else
-					return string(tmp) + "+";
-			}
-
-			//Hex format
-			else
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
-				else
-					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
-			}
-		}
-	}
-	return "";
-}
-

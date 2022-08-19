@@ -811,15 +811,9 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	m_packets.push_back(pack);
 }
 
-Gdk::Color USB2PacketDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color USB2PacketWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<USB2PacketWaveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:
@@ -856,17 +850,11 @@ Gdk::Color USB2PacketDecoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string USB2PacketDecoder::GetText(size_t i, size_t /*stream*/)
+string USB2PacketWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<USB2PacketWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[32];
 
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:

@@ -70,7 +70,13 @@ public:
 	}
 };
 
-typedef Waveform<USB2PCSSymbol> USB2PCSWaveform;
+class USB2PCSWaveform : public Waveform<USB2PCSSymbol>
+{
+public:
+	USB2PCSWaveform () : Waveform<USB2PCSSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class USB2PCSDecoder : public Filter
 {

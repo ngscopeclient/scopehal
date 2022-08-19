@@ -60,7 +60,13 @@ public:
 	}
 };
 
-typedef Waveform<SWDMemAPSymbol> SWDMemAPWaveform;
+class SWDMemAPWaveform : public Waveform<SWDMemAPSymbol>
+{
+public:
+	SWDMemAPWaveform () : Waveform<SWDMemAPSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SWDMemAPDecoder : public PacketDecoder
 {

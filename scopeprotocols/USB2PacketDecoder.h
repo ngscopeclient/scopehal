@@ -95,7 +95,13 @@ public:
 	}
 };
 
-typedef Waveform<USB2PacketSymbol> USB2PacketWaveform;
+class USB2PacketWaveform : public Waveform<USB2PacketSymbol>
+{
+public:
+	USB2PacketWaveform () : Waveform<USB2PacketSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class USB2PacketDecoder : public PacketDecoder
 {

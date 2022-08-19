@@ -434,140 +434,130 @@ void SWDDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SWDDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color SWDWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<SWDWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SWDSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const SWDSymbol& s = capture->m_samples[i];
+		case SWDSymbol::TYPE_START:
+		case SWDSymbol::TYPE_STOP:
+		case SWDSymbol::TYPE_PARK:
+		case SWDSymbol::TYPE_TURNAROUND:
+		case SWDSymbol::TYPE_LINERESET:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_stype)
-		{
-			case SWDSymbol::TYPE_START:
-			case SWDSymbol::TYPE_STOP:
-			case SWDSymbol::TYPE_PARK:
-			case SWDSymbol::TYPE_TURNAROUND:
-			case SWDSymbol::TYPE_LINERESET:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case SWDSymbol::TYPE_SWDTOJTAG:
+		case SWDSymbol::TYPE_JTAGTOSWD:
+		case SWDSymbol::TYPE_SWDTODORMANT:
+		case SWDSymbol::TYPE_LEAVEDORMANT:
+		case SWDSymbol::TYPE_AP_NDP:
+		case SWDSymbol::TYPE_R_NW:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case SWDSymbol::TYPE_SWDTOJTAG:
-			case SWDSymbol::TYPE_JTAGTOSWD:
-			case SWDSymbol::TYPE_SWDTODORMANT:
-			case SWDSymbol::TYPE_LEAVEDORMANT:
-			case SWDSymbol::TYPE_AP_NDP:
-			case SWDSymbol::TYPE_R_NW:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case SWDSymbol::TYPE_ACK:
+			switch(s.m_data)
+			{
+				case 1:
+				case 2:
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case SWDSymbol::TYPE_ACK:
-				switch(s.m_data)
-				{
-					case 1:
-					case 2:
-						return StandardColors::colors[StandardColors::COLOR_CONTROL];
+				case 4:
+				default:
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
+			}
 
-					case 4:
-					default:
-						return StandardColors::colors[StandardColors::COLOR_ERROR];
-				}
+		case SWDSymbol::TYPE_ADDRESS:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case SWDSymbol::TYPE_ADDRESS:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case SWDSymbol::TYPE_PARITY_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+		case SWDSymbol::TYPE_PARITY_BAD:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
-			case SWDSymbol::TYPE_PARITY_OK:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
-			case SWDSymbol::TYPE_PARITY_BAD:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
+		case SWDSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case SWDSymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case SWDSymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case SWDSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string SWDDecoder::GetText(size_t i, size_t /*stream*/)
+string SWDWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<SWDWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SWDSymbol& s = m_samples[i];
+	char tmp[32];
+
+	switch(s.m_stype)
 	{
-		const SWDSymbol& s = capture->m_samples[i];
-		char tmp[32];
+		case SWDSymbol::TYPE_START:
+			return "START";
+		case SWDSymbol::TYPE_LINERESET:
+			return "LINE RESET";
 
-		switch(s.m_stype)
-		{
-			case SWDSymbol::TYPE_START:
-				return "START";
-			case SWDSymbol::TYPE_LINERESET:
-				return "LINE RESET";
+		case SWDSymbol::TYPE_AP_NDP:
+			if(s.m_data)
+				return "AP";
+			else
+				return "DP";
 
-			case SWDSymbol::TYPE_AP_NDP:
-				if(s.m_data)
-					return "AP";
-				else
-					return "DP";
+		case SWDSymbol::TYPE_R_NW:
+			if(s.m_data)
+				return "R";
+			else
+				return "W";
 
-			case SWDSymbol::TYPE_R_NW:
-				if(s.m_data)
-					return "R";
-				else
-					return "W";
+		case SWDSymbol::TYPE_ADDRESS:
+			snprintf(tmp, sizeof(tmp), "Reg %02x", s.m_data);
+			return string(tmp);
 
-			case SWDSymbol::TYPE_ADDRESS:
-				snprintf(tmp, sizeof(tmp), "Reg %02x", s.m_data);
-				return string(tmp);
+		case SWDSymbol::TYPE_PARITY_OK:
+			return "OK";
 
-			case SWDSymbol::TYPE_PARITY_OK:
-				return "OK";
+		case SWDSymbol::TYPE_PARITY_BAD:
+			return "BAD";
 
-			case SWDSymbol::TYPE_PARITY_BAD:
-				return "BAD";
+		case SWDSymbol::TYPE_STOP:
+			return "STOP";
+		case SWDSymbol::TYPE_PARK:
+			return "PARK";
 
-			case SWDSymbol::TYPE_STOP:
-				return "STOP";
-			case SWDSymbol::TYPE_PARK:
-				return "PARK";
+		case SWDSymbol::TYPE_TURNAROUND:
+			return "TURN";
 
-			case SWDSymbol::TYPE_TURNAROUND:
-				return "TURN";
+		case SWDSymbol::TYPE_ACK:
+			switch(s.m_data)
+			{
+				case 1:
+					return "ACK";
+				case 2:
+					return "WAIT";
+				case 4:
+					return "FAULT";
+				default:
+					return "ERROR";
+			}
+			break;
 
-			case SWDSymbol::TYPE_ACK:
-				switch(s.m_data)
-				{
-					case 1:
-						return "ACK";
-					case 2:
-						return "WAIT";
-					case 4:
-						return "FAULT";
-					default:
-						return "ERROR";
-				}
-				break;
+		case SWDSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%08x", s.m_data);
+			return string(tmp);
 
-			case SWDSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%08x", s.m_data);
-				return string(tmp);
+		case SWDSymbol::TYPE_SWDTOJTAG:
+			return "SWD TO JTAG";
 
-			case SWDSymbol::TYPE_SWDTOJTAG:
-				return "SWD TO JTAG";
+		case SWDSymbol::TYPE_JTAGTOSWD:
+			return "JTAG TO SWD";
 
-			case SWDSymbol::TYPE_JTAGTOSWD:
-				return "JTAG TO SWD";
+		case SWDSymbol::TYPE_SWDTODORMANT:
+			return "SWD TO DORMANT";
 
-			case SWDSymbol::TYPE_SWDTODORMANT:
-				return "SWD TO DORMANT";
+		case SWDSymbol::TYPE_LEAVEDORMANT:
+			return "LEAVE DORMANT";
 
-			case SWDSymbol::TYPE_LEAVEDORMANT:
-				return "LEAVE DORMANT";
-
-			case SWDSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case SWDSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }

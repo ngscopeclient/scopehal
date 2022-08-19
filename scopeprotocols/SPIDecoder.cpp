@@ -248,49 +248,39 @@ void SPIDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SPIDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color SPIWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SPISymbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const SPISymbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case SPISymbol::TYPE_SELECT:
-			case SPISymbol::TYPE_DESELECT:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case SPISymbol::TYPE_SELECT:
+		case SPISymbol::TYPE_DESELECT:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case SPISymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
+		case SPISymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case SPISymbol::TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case SPISymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string SPIDecoder::GetText(size_t i, size_t /*stream*/)
+string SPIWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<SPIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SPISymbol& s = m_samples[i];
+	char tmp[32];
+	switch(s.m_stype)
 	{
-		const SPISymbol& s = capture->m_samples[i];
-		char tmp[32];
-		switch(s.m_stype)
-		{
-			case SPISymbol::TYPE_SELECT:
-				return "SELECT";
-			case SPISymbol::TYPE_DESELECT:
-				return "DESELECT";
-			case SPISymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
-			case SPISymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case SPISymbol::TYPE_SELECT:
+			return "SELECT";
+		case SPISymbol::TYPE_DESELECT:
+			return "DESELECT";
+		case SPISymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return string(tmp);
+		case SPISymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }

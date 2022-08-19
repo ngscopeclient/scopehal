@@ -529,133 +529,121 @@ void CANDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color CANDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color CANWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
-	if(capture != NULL)
+	const CANSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const CANSymbol& s = capture->m_samples[i];
+		case CANSymbol::TYPE_SOF:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_stype)
-		{
-			case CANSymbol::TYPE_SOF:
+		case CANSymbol::TYPE_R0:
+			if(!s.m_data)
 				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 
-			case CANSymbol::TYPE_R0:
-				if(!s.m_data)
-					return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
-				else
-					return StandardColors::colors[StandardColors::COLOR_ERROR];
+		case CANSymbol::TYPE_ID:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case CANSymbol::TYPE_ID:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case CANSymbol::TYPE_RTR:
+		case CANSymbol::TYPE_FD:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case CANSymbol::TYPE_RTR:
-			case CANSymbol::TYPE_FD:
+		case CANSymbol::TYPE_DLC:
+			if(s.m_data > 8)
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+			else
 				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case CANSymbol::TYPE_DLC:
-				if(s.m_data > 8)
-					return StandardColors::colors[StandardColors::COLOR_ERROR];
-				else
-					return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case CANSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case CANSymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
+		case CANSymbol::TYPE_CRC_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case CANSymbol::TYPE_CRC_OK:
-				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
-
-			case CANSymbol::TYPE_CRC_DELIM:
-			case CANSymbol::TYPE_ACK_DELIM:
-			case CANSymbol::TYPE_EOF:
-				if(s.m_data)
-					return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
-				else
-					return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-			case CANSymbol::TYPE_ACK:
-				if(!s.m_data)
-					return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
-				else
-					return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
-
-			case CANSymbol::TYPE_CRC_BAD:
-			default:
+		case CANSymbol::TYPE_CRC_DELIM:
+		case CANSymbol::TYPE_ACK_DELIM:
+		case CANSymbol::TYPE_EOF:
+			if(s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+			else
 				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
-	}
 
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
+		case CANSymbol::TYPE_ACK:
+			if(!s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+			else
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
+
+		case CANSymbol::TYPE_CRC_BAD:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
+	}
 }
 
-string CANDecoder::GetText(size_t i, size_t /*stream*/)
+string CANWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<CANWaveform*>(GetData(0));
-	if(capture != NULL)
+	const CANSymbol& s = m_samples[i];
+
+	char tmp[32];
+	switch(s.m_stype)
 	{
-		const CANSymbol& s = capture->m_samples[i];
+		case CANSymbol::TYPE_SOF:
+			return "SOF";
 
-		char tmp[32];
-		switch(s.m_stype)
-		{
-			case CANSymbol::TYPE_SOF:
-				return "SOF";
+		case CANSymbol::TYPE_ID:
+			snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
+			break;
 
-			case CANSymbol::TYPE_ID:
-				snprintf(tmp, sizeof(tmp), "ID %03x", s.m_data);
-				break;
+		case CANSymbol::TYPE_FD:
+			if(s.m_data)
+				return "FD";
+			else
+				return "STD";
 
-			case CANSymbol::TYPE_FD:
-				if(s.m_data)
-					return "FD";
-				else
-					return "STD";
+		case CANSymbol::TYPE_RTR:
+			if(s.m_data)
+				return "REQ";
+			else
+				return "DATA";
 
-			case CANSymbol::TYPE_RTR:
-				if(s.m_data)
-					return "REQ";
-				else
-					return "DATA";
+		case CANSymbol::TYPE_R0:
+			return "RSVD";
 
-			case CANSymbol::TYPE_R0:
-				return "RSVD";
+		case CANSymbol::TYPE_DLC:
+			snprintf(tmp, sizeof(tmp), "Len %u", s.m_data);
+			break;
 
-			case CANSymbol::TYPE_DLC:
-				snprintf(tmp, sizeof(tmp), "Len %u", s.m_data);
-				break;
+		case CANSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
 
-			case CANSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
+		case CANSymbol::TYPE_CRC_OK:
+		case CANSymbol::TYPE_CRC_BAD:
+			snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
+			break;
 
-			case CANSymbol::TYPE_CRC_OK:
-			case CANSymbol::TYPE_CRC_BAD:
-				snprintf(tmp, sizeof(tmp), "CRC: %04x", s.m_data);
-				break;
+		case CANSymbol::TYPE_CRC_DELIM:
+			return "CRC DELIM";
 
-			case CANSymbol::TYPE_CRC_DELIM:
-				return "CRC DELIM";
+		case CANSymbol::TYPE_ACK:
+			if(!s.m_data)
+				return "ACK";
+			else
+				return "NAK";
 
-			case CANSymbol::TYPE_ACK:
-				if(!s.m_data)
-					return "ACK";
-				else
-					return "NAK";
+		case CANSymbol::TYPE_ACK_DELIM:
+			return "ACK DELIM";
 
-			case CANSymbol::TYPE_ACK_DELIM:
-				return "ACK DELIM";
+		case CANSymbol::TYPE_EOF:
+			return "EOF";
 
-			case CANSymbol::TYPE_EOF:
-				return "EOF";
-
-			default:
-				return "ERROR";
-		}
-		return string(tmp);
+		default:
+			return "ERROR";
 	}
-
-	return "ERROR";
+	return string(tmp);
 }
 
 vector<string> CANDecoder::GetHeaders()

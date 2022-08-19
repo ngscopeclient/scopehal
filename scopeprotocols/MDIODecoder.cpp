@@ -619,87 +619,75 @@ vector<string> MDIODecoder::GetHeaders()
 	return ret;
 }
 
-Gdk::Color MDIODecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color MDIOWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
-	if(capture != NULL)
+	const MDIOSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const MDIOSymbol& s = capture->m_samples[i];
+		case MDIOSymbol::TYPE_PREAMBLE:
+		case MDIOSymbol::TYPE_START:
+		case MDIOSymbol::TYPE_TURN:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-		switch(s.m_stype)
-		{
-			case MDIOSymbol::TYPE_PREAMBLE:
-			case MDIOSymbol::TYPE_START:
-			case MDIOSymbol::TYPE_TURN:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
-
-			case MDIOSymbol::TYPE_OP:
-				if( (s.m_data == 1) || (s.m_data == 2) )
-					return StandardColors::colors[StandardColors::COLOR_CONTROL];
-				else
-					return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-			case MDIOSymbol::TYPE_PHYADDR:
-			case MDIOSymbol::TYPE_REGADDR:
-				return StandardColors::colors[StandardColors::COLOR_ADDRESS];
-
-			case MDIOSymbol::TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case MDIOSymbol::TYPE_ERROR:
+		case MDIOSymbol::TYPE_OP:
+			if( (s.m_data == 1) || (s.m_data == 2) )
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+			else
 				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
-	}
 
-	//error
-	return Gdk::Color("red");
+		case MDIOSymbol::TYPE_PHYADDR:
+		case MDIOSymbol::TYPE_REGADDR:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+
+		case MDIOSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
+
+		case MDIOSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
+	}
 }
 
-string MDIODecoder::GetText(size_t i, size_t /*stream*/)
+string MDIOWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<MDIOWaveform*>(GetData(0));
-	if(capture != NULL)
+	const MDIOSymbol& s = m_samples[i];
+
+	char tmp[32];
+	switch(s.m_stype)
 	{
-		const MDIOSymbol& s = capture->m_samples[i];
+		case MDIOSymbol::TYPE_PREAMBLE:
+			return "PREAMBLE";
+		case MDIOSymbol::TYPE_START:
+			return "SOF";
+		case MDIOSymbol::TYPE_TURN:
+			return "TURN";
 
-		char tmp[32];
-		switch(s.m_stype)
-		{
-			case MDIOSymbol::TYPE_PREAMBLE:
-				return "PREAMBLE";
-			case MDIOSymbol::TYPE_START:
-				return "SOF";
-			case MDIOSymbol::TYPE_TURN:
-				return "TURN";
+		case MDIOSymbol::TYPE_OP:
+			if(s.m_data == 1)
+				return "WR";
+			else if(s.m_data == 2)
+				return "RD";
+			else
+				return "BAD OP";
 
-			case MDIOSymbol::TYPE_OP:
-				if(s.m_data == 1)
-					return "WR";
-				else if(s.m_data == 2)
-					return "RD";
-				else
-					return "BAD OP";
+		case MDIOSymbol::TYPE_PHYADDR:
+			snprintf(tmp, sizeof(tmp), "PHY %02x", s.m_data);
+			break;
 
-			case MDIOSymbol::TYPE_PHYADDR:
-				snprintf(tmp, sizeof(tmp), "PHY %02x", s.m_data);
-				break;
+		case MDIOSymbol::TYPE_REGADDR:
+			snprintf(tmp, sizeof(tmp), "REG %02x", s.m_data);
+			break;
 
-			case MDIOSymbol::TYPE_REGADDR:
-				snprintf(tmp, sizeof(tmp), "REG %02x", s.m_data);
-				break;
+		case MDIOSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
+			break;
 
-			case MDIOSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%04x", s.m_data);
-				break;
-
-			case MDIOSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
-		return string(tmp);
+		case MDIOSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-
-	return "";
+	return string(tmp);
 }
 
 bool MDIODecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)

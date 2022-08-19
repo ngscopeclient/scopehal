@@ -102,7 +102,13 @@ public:
 	}
 };
 
-typedef Waveform<PCIeDataLinkSymbol> PCIeDataLinkWaveform;
+class PCIeDataLinkWaveform : public Waveform<PCIeDataLinkSymbol>
+{
+public:
+	PCIeDataLinkWaveform () : Waveform<PCIeDataLinkSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decoder for PCIe data link layer

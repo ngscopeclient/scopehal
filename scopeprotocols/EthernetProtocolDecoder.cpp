@@ -498,15 +498,9 @@ void EthernetProtocolDecoder::BytesToFrames(
 	delete pack;
 }
 
-Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color EthernetWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	switch(data->m_samples[i].m_type)
+	switch(m_samples[i].m_type)
 	{
 		//Preamble/SFD: gray (not interesting)
 		case EthernetFrameSegment::TYPE_INBAND_STATUS:
@@ -542,17 +536,11 @@ Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string EthernetProtocolDecoder::GetText(size_t i, size_t /*stream*/)
+string EthernetWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[128];
 
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case EthernetFrameSegment::TYPE_PREAMBLE:
@@ -621,9 +609,9 @@ string EthernetProtocolDecoder::GetText(size_t i, size_t /*stream*/)
 				if(ethertype < 1500)
 				{
 					//Look at the next segment to get the payload
-					if((size_t)i+1 < data->m_samples.size())
+					if((size_t)i+1 < m_samples.size())
 					{
-						auto& next = data->m_samples[i+1];
+						auto& next = m_samples[i+1];
 						if(next.m_data[0] == 0x42)
 							type += "STP";
 						else

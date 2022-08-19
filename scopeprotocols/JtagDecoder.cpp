@@ -327,61 +327,48 @@ void JtagDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color JtagDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color JtagWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
-	if(capture != NULL)
+	const JtagSymbol& s = m_samples[i];
+
+	switch(s.m_state)
 	{
-		const JtagSymbol& s = capture->m_samples[i];
+		//Unknown states
+		case JtagSymbol::UNKNOWN_0:
+		case JtagSymbol::UNKNOWN_1:
+		case JtagSymbol::UNKNOWN_2:
+		case JtagSymbol::UNKNOWN_3:
+		case JtagSymbol::UNKNOWN_4:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 
-		switch(s.m_state)
-		{
-			//Unknown states
-			case JtagSymbol::UNKNOWN_0:
-			case JtagSymbol::UNKNOWN_1:
-			case JtagSymbol::UNKNOWN_2:
-			case JtagSymbol::UNKNOWN_3:
-			case JtagSymbol::UNKNOWN_4:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
+		//Data characters
+		case JtagSymbol::SHIFT_IR:
+		case JtagSymbol::SHIFT_DR:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			//Data characters
-			case JtagSymbol::SHIFT_IR:
-			case JtagSymbol::SHIFT_DR:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			//intermediate states
-			default:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
-		}
+		//intermediate states
+		default:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 	}
-
-	//error
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string JtagDecoder::GetText(size_t i, size_t /*stream*/)
+string JtagWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<JtagWaveform*>(GetData(0));
-	if(capture != NULL)
+	const JtagSymbol& s = m_samples[i];
+
+	char tmp[128];
+	const char* sstate = JtagSymbol::GetName(s.m_state);
+	if(s.m_len == 0)
+		return sstate;
+	else if(s.m_len == 8)
 	{
-		const JtagSymbol& s = capture->m_samples[i];
-
-		char tmp[128];
-		const char* sstate = JtagSymbol::GetName(s.m_state);
-		if(s.m_len == 0)
-			return sstate;
-		else if(s.m_len == 8)
-		{
-			snprintf(tmp, sizeof(tmp), "%02x / %02x", s.m_idata, s.m_odata);
-			return tmp;
-		}
-		else
-		{
-			snprintf(tmp, sizeof(tmp), "%d'h%02x / %d'h%02x", s.m_len, s.m_idata, s.m_len, s.m_odata);
-			return tmp;
-		}
-
+		snprintf(tmp, sizeof(tmp), "%02x / %02x", s.m_idata, s.m_odata);
+		return tmp;
 	}
-	return "";
+	else
+	{
+		snprintf(tmp, sizeof(tmp), "%d'h%02x / %d'h%02x", s.m_len, s.m_idata, s.m_len, s.m_odata);
+		return tmp;
+	}
 }
 

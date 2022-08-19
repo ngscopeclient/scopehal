@@ -68,7 +68,16 @@ public:
 	}
 };
 
-typedef Waveform<I2CEepromSymbol> I2CEepromWaveform;
+class I2CEepromWaveform : public Waveform<I2CEepromSymbol>
+{
+public:
+	I2CEepromWaveform (FilterParameter& raw_bits) : Waveform<I2CEepromSymbol>(), m_raw_bits(raw_bits) {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+
+private:
+	FilterParameter& m_raw_bits;
+};
 
 class I2CEepromDecoder : public PacketDecoder
 {

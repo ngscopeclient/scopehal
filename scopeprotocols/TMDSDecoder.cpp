@@ -247,61 +247,49 @@ void TMDSDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color TMDSDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color TMDSWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
-	if(capture != NULL)
+	const TMDSSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const TMDSSymbol& s = capture->m_samples[i];
+		case TMDSSymbol::TMDS_TYPE_CONTROL:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-		switch(s.m_type)
-		{
-			case TMDSSymbol::TMDS_TYPE_CONTROL:
-				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+		case TMDSSymbol::TMDS_TYPE_GUARD:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-			case TMDSSymbol::TMDS_TYPE_GUARD:
-				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+		case TMDSSymbol::TMDS_TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case TMDSSymbol::TMDS_TYPE_DATA:
-				return StandardColors::colors[StandardColors::COLOR_DATA];
-
-			case TMDSSymbol::TMDS_TYPE_ERROR:
-			default:
-				return StandardColors::colors[StandardColors::COLOR_ERROR];
-		}
+		case TMDSSymbol::TMDS_TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	//error
-	return StandardColors::colors[StandardColors::COLOR_ERROR];
 }
 
-string TMDSDecoder::GetText(size_t i, size_t /*stream*/)
+string TMDSWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<TMDSWaveform*>(GetData(0));
-	if(capture != NULL)
+	const TMDSSymbol& s = m_samples[i];
+
+	char tmp[32];
+	switch(s.m_type)
 	{
-		const TMDSSymbol& s = capture->m_samples[i];
+		case TMDSSymbol::TMDS_TYPE_CONTROL:
+			snprintf(tmp, sizeof(tmp), "CTL%d", s.m_data);
+			break;
 
-		char tmp[32];
-		switch(s.m_type)
-		{
-			case TMDSSymbol::TMDS_TYPE_CONTROL:
-				snprintf(tmp, sizeof(tmp), "CTL%d", s.m_data);
-				break;
+		case TMDSSymbol::TMDS_TYPE_GUARD:
+			return "GB";
 
-			case TMDSSymbol::TMDS_TYPE_GUARD:
-				return "GB";
+		case TMDSSymbol::TMDS_TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
 
-			case TMDSSymbol::TMDS_TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
+		case TMDSSymbol::TMDS_TYPE_ERROR:
+		default:
+			return "ERROR";
 
-			case TMDSSymbol::TMDS_TYPE_ERROR:
-			default:
-				return "ERROR";
-
-		}
-		return string(tmp);
 	}
-	return "";
+	return string(tmp);
 }

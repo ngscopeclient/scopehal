@@ -111,7 +111,13 @@ public:
 	}
 };
 
-typedef Waveform<SPIFlashSymbol> SPIFlashWaveform;
+class SPIFlashWaveform : public Waveform<SPIFlashSymbol>
+{
+public:
+	SPIFlashWaveform () : Waveform<SPIFlashSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SPIFlashDecoder : public PacketDecoder
 {
@@ -146,9 +152,10 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(SPIFlashDecoder)
 
-protected:
-	std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
 
+	static std::string GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i);
+
+protected:
 	std::string m_typename;
 	std::string m_outfile;
 

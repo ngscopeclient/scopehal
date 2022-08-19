@@ -78,7 +78,13 @@ public:
 	virtual ~VideoScanlinePacket();
 };
 
-typedef Waveform<DVISymbol> DVIWaveform;
+class DVIWaveform : public Waveform<DVISymbol>
+{
+public:
+	DVIWaveform () : Waveform<DVISymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class DVIDecoder : public PacketDecoder
 {

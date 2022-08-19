@@ -392,15 +392,9 @@ void TCPDecoder::Refresh()
 	//TODO: packet decode too
 }
 
-Gdk::Color TCPDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color TCPWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<TCPWaveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	switch(data->m_samples[i].m_type)
+	switch(m_samples[i].m_type)
 	{
 		case TCPSymbol::TYPE_SEQ:
 		case TCPSymbol::TYPE_ACK:
@@ -428,16 +422,10 @@ Gdk::Color TCPDecoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string TCPDecoder::GetText(size_t i, size_t /*stream*/)
+string TCPWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<TCPWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[128];
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 
 	switch(sample.m_type)
 	{

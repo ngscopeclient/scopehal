@@ -502,17 +502,9 @@ void USB2PCSDecoder::RefreshIterationData(
 	}
 }
 
-Gdk::Color USB2PCSDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color USB2PCSWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<USB2PCSWaveform*>(GetData(0));
-	if(data == NULL)
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return StandardColors::colors[StandardColors::COLOR_ERROR];
-
-	//TODO: have a set of standard colors we use everywhere?
-
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PCSSymbol::TYPE_SYNC:
@@ -531,15 +523,9 @@ Gdk::Color USB2PCSDecoder::GetColor(size_t i, size_t /*stream*/)
 	}
 }
 
-string USB2PCSDecoder::GetText(size_t i, size_t /*stream*/)
+string USB2PCSWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<USB2PCSWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PCSSymbol::TYPE_SYNC:

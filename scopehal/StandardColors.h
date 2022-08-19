@@ -30,7 +30,9 @@
 #ifndef StandardColors_h
 #define StandardColors_h
 
-#include "../scopehal/scopehal.h"
+#include <gtkmm.h>
+
+// TODO: This doesn't seem like it belongs in scopehal
 
 namespace StandardColors
 {

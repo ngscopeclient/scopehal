@@ -71,7 +71,13 @@ public:
 	}
 };
 
-typedef Waveform<SDRAMSymbol> SDRAMWaveform;
+class SDRAMWaveform : public Waveform<SDRAMSymbol>
+{
+public:
+	SDRAMWaveform () : Waveform<SDRAMSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SDRAMDecoderBase : public Filter
 {

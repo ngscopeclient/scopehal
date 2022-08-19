@@ -71,7 +71,13 @@ public:
 	}
 };
 
-typedef Waveform<DSIFrameSymbol> DSIFrameWaveform;
+class DSIFrameWaveform : public Waveform<DSIFrameSymbol>
+{
+public:
+	DSIFrameWaveform () : Waveform<DSIFrameSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class DSIFrameDecoder : public PacketDecoder
 {
