@@ -73,9 +73,6 @@ class HyperRAMDecoder : public Filter
 public:
 	HyperRAMDecoder(const std::string& color);
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	void Refresh() override;
 
 	static std::string GetProtocolName();

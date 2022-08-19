@@ -76,9 +76,6 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	enum Speed
 	{
 		SPEED_LOW,

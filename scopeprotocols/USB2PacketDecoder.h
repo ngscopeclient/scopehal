@@ -104,9 +104,6 @@ public:
 
 	virtual void Refresh();
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	static std::string GetProtocolName();
 
 	virtual std::vector<std::string> GetHeaders();

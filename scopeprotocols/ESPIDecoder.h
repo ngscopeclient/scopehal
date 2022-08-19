@@ -196,9 +196,6 @@ class ESPIDecoder : public PacketDecoder
 public:
 	ESPIDecoder(const std::string& color);
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	virtual void Refresh();
 
 	std::vector<std::string> GetHeaders();

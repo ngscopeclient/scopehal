@@ -94,9 +94,6 @@ public:
 
 	static std::string GetProtocolName();
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	virtual bool GetShowDataColumn();
 
 	std::vector<std::string> GetHeaders();

@@ -85,9 +85,6 @@ public:
 	EthernetProtocolDecoder(const std::string& color);
 	virtual ~EthernetProtocolDecoder();
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	virtual std::vector<std::string> GetHeaders();

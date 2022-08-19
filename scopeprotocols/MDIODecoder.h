@@ -77,9 +77,6 @@ class MDIODecoder : public PacketDecoder
 public:
 	MDIODecoder(const std::string& color);
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
-
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
