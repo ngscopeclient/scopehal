@@ -38,10 +38,10 @@
 
 #include "../scopehal/PacketDecoder.h"
 
-class UARTWaveform : public Waveform<char>
+class ASCIIWaveform : public Waveform<char>
 {
 public:
-	UARTWaveform (const std::string& color) : Waveform<char>(), m_color(color) {};
+	ASCIIWaveform (const std::string& color) : Waveform<char>(), m_color(color) {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 
