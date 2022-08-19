@@ -104,7 +104,7 @@ void UARTDecoder::Refresh()
 	int64_t scaledbitper = ibitper / din->m_timescale;
 
 	//UART processing
-	auto cap = new ASCIIWaveform(m_displaycolor);
+	auto cap = new ByteWaveform(m_displaycolor);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -223,12 +223,12 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-Gdk::Color ASCIIWaveform::GetColor(size_t /*i*/)
+Gdk::Color ByteWaveform::GetColor(size_t /*i*/)
 {
 	return Gdk::Color(m_color);
 }
 
-string ASCIIWaveform::GetText(size_t i)
+string ByteWaveform::GetText(size_t i)
 {
 	char c = m_samples[i];
 	char sbuf[16] = {0};
