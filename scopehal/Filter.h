@@ -242,10 +242,6 @@ protected:
 	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
 public:
-	// //Text formatting for CHANNEL_TYPE_COMPLEX decodes
-	// virtual Gdk::Color GetColor(size_t i, size_t stream);
-	// virtual std::string GetText(size_t i, size_t stream);
-
 	//Helpers for sub-sample interoplation
 	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
 	static float InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, float voltage);
