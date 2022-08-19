@@ -39,6 +39,8 @@
 #include <vector>
 #include <AlignedAllocator.h>
 
+#include "StandardColors.h"
+
 /**
 	@brief Wrapper around a primitive data type that has an empty default constructor.
 
@@ -67,25 +69,6 @@ public:
 
 	T m_value;
 };
-
-namespace StandardColors
-{
-	enum FilterColor
-	{
-		COLOR_DATA,			//protocol data
-		COLOR_CONTROL,		//generic control sequences
-		COLOR_ADDRESS,		//addresses or device IDs
-		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
-		COLOR_CHECKSUM_OK,	//valid CRC/checksum
-		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
-		COLOR_ERROR,		//malformed traffic
-		COLOR_IDLE,			//downtime between frames
-
-		STANDARD_COLOR_COUNT
-	};
-
-	extern Gdk::Color colors[STANDARD_COLOR_COUNT];
-}
 
 /**
 	@brief Base class for all Waveform specializations

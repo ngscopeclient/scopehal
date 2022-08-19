@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,20 +27,28 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef StandardColors_h
+#define StandardColors_h
+
 #include "../scopehal/scopehal.h"
-#include "Waveform.h"
 
 namespace StandardColors
 {
-	Gdk::Color colors[StandardColors::STANDARD_COLOR_COUNT] =
+	enum FilterColor
 	{
-		Gdk::Color("#336699"),	//COLOR_DATA
-		Gdk::Color("#c000a0"),	//COLOR_CONTROL
-		Gdk::Color("#ffff00"),	//COLOR_ADDRESS
-		Gdk::Color("#808080"),	//COLOR_PREAMBLE
-		Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
-		Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
-		Gdk::Color("#ff0000"),	//COLOR_ERROR
-		Gdk::Color("#404040")	//COLOR_IDLE
+		COLOR_DATA,			//protocol data
+		COLOR_CONTROL,		//generic control sequences
+		COLOR_ADDRESS,		//addresses or device IDs
+		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
+		COLOR_CHECKSUM_OK,	//valid CRC/checksum
+		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
+		COLOR_ERROR,		//malformed traffic
+		COLOR_IDLE,			//downtime between frames
+
+		STANDARD_COLOR_COUNT
 	};
+
+	extern Gdk::Color colors[STANDARD_COLOR_COUNT];
 }
+
+#endif // StandardColors_h

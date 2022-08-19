@@ -127,7 +127,7 @@ set(SCOPEHAL_SOURCES
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
 
-	Waveform.cpp
+	StandardColors.cpp
 	Filter.cpp
 	FilterParameter.cpp
 	ImportFilter.cpp
