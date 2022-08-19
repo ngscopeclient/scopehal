@@ -78,6 +78,8 @@ class IBM8b10bDecoder : public Filter
 public:
 	IBM8b10bDecoder(const std::string& color);
 
+	static FilterParameter MakeIBM8b10bDisplayFormatParameter();
+
 	virtual void Refresh();
 
 	static std::string GetProtocolName();

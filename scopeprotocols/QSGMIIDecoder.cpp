@@ -55,10 +55,7 @@ QSGMIIDecoder::QSGMIIDecoder(const string& color)
 
 
 	m_displayformat = "Display Format";
-	m_parameters[m_displayformat] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_displayformat].AddEnumValue("Dotted (K28.5 D21.5)", IBM8b10bDecoder::FORMAT_DOTTED);
-	m_parameters[m_displayformat].AddEnumValue("Hex (K.bc b5)", IBM8b10bDecoder::FORMAT_HEX);
-	m_parameters[m_displayformat].SetIntVal(IBM8b10bDecoder::FORMAT_DOTTED);
+	m_parameters[m_displayformat] = IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter();
 }
 
 QSGMIIDecoder::~QSGMIIDecoder()

@@ -49,10 +49,17 @@ IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	CreateInput("clk");
 
 	m_displayformat = "Display Format";
-	m_parameters[m_displayformat] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_displayformat].AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
-	m_parameters[m_displayformat].AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
-	m_parameters[m_displayformat].SetIntVal(FORMAT_DOTTED);
+	m_parameters[m_displayformat] = MakeIBM8b10bDisplayFormatParameter();
+}
+
+FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
+{
+	auto f = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	f.AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
+	f.AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
+	f.SetIntVal(FORMAT_DOTTED);
+
+	return f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
