@@ -167,25 +167,12 @@ public:
 
 	virtual void Refresh() =0;
 
-	//Set all currently existing filters to the dirty state
-	static void SetAllFiltersDirty()
-	{
-		for(auto f : m_filters)
-			f->SetDirty();
-	}
-
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
 
 		Most decoders shouldn't have to do anything for this.
 	 */
 	virtual void ClearSweeps();
-
-	void RefreshIfDirty();
-	void RefreshInputsIfDirty();
-
-	void SetDirty()
-	{ m_dirty = true; }
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling
@@ -217,9 +204,6 @@ protected:
 
 	///Group used for the display menu
 	Category m_category;
-
-	///Indicates if our output is out-of-sync with our input
-	bool m_dirty;
 
 	///Indicates we're using an auto-generated name
 	bool m_usingDefault;

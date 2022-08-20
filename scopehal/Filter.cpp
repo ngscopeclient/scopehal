@@ -58,7 +58,6 @@ Filter::Filter(
 	const string& kernelName)
 	: OscilloscopeChannel(NULL, "", color, xunit, 0)	//TODO: handle this better?
 	, m_category(cat)
-	, m_dirty(true)
 	, m_usingDefault(true)
 {
 	m_instanceNum = 0;
@@ -151,31 +150,6 @@ void Filter::Release()
 bool Filter::IsScalarOutput()
 {
 	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Refreshing
-
-void Filter::RefreshInputsIfDirty()
-{
-	for(auto c : m_inputs)
-	{
-		if(!c.m_channel)
-			continue;
-		auto f = dynamic_cast<Filter*>(c.m_channel);
-		if(f)
-			f->RefreshIfDirty();
-	}
-}
-
-void Filter::RefreshIfDirty()
-{
-	if(m_dirty)
-	{
-		RefreshInputsIfDirty();
-		Refresh();
-		m_dirty = false;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

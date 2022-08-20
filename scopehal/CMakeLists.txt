@@ -141,6 +141,7 @@ set(SCOPEHAL_SOURCES
 	TestWaveformSource.cpp
 
 	ExportWizard.cpp
+	FilterGraphExecutor.cpp
 	)
 
 configure_file(config.h.in config.h)

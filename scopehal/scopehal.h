@@ -126,6 +126,7 @@
 #include "SParameterFilter.h"
 
 #include "ExportWizard.h"
+#include "FilterGraphExecutor.h"
 
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
