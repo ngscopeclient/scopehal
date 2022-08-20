@@ -39,6 +39,8 @@
 #include <vector>
 #include <AlignedAllocator.h>
 
+#include "StandardColors.h"
+
 /**
 	@brief Wrapper around a primitive data type that has an empty default constructor.
 
@@ -174,6 +176,16 @@ public:
 		m_durations.resize(size);
 	}
 
+	virtual std::string GetText(size_t /*i*/)
+	{
+		return "(unimplemented)";
+	}
+
+	virtual Gdk::Color GetColor(size_t /*i*/)
+	{
+		return StandardColors::colors[StandardColors::COLOR_ERROR]; 
+	}
+
 	/**
 		@brief Copies offsets/durations from one waveform to another.
 
@@ -217,6 +229,5 @@ typedef Waveform<EmptyConstructorWrapper<bool> >	DigitalWaveform;
 typedef Waveform<EmptyConstructorWrapper<float>>	AnalogWaveform;
 
 typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
-typedef Waveform<char>					AsciiWaveform;
 
 #endif

@@ -85,7 +85,7 @@ void ADL5205Decoder::Refresh()
 	size_t len = din->m_samples.size();
 
 	//Loop over the SPI events and process stuff
-	auto cap = new ADL5205Waveform;
+	auto cap = new ADL5205Waveform(m_displaycolor);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -154,23 +154,18 @@ void ADL5205Decoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color ADL5205Decoder::GetColor(size_t /*i*/, size_t /*stream*/)
+Gdk::Color ADL5205Waveform::GetColor(size_t /*i*/)
 {
-	return Gdk::Color(m_displaycolor);
+	return Gdk::Color(m_color);
 }
 
-string ADL5205Decoder::GetText(size_t i, size_t /*stream*/)
+string ADL5205Waveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<ADL5205Waveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const ADL5205Symbol& s = capture->m_samples[i];
+	const ADL5205Symbol& s = m_samples[i];
 
-		char tmp[128];
-		snprintf(tmp, sizeof(tmp), "%s: FA=%d dB, gain=%d dB",
-			s.m_write ? "write" : "read", s.m_fa, s.m_gain);
-		return string(tmp);
-	}
-	return "";
+	char tmp[128];
+	snprintf(tmp, sizeof(tmp), "%s: FA=%d dB, gain=%d dB",
+		s.m_write ? "write" : "read", s.m_fa, s.m_gain);
+	return string(tmp);
 }
 

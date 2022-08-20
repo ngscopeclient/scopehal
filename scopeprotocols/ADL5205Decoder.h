@@ -55,15 +55,21 @@ public:
 	}
 };
 
-typedef Waveform<ADL5205Symbol> ADL5205Waveform;
+class ADL5205Waveform : public Waveform<ADL5205Symbol>
+{
+public:
+	ADL5205Waveform (const std::string& color) : Waveform<ADL5205Symbol>(), m_color(color) {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+
+private:
+	const std::string& m_color;
+};
 
 class ADL5205Decoder : public Filter
 {
 public:
 	ADL5205Decoder(const std::string& color);
-
-	virtual std::string GetText(size_t i, size_t stream);
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
 
 	virtual void Refresh();
 

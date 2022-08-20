@@ -72,15 +72,18 @@ public:
 	}
 };
 
-typedef Waveform<TCPSymbol> TCPWaveform;
+class TCPWaveform : public Waveform<TCPSymbol>
+{
+public:
+	TCPWaveform () : Waveform<TCPSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class TCPDecoder : public Filter
 {
 public:
 	TCPDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

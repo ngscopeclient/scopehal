@@ -375,7 +375,7 @@ void ESPIDecoder::Refresh()
 					cap->m_offsets.push_back(bytestart);
 					cap->m_durations.push_back(timestamp - bytestart);
 					cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_COMMAND_TYPE, current_byte));
-					pack->m_headers["Command"] = GetText(cap->m_samples.size()-1, 0);
+					pack->m_headers["Command"] = cap->GetText(cap->m_samples.size()-1);
 
 					//Decide what to do based on the opcode
 					count = 0;
@@ -526,7 +526,7 @@ void ESPIDecoder::Refresh()
 					{
 						cap->m_durations.push_back(timestamp - tstart);
 						cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CAPS_ADDR, addr));
-						pack->m_headers["Address"] = GetText(cap->m_samples.size()-1, 0);
+						pack->m_headers["Address"] = cap->GetText(cap->m_samples.size()-1);
 
 						if(current_cmd == ESPISymbol::COMMAND_SET_CONFIGURATION)
 						{
@@ -566,17 +566,17 @@ void ESPIDecoder::Refresh()
 								{
 									case 0x10:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									case 0x20:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									case 0x30:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_WR, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									default:
@@ -627,7 +627,7 @@ void ESPIDecoder::Refresh()
 						if(completion_type != ESPISymbol::COMPLETION_NONE)
 							LogWarning("Appended completions not implemented yet\n");
 
-						pack->m_headers["Response"] = GetText(cap->m_samples.size()-1, 0);
+						pack->m_headers["Response"] = cap->GetText(cap->m_samples.size()-1);
 
 						count = 0;
 						data = 0;
@@ -689,22 +689,22 @@ void ESPIDecoder::Refresh()
 								{
 									case 0x8:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									case 0x10:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									case 0x20:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH1_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									case 0x30:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH2_CAPS_RD, data));
-										pack->m_headers["Info"] = Trim(GetText(cap->m_samples.size()-1, 0));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
 									default:
@@ -1388,620 +1388,609 @@ uint8_t ESPIDecoder::UpdateCRC8(uint8_t crc, uint8_t data)
 	return crc;
 }
 
-Gdk::Color ESPIDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color ESPIWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<ESPIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const ESPISymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const ESPISymbol& s = capture->m_samples[i];
+		case ESPISymbol::TYPE_COMMAND_TYPE:
+		case ESPISymbol::TYPE_RESPONSE_OP:
+		case ESPISymbol::TYPE_RESPONSE_STATUS:
+		case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
+		case ESPISymbol::TYPE_REQUEST_LEN:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-		switch(s.m_type)
-		{
-			case ESPISymbol::TYPE_COMMAND_TYPE:
-			case ESPISymbol::TYPE_RESPONSE_OP:
-			case ESPISymbol::TYPE_RESPONSE_STATUS:
-			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
-			case ESPISymbol::TYPE_REQUEST_LEN:
-				return m_standardColors[COLOR_CONTROL];
+		case ESPISymbol::TYPE_WAIT:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-			case ESPISymbol::TYPE_WAIT:
-				return m_standardColors[COLOR_PREAMBLE];
+		case ESPISymbol::TYPE_CAPS_ADDR:
+		case ESPISymbol::TYPE_VWIRE_COUNT:
+		case ESPISymbol::TYPE_VWIRE_INDEX:
+		case ESPISymbol::TYPE_REQUEST_TAG:
+		case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
+		case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
+		case ESPISymbol::TYPE_IO_ADDR:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case ESPISymbol::TYPE_CAPS_ADDR:
-			case ESPISymbol::TYPE_VWIRE_COUNT:
-			case ESPISymbol::TYPE_VWIRE_INDEX:
-			case ESPISymbol::TYPE_REQUEST_TAG:
-			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
-			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
-			case ESPISymbol::TYPE_IO_ADDR:
-				return m_standardColors[COLOR_ADDRESS];
+		case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
+		case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
+		case ESPISymbol::TYPE_COMMAND_CRC_BAD:
+		case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
-			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
-			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
-				return m_standardColors[COLOR_CHECKSUM_OK];
-			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
-			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+		case ESPISymbol::TYPE_GENERAL_CAPS:
+		case ESPISymbol::TYPE_CH0_CAPS_RD:
+		case ESPISymbol::TYPE_CH0_CAPS_WR:
+		case ESPISymbol::TYPE_CH1_CAPS_RD:
+		case ESPISymbol::TYPE_CH1_CAPS_WR:
+		case ESPISymbol::TYPE_CH2_CAPS_RD:
+		case ESPISymbol::TYPE_CH2_CAPS_WR:
+		case ESPISymbol::TYPE_VWIRE_DATA:
+		case ESPISymbol::TYPE_COMMAND_DATA_32:
+		case ESPISymbol::TYPE_RESPONSE_DATA_32:
+		case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+		case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
+		case ESPISymbol::TYPE_IO_DATA:
+		case ESPISymbol::TYPE_COMPLETION_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case ESPISymbol::TYPE_GENERAL_CAPS:
-			case ESPISymbol::TYPE_CH0_CAPS_RD:
-			case ESPISymbol::TYPE_CH0_CAPS_WR:
-			case ESPISymbol::TYPE_CH1_CAPS_RD:
-			case ESPISymbol::TYPE_CH1_CAPS_WR:
-			case ESPISymbol::TYPE_CH2_CAPS_RD:
-			case ESPISymbol::TYPE_CH2_CAPS_WR:
-			case ESPISymbol::TYPE_VWIRE_DATA:
-			case ESPISymbol::TYPE_COMMAND_DATA_32:
-			case ESPISymbol::TYPE_RESPONSE_DATA_32:
-			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
-			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
-			case ESPISymbol::TYPE_IO_DATA:
-			case ESPISymbol::TYPE_COMPLETION_DATA:
-				return m_standardColors[COLOR_DATA];
+		case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
+			if(s.m_data == ESPISymbol::CYCLE_SMBUS)
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 
-			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
-				if(s.m_data == ESPISymbol::CYCLE_SMBUS)
-					return m_standardColors[COLOR_CONTROL];
-				else
-					return m_standardColors[COLOR_ERROR];
+		case ESPISymbol::TYPE_COMPLETION_TYPE:
+			switch(s.m_data)
+			{
+				case ESPISymbol::CYCLE_SUCCESS_NODATA:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+					return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case ESPISymbol::TYPE_COMPLETION_TYPE:
-				switch(s.m_data)
-				{
-					case ESPISymbol::CYCLE_SUCCESS_NODATA:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
-						return m_standardColors[COLOR_CONTROL];
+				case ESPISymbol::CYCLE_FAIL_LAST:
+				case ESPISymbol::CYCLE_FAIL_ONLY:
+				default:
+					return StandardColors::colors[StandardColors::COLOR_ERROR];
+			};
+			break;
 
-					case ESPISymbol::CYCLE_FAIL_LAST:
-					case ESPISymbol::CYCLE_FAIL_ONLY:
-					default:
-						return m_standardColors[COLOR_ERROR];
-				};
-				break;
-
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string ESPIDecoder::GetText(size_t i, size_t /*stream*/)
+string ESPIWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<ESPIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const ESPISymbol& s = m_samples[i];
+	char tmp[128];
+	string stmp;
+
+	switch(s.m_type)
 	{
-		const ESPISymbol& s = capture->m_samples[i];
-		char tmp[128];
-		string stmp;
-
-		switch(s.m_type)
-		{
-			case ESPISymbol::TYPE_COMMAND_TYPE:
-				switch(s.m_data)
-				{
-					case ESPISymbol::COMMAND_GET_CONFIGURATION:
-						return "Get Configuration";
-					case ESPISymbol::COMMAND_SET_CONFIGURATION:
-						return "Set Configuration";
-
-					case ESPISymbol::COMMAND_GET_OOB:
-						return "Get OOB";
-					case ESPISymbol::COMMAND_PUT_OOB:
-						return "Put OOB";
-
-					case ESPISymbol::COMMAND_GET_PC:
-						return "Get Posted Completion";
-					case ESPISymbol::COMMAND_PUT_PC:
-						return "Put PC";
-
-					case ESPISymbol::COMMAND_GET_STATUS:
-						return "Get Status";
-
-					case ESPISymbol::COMMAND_GET_FLASH_NP:
-						return "Get Flash Non-Posted";
-					case ESPISymbol::COMMAND_PUT_FLASH_C:
-						return "Put Flash Completion";
-
-					case ESPISymbol::COMMAND_GET_VWIRE:
-						return "Get Virtual Wire";
-					case ESPISymbol::COMMAND_PUT_VWIRE:
-						return "Put Virtual Wire";
-
-					case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
-					case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x2:
-					case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x4:
-						return "Put I/O Write";
-
-					case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
-					case ESPISymbol::COMMAND_PUT_IORD_SHORT_x2:
-					case ESPISymbol::COMMAND_PUT_IORD_SHORT_x4:
-						return "Put I/O Read";
-
-					default:
-						snprintf(tmp, sizeof(tmp), "Unknown Cmd (%02lx)", s.m_data);
-						return tmp;
-				}
-				break;
-
-			case ESPISymbol::TYPE_CAPS_ADDR:
-				switch(s.m_data)
-				{
-					case 0x04:	return "Device ID";
-					case 0x08:	return "General Capabilities";
-					case 0x10:	return "CH0 Capabilities";
-					case 0x20:	return "CH1 Capabilities";
-					case 0x30:	return "CH2 Capabilities";
-					case 0x40:	return "CH3 Capabilities";
-
-					//Print as hex if unknown
-					default:
-						snprintf(tmp, sizeof(tmp), "%04lx", s.m_data);
-						return tmp;
-				}
-
-			case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
-			case ESPISymbol::TYPE_COMMAND_CRC_BAD:
-			case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
-			case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
-				return string("CRC: ") + to_string_hex(s.m_data);
-
-			case ESPISymbol::TYPE_VWIRE_COUNT:
-				return string("Count: ") + to_string(s.m_data + 1);
-
-			case ESPISymbol::TYPE_VWIRE_INDEX:
-				return string("Index: ") + to_string_hex(s.m_data);
-
-			case ESPISymbol::TYPE_VWIRE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_RESPONSE_OP:
-				switch(s.m_data & 0xf)
-				{
-					case ESPISymbol::RESPONSE_DEFER:
-						return "Defer";
-
-					case ESPISymbol::RESPONSE_NONFATAL_ERROR:
-						return "Nonfatal Error";
-
-					case ESPISymbol::RESPONSE_FATAL_ERROR:
-						return "Fatal Error";
-
-					case ESPISymbol::RESPONSE_ACCEPT:
-						return "Accept";
-
-					case ESPISymbol::RESPONSE_NONE:
-						return "No Response";
-
-					default:
-						snprintf(tmp, sizeof(tmp), "Unknown response %lx", s.m_data & 0xf);
-						return tmp;
-				}
-				break;
-
-			case ESPISymbol::TYPE_GENERAL_CAPS:
-				if(s.m_data & 0x80000000)
-					stmp += "CRC checking enabled\n";
-				if(s.m_data & 0x40000000)
-					stmp += "Response modifier enabled\n";
-				if( (s.m_data & 0x10000000) == 0)
-					stmp += "DQ1 used as alert\n";
-				else
-					stmp += "ALERT# used as alert\n";
-				switch( (s.m_data >> 26) & 0x3)
-				{
-					case 0:
-						stmp += "x1 mode\n";
-						break;
-					case 1:
-
-						stmp += "x2 mode\n";
-						break;
-					case 2:
-						stmp += "x4 mode\n";
-						break;
-					default:
-						stmp += "Invalid IO mode\n";
-						break;
-				}
-
-				switch( (s.m_data >> 24) & 0x3)
-				{
-					case 0:
-						stmp += "Supports x1 mode only\n";
-						break;
-					case 1:
-						stmp += "Supports x1 and x2 modes\n";
-						break;
-					case 2:
-						stmp += "Supports x1 and x4 modes\n";
-						break;
-					default:
-						stmp += "Supports x1, x2, and x4 modes\n";
-						break;
-				}
-
-				if(s.m_data & 0x00800000)
-					stmp += "ALERT# configured as open drain\n";
-				else
-					stmp += "ALERT# configured as push-pull\n";
-
-				switch( (s.m_data >> 20) & 0x7)
-				{
-					case 0:
-						stmp += "20MHz SCK\n";
-						break;
-					case 1:
-						stmp += "25MHz SCK\n";
-						break;
-					case 2:
-						stmp += "33MHz SCK\n";
-						break;
-					case 3:
-						stmp += "50MHz SCK\n";
-						break;
-					case 4:
-						stmp += "66MHz SCK\n";
-						break;
-					default:
-						stmp += "Invalid SCK speed\n";
-						break;
-				}
-
-				if(s.m_data & 0x00080000)
-					stmp += "ALERT# supports open drain mode\n";
-
-				switch( (s.m_data >> 16) & 0x7)
-				{
-					case 0:
-						stmp += "Max SCK: 20 MHz\n";
-						break;
-					case 1:
-						stmp += "Max SCK: 25 MHz\n";
-						break;
-					case 2:
-						stmp += "Max SCK: 33 MHz\n";
-						break;
-					case 3:
-						stmp += "Max SCK: 50 MHz\n";
-						break;
-					case 4:
-						stmp += "Max SCK: 66 MHz\n";
-						break;
-					default:
-						stmp += "Invalid max SCK speed\n";
-						break;
-				}
-
-				//15:12 = max wait states
-				if( ( (s.m_data >> 12) & 0xf) == 0)
-					stmp += "Max wait states: 16\n";
-				else
-					stmp += string("Max wait states: ") + to_string((s.m_data >> 12) & 0xf) + "\n";
-
-				if(s.m_data & 0x80)
-					stmp += "Platform channel 7 present\n";
-				if(s.m_data & 0x40)
-					stmp += "Platform channel 6 present\n";
-				if(s.m_data & 0x20)
-					stmp += "Platform channel 5 present\n";
-				if(s.m_data & 0x10)
-					stmp += "Platform channel 4 present\n";
-				if(s.m_data & 0x08)
-					stmp += "Flash channel present\n";
-				if(s.m_data & 0x04)
-					stmp += "OOB channel present\n";
-				if(s.m_data & 0x02)
-					stmp += "Virtual wire channel present\n";
-				if(s.m_data & 0x01)
-					stmp += "Peripheral channel present\n";
-				return stmp;	//end TYPE_GENERAL_CAPS
-
-			case ESPISymbol::TYPE_CH0_CAPS_RD:
-
-				if(s.m_data & 2)
-					stmp += "Ready\n";
-				else
-					stmp += "Not ready\n";
-
-				switch( (s.m_data >> 4) & 0x7)
-				{
-					case 1:
-						stmp += "Max periph payload supported: 64\n";
-						break;
-					case 2:
-						stmp += "Max periph payload supported: 128\n";
-						break;
-					case 3:
-						stmp += "Max periph payload supported: 256\n";
-						break;
-
-					default:
-						stmp += "Max periph payload supported: reserved\n";
-						break;
-				}
-
-				//end CH0_CAPS_RD
-				//fall through
-
-			case ESPISymbol::TYPE_CH0_CAPS_WR:
-
-				switch( (s.m_data >> 8) & 0x7)
-				{
-					case 1:
-						stmp += "Max periph payload size: 64\n";
-						break;
-					case 2:
-						stmp += "Max periph payload size: 128\n";
-						break;
-					case 3:
-						stmp += "Max periph payload size: 256\n";
-						break;
-
-					default:
-						stmp += "Max periph payload size: reserved\n";
-						break;
-				}
-
-				switch( (s.m_data >> 12) & 0x7)
-				{
-					case 0:
-						stmp += "Max periph read size: reserved\n";
-						break;
-
-					case 1:
-						stmp += "Max periph read size: 64\n";
-						break;
-					case 2:
-						stmp += "Max periph read size: 128\n";
-						break;
-					case 3:
-						stmp += "Max periph read size: 256\n";
-						break;
-					case 4:
-						stmp += "Max periph read size: 512\n";
-						break;
-					case 5:
-						stmp += "Max periph read size: 1024\n";
-						break;
-					case 6:
-						stmp += "Max periph read size: 2048\n";
-						break;
-					case 7:
-						stmp += "Max periph read size: 4096\n";
-						break;
-				}
-
-				if(s.m_data & 4)
-					stmp += "Bus mastering enabled\n";
-				else
-					stmp += "Bus mastering disabled\n";
-
-				if(s.m_data & 1)
-					stmp += "Enabled\n";
-				else
-					stmp += "Disabled\n";
-
-				return stmp;	//end TYPE_CH0_CAPS_WR
-
-			case ESPISymbol::TYPE_CH1_CAPS_RD:
-				stmp += "Operating max vwires: ";
-				stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
-
-				stmp += "Max vwires supported: ";
-				stmp += to_string( ((s.m_data >> 8) & 0x3f) + 1) + "\n";
-
-				if(s.m_data & 2)
-					stmp += "Ready\n";
-				else
-					stmp += "Not ready\n";
-
-				if(s.m_data & 1)
-					stmp += "Enabled\n";
-				else
-					stmp += "Disabled\n";
-
-				return stmp;	//end TYPE_CH1_CAPS_RD
-
-			case ESPISymbol::TYPE_CH1_CAPS_WR:
-				stmp += "Operating max vwires: ";
-				stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
-
-				if(s.m_data & 1)
-					stmp += "Enabled\n";
-				else
-					stmp += "Disabled\n";
-
-				return stmp;	//end TYPE_CH1_CAPS_WR
-
-			case ESPISymbol::TYPE_CH2_CAPS_RD:
-
-				stmp += "Max OOB payload selected: ";
-				switch( (s.m_data >> 8) & 0x7)
-				{
-					case 1:
-						stmp += "64 bytes\n";
-						break;
-					case 2:
-						stmp += "128 bytes\n";
-						break;
-					case 3:
-						stmp += "256 bytes\n";
-						break;
-					default:
-						stmp += "Reserved\n";
-						break;
-				}
-
-				stmp += "Max OOB payload supported: ";
-				switch( (s.m_data >> 4) & 0x7)
-				{
-					case 1:
-						stmp += "64 bytes\n";
-						break;
-					case 2:
-						stmp += "128 bytes\n";
-						break;
-					case 3:
-						stmp += "256 bytes\n";
-						break;
-					default:
-						stmp += "Reserved\n";
-						break;
-				}
-
-				if(s.m_data & 2)
-					stmp += "OOB channel ready\n";
-				else
-					stmp += "OOB channel not ready\n";
-
-				if(s.m_data & 1)
-					stmp += "OOB channel enabled\n";
-				else
-					stmp += "OOB channel disabled\n";
-
-				return stmp;	//end TYPE_CH2_CAPS_RD
-
-			case ESPISymbol::TYPE_CH2_CAPS_WR:
-
-				stmp += "Max OOB payload selected: ";
-				switch( (s.m_data >> 8) & 0x7)
-				{
-					case 1:
-						stmp += "64 bytes\n";
-						break;
-					case 2:
-						stmp += "128 bytes\n";
-						break;
-					case 3:
-						stmp += "256 bytes\n";
-						break;
-					default:
-						stmp += "Reserved\n";
-						break;
-				}
-
-				if(s.m_data & 1)
-					stmp += "OOB channel enabled\n";
-				else
-					stmp += "OOB channel disabled\n";
-
-				return stmp;	//end TYPE_CH2_CAPS_WR
-
-			case ESPISymbol::TYPE_RESPONSE_DATA_32:
-			case ESPISymbol::TYPE_COMMAND_DATA_32:
-				snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_RESPONSE_STATUS:
-				if(s.m_data & 0x2000)
-					stmp += "FLASH_NP_AVAIL ";
-				if(s.m_data & 0x1000)
-					stmp += "FLASH_C_AVAIL ";
-				if(s.m_data & 0x0200)
-					stmp += "FLASH_NP_FREE ";
-				if(s.m_data & 0x0080)
-					stmp += "OOB_AVAIL ";
-				if(s.m_data & 0x0040)
-					stmp += "VWIRE_AVAIL ";
-				if(s.m_data & 0x0020)
-					stmp += "NP_AVAIL ";
-				if(s.m_data & 0x0010)
-					stmp += "PC_AVAIL ";
-				if(s.m_data & 0x0008)
-					stmp += "OOB_FREE ";
-				if(s.m_data & 0x0002)
-					stmp += "NP_FREE ";
-				if(s.m_data & 0x0001)
-					stmp += "PC_FREE";
-				return stmp;
-
-			case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
-				switch(s.m_data)
-				{
-					case ESPISymbol::CYCLE_READ:
-						return "Read";
-					case ESPISymbol::CYCLE_WRITE:
-						return "Write";
-					case ESPISymbol::CYCLE_ERASE:
-						return "Erase";
-
-					case ESPISymbol::CYCLE_SUCCESS_NODATA:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
-						return "Success";
-				}
-				break;
-
-			case ESPISymbol::TYPE_REQUEST_TAG:
-				return string("Tag: ") + to_string(s.m_data);
-
-			case ESPISymbol::TYPE_REQUEST_LEN:
-				return string("Len: ") + to_string(s.m_data);
-
-			case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
-			case ESPISymbol::TYPE_IO_DATA:
-			case ESPISymbol::TYPE_COMPLETION_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
-				snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_IO_ADDR:
-				snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
-				snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
-				if(s.m_data == ESPISymbol::CYCLE_SMBUS)
-					return "SMBus Msg";
-				else
-					return "Invalid";
-
-			case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
-				snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
-				return tmp;
-
-			case ESPISymbol::TYPE_COMPLETION_TYPE:
-				switch(s.m_data)
-				{
-					case ESPISymbol::CYCLE_SUCCESS_NODATA:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
-					case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
-						return "Success";
-
-					case ESPISymbol::CYCLE_FAIL_LAST:
-					case ESPISymbol::CYCLE_FAIL_ONLY:
-						return "Fail";
-
-					default:
-						return "ERROR";
-				};
-				break;
-
-			case ESPISymbol::TYPE_WAIT:
-				return "Wait";
-
-			case ESPISymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case ESPISymbol::TYPE_COMMAND_TYPE:
+			switch(s.m_data)
+			{
+				case ESPISymbol::COMMAND_GET_CONFIGURATION:
+					return "Get Configuration";
+				case ESPISymbol::COMMAND_SET_CONFIGURATION:
+					return "Set Configuration";
+
+				case ESPISymbol::COMMAND_GET_OOB:
+					return "Get OOB";
+				case ESPISymbol::COMMAND_PUT_OOB:
+					return "Put OOB";
+
+				case ESPISymbol::COMMAND_GET_PC:
+					return "Get Posted Completion";
+				case ESPISymbol::COMMAND_PUT_PC:
+					return "Put PC";
+
+				case ESPISymbol::COMMAND_GET_STATUS:
+					return "Get Status";
+
+				case ESPISymbol::COMMAND_GET_FLASH_NP:
+					return "Get Flash Non-Posted";
+				case ESPISymbol::COMMAND_PUT_FLASH_C:
+					return "Put Flash Completion";
+
+				case ESPISymbol::COMMAND_GET_VWIRE:
+					return "Get Virtual Wire";
+				case ESPISymbol::COMMAND_PUT_VWIRE:
+					return "Put Virtual Wire";
+
+				case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x1:
+				case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x2:
+				case ESPISymbol::COMMAND_PUT_IOWR_SHORT_x4:
+					return "Put I/O Write";
+
+				case ESPISymbol::COMMAND_PUT_IORD_SHORT_x1:
+				case ESPISymbol::COMMAND_PUT_IORD_SHORT_x2:
+				case ESPISymbol::COMMAND_PUT_IORD_SHORT_x4:
+					return "Put I/O Read";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "Unknown Cmd (%02lx)", s.m_data);
+					return tmp;
+			}
+			break;
+
+		case ESPISymbol::TYPE_CAPS_ADDR:
+			switch(s.m_data)
+			{
+				case 0x04:	return "Device ID";
+				case 0x08:	return "General Capabilities";
+				case 0x10:	return "CH0 Capabilities";
+				case 0x20:	return "CH1 Capabilities";
+				case 0x30:	return "CH2 Capabilities";
+				case 0x40:	return "CH3 Capabilities";
+
+				//Print as hex if unknown
+				default:
+					snprintf(tmp, sizeof(tmp), "%04lx", s.m_data);
+					return tmp;
+			}
+
+		case ESPISymbol::TYPE_COMMAND_CRC_GOOD:
+		case ESPISymbol::TYPE_COMMAND_CRC_BAD:
+		case ESPISymbol::TYPE_RESPONSE_CRC_GOOD:
+		case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
+			return string("CRC: ") + to_string_hex(s.m_data);
+
+		case ESPISymbol::TYPE_VWIRE_COUNT:
+			return string("Count: ") + to_string(s.m_data + 1);
+
+		case ESPISymbol::TYPE_VWIRE_INDEX:
+			return string("Index: ") + to_string_hex(s.m_data);
+
+		case ESPISymbol::TYPE_VWIRE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_RESPONSE_OP:
+			switch(s.m_data & 0xf)
+			{
+				case ESPISymbol::RESPONSE_DEFER:
+					return "Defer";
+
+				case ESPISymbol::RESPONSE_NONFATAL_ERROR:
+					return "Nonfatal Error";
+
+				case ESPISymbol::RESPONSE_FATAL_ERROR:
+					return "Fatal Error";
+
+				case ESPISymbol::RESPONSE_ACCEPT:
+					return "Accept";
+
+				case ESPISymbol::RESPONSE_NONE:
+					return "No Response";
+
+				default:
+					snprintf(tmp, sizeof(tmp), "Unknown response %lx", s.m_data & 0xf);
+					return tmp;
+			}
+			break;
+
+		case ESPISymbol::TYPE_GENERAL_CAPS:
+			if(s.m_data & 0x80000000)
+				stmp += "CRC checking enabled\n";
+			if(s.m_data & 0x40000000)
+				stmp += "Response modifier enabled\n";
+			if( (s.m_data & 0x10000000) == 0)
+				stmp += "DQ1 used as alert\n";
+			else
+				stmp += "ALERT# used as alert\n";
+			switch( (s.m_data >> 26) & 0x3)
+			{
+				case 0:
+					stmp += "x1 mode\n";
+					break;
+				case 1:
+
+					stmp += "x2 mode\n";
+					break;
+				case 2:
+					stmp += "x4 mode\n";
+					break;
+				default:
+					stmp += "Invalid IO mode\n";
+					break;
+			}
+
+			switch( (s.m_data >> 24) & 0x3)
+			{
+				case 0:
+					stmp += "Supports x1 mode only\n";
+					break;
+				case 1:
+					stmp += "Supports x1 and x2 modes\n";
+					break;
+				case 2:
+					stmp += "Supports x1 and x4 modes\n";
+					break;
+				default:
+					stmp += "Supports x1, x2, and x4 modes\n";
+					break;
+			}
+
+			if(s.m_data & 0x00800000)
+				stmp += "ALERT# configured as open drain\n";
+			else
+				stmp += "ALERT# configured as push-pull\n";
+
+			switch( (s.m_data >> 20) & 0x7)
+			{
+				case 0:
+					stmp += "20MHz SCK\n";
+					break;
+				case 1:
+					stmp += "25MHz SCK\n";
+					break;
+				case 2:
+					stmp += "33MHz SCK\n";
+					break;
+				case 3:
+					stmp += "50MHz SCK\n";
+					break;
+				case 4:
+					stmp += "66MHz SCK\n";
+					break;
+				default:
+					stmp += "Invalid SCK speed\n";
+					break;
+			}
+
+			if(s.m_data & 0x00080000)
+				stmp += "ALERT# supports open drain mode\n";
+
+			switch( (s.m_data >> 16) & 0x7)
+			{
+				case 0:
+					stmp += "Max SCK: 20 MHz\n";
+					break;
+				case 1:
+					stmp += "Max SCK: 25 MHz\n";
+					break;
+				case 2:
+					stmp += "Max SCK: 33 MHz\n";
+					break;
+				case 3:
+					stmp += "Max SCK: 50 MHz\n";
+					break;
+				case 4:
+					stmp += "Max SCK: 66 MHz\n";
+					break;
+				default:
+					stmp += "Invalid max SCK speed\n";
+					break;
+			}
+
+			//15:12 = max wait states
+			if( ( (s.m_data >> 12) & 0xf) == 0)
+				stmp += "Max wait states: 16\n";
+			else
+				stmp += string("Max wait states: ") + to_string((s.m_data >> 12) & 0xf) + "\n";
+
+			if(s.m_data & 0x80)
+				stmp += "Platform channel 7 present\n";
+			if(s.m_data & 0x40)
+				stmp += "Platform channel 6 present\n";
+			if(s.m_data & 0x20)
+				stmp += "Platform channel 5 present\n";
+			if(s.m_data & 0x10)
+				stmp += "Platform channel 4 present\n";
+			if(s.m_data & 0x08)
+				stmp += "Flash channel present\n";
+			if(s.m_data & 0x04)
+				stmp += "OOB channel present\n";
+			if(s.m_data & 0x02)
+				stmp += "Virtual wire channel present\n";
+			if(s.m_data & 0x01)
+				stmp += "Peripheral channel present\n";
+			return stmp;	//end TYPE_GENERAL_CAPS
+
+		case ESPISymbol::TYPE_CH0_CAPS_RD:
+
+			if(s.m_data & 2)
+				stmp += "Ready\n";
+			else
+				stmp += "Not ready\n";
+
+			switch( (s.m_data >> 4) & 0x7)
+			{
+				case 1:
+					stmp += "Max periph payload supported: 64\n";
+					break;
+				case 2:
+					stmp += "Max periph payload supported: 128\n";
+					break;
+				case 3:
+					stmp += "Max periph payload supported: 256\n";
+					break;
+
+				default:
+					stmp += "Max periph payload supported: reserved\n";
+					break;
+			}
+
+			//end CH0_CAPS_RD
+			//fall through
+
+		case ESPISymbol::TYPE_CH0_CAPS_WR:
+
+			switch( (s.m_data >> 8) & 0x7)
+			{
+				case 1:
+					stmp += "Max periph payload size: 64\n";
+					break;
+				case 2:
+					stmp += "Max periph payload size: 128\n";
+					break;
+				case 3:
+					stmp += "Max periph payload size: 256\n";
+					break;
+
+				default:
+					stmp += "Max periph payload size: reserved\n";
+					break;
+			}
+
+			switch( (s.m_data >> 12) & 0x7)
+			{
+				case 0:
+					stmp += "Max periph read size: reserved\n";
+					break;
+
+				case 1:
+					stmp += "Max periph read size: 64\n";
+					break;
+				case 2:
+					stmp += "Max periph read size: 128\n";
+					break;
+				case 3:
+					stmp += "Max periph read size: 256\n";
+					break;
+				case 4:
+					stmp += "Max periph read size: 512\n";
+					break;
+				case 5:
+					stmp += "Max periph read size: 1024\n";
+					break;
+				case 6:
+					stmp += "Max periph read size: 2048\n";
+					break;
+				case 7:
+					stmp += "Max periph read size: 4096\n";
+					break;
+			}
+
+			if(s.m_data & 4)
+				stmp += "Bus mastering enabled\n";
+			else
+				stmp += "Bus mastering disabled\n";
+
+			if(s.m_data & 1)
+				stmp += "Enabled\n";
+			else
+				stmp += "Disabled\n";
+
+			return stmp;	//end TYPE_CH0_CAPS_WR
+
+		case ESPISymbol::TYPE_CH1_CAPS_RD:
+			stmp += "Operating max vwires: ";
+			stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
+
+			stmp += "Max vwires supported: ";
+			stmp += to_string( ((s.m_data >> 8) & 0x3f) + 1) + "\n";
+
+			if(s.m_data & 2)
+				stmp += "Ready\n";
+			else
+				stmp += "Not ready\n";
+
+			if(s.m_data & 1)
+				stmp += "Enabled\n";
+			else
+				stmp += "Disabled\n";
+
+			return stmp;	//end TYPE_CH1_CAPS_RD
+
+		case ESPISymbol::TYPE_CH1_CAPS_WR:
+			stmp += "Operating max vwires: ";
+			stmp += to_string( ((s.m_data >> 16) & 0x3f) + 1) + "\n";
+
+			if(s.m_data & 1)
+				stmp += "Enabled\n";
+			else
+				stmp += "Disabled\n";
+
+			return stmp;	//end TYPE_CH1_CAPS_WR
+
+		case ESPISymbol::TYPE_CH2_CAPS_RD:
+
+			stmp += "Max OOB payload selected: ";
+			switch( (s.m_data >> 8) & 0x7)
+			{
+				case 1:
+					stmp += "64 bytes\n";
+					break;
+				case 2:
+					stmp += "128 bytes\n";
+					break;
+				case 3:
+					stmp += "256 bytes\n";
+					break;
+				default:
+					stmp += "Reserved\n";
+					break;
+			}
+
+			stmp += "Max OOB payload supported: ";
+			switch( (s.m_data >> 4) & 0x7)
+			{
+				case 1:
+					stmp += "64 bytes\n";
+					break;
+				case 2:
+					stmp += "128 bytes\n";
+					break;
+				case 3:
+					stmp += "256 bytes\n";
+					break;
+				default:
+					stmp += "Reserved\n";
+					break;
+			}
+
+			if(s.m_data & 2)
+				stmp += "OOB channel ready\n";
+			else
+				stmp += "OOB channel not ready\n";
+
+			if(s.m_data & 1)
+				stmp += "OOB channel enabled\n";
+			else
+				stmp += "OOB channel disabled\n";
+
+			return stmp;	//end TYPE_CH2_CAPS_RD
+
+		case ESPISymbol::TYPE_CH2_CAPS_WR:
+
+			stmp += "Max OOB payload selected: ";
+			switch( (s.m_data >> 8) & 0x7)
+			{
+				case 1:
+					stmp += "64 bytes\n";
+					break;
+				case 2:
+					stmp += "128 bytes\n";
+					break;
+				case 3:
+					stmp += "256 bytes\n";
+					break;
+				default:
+					stmp += "Reserved\n";
+					break;
+			}
+
+			if(s.m_data & 1)
+				stmp += "OOB channel enabled\n";
+			else
+				stmp += "OOB channel disabled\n";
+
+			return stmp;	//end TYPE_CH2_CAPS_WR
+
+		case ESPISymbol::TYPE_RESPONSE_DATA_32:
+		case ESPISymbol::TYPE_COMMAND_DATA_32:
+			snprintf(tmp, sizeof(tmp), "%08lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_RESPONSE_STATUS:
+			if(s.m_data & 0x2000)
+				stmp += "FLASH_NP_AVAIL ";
+			if(s.m_data & 0x1000)
+				stmp += "FLASH_C_AVAIL ";
+			if(s.m_data & 0x0200)
+				stmp += "FLASH_NP_FREE ";
+			if(s.m_data & 0x0080)
+				stmp += "OOB_AVAIL ";
+			if(s.m_data & 0x0040)
+				stmp += "VWIRE_AVAIL ";
+			if(s.m_data & 0x0020)
+				stmp += "NP_AVAIL ";
+			if(s.m_data & 0x0010)
+				stmp += "PC_AVAIL ";
+			if(s.m_data & 0x0008)
+				stmp += "OOB_FREE ";
+			if(s.m_data & 0x0002)
+				stmp += "NP_FREE ";
+			if(s.m_data & 0x0001)
+				stmp += "PC_FREE";
+			return stmp;
+
+		case ESPISymbol::TYPE_FLASH_REQUEST_TYPE:
+			switch(s.m_data)
+			{
+				case ESPISymbol::CYCLE_READ:
+					return "Read";
+				case ESPISymbol::CYCLE_WRITE:
+					return "Write";
+				case ESPISymbol::CYCLE_ERASE:
+					return "Erase";
+
+				case ESPISymbol::CYCLE_SUCCESS_NODATA:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+					return "Success";
+			}
+			break;
+
+		case ESPISymbol::TYPE_REQUEST_TAG:
+			return string("Tag: ") + to_string(s.m_data);
+
+		case ESPISymbol::TYPE_REQUEST_LEN:
+			return string("Len: ") + to_string(s.m_data);
+
+		case ESPISymbol::TYPE_FLASH_REQUEST_DATA:
+		case ESPISymbol::TYPE_IO_DATA:
+		case ESPISymbol::TYPE_COMPLETION_DATA:
+			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_FLASH_REQUEST_ADDR:
+			snprintf(tmp, sizeof(tmp), "Addr: %08lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_IO_ADDR:
+			snprintf(tmp, sizeof(tmp), "Addr: %04lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_SMBUS_REQUEST_ADDR:
+			snprintf(tmp, sizeof(tmp), "Addr: %02lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_SMBUS_REQUEST_TYPE:
+			if(s.m_data == ESPISymbol::CYCLE_SMBUS)
+				return "SMBus Msg";
+			else
+				return "Invalid";
+
+		case ESPISymbol::TYPE_SMBUS_REQUEST_DATA:
+			snprintf(tmp, sizeof(tmp), "%02lx", s.m_data);
+			return tmp;
+
+		case ESPISymbol::TYPE_COMPLETION_TYPE:
+			switch(s.m_data)
+			{
+				case ESPISymbol::CYCLE_SUCCESS_NODATA:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_MIDDLE:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_FIRST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_LAST:
+				case ESPISymbol::CYCLE_SUCCESS_DATA_ONLY:
+					return "Success";
+
+				case ESPISymbol::CYCLE_FAIL_LAST:
+				case ESPISymbol::CYCLE_FAIL_ONLY:
+					return "Fail";
+
+				default:
+					return "ERROR";
+			};
+			break;
+
+		case ESPISymbol::TYPE_WAIT:
+			return "Wait";
+
+		case ESPISymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }
 
 bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)

@@ -203,7 +203,7 @@ void DSIPacketDecoder::Refresh()
 					pack->m_offset = off * din->m_timescale;
 					pack->m_len = 0;
 					pack->m_headers["VC"] = to_string(current_vc);
-					pack->m_headers["Type"] = GetText(cap->m_offsets.size() - 1, 0);
+					pack->m_headers["Type"] = cap->GetText(cap->m_offsets.size() - 1);
 					m_packets.push_back(pack);
 
 					//Set the color for the packet
@@ -503,120 +503,109 @@ void DSIPacketDecoder::Refresh()
 	}
 }
 
-Gdk::Color DSIPacketDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DSIWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<DSIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const DSISymbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const DSISymbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case DSISymbol::TYPE_VC:
-			case DSISymbol::TYPE_IDENTIFIER:
-				return m_standardColors[COLOR_ADDRESS];
+		case DSISymbol::TYPE_VC:
+		case DSISymbol::TYPE_IDENTIFIER:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case DSISymbol::TYPE_LEN:
-				return m_standardColors[COLOR_CONTROL];
+		case DSISymbol::TYPE_LEN:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case DSISymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+		case DSISymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case DSISymbol::TYPE_ECC_OK:
-			case DSISymbol::TYPE_CHECKSUM_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+		case DSISymbol::TYPE_ECC_OK:
+		case DSISymbol::TYPE_CHECKSUM_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case DSISymbol::TYPE_ECC_BAD:
-			case DSISymbol::TYPE_CHECKSUM_BAD:
-			case DSISymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case DSISymbol::TYPE_ECC_BAD:
+		case DSISymbol::TYPE_CHECKSUM_BAD:
+		case DSISymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string DSIPacketDecoder::GetText(size_t i, size_t /*stream*/)
+string DSIWaveform::GetText(size_t i)
 {
 	char tmp[128] = "";
-	auto capture = dynamic_cast<DSIWaveform*>(GetData(0));
-	if(capture != NULL)
+	const DSISymbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const DSISymbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case DSISymbol::TYPE_VC:
-				snprintf(tmp, sizeof(tmp), "VC%d", s.m_data >> 6);
-				return tmp;
+		case DSISymbol::TYPE_VC:
+			snprintf(tmp, sizeof(tmp), "VC%d", s.m_data >> 6);
+			return tmp;
 
-			case DSISymbol::TYPE_IDENTIFIER:
-				switch(s.m_data & 0x3f)
-				{
-					case TYPE_VSYNC_START:	return "VSYNC Start";
-					case TYPE_VSYNC_END:	return "VSYNC End";
-					case TYPE_HSYNC_START:	return "HSYNC Start";
-					case TYPE_HSYNC_END:	return "HSYNC End";
-					case TYPE_EOTP:			return "End of TX";
-					case TYPE_CM_OFF:		return "CM Off";
-					case TYPE_CM_ON:		return "CM On";
-					case TYPE_SHUT_DOWN:	return "Shut Down";
-					case TYPE_TURN_ON:		return "Turn On";
+		case DSISymbol::TYPE_IDENTIFIER:
+			switch(s.m_data & 0x3f)
+			{
+				case DSIPacketDecoder::TYPE_VSYNC_START:	return "VSYNC Start";
+				case DSIPacketDecoder::TYPE_VSYNC_END:		return "VSYNC End";
+				case DSIPacketDecoder::TYPE_HSYNC_START:	return "HSYNC Start";
+				case DSIPacketDecoder::TYPE_HSYNC_END:		return "HSYNC End";
+				case DSIPacketDecoder::TYPE_EOTP:			return "End of TX";
+				case DSIPacketDecoder::TYPE_CM_OFF:			return "CM Off";
+				case DSIPacketDecoder::TYPE_CM_ON:			return "CM On";
+				case DSIPacketDecoder::TYPE_SHUT_DOWN:		return "Shut Down";
+				case DSIPacketDecoder::TYPE_TURN_ON:		return "Turn On";
 
-					case TYPE_GENERIC_SHORT_WRITE_0PARAM:
-					case TYPE_GENERIC_SHORT_WRITE_1PARAM:
-					case TYPE_GENERIC_SHORT_WRITE_2PARAM:
-					case TYPE_GENERIC_LONG_WRITE:
-						return "Generic Write";
+				case DSIPacketDecoder::TYPE_GENERIC_SHORT_WRITE_0PARAM:
+				case DSIPacketDecoder::TYPE_GENERIC_SHORT_WRITE_1PARAM:
+				case DSIPacketDecoder::TYPE_GENERIC_SHORT_WRITE_2PARAM:
+				case DSIPacketDecoder::TYPE_GENERIC_LONG_WRITE:
+					return "Generic Write";
 
-					case TYPE_GENERIC_READ_0PARAM:
-					case TYPE_GENERIC_READ_1PARAM:
-					case TYPE_GENERIC_READ_2PARAM:
-						return "Generic Read";
+				case DSIPacketDecoder::TYPE_GENERIC_READ_0PARAM:
+				case DSIPacketDecoder::TYPE_GENERIC_READ_1PARAM:
+				case DSIPacketDecoder::TYPE_GENERIC_READ_2PARAM:
+					return "Generic Read";
 
-					case TYPE_DCS_SHORT_WRITE_0PARAM:
-					case TYPE_DCS_SHORT_WRITE_1PARAM:
-					case TYPE_DCS_LONG_WRITE:
-						return "DCS Write";
+				case DSIPacketDecoder::TYPE_DCS_SHORT_WRITE_0PARAM:
+				case DSIPacketDecoder::TYPE_DCS_SHORT_WRITE_1PARAM:
+				case DSIPacketDecoder::TYPE_DCS_LONG_WRITE:
+					return "DCS Write";
 
-					case TYPE_DCS_READ:				return "DCS Read";
-					case TYPE_SET_MAX_RETURN_SIZE:	return "Set Max Return Size";
-					case TYPE_NULL:					return "Null";
-					case TYPE_BLANKING:				return "Blank";
-					case TYPE_PACKED_PIXEL_RGB565:	return "RGB565";
-					case TYPE_PACKED_PIXEL_RGB666:	return "RGB666";
-					case TYPE_LOOSE_PIXEL_RGB666:	return "RGB666 Loose";
-					case TYPE_PACKED_PIXEL_RGB888:	return "RGB888";
+				case DSIPacketDecoder::TYPE_DCS_READ:				return "DCS Read";
+				case DSIPacketDecoder::TYPE_SET_MAX_RETURN_SIZE:	return "Set Max Return Size";
+				case DSIPacketDecoder::TYPE_NULL:					return "Null";
+				case DSIPacketDecoder::TYPE_BLANKING:				return "Blank";
+				case DSIPacketDecoder::TYPE_PACKED_PIXEL_RGB565:	return "RGB565";
+				case DSIPacketDecoder::TYPE_PACKED_PIXEL_RGB666:	return "RGB666";
+				case DSIPacketDecoder::TYPE_LOOSE_PIXEL_RGB666:		return "RGB666 Loose";
+				case DSIPacketDecoder::TYPE_PACKED_PIXEL_RGB888:	return "RGB888";
 
-					default:
-						snprintf(tmp, sizeof(tmp), "RSVD %02x", s.m_data & 0x3f);
-						return tmp;
-				}
-				break;
+				default:
+					snprintf(tmp, sizeof(tmp), "RSVD %02x", s.m_data & 0x3f);
+					return tmp;
+			}
+			break;
 
-			case DSISymbol::TYPE_LEN:
-				snprintf(tmp, sizeof(tmp), "Len %d", s.m_data);
-				return tmp;
+		case DSISymbol::TYPE_LEN:
+			snprintf(tmp, sizeof(tmp), "Len %d", s.m_data);
+			return tmp;
 
-			case DSISymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return tmp;
+		case DSISymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return tmp;
 
-			case DSISymbol::TYPE_ECC_OK:
-			case DSISymbol::TYPE_ECC_BAD:
-				snprintf(tmp, sizeof(tmp), "ECC %02x", s.m_data);
-				return tmp;
+		case DSISymbol::TYPE_ECC_OK:
+		case DSISymbol::TYPE_ECC_BAD:
+			snprintf(tmp, sizeof(tmp), "ECC %02x", s.m_data);
+			return tmp;
 
-			case DSISymbol::TYPE_CHECKSUM_OK:
-			case DSISymbol::TYPE_CHECKSUM_BAD:
-				snprintf(tmp, sizeof(tmp), "Check %04x", s.m_data);
-				return tmp;
+		case DSISymbol::TYPE_CHECKSUM_OK:
+		case DSISymbol::TYPE_CHECKSUM_BAD:
+			snprintf(tmp, sizeof(tmp), "Check %04x", s.m_data);
+			return tmp;
 
-			case DSISymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case DSISymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }
 
 uint16_t DSIPacketDecoder::UpdateCRC(uint16_t crc, uint8_t data)

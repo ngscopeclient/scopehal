@@ -62,15 +62,18 @@ public:
 	}
 };
 
-typedef Waveform<DPhyEscapeModeSymbol> DPhyEscapeModeWaveform;
+class DPhyEscapeModeWaveform : public Waveform<DPhyEscapeModeSymbol>
+{
+public:
+	DPhyEscapeModeWaveform () : Waveform<DPhyEscapeModeSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class DPhyEscapeModeDecoder : public PacketDecoder
 {
 public:
 	DPhyEscapeModeDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
 
 	std::vector<std::string> GetHeaders();
 

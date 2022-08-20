@@ -609,7 +609,7 @@ void SPIFlashDecoder::Refresh()
 					cap->m_durations.push_back(din->m_durations[iin]);
 					cap->m_samples.push_back(SPIFlashSymbol(SPIFlashSymbol::TYPE_COMMAND, current_cmd, 0));
 
-					pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1, 0);
+					pack->m_headers["Op"] = cap->GetText(cap->m_samples.size() - 1);
 				}
 				break;
 
@@ -833,7 +833,7 @@ void SPIFlashDecoder::Refresh()
 							pack->m_headers["Address"] = tmp;
 						}
 						else
-							pack->m_headers["Address"] = GetText(cap->m_samples.size() - 1, 0);
+							pack->m_headers["Address"] = cap->GetText(cap->m_samples.size() - 1);
 					}
 				}
 
@@ -850,12 +850,12 @@ void SPIFlashDecoder::Refresh()
 						if(data_type == SPIFlashSymbol::TYPE_PART_ID)
 						{
 							pack->m_headers["Info"] +=
-								GetText(cap->m_samples.size()-2, 0) +
+								cap->GetText(cap->m_samples.size()-2) +
 								" " +
-								GetText(cap->m_samples.size()-1, 0);
+								cap->GetText(cap->m_samples.size()-1);
 						}
 						else
-							pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
+							pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
 					}
 
 					//Only write to the output for actual flash data!
@@ -976,7 +976,7 @@ void SPIFlashDecoder::Refresh()
 
 					//At the end of a write command, crack status registers if needed
 					if(data_type != SPIFlashSymbol::TYPE_DATA)
-						pack->m_headers["Info"] = GetText(cap->m_samples.size()-1, 0);
+						pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
 				}
 				else
 				{
@@ -998,229 +998,218 @@ void SPIFlashDecoder::Refresh()
 	}
 }
 
-Gdk::Color SPIFlashDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color SPIFlashWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<SPIFlashWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SPIFlashSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const SPIFlashSymbol& s = capture->m_samples[i];
+		case SPIFlashSymbol::TYPE_DUMMY:
+			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-		switch(s.m_type)
-		{
-			case SPIFlashSymbol::TYPE_DUMMY:
-				return m_standardColors[COLOR_IDLE];
+		case SPIFlashSymbol::TYPE_COMMAND:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case SPIFlashSymbol::TYPE_COMMAND:
-				return m_standardColors[COLOR_CONTROL];
+		case SPIFlashSymbol::TYPE_ADDRESS:
+		case SPIFlashSymbol::TYPE_W25N_SR_ADDR:
+		case SPIFlashSymbol::TYPE_W25N_BLOCK_ADDR:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case SPIFlashSymbol::TYPE_ADDRESS:
-			case SPIFlashSymbol::TYPE_W25N_SR_ADDR:
-			case SPIFlashSymbol::TYPE_W25N_BLOCK_ADDR:
-				return m_standardColors[COLOR_ADDRESS];
+		case SPIFlashSymbol::TYPE_DATA:
+		case SPIFlashSymbol::TYPE_VENDOR_ID:
+		case SPIFlashSymbol::TYPE_PART_ID:
+		case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
+		case SPIFlashSymbol::TYPE_W25N_SR_PROT:
+		case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case SPIFlashSymbol::TYPE_DATA:
-			case SPIFlashSymbol::TYPE_VENDOR_ID:
-			case SPIFlashSymbol::TYPE_PART_ID:
-			case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
-			case SPIFlashSymbol::TYPE_W25N_SR_PROT:
-			case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
-				return m_standardColors[COLOR_DATA];
-
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string SPIFlashDecoder::GetText(size_t i, size_t /*stream*/)
+string SPIFlashWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<SPIFlashWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SPIFlashSymbol& s = m_samples[i];
+	char tmp[128];
+
+	switch(s.m_type)
 	{
-		const SPIFlashSymbol& s = capture->m_samples[i];
-		char tmp[128];
+		case SPIFlashSymbol::TYPE_DUMMY:
+			return "Wait state";
 
-		switch(s.m_type)
-		{
-			case SPIFlashSymbol::TYPE_DUMMY:
-				return "Wait state";
+		case SPIFlashSymbol::TYPE_VENDOR_ID:
+			switch(s.m_data)
+			{
+				case SPIFlashDecoder::VENDOR_ID_CYPRESS:
+					return "Cypress";
+				case SPIFlashDecoder::VENDOR_ID_MICRON:
+					return "Micron";
+				case SPIFlashDecoder::VENDOR_ID_WINBOND:
+					return "Winbond";
 
-			case SPIFlashSymbol::TYPE_VENDOR_ID:
-				switch(s.m_data)
+				default:
+					snprintf(tmp, sizeof(tmp), "0x%x", s.m_data);
+					break;
+			}
+			break;
+
+		//Part ID depends on vendor ID
+		case SPIFlashSymbol::TYPE_PART_ID:
+			return SPIFlashDecoder::GetPartID(this, s, i);
+
+		case SPIFlashSymbol::TYPE_COMMAND:
+			switch(s.m_cmd)
+			{
+				case SPIFlashSymbol::CMD_READ:
+					return "Read";
+				case SPIFlashSymbol::CMD_READ_SFDP:
+					return "Read SFDP";
+				case SPIFlashSymbol::CMD_FAST_READ:
+					return "Read Fast";
+				case SPIFlashSymbol::CMD_READ_1_1_4:
+					return "Read Quad";
+				case SPIFlashSymbol::CMD_READ_1_4_4:
+					return "Read Quad I/O";
+				case SPIFlashSymbol::CMD_READ_JEDEC_ID:
+					return "Read JEDEC ID";
+				case SPIFlashSymbol::CMD_READ_STATUS_REGISTER:
+					return "Read Status";
+				case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_1:
+					return "Read Status Register 1";
+				case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_2:
+					return "Read Status Register 2";
+				case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_3:
+					return "Read Status Register 3";
+				case SPIFlashSymbol::CMD_WRITE_STATUS_REGISTER:
+					return "Write Status";
+				case SPIFlashSymbol::CMD_RESET:
+					return "Reset";
+				case SPIFlashSymbol::CMD_WRITE_DISABLE:
+					return "Write Disable";
+				case SPIFlashSymbol::CMD_WRITE_ENABLE:
+					return "Write Enable";
+				case SPIFlashSymbol::CMD_BLOCK_ERASE:
+					return "Block Erase";
+				case SPIFlashSymbol::CMD_PAGE_PROGRAM:
+					return "Page Program";
+				case SPIFlashSymbol::CMD_ADDR_24BIT:
+					return "Select 24-Bit Address";
+				case SPIFlashSymbol::CMD_ADDR_32BIT:
+					return "Select 32-Bit Address";
+				case SPIFlashSymbol::CMD_RELEASE_PD:
+					return "Release from Power Down";
+				case SPIFlashSymbol::CMD_ENABLE_RESET:
+					return "Enable Reset";
+
+				//W25N specific
+				case SPIFlashSymbol::CMD_W25N_PROGRAM_EXECUTE:
+					return "Program Execute";
+				case SPIFlashSymbol::CMD_W25N_READ_PAGE:
+					return "Read Page";
+
+				default:
+					return "Unknown Cmd";
+			}
+
+		case SPIFlashSymbol::TYPE_ADDRESS:
+			snprintf(tmp, sizeof(tmp), "Addr 0x%x", s.m_data);
+			break;
+
+		case SPIFlashSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// Winbond W25N specific
+
+		case SPIFlashSymbol::TYPE_W25N_BLOCK_ADDR:
+			snprintf(tmp, sizeof(tmp), "Block %x", s.m_data);
+			break;
+
+		//Address of a W25N status register
+		case SPIFlashSymbol::TYPE_W25N_SR_ADDR:
+			if( (s.m_data & 0xf0) == 0xa0)
+				return "Protection";
+			else if( (s.m_data & 0xf0) == 0xb0)
+				return "Config";
+			else if( (s.m_data & 0xf0) == 0xc0)
+				return "Status";
+			else
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
+
+		//W25N status registers
+		case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
+			{
+				string ret = "";
+				if(s.m_data & 0x80)
+					ret += "OTP-LOCK ";
+				if(s.m_data & 0x40)
+					ret += "OTP-WR ";
+				if(s.m_data & 0x20)
+					ret += "SR1-LOCK ";
+				if(s.m_data & 0x10)
+					ret += "ECCEN ";
+				if(s.m_data & 0x08)
+					ret += "BUFFER ";
+				else
+					ret += "CONTINUOUS ";
+				return ret;
+			}
+			break;	//TYPE_W25N_SR_CONFIG
+
+		case SPIFlashSymbol::TYPE_W25N_SR_PROT:
+			return "TODO prot";
+			break;
+
+		case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
+			{
+				string ret = "";
+				if(s.m_data & 0x40)
+					ret += "LUT-F ";
+
+				uint8_t eccstat = (s.m_data >> 3) & 3;
+				switch(eccstat)
 				{
-					case VENDOR_ID_CYPRESS:
-						return "Cypress";
-					case VENDOR_ID_MICRON:
-						return "Micron";
-					case VENDOR_ID_WINBOND:
-						return "Winbond";
+					case 0:
+						ret += "ECC-OK ";
+						break;
 
-					default:
-						snprintf(tmp, sizeof(tmp), "0x%x", s.m_data);
+					case 1:
+						ret += "ECC-CORR ";
+						break;
+
+					case 2:
+						ret += "ECC-UNCORR-SINGLE ";
+						break;
+
+					case 3:
+						ret += "ECC-UNCORR-MULTI ";
 						break;
 				}
-				break;
 
-			//Part ID depends on vendor ID
-			case SPIFlashSymbol::TYPE_PART_ID:
-				return GetPartID(capture, s, i);
+				if(s.m_data & 8)
+					ret += "PROG-FAIL ";
 
-			case SPIFlashSymbol::TYPE_COMMAND:
-				switch(s.m_cmd)
-				{
-					case SPIFlashSymbol::CMD_READ:
-						return "Read";
-					case SPIFlashSymbol::CMD_READ_SFDP:
-						return "Read SFDP";
-					case SPIFlashSymbol::CMD_FAST_READ:
-						return "Read Fast";
-					case SPIFlashSymbol::CMD_READ_1_1_4:
-						return "Read Quad";
-					case SPIFlashSymbol::CMD_READ_1_4_4:
-						return "Read Quad I/O";
-					case SPIFlashSymbol::CMD_READ_JEDEC_ID:
-						return "Read JEDEC ID";
-					case SPIFlashSymbol::CMD_READ_STATUS_REGISTER:
-						return "Read Status";
-					case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_1:
-						return "Read Status Register 1";
-					case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_2:
-						return "Read Status Register 2";
-					case SPIFlashSymbol::CMD_READ_STATUS_REGISTER_3:
-						return "Read Status Register 3";
-					case SPIFlashSymbol::CMD_WRITE_STATUS_REGISTER:
-						return "Write Status";
-					case SPIFlashSymbol::CMD_RESET:
-						return "Reset";
-					case SPIFlashSymbol::CMD_WRITE_DISABLE:
-						return "Write Disable";
-					case SPIFlashSymbol::CMD_WRITE_ENABLE:
-						return "Write Enable";
-					case SPIFlashSymbol::CMD_BLOCK_ERASE:
-						return "Block Erase";
-					case SPIFlashSymbol::CMD_PAGE_PROGRAM:
-						return "Page Program";
-					case SPIFlashSymbol::CMD_ADDR_24BIT:
-						return "Select 24-Bit Address";
-					case SPIFlashSymbol::CMD_ADDR_32BIT:
-						return "Select 32-Bit Address";
-					case SPIFlashSymbol::CMD_RELEASE_PD:
-						return "Release from Power Down";
-					case SPIFlashSymbol::CMD_ENABLE_RESET:
-						return "Enable Reset";
+				if(s.m_data & 4)
+					ret += "ERASE-FAIL ";
 
-					//W25N specific
-					case SPIFlashSymbol::CMD_W25N_PROGRAM_EXECUTE:
-						return "Program Execute";
-					case SPIFlashSymbol::CMD_W25N_READ_PAGE:
-						return "Read Page";
+				if(s.m_data & 2)
+					ret += "WRITABLE ";
 
-					default:
-						return "Unknown Cmd";
-				}
+				if(s.m_data & 1)
+					ret += "BUSY";
 
-			case SPIFlashSymbol::TYPE_ADDRESS:
-				snprintf(tmp, sizeof(tmp), "Addr 0x%x", s.m_data);
-				break;
+				return ret;
+			}
+			break;	//TYPE_W25N_SR_STATUS
 
-			case SPIFlashSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
-
-			////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			// Winbond W25N specific
-
-			case SPIFlashSymbol::TYPE_W25N_BLOCK_ADDR:
-				snprintf(tmp, sizeof(tmp), "Block %x", s.m_data);
-				break;
-
-			//Address of a W25N status register
-			case SPIFlashSymbol::TYPE_W25N_SR_ADDR:
-				if( (s.m_data & 0xf0) == 0xa0)
-					return "Protection";
-				else if( (s.m_data & 0xf0) == 0xb0)
-					return "Config";
-				else if( (s.m_data & 0xf0) == 0xc0)
-					return "Status";
-				else
-					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
-
-			//W25N status registers
-			case SPIFlashSymbol::TYPE_W25N_SR_CONFIG:
-				{
-					string ret = "";
-					if(s.m_data & 0x80)
-						ret += "OTP-LOCK ";
-					if(s.m_data & 0x40)
-						ret += "OTP-WR ";
-					if(s.m_data & 0x20)
-						ret += "SR1-LOCK ";
-					if(s.m_data & 0x10)
-						ret += "ECCEN ";
-					if(s.m_data & 0x08)
-						ret += "BUFFER ";
-					else
-						ret += "CONTINUOUS ";
-					return ret;
-				}
-				break;	//TYPE_W25N_SR_CONFIG
-
-			case SPIFlashSymbol::TYPE_W25N_SR_PROT:
-				return "TODO prot";
-				break;
-
-			case SPIFlashSymbol::TYPE_W25N_SR_STATUS:
-				{
-					string ret = "";
-					if(s.m_data & 0x40)
-						ret += "LUT-F ";
-
-					uint8_t eccstat = (s.m_data >> 3) & 3;
-					switch(eccstat)
-					{
-						case 0:
-							ret += "ECC-OK ";
-							break;
-
-						case 1:
-							ret += "ECC-CORR ";
-							break;
-
-						case 2:
-							ret += "ECC-UNCORR-SINGLE ";
-							break;
-
-						case 3:
-							ret += "ECC-UNCORR-MULTI ";
-							break;
-					}
-
-					if(s.m_data & 8)
-						ret += "PROG-FAIL ";
-
-					if(s.m_data & 4)
-						ret += "ERASE-FAIL ";
-
-					if(s.m_data & 2)
-						ret += "WRITABLE ";
-
-					if(s.m_data & 1)
-						ret += "BUSY";
-
-					return ret;
-				}
-				break;	//TYPE_W25N_SR_STATUS
-
-			default:
-				return "ERROR";
-		}
-
-		return string(tmp);
+		default:
+			return "ERROR";
 	}
-	return "";
+
+	return string(tmp);
 }
 
 string SPIFlashDecoder::GetPartID(SPIFlashWaveform* cap, const SPIFlashSymbol& s, int i)

@@ -66,15 +66,18 @@ public:
 	}
 };
 
-typedef Waveform<HyperRAMSymbol> HyperRAMWaveform;
+class HyperRAMWaveform : public Waveform<HyperRAMSymbol>
+{
+public:
+	HyperRAMWaveform () : Waveform<HyperRAMSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class HyperRAMDecoder : public Filter
 {
 public:
 	HyperRAMDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	void Refresh() override;
 
@@ -84,7 +87,6 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(HyperRAMDecoder)
 
-private:
 	struct CA
 	{
 		uint32_t address;
@@ -92,7 +94,7 @@ private:
 		bool register_space;
 		bool linear;
 	};
-	struct CA DecodeCA(uint64_t data);
+	static struct CA DecodeCA(uint64_t data);
 
 protected:
 	std::string m_latencyname;

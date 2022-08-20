@@ -340,8 +340,7 @@ void CSVExportWizard::on_apply()
 
 			case Stream::STREAM_TYPE_PROTOCOL:
 				{
-					auto reffilt = dynamic_cast<Filter*>(streams[0].m_channel);
-					fprintf(fp, ",%s", reffilt->GetText(i, streams[0].m_stream).c_str());
+					fprintf(fp, ",%s", timebaseWaveform->GetText(i).c_str());
 				}
 				break;
 
@@ -415,9 +414,8 @@ void CSVExportWizard::on_apply()
 				//First-hit "interpolation"
 				case Stream::STREAM_TYPE_PROTOCOL:
 					{
-						auto filt = dynamic_cast<Filter*>(streams[j].m_channel);
 						if(firstHit)
-							fprintf(fp, ",%s", filt->GetText(k, streams[i].m_stream).c_str());
+							fprintf(fp, ",%s", w->GetText(k).c_str());
 						else
 							fprintf(fp, ",");
 					}

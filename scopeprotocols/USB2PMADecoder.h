@@ -63,7 +63,13 @@ public:
 	}
 };
 
-typedef Waveform<USB2PMASymbol> USB2PMAWaveform;
+class USB2PMAWaveform : public Waveform<USB2PMASymbol>
+{
+public:
+	USB2PMAWaveform () : Waveform<USB2PMASymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class USB2PMADecoder : public Filter
 {
@@ -75,9 +81,6 @@ public:
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	enum Speed
 	{

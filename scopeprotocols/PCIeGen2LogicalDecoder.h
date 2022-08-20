@@ -71,7 +71,13 @@ public:
 	}
 };
 
-typedef Waveform<PCIeLogicalSymbol> PCIeLogicalWaveform;
+class PCIeLogicalWaveform : public Waveform<PCIeLogicalSymbol>
+{
+public:
+	PCIeLogicalWaveform () : Waveform<PCIeLogicalSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decoder for PCIe gen 1/2 logical sub-block
@@ -81,9 +87,6 @@ class PCIeGen2LogicalDecoder : public Filter
 public:
 	PCIeGen2LogicalDecoder(const std::string& color);
 	virtual ~PCIeGen2LogicalDecoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

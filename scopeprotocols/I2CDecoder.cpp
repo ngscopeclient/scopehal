@@ -210,77 +210,65 @@ void I2CDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color I2CDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color I2CWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<I2CWaveform*>(GetData(0));
-	if(capture != NULL)
+	const I2CSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const I2CSymbol& s = capture->m_samples[i];
+		case I2CSymbol::TYPE_ERROR:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
+		case I2CSymbol::TYPE_ADDRESS:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
+		case I2CSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-		switch(s.m_stype)
-		{
-			case I2CSymbol::TYPE_ERROR:
-				return m_standardColors[COLOR_ERROR];
-			case I2CSymbol::TYPE_ADDRESS:
-				return m_standardColors[COLOR_ADDRESS];
-			case I2CSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+		case I2CSymbol::TYPE_ACK:
+			if(s.m_data)
+				return StandardColors::colors[StandardColors::COLOR_IDLE];
+			else
+				return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case I2CSymbol::TYPE_ACK:
-				if(s.m_data)
-					return m_standardColors[COLOR_IDLE];
-				else
-					return m_standardColors[COLOR_CHECKSUM_OK];
-
-			default:
-				return m_standardColors[COLOR_CONTROL];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
 }
 
-string I2CDecoder::GetText(size_t i, size_t /*stream*/)
+string I2CWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<I2CWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const I2CSymbol& s = capture->m_samples[i];
+	const I2CSymbol& s = m_samples[i];
 
-		char tmp[32];
-		switch(s.m_stype)
-		{
-			case I2CSymbol::TYPE_NONE:
-			case I2CSymbol::TYPE_ERROR:
-				snprintf(tmp, sizeof(tmp), "ERR");
-				break;
-			case I2CSymbol::TYPE_START:
-				snprintf(tmp, sizeof(tmp), "START");
-				break;
-			case I2CSymbol::TYPE_RESTART:
-				snprintf(tmp, sizeof(tmp), "RESTART");
-				break;
-			case I2CSymbol::TYPE_STOP:
-				snprintf(tmp, sizeof(tmp), "STOP");
-				break;
-			case I2CSymbol::TYPE_ACK:
-				if(s.m_data)
-					snprintf(tmp, sizeof(tmp), "NAK");
-				else
-					snprintf(tmp, sizeof(tmp), "ACK");
-				break;
-			case I2CSymbol::TYPE_ADDRESS:
-				if(s.m_data & 1)
-					snprintf(tmp, sizeof(tmp), "R:%02x", s.m_data & 0xfe);
-				else
-					snprintf(tmp, sizeof(tmp), "W:%02x", s.m_data & 0xfe);
-				break;
-			case I2CSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				break;
-		}
-		return string(tmp);
+	char tmp[32];
+	switch(s.m_stype)
+	{
+		case I2CSymbol::TYPE_NONE:
+		case I2CSymbol::TYPE_ERROR:
+			snprintf(tmp, sizeof(tmp), "ERR");
+			break;
+		case I2CSymbol::TYPE_START:
+			snprintf(tmp, sizeof(tmp), "START");
+			break;
+		case I2CSymbol::TYPE_RESTART:
+			snprintf(tmp, sizeof(tmp), "RESTART");
+			break;
+		case I2CSymbol::TYPE_STOP:
+			snprintf(tmp, sizeof(tmp), "STOP");
+			break;
+		case I2CSymbol::TYPE_ACK:
+			if(s.m_data)
+				snprintf(tmp, sizeof(tmp), "NAK");
+			else
+				snprintf(tmp, sizeof(tmp), "ACK");
+			break;
+		case I2CSymbol::TYPE_ADDRESS:
+			if(s.m_data & 1)
+				snprintf(tmp, sizeof(tmp), "R:%02x", s.m_data & 0xfe);
+			else
+				snprintf(tmp, sizeof(tmp), "W:%02x", s.m_data & 0xfe);
+			break;
+		case I2CSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			break;
 	}
-	return "";
+	return string(tmp);
 }

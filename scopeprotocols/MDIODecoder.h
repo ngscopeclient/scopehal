@@ -70,15 +70,18 @@ public:
 	}
 };
 
-typedef Waveform<MDIOSymbol> MDIOWaveform;
+class MDIOWaveform : public Waveform<MDIOSymbol>
+{
+public:
+	MDIOWaveform () : Waveform<MDIOSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class MDIODecoder : public PacketDecoder
 {
 public:
 	MDIODecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

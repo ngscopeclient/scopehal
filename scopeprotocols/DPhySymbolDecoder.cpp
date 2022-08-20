@@ -309,57 +309,52 @@ void DPhySymbolDecoder::Refresh()
 }
 
 
-Gdk::Color DPhySymbolDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DPhySymbolWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
-	if(capture != NULL)
+	const DPhySymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const DPhySymbol& s = capture->m_samples[i];
+		case DPhySymbol::STATE_HS0:
+		case DPhySymbol::STATE_HS1:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-		switch(s.m_type)
-		{
-			case DPhySymbol::STATE_HS0:
-			case DPhySymbol::STATE_HS1:
-				return m_standardColors[COLOR_DATA];
+		case DPhySymbol::STATE_LP00:
+		case DPhySymbol::STATE_LP11:
+		case DPhySymbol::STATE_LP01:
+		case DPhySymbol::STATE_LP10:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case DPhySymbol::STATE_LP00:
-			case DPhySymbol::STATE_LP11:
-			case DPhySymbol::STATE_LP01:
-			case DPhySymbol::STATE_LP10:
-				return m_standardColors[COLOR_CONTROL];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string DPhySymbolDecoder::GetText(size_t i, size_t /*stream*/)
+string DPhySymbolWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<DPhySymbolWaveform*>(GetData(0));
-	if(capture != NULL)
+	const DPhySymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const DPhySymbol& s = capture->m_samples[i];
+		case DPhySymbol::STATE_HS0:
+			return "HS-0";
 
-		switch(s.m_type)
-		{
-			case DPhySymbol::STATE_HS0:
-				return "HS-0";
+		case DPhySymbol::STATE_HS1:
+			return "HS-1";
 
-			case DPhySymbol::STATE_HS1:
-				return "HS-1";
+		case DPhySymbol::STATE_LP00:
+			return "LP-00";
 
-			case DPhySymbol::STATE_LP00:
-				return "LP-00";
+		case DPhySymbol::STATE_LP11:
+			return "LP-11";
 
-			case DPhySymbol::STATE_LP11:
-				return "LP-11";
+		case DPhySymbol::STATE_LP01:
+			return "LP-01";
 
-			case DPhySymbol::STATE_LP01:
-				return "LP-01";
+		case DPhySymbol::STATE_LP10:
+			return "LP-10";
 
-			case DPhySymbol::STATE_LP10:
-				return "LP-10";
-		}
+		default:
+			return "";
 	}
-	return "Unknown";
 }

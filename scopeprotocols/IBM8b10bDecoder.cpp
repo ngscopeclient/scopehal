@@ -43,17 +43,23 @@ using namespace std;
 
 IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
-	, m_cachedDisplayFormat(FORMAT_DOTTED)
 {
 	AddProtocolStream("data");
 	CreateInput("data");
 	CreateInput("clk");
 
 	m_displayformat = "Display Format";
-	m_parameters[m_displayformat] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_displayformat].AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
-	m_parameters[m_displayformat].AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
-	m_parameters[m_displayformat].SetIntVal(FORMAT_DOTTED);
+	m_parameters[m_displayformat] = MakeIBM8b10bDisplayFormatParameter();
+}
+
+FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
+{
+	auto f = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	f.AddEnumValue("Dotted (K28.5 D21.5)", FORMAT_DOTTED);
+	f.AddEnumValue("Hex (K.bc b5)", FORMAT_HEX);
+	f.SetIntVal(FORMAT_DOTTED);
+
+	return f;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,8 +89,6 @@ void IBM8b10bDecoder::Refresh()
 	LogTrace("IBM8b10bDecoder::Refresh\n");
 	LogIndenter li;
 
-	m_cachedDisplayFormat = (DisplayFormat) m_parameters[m_displayformat].GetIntVal();
-
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -96,7 +100,7 @@ void IBM8b10bDecoder::Refresh()
 	auto clkin = GetDigitalInputWaveform(1);
 
 	//Create the capture
-	auto cap = new IBM8b10bWaveform;
+	auto cap = new IBM8b10bWaveform(m_parameters[m_displayformat]);
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -367,65 +371,57 @@ void IBM8b10bDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color IBM8b10bDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color IBM8b10bWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
+	const IBM8b10bSymbol& s = m_samples[i];
 
-		if(s.m_error)
-			return m_standardColors[COLOR_ERROR];
-		else if(s.m_control)
-			return m_standardColors[COLOR_CONTROL];
-		else
-			return m_standardColors[COLOR_DATA];
-	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
+	if(s.m_error)
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
+	else if(s.m_control)
+		return StandardColors::colors[StandardColors::COLOR_CONTROL];
+	else
+		return StandardColors::colors[StandardColors::COLOR_DATA];
 }
 
-string IBM8b10bDecoder::GetText(size_t i, size_t /*stream*/)
+string IBM8b10bWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<IBM8b10bWaveform*>(GetData(0));
-	if(capture != NULL)
+	const IBM8b10bSymbol& s = m_samples[i];
+
+	IBM8b10bDecoder::DisplayFormat cachedDisplayFormat = (IBM8b10bDecoder::DisplayFormat) m_displayformat.GetIntVal();
+
+	unsigned int right = s.m_data >> 5;
+	unsigned int left = s.m_data & 0x1F;
+
+	char tmp[32];
+	if(s.m_error)
+		return "ERROR";
+	else
 	{
-		const IBM8b10bSymbol& s = capture->m_samples[i];
+		//Dotted format
+		if(cachedDisplayFormat == IBM8b10bDecoder::FORMAT_DOTTED)
+		{
+			if(s.m_control)
+				snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
+			else
+				snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
 
-		unsigned int right = s.m_data >> 5;
-		unsigned int left = s.m_data & 0x1F;
+			if(s.m_disparity < 0)
+				return string(tmp) + "-";
+			else
+				return string(tmp) + "+";
+		}
 
-		char tmp[32];
-		if(s.m_error)
-			return "ERROR";
+		//Hex format
 		else
 		{
-			//Dotted format
-			if(m_cachedDisplayFormat == FORMAT_DOTTED)
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K%u.%u", left, right);
-				else
-					snprintf(tmp, sizeof(tmp), "D%u.%u", left, right);
-
-				if(s.m_disparity < 0)
-					return string(tmp) + "-";
-				else
-					return string(tmp) + "+";
-			}
-
-			//Hex format
+			if(s.m_control)
+				snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
 			else
-			{
-				if(s.m_control)
-					snprintf(tmp, sizeof(tmp), "K.%02x", s.m_data);
-				else
-					snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
-			}
+				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return string(tmp);
 		}
 	}
+
 	return "";
 }
 

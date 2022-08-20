@@ -369,70 +369,60 @@ struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 	};
 }
 
-Gdk::Color HyperRAMDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color HyperRAMWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<HyperRAMWaveform*>(GetData(0));
-	if(capture != NULL)
+	const HyperRAMSymbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const HyperRAMSymbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case HyperRAMSymbol::TYPE_SELECT:
-			case HyperRAMSymbol::TYPE_DESELECT:
-				return m_standardColors[COLOR_CONTROL];
+		case HyperRAMSymbol::TYPE_SELECT:
+		case HyperRAMSymbol::TYPE_DESELECT:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case HyperRAMSymbol::TYPE_CA:
-				return m_standardColors[COLOR_ADDRESS];
+		case HyperRAMSymbol::TYPE_CA:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case HyperRAMSymbol::TYPE_WAIT:
-				return m_standardColors[COLOR_IDLE];
+		case HyperRAMSymbol::TYPE_WAIT:
+			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
-			case HyperRAMSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+		case HyperRAMSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case HyperRAMSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case HyperRAMSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-	return m_standardColors[COLOR_ERROR];
 }
 
-string HyperRAMDecoder::GetText(size_t i, size_t /*stream*/)
+string HyperRAMWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<HyperRAMWaveform*>(GetData(0));
-	if(capture != NULL)
+	const HyperRAMSymbol& s = m_samples[i];
+	char tmp[32];
+	struct HyperRAMDecoder::CA ca;
+	const char* rw;
+	const char* space;
+	uint32_t addr;
+	const char* burst;
+	switch(s.m_stype)
 	{
-		const HyperRAMSymbol& s = capture->m_samples[i];
-		char tmp[32];
-		struct HyperRAMDecoder::CA ca;
-		const char* rw;
-		const char* space;
-		uint32_t addr;
-		const char* burst;
-		switch(s.m_stype)
-		{
-			case HyperRAMSymbol::TYPE_SELECT:
-				return "SELECT";
-			case HyperRAMSymbol::TYPE_DESELECT:
-				return "DESELECT";
-			case HyperRAMSymbol::TYPE_CA:
-				ca    = DecodeCA(s.m_data);
-				rw    = ca.read ? "Read" : "Write";
-				space = ca.register_space ? "reg" : "mem";
-				addr  = ca.address;
-				burst = ca.linear ? "linear" : "wrapped";
-				snprintf(tmp, sizeof(tmp), "%s %s %08x %s", rw, space, addr, burst);
-				return string(tmp);
-			case HyperRAMSymbol::TYPE_WAIT:
-				return "WAIT";
-			case HyperRAMSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", (uint8_t)s.m_data);
-				return string(tmp);
-			case HyperRAMSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case HyperRAMSymbol::TYPE_SELECT:
+			return "SELECT";
+		case HyperRAMSymbol::TYPE_DESELECT:
+			return "DESELECT";
+		case HyperRAMSymbol::TYPE_CA:
+			ca    = HyperRAMDecoder::DecodeCA(s.m_data);
+			rw    = ca.read ? "Read" : "Write";
+			space = ca.register_space ? "reg" : "mem";
+			addr  = ca.address;
+			burst = ca.linear ? "linear" : "wrapped";
+			snprintf(tmp, sizeof(tmp), "%s %s %08x %s", rw, space, addr, burst);
+			return string(tmp);
+		case HyperRAMSymbol::TYPE_WAIT:
+			return "WAIT";
+		case HyperRAMSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", (uint8_t)s.m_data);
+			return string(tmp);
+		case HyperRAMSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }

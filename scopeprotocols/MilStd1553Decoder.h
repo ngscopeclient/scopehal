@@ -92,16 +92,19 @@ public:
 	}
 };
 
-typedef Waveform<MilStd1553Symbol> MilStd1553Waveform;
+class MilStd1553Waveform : public Waveform<MilStd1553Symbol>
+{
+public:
+	MilStd1553Waveform () : Waveform<MilStd1553Symbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class MilStd1553Decoder : public PacketDecoder
 {
 public:
 	MilStd1553Decoder(const std::string& color);
 	virtual ~MilStd1553Decoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 	static std::string GetProtocolName();

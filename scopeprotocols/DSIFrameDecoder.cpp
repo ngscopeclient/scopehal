@@ -279,60 +279,48 @@ void DSIFrameDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DSIFrameDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DSIFrameWaveform::GetColor(size_t i)
 {
-	DSIFrameWaveform* capture = dynamic_cast<DSIFrameWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
-		switch(s.m_type)
-		{
-			case DSIFrameSymbol::TYPE_HSYNC:
-			case DSIFrameSymbol::TYPE_VSYNC:
-				return m_standardColors[COLOR_CONTROL];
+		case DSIFrameSymbol::TYPE_HSYNC:
+		case DSIFrameSymbol::TYPE_VSYNC:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case DSIFrameSymbol::TYPE_VIDEO:
-				{
-					Gdk::Color ret;
-					ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
-					return ret;
-				}
+		case DSIFrameSymbol::TYPE_VIDEO:
+			{
+				Gdk::Color ret;
+				ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
+				return ret;
+			}
 
-			case DSIFrameSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case DSIFrameSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
 }
 
-string DSIFrameDecoder::GetText(size_t i, size_t /*stream*/)
+string DSIFrameWaveform::GetText(size_t i)
 {
-	DSIFrameWaveform* capture = dynamic_cast<DSIFrameWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+	char tmp[32];
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
-		char tmp[32];
-		switch(s.m_type)
-		{
-			case DSIFrameSymbol::TYPE_HSYNC:
-				return "HSYNC";
+		case DSIFrameSymbol::TYPE_HSYNC:
+			return "HSYNC";
 
-			case DSIFrameSymbol::TYPE_VSYNC:
-				return "VSYNC";
+		case DSIFrameSymbol::TYPE_VSYNC:
+			return "VSYNC";
 
-			case DSIFrameSymbol::TYPE_VIDEO:
-				snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
-				break;
+		case DSIFrameSymbol::TYPE_VIDEO:
+			snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
+			break;
 
-			case DSIFrameSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
+		case DSIFrameSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 
-		}
-		return string(tmp);
 	}
-	return "";
+	return string(tmp);
 }

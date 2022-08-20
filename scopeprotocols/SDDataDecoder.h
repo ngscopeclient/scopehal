@@ -69,7 +69,13 @@ public:
 	}
 };
 
-typedef Waveform<SDDataSymbol> SDDataWaveform;
+class SDDataWaveform : public Waveform<SDDataSymbol>
+{
+public:
+	SDDataWaveform () : Waveform<SDDataSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SDDataDecoder : public PacketDecoder
 {
@@ -81,9 +87,6 @@ public:
 	std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

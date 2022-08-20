@@ -45,9 +45,6 @@ public:
 	QSGMIIDecoder(const std::string& color);
 	virtual ~QSGMIIDecoder();
 
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
-
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
@@ -55,6 +52,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(QSGMIIDecoder)
+
+protected:
+	std::string m_displayformat;
 };
 
 #endif

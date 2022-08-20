@@ -811,62 +811,50 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	m_packets.push_back(pack);
 }
 
-Gdk::Color USB2PacketDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color USB2PacketWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<USB2PacketWaveform*>(GetData(0));
-	if(data == NULL)
-		return m_standardColors[COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return m_standardColors[COLOR_ERROR];
-
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:
 			if( (sample.m_data == USB2PacketSymbol::PID_RESERVED) ||
 				(sample.m_data == USB2PacketSymbol::PID_STALL) )
-				return m_standardColors[COLOR_ERROR];
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 			else
-				return m_standardColors[COLOR_PREAMBLE];
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		case USB2PacketSymbol::TYPE_ADDR:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case USB2PacketSymbol::TYPE_ENDP:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case USB2PacketSymbol::TYPE_NFRAME:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
 		case USB2PacketSymbol::TYPE_CRC5_GOOD:
 		case USB2PacketSymbol::TYPE_CRC16_GOOD:
-			return m_standardColors[COLOR_CHECKSUM_OK];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
 		case USB2PacketSymbol::TYPE_CRC5_BAD:
 		case USB2PacketSymbol::TYPE_CRC16_BAD:
-			return m_standardColors[COLOR_CHECKSUM_BAD];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 		case USB2PacketSymbol::TYPE_DATA:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
 		//invalid state, should never happen
 		case USB2PacketSymbol::TYPE_ERROR:
 		default:
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 }
 
-string USB2PacketDecoder::GetText(size_t i, size_t /*stream*/)
+string USB2PacketWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<USB2PacketWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[32];
 
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case USB2PacketSymbol::TYPE_PID:

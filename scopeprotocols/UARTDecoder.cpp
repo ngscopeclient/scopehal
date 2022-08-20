@@ -104,7 +104,7 @@ void UARTDecoder::Refresh()
 	int64_t scaledbitper = ibitper / din->m_timescale;
 
 	//UART processing
-	auto cap = new AsciiWaveform;
+	auto cap = new ByteWaveform(m_displaycolor);
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -223,12 +223,24 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-Gdk::Color UARTDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
+Gdk::Color ByteWaveform::GetColor(size_t /*i*/)
 {
-	return Gdk::Color(m_displaycolor);
+	return Gdk::Color(m_color);
 }
 
-string UARTDecoder::GetText(size_t i, size_t /*stream*/)
+string ByteWaveform::GetText(size_t i)
 {
-	return Filter::GetTextForAsciiChannel(i, 0);
+	char c = m_samples[i];
+	char sbuf[16] = {0};
+	if(isprint(c))
+		sbuf[0] = c;
+	else if(c == '\r')		//special case common non-printable chars
+		return "\\r";
+	else if(c == '\n')
+		return "\\n";
+	else if(c == '\b')
+		return "\\b";
+	else
+		snprintf(sbuf, sizeof(sbuf), "\\x%02x", 0xFF & c);
+	return sbuf;
 }

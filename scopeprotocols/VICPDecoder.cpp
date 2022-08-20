@@ -252,7 +252,7 @@ void VICPDecoder::Refresh()
 						m_packets.push_back(pack);
 
 						//Save the opcode
-						pack->m_headers["Op"] = GetText(cap->m_samples.size() - 1, 0);
+						pack->m_headers["Op"] = cap->GetText(cap->m_samples.size() - 1);
 
 						//Set color to reflect direction of the packet
 						if(!nextIsTx)
@@ -473,109 +473,98 @@ void VICPDecoder::Refresh()
 	}
 }
 
-Gdk::Color VICPDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color VICPWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<VICPWaveform*>(GetData(0));
-	if(capture != NULL)
+	const VICPSymbol& s = m_samples[i];
+
+	switch(s.m_type)
 	{
-		const VICPSymbol& s = capture->m_samples[i];
+		case VICPSymbol::TYPE_RESERVED:
+			if(s.m_data == 0)
+				return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 
-		switch(s.m_type)
-		{
-			case VICPSymbol::TYPE_RESERVED:
-				if(s.m_data == 0)
-					return m_standardColors[COLOR_PREAMBLE];
-				else
-					return m_standardColors[COLOR_ERROR];
+		case VICPSymbol::TYPE_OPCODE:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case VICPSymbol::TYPE_OPCODE:
-				return m_standardColors[COLOR_CONTROL];
+		case VICPSymbol::TYPE_VERSION:
+			if(s.m_data == 1)
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
+			else
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
 
-			case VICPSymbol::TYPE_VERSION:
-				if(s.m_data == 1)
-					return m_standardColors[COLOR_CONTROL];
-				else
-					return m_standardColors[COLOR_ERROR];
+		case VICPSymbol::TYPE_SEQ:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case VICPSymbol::TYPE_SEQ:
-				return m_standardColors[COLOR_CONTROL];
+		case VICPSymbol::TYPE_LENGTH:
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-			case VICPSymbol::TYPE_LENGTH:
-				return m_standardColors[COLOR_ADDRESS];
+		case VICPSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case VICPSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
-
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string VICPDecoder::GetText(size_t i, size_t /*stream*/)
+string VICPWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<VICPWaveform*>(GetData(0));
-	if(capture != NULL)
+	const VICPSymbol& s = m_samples[i];
+	char tmp[128];
+
+	switch(s.m_type)
 	{
-		const VICPSymbol& s = capture->m_samples[i];
-		char tmp[128];
+		case VICPSymbol::TYPE_OPCODE:
+			{
+				string ret = "";
+				if(s.m_data & 0x80)
+					ret += "DATA ";
+				if(s.m_data & 0x40)
+					ret += "REMOTE ";
+				if(s.m_data & 0x20)
+					ret += "LOCKOUT ";
+				if(s.m_data & 0x10)
+					ret += "CLEAR ";
+				if(s.m_data & 0x8)
+					ret += "SRQ ";
+				if(s.m_data & 0x4)
+					ret += "REQ ";
+				//0x02 reserved?
+				if(s.m_data & 0x1)
+					ret += "EOI ";
 
-		switch(s.m_type)
-		{
-			case VICPSymbol::TYPE_OPCODE:
-				{
-					string ret = "";
-					if(s.m_data & 0x80)
-						ret += "DATA ";
-					if(s.m_data & 0x40)
-						ret += "REMOTE ";
-					if(s.m_data & 0x20)
-						ret += "LOCKOUT ";
-					if(s.m_data & 0x10)
-						ret += "CLEAR ";
-					if(s.m_data & 0x8)
-						ret += "SRQ ";
-					if(s.m_data & 0x4)
-						ret += "REQ ";
-					//0x02 reserved?
-					if(s.m_data & 0x1)
-						ret += "EOI ";
-
-					return ret;
-				}
-				break;
+				return ret;
+			}
+			break;
 
 
-			case VICPSymbol::TYPE_VERSION:
-				snprintf(tmp, sizeof(tmp), "Version %d", s.m_data);
-				return string(tmp);
+		case VICPSymbol::TYPE_VERSION:
+			snprintf(tmp, sizeof(tmp), "Version %d", s.m_data);
+			return string(tmp);
 
-			case VICPSymbol::TYPE_SEQ:
-				snprintf(tmp, sizeof(tmp), "Seq %d", s.m_data);
-				return string(tmp);
+		case VICPSymbol::TYPE_SEQ:
+			snprintf(tmp, sizeof(tmp), "Seq %d", s.m_data);
+			return string(tmp);
 
-			case VICPSymbol::TYPE_RESERVED:
-				if(s.m_data == 0)
-					return "RESERVED";
-				else
-					return "ERROR";
-
-			case VICPSymbol::TYPE_LENGTH:
-				snprintf(tmp, sizeof(tmp), "Len %d", s.m_data);
-				return string(tmp);
-
-			case VICPSymbol::TYPE_DATA:
-				return s.m_str;
-
-			default:
+		case VICPSymbol::TYPE_RESERVED:
+			if(s.m_data == 0)
+				return "RESERVED";
+			else
 				return "ERROR";
-		}
 
-		return string(tmp);
+		case VICPSymbol::TYPE_LENGTH:
+			snprintf(tmp, sizeof(tmp), "Len %d", s.m_data);
+			return string(tmp);
+
+		case VICPSymbol::TYPE_DATA:
+			return s.m_str;
+
+		default:
+			return "ERROR";
 	}
-	return "";
+
+	return string(tmp);
 }
 
 bool VICPDecoder::CanMerge(Packet* /*first*/, Packet* /*cur*/, Packet* /*next*/)

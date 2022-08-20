@@ -498,61 +498,49 @@ void EthernetProtocolDecoder::BytesToFrames(
 	delete pack;
 }
 
-Gdk::Color EthernetProtocolDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color EthernetWaveform::GetColor(size_t i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
-	if(data == NULL)
-		return m_standardColors[COLOR_ERROR];
-	if(i >= data->m_samples.size())
-		return m_standardColors[COLOR_ERROR];
-
-	switch(data->m_samples[i].m_type)
+	switch(m_samples[i].m_type)
 	{
 		//Preamble/SFD: gray (not interesting)
 		case EthernetFrameSegment::TYPE_INBAND_STATUS:
 		case EthernetFrameSegment::TYPE_PREAMBLE:
 		case EthernetFrameSegment::TYPE_SFD:
-			return m_standardColors[COLOR_PREAMBLE];
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		//MAC addresses (src or dest)
 		case EthernetFrameSegment::TYPE_DST_MAC:
 		case EthernetFrameSegment::TYPE_SRC_MAC:
-			return m_standardColors[COLOR_ADDRESS];
+			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		//Control codes
 		case EthernetFrameSegment::TYPE_ETHERTYPE:
 		case EthernetFrameSegment::TYPE_VLAN_TAG:
-			return m_standardColors[COLOR_CONTROL];
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case EthernetFrameSegment::TYPE_FCS_GOOD:
-			return m_standardColors[COLOR_CHECKSUM_OK];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 		case EthernetFrameSegment::TYPE_FCS_BAD:
-			return m_standardColors[COLOR_CHECKSUM_BAD];
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
 		//Signal has entirely disappeared, or fault condition reported
 		case EthernetFrameSegment::TYPE_NO_CARRIER:
 		case EthernetFrameSegment::TYPE_REMOTE_FAULT:
 		case EthernetFrameSegment::TYPE_LOCAL_FAULT:
 		case EthernetFrameSegment::TYPE_LINK_INTERRUPTION:
-			return m_standardColors[COLOR_ERROR];
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 
 		//Payload
 		default:
-			return m_standardColors[COLOR_DATA];
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 	}
 }
 
-string EthernetProtocolDecoder::GetText(size_t i, size_t /*stream*/)
+string EthernetWaveform::GetText(size_t i)
 {
-	auto data = dynamic_cast<EthernetWaveform*>(GetData(0));
-	if(data == NULL)
-		return "";
-	if(i >= data->m_samples.size())
-		return "";
-
 	char tmp[128];
 
-	auto sample = data->m_samples[i];
+	auto sample = m_samples[i];
 	switch(sample.m_type)
 	{
 		case EthernetFrameSegment::TYPE_PREAMBLE:
@@ -621,9 +609,9 @@ string EthernetProtocolDecoder::GetText(size_t i, size_t /*stream*/)
 				if(ethertype < 1500)
 				{
 					//Look at the next segment to get the payload
-					if((size_t)i+1 < data->m_samples.size())
+					if((size_t)i+1 < m_samples.size())
 					{
-						auto& next = data->m_samples[i+1];
+						auto& next = m_samples[i+1];
 						if(next.m_data[0] == 0x42)
 							type += "STP";
 						else

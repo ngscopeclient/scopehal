@@ -110,7 +110,13 @@ public:
 	}
 };
 
-typedef Waveform<PCIeTransportSymbol> PCIeTransportWaveform;
+class PCIeTransportWaveform : public Waveform<PCIeTransportSymbol>
+{
+public:
+	PCIeTransportWaveform () : Waveform<PCIeTransportSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decoder for PCIe transport layer
@@ -120,9 +126,6 @@ class PCIeTransportDecoder : public PacketDecoder
 public:
 	PCIeTransportDecoder(const std::string& color);
 	virtual ~PCIeTransportDecoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 
@@ -134,8 +137,7 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(PCIeTransportDecoder)
 
-protected:
-	std::string FormatID(uint16_t id);
+	static std::string FormatID(uint16_t id);
 };
 
 #endif

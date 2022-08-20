@@ -77,16 +77,19 @@ public:
 	}
 };
 
-typedef Waveform<EthernetFrameSegment> EthernetWaveform;
+class EthernetWaveform : public Waveform<EthernetFrameSegment>
+{
+public:
+	EthernetWaveform () : Waveform<EthernetFrameSegment>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class EthernetProtocolDecoder : public PacketDecoder
 {
 public:
 	EthernetProtocolDecoder(const std::string& color);
 	virtual ~EthernetProtocolDecoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

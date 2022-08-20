@@ -70,7 +70,13 @@ public:
 	bool operator==(const SWDSymbol& s) const { return (m_stype == s.m_stype) && (m_data == s.m_data); }
 };
 
-typedef Waveform<SWDSymbol> SWDWaveform;
+class SWDWaveform : public Waveform<SWDSymbol>
+{
+public:
+	SWDWaveform () : Waveform<SWDSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SWDDecoder : public Filter
 {
@@ -86,9 +92,6 @@ private:
 
 public:
 	SWDDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

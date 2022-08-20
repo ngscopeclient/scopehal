@@ -338,32 +338,20 @@ void SWDMemAPDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SWDMemAPDecoder::GetColor(size_t /*i*/, size_t /*stream*/)
+Gdk::Color SWDMemAPWaveform::GetColor(size_t /*i*/)
 {
-	auto capture = dynamic_cast<SWDMemAPWaveform*>(GetData(0));
-	if(capture != NULL)
-	{
-		//const SWDMemAPSymbol& s = capture->m_samples[i];
-		return m_standardColors[COLOR_DATA];
-	}
-
-	return m_standardColors[COLOR_ERROR];
+	return StandardColors::colors[StandardColors::COLOR_DATA];
 }
 
-string SWDMemAPDecoder::GetText(size_t i, size_t /*stream*/)
+string SWDMemAPWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<SWDMemAPWaveform*>(GetData(0));
 	char tmp[128] = "";
-	if(capture != NULL)
-	{
-		const SWDMemAPSymbol& s = capture->m_samples[i];
+	const SWDMemAPSymbol& s = m_samples[i];
 
-		if(s.m_write)
-			snprintf(tmp, sizeof(tmp), "Write %08x: %08x", s.m_addr, s.m_data);
-		else
-			snprintf(tmp, sizeof(tmp), "Read %08x: %08x", s.m_addr, s.m_data);
-		return string(tmp);
-	}
+	if(s.m_write)
+		snprintf(tmp, sizeof(tmp), "Write %08x: %08x", s.m_addr, s.m_data);
+	else
+		snprintf(tmp, sizeof(tmp), "Read %08x: %08x", s.m_addr, s.m_data);
 
 	return string(tmp);
 }

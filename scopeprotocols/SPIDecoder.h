@@ -64,15 +64,18 @@ public:
 	}
 };
 
-typedef Waveform<SPISymbol> SPIWaveform;
+class SPIWaveform : public Waveform<SPISymbol>
+{
+public:
+	SPIWaveform () : Waveform<SPISymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class SPIDecoder : public Filter
 {
 public:
 	SPIDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

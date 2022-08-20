@@ -64,16 +64,19 @@ public:
 	}
 };
 
-typedef Waveform<OneWireSymbol> OneWireWaveform;
+class OneWireWaveform : public Waveform<OneWireSymbol>
+{
+public:
+	OneWireWaveform () : Waveform<OneWireSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class OneWireDecoder : public Filter
 {
 public:
 	OneWireDecoder(const std::string& color);
 	virtual ~OneWireDecoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

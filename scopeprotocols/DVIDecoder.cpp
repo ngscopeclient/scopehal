@@ -270,66 +270,54 @@ void DVIDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DVIDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color DVIWaveform::GetColor(size_t i)
 {
-	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
-		switch(s.m_type)
-		{
-			case DVISymbol::DVI_TYPE_PREAMBLE:
-				return m_standardColors[COLOR_PREAMBLE];
+		case DVISymbol::DVI_TYPE_PREAMBLE:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-			case DVISymbol::DVI_TYPE_HSYNC:
-			case DVISymbol::DVI_TYPE_VSYNC:
-				return m_standardColors[COLOR_CONTROL];
+		case DVISymbol::DVI_TYPE_HSYNC:
+		case DVISymbol::DVI_TYPE_VSYNC:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case DVISymbol::DVI_TYPE_VIDEO:
-				{
-					Gdk::Color ret;
-					ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
-					return ret;
-				}
+		case DVISymbol::DVI_TYPE_VIDEO:
+			{
+				Gdk::Color ret;
+				ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
+				return ret;
+			}
 
-			case DVISymbol::DVI_TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case DVISymbol::DVI_TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	//error
-	return m_standardColors[COLOR_ERROR];
 }
 
-string DVIDecoder::GetText(size_t i, size_t /*stream*/)
+string DVIWaveform::GetText(size_t i)
 {
-	DVIWaveform* capture = dynamic_cast<DVIWaveform*>(GetData(0));
-	if(capture != NULL)
+	auto s = m_samples[i];
+	char tmp[32];
+	switch(s.m_type)
 	{
-		auto s = capture->m_samples[i];
-		char tmp[32];
-		switch(s.m_type)
-		{
-			case DVISymbol::DVI_TYPE_PREAMBLE:
-				return "BLANK";
+		case DVISymbol::DVI_TYPE_PREAMBLE:
+			return "BLANK";
 
-			case DVISymbol::DVI_TYPE_HSYNC:
-				return "HSYNC";
+		case DVISymbol::DVI_TYPE_HSYNC:
+			return "HSYNC";
 
-			case DVISymbol::DVI_TYPE_VSYNC:
-				return "VSYNC";
+		case DVISymbol::DVI_TYPE_VSYNC:
+			return "VSYNC";
 
-			case DVISymbol::DVI_TYPE_VIDEO:
-				snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
-				break;
+		case DVISymbol::DVI_TYPE_VIDEO:
+			snprintf(tmp, sizeof(tmp), "#%02x%02x%02x", s.m_red, s.m_green, s.m_blue);
+			break;
 
-			case DVISymbol::DVI_TYPE_ERROR:
-			default:
-				return "ERROR";
+		case DVISymbol::DVI_TYPE_ERROR:
+		default:
+			return "ERROR";
 
-		}
-		return string(tmp);
 	}
-	return "";
+	return string(tmp);
 }

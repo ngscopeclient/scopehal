@@ -73,16 +73,19 @@ public:
 	}
 };
 
-typedef Waveform<VICPSymbol> VICPWaveform;
+class VICPWaveform : public Waveform<VICPSymbol>
+{
+public:
+	VICPWaveform () : Waveform<VICPSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class VICPDecoder : public PacketDecoder
 {
 public:
 	VICPDecoder(const std::string& color);
 	virtual ~VICPDecoder();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	virtual void Refresh();
 

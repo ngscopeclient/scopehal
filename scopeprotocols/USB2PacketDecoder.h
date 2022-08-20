@@ -95,7 +95,13 @@ public:
 	}
 };
 
-typedef Waveform<USB2PacketSymbol> USB2PacketWaveform;
+class USB2PacketWaveform : public Waveform<USB2PacketSymbol>
+{
+public:
+	USB2PacketWaveform () : Waveform<USB2PacketSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class USB2PacketDecoder : public PacketDecoder
 {
@@ -103,9 +109,6 @@ public:
 	USB2PacketDecoder(const std::string& color);
 
 	virtual void Refresh();
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream) override;
-	virtual std::string GetText(size_t i, size_t stream) override;
 
 	static std::string GetProtocolName();
 

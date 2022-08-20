@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,83 +27,30 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of DVIDecoder
- */
+#ifndef StandardColors_h
+#define StandardColors_h
 
-#ifndef DVIDecoder_h
-#define DVIDecoder_h
+#include <gtkmm.h>
 
-#include "../scopehal/PacketDecoder.h"
+// TODO: This doesn't seem like it belongs in scopehal
 
-class DVISymbol
+namespace StandardColors
 {
-public:
-	enum DVIType
+	enum FilterColor
 	{
-		DVI_TYPE_PREAMBLE,
-		DVI_TYPE_HSYNC,
-		DVI_TYPE_VSYNC,
-		DVI_TYPE_VIDEO,
-		DVI_TYPE_ERROR
+		COLOR_DATA,			//protocol data
+		COLOR_CONTROL,		//generic control sequences
+		COLOR_ADDRESS,		//addresses or device IDs
+		COLOR_PREAMBLE,		//preambles, start bits, and other constant framing
+		COLOR_CHECKSUM_OK,	//valid CRC/checksum
+		COLOR_CHECKSUM_BAD,	//invalid CRC/checksum
+		COLOR_ERROR,		//malformed traffic
+		COLOR_IDLE,			//downtime between frames
+
+		STANDARD_COLOR_COUNT
 	};
 
-	//default for STL
-	DVISymbol()
-	{}
+	extern Gdk::Color colors[STANDARD_COLOR_COUNT];
+}
 
-	DVISymbol(DVIType type, uint8_t r = 0, uint8_t g = 0, uint8_t b = 0)
-	 : m_type(type)
-	 , m_red(r)
-	 , m_green(g)
-	 , m_blue(b)
-	{}
-
-	DVIType m_type;
-	uint8_t m_red;
-	uint8_t m_green;
-	uint8_t m_blue;
-
-	bool operator== (const DVISymbol& s) const
-	{
-		return (m_type == s.m_type) && (m_red == s.m_red) && (m_green == s.m_green) && (m_blue == s.m_blue);
-	}
-};
-
-class VideoScanlinePacket : public Packet
-{
-public:
-	virtual ~VideoScanlinePacket();
-};
-
-class DVIWaveform : public Waveform<DVISymbol>
-{
-public:
-	DVIWaveform () : Waveform<DVISymbol>() {};
-	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
-};
-
-class DVIDecoder : public PacketDecoder
-{
-public:
-	DVIDecoder(const std::string& color);
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual bool GetShowImageColumn();
-
-	virtual std::vector<std::string> GetHeaders();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(DVIDecoder)
-
-protected:
-};
-
-#endif
+#endif // StandardColors_h

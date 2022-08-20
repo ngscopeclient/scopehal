@@ -67,7 +67,13 @@ public:
 	}
 };
 
-typedef Waveform<DSISymbol> DSIWaveform;
+class DSIWaveform : public Waveform<DSISymbol>
+{
+public:
+	DSIWaveform () : Waveform<DSISymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 /**
 	@brief Decodes MIPI DSI from a D-PHY data stream
@@ -76,9 +82,6 @@ class DSIPacketDecoder : public PacketDecoder
 {
 public:
 	DSIPacketDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
 
 	virtual void Refresh();
 

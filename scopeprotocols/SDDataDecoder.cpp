@@ -252,64 +252,54 @@ void SDDataDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color SDDataDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color SDDataWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<SDDataWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SDDataSymbol& s = m_samples[i];
+	switch(s.m_stype)
 	{
-		const SDDataSymbol& s = capture->m_samples[i];
-		switch(s.m_stype)
-		{
-			case SDDataSymbol::TYPE_START:
-			case SDDataSymbol::TYPE_END:
-				return m_standardColors[COLOR_PREAMBLE];
+		case SDDataSymbol::TYPE_START:
+		case SDDataSymbol::TYPE_END:
+			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
-			case SDDataSymbol::TYPE_CRC_OK:
-				return m_standardColors[COLOR_CHECKSUM_OK];
+		case SDDataSymbol::TYPE_CRC_OK:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_OK];
 
-			case SDDataSymbol::TYPE_CRC_BAD:
-				return m_standardColors[COLOR_CHECKSUM_BAD];
+		case SDDataSymbol::TYPE_CRC_BAD:
+			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
-			case SDDataSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
+		case SDDataSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case SDDataSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case SDDataSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-	return m_standardColors[COLOR_ERROR];
 }
 
-string SDDataDecoder::GetText(size_t i, size_t /*stream*/)
+string SDDataWaveform::GetText(size_t i)
 {
-	auto capture = dynamic_cast<SDDataWaveform*>(GetData(0));
-	if(capture != NULL)
+	const SDDataSymbol& s = m_samples[i];
+	char tmp[32];
+	switch(s.m_stype)
 	{
-		const SDDataSymbol& s = capture->m_samples[i];
-		char tmp[32];
-		switch(s.m_stype)
-		{
-			case SDDataSymbol::TYPE_START:
-				return "START";
+		case SDDataSymbol::TYPE_START:
+			return "START";
 
-			case SDDataSymbol::TYPE_END:
-				return "END";
+		case SDDataSymbol::TYPE_END:
+			return "END";
 
-			case SDDataSymbol::TYPE_CRC_OK:
-			case SDDataSymbol::TYPE_CRC_BAD:
-				return "CRC FIXME";
+		case SDDataSymbol::TYPE_CRC_OK:
+		case SDDataSymbol::TYPE_CRC_BAD:
+			return "CRC FIXME";
 
-			case SDDataSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
+		case SDDataSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return string(tmp);
 
-			case SDDataSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case SDDataSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-	return "";
 }
 
 vector<string> SDDataDecoder::GetHeaders()

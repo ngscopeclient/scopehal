@@ -36,15 +36,18 @@
 #ifndef EthernetAutonegotiationDecoder_h
 #define EthernetAutonegotiationDecoder_h
 
-typedef Waveform<uint16_t> EthernetAutonegotiationWaveform;
+class EthernetAutonegotiationWaveform : public Waveform<uint16_t>
+{
+public:
+	EthernetAutonegotiationWaveform () : Waveform<uint16_t>() {};
+	virtual std::string GetText(size_t) override;
+	virtual Gdk::Color GetColor(size_t) override;
+};
 
 class EthernetAutonegotiationDecoder : public Filter
 {
 public:
 	EthernetAutonegotiationDecoder(const std::string& color);
-
-	virtual Gdk::Color GetColor(size_t i, size_t stream);
-	virtual std::string GetText(size_t i, size_t stream);
 
 	virtual void Refresh();
 

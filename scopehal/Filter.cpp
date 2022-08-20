@@ -47,18 +47,6 @@ map<pair<WaveformBase*, float>, vector<int64_t> > Filter::m_zeroCrossingCache;
 
 map<string, unsigned int> Filter::m_instanceCount;
 
-Gdk::Color Filter::m_standardColors[STANDARD_COLOR_COUNT] =
-{
-	Gdk::Color("#336699"),	//COLOR_DATA
-	Gdk::Color("#c000a0"),	//COLOR_CONTROL
-	Gdk::Color("#ffff00"),	//COLOR_ADDRESS
-	Gdk::Color("#808080"),	//COLOR_PREAMBLE
-	Gdk::Color("#00ff00"),	//COLOR_CHECKSUM_OK
-	Gdk::Color("#ff0000"),	//COLOR_CHECKSUM_BAD
-	Gdk::Color("#ff0000"),	//COLOR_ERROR
-	Gdk::Color("#404040")	//COLOR_IDLE
-};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -1081,41 +1069,6 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 				SetOffset(snode["offset"].as<float>(), index);
 		}
 	}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Complex protocol decodes
-
-Gdk::Color Filter::GetColor(size_t /*i*/, size_t /*stream*/)
-{
-	return m_standardColors[COLOR_ERROR];
-}
-
-string Filter::GetText(size_t /*i*/, size_t /*stream*/)
-{
-	return "(unimplemented)";
-}
-
-string Filter::GetTextForAsciiChannel(int i, size_t stream)
-{
-	AsciiWaveform* capture = dynamic_cast<AsciiWaveform*>(GetData(stream));
-	if(capture != NULL)
-	{
-		char c = capture->m_samples[i];
-		char sbuf[16] = {0};
-		if(isprint(c))
-			sbuf[0] = c;
-		else if(c == '\r')		//special case common non-printable chars
-			return "\\r";
-		else if(c == '\n')
-			return "\\n";
-		else if(c == '\b')
-			return "\\b";
-		else
-			snprintf(sbuf, sizeof(sbuf), "\\x%02x", 0xFF & c);
-		return sbuf;
-	}
-	return "";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

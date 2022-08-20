@@ -265,65 +265,53 @@ void OneWireDecoder::Refresh()
 	}
 }
 
-Gdk::Color OneWireDecoder::GetColor(size_t i, size_t /*stream*/)
+Gdk::Color OneWireWaveform::GetColor(size_t i)
 {
-	auto capture = dynamic_cast<OneWireWaveform*>(GetData(0));
-	if(capture != NULL)
+	const OneWireSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const OneWireSymbol& s = capture->m_samples[i];
+		case OneWireSymbol::TYPE_RESET:
+			if(s.m_data == 1)
+				return StandardColors::colors[StandardColors::COLOR_ERROR];
+			else
+				return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-		switch(s.m_stype)
-		{
-			case OneWireSymbol::TYPE_RESET:
-				if(s.m_data == 1)
-					return m_standardColors[COLOR_ERROR];
-				else
-					return m_standardColors[COLOR_CONTROL];
+		case OneWireSymbol::TYPE_PRESENCE:
+			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
-			case OneWireSymbol::TYPE_PRESENCE:
-				return m_standardColors[COLOR_CONTROL];
+		case OneWireSymbol::TYPE_DATA:
+			return StandardColors::colors[StandardColors::COLOR_DATA];
 
-			case OneWireSymbol::TYPE_DATA:
-				return m_standardColors[COLOR_DATA];
-
-			case OneWireSymbol::TYPE_ERROR:
-			default:
-				return m_standardColors[COLOR_ERROR];
-		}
+		case OneWireSymbol::TYPE_ERROR:
+		default:
+			return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
-
-	return m_standardColors[COLOR_ERROR];
 }
 
-string OneWireDecoder::GetText(size_t i, size_t /*stream*/)
+string OneWireWaveform::GetText(size_t i)
 {
 	char tmp[32];
 
-	auto capture = dynamic_cast<OneWireWaveform*>(GetData(0));
-	if(capture != NULL)
+	const OneWireSymbol& s = m_samples[i];
+
+	switch(s.m_stype)
 	{
-		const OneWireSymbol& s = capture->m_samples[i];
+		case OneWireSymbol::TYPE_RESET:
+			if(s.m_data == 1)
+				return "RESET (too short)";
+			else
+				return "RESET";
 
-		switch(s.m_stype)
-		{
-			case OneWireSymbol::TYPE_RESET:
-				if(s.m_data == 1)
-					return "RESET (too short)";
-				else
-					return "RESET";
+		case OneWireSymbol::TYPE_DATA:
+			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
+			return string(tmp);
 
-			case OneWireSymbol::TYPE_DATA:
-				snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
-				return string(tmp);
+		case OneWireSymbol::TYPE_PRESENCE:
+			return "PRESENT";
 
-			case OneWireSymbol::TYPE_PRESENCE:
-				return "PRESENT";
-
-			case OneWireSymbol::TYPE_ERROR:
-			default:
-				return "ERROR";
-		}
+		case OneWireSymbol::TYPE_ERROR:
+		default:
+			return "ERROR";
 	}
-
-	return "";
 }
