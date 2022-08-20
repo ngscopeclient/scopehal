@@ -133,6 +133,10 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 			SetSampleDepth(1000000);
 		}
 		break;
+
+		default:
+			LogWarning("Unknown/unsupported Pico model\n");
+			break;
 	}
 
 	//Set initial AWG configuration
