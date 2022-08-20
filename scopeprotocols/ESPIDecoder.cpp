@@ -1991,6 +1991,9 @@ string ESPIWaveform::GetText(size_t i)
 		default:
 			return "ERROR";
 	}
+
+	//should never get here
+	return "ERROR";
 }
 
 bool ESPIDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
