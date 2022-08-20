@@ -327,14 +327,14 @@ void CSVExportWizard::on_apply()
 			case Stream::STREAM_TYPE_ANALOG:
 				{
 					auto refan = dynamic_cast<AnalogWaveform*>(timebaseWaveform);
-					fprintf(fp, ",%f", refan->m_samples[i].m_value);
+					fprintf(fp, ",%f", refan->m_samples[i]);
 				}
 				break;
 
 			case Stream::STREAM_TYPE_DIGITAL:
 				{
 					auto refdig = dynamic_cast<DigitalWaveform*>(timebaseWaveform);
-					fprintf(fp, ",%d", refdig->m_samples[i].m_value);
+					fprintf(fp, ",%d", refdig->m_samples[i]);
 				}
 				break;
 
@@ -384,13 +384,13 @@ void CSVExportWizard::on_apply()
 						//No interpolation for last sample since there's no next to lerp to
 						auto an = dynamic_cast<AnalogWaveform*>(w);
 						if(k+1 > w->m_offsets.size())
-							fprintf(fp, ",%f", an->m_samples[k].m_value);
+							fprintf(fp, ",%f", an->m_samples[k]);
 
 						//Interpolate
 						else
 						{
-							float vleft = an->m_samples[k].m_value;
-							float vright = an->m_samples[k+1].m_value;
+							float vleft = an->m_samples[k];
+							float vright = an->m_samples[k+1];
 
 							int64_t tleft = sstart;
 							int64_t tright = (w->m_offsets[k+1] * w->m_timescale) + w->m_triggerPhase;
@@ -407,7 +407,7 @@ void CSVExportWizard::on_apply()
 				case Stream::STREAM_TYPE_DIGITAL:
 					{
 						auto dig = dynamic_cast<DigitalWaveform*>(w);
-						fprintf(fp, ",%d", dig->m_samples[k].m_value);
+						fprintf(fp, ",%d", dig->m_samples[k]);
 					}
 					break;
 

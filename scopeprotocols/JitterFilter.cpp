@@ -103,7 +103,7 @@ void JitterFilter::Refresh()
 	//Copy the initial configuration over
 	auto cap = SetupEmptyDigitalOutputWaveform(din, 0);
 	cap->Resize(len);
-	cap->m_samples = din->m_samples;
+	cap->m_samples.CopyFrom(din->m_samples);
 	cap->m_densePacked = false;
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;

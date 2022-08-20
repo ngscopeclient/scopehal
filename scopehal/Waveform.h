@@ -40,35 +40,7 @@
 #include <AlignedAllocator.h>
 
 #include "StandardColors.h"
-
-/**
-	@brief Wrapper around a primitive data type that has an empty default constructor.
-
-	Can be seamlessly casted to that type. This allows STL data structures to be created with explicitly uninitialized
-	members via resize() and avoids a nasty memset that wastes a lot of time.
-*/
-template<class T>
-class EmptyConstructorWrapper
-{
-public:
-	EmptyConstructorWrapper()
-	{}
-
-	EmptyConstructorWrapper(const T& rhs)
-	: m_value(rhs)
-	{}
-
-	operator T&()
-	{ return m_value; }
-
-	T& operator=(const T& rhs)
-	{
-		m_value = rhs;
-		return *this;
-	}
-
-	T m_value;
-};
+#include "AcceleratorBuffer.h"
 
 /**
 	@brief Base class for all Waveform specializations
@@ -89,7 +61,10 @@ public:
 		, m_densePacked(false)
 		, m_flags(0)
 		, m_revision(0)
-	{}
+	{
+		m_offsets.PrepareForCpuAccess();
+		m_durations.PrepareForCpuAccess();
+	}
 
 	//empty virtual destructor in case any derived classes need one
 	virtual ~WaveformBase()
@@ -153,16 +128,10 @@ public:
 	};
 
 	///@brief Start timestamps of each sample
-	std::vector<
-		EmptyConstructorWrapper<int64_t>,
-		AlignedAllocator< EmptyConstructorWrapper<int64_t>, 64 >
-		> m_offsets;
+	AcceleratorBuffer<int64_t> m_offsets;
 
 	///@brief Durations of each sample
-	std::vector<
-		EmptyConstructorWrapper<int64_t>,
-		AlignedAllocator< EmptyConstructorWrapper<int64_t>, 64 >
-		> m_durations;
+	AcceleratorBuffer<int64_t> m_durations;
 
 	virtual void clear()
 	{
@@ -183,7 +152,7 @@ public:
 
 	virtual Gdk::Color GetColor(size_t /*i*/)
 	{
-		return StandardColors::colors[StandardColors::COLOR_ERROR]; 
+		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 
 	/**
@@ -193,9 +162,8 @@ public:
 	 */
 	void CopyTimestamps(const WaveformBase* rhs)
 	{
-		size_t len = sizeof(int64_t) * rhs->m_offsets.size();
-		memcpy((void*)&m_offsets[0], (void*)&rhs->m_offsets[0], len);
-		memcpy((void*)&m_durations[0], (void*)&rhs->m_durations[0], len);
+		m_offsets.CopyFrom(rhs->m_offsets);
+		m_durations.CopyFrom(rhs->m_durations);
 	}
 };
 
@@ -208,7 +176,7 @@ class Waveform : public WaveformBase
 public:
 
 	///@brief Sample data
-	std::vector< S, AlignedAllocator<S, 64> > m_samples;
+	AcceleratorBuffer<S> m_samples;
 
 	virtual void Resize(size_t size)
 	{
@@ -225,8 +193,8 @@ public:
 	}
 };
 
-typedef Waveform<EmptyConstructorWrapper<bool> >	DigitalWaveform;
-typedef Waveform<EmptyConstructorWrapper<float>>	AnalogWaveform;
+typedef Waveform<bool>	DigitalWaveform;
+typedef Waveform<float>	AnalogWaveform;
 
 typedef Waveform< std::vector<bool> > 	DigitalBusWaveform;
 

@@ -65,9 +65,9 @@ void SParameterVector::ConvertFromWaveforms(const AnalogWaveform* wmag, const An
 	for(size_t i=0; i<len; i++)
 	{
 		m_points[i] = SParameterPoint(
-			wmag->m_timescale*wmag->m_offsets[i].m_value + wmag->m_triggerPhase,
-			pow(10, wmag->m_samples[i].m_value / 20),
-			wang->m_samples[i].m_value * ascale);
+			wmag->m_timescale*wmag->m_offsets[i] + wmag->m_triggerPhase,
+			pow(10, wmag->m_samples[i] / 20),
+			wang->m_samples[i] * ascale);
 	}
 }
 
@@ -97,11 +97,11 @@ void SParameterVector::ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* 
 
 		//Magnitude
 		wmag->m_offsets[i] = freq;
-		wmag->m_samples[i].m_value = 20 * log10(m_points[i].m_amplitude);
+		wmag->m_samples[i] = 20 * log10(m_points[i].m_amplitude);
 
 		//Angle
 		wang->m_offsets[i] = freq;
-		wang->m_samples[i].m_value = m_points[i].m_phase * ascale;
+		wang->m_samples[i] = m_points[i].m_phase * ascale;
 
 		//Last sample?
 		if(i+1 == len)

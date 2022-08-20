@@ -135,9 +135,9 @@ void MultimeterTrendFilter::AddSample(AnalogWaveform* wfm, double value, double 
 	size_t nmax = 4096;
 	while(wfm->m_samples.size() > nmax)
 	{
-		wfm->m_samples.erase(wfm->m_samples.begin());
-		wfm->m_durations.erase(wfm->m_durations.begin());
-		wfm->m_offsets.erase(wfm->m_offsets.begin());
+		wfm->m_samples.pop_front();
+		wfm->m_durations.pop_front();
+		wfm->m_offsets.pop_front();
 	}
 
 	//Update timestamp

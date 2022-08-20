@@ -93,7 +93,7 @@ protected:
 
 	void DoRefresh(
 		AnalogWaveform* din,
-		std::vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
+		AcceleratorBuffer<float>& data,
 		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
 
 	size_t m_cachedNumPoints;

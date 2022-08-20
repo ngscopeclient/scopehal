@@ -134,7 +134,7 @@ void HyperRAMDecoder::Refresh()
 	int64_t ca_byte     = 0;
 	int64_t clk_time    = 0;
 	int64_t last_clk    = 0;
-	bool last_clkval	= clk->m_samples[0].m_value;
+	bool last_clkval	= clk->m_samples[0];
 
 	size_t clklen = clk->m_samples.size();
 	size_t cslen = csn->m_samples.size();

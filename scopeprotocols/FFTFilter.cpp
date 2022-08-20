@@ -331,7 +331,7 @@ void FFTFilter::Refresh()
 
 void FFTFilter::DoRefresh(
 	AnalogWaveform* din,
-	vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>>& data,
+	AcceleratorBuffer<float>& data,
 	double fs_per_sample,
 	size_t npoints,
 	size_t nouts,

@@ -140,12 +140,12 @@ void EthernetRMIIDecoder::Refresh()
 			uint8_t dval = 0;
 			for(size_t j=0; j<4; j ++)
 			{
-				if(dd0.m_samples[i+j].m_value)
+				if(dd0.m_samples[i+j])
 					dval |= (1 << j*2);
-				if(dd1.m_samples[i+j].m_value)
+				if(dd1.m_samples[i+j])
 					dval |= (2 << j*2);
 
-				if(!dctl.m_samples[i+j].m_value)
+				if(!dctl.m_samples[i+j])
 				{
 					LogDebug("ctl ended partway through a byte at i=%zu, j=%zu)\n", i, j);
 					err = true;

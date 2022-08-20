@@ -177,7 +177,7 @@ void JitterSpectrumFilter::Refresh()
 	//Loop over the input and copy samples.
 	//If we have runs of identical bits, extend the same jitter value.
 	//TODO: interpolate?
-	vector<EmptyConstructorWrapper<float>, AlignedAllocator<EmptyConstructorWrapper<float>, 64>> extended_samples;
+	AcceleratorBuffer<float> extended_samples;
 	extended_samples.reserve(inlen);
 	for(size_t i=0; i<inlen; i++)
 	{
