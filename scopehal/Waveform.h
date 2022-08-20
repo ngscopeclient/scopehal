@@ -155,6 +155,12 @@ public:
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
 
+	virtual void PrepareForCpuAccess()
+	{
+		m_offsets.PrepareForCpuAccess();
+		m_durations.PrepareForCpuAccess();
+	}
+
 	/**
 		@brief Copies offsets/durations from one waveform to another.
 
@@ -190,6 +196,13 @@ public:
 		m_offsets.clear();
 		m_durations.clear();
 		m_samples.clear();
+	}
+
+	virtual void PrepareForCpuAccess()
+	{
+		m_offsets.PrepareForCpuAccess();
+		m_durations.PrepareForCpuAccess();
+		m_samples.PrepareForCpuAccess();
 	}
 };
 
