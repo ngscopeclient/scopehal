@@ -1784,3 +1784,20 @@ void Filter::SetOffset(float offset, size_t stream)
 {
 	m_offsets[stream] = offset;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accelerated waveform accessors
+
+/**
+	@brief Gets the desired location of the filter's output data
+
+	The default implementation returns CPU.
+
+	@return		LOC_CPU: if the filter assumes input waveforms are readable from the CPU
+				LOC_GPU: if the filter assumes input waveforms are readable from the GPU
+				LOC_DONTCARE: if the filter manages its own input memory, or can work with either CPU or GPU input
+ */
+Filter::DataLocation Filter::GetInputLocation()
+{
+	return LOC_CPU;
+}

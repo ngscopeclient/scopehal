@@ -171,3 +171,5 @@ PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
        ${LIBFFTS_INCLUDE_DIR})
 
 install(TARGETS scopeprotocols LIBRARY)
+
+add_subdirectory(shaders)

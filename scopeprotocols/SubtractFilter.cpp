@@ -91,6 +91,12 @@ void SubtractFilter::Refresh()
 	auto din_p = GetAnalogInputWaveform(0);
 	auto din_n = GetAnalogInputWaveform(1);
 
+	//We need offset/duration on the CPU for SetupOutputWaveform() to work
+	din_p->m_offsets.PrepareForCpuAccess();
+	din_n->m_offsets.PrepareForCpuAccess();
+	din_p->m_durations.PrepareForCpuAccess();
+	din_n->m_durations.PrepareForCpuAccess();
+
 	//Set up units and complain if they're inconsistent
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
@@ -114,6 +120,10 @@ void SubtractFilter::Refresh()
 	//TODO: vectorized version of this
 	if(GetYAxisUnits(0) == Unit::UNIT_DEGREES)
 	{
+		//Waveform data must be on CPU
+		din_p->m_samples.PrepareForCpuAccess();
+		din_n->m_samples.PrepareForCpuAccess();
+
 		for(size_t i=0; i<len; i++)
 		{
 			out[i] 		= a[i] - b[i];
@@ -127,6 +137,10 @@ void SubtractFilter::Refresh()
 	//Just regular subtraction
 	else
 	{
+		//Waveform data must be on CPU
+		din_p->m_samples.PrepareForCpuAccess();
+		din_n->m_samples.PrepareForCpuAccess();
+
 		if(g_hasAvx2)
 			InnerLoopAVX2(out, a, b, len);
 		else
@@ -162,4 +176,10 @@ void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 	//Get any extras
 	for(size_t i=end; i<len; i++)
 		out[i] 		= a[i] - b[i];
+}
+
+Filter::DataLocation SubtractFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
 }

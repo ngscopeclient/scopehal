@@ -27,33 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-class SubtractFilter : public Filter
+layout(std430, binding=0) restrict readonly buffer buf_inP
 {
-public:
-	SubtractFilter(const std::string& color);
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual DataLocation GetInputLocation();
-
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
-
-protected:
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+	float inP[];
 };
 
-#endif
+layout(std430, binding=1) restrict readonly buffer buf_inN
+{
+	float inN[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(binding=3) buffer buf_args
+{
+	uint size;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	if(gl_GlobalInvocationID.x >= size)
+		return;
+
+	dout[gl_GlobalInvocationID.x] = inP[gl_GlobalInvocationID.x] - inN[gl_GlobalInvocationID.x];
+}

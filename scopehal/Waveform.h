@@ -161,6 +161,12 @@ public:
 		m_durations.PrepareForCpuAccess();
 	}
 
+	virtual void PrepareForGpuAccess()
+	{
+		m_offsets.PrepareForGpuAccess();
+		m_durations.PrepareForGpuAccess();
+	}
+
 	/**
 		@brief Copies offsets/durations from one waveform to another.
 
@@ -203,6 +209,13 @@ public:
 		m_offsets.PrepareForCpuAccess();
 		m_durations.PrepareForCpuAccess();
 		m_samples.PrepareForCpuAccess();
+	}
+
+	virtual void PrepareForGpuAccess()
+	{
+		m_offsets.PrepareForGpuAccess();
+		m_durations.PrepareForGpuAccess();
+		m_samples.PrepareForGpuAccess();
 	}
 };
 

@@ -175,7 +175,7 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 	pThis->DoExecutorThread(i);
 }
 
-void FilterGraphExecutor::DoExecutorThread(size_t i)
+void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
 {
 	while(true)
 	{
@@ -193,6 +193,26 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		Filter* f;
 		while( (f = GetNextRunnableFilter()) != nullptr)
 		{
+			//Make sure the filter's inputs are where we need them
+			auto loc = f->GetInputLocation();
+			if(loc != Filter::LOC_DONTCARE)
+			{
+				bool expectGpuInput = (loc == Filter::LOC_GPU);
+				bool expectCpuInput = (loc == Filter::LOC_CPU);
+				for(size_t j=0; j<f->GetInputCount(); j++)
+				{
+					auto data = f->GetInput(j).GetData();
+					if(data)
+					{
+						if(expectGpuInput)
+							data->PrepareForGpuAccess();
+						else if(expectCpuInput)
+							data->PrepareForCpuAccess();
+					}
+				}
+			}
+
+			//Actually execute the filter
 			f->Refresh();
 
 			//Filter execution has completed, remove it from the running list and mark as completed
