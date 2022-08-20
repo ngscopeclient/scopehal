@@ -249,19 +249,19 @@ public:
 	/**
 		@brief Returns the actual size of the container (may be smaller than what was allocated)
 	 */
-	size_t size()
+	size_t size() const
 	{ return m_size; }
 
 	/**
 		@brief Returns the allocated size of the container
 	 */
-	size_t capacity()
+	size_t capacity() const
 	{ return m_capacity; }
 
 	/**
 		@brief Returns the total reserved CPU memory, in bytes
 	 */
-	size_t GetCpuMemoryBytes()
+	size_t GetCpuMemoryBytes() const
 	{
 		if(m_cpuMemoryType == MEM_TYPE_NULL)
 			return 0;
@@ -272,7 +272,7 @@ public:
 	/**
 		@brief Returns the total reserved GPU memory, in bytes
 	 */
-	size_t GetGpuMemoryBytes()
+	size_t GetGpuMemoryBytes() const
 	{
 		if(m_gpuMemoryType == MEM_TYPE_NULL)
 			return 0;
@@ -283,37 +283,37 @@ public:
 	/**
 		@brief Returns true if the container is empty
 	 */
-	bool empty()
+	bool empty() const
 	{ return (m_size == 0); }
 
 	/**
 		@brief Returns true if the CPU-side buffer is stale
 	 */
-	bool IsCpuBufferStale()
+	bool IsCpuBufferStale() const
 	{ return m_cpuPhysMemIsStale; }
 
 	/**
 		@brief Returns true if the GPU-side buffer is stale
 	 */
-	bool IsGpuBufferStale()
+	bool IsGpuBufferStale() const
 	{ return m_gpuPhysMemIsStale; }
 
 	/**
 		@brief Returns true if there is currently a CPU-side buffer
 	 */
-	bool HasCpuBuffer()
+	bool HasCpuBuffer() const
 	{ return (m_cpuPtr != nullptr); }
 
 	/**
 		@brief Returns true if there is currently a GPU-side buffer
 	 */
-	bool HasGpuBuffer()
+	bool HasGpuBuffer() const
 	{ return (m_gpuPhysMem != nullptr); }
 
 	/**
 		@brief Returns true if the object contains only a single buffer
 	 */
-	bool IsSingleSharedBuffer()
+	bool IsSingleSharedBuffer() const
 	{ return m_buffersAreSame; }
 
 	/**
@@ -336,6 +336,12 @@ public:
 	}
 
 	/**
+		@brief Resize the container to be empty (but don't free memory)
+	 */
+	void clear()
+	{ resize(0); }
+
+	/**
 		@brief Reallocates buffers so that at least size elements of storage are available
 	 */
 	void reserve(size_t size)
@@ -352,6 +358,44 @@ public:
 	void shrink_to_fit()
 	{
 		Reallocate(m_size);
+	}
+
+	/**
+		@brief Copies our content from another one
+	 */
+	 __attribute__((noinline))
+	void CopyFrom(const AcceleratorBuffer<T>& rhs)
+	{
+		//Copy placement hints from the other instance, then resize to match
+		SetCpuAccessHint(rhs.m_cpuAccessHint);
+		SetGpuAccessHint(rhs.m_gpuAccessHint, true);
+		resize(rhs.m_size);
+
+		//Valid data CPU side? Copy it to here
+		if(rhs.HasCpuBuffer() && !rhs.m_cpuPhysMemIsStale)
+			memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
+
+		//Valid data GPU side? Copy it to here
+		if(rhs.HasGpuBuffer() && !rhs.m_gpuPhysMemIsStale)
+		{
+			std::lock_guard<std::mutex> lock(g_vkTransferMutex);
+
+			//Make the transfer request
+			g_vkTransferCommandBuffer->begin({});
+			vk::BufferCopy region(0, 0, m_size * sizeof(T));
+			g_vkTransferCommandBuffer->copyBuffer(**rhs.m_gpuBuffer, **m_gpuBuffer, {region});
+			g_vkTransferCommandBuffer->end();
+
+			//Submit the request and block until it completes
+			vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+			vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
+			g_vkTransferQueue->submit(info, *fence);
+			while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+			{}
+
+		}
+		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
 	}
 
 protected:
