@@ -48,6 +48,52 @@ extern std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 extern std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
 extern std::mutex g_vkTransferMutex;
 
+template<class T>
+class AcceleratorBuffer;
+
+template<class T>
+class AcceleratorBufferIterator
+{
+public:
+	using value_type = T;
+	using iterator_category = std::forward_iterator_tag;
+	using difference_type = std::ptrdiff_t;
+	using pointer = T*;
+	using reference = T&;
+
+	AcceleratorBufferIterator(AcceleratorBuffer<T>& buf, size_t i)
+	: m_index(i)
+	, m_buf(buf)
+	{}
+
+	T& operator*()
+	{ return m_buf[m_index]; }
+
+	size_t GetIndex() const
+	{ return m_index; }
+
+	bool operator!=(AcceleratorBufferIterator<T>& it)
+	{
+		//TODO: should we check m_buf equality too?
+		//Will slow things down, but be more semantically correct. Does anything care?
+		return (m_index != it.m_index);
+	}
+
+	AcceleratorBufferIterator<T>& operator++()
+	{
+		m_index ++;
+		return *this;
+	}
+
+protected:
+	size_t m_index;
+	AcceleratorBuffer<T>& m_buf;
+};
+
+template<class T>
+std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const AcceleratorBufferIterator<T>& b)
+{ return a.GetIndex() - b.GetIndex(); }
+
 /**
 	@brief A buffer of memory which may be used by GPU acceleration
 
@@ -186,6 +232,9 @@ protected:
 #ifndef _WIN32
 	int m_tempFileHandle;
 #endif
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Iteration
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sizes of buffers
@@ -432,7 +481,17 @@ protected:
 				//If CPU-side data is valid, copy existing data over.
 				//New pointer is still valid in this case.
 				if(!m_cpuPhysMemIsStale)
+				{
+					//Disable compiler warning about copying classes that don't have non-default constructors
+					//or assignment operators. This is intentional and guaranteed to be safe;
+					//waveform sample types must be POD and not contain pointer members etc.
+					#pragma GCC diagnostic push
+					#pragma GCC diagnostic ignored "-Wclass-memaccess"
+
 					memcpy(m_cpuPtr, pOld, sizeof(T) * m_size);
+
+					#pragma GCC diagnostic pop
+				}
 
 				//If CPU-side data is stale, just allocate the new buffer but leave it as stale
 				//(don't do a potentially unnecessary copy from the GPU)
@@ -542,15 +601,49 @@ public:
 	 */
 	void push_back(const T& value)
 	{
-		LogDebug("push_back (size=%zu, capacity=%zu)\n", m_size, m_capacity);
-		LogIndenter li;
-
 		size_t cursize = m_size;
 		resize(m_size + 1);
 		m_cpuPtr[cursize] = value;
 
 		MarkModifiedFromCpu();
 	}
+
+	/**
+		@brief Removes the last item in the container
+	 */
+	void pop_back()
+	{
+		if(!empty())
+			resize(m_size - 1);
+	}
+
+	/**
+		@brief Removes the first item in the container
+
+		TODO: GPU implementation of this?
+	 */
+	void pop_front()
+	{
+		//No need to move data if popping last element
+		if(m_size == 1)
+		{
+			clear();
+			return;
+		}
+
+		//Don't touch GPU side buffer
+
+		memmove(m_cpuPtr, m_cpuPtr+1, sizeof(T) * (m_size-1));
+		resize(m_size - 1);
+
+		MarkModifiedFromCpu();
+	}
+
+	AcceleratorBufferIterator<T> begin()
+	{ return AcceleratorBufferIterator<T>(*this, 0); }
+
+	AcceleratorBufferIterator<T> end()
+	{ return AcceleratorBufferIterator<T>(*this, m_size); }
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Hints about near-future usage patterns
@@ -643,8 +736,6 @@ public:
 		if(m_capacity == 0)
 			return;
 
-		LogVerbose("PrepareForGpuAccess\n");
-
 		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
 		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
 			AllocateGpuBuffer(m_capacity);
@@ -663,8 +754,6 @@ protected:
 	 */
 	void CopyToCpu()
 	{
-		LogVerbose("CopyToCPU\n");
-
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 		//Make the transfer request
@@ -688,8 +777,6 @@ protected:
 	 */
 	void CopyToGpu()
 	{
-		LogVerbose("CopyToGPU\n");
-
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 		//Make the transfer request
@@ -786,8 +873,6 @@ protected:
 		//If any GPU access is expected, use pinned memory so we don't have to move things around
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
-			LogVerbose("Allocating CPU buffer (%zu elements, pinned)\n", size);
-
 			//Allocate the buffer
 			vk::MemoryAllocateInfo info(size, g_vkPinnedMemoryType);
 			m_cpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
@@ -812,7 +897,6 @@ protected:
 		//If frequent CPU access is expected, use normal host memory
 		else if(m_cpuAccessHint == HINT_LIKELY)
 		{
-			LogVerbose("Allocating CPU buffer (%zu elements, not pinned)\n", size);
 			m_cpuBuffer = nullptr;
 			m_cpuMemoryType = MEM_TYPE_CPU_ONLY;
 			m_cpuPtr = m_cpuAllocator.allocate(size);
@@ -825,14 +909,12 @@ protected:
 
 				//On Windows, use normal memory for now
 				//until we figure out how to do this there
-				LogVerbose("Allocating CPU buffer (%zu elements, not pinned)\n", size);
 				m_cpuBuffer = nullptr;
 				m_cpuMemoryType = MEM_TYPE_CPU_ONLY;
 				m_cpuPtr = m_cpuAllocator.allocate(size);
 
 			#else
 
-				LogVerbose("Allocating CPU buffer (%zu elements, paged)\n", size);
 				m_cpuBuffer = nullptr;
 				m_cpuMemoryType = MEM_TYPE_CPU_PAGED;
 
@@ -941,8 +1023,6 @@ protected:
 	__attribute__((noinline))
 	void AllocateGpuBuffer(size_t size)
 	{
-		LogVerbose("Allocating GPU buffer (%zu elements, local)\n", size);
-
 		//For now, always use local memory
 		vk::MemoryAllocateInfo info(size, g_vkLocalMemoryType);
 		m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
