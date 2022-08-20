@@ -35,8 +35,7 @@ using namespace std;
 // Construction / destruction
 
 FilterGraphExecutor::FilterGraphExecutor(size_t numThreads)
-	: m_barrier(numThreads + 1)
-	, m_terminating(false)
+	: m_terminating(false)
 {
 	//Create our thread pool
 	for(size_t i=0; i<numThreads; i++)
@@ -47,7 +46,7 @@ FilterGraphExecutor::~FilterGraphExecutor()
 {
 	//Terminate worker threads
 	m_terminating = true;
-	m_barrier.arrive_and_wait();
+	m_workerCvar.notify_all();
 	for(auto& t : m_threads)
 		t->join();
 }
@@ -58,72 +57,29 @@ FilterGraphExecutor::~FilterGraphExecutor()
 /**
 	@brief Evaluates the filter graph, blocking until execution has completed
  */
-void FilterGraphExecutor::RunBlocking(set<Filter*>& filters)
+void FilterGraphExecutor::RunBlocking(const set<Filter*>& filters)
 {
-	LogTrace("Initializing execution context with %zu filters\n", filters.size());
+	//Nothing to do if we have no filters to run
+	if(filters.empty())
+		return;
 
 	m_incompleteFilters = filters;
 	m_runnableFilters.clear();
 
 	Filter::ClearAnalysisCache();
 
-	//Wait for all worker threads to be ready (should be instantaneous, they should be waiting for us to get here)
-	LogTrace("At barrier in main thread\n");
-	m_barrier.arrive_and_wait();
-	LogTrace("Barrier cleared in main thread\n");
+	//Wake up our workers
+	m_workerCvar.notify_all();
 
-
-	///////////////
-	//DEBUG: old filter scheduler
-
-	//Prepare to topologically sort filter nodes into blocks capable of parallel evaluation.
-	//Block 0 may only depend on physical scope channels.
-	//Block 1 may depend on decodes in block 0 or physical channels.
-	//Block 2 may depend on 1/0/physical, etc.
-	typedef vector<Filter*> FilterBlock;
-	vector<FilterBlock> blocks;
-
-	//Working set starts out aspThis->m_barrier.arrive_and_wait(); all decoders
-	auto working = filters;
-
-	//Each iteration, put all decodes that only depend on previous blocks into this block.
-	for(int block=0; !working.empty(); block++)
+	//Block until they're finished
+	while(true)
 	{
-		FilterBlock current_block;
-		for(auto w : working)
-		{
-			auto d = static_cast<Filter*>(w);
+		unique_lock<mutex> lock(m_completionCvarMutex);
+		m_completionCvar.wait(lock);
 
-			//Check if we have any inputs that are still in the working set.
-			bool ok = true;
-			for(size_t i=0; i<d->GetInputCount(); i++)
-			{
-				auto in = d->GetInput(i).m_channel;
-				if(working.find((Filter*)in) != working.end())
-				{
-					ok = false;
-					break;
-				}
-			}
-
-			//All inputs are in previous blocks, we're good to go for the current block
-			if(ok)
-				current_block.push_back(d);
-		}
-
-		//Anything we assigned this iteration shouldn't be in the working set for next time.
-		//It does, however, have to get saved in the output block.
-		for(auto d : current_block)
-			working.erase(d);
-		blocks.push_back(current_block);
-	}
-
-	//Evaluate the blocks, taking advantage of parallelism between them
-	for(auto& block : blocks)
-	{
-		#pragma omp parallel for
-		for(size_t i=0; i<block.size(); i++)
-			block[i]->Refresh();
+		lock_guard<mutex> lock2(m_mutex);
+		if(m_runnableFilters.empty())
+			break;
 	}
 }
 
@@ -137,7 +93,71 @@ void FilterGraphExecutor::RunBlocking(set<Filter*>& filters)
  */
 Filter* FilterGraphExecutor::GetNextRunnableFilter()
 {
-	return nullptr;
+	while(true)
+	{
+		//Check for stuff
+		{
+			lock_guard<mutex> lock(m_mutex);
+
+			//Nothing left to run? Stop
+			if(m_incompleteFilters.empty())
+				return nullptr;
+
+			//Nothing ready to run? Update the run queue
+			if(m_runnableFilters.empty())
+				UpdateRunnable();
+
+			//If there is something ready to run, grab it
+			if(!m_runnableFilters.empty())
+			{
+				auto f = *m_runnableFilters.begin();
+				m_runnableFilters.erase(f);
+				m_runningFilters.emplace(f);
+				return f;
+			}
+		}
+
+		//Still nothing to run? Block
+		unique_lock<mutex> lock(m_workerCvarMutex);
+		m_workerCvar.wait(lock);
+	}
+}
+
+/**
+	@brief Searches m_incompleteFilters for any that are unblocked, and adds them to m_runnableFilters
+
+	Assumes m_mutex is locked
+ */
+void FilterGraphExecutor::UpdateRunnable()
+{
+	//Do nothing if we already have other filters marked runnable
+	if(!m_runnableFilters.empty())
+		return;
+
+	//Look for new filters that are eligible to run
+	for(auto f : m_incompleteFilters)
+	{
+		//If the filter is already running, nothing we can do
+		if(m_runningFilters.find(f) != m_runningFilters.end())
+			continue;
+
+		//Not actively running.
+		//Is it blocked by any of our incomplete filters?
+		bool ok = true;
+		for(size_t i=0; i<f->GetInputCount(); i++)
+		{
+			auto in = f->GetInput(i).m_channel;
+			if(m_incompleteFilters.find((Filter*)in) != m_incompleteFilters.end())
+			{
+				ok = false;
+				break;
+			}
+		}
+
+		//Not blocked. It's runnable.
+		if(ok)
+			m_runnableFilters.emplace(f);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,27 +171,43 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 	#ifdef __linux__
 	pthread_setname_np(pthread_self(), "FilterGraph");
 	#endif
-	LogTrace("ExecutorThread %zu starting\n", i);
 
+	pThis->DoExecutorThread(i);
+}
+
+void FilterGraphExecutor::DoExecutorThread(size_t i)
+{
 	while(true)
 	{
-		//Wait until the main thread starts a new round of execution
-		LogTrace("ExecutorThread %zu at barrier\n", i);
-		pThis->m_barrier.arrive_and_wait();
-		LogTrace("ExecutorThread %zu cleared barrier\n", i);
+		{
+			//Wait until the main thread starts a new round of execution
+			unique_lock<mutex> lock(m_workerCvarMutex);
+			m_workerCvar.wait(lock);
+		}
 
 		//If they woke us up because the context is being destroyed, we're done
-		if(pThis->m_terminating)
+		if(m_terminating)
 			break;
 
 		//Evaluate filter objects as they become available, then stop when there's nothing left to do
 		Filter* f;
-		while( (f = pThis->GetNextRunnableFilter()) != nullptr)
+		while( (f = GetNextRunnableFilter()) != nullptr)
 		{
-			LogTrace("Evaluating %s in thread %zu\n", f->GetDisplayName().c_str(), i);
 			f->Refresh();
-		}
-	}
 
-	LogTrace("ExecutorThread %zu exiting\n", i);
+			//Filter execution has completed, remove it from the running list and mark as completed
+			lock_guard<mutex> lock2(m_mutex);
+			m_runningFilters.erase(f);
+			m_incompleteFilters.erase(f);
+
+			//Wake up all threads that might have been waiting on this filter to complete
+			m_workerCvar.notify_all();
+		}
+
+		//We have no more filters to run.
+		//If this was the last filter (nothing left incomplete), we're done - wake up the main thread
+		lock_guard<mutex> lock2(m_mutex);
+		if(m_incompleteFilters.empty())
+			m_completionCvar.notify_one();
+	}
 }

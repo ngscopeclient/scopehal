@@ -34,85 +34,6 @@
 #include <atomic>
 
 /**
-	@brief Simple std::barrier replacement because not all supported platforms currently implement std::barrier
- */
-class Barrier
-{
-public:
-	Barrier(size_t expectedThreads)
-	: m_expectedThreads(expectedThreads)
-	, m_waitingThreads(expectedThreads)
-	, m_clearedThreads(expectedThreads)
-	{}
-
-	/**
-		@brief Blocks until all of our threads have reached a sync point
-
-		Two-phase implementation so we can reset counters for a second invocation
-	 */
-	void arrive_and_wait()
-	{
-		//Decrement number of waiting threads
-		size_t numWaiting = --m_waitingThreads;
-
-		//If we were the last thread, notify everyone else
-		LogTrace("First sync: numWaiting=%zu\n", numWaiting);
-		if(numWaiting == 0)
-		{
-			LogTrace("notifying all A\n");
-			m_clearedThreads -= m_expectedThreads;
-			m_cvarA.notify_all();
-		}
-
-		//If not, block until notified
-		else
-		{
-			LogTrace("Blocking A\n");
-			while(m_waitingThreads != 0)
-			{
-				std::unique_lock<std::mutex> lock(m_mutex);
-				m_cvarA.wait(lock);
-				LogTrace("cvarA woke up, waitingThreads = %zu\n", (size_t)m_waitingThreads);
-			}
-		}
-
-		//At this point we've passed the sync point.
-		//Atomically increment the "cleared" count so we know everyone's passed it.
-		size_t numCleared = ++m_clearedThreads;
-		LogTrace("Second sync: numWaiting=%zu\n", numWaiting);
-		if(numCleared == m_expectedThreads)
-		{
-			LogTrace("notifying all B\n");
-			m_waitingThreads += m_expectedThreads;
-			m_cvarB.notify_all();
-		}
-
-		//If not, block until notified
-		else
-		{
-			LogTrace("Blocking B\n");
-			while(numCleared != m_expectedThreads)
-			{
-				std::unique_lock<std::mutex> lock(m_mutex);
-				m_cvarB.wait(lock);
-				LogTrace("cvarB woke up, numCleared = %zu\n", (size_t)numCleared);
-			}
-		}
-	}
-
-protected:
-	size_t m_expectedThreads;
-
-	std::atomic<size_t> m_waitingThreads;
-	std::atomic<size_t> m_clearedThreads;
-
-	std::mutex m_mutex;
-
-	std::condition_variable m_cvarA;
-	std::condition_variable m_cvarB;
-};
-
-/**
 	@brief Execution manager / scheduler for the filter graph
  */
 class FilterGraphExecutor
@@ -121,26 +42,42 @@ public:
 	FilterGraphExecutor(size_t numThreads = 8);
 	~FilterGraphExecutor();
 
-	void RunBlocking(std::set<Filter*>& filters);
+	void RunBlocking(const std::set<Filter*>& filters);
 
 	Filter* GetNextRunnableFilter();
 
 protected:
 	static void ExecutorThread(FilterGraphExecutor* pThis, size_t i);
+	void DoExecutorThread(size_t i);
 
+	void UpdateRunnable();
+
+	//Mutex for access to shared state
 	std::mutex m_mutex;
 
 	//Filters that have not yet been updated
 	std::set<Filter*> m_incompleteFilters;
 
 	//Filters that have no dependencies and are eligible to run now
-	std::vector<Filter*> m_runnableFilters;
+	std::set<Filter*> m_runnableFilters;
+
+	//Filters that are actively being run
+	std::set<Filter*> m_runningFilters;
 
 	//Set of thread contexts
 	std::vector<std::unique_ptr<std::thread>> m_threads;
 
-	//Barrier for waking up worker threads when work arrives
-	Barrier m_barrier;
+	//Condition variable for waking up worker threads when work arrives
+	std::condition_variable m_workerCvar;
+
+	//Mutex for access to m_workerCvar
+	std::mutex m_workerCvarMutex;
+
+	//Condition variable for waking up main thread when work is complete
+	std::condition_variable m_completionCvar;
+
+	//Mutex for access to m_workerCvar
+	std::mutex m_completionCvarMutex;
 
 	//Shutdown flag
 	bool m_terminating;
