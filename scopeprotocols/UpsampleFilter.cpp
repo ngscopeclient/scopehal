@@ -111,6 +111,13 @@ void UpsampleFilter::Refresh()
 	//Get the input data
 	auto din = GetAnalogInputWaveform(0);
 
+	//Current resampling implementation assumes input is dense, fail if it's not
+	if(!din->m_densePacked)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
 	//Configuration parameters that eventually have to be user specified
 	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
 	size_t window = 5;
@@ -132,8 +139,7 @@ void UpsampleFilter::Refresh()
 
 	//Create the output and configure it
 	auto cap = new AnalogWaveform;
-
-	//TODO: make this work on not-dense-packed waveforms
+	cap->m_densePacked = true;
 
 	//Fill out the input with samples
 	size_t len = din->m_samples.size();
