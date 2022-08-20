@@ -141,21 +141,25 @@ void UpsampleFilter::Refresh()
 	auto cap = new AnalogWaveform;
 	cap->m_densePacked = true;
 
-	//Fill out the input with samples
+	//Fill the output buffer with default values
 	size_t len = din->m_samples.size();
+	size_t outlen = len*upsample_factor;
+	cap->Resize(outlen);
+	size_t iout = 0;
 	for(size_t i=0; i < len; i++)
 	{
 		for(size_t j=0; j<upsample_factor; j++)
 		{
-			cap->m_offsets.push_back(i * upsample_factor + j);
-			cap->m_durations.push_back(1);
-			cap->m_samples.push_back(0);
+			cap->m_offsets[iout] = iout;
+			cap->m_durations[iout] = 1;
+			cap->m_samples[iout] = 0;
+			iout ++;
 		}
 	}
 
 	//Logically, we upsample by inserting zeroes, then convolve with the sinc filter.
 	//Optimization: don't actually waste time multiplying by zero
-	//TODO: vectorize this instead of multithreading
+	//TODO: move to GPU
 	size_t imax = len - window;
 	#pragma omp parallel for
 	for(size_t i=0; i < imax; i++)
