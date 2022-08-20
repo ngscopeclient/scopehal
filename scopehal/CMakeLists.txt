@@ -14,7 +14,7 @@ if(WIN32)
 	set(YAML_LIBRARIES yaml-cpp)
 else()
 	set(LIN_LIBS dl)
-	find_package(Yaml REQUIRED)
+	find_package(YAML REQUIRED)
 endif()
 
 # Apple has their own idea about stat structs
