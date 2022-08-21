@@ -736,10 +736,15 @@ public:
 		if(m_capacity == 0)
 			return;
 
+		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
+		if(m_gpuAccessHint == HINT_NEVER)
+			SetGpuAccessHint(HINT_UNLIKELY, true);
+
 		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
 		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
 			AllocateGpuBuffer(m_capacity);
 
+		//Make sure the GPU-side buffer is up to date
 		if(m_gpuPhysMemIsStale)
 			CopyToGpu();
 	}

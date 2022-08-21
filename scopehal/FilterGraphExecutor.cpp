@@ -177,6 +177,16 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 
 void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
 {
+	//Create a queue and command buffer for this thread's accelerated processing
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		g_computeQueueType );
+	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
+	vk::CommandBufferAllocateInfo bufinfo(**g_vkTransferCommandPool, vk::CommandBufferLevel::ePrimary, 1);
+	vk::raii::CommandBuffer cmdbuf(move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+	vk::raii::Queue queue(*g_vkComputeDevice, g_computeQueueType, 0);
+
+	//Main loop
 	while(true)
 	{
 		{
@@ -213,7 +223,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
 			}
 
 			//Actually execute the filter
-			f->Refresh();
+			f->Refresh(cmdbuf, queue);
 
 			//Filter execution has completed, remove it from the running list and mark as completed
 			lock_guard<mutex> lock2(m_mutex);

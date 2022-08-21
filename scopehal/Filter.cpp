@@ -1786,7 +1786,7 @@ void Filter::SetOffset(float offset, size_t stream)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accelerated waveform accessors
+// Accelerated waveform processing
 
 /**
 	@brief Gets the desired location of the filter's output data
@@ -1800,4 +1800,24 @@ void Filter::SetOffset(float offset, size_t stream)
 Filter::DataLocation Filter::GetInputLocation()
 {
 	return LOC_CPU;
+}
+
+/**
+	@brief Evaluates the filter.
+
+	This version does not support using Vulkan acceleration and should be considered deprecated. It will be
+	removed in the indefinite future once all filters have been converted to the new API.
+ */
+void Filter::Refresh()
+{
+}
+
+/**
+	@brief Evaluates the filter, using GPU acceleration if possible
+
+	The default implementation calls the legacy non-accelerated Refresh() method.
+ */
+void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, vk::raii::Queue& /*queue*/)
+{
+	Refresh();
 }

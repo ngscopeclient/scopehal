@@ -165,7 +165,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Evaluation
 
-	virtual void Refresh() =0;
+	//Legacy CPU implementation
+	virtual void Refresh();
+
+	//GPU accelerated refresh method
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
