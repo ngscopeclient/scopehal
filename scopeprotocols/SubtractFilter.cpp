@@ -42,6 +42,41 @@ SubtractFilter::SubtractFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("IN+");
 	CreateInput("IN-");
+
+	auto srcvec = ReadDataFileUint32("shaders/SubtractFilter.spv");
+	vk::ShaderModuleCreateInfo info({}, srcvec);
+	m_shaderModule = make_unique<vk::raii::ShaderModule>(*g_vkComputeDevice, info);
+
+	//Configure shader input bindings
+	vector<vk::DescriptorSetLayoutBinding> bindings =
+	{
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {}),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {}),
+		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {})
+	};
+
+	//DescriptorSetLayoutBinding
+	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
+	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
+
+	vk::PipelineLayoutCreateInfo linfo(
+		{},
+		**m_descriptorSetLayout,
+		{});
+	m_pipelineLayout = make_unique<vk::raii::PipelineLayout>(*g_vkComputeDevice, linfo);
+
+	vk::PipelineShaderStageCreateInfo stageinfo({}, vk::ShaderStageFlagBits::eCompute, **m_shaderModule, "main");
+	vk::ComputePipelineCreateInfo pinfo({}, stageinfo, **m_pipelineLayout);
+	m_computePipeline = make_unique<vk::raii::Pipeline>(
+		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
+}
+
+SubtractFilter::~SubtractFilter()
+{
+	m_computePipeline = nullptr;
+	m_descriptorSetLayout = nullptr;
+	m_pipelineLayout = nullptr;
+	m_shaderModule = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,6 +170,12 @@ void SubtractFilter::Refresh()
 	}
 
 	//Just regular subtraction
+	else if(g_gpuFilterEnabled)
+	{
+
+	}
+
+	//Software fallback
 	else
 	{
 		//Waveform data must be on CPU

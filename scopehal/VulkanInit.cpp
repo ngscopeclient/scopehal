@@ -393,12 +393,10 @@ bool VulkanInit()
 				g_vkTransferCommandBuffer = make_unique<vk::raii::CommandBuffer>(
 					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 
-				//Make a Queue for memory trasnfers that we can use implicitly during buffer management
+				//Make a Queue for memory transfers that we can use implicitly during buffer management
 				g_vkTransferQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
 			}
 		}
-
-		//TODO: pipeline caching etc?
 	}
 	catch ( vk::SystemError & err )
 	{
@@ -417,6 +415,9 @@ bool VulkanInit()
 	}
 
 	LogDebug("\n");
+
+	//If we get here, everything is good
+	g_gpuFilterEnabled = true;
 
 	return true;
 }

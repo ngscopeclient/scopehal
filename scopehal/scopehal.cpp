@@ -88,6 +88,7 @@ bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 bool g_hasFMA = false;
 bool g_disableOpenCL = false;
+bool g_gpuFilterEnabled = false;
 
 vector<string> g_searchPaths;
 
@@ -843,7 +844,7 @@ void InitializeSearchPaths()
 }
 
 /**
-	@brief Locates and returns the contents of a data file
+	@brief Locates and returns the contents of a data file as a std::string
  */
 string ReadDataFile(const string& relpath)
 {
@@ -879,6 +880,44 @@ string ReadDataFile(const string& relpath)
 	delete[] buf;
 
 	return ret;
+}
+
+/**
+	@brief Locates and returns the contents of a data file as a std::vector<uint32_t>
+ */
+vector<uint32_t> ReadDataFileUint32(const string& relpath)
+{
+	vector<uint32_t> buf;
+
+	FILE* fp = NULL;
+	for(auto dir : g_searchPaths)
+	{
+		string path = dir + "/" + relpath;
+		fp = fopen(path.c_str(), "rb");
+		if(fp)
+			break;
+	}
+
+	if(!fp)
+	{
+		LogWarning("ReadDataFile: Could not open file \"%s\"\n", relpath.c_str());
+		return buf;
+	}
+	fseek(fp, 0, SEEK_END);
+	size_t fsize = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	size_t wordsize = fsize / sizeof(uint32_t);
+	buf.resize(wordsize);
+	if(wordsize != fread(&buf[0], sizeof(uint32_t), wordsize, fp))
+	{
+		LogWarning("ReadDataFile: Could not read file \"%s\"\n", relpath.c_str());
+		fclose(fp);
+		return buf;
+	}
+	fclose(fp);
+
+	return buf;
 }
 
 /**

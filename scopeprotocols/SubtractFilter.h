@@ -39,6 +39,7 @@ class SubtractFilter : public Filter
 {
 public:
 	SubtractFilter(const std::string& color);
+	~SubtractFilter();
 
 	virtual void Refresh();
 
@@ -54,6 +55,11 @@ public:
 protected:
 	void InnerLoop(float* out, float* a, float* b, size_t len);
 	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+
+	std::unique_ptr<vk::raii::ShaderModule> m_shaderModule;
+	std::unique_ptr<vk::raii::Pipeline> m_computePipeline;
+	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
+	std::unique_ptr<vk::raii::DescriptorSetLayout> m_descriptorSetLayout;
 };
 
 #endif

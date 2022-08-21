@@ -138,6 +138,7 @@ std::string BaseName(const std::string& path);
 
 std::string ReadFile(const std::string& path);
 std::string ReadDataFile(const std::string& relpath);
+std::vector<uint32_t> ReadDataFileUint32(const std::string& relpath);
 std::string FindDataFile(const std::string& relpath);
 void GetTimestampOfFile(std::string path, time_t& timestamp, int64_t& fs);
 
@@ -195,5 +196,8 @@ extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
 extern std::unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
 extern size_t g_computeQueueType;
+
+//Enable filter acceleration
+extern bool g_gpuFilterEnabled;
 
 #endif
