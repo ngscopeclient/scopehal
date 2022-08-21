@@ -161,7 +161,7 @@ void FilterGraphExecutor::UpdateRunnable()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 	omp_ge
+// 	Main parallel execution logic
 
 /**
 	@brief Thread function to handle filter graph execution
@@ -182,7 +182,8 @@ void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 		g_computeQueueType );
 	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
-	vk::CommandBufferAllocateInfo bufinfo(**g_vkTransferCommandPool, vk::CommandBufferLevel::ePrimary, 1);
+
+	vk::CommandBufferAllocateInfo bufinfo(*pool, vk::CommandBufferLevel::ePrimary, 1);
 	vk::raii::CommandBuffer cmdbuf(move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 	vk::raii::Queue queue(*g_vkComputeDevice, g_computeQueueType, 0);
 
