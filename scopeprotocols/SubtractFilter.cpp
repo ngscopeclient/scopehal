@@ -50,25 +50,36 @@ SubtractFilter::SubtractFilter(const string& color)
 	//Configure shader input bindings
 	vector<vk::DescriptorSetLayoutBinding> bindings =
 	{
-		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {}),
-		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {}),
-		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, vk::ShaderStageFlagBits::eCompute, {})
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
+		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
+		vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute)
 	};
-
-	//DescriptorSetLayoutBinding
 	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
 
+	//Make the pipeline layout
 	vk::PipelineLayoutCreateInfo linfo(
 		{},
 		**m_descriptorSetLayout,
 		{});
 	m_pipelineLayout = make_unique<vk::raii::PipelineLayout>(*g_vkComputeDevice, linfo);
 
+	//Make the pipeline
 	vk::PipelineShaderStageCreateInfo stageinfo({}, vk::ShaderStageFlagBits::eCompute, **m_shaderModule, "main");
 	vk::ComputePipelineCreateInfo pinfo({}, stageinfo, **m_pipelineLayout);
 	m_computePipeline = make_unique<vk::raii::Pipeline>(
 		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
+
+	//Descriptor pool for our shader parameters
+	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 4);
+	vk::DescriptorPoolCreateInfo poolInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 4, poolSize);
+	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
+
+	//Use pinned memory for the arg buffer
+	m_argbuf.resize(1);
+	m_argbuf.SetCpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
+	m_argbuf.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_UNLIKELY, true);
 }
 
 SubtractFilter::~SubtractFilter()
@@ -114,7 +125,7 @@ string SubtractFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SubtractFilter::Refresh()
+void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndAnalog())
@@ -147,9 +158,6 @@ void SubtractFilter::Refresh()
 
 	//Create the output and copy timestamps
 	auto cap = SetupOutputWaveform(din_p, 0, 0, 0);
-	float* out = (float*)&cap->m_samples[0];
-	float* a = (float*)&din_p->m_samples[0];
-	float* b = (float*)&din_n->m_samples[0];
 
 	//Special case if input units are degrees: we want to do modular arithmetic
 	//TODO: vectorized version of this
@@ -159,6 +167,9 @@ void SubtractFilter::Refresh()
 		din_p->m_samples.PrepareForCpuAccess();
 		din_n->m_samples.PrepareForCpuAccess();
 
+		float* out = (float*)&cap->m_samples[0];
+		float* a = (float*)&din_p->m_samples[0];
+		float* b = (float*)&din_n->m_samples[0];
 		for(size_t i=0; i<len; i++)
 		{
 			out[i] 		= a[i] - b[i];
@@ -169,19 +180,55 @@ void SubtractFilter::Refresh()
 		}
 	}
 
-	//Just regular subtraction
+	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
+		//Waveform data must be on GPU
+		din_p->m_samples.PrepareForGpuAccess();
+		din_n->m_samples.PrepareForGpuAccess();
+
+		//Set up the other arguments
+		m_argbuf.PrepareForCpuAccess();
+		m_argbuf[0] = len;
+		m_argbuf.PrepareForGpuAccess();
+
+		//Dispatch the compute operation
+		cmdBuf.begin({});
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
+		/*cmdbuf.bindDescriptorSets(
+			vk::PipelineBindPoint::eCompute,
+			*m_pipelineLayout,*/
+
+
+		/*
+		void bindDescriptorSets( VULKAN_HPP_NAMESPACE::PipelineBindPoint                       pipelineBindPoint,
+                               VULKAN_HPP_NAMESPACE::PipelineLayout                          layout,
+                               uint32_t                                                      firstSet,
+                               ArrayProxy<const VULKAN_HPP_NAMESPACE::DescriptorSet> const & descriptorSets,
+                               ArrayProxy<const uint32_t> const &                            dynamicOffsets ) const VULKAN_HPP_NOEXCEPT;
+		void dispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ ) const VULKAN_HPP_NOEXCEPT;
+                               */
+		cmdBuf.end();
+
+		//Block until the compute operation finishes
+		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+		vk::SubmitInfo info({}, {}, *cmdBuf);
+		queue.submit(info, *fence);
+		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+		{}
 
 	}
 
 	//Software fallback
-	else
+	/*else*/
 	{
 		//Waveform data must be on CPU
 		din_p->m_samples.PrepareForCpuAccess();
 		din_n->m_samples.PrepareForCpuAccess();
 
+		float* out = (float*)&cap->m_samples[0];
+		float* a = (float*)&din_p->m_samples[0];
+		float* b = (float*)&din_n->m_samples[0];
 		if(g_hasAvx2)
 			InnerLoopAVX2(out, a, b, len);
 		else

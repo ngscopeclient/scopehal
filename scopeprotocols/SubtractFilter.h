@@ -41,7 +41,7 @@ public:
 	SubtractFilter(const std::string& color);
 	~SubtractFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
@@ -60,6 +60,9 @@ protected:
 	std::unique_ptr<vk::raii::Pipeline> m_computePipeline;
 	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
 	std::unique_ptr<vk::raii::DescriptorSetLayout> m_descriptorSetLayout;
+	std::unique_ptr<vk::raii::DescriptorPool> m_descriptorPool;
+
+	AcceleratorBuffer<uint32_t> m_argbuf;
 };
 
 #endif
