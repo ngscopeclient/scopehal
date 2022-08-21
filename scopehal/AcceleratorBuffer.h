@@ -282,8 +282,8 @@ public:
 		#endif
 		, m_capacity(0)
 		, m_size(0)
-		, m_cpuAccessHint(HINT_LIKELY)	//default access hint: CPU-only
-		, m_gpuAccessHint(HINT_NEVER)
+		, m_cpuAccessHint(HINT_LIKELY)	//default access hint: CPU-side pinned memory
+		, m_gpuAccessHint(HINT_UNLIKELY)
 	{
 	}
 
@@ -878,14 +878,7 @@ protected:
 		//If any GPU access is expected, use pinned memory so we don't have to move things around
 		if(m_gpuAccessHint != HINT_NEVER)
 		{
-			//Allocate the buffer
-			vk::MemoryAllocateInfo info(size, g_vkPinnedMemoryType);
-			m_cpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
-
-			//Map it
-			m_cpuPtr = reinterpret_cast<T*>(m_cpuPhysMem->mapMemory(0, size));
-
-			//Make a Vulkan buffer for it
+			//Make a Vulkan buffer first
 			vk::BufferCreateInfo bufinfo(
 				{},
 				size * sizeof(T),
@@ -893,6 +886,17 @@ protected:
 					vk::BufferUsageFlagBits::eTransferDst |
 					vk::BufferUsageFlagBits::eStorageBuffer);
 			m_cpuBuffer = std::make_unique<vk::raii::Buffer>(*g_vkComputeDevice, bufinfo);
+
+			//Figure out actual memory requirements of the buffer
+			//(may be rounded up from what we asked for)
+			auto req = m_cpuBuffer->getMemoryRequirements();
+
+			//Allocate the physical memory to back the buffer
+			vk::MemoryAllocateInfo info(req.size, g_vkPinnedMemoryType);
+			m_cpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+
+			//Map it and bind to the buffer
+			m_cpuPtr = reinterpret_cast<T*>(m_cpuPhysMem->mapMemory(0, req.size));
 			m_cpuBuffer->bindMemory(**m_cpuPhysMem, 0);
 
 			//We now have pinned memory
@@ -1028,12 +1032,7 @@ protected:
 	__attribute__((noinline))
 	void AllocateGpuBuffer(size_t size)
 	{
-		//For now, always use local memory
-		vk::MemoryAllocateInfo info(size, g_vkLocalMemoryType);
-		m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
-		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
-
-		//Make a Vulkan buffer for it
+		//Make a Vulkan buffer first
 		vk::BufferCreateInfo bufinfo(
 			{},
 			size * sizeof(T),
@@ -1041,6 +1040,16 @@ protected:
 				vk::BufferUsageFlagBits::eTransferDst |
 				vk::BufferUsageFlagBits::eStorageBuffer);
 		m_gpuBuffer = std::make_unique<vk::raii::Buffer>(*g_vkComputeDevice, bufinfo);
+
+		//Figure out actual memory requirements of the buffer
+		//(may be rounded up from what we asked for)
+		auto req = m_gpuBuffer->getMemoryRequirements();
+
+		//For now, always use local memory
+		vk::MemoryAllocateInfo info(req.size, g_vkLocalMemoryType);
+		m_gpuPhysMem = std::make_unique<vk::raii::DeviceMemory>(*g_vkComputeDevice, info);
+		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
+
 		m_gpuBuffer->bindMemory(**m_gpuPhysMem, 0);
 	}
 };
