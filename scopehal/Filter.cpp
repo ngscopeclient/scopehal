@@ -1820,4 +1820,12 @@ void Filter::Refresh()
 void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, vk::raii::Queue& /*queue*/)
 {
 	Refresh();
+
+	//Mark our outputs as modified CPU side
+	for(size_t i=0; i<m_streams.size(); i++)
+	{
+		auto data = m_streams[i].m_waveform;
+		if(data)
+			data->MarkSamplesModifiedFromCpu();
+	}
 }

@@ -177,6 +177,15 @@ public:
 		m_offsets.CopyFrom(rhs->m_offsets);
 		m_durations.CopyFrom(rhs->m_durations);
 	}
+
+	virtual void MarkSamplesModifiedFromCpu()
+	{
+
+	}
+
+	virtual void MarkSamplesModifiedFromGpu()
+	{
+	}
 };
 
 /**
@@ -186,6 +195,15 @@ template<class S>
 class Waveform : public WaveformBase
 {
 public:
+
+	Waveform()
+	{
+		//Default waveform data buffer to CPU/GPU mirror
+		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
+		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
+
+		//TODO: what about offset/duration?
+	}
 
 	///@brief Sample data
 	AcceleratorBuffer<S> m_samples;
@@ -216,6 +234,16 @@ public:
 		m_offsets.PrepareForGpuAccess();
 		m_durations.PrepareForGpuAccess();
 		m_samples.PrepareForGpuAccess();
+	}
+
+	virtual void MarkSamplesModifiedFromCpu()
+	{
+		m_samples.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkSamplesModifiedFromGpu()
+	{
+		m_samples.MarkModifiedFromGpu();
 	}
 };
 
