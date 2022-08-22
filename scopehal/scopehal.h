@@ -81,6 +81,7 @@
 #include "IDTable.h"
 
 #include "AcceleratorBuffer.h"
+#include "ComputePipeline.h"
 
 #include "SCPITransport.h"
 #include "SCPISocketTransport.h"
@@ -196,6 +197,8 @@ extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
 extern std::unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
 extern size_t g_computeQueueType;
+
+void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
 //Enable filter acceleration
 extern bool g_gpuFilterEnabled;

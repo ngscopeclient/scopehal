@@ -999,3 +999,15 @@ string str_replace(const string& search, const string& replace, const string& su
 
 	return ret;
 }
+
+/**
+	@brief Helper function that submits a command buffer to a queue and blocks until it completes
+ */
+void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+{
+	vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
+	vk::SubmitInfo info({}, {}, *cmdBuf);
+	queue.submit(info, *fence);
+	while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
+	{}
+}

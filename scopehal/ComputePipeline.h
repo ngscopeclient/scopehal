@@ -27,38 +27,69 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#ifndef ComputePipeline_h
+#define ComputePipeline_h
 
-class SubtractFilter : public Filter
+#include "AcceleratorBuffer.h"
+
+/**
+	@brief A ComputePipeline encapsulates a Vulkan compute pipeline and all necessary resources to use it
+
+	For now, only pure compute is supported, and there is no support for accessing images or other non-SSBO
+	data types.
+
+	A ComputePipeline is typically owned by a filter instance.
+ */
+class ComputePipeline
 {
 public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
+	ComputePipeline(const std::string& shaderPath, size_t numSSBOs);
+	virtual ~ComputePipeline();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	/**
+		@brief Binds a buffer to a descriptor slot
+	 */
+	template<class T>
+	void BindBuffer(size_t i, AcceleratorBuffer<T>& buf, bool outputOnly = false)
+	{
+		buf.PrepareForGpuAccess(outputOnly);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+		m_bufferInfo[i] = buf.GetBufferInfo();
+		m_writeDescriptors[i] =
+			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+	}
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	/**
+		@brief Pushes pending descriptor changes to the device
+	 */
+	void UpdateDescriptors()
+	{ g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr); }
 
-	virtual DataLocation GetInputLocation();
-
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
+	/**
+		@brief Dispatches a compute operation to a command buffer
+	 */
+	void Dispatch(vk::raii::CommandBuffer& cmdBuf, uint32_t x, uint32_t y=1, uint32_t z=1)
+	{
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
+		cmdBuf.bindDescriptorSets(
+			vk::PipelineBindPoint::eCompute,
+			**m_pipelineLayout,
+			0,
+			**m_descriptorSet,
+			{});
+		cmdBuf.dispatch(x, y, z);
+	}
 
 protected:
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+	std::unique_ptr<vk::raii::ShaderModule> m_shaderModule;
+	std::unique_ptr<vk::raii::Pipeline> m_computePipeline;
+	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
+	std::unique_ptr<vk::raii::DescriptorSetLayout> m_descriptorSetLayout;
+	std::unique_ptr<vk::raii::DescriptorPool> m_descriptorPool;
+	std::unique_ptr<vk::raii::DescriptorSet> m_descriptorSet;
 
-	AcceleratorBuffer<uint32_t> m_argbuf;
-
-	ComputePipeline m_computePipeline;
+	std::vector<vk::WriteDescriptorSet> m_writeDescriptors;
+	std::vector<vk::DescriptorBufferInfo> m_bufferInfo;
 };
 
 #endif

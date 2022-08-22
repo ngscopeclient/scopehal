@@ -38,52 +38,11 @@ using namespace std;
 
 SubtractFilter::SubtractFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/SubtractFilter.spv", 4)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("IN+");
 	CreateInput("IN-");
-
-	auto srcvec = ReadDataFileUint32("shaders/SubtractFilter.spv");
-	vk::ShaderModuleCreateInfo info({}, srcvec);
-	m_shaderModule = make_unique<vk::raii::ShaderModule>(*g_vkComputeDevice, info);
-
-	//Configure shader input bindings
-	vector<vk::DescriptorSetLayoutBinding> bindings =
-	{
-		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
-		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
-		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
-		vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute)
-	};
-	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
-	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
-
-	//Make the pipeline layout
-	vk::PipelineLayoutCreateInfo linfo(
-		{},
-		**m_descriptorSetLayout,
-		{});
-	m_pipelineLayout = make_unique<vk::raii::PipelineLayout>(*g_vkComputeDevice, linfo);
-
-	//Make the pipeline
-	vk::PipelineShaderStageCreateInfo stageinfo({}, vk::ShaderStageFlagBits::eCompute, **m_shaderModule, "main");
-	vk::ComputePipelineCreateInfo pinfo({}, stageinfo, **m_pipelineLayout);
-	m_computePipeline = make_unique<vk::raii::Pipeline>(
-		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
-
-	//Descriptor pool for our shader parameters
-	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 4);
-	vk::DescriptorPoolCreateInfo poolInfo(
-		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
-			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
-		1,
-		poolSize);
-	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
-
-	//Set up descriptors for our buffers
-	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
-	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
-		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
 
 	//Use pinned memory for the arg buffer
 	m_argbuf.resize(1);
@@ -93,10 +52,6 @@ SubtractFilter::SubtractFilter(const string& color)
 
 SubtractFilter::~SubtractFilter()
 {
-	m_computePipeline = nullptr;
-	m_descriptorSetLayout = nullptr;
-	m_pipelineLayout = nullptr;
-	m_shaderModule = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,45 +147,25 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
-		//Waveform data must be on GPU
-		din_p->m_samples.PrepareForGpuAccess();
-		din_n->m_samples.PrepareForGpuAccess();
-		cap->m_samples.PrepareForGpuAccess(true);
-
-		//Set up the other arguments
+		//Set up the miscellaneous argument buffer
 		m_argbuf.PrepareForCpuAccess();
 		m_argbuf[0] = len;
-		m_argbuf.PrepareForGpuAccess();
 
-		//Update our descriptor sets with current buffer sizes etc
-		auto infoP = din_p->m_samples.GetBufferInfo();
-		auto infoN = din_n->m_samples.GetBufferInfo();
-		auto infoCap = cap->m_samples.GetBufferInfo();
-		auto infoArg = m_argbuf.GetBufferInfo();
-		vk::WriteDescriptorSet setP(**m_descriptorSet, 0, 0, vk::DescriptorType::eStorageBuffer, {}, infoP);
-		vk::WriteDescriptorSet setN(**m_descriptorSet, 1, 0, vk::DescriptorType::eStorageBuffer, {}, infoN);
-		vk::WriteDescriptorSet setOut(**m_descriptorSet, 2, 0, vk::DescriptorType::eStorageBuffer, {}, infoCap);
-		vk::WriteDescriptorSet setArgs(**m_descriptorSet, 3, 0, vk::DescriptorType::eStorageBuffer, {}, infoArg);
-		g_vkComputeDevice->updateDescriptorSets({setP, setN, setOut, setArgs}, nullptr);
+		//Update our descriptor sets with current buffers
+		m_computePipeline.BindBuffer(0, din_p->m_samples);
+		m_computePipeline.BindBuffer(1, din_n->m_samples);
+		m_computePipeline.BindBuffer(2, cap->m_samples);
+		m_computePipeline.BindBuffer(3, m_argbuf, true);
+		m_computePipeline.UpdateDescriptors();
 
-		//Dispatch the compute operation
+		//Dispatch the compute operation and block until it completes
 		cmdBuf.begin({});
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
-		cmdBuf.bindDescriptorSets(
-			vk::PipelineBindPoint::eCompute,
-			**m_pipelineLayout,
-			0,
-			**m_descriptorSet,
-			{});
-		cmdBuf.dispatch(len, 1, 1);
+		m_computePipeline.Dispatch(cmdBuf, len);
 		cmdBuf.end();
+		SubmitAndBlock(cmdBuf, queue);
 
-		//Block until the compute operation finishes
-		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
-		vk::SubmitInfo info({}, {}, *cmdBuf);
-		queue.submit(info, *fence);
-		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
-		{}
+		//Data was updated GPU side
+		cap->m_samples.MarkModifiedFromGpu();
 	}
 
 	//Software fallback

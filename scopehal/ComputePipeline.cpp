@@ -27,38 +27,67 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#include "../scopehal/scopehal.h"
 
-class SubtractFilter : public Filter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs)
 {
-public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
+	//Load the shader module
+	auto srcvec = ReadDataFileUint32(shaderPath);
+	vk::ShaderModuleCreateInfo info({}, srcvec);
+	m_shaderModule = make_unique<vk::raii::ShaderModule>(*g_vkComputeDevice, info);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	//Configure shader input bindings
+	vector<vk::DescriptorSetLayoutBinding> bindings;
+	for(size_t i=0; i<numSSBOs; i++)
+	{
+		bindings.push_back(vk::DescriptorSetLayoutBinding(
+			i, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
+	}
+	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
+	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	//Make the pipeline layout
+	vk::PipelineLayoutCreateInfo linfo(
+		{},
+		**m_descriptorSetLayout,
+		{});
+	m_pipelineLayout = make_unique<vk::raii::PipelineLayout>(*g_vkComputeDevice, linfo);
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	//Make the pipeline
+	vk::PipelineShaderStageCreateInfo stageinfo({}, vk::ShaderStageFlagBits::eCompute, **m_shaderModule, "main");
+	vk::ComputePipelineCreateInfo pinfo({}, stageinfo, **m_pipelineLayout);
+	m_computePipeline = make_unique<vk::raii::Pipeline>(
+		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
 
-	virtual DataLocation GetInputLocation();
+	//Descriptor pool for our shader parameters
+	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, numSSBOs);
+	vk::DescriptorPoolCreateInfo poolInfo(
+		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
+			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+		1,
+		poolSize);
+	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
 
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
+	//Set up descriptors for our buffers
+	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
+	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
+		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
 
-protected:
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+	m_writeDescriptors.resize(numSSBOs);
+	m_bufferInfo.resize(numSSBOs);
+}
 
-	AcceleratorBuffer<uint32_t> m_argbuf;
-
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+ComputePipeline::~ComputePipeline()
+{
+	//Make sure we destroy some objects in a particular order
+	//TODO: how much of this really is important?
+	m_computePipeline = nullptr;
+	m_descriptorSetLayout = nullptr;
+	m_pipelineLayout = nullptr;
+	m_shaderModule = nullptr;
+}
