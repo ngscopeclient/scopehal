@@ -61,6 +61,7 @@ protected:
 	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
 	std::unique_ptr<vk::raii::DescriptorSetLayout> m_descriptorSetLayout;
 	std::unique_ptr<vk::raii::DescriptorPool> m_descriptorPool;
+	std::unique_ptr<vk::raii::DescriptorSet> m_descriptorSet;
 
 	AcceleratorBuffer<uint32_t> m_argbuf;
 };

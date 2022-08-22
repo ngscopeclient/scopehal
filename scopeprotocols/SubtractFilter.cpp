@@ -73,8 +73,17 @@ SubtractFilter::SubtractFilter(const string& color)
 
 	//Descriptor pool for our shader parameters
 	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, 4);
-	vk::DescriptorPoolCreateInfo poolInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 4, poolSize);
+	vk::DescriptorPoolCreateInfo poolInfo(
+		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
+			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+		1,
+		poolSize);
 	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
+
+	//Set up descriptors for our buffers
+	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
+	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
+		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
 
 	//Use pinned memory for the arg buffer
 	m_argbuf.resize(1);
@@ -186,28 +195,34 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		//Waveform data must be on GPU
 		din_p->m_samples.PrepareForGpuAccess();
 		din_n->m_samples.PrepareForGpuAccess();
+		cap->m_samples.PrepareForGpuAccess(true);
 
 		//Set up the other arguments
 		m_argbuf.PrepareForCpuAccess();
 		m_argbuf[0] = len;
 		m_argbuf.PrepareForGpuAccess();
 
+		//Update our descriptor sets with current buffer sizes etc
+		auto infoP = din_p->m_samples.GetBufferInfo();
+		auto infoN = din_n->m_samples.GetBufferInfo();
+		auto infoCap = cap->m_samples.GetBufferInfo();
+		auto infoArg = m_argbuf.GetBufferInfo();
+		vk::WriteDescriptorSet setP(**m_descriptorSet, 0, 0, vk::DescriptorType::eStorageBuffer, {}, infoP);
+		vk::WriteDescriptorSet setN(**m_descriptorSet, 1, 0, vk::DescriptorType::eStorageBuffer, {}, infoN);
+		vk::WriteDescriptorSet setOut(**m_descriptorSet, 2, 0, vk::DescriptorType::eStorageBuffer, {}, infoCap);
+		vk::WriteDescriptorSet setArgs(**m_descriptorSet, 3, 0, vk::DescriptorType::eStorageBuffer, {}, infoArg);
+		g_vkComputeDevice->updateDescriptorSets({setP, setN, setOut, setArgs}, nullptr);
+
 		//Dispatch the compute operation
 		cmdBuf.begin({});
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
-		/*cmdbuf.bindDescriptorSets(
+		cmdBuf.bindDescriptorSets(
 			vk::PipelineBindPoint::eCompute,
-			*m_pipelineLayout,*/
-
-
-		/*
-		void bindDescriptorSets( VULKAN_HPP_NAMESPACE::PipelineBindPoint                       pipelineBindPoint,
-                               VULKAN_HPP_NAMESPACE::PipelineLayout                          layout,
-                               uint32_t                                                      firstSet,
-                               ArrayProxy<const VULKAN_HPP_NAMESPACE::DescriptorSet> const & descriptorSets,
-                               ArrayProxy<const uint32_t> const &                            dynamicOffsets ) const VULKAN_HPP_NOEXCEPT;
-		void dispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ ) const VULKAN_HPP_NOEXCEPT;
-                               */
+			**m_pipelineLayout,
+			0,
+			**m_descriptorSet,
+			{});
+		cmdBuf.dispatch(len, 1, 1);
 		cmdBuf.end();
 
 		//Block until the compute operation finishes
@@ -216,11 +231,10 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		queue.submit(info, *fence);
 		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
 		{}
-
 	}
 
 	//Software fallback
-	/*else*/
+	else
 	{
 		//Waveform data must be on CPU
 		din_p->m_samples.PrepareForCpuAccess();

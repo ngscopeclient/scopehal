@@ -366,6 +366,30 @@ public:
 	{ return m_buffersAreSame; }
 
 	/**
+		@brief Returns the preferred buffer for GPU-side access.
+
+		This is the GPU buffer if we have one, otherwise the CPU buffer.
+	 */
+	vk::Buffer GetBuffer()
+	{
+		if(m_gpuBuffer != nullptr)
+			return **m_gpuBuffer;
+		else
+			return **m_cpuBuffer;
+	}
+
+	/**
+		@brief Returns a vk::DescriptorBufferInfo suitable for binding this object to
+	 */
+	vk::DescriptorBufferInfo GetBufferInfo()
+	{
+		return vk::DescriptorBufferInfo(
+			GetBuffer(),
+			0,
+			m_size * sizeof(T));
+	}
+
+	/**
 		@brief Change the usable size of the container
 	 */
 	void resize(size_t size)
@@ -729,8 +753,11 @@ public:
 		@brief Prepares the buffer to be accessed from the GPU
 
 		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPhysMem is valid and up to date.
+
+		@param outputOnly	True if the buffer is output-only for the shader, so there's no need to copy anything
+							to the GPU even if data is stale.
 	 */
-	void PrepareForGpuAccess()
+	void PrepareForGpuAccess(bool outputOnly = false)
 	{
 		//Early out if no content
 		if(m_capacity == 0)
@@ -745,7 +772,7 @@ public:
 			AllocateGpuBuffer(m_capacity);
 
 		//Make sure the GPU-side buffer is up to date
-		if(m_gpuPhysMemIsStale)
+		if(m_gpuPhysMemIsStale && !outputOnly)
 			CopyToGpu();
 	}
 
