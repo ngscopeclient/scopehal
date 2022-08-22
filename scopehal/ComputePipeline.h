@@ -43,7 +43,7 @@
 class ComputePipeline
 {
 public:
-	ComputePipeline(const std::string& shaderPath, size_t numSSBOs);
+	ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize);
 	virtual ~ComputePipeline();
 
 	/**
@@ -68,9 +68,15 @@ public:
 	/**
 		@brief Dispatches a compute operation to a command buffer
 	 */
-	void Dispatch(vk::raii::CommandBuffer& cmdBuf, uint32_t x, uint32_t y=1, uint32_t z=1)
+	template<class T>
+	void Dispatch(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
 	{
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
+		cmdBuf.pushConstants<T>(
+			**m_pipelineLayout,
+			vk::ShaderStageFlagBits::eCompute,
+			0,
+			pushConstants);
 		cmdBuf.bindDescriptorSets(
 			vk::PipelineBindPoint::eCompute,
 			**m_pipelineLayout,

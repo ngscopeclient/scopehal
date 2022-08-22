@@ -34,7 +34,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs)
+ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize)
 {
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(shaderPath);
@@ -51,11 +51,14 @@ ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs)
 	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
 
+	//Configure push constants
+	vk::PushConstantRange range(vk::ShaderStageFlagBits::eCompute, 0, pushConstantSize);
+
 	//Make the pipeline layout
 	vk::PipelineLayoutCreateInfo linfo(
 		{},
 		**m_descriptorSetLayout,
-		{});
+		range);
 	m_pipelineLayout = make_unique<vk::raii::PipelineLayout>(*g_vkComputeDevice, linfo);
 
 	//Make the pipeline

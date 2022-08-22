@@ -97,6 +97,9 @@ size_t g_computeQueueType;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
+bool g_hasShaderInt64 = false;
+bool g_hasShaderInt16 = false;
+
 /**
 	@brief Initialize a Vulkan context for compute
  */
@@ -204,6 +207,11 @@ bool VulkanInit()
 				else
 					LogDebug("int64:                  no\n");
 
+				if(features.shaderInt16)
+					LogDebug("int16:                  yes\n");
+				else
+					LogDebug("int16:                  no\n");
+
 				const size_t k = 1024LL;
 				const size_t m = k*k;
 				const size_t g = k*m;
@@ -287,40 +295,63 @@ bool VulkanInit()
 				//Look at queue families
 				auto families = device.getQueueFamilyProperties();
 				LogDebug("Queue families\n");
-				LogIndenter li4;
-				g_computeQueueType = 0;
-				for(size_t j=0; j<families.size(); j++)
 				{
-					LogDebug("Queue type %zu\n", j);
-					LogIndenter li5;
-
-					auto f = families[j];
-					LogDebug("Queue count:          %d\n", f.queueCount);
-					LogDebug("Timestamp valid bits: %d\n", f.timestampValidBits);
-					if(f.queueFlags & vk::QueueFlagBits::eGraphics)
-						LogDebug("Graphics\n");
-					if(f.queueFlags & vk::QueueFlagBits::eCompute)
-						LogDebug("Compute\n");
-					if(f.queueFlags & vk::QueueFlagBits::eTransfer)
-						LogDebug("Transfer\n");
-					if(f.queueFlags & vk::QueueFlagBits::eSparseBinding)
-						LogDebug("Sparse binding\n");
-					if(f.queueFlags & vk::QueueFlagBits::eProtected)
-						LogDebug("Protected\n");
-					//TODO: VIDEO_DECODE_BIT_KHR, VIDEO_ENCODE_BIT_KHR
-
-					//Pick the first type that supports compute and transfers
-					if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
+					LogIndenter li4;
+					g_computeQueueType = 0;
+					for(size_t j=0; j<families.size(); j++)
 					{
-						g_computeQueueType = j;
-						break;
+						LogDebug("Queue type %zu\n", j);
+						LogIndenter li5;
+
+						auto f = families[j];
+						LogDebug("Queue count:          %d\n", f.queueCount);
+						LogDebug("Timestamp valid bits: %d\n", f.timestampValidBits);
+						if(f.queueFlags & vk::QueueFlagBits::eGraphics)
+							LogDebug("Graphics\n");
+						if(f.queueFlags & vk::QueueFlagBits::eCompute)
+							LogDebug("Compute\n");
+						if(f.queueFlags & vk::QueueFlagBits::eTransfer)
+							LogDebug("Transfer\n");
+						if(f.queueFlags & vk::QueueFlagBits::eSparseBinding)
+							LogDebug("Sparse binding\n");
+						if(f.queueFlags & vk::QueueFlagBits::eProtected)
+							LogDebug("Protected\n");
+						//TODO: VIDEO_DECODE_BIT_KHR, VIDEO_ENCODE_BIT_KHR
+
+						//Pick the first type that supports compute and transfers
+						if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
+						{
+							g_computeQueueType = j;
+							break;
+						}
 					}
+				}
+
+				//See if the device has int64 support. If so, enable it
+				vk::PhysicalDeviceFeatures enabledFeatures;
+				if(device.getFeatures().shaderInt64)
+				{
+					enabledFeatures.shaderInt64 = true;
+					g_hasShaderInt64 = true;
+					LogDebug("Enabling 64-bit integer support\n");
+				}
+				if(device.getFeatures().shaderInt16)
+				{
+					enabledFeatures.shaderInt16 = true;
+					g_hasShaderInt16 = true;
+					LogDebug("Enabling 16-bit integer support\n");
 				}
 
 				//Initialize the device
 				float queuePriority = 0;
 				vk::DeviceQueueCreateInfo qinfo( {}, g_computeQueueType, 1, &queuePriority);
-				vk::DeviceCreateInfo devinfo( {}, qinfo);
+				vk::DeviceCreateInfo devinfo(
+					{},
+					qinfo,
+					{},
+					{},
+					&enabledFeatures
+					);
 				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
 
 				//Figure out what memory types to use for various purposes

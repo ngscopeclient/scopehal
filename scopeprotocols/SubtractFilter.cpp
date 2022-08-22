@@ -38,16 +38,11 @@ using namespace std;
 
 SubtractFilter::SubtractFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_computePipeline("shaders/SubtractFilter.spv", 4)
+	, m_computePipeline("shaders/SubtractFilter.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("IN+");
 	CreateInput("IN-");
-
-	//Use pinned memory for the arg buffer
-	m_argbuf.resize(1);
-	m_argbuf.SetCpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_LIKELY);
-	m_argbuf.SetGpuAccessHint(AcceleratorBuffer<uint32_t>::HINT_UNLIKELY, true);
 }
 
 SubtractFilter::~SubtractFilter()
@@ -147,20 +142,15 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
-		//Set up the miscellaneous argument buffer
-		m_argbuf.PrepareForCpuAccess();
-		m_argbuf[0] = len;
-
 		//Update our descriptor sets with current buffers
 		m_computePipeline.BindBuffer(0, din_p->m_samples);
 		m_computePipeline.BindBuffer(1, din_n->m_samples);
 		m_computePipeline.BindBuffer(2, cap->m_samples);
-		m_computePipeline.BindBuffer(3, m_argbuf, true);
 		m_computePipeline.UpdateDescriptors();
 
 		//Dispatch the compute operation and block until it completes
 		cmdBuf.begin({});
-		m_computePipeline.Dispatch(cmdBuf, len);
+		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, len);
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 

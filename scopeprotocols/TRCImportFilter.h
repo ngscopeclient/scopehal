@@ -35,6 +35,13 @@
 #ifndef TRCImportFilter_h
 #define TRCImportFilter_h
 
+struct TRCImportFilterShaderArgs
+{
+	uint32_t size;
+	float gain;
+	float offset;
+};
+
 class TRCImportFilter : public ImportFilter
 {
 public:
@@ -46,6 +53,8 @@ public:
 
 protected:
 	void OnFileNameChanged();
+
+	std::unique_ptr<ComputePipeline> m_computePipeline16Bit;
 };
 
 #endif

@@ -27,35 +27,46 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#version 430
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
 
-class SubtractFilter : public Filter
+layout(std430, binding=0) restrict writeonly buffer buf_offs
 {
-public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-	virtual DataLocation GetInputLocation();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
-
-protected:
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
-
-	ComputePipeline m_computePipeline;
+	int64_t offs[];
 };
 
-#endif
+layout(std430, binding=1) restrict writeonly buffer buf_durs
+{
+	int64_t durs[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_pout
+{
+	float pout[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_pin
+{
+	int16_t pin[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
+	float gain;
+	float offset;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	if(gl_GlobalInvocationID.x >= size)
+		return;
+
+	offs[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x;
+	durs[gl_GlobalInvocationID.x] = 1;
+	pout[gl_GlobalInvocationID.x] = gain*pin[gl_GlobalInvocationID.x] - offset;
+}

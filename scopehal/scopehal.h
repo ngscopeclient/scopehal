@@ -202,5 +202,7 @@ void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
 //Enable filter acceleration
 extern bool g_gpuFilterEnabled;
+extern bool g_hasShaderInt64;
+extern bool g_hasShaderInt16;
 
 #endif

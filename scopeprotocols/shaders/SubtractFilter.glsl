@@ -45,7 +45,7 @@ layout(std430, binding=2) restrict writeonly buffer buf_dout
 	float dout[];
 };
 
-layout(binding=3) buffer buf_args
+layout(std430, push_constant) uniform constants
 {
 	uint size;
 };
