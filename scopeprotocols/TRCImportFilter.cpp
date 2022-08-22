@@ -112,18 +112,17 @@ void TRCImportFilter::OnFileNameChanged()
 		return;
 	}
 
-	//Read the file
-	uint8_t* buf = new uint8_t[len];
-	if(len != fread(buf, 1, len, fp))
+	//Read the WAVEDESC
+	uint8_t wavedesc[wavedescSize];
+	if(wavedescSize != fread(wavedesc, 1, wavedescSize, fp))
 	{
-		LogError("Failed to read file contents\n");
+		LogError("Failed to read WAVEDESC\n");
 		fclose(fp);
-		delete[] buf;
 		return;
 	}
 
 	//Validate the WAVEDESC
-	if(0 != memcmp(buf, "WAVEDESC", 8))
+	if(0 != memcmp(wavedesc, "WAVEDESC", 8))
 	{
 		LogError("Malformed WAVEDESC (magic number is wrong)\n");
 		fclose(fp);
@@ -131,7 +130,7 @@ void TRCImportFilter::OnFileNameChanged()
 	}
 
 	//Figure out sample resolution
-	bool hdMode = (buf[32] != 0);
+	bool hdMode = (wavedesc[32] != 0);
 	if(hdMode)
 		LogTrace("Sample format:           int16_t\n");
 	else
@@ -141,20 +140,20 @@ void TRCImportFilter::OnFileNameChanged()
 
 	//Get instrument format
 	char instName[17] = {0};
-	memcpy(instName, buf + 76, 16);
+	memcpy(instName, wavedesc + 76, 16);
 	LogTrace("Instrument name:         %s\n", instName);
 
 	//cppcheck-suppress invalidPointerCast
-	float v_gain = *reinterpret_cast<float*>(buf + 156);
+	float v_gain = *reinterpret_cast<float*>(wavedesc + 156);
 
 	//cppcheck-suppress invalidPointerCast
-	float v_off = *reinterpret_cast<float*>(buf + 160);
+	float v_off = *reinterpret_cast<float*>(wavedesc + 160);
 
 	//cppcheck-suppress invalidPointerCast
-	float interval = *reinterpret_cast<float*>(buf + 176) * FS_PER_SECOND;
+	float interval = *reinterpret_cast<float*>(wavedesc + 176) * FS_PER_SECOND;
 
 	//cppcheck-suppress invalidPointerCast
-	double h_off = *reinterpret_cast<double*>(buf + 180) * FS_PER_SECOND;	//fs from start of waveform to trigger
+	double h_off = *reinterpret_cast<double*>(wavedesc + 180) * FS_PER_SECOND;	//fs from start of waveform to trigger
 
 	double h_off_frac = fmodf(h_off, interval);						//fractional sample position, in fs
 	if(h_off_frac < 0)
@@ -162,16 +161,25 @@ void TRCImportFilter::OnFileNameChanged()
 
 	//Get the waveform timestamp
 	double basetime;
-	auto ttime = LeCroyOscilloscope::ExtractTimestamp(buf, basetime);
+	auto ttime = LeCroyOscilloscope::ExtractTimestamp(wavedesc, basetime);
 
 	//TODO: support sequence mode .trc files here??
 
 	//Set up output stream
 	//Channel number is byte at offset 344 (zero based)
 	ClearStreams();
-	string chName = string("C") + to_string(buf[344] + 1);
+	string chName = string("C") + to_string(wavedesc[344] + 1);
 	AddStream(Unit(Unit::UNIT_VOLTS), chName, Stream::STREAM_TYPE_ANALOG);
 	m_outputsChangedSignal.emit();
+
+	//Figure out length of actual waveform data
+	size_t datalen = len - wavedescSize;
+	size_t num_samples;
+	if(hdMode)
+		num_samples = datalen/2;
+	else
+		num_samples = datalen;
+	size_t num_per_segment = num_samples /* / num_sequences*/;
 
 	//Create output waveform
 	auto wfm = new AnalogWaveform;
@@ -181,46 +189,63 @@ void TRCImportFilter::OnFileNameChanged()
 	wfm->m_triggerPhase = h_off_frac;
 	wfm->m_densePacked = true;
 	SetData(wfm, 0);
-
-	size_t datalen = len - wavedescSize;
-
-	//Figure out length and position of actual waveform data
-	size_t num_samples;
-	if(hdMode)
-		num_samples = datalen/2;
-	else
-		num_samples = datalen;
-	size_t num_per_segment = num_samples/* / num_sequences*/;
-	auto wdata = reinterpret_cast<int16_t*>(buf + wavedescSize);
-	auto bdata = reinterpret_cast<int8_t*>(buf + wavedescSize);
 	wfm->Resize(num_per_segment);
 
-	//Convert raw ADC samples to volts
+	//16 bit sample path
 	if(hdMode)
 	{
+		AcceleratorBuffer<int16_t> buf;
+		buf.resize(num_per_segment);
+		buf.PrepareForCpuAccess();
+
+		if(num_per_segment != fread(&buf[0], sizeof(int16_t), num_per_segment, fp))
+		{
+			LogError("Failed to read sample data\n");
+			fclose(fp);
+			return;
+		}
+
 		Oscilloscope::Convert16BitSamples(
 			(int64_t*)&wfm->m_offsets[0],
 			(int64_t*)&wfm->m_durations[0],
 			(float*)&wfm->m_samples[0],
-			wdata,
+			&buf[0],
 			v_gain,
 			v_off,
 			num_per_segment,
 			0);
+
+		wfm->m_offsets.MarkModifiedFromCpu();
+		wfm->m_durations.MarkModifiedFromCpu();
+		wfm->m_samples.MarkModifiedFromCpu();
 	}
+
+	//8 bit sample path
 	else
 	{
+		AcceleratorBuffer<int8_t> buf;
+		buf.resize(num_per_segment);
+		buf.PrepareForCpuAccess();
+
+		if(num_per_segment != fread(&buf[0], sizeof(int8_t), num_per_segment, fp))
+		{
+			LogError("Failed to read sample data\n");
+			fclose(fp);
+			return;
+		}
+
 		Oscilloscope::Convert8BitSamples(
 			(int64_t*)&wfm->m_offsets[0],
 			(int64_t*)&wfm->m_durations[0],
 			(float*)&wfm->m_samples[0],
-			bdata,
+			&buf[0],
 			v_gain,
 			v_off,
 			num_per_segment,
 			0);
-	}
 
-	//Done, clean up
-	delete[] buf;
+		wfm->m_offsets.MarkModifiedFromCpu();
+		wfm->m_durations.MarkModifiedFromCpu();
+		wfm->m_samples.MarkModifiedFromCpu();
+	}
 }
