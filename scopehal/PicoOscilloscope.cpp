@@ -171,8 +171,13 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetTriggerOffset(10 * 1000L * 1000L);
 
 	//Initialize waveform buffers
+	//Plain old garden-variety CPU-side RAM here
 	for(size_t i=0; i<m_analogChannelCount; i++)
+	{
 		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
+		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
+		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_NEVER);
+	}
 }
 
 /**
@@ -482,6 +487,8 @@ bool PicoOscilloscope::AcquireData()
 			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(abuf->GetCpuPointer())))
 				return false;
 
+			abuf->MarkModifiedFromCpu();
+
 			//Create our waveform
 			AnalogWaveform* cap = new AnalogWaveform;
 			cap->m_timescale = fs_per_sample;
@@ -584,28 +591,24 @@ bool PicoOscilloscope::AcquireData()
 		}
 	}
 
-	//if(g_gpuScopeDriverEnabled)
-	if(false)
+	//Fallback path
+	//Process analog captures in parallel
+	#pragma omp parallel for
+	for(size_t i=0; i<awfms.size(); i++)
 	{
-	}
-	else
-	{
-		//Fallback path
-		//Process analog captures in parallel
-		#pragma omp parallel for
-		for(size_t i=0; i<awfms.size(); i++)
-		{
-			auto cap = awfms[i];
-			Convert16BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
-				m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-				scales[i],
-				-offsets[i],
-				cap->m_offsets.size(),
-				0);
-		}
+		auto cap = awfms[i];
+		Convert16BitSamples(
+			(int64_t*)&cap->m_offsets[0],
+			(int64_t*)&cap->m_durations[0],
+			(float*)&cap->m_samples[0],
+			m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+			scales[i],
+			-offsets[i],
+			cap->m_offsets.size(),
+			0);
+
+		cap->MarkSamplesModifiedFromCpu();
+		cap->MarkTimestampsModifiedFromCpu();
 	}
 
 	//Save the waveforms to our queue

@@ -216,6 +216,7 @@ void TRCImportFilter::OnFileNameChanged()
 	wfm->m_triggerPhase = h_off_frac;
 	wfm->m_densePacked = true;
 	SetData(wfm, 0);
+
 	wfm->Resize(num_per_segment);
 
 	//16 bit sample path

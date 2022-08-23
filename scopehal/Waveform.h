@@ -186,6 +186,15 @@ public:
 	virtual void MarkSamplesModifiedFromGpu()
 	{
 	}
+
+	virtual void MarkTimestampsModifiedFromCpu()
+	{
+
+	}
+
+	virtual void MarkTimestampsModifiedFromGpu()
+	{
+	}
 };
 
 /**
@@ -198,11 +207,10 @@ public:
 
 	Waveform()
 	{
-		//Default waveform data buffer to CPU/GPU mirror
+		//Default waveform data to CPU/GPU mirror
+		//and sample data to pinned memory
 		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
-
-		//TODO: what about offset/duration?
 	}
 
 	///@brief Sample data
@@ -234,6 +242,18 @@ public:
 		m_offsets.PrepareForGpuAccess();
 		m_durations.PrepareForGpuAccess();
 		m_samples.PrepareForGpuAccess();
+	}
+
+	virtual void MarkTimestampsModifiedFromCpu()
+	{
+		m_offsets.MarkModifiedFromCpu();
+		m_durations.MarkModifiedFromCpu();
+	}
+
+	virtual void MarkTimestampsModifiedFromGpu()
+	{
+		m_offsets.MarkModifiedFromGpu();
+		m_durations.MarkModifiedFromGpu();
 	}
 
 	virtual void MarkSamplesModifiedFromCpu()
