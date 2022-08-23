@@ -27,35 +27,46 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of TRCImportFilter
- */
-#ifndef TRCImportFilter_h
-#define TRCImportFilter_h
+#version 430
+#pragma shader_stage(compute)
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 
-struct TRCImportFilterShaderArgs
+layout(std430, binding=0) restrict writeonly buffer buf_offs
 {
-	uint32_t size;
+	int64_t offs[];
+};
+
+layout(std430, binding=1) restrict writeonly buffer buf_durs
+{
+	int64_t durs[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_pout
+{
+	float pout[];
+};
+
+layout(std430, binding=3) restrict readonly buffer buf_pin
+{
+	int8_t pin[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint size;
 	float gain;
 	float offset;
 };
 
-class TRCImportFilter : public ImportFilter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	TRCImportFilter(const std::string& color);
+	if(gl_GlobalInvocationID.x >= size)
+		return;
 
-	static std::string GetProtocolName();
-
-	PROTOCOL_DECODER_INITPROC(TRCImportFilter)
-
-protected:
-	void OnFileNameChanged();
-
-	std::unique_ptr<ComputePipeline> m_computePipeline8Bit;
-	std::unique_ptr<ComputePipeline> m_computePipeline16Bit;
-};
-
-#endif
+	offs[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x;
+	durs[gl_GlobalInvocationID.x] = 1;
+	pout[gl_GlobalInvocationID.x] = gain*pin[gl_GlobalInvocationID.x] - offset;
+}

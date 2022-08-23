@@ -50,6 +50,12 @@ TRCImportFilter::TRCImportFilter(const string& color)
 		m_computePipeline16Bit = make_unique<ComputePipeline>(
 			"shaders/Convert16BitSamples.spv", 4, sizeof(TRCImportFilterShaderArgs) );
 	}
+
+	if(g_hasShaderInt64)
+	{
+		m_computePipeline8Bit = make_unique<ComputePipeline>(
+			"shaders/Convert8BitSamples.spv", 4, sizeof(TRCImportFilterShaderArgs) );
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,6 +220,8 @@ void TRCImportFilter::OnFileNameChanged()
 		//The accelerated filter needs int64 and int16 support
 		if(g_hasShaderInt64 && g_hasShaderInt16 && g_gpuFilterEnabled)
 		{
+			LogTrace("GPU path\n");
+
 			//Update our descriptor sets with current buffers
 			m_computePipeline16Bit->BindBuffer(0, wfm->m_offsets);
 			m_computePipeline16Bit->BindBuffer(1, wfm->m_durations);
@@ -241,6 +249,8 @@ void TRCImportFilter::OnFileNameChanged()
 		//Software fallback
 		else
 		{
+			LogTrace("Fallback path\n");
+
 			Oscilloscope::Convert16BitSamples(
 				(int64_t*)&wfm->m_offsets[0],
 				(int64_t*)&wfm->m_durations[0],
@@ -271,18 +281,52 @@ void TRCImportFilter::OnFileNameChanged()
 			return;
 		}
 
-		Oscilloscope::Convert8BitSamples(
-			(int64_t*)&wfm->m_offsets[0],
-			(int64_t*)&wfm->m_durations[0],
-			(float*)&wfm->m_samples[0],
-			&buf[0],
-			v_gain,
-			v_off,
-			num_per_segment,
-			0);
+		//The accelerated filter needs int64 support
+		if(g_hasShaderInt64 && g_gpuFilterEnabled)
+		{
+			LogTrace("GPU path\n");
 
-		wfm->m_offsets.MarkModifiedFromCpu();
-		wfm->m_durations.MarkModifiedFromCpu();
-		wfm->m_samples.MarkModifiedFromCpu();
+			//Update our descriptor sets with current buffers
+			m_computePipeline8Bit->BindBuffer(0, wfm->m_offsets);
+			m_computePipeline8Bit->BindBuffer(1, wfm->m_durations);
+			m_computePipeline8Bit->BindBuffer(2, wfm->m_samples);
+			m_computePipeline8Bit->BindBuffer(3, buf);
+			m_computePipeline8Bit->UpdateDescriptors();
+
+			TRCImportFilterShaderArgs args;
+			args.size = num_per_segment;
+			args.gain = v_gain;
+			args.offset = v_off;
+
+			//Dispatch the compute operation and block until it completes
+			//We are in an event handler, so use the global transfer queue here
+			g_vkTransferCommandBuffer->begin({});
+			m_computePipeline8Bit->Dispatch(*g_vkTransferCommandBuffer, args, len);
+			g_vkTransferCommandBuffer->end();
+			SubmitAndBlock(*g_vkTransferCommandBuffer, *g_vkTransferQueue);
+
+			wfm->m_offsets.MarkModifiedFromGpu();
+			wfm->m_durations.MarkModifiedFromGpu();
+			wfm->m_samples.MarkModifiedFromGpu();
+		}
+
+		//Software fallback
+		else
+		{
+			LogTrace("Fallback path\n");
+			Oscilloscope::Convert8BitSamples(
+				(int64_t*)&wfm->m_offsets[0],
+				(int64_t*)&wfm->m_durations[0],
+				(float*)&wfm->m_samples[0],
+				&buf[0],
+				v_gain,
+				v_off,
+				num_per_segment,
+				0);
+
+			wfm->m_offsets.MarkModifiedFromCpu();
+			wfm->m_durations.MarkModifiedFromCpu();
+			wfm->m_samples.MarkModifiedFromCpu();
+		}
 	}
 }

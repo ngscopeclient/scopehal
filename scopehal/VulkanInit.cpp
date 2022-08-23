@@ -97,6 +97,7 @@ size_t g_computeQueueType;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
+//Feature flags indicating that we have support for specific data types etc on the GPU
 bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 
@@ -327,7 +328,7 @@ bool VulkanInit()
 					}
 				}
 
-				//See if the device has int64 support. If so, enable it
+				//See if the device has good integer data type support. If so, enable it
 				vk::PhysicalDeviceFeatures enabledFeatures;
 				if(device.getFeatures().shaderInt64)
 				{
