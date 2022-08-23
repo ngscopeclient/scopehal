@@ -431,12 +431,11 @@ public:
 
 	/**
 		@brief Frees unused memory so that m_size == m_capacity
-
-		This also ensures that the buffer is stored in the best location described by the current hint flags
 	 */
 	void shrink_to_fit()
 	{
-		Reallocate(m_size);
+		if(m_size != m_capacity)
+			Reallocate(m_size);
 	}
 
 	/**
