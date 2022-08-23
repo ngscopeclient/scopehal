@@ -845,6 +845,8 @@ public:
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 	static void Convert16BitSamplesAVX2(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	static void Convert16BitSamplesAVX512F(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 	static void Convert16BitSamplesFMA(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
 

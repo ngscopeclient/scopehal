@@ -1180,11 +1180,11 @@ void Oscilloscope::Convert16BitSamples(
 	//TODO: tune split
 	if(count > 1000000)
 	{
-		//Round blocks to multiples of 32 samples for clean vectorization
+		//Round blocks to multiples of 64 samples for clean vectorization
 		size_t numblocks = omp_get_max_threads();
 		size_t lastblock = numblocks - 1;
 		size_t blocksize = count / numblocks;
-		blocksize = blocksize - (blocksize % 32);
+		blocksize = blocksize - (blocksize % 64);
 
 		#pragma omp parallel for
 		for(size_t i=0; i<numblocks; i++)
@@ -1195,7 +1195,19 @@ void Oscilloscope::Convert16BitSamples(
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
-			if(g_hasAvx2)
+			if(g_hasAvx512F)
+			{
+				Convert16BitSamplesAVX512F(
+					offs + off,
+					durs + off,
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp,
+					ibase + off);
+			}
+			else if(g_hasAvx2)
 			{
 				if(g_hasFMA)
 				{
@@ -1503,6 +1515,109 @@ void Oscilloscope::Convert16BitSamplesFMA(
 		_mm256_store_ps(pout + k + 40,	block5_float);
 		_mm256_store_ps(pout + k + 48,	block6_float);
 		_mm256_store_ps(pout + k + 56,	block7_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<count; k++)
+	{
+		offs[k] = ibase + k;
+		durs[k] = 1;
+		pout[k] = pin[k] * gain - offset;
+	}
+}
+
+__attribute__((target("avx512f,fma")))
+void Oscilloscope::Convert16BitSamplesAVX512F(
+		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+{
+	size_t end = count - (count % 64);
+
+	__m512i all_ones	= _mm512_set1_epi64(1);
+	__m512i all_8s		= _mm512_set1_epi64(8);
+	__m512i all_16s		= _mm512_set1_epi64(16);
+	int64_t __attribute__ ((aligned(32))) count_x8[] =
+	{
+		ibase + 0,
+		ibase + 1,
+		ibase + 2,
+		ibase + 3,
+		ibase + 4,
+		ibase + 5,
+		ibase + 6,
+		ibase + 7,
+	};
+	__m512i counts1 = _mm512_load_si512(reinterpret_cast<__m512i*>(count_x8));
+	__m512i counts2 = _mm512_add_epi64(counts1, all_8s);
+
+	__m512 gains = _mm512_set1_ps(gain);
+	__m512 offsets = _mm512_set1_ps(offset);
+
+	for(size_t k=0; k<end; k += 64)
+	{
+		//Load all 64 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m512i raw_samples1 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k));
+		__m512i raw_samples2 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k + 32));
+
+		//Fill offset
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k), counts1);
+		counts1 = _mm512_add_epi64(counts1, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 8), counts2);
+		counts2 = _mm512_add_epi64(counts2, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 16), counts1);
+		counts1 = _mm512_add_epi64(counts1, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 24), counts2);
+		counts2 = _mm512_add_epi64(counts2, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 32), counts1);
+		counts1 = _mm512_add_epi64(counts1, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 40), counts2);
+		counts2 = _mm512_add_epi64(counts2, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 48), counts1);
+		counts1 = _mm512_add_epi64(counts1, all_16s);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 56), counts2);
+		counts2 = _mm512_add_epi64(counts2, all_16s);
+
+		//Extract the high and low halves (16 samples each) from the input blocks
+		__m256i block0_i16 = _mm512_extracti64x4_epi64(raw_samples1, 0);
+		__m256i block1_i16 = _mm512_extracti64x4_epi64(raw_samples1, 1);
+		__m256i block2_i16 = _mm512_extracti64x4_epi64(raw_samples2, 0);
+		__m256i block3_i16 = _mm512_extracti64x4_epi64(raw_samples2, 1);
+
+		//Convert the blocks from 16 to 32 bit, giving us a pair of 16x int32 vectors
+		__m512i block0_i32 = _mm512_cvtepi16_epi32(block0_i16);
+		__m512i block1_i32 = _mm512_cvtepi16_epi32(block1_i16);
+		__m512i block2_i32 = _mm512_cvtepi16_epi32(block2_i16);
+		__m512i block3_i32 = _mm512_cvtepi16_epi32(block3_i16);
+
+		//Convert the 32-bit int blocks to fp32
+		//Sadly there's no direct epi16 to ps conversion instruction.
+		__m512 block0_float = _mm512_cvtepi32_ps(block0_i32);
+		__m512 block1_float = _mm512_cvtepi32_ps(block1_i32);
+		__m512 block2_float = _mm512_cvtepi32_ps(block2_i32);
+		__m512 block3_float = _mm512_cvtepi32_ps(block3_i32);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm512_fmsub_ps(block0_float, gains, offsets);
+		block1_float = _mm512_fmsub_ps(block1_float, gains, offsets);
+		block2_float = _mm512_fmsub_ps(block2_float, gains, offsets);
+		block3_float = _mm512_fmsub_ps(block3_float, gains, offsets);
+
+		//Fill duration
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 8), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 16), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 24), all_ones);
+
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 32), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 40), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 48), all_ones);
+		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 56), all_ones);
+
+		//All done, store back to the output buffer
+		_mm512_store_ps(pout + k, 		block0_float);
+		_mm512_store_ps(pout + k + 16,	block1_float);
+		_mm512_store_ps(pout + k + 32,	block2_float);
+		_mm512_store_ps(pout + k + 48,	block3_float);
 	}
 
 	//Get any extras we didn't get in the SIMD loop
