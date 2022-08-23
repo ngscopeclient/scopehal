@@ -169,6 +169,10 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(10 * 1000L * 1000L);
+
+	//Initialize waveform buffers
+	for(size_t i=0; i<m_analogChannelCount; i++)
+		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
 }
 
 /**
@@ -444,8 +448,8 @@ bool PicoOscilloscope::AcquireData()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
-	vector<unique_ptr<AcceleratorBuffer<int16_t> > > abufs;
 	vector<AnalogWaveform*> awfms;
+	vector<size_t> achans;
 	vector<float> scales;
 	vector<float> offsets;
 
@@ -460,9 +464,10 @@ bool PicoOscilloscope::AcquireData()
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
-			auto abuf = std::make_unique<AcceleratorBuffer<int16_t> >();
+			auto& abuf = m_analogRawWaveformBuffers[chnum];
 			abuf->resize(memdepth);
 			abuf->PrepareForCpuAccess();
+			achans.push_back(chnum);
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
@@ -490,8 +495,6 @@ bool PicoOscilloscope::AcquireData()
 			offsets.push_back(offset);
 
 			s[m_channels[chnum]] = cap;
-
-			abufs.push_back(std::move(abuf));
 		}
 
 		//Digital pod
@@ -597,7 +600,7 @@ bool PicoOscilloscope::AcquireData()
 				(int64_t*)&cap->m_offsets[0],
 				(int64_t*)&cap->m_durations[0],
 				(float*)&cap->m_samples[0],
-				abufs[i]->GetCpuPointer(),
+				m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
 				scales[i],
 				-offsets[i],
 				cap->m_offsets.size(),

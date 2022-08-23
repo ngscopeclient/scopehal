@@ -227,6 +227,9 @@ protected:
 
 	Series m_series;
 
+	///@brief Buffers for storing raw ADC samples before converting to fp32
+	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
+
 public:
 
 	static std::string GetDriverNameInternal();
