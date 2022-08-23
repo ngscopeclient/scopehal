@@ -444,7 +444,7 @@ bool PicoOscilloscope::AcquireData()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
-	vector<int16_t*> abufs;
+	vector<unique_ptr<AcceleratorBuffer<int16_t> > > abufs;
 	vector<AnalogWaveform*> awfms;
 	vector<float> scales;
 	vector<float> offsets;
@@ -456,12 +456,13 @@ bool PicoOscilloscope::AcquireData()
 			return false;
 		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
 			return false;
-		int16_t* buf = new int16_t[memdepth];
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
 		{
-			abufs.push_back(buf);
+			auto abuf = std::make_unique<AcceleratorBuffer<int16_t> >();
+			abuf->resize(memdepth);
+			abuf->PrepareForCpuAccess();
 
 			//Scale and offset are sent in the header since they might have changed since the capture began
 			if(!m_transport->ReadRawData(sizeof(config), (uint8_t*)&config))
@@ -473,8 +474,7 @@ bool PicoOscilloscope::AcquireData()
 			offset *= GetChannelAttenuation(chnum);
 
 			//TODO: stream timestamp from the server
-
-			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), (uint8_t*)buf))
+			if(!m_transport->ReadRawData(memdepth * sizeof(int16_t), reinterpret_cast<uint8_t*>(abuf->GetCpuPointer())))
 				return false;
 
 			//Create our waveform
@@ -490,11 +490,15 @@ bool PicoOscilloscope::AcquireData()
 			offsets.push_back(offset);
 
 			s[m_channels[chnum]] = cap;
+
+			abufs.push_back(std::move(abuf));
 		}
 
 		//Digital pod
 		else
 		{
+			int16_t* buf = new int16_t[memdepth];
+
 			float trigphase;
 			if(!m_transport->ReadRawData(sizeof(trigphase), (uint8_t*)&trigphase))
 				return false;
@@ -577,21 +581,28 @@ bool PicoOscilloscope::AcquireData()
 		}
 	}
 
-	//Process analog captures in parallel
-	#pragma omp parallel for
-	for(size_t i=0; i<awfms.size(); i++)
+	//if(g_gpuScopeDriverEnabled)
+	if(false)
 	{
-		auto cap = awfms[i];
-		Convert16BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
-			abufs[i],
-			scales[i],
-			-offsets[i],
-			cap->m_offsets.size(),
-			0);
-		delete[] abufs[i];
+	}
+	else
+	{
+		//Fallback path
+		//Process analog captures in parallel
+		#pragma omp parallel for
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			auto cap = awfms[i];
+			Convert16BitSamples(
+				(int64_t*)&cap->m_offsets[0],
+				(int64_t*)&cap->m_durations[0],
+				(float*)&cap->m_samples[0],
+				abufs[i]->GetCpuPointer(),
+				scales[i],
+				-offsets[i],
+				cap->m_offsets.size(),
+				0);
+		}
 	}
 
 	//Save the waveforms to our queue
