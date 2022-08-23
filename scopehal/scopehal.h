@@ -200,8 +200,9 @@ extern size_t g_computeQueueType;
 
 void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
-//Enable filter acceleration
+//Enable flags for various features
 extern bool g_gpuFilterEnabled;
+extern bool g_gpuScopeDriverEnabled;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
 

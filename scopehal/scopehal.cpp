@@ -88,7 +88,12 @@ bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 bool g_hasFMA = false;
 bool g_disableOpenCL = false;
+
+///@brief True if filters can use GPU acceleration
 bool g_gpuFilterEnabled = false;
+
+///@brief True if scope drivers can use GPU acceleration
+bool g_gpuScopeDriverEnabled = false;
 
 vector<string> g_searchPaths;
 

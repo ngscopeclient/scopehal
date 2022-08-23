@@ -450,6 +450,7 @@ bool VulkanInit()
 
 	//If we get here, everything is good
 	g_gpuFilterEnabled = true;
+	g_gpuScopeDriverEnabled = true;
 
 	return true;
 }
