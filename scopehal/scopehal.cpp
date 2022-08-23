@@ -1016,3 +1016,11 @@ void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 	while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
 	{}
 }
+
+uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize)
+{
+	uint32_t ret = numGlobal / blockSize;
+	if(numGlobal % blockSize)
+		ret ++;
+	return ret;
+}

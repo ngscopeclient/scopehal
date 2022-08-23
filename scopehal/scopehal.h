@@ -206,4 +206,14 @@ extern bool g_gpuScopeDriverEnabled;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
 
+//Shader args for frequently used kernels
+struct ConvertRawSamplesShaderArgs
+{
+	uint32_t size;
+	float gain;
+	float offset;
+};
+
+uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
+
 #endif
