@@ -1526,7 +1526,7 @@ void Oscilloscope::Convert16BitSamplesFMA(
 	}
 }
 
-__attribute__((target("avx512f,fma")))
+__attribute__((target("avx512f")))
 void Oscilloscope::Convert16BitSamplesAVX512F(
 		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
 {
