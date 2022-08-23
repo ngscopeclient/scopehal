@@ -35,17 +35,11 @@
 #ifndef TRCImportFilter_h
 #define TRCImportFilter_h
 
-struct TRCImportFilterShaderArgs
-{
-	uint32_t size;
-	float gain;
-	float offset;
-};
-
 class TRCImportFilter : public ImportFilter
 {
 public:
 	TRCImportFilter(const std::string& color);
+	virtual ~TRCImportFilter();
 
 	static std::string GetProtocolName();
 
@@ -56,6 +50,9 @@ protected:
 
 	std::unique_ptr<ComputePipeline> m_computePipeline8Bit;
 	std::unique_ptr<ComputePipeline> m_computePipeline16Bit;
+
+	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
+	std::unique_ptr<vk::raii::CommandBuffer> m_commandBuffer;
 };
 
 #endif

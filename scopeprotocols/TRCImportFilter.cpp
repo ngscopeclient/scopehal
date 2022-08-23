@@ -48,14 +48,29 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	if(g_hasShaderInt64 && g_hasShaderInt16)
 	{
 		m_computePipeline16Bit = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 4, sizeof(TRCImportFilterShaderArgs) );
+			"shaders/Convert16BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
 	if(g_hasShaderInt64)
 	{
 		m_computePipeline8Bit = make_unique<ComputePipeline>(
-			"shaders/Convert8BitSamples.spv", 4, sizeof(TRCImportFilterShaderArgs) );
+			"shaders/Convert8BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
 	}
+
+	//Make a command buffer for our accelerated stuff
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		g_computeQueueType );
+	m_commandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+	vk::CommandBufferAllocateInfo bufinfo(**m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
+	m_commandBuffer = make_unique<vk::raii::CommandBuffer>(
+		move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+}
+
+TRCImportFilter::~TRCImportFilter()
+{
+	m_commandBuffer = nullptr;
+	m_commandPool = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -223,23 +238,27 @@ void TRCImportFilter::OnFileNameChanged()
 			LogTrace("GPU path\n");
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline16Bit->BindBuffer(0, wfm->m_offsets);
-			m_computePipeline16Bit->BindBuffer(1, wfm->m_durations);
-			m_computePipeline16Bit->BindBuffer(2, wfm->m_samples);
+			m_computePipeline16Bit->BindBuffer(0, wfm->m_offsets, true);
+			m_computePipeline16Bit->BindBuffer(1, wfm->m_durations, true);
+			m_computePipeline16Bit->BindBuffer(2, wfm->m_samples, true);
 			m_computePipeline16Bit->BindBuffer(3, buf);
 			m_computePipeline16Bit->UpdateDescriptors();
 
-			TRCImportFilterShaderArgs args;
+			ConvertRawSamplesShaderArgs args;
 			args.size = num_per_segment;
 			args.gain = v_gain;
 			args.offset = v_off;
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			g_vkTransferCommandBuffer->begin({});
-			m_computePipeline16Bit->Dispatch(*g_vkTransferCommandBuffer, args, len);
-			g_vkTransferCommandBuffer->end();
-			SubmitAndBlock(*g_vkTransferCommandBuffer, *g_vkTransferQueue);
+			m_commandBuffer->begin({});
+			m_computePipeline16Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
+			m_commandBuffer->end();
+
+			{
+				lock_guard<mutex> lock(g_vkTransferMutex);
+				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
+			}
 
 			wfm->m_offsets.MarkModifiedFromGpu();
 			wfm->m_durations.MarkModifiedFromGpu();
@@ -287,23 +306,27 @@ void TRCImportFilter::OnFileNameChanged()
 			LogTrace("GPU path\n");
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline8Bit->BindBuffer(0, wfm->m_offsets);
-			m_computePipeline8Bit->BindBuffer(1, wfm->m_durations);
-			m_computePipeline8Bit->BindBuffer(2, wfm->m_samples);
+			m_computePipeline8Bit->BindBuffer(0, wfm->m_offsets, true);
+			m_computePipeline8Bit->BindBuffer(1, wfm->m_durations, true);
+			m_computePipeline8Bit->BindBuffer(2, wfm->m_samples, true);
 			m_computePipeline8Bit->BindBuffer(3, buf);
 			m_computePipeline8Bit->UpdateDescriptors();
 
-			TRCImportFilterShaderArgs args;
+			ConvertRawSamplesShaderArgs args;
 			args.size = num_per_segment;
 			args.gain = v_gain;
 			args.offset = v_off;
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			g_vkTransferCommandBuffer->begin({});
-			m_computePipeline8Bit->Dispatch(*g_vkTransferCommandBuffer, args, len);
-			g_vkTransferCommandBuffer->end();
-			SubmitAndBlock(*g_vkTransferCommandBuffer, *g_vkTransferQueue);
+			m_commandBuffer->begin({});
+			m_computePipeline8Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
+			m_commandBuffer->end();
+
+			{
+				lock_guard<mutex> lock(g_vkTransferMutex);
+				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
+			}
 
 			wfm->m_offsets.MarkModifiedFromGpu();
 			wfm->m_durations.MarkModifiedFromGpu();

@@ -145,12 +145,12 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		//Update our descriptor sets with current buffers
 		m_computePipeline.BindBuffer(0, din_p->m_samples);
 		m_computePipeline.BindBuffer(1, din_n->m_samples);
-		m_computePipeline.BindBuffer(2, cap->m_samples);
+		m_computePipeline.BindBuffer(2, cap->m_samples, true);
 		m_computePipeline.UpdateDescriptors();
 
 		//Dispatch the compute operation and block until it completes
 		cmdBuf.begin({});
-		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, len);
+		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, GetComputeBlockCount(len, 64));
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 
