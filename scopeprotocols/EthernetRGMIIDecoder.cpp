@@ -93,19 +93,22 @@ void EthernetRGMIIDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto data = GetDigitalBusInputWaveform(0);
-	auto clk = GetDigitalInputWaveform(1);
-	auto ctl = GetDigitalInputWaveform(2);
+	auto data = GetInputWaveform(0);
+	auto clk = GetInputWaveform(1);
+	auto ctl = GetInputWaveform(2);
 
 	//Sample everything on the clock edges
-	DigitalWaveform dctl;
-	DigitalBusWaveform ddata;
-	SampleOnAnyEdges(ctl, clk, dctl);
-	SampleOnAnyEdges(data, clk, ddata);
+	SparseDigitalWaveform dctl;
+	SparseDigitalBusWaveform ddata;
+	SampleOnAnyEdgesBase(ctl, clk, dctl);
+	SampleOnAnyEdgesBase(data, clk, ddata);
+
+	dctl.PrepareForCpuAccess();
+	ddata.PrepareForCpuAccess();
 
 	//Need a reasonable number of samples or there's no point in decoding.
 	//Cut off the last few samples because we might be either DDR or SDR and need to seek past our current position.
-	size_t len = min(dctl.m_samples.size(), ddata.m_samples.size());
+	size_t len = min(dctl.size(), ddata.size());
 	if(len < 100)
 	{
 		SetData(NULL, 0);
@@ -118,6 +121,7 @@ void EthernetRGMIIDecoder::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//skip first 2 samples so we can get a full clock cycle before starting
 	for(size_t i=2; i < len; i++)
@@ -135,7 +139,7 @@ void EthernetRGMIIDecoder::Refresh()
 
 			//Same status? Merge samples
 			bool extend = false;
-			size_t last = cap->m_samples.size() - 1;
+			size_t last = cap->size() - 1;
 			if(!cap->m_samples.empty())
 			{
 				auto& sample = cap->m_samples[last];
@@ -164,7 +168,7 @@ void EthernetRGMIIDecoder::Refresh()
 		//Need to do this cycle-by-cycle in case the link speed changes during a deep capture
 		//TODO: alert if clock isn't close to one of the three legal frequencies
 		int64_t clkperiod = dctl.m_offsets[i] - dctl.m_offsets[i-2];
-		bool ddr = false;		//Default to 2.5/25 MHz SDR.
+		bool ddr = false;			//Default to 2.5/25 MHz SDR.
 		if(clkperiod < 10000000)	//Faster than 100 MHz? assume it's 125 MHz DDR.
 			ddr = true;
 
@@ -224,4 +228,6 @@ void EthernetRGMIIDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

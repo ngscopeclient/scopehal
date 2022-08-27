@@ -68,6 +68,7 @@ void EthernetSGMIIDecoder::Refresh()
 		return;
 	}
 	auto data = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
+	data->PrepareForCpuAccess();
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
@@ -75,7 +76,7 @@ void EthernetSGMIIDecoder::Refresh()
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
 	cap->m_triggerPhase = data->m_triggerPhase;
-	cap->m_densePacked = false;
+	cap->PrepareForCpuAccess();
 
 	size_t delta = 1;
 	switch(m_parameters[m_speedName].GetIntVal())
@@ -93,7 +94,7 @@ void EthernetSGMIIDecoder::Refresh()
 			delta = 1;
 	}
 
-	size_t len = data->m_samples.size();
+	size_t len = data->size();
 	for(size_t i=0; i < len; i++)
 	{
 		//Ignore idles and autonegotiation for now
@@ -150,4 +151,6 @@ void EthernetSGMIIDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

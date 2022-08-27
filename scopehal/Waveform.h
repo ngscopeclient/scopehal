@@ -279,6 +279,9 @@ public:
 
 	void MarkModifiedFromGpu()
 	{ MarkSamplesModifiedFromGpu(); }
+
+	void SetGpuAccessHint(enum AcceleratorBuffer<S>::UsageHint hint)
+	{ m_samples.SetGpuAccessHint(hint); }
 };
 
 /**
@@ -361,6 +364,13 @@ public:
 
 	virtual void MarkSamplesModifiedFromGpu()
 	{ m_samples.MarkModifiedFromGpu(); }
+
+	void SetGpuAccessHint(enum AcceleratorBuffer<S>::UsageHint hint)
+	{
+		m_offsets.SetGpuAccessHint(static_cast<AcceleratorBuffer<int64_t>::UsageHint>(hint));
+		m_durations.SetGpuAccessHint(static_cast<AcceleratorBuffer<int64_t>::UsageHint>(hint));
+		m_samples.SetGpuAccessHint(hint);
+	}
 };
 
 typedef SparseWaveform<bool> 					SparseDigitalWaveform;

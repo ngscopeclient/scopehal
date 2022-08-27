@@ -591,14 +591,15 @@ public:
 	 */
 	template<class T, class R, class S>
 	__attribute__((noinline))
-	static void SampleOnAnyEdges(T* data, R* clock, S& samples)
+	static void SampleOnAnyEdges(T* data, R* clock, SparseWaveform<S>& samples)
 	{
 		//Compile-time check to make sure inputs are correct types
 		AssertTypeIsDigitalWaveform(clock);
-		AssertTypeIsSparseWaveform(&samples);
 		AssertSampleTypesAreSame(data, &samples);
 
 		samples.clear();
+		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
+		samples.PrepareForCpuAccess();
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -630,6 +631,8 @@ public:
 			FillDurationsAVX2(samples);
 		else
 			FillDurationsGeneric(samples);
+
+		samples.MarkModifiedFromCpu();
 	}
 
 	/**
@@ -682,7 +685,7 @@ public:
 	 */
 	template<class T, class R, class S>
 	__attribute__((noinline))
-	static void SampleOnRisingEdges(T* data, R* clock, S& samples)
+	static void SampleOnRisingEdges(T* data, R* clock, SparseWaveform<S>& samples)
 	{
 		//Compile-time check to make sure inputs are correct types
 		AssertTypeIsDigitalWaveform(clock);
@@ -690,6 +693,7 @@ public:
 		AssertSampleTypesAreSame(data, &samples);
 
 		samples.clear();
+		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -721,6 +725,8 @@ public:
 			FillDurationsAVX2(samples);
 		else
 			FillDurationsGeneric(samples);
+
+		samples.MarkModifiedFromCpu();
 	}
 
 	/**
@@ -746,8 +752,8 @@ public:
 		auto udata = dynamic_cast<UniformWaveform<T>*>(data);
 		auto sdata = dynamic_cast<SparseWaveform<T>*>(data);
 
-		auto uclock = dynamic_cast<UniformWaveform<T>*>(clock);
-		auto sclock = dynamic_cast<SparseWaveform<T>*>(clock);
+		auto uclock = dynamic_cast<UniformDigitalWaveform*>(clock);
+		auto sclock = dynamic_cast<SparseDigitalWaveform*>(clock);
 
 		if(udata && uclock)
 			SampleOnAnyEdges(udata, uclock, samples);
@@ -773,7 +779,7 @@ public:
 	 */
 	template<class T, class R, class S>
 	__attribute__((noinline))
-	static void SampleOnFallingEdges(T* data, R* clock, S& samples)
+	static void SampleOnFallingEdges(T* data, R* clock, SparseWaveform<S>& samples)
 	{
 		//Compile-time check to make sure inputs are correct types
 		AssertTypeIsDigitalWaveform(clock);
@@ -781,6 +787,7 @@ public:
 		AssertSampleTypesAreSame(data, &samples);
 
 		samples.clear();
+		samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress?
@@ -812,6 +819,8 @@ public:
 			FillDurationsAVX2(samples);
 		else
 			FillDurationsGeneric(samples);
+
+		samples.MarkModifiedFromCpu();
 	}
 
 	/**
@@ -834,6 +843,7 @@ public:
 		AssertTypeIsDigitalWaveform(clock);
 
 		samples.clear();
+		samples.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);	//assume we're being used as part of a CPU-side filter
 
 		//TODO: split up into blocks and multithread?
 		//TODO: AVX vcompress
@@ -870,6 +880,8 @@ public:
 			FillDurationsAVX2(samples);
 		else
 			FillDurationsGeneric(samples);
+
+		samples.MarkModifiedFromCpu();
 	}
 
 	/**

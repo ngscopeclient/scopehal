@@ -79,29 +79,29 @@ void EthernetRMIIDecoder::Refresh()
 {
 	ClearPackets();
 
-	if(!VerifyAllInputsOKAndDigital())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto ctl = GetDigitalInputWaveform(1);
-	auto d0 = GetDigitalInputWaveform(2);
-	auto d1 = GetDigitalInputWaveform(3);
+	auto clk = GetInputWaveform(0);
+	auto ctl = GetInputWaveform(1);
+	auto d0 = GetInputWaveform(2);
+	auto d1 = GetInputWaveform(3);
 
 	//Sample everything on the clock edges
-	DigitalWaveform dctl;
-	DigitalWaveform dd0;
-	DigitalWaveform dd1;
-	SampleOnRisingEdges(ctl, clk, dctl);
-	SampleOnRisingEdges(d0, clk, dd0);
-	SampleOnRisingEdges(d1, clk, dd1);
+	SparseDigitalWaveform dctl;
+	SparseDigitalWaveform dd0;
+	SparseDigitalWaveform dd1;
+	SampleOnRisingEdgesBase(ctl, clk, dctl);
+	SampleOnRisingEdgesBase(d0, clk, dd0);
+	SampleOnRisingEdgesBase(d1, clk, dd1);
 
 	//Need a reasonable number of samples or there's no point in decoding.
-	size_t len = min(dctl.m_samples.size(), dd0.m_samples.size());
-	len = min(len, dd1.m_samples.size());
+	size_t len = min(dctl.size(), dd0.size());
+	len = min(len, dd1.size());
 	if(len < 100)
 	{
 		SetData(NULL, 0);
@@ -114,6 +114,7 @@ void EthernetRMIIDecoder::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//skip first 2 samples so we can get a full clock cycle before starting
 	for(size_t i=2; i < len; i++)
@@ -163,4 +164,5 @@ void EthernetRMIIDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

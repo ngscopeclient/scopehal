@@ -95,28 +95,29 @@ void EthernetGMIIDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto data = GetDigitalBusInputWaveform(0);
-	auto clk = GetDigitalInputWaveform(1);
-	auto en = GetDigitalInputWaveform(2);
-	auto er = GetDigitalInputWaveform(3);
+	auto data = GetInputWaveform(0);
+	auto clk = GetInputWaveform(1);
+	auto en = GetInputWaveform(2);
+	auto er = GetInputWaveform(3);
 
 	//Sample everything on the clock edges
-	DigitalWaveform den;
-	DigitalWaveform der;
-	DigitalBusWaveform ddata;
-	SampleOnRisingEdges(en, clk, den);
-	SampleOnRisingEdges(er, clk, der);
-	SampleOnRisingEdges(data, clk, ddata);
+	SparseDigitalWaveform den;
+	SparseDigitalWaveform der;
+	SparseDigitalBusWaveform ddata;
+	SampleOnRisingEdgesBase(en, clk, den);
+	SampleOnRisingEdgesBase(er, clk, der);
+	SampleOnRisingEdgesBase(data, clk, ddata);
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
-	size_t len = den.m_samples.size();
-	len = min(len, der.m_samples.size());
-	len = min(len, ddata.m_samples.size());
+	size_t len = den.size();
+	len = min(len, der.size());
+	len = min(len, ddata.size());
 	for(size_t i=0; i < len; i++)
 	{
 		if(!den.m_samples[i])
@@ -149,4 +150,6 @@ void EthernetGMIIDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
