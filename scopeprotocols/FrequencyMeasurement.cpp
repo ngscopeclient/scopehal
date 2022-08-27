@@ -85,17 +85,24 @@ void FrequencyMeasurement::Refresh()
 	}
 
 	auto din = GetInputWaveform(0);
-	auto din_analog = GetAnalogInputWaveform(0);
-	auto din_digital = GetDigitalInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 	vector<int64_t> edges;
 
 	//Auto-threshold analog signals at 50% of full scale range
-	if(din_analog)
-		FindZeroCrossings(din_analog, GetAvgVoltage(din_analog), edges);
+	if(uadin)
+		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+	else if(sadin)
+		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
 
 	//Just find edges in digital signals
+	else if(uddin)
+		FindZeroCrossings(uddin, edges);
 	else
-		FindZeroCrossings(din_digital, edges);
+		FindZeroCrossings(sddin, edges);
 
 	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
@@ -105,7 +112,9 @@ void FrequencyMeasurement::Refresh()
 	}
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	size_t elen = edges.size();
 	for(size_t i=0; i < (elen - 2); i+= 2)
@@ -124,8 +133,5 @@ void FrequencyMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

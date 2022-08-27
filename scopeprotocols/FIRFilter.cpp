@@ -137,14 +137,15 @@ string FIRFilter::GetProtocolName()
 void FIRFilter::Refresh()
 {
 	//Sanity check
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Assume the input is dense packed, get the sample frequency
 	int64_t fs_per_sample = din->m_timescale;
@@ -208,10 +209,14 @@ void FIRFilter::Refresh()
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	size_t radius = (filterlen - 1) / 2;
-	auto cap = SetupOutputWaveform(din, 0, 0, filterlen);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+
+	cap->Resize(din->size() - filterlen);
+	cap->PrepareForCpuAccess();
 
 	//Run the actual filter
 	DoFilterKernel(coeffs, din, cap);
+	cap->MarkModifiedFromCpu();
 
 	//Shift output to compensate for filter group delay
 	cap->m_triggerPhase = (radius * fs_per_sample) + din->m_triggerPhase;

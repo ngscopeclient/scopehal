@@ -82,15 +82,16 @@ string FSKDecoder::GetProtocolName()
 
 void FSKDecoder::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto len = din->size();
+	din->PrepareForCpuAccess();
 
 	//Calculate min/max of the input data (ignoring really low values that failed squelch)
 	float nmin = FLT_MAX;
@@ -157,7 +158,9 @@ void FSKDecoder::Refresh()
 	//Hysteresis is 20% of the range.
 	float midpoint = (freq1 + freq2) / 2;
 	float hys = fabs(freq1 - freq2) * 0.2;
-	auto cap = SetupDigitalOutputWaveform(din, 0, 0, 0);
+	auto cap = SetupEmptyUniformDigitalOutputWaveform(din, 0);
+	cap->Resize(len);
+	cap->PrepareForCpuAccess();
 
 	//Threshold all of our samples
 	//Optimized inner loop if no hysteresis
@@ -183,4 +186,6 @@ void FSKDecoder::Refresh()
 			cap->m_samples[i] = cur;
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }

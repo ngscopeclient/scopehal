@@ -303,14 +303,14 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 void FFTFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
-	const size_t npoints_raw = din->m_samples.size();
+	const size_t npoints_raw = din->size();
 	size_t npoints;
 	if(m_parameters[m_roundingName].GetIntVal() == ROUND_TRUNCATE)
 		npoints = prev_pow2(npoints_raw);
@@ -325,8 +325,7 @@ void FFTFilter::Refresh()
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
-	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
-	DoRefresh(din, din->m_samples, fs, npoints, nouts, true);
+	DoRefresh(din, din->m_samples, din->m_timescale, npoints, nouts, true);
 }
 
 void FFTFilter::DoRefresh(
@@ -475,16 +474,16 @@ void FFTFilter::DoRefresh(
 		if(log_output)
 		{
 			if(g_hasAvx2 && g_hasFMA)
-				NormalizeOutputLogAVX2FMA(cap, nouts, scale);
+				NormalizeOutputLogAVX2FMA(cap->m_samples, nouts, scale);
 			else
-				NormalizeOutputLog(cap, nouts, scale);
+				NormalizeOutputLog(cap->m_samples, nouts, scale);
 		}
 		else
 		{
 			if(g_hasAvx2)
-				NormalizeOutputLinearAVX2(cap, nouts, scale);
+				NormalizeOutputLinearAVX2(cap->m_samples, nouts, scale);
 			else
-				NormalizeOutputLinear(cap, nouts, scale);
+				NormalizeOutputLinear(cap->m_samples, nouts, scale);
 		}
 
 	#ifdef HAVE_CLFFT

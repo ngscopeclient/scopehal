@@ -425,6 +425,17 @@ public:
 	}
 
 	/**
+		@brief Gets the base voltage of a waveform which may be sparse or uniform
+	 */
+	static float GetBaseVoltage(SparseAnalogWaveform* swfm, UniformAnalogWaveform* uwfm)
+	{
+		if(swfm)
+			return GetBaseVoltage(swfm);
+		else
+			return GetBaseVoltage(uwfm);
+	}
+
+	/**
 		@brief Gets the most probable "1" level for a digital waveform
 	 */
 	template<class T>
@@ -453,6 +464,17 @@ public:
 
 		float fbin = (idx + 0.5f)/nbins;
 		return fbin*delta + vmin;
+	}
+
+	/**
+		@brief Gets the top voltage of a waveform which may be sparse or uniform
+	 */
+	static float GetTopVoltage(SparseAnalogWaveform* swfm, UniformAnalogWaveform* uwfm)
+	{
+		if(swfm)
+			return GetTopVoltage(swfm);
+		else
+			return GetTopVoltage(uwfm);
 	}
 
 	/**
