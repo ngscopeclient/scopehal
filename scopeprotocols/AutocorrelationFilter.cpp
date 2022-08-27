@@ -73,14 +73,14 @@ string AutocorrelationFilter::GetProtocolName()
 
 void AutocorrelationFilter::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = dynamic_cast<AnalogWaveform*>(GetInputWaveform(0));
-	auto len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto len = din->size();
 
 	//Copy the units
 	SetYAxisUnits(m_inputs[0].m_channel->GetYAxisUnits(0), 0);
@@ -94,7 +94,9 @@ void AutocorrelationFilter::Refresh()
 	}
 
 	//Set up the output waveform
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
+	cap->PrepareForCpuAccess();
+	din->PrepareForCpuAccess();
 
 	size_t end = len - range;
 	for(size_t delta=1; delta <= range; delta ++)
@@ -104,14 +106,8 @@ void AutocorrelationFilter::Refresh()
 			total += din->m_samples[i] * din->m_samples[i+delta];
 
 		cap->m_samples.push_back(total / end);
-		cap->m_offsets.push_back(delta);
-		cap->m_durations.push_back(1);
 	}
 
-	//Copy our time scales from the input
-	cap->m_timescale 		= din->m_timescale;
-	cap->m_startTimestamp 	= din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-
+	cap->MarkSamplesModifiedFromCpu();
 	SetData(cap, 0);
 }

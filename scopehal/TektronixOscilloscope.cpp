@@ -1541,24 +1541,23 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 			//Set up the capture we're going to store our data into
 			//(no TDC data or fine timestamping available on Tektronix scopes?)
-			AnalogWaveform* cap = new AnalogWaveform;
-			cap->m_densePacked = true;
+			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = timebase;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
 			double t = GetTime();
 			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 			cap->Resize(nsamples);
+			cap->PrepareForCpuAccess();
 
 			Convert8BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
+				cap->m_samples.GetCpuPointer(),
 				samples,
 				preamble.ymult,
 				-preamble.yoff,
-				nsamples,
-				0);
+				nsamples);
+
+			cap->MarkSamplesModifiedFromCpu();
 
 			//Done, update the data
 			pending_waveforms[i].push_back(cap);
@@ -1650,26 +1649,23 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 			//Set up the capture we're going to store our data into
 			//(no TDC data or fine timestamping available on Tektronix scopes?)
-			AnalogWaveform* cap = new AnalogWaveform;
+			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = preamble.hzbase;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
 			double t = GetTime();
 			cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 			cap->Resize(nsamples);
+			cap->PrepareForCpuAccess();
 
 			//We get dBm from the instrument, so just have to convert double to single precision
 			//TODO: are other units possible here?
-			int64_t ibase = preamble.hzoff / preamble.hzbase;
+			//int64_t ibase = preamble.hzoff / preamble.hzbase;
 			for(size_t j=0; j<nsamples; j++)
-			{
-				cap->m_offsets[j] = j + ibase;
-				cap->m_durations[j] = 1;
 				cap->m_samples[j] = preamble.ymult*samples[j] + preamble.yoff;
-			}
 
 			//Done, update the data
+			cap->MarkSamplesModifiedFromCpu();
 			pending_waveforms[nchan].push_back(cap);
 
 			//Done
@@ -1778,14 +1774,14 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			{
 				//Set up the capture we're going to store our data into
 				//(no TDC data or fine timestamping available on Tektronix scopes?)
-				DigitalWaveform* cap = new DigitalWaveform;
+				auto cap = new SparseDigitalWaveform;
 				cap->m_timescale = timebase;
 				cap->m_triggerPhase = 0;
 				cap->m_startTimestamp = time(NULL);
-				cap->m_densePacked = true;
 				double t = GetTime();
 				cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 				cap->Resize(msglen);
+				cap->PrepareForCpuAccess();
 
 				//Extract sample data
 				int mask = (1 << j);
@@ -1824,6 +1820,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
+
+				cap->MarkSamplesModifiedFromCpu();
+				cap->MarkTimestampsModifiedFromCpu();
 
 				//Done, update the data
 				pending_waveforms[m_digitalChannelBase + i*8 + j].push_back(cap);

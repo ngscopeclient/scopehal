@@ -84,35 +84,39 @@ void DDR1Decoder::Refresh()
 	}
 
 	//Get the input data
-	DigitalWaveform* caps[6] = {0};
+	WaveformBase* caps[6] = {0};
 	for(int i=0; i<6; i++)
-		caps[i] = GetDigitalInputWaveform(i);
+	{
+		caps[i] = GetInputWaveform(i);
+		caps[i]->PrepareForCpuAccess();
+	}
 
 	//Sample all of the inputs
-	DigitalWaveform* cclk = caps[0];
-	DigitalWaveform we;
-	DigitalWaveform ras;
-	DigitalWaveform cas;
-	DigitalWaveform cs;
-	DigitalWaveform a10;
-	SampleOnRisingEdges(caps[1], cclk, we);
-	SampleOnRisingEdges(caps[2], cclk, ras);
-	SampleOnRisingEdges(caps[3], cclk, cas);
-	SampleOnRisingEdges(caps[4], cclk, cs);
-	SampleOnRisingEdges(caps[5], cclk, a10);
+	auto cclk = caps[0];
+	SparseDigitalWaveform we;
+	SparseDigitalWaveform ras;
+	SparseDigitalWaveform cas;
+	SparseDigitalWaveform cs;
+	SparseDigitalWaveform a10;
+	SampleOnRisingEdgesBase(caps[1], cclk, we);
+	SampleOnRisingEdgesBase(caps[2], cclk, ras);
+	SampleOnRisingEdgesBase(caps[3], cclk, cas);
+	SampleOnRisingEdgesBase(caps[4], cclk, cs);
+	SampleOnRisingEdgesBase(caps[5], cclk, a10);
 
 	//Create the capture
 	auto cap = new SDRAMWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = cclk->m_startTimestamp;
 	cap->m_startFemtoseconds = 0;
+	cap->PrepareForCpuAccess();
 
 	//Loop over the data and look for events on clock edges
-	size_t len = we.m_samples.size();
-	len = min(len, ras.m_samples.size());
-	len = min(len, cas.m_samples.size());
-	len = min(len, cs.m_samples.size());
-	len = min(len, a10.m_samples.size());
+	size_t len = we.size();
+	len = min(len, ras.size());
+	len = min(len, cas.size());
+	len = min(len, cs.size());
+	len = min(len, a10.size());
 	for(size_t i=0; i<len; i++)
 	{
 		bool swe = we.m_samples[i];
@@ -168,4 +172,6 @@ void DDR1Decoder::Refresh()
 		}
 	}
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

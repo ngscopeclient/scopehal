@@ -76,16 +76,57 @@ class SParameterVector
 public:
 	SParameterVector()
 	{}
-	SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang);
 
-	void ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang);
-	void ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* wang);
+	/**
+		@brief Creates an S-parameter vector from analog waveforms in dB / degree format
+	 */
+	template<class T>
+	SParameterVector(const T* wmag, const T* wang)
+	{
+		AssertTypeIsAnalogWaveform(wmag);
+		AssertTypeIsAnalogWaveform(wang);
+
+		ConvertFromWaveforms(wmag, wang);
+	}
+
+	/**
+		@brief Loads the vector from a pair of waveforms in mag/angle format.
+
+		The waveforms may be sparse or uniformly sampled, but must be sampled at the same frequencies.
+	 */
+	template<class T>
+	__attribute__((noinline))
+	void ConvertFromWaveforms(const T* wmag, const T* wang)
+	{
+		if( (wmag == nullptr) || (wang == nullptr) )
+		{
+			LogError("Null input supplied to SParameterVector::ConvertFromWaveforms\n");
+			return;
+		}
+
+		size_t len = std::min(wmag->size(), wang->size());
+		m_points.resize(len);
+		m_points.PrepareForCpuAccess();
+
+		float ascale = M_PI / 180;
+		for(size_t i=0; i<len; i++)
+		{
+			m_points[i] = SParameterPoint(
+				GetOffsetScaled(wmag, i),
+				pow(10, wmag->m_samples[i] / 20),
+				wang->m_samples[i] * ascale);
+		}
+
+		m_points.MarkModifiedFromCpu();
+	}
+
+	void ConvertToWaveforms(SparseAnalogWaveform* wmag, SparseAnalogWaveform* wang);
 
 	SParameterPoint InterpolatePoint(float frequency) const;
 	float InterpolateMagnitude(float frequency) const;
 	float InterpolateAngle(float frequency) const;
 
-	std::vector<SParameterPoint> m_points;
+	AcceleratorBuffer<SParameterPoint> m_points;
 
 	void resize(size_t nsize)
 	{ m_points.resize(nsize); }
@@ -94,8 +135,6 @@ public:
 
 	size_t size() const
 	{ return m_points.size(); }
-
-	SParameterVector& operator *=(const SParameterVector& rhs);
 
 	SParameterPoint& operator[](size_t i)
 	{ return m_points[i]; }
@@ -126,8 +165,6 @@ public:
 	 */
 	SParameterPoint SamplePoint(int to, int from, float frequency)
 	{ return m_params[ SPair(to, from) ]->InterpolatePoint(frequency); }
-
-	SParameters& operator *=(const SParameters& rhs);
 
 	SParameterVector& operator[] (SPair pair)
 	{ return *m_params[pair]; }

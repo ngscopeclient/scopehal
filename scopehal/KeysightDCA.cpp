@@ -483,12 +483,13 @@ bool KeysightDCA::AcquireData()
 
 		int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
 
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
+		cap->PrepareForCpuAccess();
 
 		auto buf = GetWaveformData(chname);
 		if(preamble.length != buf.size())
@@ -496,9 +497,6 @@ bool KeysightDCA::AcquireData()
 		cap->Resize(buf.size());
 		for(size_t j = 0; j < buf.size(); j++)
 		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
-
 			// Handle magic values representing clipped samples
 			// TODO: handle '125' which represents missing samples
 			if (buf[j] == 127)
@@ -510,6 +508,7 @@ bool KeysightDCA::AcquireData()
 				cap->m_samples[j] = preamble.yincrement * (buf[j] - preamble.yreference) + preamble.yorigin;
 		}
 
+		cap->MarkSamplesModifiedFromCpu();
 		pending_waveforms[i].push_back(cap);
 	}
 

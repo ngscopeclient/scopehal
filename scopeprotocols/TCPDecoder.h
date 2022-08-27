@@ -72,10 +72,10 @@ public:
 	}
 };
 
-class TCPWaveform : public Waveform<TCPSymbol>
+class TCPWaveform : public SparseWaveform<TCPSymbol>
 {
 public:
-	TCPWaveform () : Waveform<TCPSymbol>() {};
+	TCPWaveform () : SparseWaveform<TCPSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

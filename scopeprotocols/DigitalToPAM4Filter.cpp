@@ -81,7 +81,7 @@ vector<float> DigitalToPAM4Filter::GetVoltageLevels()
 	return ret;
 }
 
-size_t DigitalToPAM4Filter::GetVoltageCode(size_t i, DigitalWaveform& samples)
+size_t DigitalToPAM4Filter::GetVoltageCode(size_t i, SparseDigitalWaveform& samples)
 {
 	size_t code = 0;
 	if(samples.m_samples[i])

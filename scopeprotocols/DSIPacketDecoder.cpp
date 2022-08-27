@@ -78,7 +78,8 @@ void DSIPacketDecoder::Refresh()
 	}
 
 	auto din = dynamic_cast<DPhyDataWaveform*>(GetInputWaveform(0));
-	size_t len = din->m_samples.size();
+	size_t len = din->size();
+	din->PrepareForCpuAccess();
 
 	enum
 	{
@@ -104,6 +105,7 @@ void DSIPacketDecoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	//Main decode loop
@@ -501,6 +503,8 @@ void DSIPacketDecoder::Refresh()
 				break;	//end STATE_DROP
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color DSIWaveform::GetColor(size_t i)

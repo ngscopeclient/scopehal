@@ -228,55 +228,684 @@ protected:
 
 	bool VerifyAllInputsOK(bool allowEmpty = false);
 	bool VerifyInputOK(size_t i, bool allowEmpty = false);
-	bool VerifyAllInputsOKAndAnalog();
-	bool VerifyAllInputsOKAndDigital();
+	bool VerifyAllInputsOKAndUniformAnalog();
+	bool VerifyAllInputsOKAndSparseAnalog();
+	bool VerifyAllInputsOKAndSparseDigital();
+	bool VerifyAllInputsOKAndSparseOrUniformDigital();
 
 public:
-	static int64_t GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	static void AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
-	static int64_t GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
-	static void AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	static int64_t GetNextEventTimestamp(SparseWaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static int64_t GetNextEventTimestamp(UniformWaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+
+	static int64_t GetNextEventTimestamp(
+		SparseWaveformBase* swfm, UniformWaveformBase* uwfm, size_t i, size_t len, int64_t timestamp)
+	{
+		if(swfm)
+			return GetNextEventTimestamp(swfm, i, len, timestamp);
+		else
+			return GetNextEventTimestamp(uwfm, i, len, timestamp);
+	}
+
+	static void AdvanceToTimestamp(SparseWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestamp(UniformWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+
+	static void AdvanceToTimestamp(
+		SparseWaveformBase* swfm, UniformWaveformBase* uwfm, size_t& i, size_t len, int64_t timestamp)
+	{
+		if(swfm)
+			AdvanceToTimestamp(swfm, i, len, timestamp);
+		else
+			AdvanceToTimestamp(uwfm, i, len, timestamp);
+	}
+
+	static int64_t GetNextEventTimestampScaled(SparseWaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static int64_t GetNextEventTimestampScaled(UniformWaveformBase* wfm, size_t i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestampScaled(SparseWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
+	static void AdvanceToTimestampScaled(UniformWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
 protected:
-	AnalogWaveform* SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
-	DigitalWaveform* SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream);
-	AnalogWaveform* SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
-	DigitalWaveform* SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
+	UniformAnalogWaveform* SetupEmptyUniformAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
+	SparseAnalogWaveform* SetupEmptySparseAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
+	UniformDigitalWaveform* SetupEmptyUniformDigitalOutputWaveform(WaveformBase* din, size_t stream);
+	SparseDigitalWaveform* SetupEmptySparseDigitalOutputWaveform(WaveformBase* din, size_t stream);
+	SparseAnalogWaveform* SetupSparseOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
+	SparseDigitalWaveform* SetupSparseDigitalOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend);
 
 public:
-	//Helpers for sub-sample interoplation
-	static float InterpolateTime(AnalogWaveform* cap, size_t a, float voltage);
-	static float InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, float voltage);
-	static float InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks);
+	//Helpers for sub-sample interpolation
+
+	/**
+		@brief Interpolates the actual time of a threshold crossing between two samples
+
+		Simple linear interpolation for now (TODO sinc)
+
+		@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
+
+		TODO: validate that this works correctly for sparsely sampled waveforms?
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float InterpolateTime(T* cap, size_t a, float voltage)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		//If the voltage isn't between the two points, abort
+		float fa = cap->m_samples[a];
+		float fb = cap->m_samples[a+1];
+		bool ag = (fa > voltage);
+		bool bg = (fb > voltage);
+		if( (ag && bg) || (!ag && !bg) )
+			return 0;
+
+		//no need to divide by time, sample spacing is normalized to 1 timebase unit
+		float slope = (fb - fa);
+		float delta = voltage - fa;
+		return delta / slope;
+	}
+
+	static float InterpolateTime(SparseAnalogWaveform* s, UniformAnalogWaveform* u, size_t a, float voltage)
+	{
+		if(s)
+			return InterpolateTime(s, a, voltage);
+		else
+			return InterpolateTime(u, a, voltage);
+	}
+
+	static float InterpolateTime(UniformAnalogWaveform* p, UniformAnalogWaveform* n, size_t a, float voltage);
+	static float InterpolateTime(SparseAnalogWaveform* p, SparseAnalogWaveform* n, size_t a, float voltage);
+
+	static float InterpolateTime(
+		SparseAnalogWaveform* sp,
+		UniformAnalogWaveform* up,
+		SparseAnalogWaveform* sn,
+		UniformAnalogWaveform* un,
+		size_t a, float voltage)
+	{
+		if(sp)
+			return InterpolateTime(sp, sn, a, voltage);
+		else
+			return InterpolateTime(up, un, a, voltage);
+	}
+
+	static float InterpolateValue(SparseAnalogWaveform* cap, size_t index, float frac_ticks);
+	static float InterpolateValue(UniformAnalogWaveform* cap, size_t index, float frac_ticks);
 
 	//Helpers for more complex measurements
 	//TODO: create some process for caching this so we don't waste CPU time
-	static float GetMinVoltage(AnalogWaveform* cap);
-	static float GetMaxVoltage(AnalogWaveform* cap);
-	static float GetBaseVoltage(AnalogWaveform* cap);
-	static float GetTopVoltage(AnalogWaveform* cap);
-	static float GetAvgVoltage(AnalogWaveform* cap);
-	static std::vector<size_t> MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins);
-	static std::vector<size_t> MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins);
 
-	//Samples a channel on the edges of another channel.
-	//The two channels need not be the same sample rate.
-	static void SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
-	static void SampleOnAnyEdgesWithInterpolation(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples);
-	static void SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
-	static void SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
-	static void SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
-	static void SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples);
-	static void SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples);
+	/**
+		@brief Gets the lowest voltage of a waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float GetMinVoltage(T* cap)
+	{
+		AssertTypeIsAnalogWaveform(cap);
 
-	//Find interpolated zero crossings of a signal
-	static void FindRisingEdges(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
-	static void FindZeroCrossings(AnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+		//Loop over samples and find the minimum
+		float tmp = FLT_MAX;
+		for(float f : cap->m_samples)
+		{
+			if(f < tmp)
+				tmp = f;
+		}
+		return tmp;
+	}
 
-	//Find edges in a signal (discarding repeated samples)
-	static void FindZeroCrossings(DigitalWaveform* data, std::vector<int64_t>& edges);
-	static void FindRisingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
-	static void FindFallingEdges(DigitalWaveform* data, std::vector<int64_t>& edges);
+	/**
+		@brief Gets the lowest voltage of a waveform
+	 */
+	static float GetMinVoltage(SparseAnalogWaveform* s, UniformAnalogWaveform* u)
+	{
+		if(s)
+			return GetMinVoltage(s);
+		else
+			return GetMinVoltage(u);
+	}
+
+	/**
+		@brief Gets the highest voltage of a waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float GetMaxVoltage(T* cap)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		//Loop over samples and find the maximum
+		float tmp = -FLT_MAX;
+		for(float f : cap->m_samples)
+		{
+			if(f > tmp)
+				tmp = f;
+		}
+		return tmp;
+	}
+
+	/**
+		@brief Gets the lowest voltage of a waveform
+	 */
+	static float GetMaxVoltage(SparseAnalogWaveform* s, UniformAnalogWaveform* u)
+	{
+		if(s)
+			return GetMaxVoltage(s);
+		else
+			return GetMaxVoltage(u);
+	}
+
+	/**
+		@brief Gets the most probable "0" level for a digital waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float GetBaseVoltage(T* cap)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		float vmin = GetMinVoltage(cap);
+		float vmax = GetMaxVoltage(cap);
+		float delta = vmax - vmin;
+		const int nbins = 100;
+		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+		//Find the highest peak in the first quarter of the histogram
+		size_t binval = 0;
+		int idx = 0;
+		for(int i=0; i<(nbins/4); i++)
+		{
+			if(hist[i] > binval)
+			{
+				binval = hist[i];
+				idx = i;
+			}
+		}
+
+		float fbin = (idx + 0.5f)/nbins;
+		return fbin*delta + vmin;
+	}
+
+	/**
+		@brief Gets the most probable "1" level for a digital waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float GetTopVoltage(T* cap)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		float vmin = GetMinVoltage(cap);
+		float vmax = GetMaxVoltage(cap);
+		float delta = vmax - vmin;
+		const int nbins = 100;
+		auto hist = MakeHistogram(cap, vmin, vmax, nbins);
+
+		//Find the highest peak in the third quarter of the histogram
+		size_t binval = 0;
+		int idx = 0;
+		for(int i=(nbins*3)/4; i<nbins; i++)
+		{
+			if(hist[i] > binval)
+			{
+				binval = hist[i];
+				idx = i;
+			}
+		}
+
+		float fbin = (idx + 0.5f)/nbins;
+		return fbin*delta + vmin;
+	}
+
+	/**
+		@brief Gets the average voltage of a waveform
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static float GetAvgVoltage(T* cap)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		//Loop over samples and find the average
+		//TODO: more numerically stable summation algorithm for deep captures
+		double sum = 0;
+		for(float f : cap->m_samples)
+			sum += f;
+		return sum / cap->m_samples.size();
+	}
+
+	/**
+		@brief Gets the average voltage of a waveform which may be sparse or uniform
+	 */
+	static float GetAvgVoltage(SparseAnalogWaveform* swfm, UniformAnalogWaveform* uwfm)
+	{
+		if(swfm)
+			return GetAvgVoltage(swfm);
+		else
+			return GetAvgVoltage(uwfm);
+	}
+
+	/**
+		@brief Makes a histogram from a waveform with the specified number of bins.
+
+		Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+		@param low	Low endpoint of the histogram (volts)
+		@param high High endpoint of the histogram (volts)
+		@param bins	Number of histogram bins
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static std::vector<size_t> MakeHistogram(T* cap, float low, float high, size_t bins)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		std::vector<size_t> ret;
+		for(size_t i=0; i<bins; i++)
+			ret.push_back(0);
+
+		//Early out if we have zero span
+		if(bins == 0)
+			return ret;
+
+		float delta = high-low;
+
+		for(float v : cap->m_samples)
+		{
+			float fbin = (v-low) / delta;
+			size_t bin = floor(fbin * bins);
+			if(fbin < 0)
+				bin = 0;
+			else
+				bin = std::min(bin, bins-1);
+			ret[bin] ++;
+		}
+
+		return ret;
+	}
+
+	/**
+		@brief Makes a histogram from a waveform with the specified number of bins.
+
+		Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
+
+		@param low	Low endpoint of the histogram (volts)
+		@param high High endpoint of the histogram (volts)
+		@param bins	Number of histogram bins
+	 */
+	static std::vector<size_t> MakeHistogram(
+		SparseAnalogWaveform* s, UniformAnalogWaveform* u, float low, float high, size_t bins)
+	{
+		if(s)
+			return MakeHistogram(s, low, high, bins);
+		else
+			return MakeHistogram(u, low, high, bins);
+	}
+
+	/**
+		@brief Makes a histogram from a waveform with the specified number of bins.
+
+		Any values outside the range are discarded.
+
+		@param low	Low endpoint of the histogram (volts)
+		@param high High endpoint of the histogram (volts)
+		@param bins	Number of histogram bins
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static std::vector<size_t> MakeHistogramClipped(T* cap, float low, float high, size_t bins)
+	{
+		AssertTypeIsAnalogWaveform(cap);
+
+		std::vector<size_t> ret;
+		for(size_t i=0; i<bins; i++)
+			ret.push_back(0);
+
+		//Early out if we have zero span
+		if(bins == 0)
+			return ret;
+
+		float delta = high-low;
+
+		for(float v : cap->m_samples)
+		{
+			float fbin = (v-low) / delta;
+			size_t bin = floor(fbin * bins);
+			if(bin >= bins)	//negative values wrap to huge positive and get caught here
+				continue;
+			ret[bin] ++;
+		}
+
+		return ret;
+	}
+
+	/**
+		@brief Samples a waveform on all edges of a clock
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T, class R, class S>
+	__attribute__((noinline))
+	static void SampleOnAnyEdges(T* data, R* clock, S& samples)
+	{
+		//Compile-time check to make sure inputs are correct types
+		AssertTypeIsDigitalWaveform(clock);
+		AssertTypeIsSparseWaveform(&samples);
+		AssertSampleTypesAreSame(data, &samples);
+
+		samples.clear();
+
+		//TODO: split up into blocks and multithread?
+		//TODO: AVX vcompress?
+
+		size_t len = clock->size();
+		size_t dlen = data->size();
+
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = GetOffsetScaled(clock, i);
+			while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(data->m_samples[ndata]);
+		}
+
+		//Compute sample durations
+		if(g_hasAvx2)
+			FillDurationsAVX2(samples);
+		else
+			FillDurationsGeneric(samples);
+	}
+
+	/**
+		@brief Samples a waveform on all edges of a clock
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void SampleOnAnyEdgesBase(WaveformBase* data, WaveformBase* clock, SparseWaveform<T>& samples)
+	{
+		data->PrepareForCpuAccess();
+		clock->PrepareForCpuAccess();
+		samples.PrepareForCpuAccess();
+
+		auto udata = dynamic_cast<UniformWaveform<T>*>(data);
+		auto sdata = dynamic_cast<SparseWaveform<T>*>(data);
+
+		auto uclock = dynamic_cast<UniformDigitalWaveform*>(clock);
+		auto sclock = dynamic_cast<SparseDigitalWaveform*>(clock);
+
+		if(udata && uclock)
+			SampleOnAnyEdges(udata, uclock, samples);
+		else if(udata && sclock)
+			SampleOnAnyEdges(udata, sclock, samples);
+		else if(sdata && sclock)
+			SampleOnAnyEdges(sdata, sclock, samples);
+		else if(sdata && uclock)
+			SampleOnAnyEdges(sdata, uclock, samples);
+	}
+
+	/**
+		@brief Samples a waveform on the rising edges of a clock
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T, class R, class S>
+	__attribute__((noinline))
+	static void SampleOnRisingEdges(T* data, R* clock, S& samples)
+	{
+		//Compile-time check to make sure inputs are correct types
+		AssertTypeIsDigitalWaveform(clock);
+		AssertTypeIsSparseWaveform(&samples);
+		AssertSampleTypesAreSame(data, &samples);
+
+		samples.clear();
+
+		//TODO: split up into blocks and multithread?
+		//TODO: AVX vcompress?
+
+		size_t len = clock->size();
+		size_t dlen = data->size();
+
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find a rising edge
+			if(!(clock->m_samples[i] && !clock->m_samples[i-1]))
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = GetOffsetScaled(clock, i);
+			while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(data->m_samples[ndata]);
+		}
+
+		//Compute sample durations
+		if(g_hasAvx2)
+			FillDurationsAVX2(samples);
+		else
+			FillDurationsGeneric(samples);
+	}
+
+	/**
+		@brief Samples a waveform on rising edges of a clock
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void SampleOnRisingEdgesBase(WaveformBase* data, WaveformBase* clock, SparseWaveform<T>& samples)
+	{
+		data->PrepareForCpuAccess();
+		clock->PrepareForCpuAccess();
+		samples.PrepareForCpuAccess();
+
+		auto udata = dynamic_cast<UniformWaveform<T>*>(data);
+		auto sdata = dynamic_cast<SparseWaveform<T>*>(data);
+
+		auto uclock = dynamic_cast<UniformWaveform<T>*>(clock);
+		auto sclock = dynamic_cast<SparseWaveform<T>*>(clock);
+
+		if(udata && uclock)
+			SampleOnAnyEdges(udata, uclock, samples);
+		else if(udata && sclock)
+			SampleOnAnyEdges(udata, sclock, samples);
+		else if(sdata && sclock)
+			SampleOnAnyEdges(sdata, sclock, samples);
+		else if(sdata && uclock)
+			SampleOnAnyEdges(sdata, uclock, samples);
+	}
+
+	/**
+		@brief Samples a waveform on the falling edges of a clock
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T, class R, class S>
+	__attribute__((noinline))
+	static void SampleOnFallingEdges(T* data, R* clock, S& samples)
+	{
+		//Compile-time check to make sure inputs are correct types
+		AssertTypeIsDigitalWaveform(clock);
+		AssertTypeIsSparseWaveform(&samples);
+		AssertSampleTypesAreSame(data, &samples);
+
+		samples.clear();
+
+		//TODO: split up into blocks and multithread?
+		//TODO: AVX vcompress?
+
+		size_t len = clock->size();
+		size_t dlen = data->size();
+
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find a falling edge
+			if(!(!clock->m_samples[i] && clock->m_samples[i-1]))
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = GetOffsetScaled(clock, i);
+			while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(data->m_samples[ndata]);
+		}
+
+		//Compute sample durations
+		if(g_hasAvx2)
+			FillDurationsAVX2(samples);
+		else
+			FillDurationsGeneric(samples);
+	}
+
+	/**
+		@brief Samples an analog waveform on all edges of a clock, interpolating linearly to get sub-sample accuracy.
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
+
+		@param data		The data signal to sample
+		@param clock	The clock signal to use
+		@param samples	Output waveform
+	 */
+	template<class T, class R>
+	__attribute__((noinline))
+	static void SampleOnAnyEdgesWithInterpolation(T* data, R* clock, SparseAnalogWaveform& samples)
+	{
+		//Compile-time check to make sure inputs are correct types
+		AssertTypeIsAnalogWaveform(data);
+		AssertTypeIsDigitalWaveform(clock);
+
+		samples.clear();
+
+		//TODO: split up into blocks and multithread?
+		//TODO: AVX vcompress
+
+		size_t len = clock->size();
+		size_t dlen = data->size();
+
+		size_t ndata = 0;
+		for(size_t i=1; i<len; i++)
+		{
+			//Throw away clock samples until we find an edge
+			if(clock->m_samples[i] == clock->m_samples[i-1])
+				continue;
+
+			//Throw away data samples until the data is synced with us
+			int64_t clkstart = GetOffsetScaled(clock, i);
+			while( (ndata+1 < dlen) && (GetOffsetScaled(data, ndata+1) < clkstart) )
+				ndata ++;
+			if(ndata >= dlen)
+				break;
+
+			//Find the fractional position of the clock edge
+			int64_t tsample = GetOffsetScaled(data, ndata);
+			int64_t delta = clkstart - tsample;
+			float frac = delta * 1.0 / data->m_timescale;
+
+			//Add the new sample
+			samples.m_offsets.push_back(clkstart);
+			samples.m_samples.push_back(InterpolateValue(data, ndata, frac));
+		}
+
+		//Compute sample durations
+		if(g_hasAvx2)
+			FillDurationsAVX2(samples);
+		else
+			FillDurationsGeneric(samples);
+	}
+
+	/**
+		@brief Prepares a sparse or uniform analog waveform for CPU access
+	 */
+	template<class T>
+	static void PrepareForCpuAccess(SparseWaveform<T>* s, UniformWaveform<T>* u)
+	{
+		if(s)
+			s->PrepareForCpuAccess();
+		else
+			u->PrepareForCpuAccess();
+	}
+
+	/**
+		@brief Prepares a sparse or uniform analog waveform for GPU access
+	 */
+	template<class T>
+	static void PrepareForGpuAccess(SparseWaveform<T>* s, UniformWaveform<T>* u)
+	{
+		if(s)
+			s->PrepareForGpuAccess();
+		else
+			u->PrepareForGpuAccess();
+	}
+
+	static void FindRisingEdges(UniformAnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	static void FindRisingEdges(SparseAnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(SparseAnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindZeroCrossings(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindRisingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindRisingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindFallingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindFallingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
 
 	static void ClearAnalysisCache();
 
@@ -284,9 +913,9 @@ public:
 	static uint32_t CRC32(std::vector<uint8_t>& bytes, size_t start, size_t end);
 
 protected:
-	//Helpers for sampling
-	static void FillDurationsGeneric(WaveformBase& wfm);
-	static void FillDurationsAVX2(WaveformBase& wfm);
+	//Helpers for sparse waveforms
+	static void FillDurationsGeneric(SparseWaveformBase& wfm);
+	static void FillDurationsAVX2(SparseWaveformBase& wfm);
 
 public:
 	sigc::signal<void> signal_outputsChanged()

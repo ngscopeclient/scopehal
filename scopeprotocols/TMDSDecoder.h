@@ -65,10 +65,10 @@ public:
 	}
 };
 
-class TMDSWaveform : public Waveform<TMDSSymbol>
+class TMDSWaveform : public SparseWaveform<TMDSSymbol>
 {
 public:
-	TMDSWaveform () : Waveform<TMDSSymbol>() {};
+	TMDSWaveform () : SparseWaveform<TMDSSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

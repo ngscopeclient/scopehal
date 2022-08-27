@@ -73,10 +73,10 @@ public:
 	}
 };
 
-class IPv4Waveform : public Waveform<IPv4Symbol>
+class IPv4Waveform : public SparseWaveform<IPv4Symbol>
 {
 public:
-	IPv4Waveform () : Waveform<IPv4Symbol>() {};
+	IPv4Waveform () : SparseWaveform<IPv4Symbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

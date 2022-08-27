@@ -70,21 +70,45 @@ string ACCoupleFilter::GetProtocolName()
 void ACCoupleFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	//Find the average of our samples (assume data is DC balanced)
-	auto din = GetAnalogInputWaveform(0);
-	float average = GetAvgVoltage(din);
+	auto data = GetInput(0).GetData();
+	auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+	auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
 
-	//Subtract all of our samples
-	auto len = din->m_samples.size();
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-	float* fsrc = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
-	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+	//Find the average of our samples (assume data is DC balanced)
+	float average = GetAvgVoltage(sdata, udata);
+	auto len = data->size();
+
+	//Set up waveforms
+	float* fsrc;
+	float* fdst;
+	if(sdata)
+	{
+		auto cap = SetupSparseOutputWaveform(sdata, 0, 0, 0);
+		fsrc = sdata->m_samples.GetCpuPointer();
+		fdst = cap->m_samples.GetCpuPointer();
+
+		cap->PrepareForCpuAccess();
+		cap->MarkSamplesModifiedFromCpu();
+		cap->MarkTimestampsModifiedFromCpu();
+	}
+	else
+	{
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udata, 0);
+		cap->Resize(len);
+		fsrc = udata->m_samples.GetCpuPointer();
+		fdst = cap->m_samples.GetCpuPointer();
+
+		cap->PrepareForCpuAccess();
+		cap->MarkSamplesModifiedFromCpu();
+	}
+
+	//Do the actual subtraction
 	for(size_t i=0; i<len; i++)
 		fdst[i] = fsrc[i] - average;
 }

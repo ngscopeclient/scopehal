@@ -71,10 +71,10 @@ public:
 	}
 };
 
-class PCIeLogicalWaveform : public Waveform<PCIeLogicalSymbol>
+class PCIeLogicalWaveform : public SparseWaveform<PCIeLogicalSymbol>
 {
 public:
-	PCIeLogicalWaveform () : Waveform<PCIeLogicalSymbol>() {};
+	PCIeLogicalWaveform () : SparseWaveform<PCIeLogicalSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

@@ -240,8 +240,8 @@ void CSVImportFilter::OnFileNameChanged()
 	}
 
 	//Figure out if channels are analog or digital and create output streams/waveforms
-	vector<DigitalWaveform*> digwaves;
-	vector<AnalogWaveform*> anwaves;
+	vector<SparseDigitalWaveform*> digwaves;
+	vector<SparseAnalogWaveform*> anwaves;
 	for(size_t i=0; i<ncols; i++)
 	{
 		LogIndenter li;
@@ -263,12 +263,11 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			AddStream(Unit(Unit::UNIT_COUNTS), names[i], Stream::STREAM_TYPE_DIGITAL);
 
-			auto wfm = new DigitalWaveform;
+			auto wfm = new SparseDigitalWaveform;
 			wfm->m_timescale = 1;
 			wfm->m_startTimestamp = timestamp;
 			wfm->m_startFemtoseconds = fs;
 			wfm->m_triggerPhase = 0;
-			wfm->m_densePacked = false;
 			wfm->Resize(lines.size());
 			digwaves.push_back(wfm);
 
@@ -280,12 +279,11 @@ void CSVImportFilter::OnFileNameChanged()
 		{
 			AddStream(Unit(Unit::UNIT_VOLTS), names[i], Stream::STREAM_TYPE_ANALOG);
 
-			auto wfm = new AnalogWaveform;
+			auto wfm = new SparseAnalogWaveform;
 			wfm->m_timescale = 1;
 			wfm->m_startTimestamp = timestamp;
 			wfm->m_startFemtoseconds = fs;
 			wfm->m_triggerPhase = 0;
-			wfm->m_densePacked = false;
 			wfm->Resize(lines.size());
 			anwaves.push_back(wfm);
 
@@ -324,7 +322,11 @@ void CSVImportFilter::OnFileNameChanged()
 					wfm->m_samples[j] = false;
 			}
 
-			NormalizeTimebase(wfm);
+			if(TryNormalizeTimebase(wfm))
+			{
+				auto dense = new UniformDigitalWaveform(*wfm);
+				SetData(dense, i);
+			}
 		}
 
 		//Analog data
@@ -355,7 +357,11 @@ void CSVImportFilter::OnFileNameChanged()
 				wfm->m_samples[j] = v;
 			}
 
-			NormalizeTimebase(wfm);
+			if(TryNormalizeTimebase(wfm))
+			{
+				auto dense = new UniformAnalogWaveform(*wfm);
+				SetData(dense, i);
+			}
 		}
 	}
 }

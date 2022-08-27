@@ -64,10 +64,10 @@ public:
 	}
 };
 
-class SPIWaveform : public Waveform<SPISymbol>
+class SPIWaveform : public SparseWaveform<SPISymbol>
 {
 public:
-	SPIWaveform () : Waveform<SPISymbol>() {};
+	SPIWaveform () : SparseWaveform<SPISymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

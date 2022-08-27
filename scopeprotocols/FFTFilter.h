@@ -84,15 +84,15 @@ public:
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
 protected:
-	void NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale);
+	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
+	void NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale);
+	void NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale);
+	void NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t nouts, float scale);
 
 	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
 
 	void DoRefresh(
-		AnalogWaveform* din,
+		WaveformBase* din,
 		AcceleratorBuffer<float>& data,
 		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
 

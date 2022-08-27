@@ -60,10 +60,10 @@ public:
 	}
 };
 
-class SWDMemAPWaveform : public Waveform<SWDMemAPSymbol>
+class SWDMemAPWaveform : public SparseWaveform<SWDMemAPSymbol>
 {
 public:
-	SWDMemAPWaveform () : Waveform<SWDMemAPSymbol>() {};
+	SWDMemAPWaveform () : SparseWaveform<SWDMemAPSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

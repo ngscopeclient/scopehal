@@ -110,10 +110,10 @@ public:
 	}
 };
 
-class PCIeTransportWaveform : public Waveform<PCIeTransportSymbol>
+class PCIeTransportWaveform : public SparseWaveform<PCIeTransportSymbol>
 {
 public:
-	PCIeTransportWaveform () : Waveform<PCIeTransportSymbol>() {};
+	PCIeTransportWaveform () : SparseWaveform<PCIeTransportSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

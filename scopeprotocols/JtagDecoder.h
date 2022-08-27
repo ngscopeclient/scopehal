@@ -94,10 +94,10 @@ public:
 	uint8_t m_len;
 };
 
-class JtagWaveform : public Waveform<JtagSymbol>
+class JtagWaveform : public SparseWaveform<JtagSymbol>
 {
 public:
-	JtagWaveform () : Waveform<JtagSymbol>() {};
+	JtagWaveform () : SparseWaveform<JtagSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

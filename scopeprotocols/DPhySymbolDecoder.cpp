@@ -95,26 +95,37 @@ void DPhySymbolDecoder::Refresh()
 	}
 
 	//Get D+ and D- data
-	auto dp = GetAnalogInputWaveform(0);
-	auto dn = GetAnalogInputWaveform(1);
-	auto len = dp->m_samples.size();
+	auto dp = GetInputWaveform(0);
+	auto dn = GetInputWaveform(1);
+	auto len = dp->size();
+	dp->PrepareForCpuAccess();
 	if(dn)
-		len = min(len, dn->m_samples.size());
+	{
+		len = min(len, dn->size());
+		dn->PrepareForCpuAccess();
+	}
+
+	//See if sparse or uniform
+	auto sdp = dynamic_cast<SparseAnalogWaveform*>(dp);
+	auto udp = dynamic_cast<UniformAnalogWaveform*>(dp);
+	auto sdn = dynamic_cast<SparseAnalogWaveform*>(dn);
+	auto udn = dynamic_cast<UniformAnalogWaveform*>(dn);
 
 	//Create output waveform
-	DPhySymbolWaveform* cap = new DPhySymbolWaveform;
+	auto cap = new DPhySymbolWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = dp->m_startTimestamp;
 	cap->m_startFemtoseconds = dp->m_startFemtoseconds;
 	DPhySymbol::type last_state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type state = DPhySymbol::STATE_HS0;
 	DPhySymbol::type nextstate = state;
+	cap->PrepareForCpuAccess();
 
 	for(size_t i=0; i<len; i++)
 	{
-		float v = dp->m_samples[i];
-		int64_t start = dp->m_offsets[i] * dp->m_timescale;
-		int64_t dur = dp->m_durations[i] * dp->m_timescale;
+		float v = GetValue(sdp, udp, i);
+		int64_t start = GetOffsetScaled(sdp, udp, i);
+		int64_t dur = GetDurationScaled(sdp, udp, i);
 
 		/*
 			If we have Dp only, we can decode a restricted subset of line states by cheating a bit.
@@ -146,14 +157,14 @@ void DPhySymbolDecoder::Refresh()
 				{
 					//Interpolate the toggle time to sub-sample precision
 					if(i != 0)
-						start += dp->m_timescale * InterpolateTime(dp, i-1, 0.21);
+						start += dp->m_timescale * InterpolateTime(sdp, udp, i-1, 0.21);
 
 					nextstate = DPhySymbol::STATE_HS1;
 				}
 				else if(v < 0.16)
 				{
 					if(i != 0)
-						start += dp->m_timescale * InterpolateTime(dp, i-1, 0.16);
+						start += dp->m_timescale * InterpolateTime(sdp, udp, i-1, 0.16);
 					nextstate = DPhySymbol::STATE_HS0;
 				}
 			}
@@ -180,8 +191,8 @@ void DPhySymbolDecoder::Refresh()
 		//Full differential decode
 		else
 		{
-			float vp = dp->m_samples[i];
-			float vn = dn->m_samples[i];
+			float vp = v;
+			float vn = GetValue(sdn, udn, i);
 			float vd = vp - vn;
 
 			if( (vp < 0.55) && (vn < 0.55) )
@@ -195,13 +206,13 @@ void DPhySymbolDecoder::Refresh()
 					{
 						nextstate = DPhySymbol::STATE_HS0;
 						if(i != 0)
-							start += dp->m_timescale * InterpolateTime(dp, dn, i-1, -0.05);
+							start += dp->m_timescale * InterpolateTime(sdp, udp, sdn, udn, i-1, -0.05);
 					}
 					else if(vd > 0.05)
 					{
 						nextstate = DPhySymbol::STATE_HS1;
 						if(i != 0)
-							start += dp->m_timescale * InterpolateTime(dp, dn, i-1, 0.05);
+							start += dp->m_timescale * InterpolateTime(sdp, udp, sdn, udn, i-1, 0.05);
 					}
 				}
 
@@ -267,7 +278,7 @@ void DPhySymbolDecoder::Refresh()
 				cap->m_samples.pop_back();
 
 				//Update sizes
-				nsize = cap->m_samples.size();
+				nsize = cap->size();
 				if(nsize)
 				{
 					nlast = nsize-1;
@@ -285,13 +296,13 @@ void DPhySymbolDecoder::Refresh()
 
 		//If same as existing state, extend last one
 		if(samestate)
-			cap->m_durations[nlast] = start + dp->m_durations[i]*dp->m_timescale - cap->m_offsets[nlast];
+			cap->m_durations[nlast] = start + GetDurationScaled(sdp, udp, i) - cap->m_offsets[nlast];
 
 		//Nope, create a new sample
 		else
 		{
 			//Extend last sample to start of this one, if needed
-			nsize = cap->m_samples.size();
+			nsize = cap->size();
 			nlast = nsize-1;
 			if(nsize)
 				cap->m_durations[nlast] = start - cap->m_offsets[nlast];
@@ -306,6 +317,7 @@ void DPhySymbolDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 

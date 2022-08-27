@@ -242,8 +242,14 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	const size_t npoints_raw = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+	din->PrepareForCpuAccess();
+	const size_t npoints_raw = din->size();
 
 	//Zero pad to next power of two up
 	const size_t npoints = next_pow2(npoints_raw);
@@ -374,7 +380,7 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	}
 
 	//Calculate size of each bin
-	double fs = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	double fs = din->m_timescale;
 	double sample_ghz = 1e6 / fs;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
 
@@ -533,19 +539,14 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//Since we're phase shifting, there's gonna be some garbage response at one end of the channel.
 	size_t istart = 0;
 	size_t iend = npoints_raw;
-	AnalogWaveform* cap = NULL;
+	UniformAnalogWaveform* cap = NULL;
 	if(invert)
-	{
 		iend -= groupdelay_samples;
-		cap = SetupOutputWaveform(din, 0, 0, groupdelay_samples);
-	}
 	else
-	{
 		istart += groupdelay_samples;
-		cap = SetupOutputWaveform(din, 0, groupdelay_samples, 0);
-	}
+	cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 
-	//Apply phase shift for the group delay so we draw the waveform in the right place even if dense packed
+	//Apply phase shift for the group delay so we draw the waveform in the right place
 	if(invert)
 		cap->m_triggerPhase = -groupdelay_fs;
 	else
@@ -555,8 +556,12 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//TODO: vectorize this
 	float scale = 1.0f / npoints;
 	size_t outlen = iend - istart;
+	cap->Resize(outlen);
+	cap->PrepareForCpuAccess();
 	for(size_t i=0; i<outlen; i++)
 		cap->m_samples[i] = m_reverseOutBuf[i+istart] * scale;
+
+	cap->MarkModifiedFromCpu();
 }
 
 /**
@@ -589,9 +594,20 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 	float maxGain = pow(10, m_parameters[m_maxGainName].GetFloatVal()/20);
 
 	//Extract the S-parameters
-	m_cachedSparams = SParameterVector(
-		dynamic_cast<AnalogWaveform*>(GetInput(1).GetData()),
-		dynamic_cast<AnalogWaveform*>(GetInput(2).GetData()));
+	auto wmag = GetInputWaveform(1);
+	auto wang = GetInputWaveform(2);
+	wmag->PrepareForCpuAccess();
+	wang->PrepareForCpuAccess();
+
+	auto smag = dynamic_cast<SparseAnalogWaveform*>(wmag);
+	auto sang = dynamic_cast<SparseAnalogWaveform*>(wang);
+	auto umag = dynamic_cast<UniformAnalogWaveform*>(wmag);
+	auto uang = dynamic_cast<UniformAnalogWaveform*>(wang);
+
+	if(smag && sang)
+		m_cachedSparams.ConvertFromWaveforms(smag, sang);
+	else
+		m_cachedSparams.ConvertFromWaveforms(umag, uang);
 
 	m_resampledSparamSines.resize(nouts);
 	m_resampledSparamCosines.resize(nouts);

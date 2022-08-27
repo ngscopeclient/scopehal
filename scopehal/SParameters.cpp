@@ -41,53 +41,22 @@ using namespace std;
 // SParameterVector
 
 /**
-	@brief Creates an S-parameter vector from analog waveforms in dB / degree format
- */
-SParameterVector::SParameterVector(const AnalogWaveform* wmag, const AnalogWaveform* wang)
-{
-	ConvertFromWaveforms(wmag, wang);
-}
-
-void SParameterVector::ConvertFromWaveforms(const AnalogWaveform* wmag, const AnalogWaveform* wang)
-{
-	if( (wmag == nullptr) || (wang == nullptr) )
-	{
-		LogError("Null input supplied to SParameterVector::ConvertFromWaveforms\n");
-		return;
-	}
-
-	m_points.clear();
-
-	size_t len = min(wmag->m_samples.size(), wang->m_samples.size());
-	m_points.resize(len);
-
-	float ascale = M_PI / 180;
-	for(size_t i=0; i<len; i++)
-	{
-		m_points[i] = SParameterPoint(
-			wmag->m_timescale*wmag->m_offsets[i] + wmag->m_triggerPhase,
-			pow(10, wmag->m_samples[i] / 20),
-			wang->m_samples[i] * ascale);
-	}
-}
-
-/**
 	@brief Copy our state to analog mag/angle waveforms
  */
-void SParameterVector::ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* wang)
+void SParameterVector::ConvertToWaveforms(SparseAnalogWaveform* wmag, SparseAnalogWaveform* wang)
 {
 	size_t len = m_points.size();
 
 	//Resize outputs as needed
 	wmag->Resize(len);
+	wmag->PrepareForCpuAccess();
 	wmag->m_triggerPhase = 0;
 	wmag->m_timescale = 1;
-	wmag->m_densePacked = false;
 
 	wang->Resize(len);
+	wang->PrepareForCpuAccess();
 	wang->m_triggerPhase = 0;
 	wang->m_timescale = 1;
-	wang->m_densePacked = false;
 
 	float ascale = 180 / M_PI;
 
@@ -119,6 +88,12 @@ void SParameterVector::ConvertToWaveforms(AnalogWaveform* wmag, AnalogWaveform* 
 			wmag->m_durations[i] = dur;
 		}
 	}
+
+	wmag->MarkSamplesModifiedFromCpu();
+	wang->MarkSamplesModifiedFromCpu();
+
+	wmag->MarkTimestampsModifiedFromCpu();
+	wang->MarkTimestampsModifiedFromCpu();
 }
 
 SParameterPoint SParameterVector::InterpolatePoint(float frequency) const
@@ -226,33 +201,6 @@ float SParameterVector::InterpolateAngle(float frequency) const
 }
 
 /**
-	@brief Multiplies this vector by another set of S-parameters.
-
-	Sampling points are kept unchanged, and incident points are interpolated as necessary.
- */
-SParameterVector& SParameterVector::operator *=(const SParameterVector& rhs)
-{
-	size_t len = m_points.size();
-	for(size_t i=0; i<len; i++)
-	{
-		auto& us = m_points[i];
-		auto point = rhs.InterpolatePoint(us.m_frequency);
-
-		//Phases add mod +/- pi
-		us.m_phase += point.m_phase;
-		if(us.m_phase < -M_PI)
-			us.m_phase += 2*M_PI;
-		if(us.m_phase > M_PI)
-			us.m_phase -= 2*M_PI;
-
-		//Amplitudes get multiplied
-		us.m_amplitude *= point.m_amplitude;
-	}
-
-	return *this;
-}
-
-/**
 	@brief Gets the group delay at a given bin
  */
 float SParameterVector::GetGroupDelay(size_t bin) const
@@ -302,43 +250,6 @@ void SParameters::Allocate(int nports)
 	}
 
 	m_nports = nports;
-}
-
-/**
-	@brief Applies a second set of S-parameters after this one
- */
-SParameters& SParameters::operator *=(const SParameters& rhs)
-{
-	//TODO: verify we're the same number of ports
-
-	//Make sure we have parameters to work with
-	if(rhs.empty())
-	{
-	}
-
-	//If we have no parameters, just copy whatever is there
-	else if(m_params.empty())
-	{
-		Allocate(rhs.m_nports);
-
-		for(size_t d=1; d <= m_nports; d++)
-		{
-			for(size_t s=1; s <= m_nports; s++)
-				*m_params[SPair(d, s)] = *rhs.m_params.find(SPair(d,s))->second;
-		}
-	}
-
-	//If we have parameters, append the new ones
-	else
-	{
-		for(size_t d=1; d <= m_nports; d++)
-		{
-			for(size_t s=1; s <= m_nports; s++)
-				*m_params[SPair(d, s)] *= *rhs.m_params.find(SPair(d,s))->second;
-		}
-	}
-
-	return *this;
 }
 
 /**

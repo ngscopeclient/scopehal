@@ -453,7 +453,7 @@ bool PicoOscilloscope::AcquireData()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Analog channels get processed separately
-	vector<AnalogWaveform*> awfms;
+	vector<UniformAnalogWaveform*> awfms;
 	vector<size_t> achans;
 	vector<float> scales;
 	vector<float> offsets;
@@ -490,11 +490,10 @@ bool PicoOscilloscope::AcquireData()
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
-			AnalogWaveform* cap = new AnalogWaveform;
+			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
@@ -525,10 +524,10 @@ bool PicoOscilloscope::AcquireData()
 			}
 
 			//Create buffers for output waveforms
-			DigitalWaveform* caps[8];
+			SparseDigitalWaveform* caps[8];
 			for(size_t j=0; j<8; j++)
 			{
-				caps[j] = new DigitalWaveform;
+				caps[j] = new SparseDigitalWaveform;
 				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = caps[j];
 			}
 
@@ -544,11 +543,11 @@ bool PicoOscilloscope::AcquireData()
 				cap->m_timescale = fs_per_sample;
 				cap->m_triggerPhase = trigphase;
 				cap->m_startTimestamp = time(NULL);
-				cap->m_densePacked = false;
 				cap->m_startFemtoseconds = fs;
 
 				//Preallocate memory assuming no deduplication possible
 				cap->Resize(memdepth);
+				cap->PrepareForCpuAccess();
 
 				//First sample never gets deduplicated
 				bool last = (buf[0] & mask) ? true : false;
@@ -585,6 +584,8 @@ bool PicoOscilloscope::AcquireData()
 				cap->m_offsets.shrink_to_fit();
 				cap->m_durations.shrink_to_fit();
 				cap->m_samples.shrink_to_fit();
+				cap->MarkSamplesModifiedFromCpu();
+				cap->MarkTimestampsModifiedFromCpu();
 			}
 
 			delete[] buf;
@@ -597,18 +598,15 @@ bool PicoOscilloscope::AcquireData()
 	for(size_t i=0; i<awfms.size(); i++)
 	{
 		auto cap = awfms[i];
+		cap->PrepareForCpuAccess();
 		Convert16BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
+			cap->m_samples.GetCpuPointer(),
 			m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
 			scales[i],
 			-offsets[i],
-			cap->m_offsets.size(),
-			0);
+			cap->size());
 
 		cap->MarkSamplesModifiedFromCpu();
-		cap->MarkTimestampsModifiedFromCpu();
 	}
 
 	//Save the waveforms to our queue

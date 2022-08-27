@@ -277,15 +277,22 @@ void TouchstoneExportWizard::on_apply()
 
 			auto magrow = group->m_magBox.get_active_row_number();
 			auto angrow = group->m_angBox.get_active_row_number();
-			auto magData = dynamic_cast<AnalogWaveform*>(group->m_magStreams[magrow].GetData());
-			auto angData = dynamic_cast<AnalogWaveform*>(group->m_angStreams[angrow].GetData());
-			if(!magData || !angData)
+
+			auto umagData = dynamic_cast<const UniformAnalogWaveform*>(group->m_magStreams[magrow].GetData());
+			auto uangData = dynamic_cast<const UniformAnalogWaveform*>(group->m_angStreams[angrow].GetData());
+
+			auto smagData = dynamic_cast<const SparseAnalogWaveform*>(group->m_magStreams[magrow].GetData());
+			auto sangData = dynamic_cast<const SparseAnalogWaveform*>(group->m_angStreams[angrow].GetData());
+
+			if(umagData && uangData)
+				params[SPair(to, from)].ConvertFromWaveforms(umagData, uangData);
+			else if(smagData && sangData)
+				params[SPair(to, from)].ConvertFromWaveforms(smagData, sangData);
+			else
 			{
 				LogError("Missing mag or angle data\n");
 				continue;
 			}
-
-			params[SPair(to, from)].ConvertFromWaveforms(magData, angData);
 		}
 	}
 

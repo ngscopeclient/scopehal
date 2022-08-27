@@ -73,9 +73,9 @@ bool DramClockFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 	if( (i == 0) && (dynamic_cast<SDRAMWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
 		return true;
-	if( (i == 1) && (dynamic_cast<DigitalWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
-	if( (i == 2) && (dynamic_cast<AnalogWaveform*>(stream.m_channel->GetData(stream.m_stream)) != NULL ) )
+	if( (i == 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;
@@ -102,27 +102,43 @@ void DramClockFilter::Refresh()
 
 	//Get the input data
 	auto cmd = dynamic_cast<SDRAMWaveform*>(GetInputWaveform(0));
-	auto clk = GetDigitalInputWaveform(1);
-	auto dqs = GetAnalogInputWaveform(2);
+	auto clk = GetInputWaveform(1);
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clk);
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clk);
+	auto dqs = GetInputWaveform(2);
+	auto sdqs = dynamic_cast<SparseAnalogWaveform*>(dqs);
+	auto udqs = dynamic_cast<UniformAnalogWaveform*>(dqs);
+
+	cmd->PrepareForCpuAccess();
+	clk->PrepareForCpuAccess();
+	dqs->PrepareForCpuAccess();
 
 	//Find edges in the DQS signal (double rate so we want both polarity)
 	//TODO: support differential DQS for DDR2/3
 	vector<int64_t> edges;
 	float thresh = m_parameters[m_dqsthreshname].GetFloatVal();
-	FindZeroCrossings(dqs, thresh, edges);
+	if(sdqs)
+		FindZeroCrossings(sdqs, thresh, edges);
+	else
+		FindZeroCrossings(udqs, thresh, edges);
 
 	//Find edges in the CLK signal
 	//TODO: support analog clock too?
 	vector<int64_t> clkedges;
-	FindZeroCrossings(clk, clkedges);
+	if(sclk)
+		FindZeroCrossings(sclk, clkedges);
+	else
+		FindZeroCrossings(uclk, clkedges);
 
 	//Create output waveforms
-	auto rdclk = new DigitalWaveform;
-	auto wrclk = new DigitalWaveform;
+	auto rdclk = new SparseDigitalWaveform;
+	auto wrclk = new SparseDigitalWaveform;
 	rdclk->m_timescale 			= 1;
 	wrclk->m_timescale 			= 1;
 	SetData(rdclk, 0);
 	SetData(wrclk, 1);
+	rdclk->PrepareForCpuAccess();
+	wrclk->PrepareForCpuAccess();
 
 	//Copy timestamps
 	rdclk->m_startTimestamp 	= dqs->m_startTimestamp;
@@ -266,9 +282,9 @@ void DramClockFilter::Refresh()
 	}
 
 	//Stretch last zero sample to end of capture
-	size_t ilast = dqs->m_samples.size() - 1;
-	size_t tlast = (dqs->m_offsets[ilast] + dqs->m_durations[ilast])*dqs->m_timescale + dqs->m_triggerPhase;
-	size_t last = wrclk->m_samples.size() - 1;
+	size_t ilast = dqs->size() - 1;
+	size_t tlast = GetOffsetScaled(sdqs, udqs, ilast) + GetDurationScaled(sdqs, udqs, ilast);
+	size_t last = wrclk->size() - 1;
 	wrclk->m_durations[last] = tlast - wrclk->m_offsets[last];
 	last = rdclk->m_samples.size() - 1;
 	rdclk->m_durations[last] = tlast - rdclk->m_offsets[last];
@@ -286,4 +302,7 @@ void DramClockFilter::Refresh()
 		rdclk->m_durations.push_back(1);
 		rdclk->m_offsets.push_back(rdclk->m_offsets[last] + 1);
 	}
+
+	rdclk->MarkModifiedFromCpu();
+	wrclk->MarkModifiedFromCpu();
 }

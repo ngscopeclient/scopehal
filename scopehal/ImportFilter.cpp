@@ -84,13 +84,15 @@ void ImportFilter::Refresh()
 	This function identifies data sampled at regular intervals and adjusts the timescale and sample duration/offset
 	values accordingly, to enable dense packed optimizations and proper display of instrument timebase settings on
 	imported waveforms.
+
+	This function doesn't actually generate a uniform waveform, the caller has to take care of that.
  */
-void ImportFilter::NormalizeTimebase(WaveformBase* wfm)
+bool ImportFilter::TryNormalizeTimebase(SparseWaveformBase* wfm)
 {
 	//Find the mean sample interval
 	Unit fs(Unit::UNIT_FS);
 	uint64_t interval_sum = 0;
-	uint64_t interval_count = wfm->m_offsets.size();
+	uint64_t interval_count = wfm->size();
 	for(size_t i=0; i<interval_count; i++)
 		interval_sum += wfm->m_durations[i];
 	uint64_t avg = interval_sum / interval_count;
@@ -110,12 +112,11 @@ void ImportFilter::NormalizeTimebase(WaveformBase* wfm)
 	if( (stdev * 50) > avg)
 	{
 		LogTrace("Deviation is too large, assuming non-uniform sample interval\n");
-		return;
+		return false;
 	}
 
 	//If we get here, assume uniform sampling.
 	//Use time zero as the trigger phase.
-	wfm->m_densePacked = true;
 	wfm->m_timescale = avg;
 	wfm->m_triggerPhase = wfm->m_offsets[0];
 	size_t len = wfm->m_offsets.size();
@@ -124,4 +125,5 @@ void ImportFilter::NormalizeTimebase(WaveformBase* wfm)
 		wfm->m_offsets[j] = j;
 		wfm->m_durations[j] = 1;
 	}
+	return true;
 }

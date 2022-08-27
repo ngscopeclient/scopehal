@@ -84,7 +84,7 @@ WaveformBase* TestWaveformSource::GenerateStep(
 	int64_t sampleperiod,
 	size_t depth)
 {
-	auto ret = new AnalogWaveform;
+	auto ret = new UniformAnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -95,9 +95,6 @@ WaveformBase* TestWaveformSource::GenerateStep(
 			ret->m_samples[i] = vlo;
 		else
 			ret->m_samples[i] = vhi;
-
-		ret->m_offsets[i] = i;
-		ret->m_durations[i] = 1;
 	}
 
 	return ret;
@@ -114,7 +111,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	size_t depth,
 	float noise_amplitude)
 {
-	auto ret = new AnalogWaveform;
+	auto ret = new UniformAnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -127,12 +124,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	float scale = amplitude / 2;
 
 	for(size_t i=0; i<depth; i++)
-	{
-		ret->m_offsets[i] = i;
-		ret->m_durations[i] = 1;
-
 		ret->m_samples[i] = scale * sinf(i*radians_per_sample + startphase) + noise(m_rng);
-	}
 
 	return ret;
 }
@@ -150,7 +142,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	size_t depth,
 	float noise_amplitude)
 {
-	auto ret = new AnalogWaveform;
+	auto ret = new UniformAnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -165,9 +157,6 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 
 	for(size_t i=0; i<depth; i++)
 	{
-		ret->m_offsets[i] = i;
-		ret->m_durations[i] = 1;
-
 		ret->m_samples[i] = scale *
 			(sinf(i*radians_per_sample1 + startphase1) + sinf(i*radians_per_sample2 + startphase2))
 			+ noise(m_rng);
@@ -185,7 +174,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float noise_amplitude
 	)
 {
-	auto ret = new AnalogWaveform;
+	auto ret = new UniformAnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -196,9 +185,6 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	bool value = false;
 	for(size_t i=0; i<depth; i++)
 	{
-		ret->m_offsets[i] = i;
-		ret->m_durations[i] = 1;
-
 		//Increment phase accumulator
 		float last_phase = phase_to_next_edge;
 		phase_to_next_edge -= sampleperiod;
@@ -243,7 +229,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	bool lpf,
 	float noise_amplitude)
 {
-	auto ret = new AnalogWaveform;
+	auto ret = new UniformAnalogWaveform;
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -261,9 +247,6 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	int nbit = 0;
 	for(size_t i=0; i<depth; i++)
 	{
-		ret->m_offsets[i] = i;
-		ret->m_durations[i] = 1;
-
 		//Increment phase accumulator
 		float last_phase = phase_to_next_edge;
 		phase_to_next_edge -= sampleperiod;
@@ -304,9 +287,11 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	@brief Takes an idealized serial data stream and turns it into something less pretty
 
 	by adding noise and a band-limiting filter
+
+	TODO: apply a more realistic channel model, maybe a hard coded table of S-parameters or something?
  */
 void TestWaveformSource::DegradeSerialData(
-	AnalogWaveform* cap,
+	UniformAnalogWaveform* cap,
 	int64_t sampleperiod,
 	size_t depth,
 	bool lpf,

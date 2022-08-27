@@ -86,19 +86,24 @@ void CANDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto diff = dynamic_cast<DigitalWaveform*>(GetInputWaveform(0));
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto udiff = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sdiff = dynamic_cast<SparseDigitalWaveform*>(din);
 
 	//Create the capture
 	auto cap = new CANWaveform;
-	cap->m_timescale = diff->m_timescale;
-	cap->m_startTimestamp = diff->m_startTimestamp;
-	cap->m_startFemtoseconds = diff->m_startFemtoseconds;
+	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
+	cap->PrepareForCpuAccess();
 
 	//Calculate some time scale values
 	//Sample point is 3/4 of the way through the UI
 	auto bitrate = m_parameters[m_baudrateName].GetIntVal();
 	int64_t fs_per_ui = FS_PER_SECOND / bitrate;
-	int64_t samples_per_ui = fs_per_ui / diff->m_timescale;
+	int64_t samples_per_ui = fs_per_ui / din->m_timescale;
 
 	enum
 	{
@@ -126,7 +131,7 @@ void CANDecoder::Refresh()
 
 	Packet* pack = NULL;
 
-	size_t len = diff->m_samples.size();
+	size_t len = din->size();
 	int64_t tbitstart = 0;
 	int64_t tblockstart = 0;
 	bool vlast = true;
@@ -149,12 +154,12 @@ void CANDecoder::Refresh()
 
 	for(size_t i = 0; i < len; i++)
 	{
-		bool v = diff->m_samples[i];
+		bool v = GetValue(sdiff, udiff, i);
 		bool toggle = (v != vlast);
 		vlast = v;
 
-		auto off = diff->m_offsets[i];
-		auto end = diff->m_durations[i] + off;
+		auto off = ::GetOffset(sdiff, udiff, i);
+		auto end = ::GetDuration(sdiff, udiff, i) + off;
 
 		auto current_bitlen = off - tbitstart;
 
@@ -263,7 +268,7 @@ void CANDecoder::Refresh()
 
 					//Start a new packet
 					pack = new Packet;
-					pack->m_offset = off * diff->m_timescale;
+					pack->m_offset = off * din->m_timescale;
 					pack->m_len = 0;
 					m_packets.push_back(pack);
 
@@ -527,6 +532,8 @@ void CANDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color CANWaveform::GetColor(size_t i)

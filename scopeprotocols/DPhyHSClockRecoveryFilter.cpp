@@ -82,13 +82,18 @@ void DPhyHSClockRecoveryFilter::Refresh()
 	auto clk = dynamic_cast<DPhySymbolWaveform*>(GetInputWaveform(0));
 	auto data = dynamic_cast<DPhySymbolWaveform*>(GetInputWaveform(1));
 
+	clk->PrepareForCpuAccess();
+	data->PrepareForCpuAccess();
+
 	//Create the output waveform and copy our timescales
-	auto cap = new DigitalWaveform;
+	auto cap = new SparseDigitalWaveform;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = clk->m_triggerPhase;
 	cap->m_timescale = clk->m_timescale;
 	SetData(cap, 0);
+
+	cap->PrepareForCpuAccess();
 
 	//Process the data
 	size_t clklen = clk->m_samples.size();
@@ -179,4 +184,6 @@ void DPhyHSClockRecoveryFilter::Refresh()
 		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
 		AdvanceToTimestamp(data, idata, datalen, timestamp);
 	}
+
+	cap->MarkModifiedFromCpu();
 }

@@ -219,8 +219,8 @@ void FIRFilter::Refresh()
 
 void FIRFilter::DoFilterKernel(
 	vector<float>& coefficients,
-	AnalogWaveform* din,
-	AnalogWaveform* cap)
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap)
 {
 	#ifdef HAVE_OPENCL
 	if(g_clContext && m_kernel)
@@ -239,8 +239,8 @@ void FIRFilter::DoFilterKernel(
 #ifdef HAVE_OPENCL
 void FIRFilter::DoFilterKernelOpenCL(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap)
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap)
 {
 	//Setup
 	size_t len = din->m_samples.size();
@@ -296,8 +296,8 @@ void FIRFilter::DoFilterKernelOpenCL(
  */
 void FIRFilter::DoFilterKernelGeneric(
 	vector<float>& coefficients,
-	AnalogWaveform* din,
-	AnalogWaveform* cap)
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap)
 {
 	//Setup
 	size_t len = din->m_samples.size();
@@ -323,8 +323,8 @@ void FIRFilter::DoFilterKernelGeneric(
 __attribute__((target("avx2")))
 void FIRFilter::DoFilterKernelAVX2(
 	vector<float>& coefficients,
-	AnalogWaveform* din,
-	AnalogWaveform* cap)
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap)
 {
 	//Save some pointers and sizes
 	size_t len = din->m_samples.size();
@@ -422,8 +422,8 @@ void FIRFilter::DoFilterKernelAVX2(
 __attribute__((target("avx512f")))
 void FIRFilter::DoFilterKernelAVX512F(
 	vector<float>& coefficients,
-	AnalogWaveform* din,
-	AnalogWaveform* cap)
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap)
 {
 	//Save some pointers and sizes
 	size_t len = din->m_samples.size();

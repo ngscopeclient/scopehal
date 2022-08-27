@@ -97,21 +97,40 @@ void ESPIDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto csn = GetDigitalInputWaveform(1);
-	auto data3 = GetDigitalInputWaveform(2);
-	auto data2 = GetDigitalInputWaveform(3);
-	auto data1 = GetDigitalInputWaveform(4);
-	auto data0 = GetDigitalInputWaveform(5);
+	auto clk = GetInputWaveform(0);
+	auto csn = GetInputWaveform(1);
+	auto data3 = GetInputWaveform(2);
+	auto data2 = GetInputWaveform(3);
+	auto data1 = GetInputWaveform(4);
+	auto data0 = GetInputWaveform(5);
+	clk->PrepareForCpuAccess();
+	csn->PrepareForCpuAccess();
+	data3->PrepareForCpuAccess();
+	data2->PrepareForCpuAccess();
+	data1->PrepareForCpuAccess();
+	data0->PrepareForCpuAccess();
 
-	size_t clklen = clk->m_samples.size();
-	size_t cslen = csn->m_samples.size();
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clk);
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clk);
+	auto scsn = dynamic_cast<SparseDigitalWaveform*>(csn);
+	auto ucsn = dynamic_cast<UniformDigitalWaveform*>(csn);
+	auto sdata0 = dynamic_cast<SparseDigitalWaveform*>(data0);
+	auto udata0 = dynamic_cast<UniformDigitalWaveform*>(data0);
+	auto sdata1 = dynamic_cast<SparseDigitalWaveform*>(data1);
+	auto udata1 = dynamic_cast<UniformDigitalWaveform*>(data1);
+	auto sdata2 = dynamic_cast<SparseDigitalWaveform*>(data2);
+	auto udata2 = dynamic_cast<UniformDigitalWaveform*>(data2);
+	auto sdata3 = dynamic_cast<SparseDigitalWaveform*>(data3);
+	auto udata3 = dynamic_cast<UniformDigitalWaveform*>(data3);
+
+	size_t clklen = clk->size();
+	size_t cslen = csn->size();
 	size_t datalen[4] =
 	{
-		data0->m_samples.size(),
-		data1->m_samples.size(),
-		data2->m_samples.size(),
-		data3->m_samples.size()
+		data0->size(),
+		data1->size(),
+		data2->size(),
+		data3->size()
 	};
 
 	size_t ics			= 0;
@@ -125,6 +144,7 @@ void ESPIDecoder::Refresh()
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = clk->m_triggerPhase;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	ESPISymbol samp;
@@ -207,13 +227,13 @@ void ESPIDecoder::Refresh()
 
 	while(true)
 	{
-		bool cur_cs = csn->m_samples[ics];
-		bool cur_clk = clk->m_samples[iclk];
+		bool cur_cs = GetValue(scsn, ucsn, ics);
+		bool cur_clk = GetValue(sclk, uclk, iclk);
 		uint8_t cur_data =
-			(data3->m_samples[idata[3]] ? 0x8 : 0) |
-			(data2->m_samples[idata[2]] ? 0x4 : 0) |
-			(data1->m_samples[idata[1]] ? 0x2 : 0) |
-			(data0->m_samples[idata[0]] ? 0x1 : 0);
+			(GetValue(sdata3, udata3, idata[3]) ? 0x8 : 0) |
+			(GetValue(sdata3, udata3, idata[2]) ? 0x4 : 0) |
+			(GetValue(sdata3, udata3, idata[1]) ? 0x2 : 0) |
+			(GetValue(sdata3, udata3, idata[0]) ? 0x1 : 0);
 
 		bool byte_valid = false;
 
@@ -1351,8 +1371,8 @@ void ESPIDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		int64_t next_cs = GetNextEventTimestamp(csn, ics, cslen, timestamp);
-		int64_t next_clk = GetNextEventTimestamp(clk, iclk, clklen, timestamp);
+		int64_t next_cs = GetNextEventTimestamp(scsn, ucsn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestamp(sclk, uclk, iclk, clklen, timestamp);
 
 		//If we can't move forward, stop (don't bother looking for glitches on data)
 		int64_t next_timestamp = min(next_clk, next_cs);
@@ -1361,13 +1381,15 @@ void ESPIDecoder::Refresh()
 
 		//All good, move on
 		timestamp = next_timestamp;
-		AdvanceToTimestamp(csn, ics, cslen, timestamp);
-		AdvanceToTimestamp(clk, iclk, clklen, timestamp);
-		AdvanceToTimestamp(data0, idata[0], datalen[0], timestamp);
-		AdvanceToTimestamp(data1, idata[1], datalen[1], timestamp);
-		AdvanceToTimestamp(data2, idata[2], datalen[2], timestamp);
-		AdvanceToTimestamp(data3, idata[3], datalen[3], timestamp);
+		AdvanceToTimestamp(scsn, ucsn, ics, cslen, timestamp);
+		AdvanceToTimestamp(sclk, uclk, iclk, clklen, timestamp);
+		AdvanceToTimestamp(sdata0, udata0, idata[0], datalen[0], timestamp);
+		AdvanceToTimestamp(sdata1, udata1, idata[1], datalen[1], timestamp);
+		AdvanceToTimestamp(sdata2, udata2, idata[2], datalen[2], timestamp);
+		AdvanceToTimestamp(sdata3, udata3, idata[3], datalen[3], timestamp);
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 uint8_t ESPIDecoder::UpdateCRC8(uint8_t crc, uint8_t data)

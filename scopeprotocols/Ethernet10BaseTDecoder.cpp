@@ -61,20 +61,22 @@ void Ethernet10BaseTDecoder::Refresh()
 	ClearPackets();
 
 	//Get the input data
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	size_t len = din->size();
+	din->PrepareForCpuAccess();
 
 	//Copy our time scales from the input
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	const int64_t ui_width 		= 100000 * 1000;
 	const int64_t ui_halfwidth 	= 50000 * 1000;
@@ -108,7 +110,7 @@ void Ethernet10BaseTDecoder::Refresh()
 
 		//Recover the Manchester bitstream
 		bool current_state = false;
-		int64_t ui_start = din->m_offsets[i] * cap->m_timescale;
+		int64_t ui_start = GetOffsetScaled(din, i);
 		int64_t byte_start = ui_start;
 		//LogDebug("[T = %.3f ns] Found initial falling edge\n", ui_start * 1e-6f);
 		while(i < len)
@@ -125,7 +127,7 @@ void Ethernet10BaseTDecoder::Refresh()
 
 			//If the edge came too soon or too late, possible sync error - restart from this edge
 			//If the delta was more than ten UIs, it's a new frame - end this one
-			int64_t edgepos = din->m_offsets[i] * cap->m_timescale;
+			int64_t edgepos = GetOffsetScaled(din, i);
 			int64_t delta = edgepos - ui_start;
 			/*LogDebug("[T = %.3f ns] Found edge! edgepos=%d ui_start = %d, Delta = %.3f ns (%.2f UI)\n",
 				edgepos * 1e-6f,
@@ -143,12 +145,12 @@ void Ethernet10BaseTDecoder::Refresh()
 			{
 				LogTrace("Edge was in the wrong place, skipping it and attempting resync\n");
 				i++;
-				ui_start = din->m_offsets[i] * cap->m_timescale;
+				ui_start = GetOffsetScaled(din, i);
 				current_state = !current_state;
 				continue;
 			}
 			int64_t i_middle = i;
-			int64_t ui_middle = din->m_offsets[i] * cap->m_timescale;
+			int64_t ui_middle = GetOffsetScaled(din, i);
 
 			//Edge is in the right spot! Decode it. Ethernet sends LSB first.
 			//Ethernet says rising edge in the middle of the bit = 1
@@ -177,7 +179,7 @@ void Ethernet10BaseTDecoder::Refresh()
 				done = true;
 				break;
 			}
-			edgepos = din->m_offsets[i] * cap->m_timescale;
+			edgepos = GetOffsetScaled(din, i);
 			delta = edgepos - ui_middle;
 
 			//If the next edge is more than ten UIs after this one, declare the frame over
@@ -200,7 +202,7 @@ void Ethernet10BaseTDecoder::Refresh()
 				int64_t target = ui_middle + ui_halfwidth;
 				while(i < len)
 				{
-					int64_t pos = din->m_offsets[i] * cap->m_timescale;
+					int64_t pos = GetOffsetScaled(din, i);
 					if(pos >= target)
 						break;
 					else
@@ -217,7 +219,7 @@ void Ethernet10BaseTDecoder::Refresh()
 			}
 
 			//Either way, i now points to the beginning of the next bit's UI
-			ui_start = din->m_offsets[i] * cap->m_timescale;
+			ui_start = GetOffsetScaled(din, i);
 		}
 
 		//Crunch the Manchester-coded data
@@ -225,9 +227,11 @@ void Ethernet10BaseTDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
-bool Ethernet10BaseTDecoder::FindFallingEdge(size_t& i, AnalogWaveform* cap)
+bool Ethernet10BaseTDecoder::FindFallingEdge(size_t& i, UniformAnalogWaveform* cap)
 {
 	size_t j = i;
 	size_t len = cap->m_samples.size();
@@ -244,7 +248,7 @@ bool Ethernet10BaseTDecoder::FindFallingEdge(size_t& i, AnalogWaveform* cap)
 	return false;	//not found
 }
 
-bool Ethernet10BaseTDecoder::FindRisingEdge(size_t& i, AnalogWaveform* cap)
+bool Ethernet10BaseTDecoder::FindRisingEdge(size_t& i, UniformAnalogWaveform* cap)
 {
 	size_t j = i;
 	size_t len = cap->m_samples.size();

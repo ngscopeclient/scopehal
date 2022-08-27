@@ -47,7 +47,7 @@ public:
 protected:
 	virtual size_t GetBitsPerSymbol() =0;
 	virtual std::vector<float> GetVoltageLevels() =0;
-	virtual size_t GetVoltageCode(size_t i, DigitalWaveform& samples) =0;
+	virtual size_t GetVoltageCode(size_t i, SparseDigitalWaveform& samples) =0;
 
 	virtual float GetMaxLevel();
 	virtual float GetMinLevel();

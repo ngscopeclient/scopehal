@@ -62,10 +62,10 @@ public:
 	}
 };
 
-class DPhyEscapeModeWaveform : public Waveform<DPhyEscapeModeSymbol>
+class DPhyEscapeModeWaveform : public SparseWaveform<DPhyEscapeModeSymbol>
 {
 public:
-	DPhyEscapeModeWaveform () : Waveform<DPhyEscapeModeSymbol>() {};
+	DPhyEscapeModeWaveform () : SparseWaveform<DPhyEscapeModeSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

@@ -144,17 +144,25 @@ protected:
 	 */
 	WaveformBase* GetInputWaveform(size_t i);	//implementation in FlowGraphNode_inlines.h
 
-	///Gets the analog waveform attached to the specified input
-	AnalogWaveform* GetAnalogInputWaveform(size_t i)
-	{ return dynamic_cast<AnalogWaveform*>(GetInputWaveform(i)); }
+	///@brief Gets the analog waveform attached to the specified input
+	SparseAnalogWaveform* GetSparseAnalogInputWaveform(size_t i)
+	{ return dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(i)); }
 
-	///Gets the digital waveform attached to the specified input
-	DigitalWaveform* GetDigitalInputWaveform(size_t i)
-	{ return dynamic_cast<DigitalWaveform*>(GetInputWaveform(i)); }
+	///@brief Gets the analog waveform attached to the specified input
+	UniformAnalogWaveform* GetUniformAnalogInputWaveform(size_t i)
+	{ return dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(i)); }
+
+	///@brief Gets the digital waveform attached to the specified input
+	SparseDigitalWaveform* GetSparseDigitalInputWaveform(size_t i)
+	{ return dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(i)); }
+
+	///@brief Gets the digital waveform attached to the specified input
+	UniformDigitalWaveform* GetUniformDigitalInputWaveform(size_t i)
+	{ return dynamic_cast<UniformDigitalWaveform*>(GetInputWaveform(i)); }
 
 	///Gets the digital bus waveform attached to the specified input
-	DigitalBusWaveform* GetDigitalBusInputWaveform(size_t i)
-	{ return dynamic_cast<DigitalBusWaveform*>(GetInputWaveform(i)); }
+	SparseDigitalBusWaveform* GetSparseDigitalBusInputWaveform(size_t i)
+	{ return dynamic_cast<SparseDigitalBusWaveform*>(GetInputWaveform(i)); }
 
 	/**
 		@brief Creates and names an input signal

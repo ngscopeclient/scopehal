@@ -102,10 +102,10 @@ public:
 	}
 };
 
-class PCIeDataLinkWaveform : public Waveform<PCIeDataLinkSymbol>
+class PCIeDataLinkWaveform : public SparseWaveform<PCIeDataLinkSymbol>
 {
 public:
-	PCIeDataLinkWaveform () : Waveform<PCIeDataLinkSymbol>() {};
+	PCIeDataLinkWaveform () : SparseWaveform<PCIeDataLinkSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

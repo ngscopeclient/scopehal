@@ -69,21 +69,23 @@ string BaseMeasurement::GetProtocolName()
 
 void BaseMeasurement::Refresh()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	//Set up input
+	auto in = GetInput(0).GetData();
+	auto uin = dynamic_cast<UniformAnalogWaveform*>(in);
+	auto sin = dynamic_cast<SparseAnalogWaveform*>(in);
+	if(!uin && !sin)
 	{
 		SetData(NULL, 0);
 		return;
 	}
-
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	size_t len = in->size();
+	PrepareForCpuAccess(sin, uin);
 
 	//Make a histogram of the waveform
-	float vmin = GetMinVoltage(din);
-	float vmax = GetMaxVoltage(din);
+	float vmin = GetMinVoltage(sin, uin);
+	float vmax = GetMaxVoltage(sin, uin);
 	size_t nbins = 64;
-	vector<size_t> hist = MakeHistogram(din, vmin, vmax, nbins);
+	vector<size_t> hist = MakeHistogram(sin, uin, vmin, vmax, nbins);
 
 	//Set temporary midpoint and range
 	float range = (vmax - vmin);
@@ -105,7 +107,9 @@ void BaseMeasurement::Refresh()
 	float global_base = fbin*range + vmin;
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(in, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	float last = vmin;
 	int64_t tfall = 0;
@@ -121,8 +125,8 @@ void BaseMeasurement::Refresh()
 	for(size_t i=0; i < len; i++)
 	{
 		//Wait for a rising edge (end of the low period)
-		float cur = din->m_samples[i];
-		int64_t tnow = din->m_offsets[i] * din->m_timescale;
+		auto cur = GetValue(sin, uin, i);
+		auto tnow = GetOffsetScaled(sin, uin, i);
 
 		//Find falling edge
 		if( (cur < mid) && (last >= mid) )
@@ -179,10 +183,5 @@ void BaseMeasurement::Refresh()
 		last = cur;
 	}
 
-	SetData(cap, 0);
-
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

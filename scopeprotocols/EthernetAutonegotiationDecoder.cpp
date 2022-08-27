@@ -72,18 +72,22 @@ string EthernetAutonegotiationDecoder::GetProtocolName()
 
 void EthernetAutonegotiationDecoder::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	din->PrepareForCpuAccess();
 
 	//Create the outbound data
 	auto* cap = new EthernetAutonegotiationWaveform;
 	cap->m_timescale = din->m_timescale;
+	cap->PrepareForCpuAccess();
 
 	//Crunch it
 	bool old_value = false;
@@ -92,11 +96,11 @@ void EthernetAutonegotiationDecoder::Refresh()
 	int nbit = 0;
 	int64_t frame_start = 0;
 	bool last_was_data = false;
-	auto len = din->m_samples.size();
+	auto len = din->size();
 	for(size_t i = 0; i < len; i ++)
 	{
-		bool sample_value = (din->m_samples[i] > 1.25);
-		int64_t tm = din->m_offsets[i] * din->m_timescale;
+		bool sample_value = GetValue(sdin, udin, i) > 1.25;
+		int64_t tm = GetOffsetScaled(sdin, udin, i);
 		float dt = (tm - last_pulse) * 1e-9f;
 
 		if(sample_value && !old_value)
@@ -106,7 +110,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 			{
 				nbit = 0;
 				last_was_data = false;
-				frame_start = din->m_offsets[i];
+				frame_start = ::GetOffset(sdin, udin, i);
 			}
 
 			//If delta is less than 30 us, it's a glitch - skip it
@@ -142,7 +146,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 					ncode |= (code[j] << j);
 
 				cap->m_offsets.push_back(frame_start);
-				cap->m_durations.push_back(din->m_offsets[i] + din->m_durations[i] - frame_start);
+				cap->m_durations.push_back(::GetOffset(sdin, udin, i) + GetDuration(sdin, udin, i) - frame_start);
 				cap->m_samples.push_back(ncode);
 
 				nbit = 0;
@@ -155,6 +159,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color EthernetAutonegotiationWaveform::GetColor(size_t /*i*/)

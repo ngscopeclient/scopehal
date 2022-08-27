@@ -77,9 +77,12 @@ void DramRowColumnLatencyMeasurement::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<SDRAMWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->PrepareForCpuAccess();
+	cap->m_timescale = 1;
 
 	//Measure delay from activating a row in a bank until a read or write to the same bank
 	int64_t lastAct[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -132,8 +135,5 @@ void DramRowColumnLatencyMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

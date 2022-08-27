@@ -373,7 +373,7 @@ void EyePattern::Refresh()
 	SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
 
 	//If center of the eye was changed, reset existing eye data
-	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	auto = dynamic_cast<EyeWaveform*>(GetData(0));
 	double center = m_parameters[m_centerName].GetFloatVal();
 	if(cap)
 	{
@@ -499,7 +499,7 @@ void EyePattern::Refresh()
 
 __attribute__((target("avx2")))
 void EyePattern::DensePackedInnerLoopAVX2(
-	AnalogWaveform* waveform,
+	UniformAnalogWaveform* waveform,
 	vector<int64_t>& clock_edges,
 	int64_t* data,
 	size_t wend,
@@ -511,7 +511,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 	float yoff
 	)
 {
-	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
 	int64_t halfwidth = width/2;
 
@@ -680,7 +680,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 }
 
 void EyePattern::DensePackedInnerLoop(
-	AnalogWaveform* waveform,
+	UniformAnalogWaveform* waveform,
 	vector<int64_t>& clock_edges,
 	int64_t* data,
 	size_t wend,
@@ -692,7 +692,7 @@ void EyePattern::DensePackedInnerLoop(
 	float yoff
 	)
 {
-	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
 	int64_t halfwidth = width/2;
 
@@ -754,7 +754,7 @@ void EyePattern::DensePackedInnerLoop(
 }
 
 void EyePattern::SparsePackedInnerLoop(
-	AnalogWaveform* waveform,
+	SparseAnalogWaveform* waveform,
 	vector<int64_t>& clock_edges,
 	int64_t* data,
 	size_t wend,
@@ -766,7 +766,7 @@ void EyePattern::SparsePackedInnerLoop(
 	float yoff
 	)
 {
-	EyeWaveform* cap = dynamic_cast<EyeWaveform*>(GetData(0));
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	int64_t width = cap->GetUIWidth();
 	int64_t halfwidth = width/2;
 

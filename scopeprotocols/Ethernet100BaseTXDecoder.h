@@ -50,8 +50,8 @@ public:
 protected:
 	int GetState(float voltage);
 	bool TrySync(
-		DigitalWaveform& bits,
-		DigitalWaveform& descrambled_bits,
+		SparseDigitalWaveform& bits,
+		SparseDigitalWaveform& descrambled_bits,
 		size_t idle_offset,
 		size_t stop);
 };

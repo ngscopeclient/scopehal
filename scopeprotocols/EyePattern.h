@@ -180,7 +180,7 @@ protected:
 	void DoMaskTest(EyeWaveform* cap);
 
 	void SparsePackedInnerLoop(
-		AnalogWaveform* waveform,
+		SparseAnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
@@ -193,7 +193,7 @@ protected:
 		);
 
 	void DensePackedInnerLoop(
-		AnalogWaveform* waveform,
+		UniformAnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,
@@ -206,7 +206,7 @@ protected:
 		);
 
 	void DensePackedInnerLoopAVX2(
-		AnalogWaveform* waveform,
+		UniformAnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
 		int64_t* data,
 		size_t wend,

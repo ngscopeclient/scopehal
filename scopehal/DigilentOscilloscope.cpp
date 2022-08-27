@@ -279,7 +279,7 @@ bool DigilentOscilloscope::AcquireData()
 
 	//Analog channels get processed separately
 	vector<double*> abufs;
-	vector<AnalogWaveform*> awfms;
+	vector<UniformAnalogWaveform*> awfms;
 	for(size_t i=0; i<numChannels; i++)
 	{
 		//Get channel ID and memory depth (samples, not bytes)
@@ -303,11 +303,10 @@ bool DigilentOscilloscope::AcquireData()
 				return false;
 
 			//Create our waveform
-			AnalogWaveform* cap = new AnalogWaveform;
+			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
 			cap->m_startFemtoseconds = fs;
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
@@ -409,12 +408,10 @@ bool DigilentOscilloscope::AcquireData()
 		auto cap = awfms[i];
 
 		double* buf = abufs[i];
+		cap->PrepareForCpuAccess();
 		for(size_t j=0; j<memdepth; j++)
-		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
 			cap->m_samples[j] = buf[j];
-		}
+		cap->MarkSamplesModifiedFromCpu();
 
 		delete[] abufs[i];
 	}

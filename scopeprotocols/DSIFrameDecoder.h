@@ -71,10 +71,10 @@ public:
 	}
 };
 
-class DSIFrameWaveform : public Waveform<DSIFrameSymbol>
+class DSIFrameWaveform : public SparseWaveform<DSIFrameSymbol>
 {
 public:
-	DSIFrameWaveform () : Waveform<DSIFrameSymbol>() {};
+	DSIFrameWaveform () : SparseWaveform<DSIFrameSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

@@ -495,7 +495,7 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 	double xstop;
 	size_t length;
 	int ignored;
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	map<int, vector<UniformAnalogWaveform*> > pending_waveforms;
 	bool any_data = false;
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
@@ -521,7 +521,7 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		float* temp_buf = new float[length];
 
 		//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -538,20 +538,15 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		m_transport->ReadRawData(num_digits, (unsigned char*)tmp);
 		//int actual_len = atoi(tmp);
 
-		//Read the actual data
-		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)temp_buf);
+		//Read the actual data.
+		//Super easy, it comes across the wire in IEEE754 already!
+		cap->Resize(length);
+		cap->PrepareForCpuAccess();
+		m_transport->ReadRawData(length*sizeof(float), (unsigned char*)cap->m_samples.GetCpuPointer());
+		cap->MarkSamplesModifiedFromCpu();
+
 		//Discard trailing newline
 		m_transport->ReadRawData(1, (unsigned char*)tmp);
-
-
-		//Format the capture
-		cap->Resize(length);
-		for(size_t j=0; j<length; j++)
-		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
-			cap->m_samples[j] = temp_buf[j];
-		}
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);
@@ -559,7 +554,8 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		//Clean up
 		delete[] temp_buf;
 	}
-	if (!any_data) {
+	if (!any_data)
+	{
 		LogDebug("Skip update, no data from scope\n");
 		//Re-arm the trigger if not in one-shot mode
 		if(!m_triggerOneShot)

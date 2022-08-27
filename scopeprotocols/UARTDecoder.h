@@ -38,10 +38,10 @@
 
 #include "../scopehal/PacketDecoder.h"
 
-class ByteWaveform : public Waveform<char>
+class ByteWaveform : public SparseWaveform<char>
 {
 public:
-	ByteWaveform (const std::string& color) : Waveform<char>(), m_color(color) {};
+	ByteWaveform (const std::string& color) : SparseWaveform<char>(), m_color(color) {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 

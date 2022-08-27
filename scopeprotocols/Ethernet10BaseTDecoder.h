@@ -47,10 +47,10 @@ public:
 	PROTOCOL_DECODER_INITPROC(Ethernet10BaseTDecoder)
 
 protected:
-	bool FindFallingEdge(size_t& i, AnalogWaveform* cap);
-	bool FindRisingEdge(size_t& i, AnalogWaveform* cap);
+	bool FindFallingEdge(size_t& i, UniformAnalogWaveform* cap);
+	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* cap);
 
-	bool FindEdge(size_t& i, AnalogWaveform* cap, bool polarity)
+	bool FindEdge(size_t& i, UniformAnalogWaveform* cap, bool polarity)
 	{
 		if(polarity)
 			return FindRisingEdge(i, cap);

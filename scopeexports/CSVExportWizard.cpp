@@ -305,12 +305,16 @@ void CSVExportWizard::on_apply()
 	//Write data
 	//TODO: lots of redundant casting, this can probably be optimized!
 	int64_t lastTimestamp = LONG_LONG_MIN;
-	for(size_t i=0; i<timebaseWaveform->m_offsets.size(); i++)
+	auto timebaseSparse = dynamic_cast<SparseWaveformBase*>(timebaseWaveform);
+	auto timebaseUniform = dynamic_cast<UniformWaveformBase*>(timebaseWaveform);
+	auto timebaseSparseAnalog = dynamic_cast<SparseAnalogWaveform*>(timebaseWaveform);
+	auto timebaseUniformAnalog = dynamic_cast<UniformAnalogWaveform*>(timebaseWaveform);
+	auto timebaseSparseDigital = dynamic_cast<SparseDigitalWaveform*>(timebaseWaveform);
+	auto timebaseUniformDigital = dynamic_cast<UniformDigitalWaveform*>(timebaseWaveform);
+	for(size_t i=0; i<timebaseWaveform->size(); i++)
 	{
 		//Get current timestamp
-		auto timestamp =
-			(timebaseWaveform->m_offsets[i] * timebaseWaveform->m_timescale) +
-			timebaseWaveform->m_triggerPhase;
+		auto timestamp = GetOffsetScaled(timebaseSparse, timebaseUniform, i);
 
 		//Write timestamp
 		if(timebaseUnit == Unit(Unit::UNIT_FS))
@@ -325,23 +329,15 @@ void CSVExportWizard::on_apply()
 		switch(reftype)
 		{
 			case Stream::STREAM_TYPE_ANALOG:
-				{
-					auto refan = dynamic_cast<AnalogWaveform*>(timebaseWaveform);
-					fprintf(fp, ",%f", refan->m_samples[i]);
-				}
+				fprintf(fp, ",%f", GetValue(timebaseSparseAnalog, timebaseUniformAnalog, i));
 				break;
 
 			case Stream::STREAM_TYPE_DIGITAL:
-				{
-					auto refdig = dynamic_cast<DigitalWaveform*>(timebaseWaveform);
-					fprintf(fp, ",%d", refdig->m_samples[i]);
-				}
+				fprintf(fp, ",%d", GetValue(timebaseSparseDigital, timebaseUniformDigital, i));
 				break;
 
 			case Stream::STREAM_TYPE_PROTOCOL:
-				{
-					fprintf(fp, ",%s", timebaseWaveform->GetText(i).c_str());
-				}
+				fprintf(fp, ",%s", timebaseWaveform->GetText(i).c_str());
 				break;
 
 			default:
@@ -356,10 +352,12 @@ void CSVExportWizard::on_apply()
 			auto w = waveforms[j];
 			int64_t sstart = 0;
 			int64_t send = 0;
-			for(; k < w->m_offsets.size(); k++)
+			auto sw = dynamic_cast<SparseWaveformBase*>(w);
+			auto uw = dynamic_cast<UniformWaveformBase*>(w);
+			for(; k < w->size(); k++)
 			{
-				sstart = (w->m_offsets[k] * w->m_timescale) + w->m_triggerPhase;
-				send = sstart + (w->m_durations[k] * w->m_timescale);
+				sstart = GetOffsetScaled(sw, uw, k);
+				send = sstart + GetDurationScaled(sw, uw, k);
 
 				//If this sample ends in the future, we're good to go.
 				if(send > timestamp)
@@ -382,18 +380,20 @@ void CSVExportWizard::on_apply()
 				case Stream::STREAM_TYPE_ANALOG:
 					{
 						//No interpolation for last sample since there's no next to lerp to
-						auto an = dynamic_cast<AnalogWaveform*>(w);
-						if(k+1 > w->m_offsets.size())
-							fprintf(fp, ",%f", an->m_samples[k]);
+						auto uan = dynamic_cast<UniformAnalogWaveform*>(w);
+						auto san = dynamic_cast<SparseAnalogWaveform*>(w);
+
+						if(k+1 > w->size())
+							fprintf(fp, ",%f", GetValue(san, uan, k));
 
 						//Interpolate
 						else
 						{
-							float vleft = an->m_samples[k];
-							float vright = an->m_samples[k+1];
+							float vleft = GetValue(san, uan, k);
+							float vright = GetValue(san, uan, k+1);
 
 							int64_t tleft = sstart;
-							int64_t tright = (w->m_offsets[k+1] * w->m_timescale) + w->m_triggerPhase;
+							int64_t tright = GetDurationScaled(san, uan, k+1);
 
 							float frac = 1.0 * (timestamp - tleft) / (tright - tleft);
 
@@ -406,8 +406,9 @@ void CSVExportWizard::on_apply()
 				//Nearest neighbor interpolation
 				case Stream::STREAM_TYPE_DIGITAL:
 					{
-						auto dig = dynamic_cast<DigitalWaveform*>(w);
-						fprintf(fp, ",%d", dig->m_samples[k]);
+						auto udig = dynamic_cast<UniformDigitalWaveform*>(w);
+						auto sdig = dynamic_cast<SparseDigitalWaveform*>(w);
+						fprintf(fp, ",%d", GetValue(sdig, udig, k));
 					}
 					break;
 

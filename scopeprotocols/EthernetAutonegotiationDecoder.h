@@ -36,10 +36,11 @@
 #ifndef EthernetAutonegotiationDecoder_h
 #define EthernetAutonegotiationDecoder_h
 
-class EthernetAutonegotiationWaveform : public Waveform<uint16_t>
+class EthernetAutonegotiationWaveform : public SparseWaveform<uint16_t>
 {
 public:
-	EthernetAutonegotiationWaveform () : Waveform<uint16_t>() {};
+	EthernetAutonegotiationWaveform () : SparseWaveform<uint16_t>() {};
+
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

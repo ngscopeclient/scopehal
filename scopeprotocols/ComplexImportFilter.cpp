@@ -115,20 +115,20 @@ void ComplexImportFilter::Reload()
 	}
 	int64_t interval = FS_PER_SECOND / samplerate;
 
-	auto iwfm = new AnalogWaveform;
+	auto iwfm = new UniformAnalogWaveform;
 	iwfm->m_timescale = interval;
 	iwfm->m_startTimestamp = timestamp;
 	iwfm->m_startFemtoseconds = fs;
 	iwfm->m_triggerPhase = 0;
-	iwfm->m_densePacked = true;
+	iwfm->PrepareForCpuAccess();
 	SetData(iwfm, 0);
 
-	auto qwfm = new AnalogWaveform;
+	auto qwfm = new UniformAnalogWaveform;
 	qwfm->m_timescale = interval;
 	qwfm->m_startTimestamp = timestamp;
 	qwfm->m_startFemtoseconds = fs;
 	qwfm->m_triggerPhase = 0;
-	qwfm->m_densePacked = true;
+	qwfm->PrepareForCpuAccess();
 	SetData(qwfm, 1);
 
 	//Figure out actual data element size
@@ -154,19 +154,7 @@ void ComplexImportFilter::Reload()
 			break;
 	}
 	size_t nsamples = len_bytes / (bytes_per_sample * 2);
-
-	//Fill duration/offset of samples
-	//TODO: vectorize this?
 	iwfm->Resize(nsamples);
-	qwfm->Resize(nsamples);
-	for(size_t i=0; i<nsamples; i++)
-	{
-		iwfm->m_offsets[i] = i;
-		qwfm->m_offsets[i] = i;
-
-		iwfm->m_durations[i] = 1;
-		qwfm->m_durations[i] = 1;
-	}
 
 	//Actual output processing
 	//TODO: vectorize this?
@@ -231,6 +219,9 @@ void ComplexImportFilter::Reload()
 			break;
 
 	}
+
+	iwfm->MarkModifiedFromCpu();
+	qwfm->MarkModifiedFromCpu();
 
 	//Done, clean up
 	delete[] buf;

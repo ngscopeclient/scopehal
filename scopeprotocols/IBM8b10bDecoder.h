@@ -63,10 +63,10 @@ public:
 	}
 };
 
-class IBM8b10bWaveform : public Waveform<IBM8b10bSymbol>
+class IBM8b10bWaveform : public SparseWaveform<IBM8b10bSymbol>
 {
 public:
-	IBM8b10bWaveform (FilterParameter& displayformat) : Waveform<IBM8b10bSymbol>(), m_displayformat(displayformat) {};
+	IBM8b10bWaveform (FilterParameter& displayformat) : SparseWaveform<IBM8b10bSymbol>(), m_displayformat(displayformat) {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 

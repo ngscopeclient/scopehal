@@ -63,10 +63,10 @@ public:
 	}
 };
 
-class DPhySymbolWaveform : public Waveform<DPhySymbol>
+class DPhySymbolWaveform : public SparseWaveform<DPhySymbol>
 {
 public:
-	DPhySymbolWaveform () : Waveform<DPhySymbol>() {};
+	DPhySymbolWaveform () : SparseWaveform<DPhySymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

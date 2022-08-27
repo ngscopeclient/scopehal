@@ -92,10 +92,10 @@ public:
 	}
 };
 
-class MilStd1553Waveform : public Waveform<MilStd1553Symbol>
+class MilStd1553Waveform : public SparseWaveform<MilStd1553Symbol>
 {
 public:
-	MilStd1553Waveform () : Waveform<MilStd1553Symbol>() {};
+	MilStd1553Waveform () : SparseWaveform<MilStd1553Symbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

@@ -94,7 +94,7 @@ public:
 		int64_t sampleperiod,
 		size_t depth);
 
-	void DegradeSerialData(AnalogWaveform* cap, int64_t sampleperiod, size_t depth, bool lpf, float noise_amplitude);
+	void DegradeSerialData(UniformAnalogWaveform* cap, int64_t sampleperiod, size_t depth, bool lpf, float noise_amplitude);
 
 protected:
 	std::minstd_rand& m_rng;

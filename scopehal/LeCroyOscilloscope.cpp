@@ -2414,12 +2414,11 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	for(size_t j=0; j<num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = round(interval);
-
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
-		cap->m_densePacked = true;
+		cap->PrepareForCpuAccess();
 
 		//Parse the time
 		if(num_sequences > 1)
@@ -2433,37 +2432,32 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		if(m_highDefinition)
 		{
 			Convert16BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
+				cap->m_samples.GetCpuPointer(),
 				wdata + j*num_per_segment,
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 		}
 		else
 		{
 			Convert8BitSamples(
-				(int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
+				cap->m_samples.GetCpuPointer(),
 				bdata + j*num_per_segment,
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 		}
 
+		cap->MarkSamplesModifiedFromCpu();
 		ret.push_back(cap);
 	}
 
 	return ret;
 }
 
-map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data, int64_t analog_hoff)
+map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& data, int64_t analog_hoff)
 {
-	map<int, DigitalWaveform*> ret;
+	map<int, SparseDigitalWaveform*> ret;
 
 	//See what channels are enabled
 	string tmp = data.substr(data.find("SelectedLines=") + 14);
@@ -2546,9 +2540,9 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 	{
 		if(enabledChannels[i])
 		{
-			DigitalWaveform* cap = new DigitalWaveform;
+			auto cap = new SparseDigitalWaveform;
 			cap->m_timescale = interval;
-			cap->m_densePacked = false;
+			cap->PrepareForCpuAccess();
 
 			//Capture timestamp
 			cap->m_startTimestamp = start_time;
@@ -2595,6 +2589,8 @@ map<int, DigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(string& da
 			cap->m_offsets.shrink_to_fit();
 			cap->m_durations.shrink_to_fit();
 			cap->m_samples.shrink_to_fit();
+			cap->MarkSamplesModifiedFromCpu();
+			cap->MarkTimestampsModifiedFromCpu();
 
 			//See how much space we saved
 			/*
@@ -2774,7 +2770,7 @@ bool LeCroyOscilloscope::AcquireData()
 	if(denabled)
 	{
 		//This is a weird XML-y format but I can't find any other way to get it :(
-		map<int, DigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, analog_hoff);
+		map<int, SparseDigitalWaveform*> digwaves = ProcessDigitalWaveform(digitalWaveformData, analog_hoff);
 
 		//Done, update the data
 		for(auto it : digwaves)

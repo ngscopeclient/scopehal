@@ -73,37 +73,32 @@ string DeskewFilter::GetProtocolName()
 
 void DeskewFilter::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
-
-	//convert offset to time ticks
 	float offset = m_parameters[m_skewname].GetFloatVal();
-	int64_t toff = round(offset / din->m_timescale);
+	auto din = GetInputWaveform(0);
+	size_t len = din->size();
 
-	//Shift all of our samples
-	auto cap = new AnalogWaveform;
-	cap->Resize(len);
-	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
-	int64_t* tout = (int64_t*)__builtin_assume_aligned(&cap->m_offsets[0], 16);
-	int64_t* ta = (int64_t*)__builtin_assume_aligned(&din->m_offsets[0], 16);
-	memcpy((void*)&cap->m_durations[0], (void*)&din->m_durations[0], len * sizeof(int64_t));
-	for(size_t i=0; i<len; i++)
+	//Get the input data
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	//Copy the data
+	if(sdin)
 	{
-		out[i] 		= a[i];
-		tout[i]		= ta[i] + toff;
+		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
+		cap->m_samples.CopyFrom(sdin->m_samples);
+		cap->m_triggerPhase += offset;
 	}
-	SetData(cap, 0);
-
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	else
+	{
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+		cap->Resize(len);
+		cap->m_samples.CopyFrom(udin->m_samples);
+		cap->m_triggerPhase += offset;
+	}
 }

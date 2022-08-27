@@ -184,10 +184,10 @@ public:
 	}
 };
 
-class ESPIWaveform : public Waveform<ESPISymbol>
+class ESPIWaveform : public SparseWaveform<ESPISymbol>
 {
 public:
-	ESPIWaveform () : Waveform<ESPISymbol>() {};
+	ESPIWaveform () : SparseWaveform<ESPISymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

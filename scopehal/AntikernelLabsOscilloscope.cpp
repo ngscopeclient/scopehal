@@ -375,7 +375,7 @@ bool AntikernelLabsOscilloscope::AcquireData()
 	LogIndenter li;
 
 	//1600 ps per sample for now, hard coded
-	AnalogWaveform* cap = new AnalogWaveform;
+	auto cap = new UniformAnalogWaveform;
 	cap->m_timescale = 1600;
 	cap->m_triggerPhase = 0;
 	double t = GetTime();
@@ -388,11 +388,7 @@ bool AntikernelLabsOscilloscope::AcquireData()
 	float offset = GetChannelOffset(0, 0);
 	cap->Resize(depth);
 	for(size_t i=0; i<depth; i++)
-	{
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
 		cap->m_samples[i] = ((waveform[i] - 128.0f) * scale) + offset;
-	}
 
 	//See what the actual voltages are at the zero crossing
 	//TODO: this isn't the actual trigger point??
@@ -402,7 +398,7 @@ bool AntikernelLabsOscilloscope::AcquireData()
 
 	//Done, update
 	lock_guard<recursive_mutex> lock(m_mutex);
-	map<int, vector<AnalogWaveform*> > pending_waveforms;
+	map<int, vector<WaveformBase*> > pending_waveforms;
 	pending_waveforms[0].push_back(cap);
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels

@@ -82,18 +82,22 @@ void Ethernet100BaseTXDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	auto clk = GetDigitalInputWaveform(1);
+	auto din = GetInputWaveform(0);
+	auto clk = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clk->PrepareForCpuAccess();
 
 	//Sample the input on the edges of the recovered clock
-	AnalogWaveform samples;
-	SampleOnAnyEdges(din, clk, samples);
-	size_t ilen = samples.m_samples.size();
+	SparseAnalogWaveform samples;
+	samples.PrepareForCpuAccess();
+	SampleOnAnyEdgesBase(din, clk, samples);
+	size_t ilen = samples.size();
 
 	//MLT-3 decode
 	//TODO: some kind of sanity checking that voltage is changing in the right direction
 	int oldstate = GetState(samples.m_samples[0]);
-	DigitalWaveform bits;
+	SparseDigitalWaveform bits;
+	bits.PrepareForCpuAccess();
 	for(size_t i=1; i<ilen; i++)
 	{
 		int nstate = GetState(samples.m_samples[i]);
@@ -114,7 +118,8 @@ void Ethernet100BaseTXDecoder::Refresh()
 
 	//RX LFSR sync
 	size_t nbits = bits.m_samples.size();
-	DigitalWaveform descrambled_bits;
+	SparseDigitalWaveform descrambled_bits;
+	descrambled_bits.PrepareForCpuAccess();
 	bool synced = false;
 	for(size_t idle_offset = 0; idle_offset<15000; idle_offset++)
 	{
@@ -134,10 +139,11 @@ void Ethernet100BaseTXDecoder::Refresh()
 	}
 
 	//Copy our timestamps from the input. Output has femtosecond resolution since we sampled on clock edges
-	EthernetWaveform* cap = new EthernetWaveform;
+	auto cap = new EthernetWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	//Search until we find a 1100010001 (J-K, start of stream) sequence
@@ -276,11 +282,13 @@ void Ethernet100BaseTXDecoder::Refresh()
 
 		first = !first;
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 bool Ethernet100BaseTXDecoder::TrySync(
-	DigitalWaveform& bits,
-	DigitalWaveform& descrambled_bits,
+	SparseDigitalWaveform& bits,
+	SparseDigitalWaveform& descrambled_bits,
 	size_t idle_offset,
 	size_t stop)
 {

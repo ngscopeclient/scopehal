@@ -100,16 +100,25 @@ void ClockRecoveryFilter::Refresh()
 		return;
 	}
 
-	auto adin = GetAnalogInputWaveform(0);
-	auto ddin = GetDigitalInputWaveform(0);
-	auto gate = GetDigitalInputWaveform(1);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+
+	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto gate = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(1));
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	if(adin)
-		FindZeroCrossings(adin, m_parameters[m_threshname].GetFloatVal(), edges);
-	else
-		FindZeroCrossings(ddin, edges);
+	if(uadin)
+		FindZeroCrossings(uadin, m_parameters[m_threshname].GetFloatVal(), edges);
+	else if(sadin)
+		FindZeroCrossings(sadin, m_parameters[m_threshname].GetFloatVal(), edges);
+	else if(uddin)
+		FindZeroCrossings(uddin, edges);
+	else if(sddin)
+		FindZeroCrossings(sddin, edges);
 	if(edges.empty())
 	{
 		SetData(NULL, 0);
@@ -120,7 +129,7 @@ void ClockRecoveryFilter::Refresh()
 	int64_t period = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
 
 	//Disallow frequencies higher than Nyquist of the input
-	auto fnyquist = 2*GetInputWaveform(0)->m_timescale;
+	auto fnyquist = 2*din->m_timescale;
 	if( period < fnyquist)
 	{
 		SetData(NULL, 0);
@@ -128,27 +137,19 @@ void ClockRecoveryFilter::Refresh()
 	}
 
 	//Create the output waveform and copy our timescales
-	auto cap = new DigitalWaveform;
-	if(adin)
-	{
-		cap->m_startTimestamp = adin->m_startTimestamp;
-		cap->m_startFemtoseconds = adin->m_startFemtoseconds;
-	}
-	else
-	{
-		cap->m_startTimestamp = ddin->m_startTimestamp;
-		cap->m_startFemtoseconds = ddin->m_startFemtoseconds;
-	}
+	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+	cap->PrepareForCpuAccess();
+
+	int64_t tend;
+	if(sadin || uadin)
+		tend = GetOffsetScaled(sadin, uadin, din->size()-1);
+	else
+		tend = GetOffsetScaled(sddin, uddin, din->size()-1);
 
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
-	int64_t tend;
-	if(adin)
-		tend = adin->m_offsets[adin->m_offsets.size() - 1] * adin->m_timescale + adin->m_triggerPhase;
-	else
-		tend = ddin->m_offsets[ddin->m_offsets.size() - 1] * ddin->m_timescale + ddin->m_triggerPhase;
 	size_t nedge = 1;
 	//LogDebug("n, delta, period, freq_ghz, cycles_open_loop\n");
 	int64_t edgepos = edges[0];
@@ -246,4 +247,6 @@ void ClockRecoveryFilter::Refresh()
 	LogTrace("average phase error %zu\n", total_error);
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

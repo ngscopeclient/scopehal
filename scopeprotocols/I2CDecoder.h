@@ -68,10 +68,10 @@ public:
 	}
 };
 
-class I2CWaveform : public Waveform<I2CSymbol>
+class I2CWaveform : public SparseWaveform<I2CSymbol>
 {
 public:
-	I2CWaveform () : Waveform<I2CSymbol>() {};
+	I2CWaveform () : SparseWaveform<I2CSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

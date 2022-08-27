@@ -78,17 +78,16 @@ void MultimeterTrendFilter::ClearSweeps()
 	SetData(NULL, 1);
 }
 
-AnalogWaveform* MultimeterTrendFilter::GetWaveform(size_t stream)
+SparseAnalogWaveform* MultimeterTrendFilter::GetWaveform(size_t stream)
 {
-	auto wfm = dynamic_cast<AnalogWaveform*>(GetData(stream));
+	auto wfm = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
 	if(wfm == NULL)
 	{
-		wfm = new AnalogWaveform;
+		wfm = new SparseAnalogWaveform;
 		SetData(wfm, stream);
 
-		//Base time unit is milliseconds, and sampling is irregular
+		//Base time unit is milliseconds
 		wfm->m_timescale = FS_PER_SECOND / 1000;
-		wfm->m_densePacked = false;
 		wfm->m_triggerPhase = false;
 		wfm->m_flags = 0;
 	}
@@ -129,7 +128,7 @@ void MultimeterTrendFilter::OnDataReady(double prival, double secval)
 	m_tlast = now;
 }
 
-void MultimeterTrendFilter::AddSample(AnalogWaveform* wfm, double value, double now)
+void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, double now)
 {
 	//Remove old samples
 	size_t nmax = 4096;

@@ -84,15 +84,15 @@ string EmphasisRemovalFilter::GetProtocolName()
 
 void EmphasisRemovalFilter::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	size_t len = din->size();
 	if(len < 8)
 	{
 		SetData(NULL, 0);
@@ -111,7 +111,8 @@ void EmphasisRemovalFilter::Refresh()
 	}
 	int64_t tap_delay = round(FS_PER_SECOND / dataRate);
 	int64_t samples_per_tap = tap_delay / din->m_timescale;
-	auto cap = SetupOutputWaveform(din, 0, tap_count * samples_per_tap, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
+	cap->Resize(len - (tap_count * samples_per_tap));
 
 	//Calculate the tap values
 	//Reference: "Dealing with De-Emphasis in Jitter Testing", P. Pupalaikis, LeCroy technical brief, 2008

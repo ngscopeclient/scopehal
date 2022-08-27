@@ -330,7 +330,7 @@ void FFTFilter::Refresh()
 }
 
 void FFTFilter::DoRefresh(
-	AnalogWaveform* din,
+	WaveformBase* din,
 	AcceleratorBuffer<float>& data,
 	double fs_per_sample,
 	size_t npoints,
@@ -344,29 +344,13 @@ void FFTFilter::DoRefresh(
 	LogTrace("bin_hz: %f\n", bin_hz);
 
 	//Set up output and copy time scales / configuration
-	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(0));
-	if(cap == NULL)
-	{
-		cap = new AnalogWaveform;
-		SetData(cap, 0);
-	}
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_triggerPhase = 1*bin_hz;
 	cap->m_timescale = bin_hz;
-	cap->m_densePacked = true;
-
-	//Update output timestamps if capture depth grew
-	size_t oldlen = cap->m_offsets.size();
 	cap->Resize(nouts);
-	if(nouts > oldlen)
-	{
-		for(size_t i = oldlen; i < nouts; i++)
-		{
-			cap->m_offsets[i] = i;
-			cap->m_durations[i] = 1;
-		}
-	}
+
+	din->PrepareForCpuAccess();
+	cap->PrepareForCpuAccess();
 
 	//Output scale is based on the number of points we FFT that contain actual sample data.
 	//(If we're zero padding, the zeroes don't contribute any power)
@@ -507,6 +491,8 @@ void FFTFilter::DoRefresh(
 		}
 	#endif
 
+	cap->MarkModifiedFromCpu();
+
 	//Peak search
 	FindPeaks(cap);
 }
@@ -517,7 +503,7 @@ void FFTFilter::DoRefresh(
 /**
 	@brief Normalize FFT output and convert to dBm (unoptimized C++ implementation)
  */
-void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale)
 {
 	//assume constant 50 ohms for now
 	const float impedance = 50;
@@ -530,21 +516,21 @@ void FFTFilter::NormalizeOutputLog(AnalogWaveform* cap, size_t nouts, float scal
 		float vsq = real*real + imag*imag;
 
 		//Convert to dBm
-		cap->m_samples[i] = (10 * log10(vsq * sscale) + 30);
+		data[i] = (10 * log10(vsq * sscale) + 30);
 	}
 }
 
 /**
 	@brief Normalize FFT output and output in native Y-axis units (unoptimized C++ implementation)
  */
-void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale)
 {
 	for(size_t i=0; i<nouts; i++)
 	{
 		float real = m_rdoutbuf[i*2];
 		float imag = m_rdoutbuf[i*2 + 1];
 
-		cap->m_samples[i] = sqrtf(real*real + imag*imag) * scale;
+		data[i] = sqrtf(real*real + imag*imag) * scale;
 	}
 }
 
@@ -552,7 +538,7 @@ void FFTFilter::NormalizeOutputLinear(AnalogWaveform* cap, size_t nouts, float s
 	@brief Normalize FFT output and convert to dBm (optimized AVX2 implementation)
  */
 __attribute__((target("avx2,fma")))
-void FFTFilter::NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale)
 {
 	size_t end = nouts - (nouts % 8);
 
@@ -566,7 +552,7 @@ void FFTFilter::NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, flo
 	__m256 vlogscale = { logscale, logscale, logscale, logscale, logscale, logscale, logscale, logscale };
 	__m256 const_30 = {30, 30, 30, 30, 30, 30, 30, 30 };
 
-	float* pout = (float*)&cap->m_samples[0];
+	float* pout = data.GetCpuPointer();
 	float* pin = &m_rdoutbuf[0];
 
 	//Vectorized processing (8 samples per iteration)
@@ -619,14 +605,14 @@ void FFTFilter::NormalizeOutputLogAVX2FMA(AnalogWaveform* cap, size_t nouts, flo
 	@brief Normalize FFT output and keep in native units (optimized AVX2 implementation)
  */
 __attribute__((target("avx2")))
-void FFTFilter::NormalizeOutputLinearAVX2(AnalogWaveform* cap, size_t nouts, float scale)
+void FFTFilter::NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t nouts, float scale)
 {
 	size_t end = nouts - (nouts % 8);
 
 	//double since we only look at positive half
 	__m256 norm_f = { scale, scale, scale, scale, scale, scale, scale, scale };
 
-	float* pout = (float*)&cap->m_samples[0];
+	float* pout = data.GetCpuPointer();
 	float* pin = &m_rdoutbuf[0];
 
 	//Vectorized processing (8 samples per iteration)

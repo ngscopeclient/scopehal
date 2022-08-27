@@ -77,19 +77,29 @@ string DivideFilter::GetProtocolName()
 void DivideFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto a = GetAnalogInputWaveform(0);
-	auto b = GetAnalogInputWaveform(1);
-	auto len = min(a->m_samples.size(), b->m_samples.size());
+	//For now, only implement uniform analog
+	auto a = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!a || !b)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+	auto len = min(a->size(), b->size());
+
+	a->PrepareForCpuAccess();
+	b->PrepareForCpuAccess();
 
 	//Set up the output waveform
-	auto cap = SetupOutputWaveform(a, 0, 0, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
+	cap->PrepareForCpuAccess();
 
 	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
@@ -101,9 +111,6 @@ void DivideFilter::Refresh()
 	{
 		SetYAxisUnits(Unit(Unit::UNIT_COUNTS), 0);
 
-		//Divide the units
-		//m_yAxisUnit = m_inputs[0].m_channel->GetYAxisUnits() / m_inputs[1].m_channel->GetYAxisUnits();
-
 		for(size_t i=0; i<len; i++)
 			fdst[i] = fa[i] / fb[i];
 	}
@@ -114,4 +121,6 @@ void DivideFilter::Refresh()
 		for(size_t i=0; i<len; i++)
 			fdst[i] = 20 * log10(fa[i] / fb[i]);
 	}
+
+	cap->MarkModifiedFromCpu();
 }

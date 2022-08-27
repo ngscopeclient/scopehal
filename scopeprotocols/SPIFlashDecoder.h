@@ -111,10 +111,10 @@ public:
 	}
 };
 
-class SPIFlashWaveform : public Waveform<SPIFlashSymbol>
+class SPIFlashWaveform : public SparseWaveform<SPIFlashSymbol>
 {
 public:
-	SPIFlashWaveform () : Waveform<SPIFlashSymbol>() {};
+	SPIFlashWaveform () : SparseWaveform<SPIFlashSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

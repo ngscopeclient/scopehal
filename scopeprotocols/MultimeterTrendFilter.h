@@ -59,8 +59,8 @@ protected:
 	Multimeter* m_meter;
 	double m_tlast;
 
-	void AddSample(AnalogWaveform* wfm, double value, double now);
-	AnalogWaveform* GetWaveform(size_t stream);
+	void AddSample(SparseAnalogWaveform* wfm, double value, double now);
+	SparseAnalogWaveform* GetWaveform(size_t stream);
 };
 
 #endif

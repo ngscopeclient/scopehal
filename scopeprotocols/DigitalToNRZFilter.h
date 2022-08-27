@@ -52,7 +52,7 @@ protected:
 
 	virtual size_t GetBitsPerSymbol();
 	virtual std::vector<float> GetVoltageLevels();
-	virtual size_t GetVoltageCode(size_t i, DigitalWaveform& samples) ;
+	virtual size_t GetVoltageCode(size_t i, SparseDigitalWaveform& samples) ;
 };
 
 #endif

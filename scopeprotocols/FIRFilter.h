@@ -54,8 +54,8 @@ public:
 
 	void DoFilterKernel(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 	enum FilterType
 	{
@@ -78,25 +78,25 @@ protected:
 
 	void DoFilterKernelGeneric(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 #ifdef HAVE_OPENCL
 	void DoFilterKernelOpenCL(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 #endif
 
 	void DoFilterKernelAVX2(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 	void DoFilterKernelAVX512F(
 		std::vector<float>& coefficients,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 	std::string m_filterTypeName;
 	std::string m_filterLengthName;

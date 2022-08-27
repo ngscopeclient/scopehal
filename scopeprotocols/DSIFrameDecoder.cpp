@@ -94,12 +94,14 @@ void DSIFrameDecoder::Refresh()
 		return;
 	}
 	auto din = dynamic_cast<DSIWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Create the capture
-	DSIFrameWaveform* cap = new DSIFrameWaveform;
+	auto cap = new DSIFrameWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	enum
 	{
@@ -277,6 +279,8 @@ void DSIFrameDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color DSIFrameWaveform::GetColor(size_t i)

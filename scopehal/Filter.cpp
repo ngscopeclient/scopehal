@@ -197,7 +197,7 @@ bool Filter::VerifyInputOK(size_t i, bool allowEmpty)
 
 	if(!allowEmpty)
 	{
-		if(data->m_offsets.size() == 0)
+		if(data->size() == 0)
 			return false;
 	}
 
@@ -219,23 +219,23 @@ bool Filter::VerifyAllInputsOK(bool allowEmpty)
 }
 
 /**
-	@brief Returns true if every input to the filter is non-NULL and has a non-empty analog waveform present
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty, uniformly sampled analog waveform present
  */
-bool Filter::VerifyAllInputsOKAndAnalog()
+bool Filter::VerifyAllInputsOKAndUniformAnalog()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == NULL)
+		if(p.m_channel == nullptr)
 			return false;
 
 		auto data = p.m_channel->GetData(p.m_stream);
-		if(data == NULL)
+		if(data == nullptr)
 			return false;
-		if(data->m_offsets.size() == 0)
+		if(data->size() == 0)
 			return false;
 
-		auto adata = dynamic_cast<AnalogWaveform*>(data);
-		if(adata == NULL)
+		auto adata = dynamic_cast<UniformAnalogWaveform*>(data);
+		if(adata == nullptr)
 			return false;
 	}
 
@@ -243,28 +243,78 @@ bool Filter::VerifyAllInputsOKAndAnalog()
 }
 
 /**
-	@brief Returns true if every input to the filter is non-NULL and has a non-empty digital waveform present
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty, sparsely sampled analog waveform present
  */
-bool Filter::VerifyAllInputsOKAndDigital()
+bool Filter::VerifyAllInputsOKAndSparseAnalog()
 {
 	for(auto p : m_inputs)
 	{
-		if(p.m_channel == NULL)
+		if(p.m_channel == nullptr)
 			return false;
 
 		auto data = p.m_channel->GetData(p.m_stream);
-		if(data == NULL)
+		if(data == nullptr)
 			return false;
-		if(data->m_offsets.size() == 0)
+		if(data->size() == 0)
 			return false;
 
-		auto ddata = dynamic_cast<DigitalWaveform*>(data);
-		if(ddata == NULL)
+		auto adata = dynamic_cast<SparseAnalogWaveform*>(data);
+		if(adata == nullptr)
 			return false;
 	}
 
 	return true;
 }
+
+/**
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty, sparsely sampled digital waveform present
+ */
+bool Filter::VerifyAllInputsOKAndSparseDigital()
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == nullptr)
+			return false;
+
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == nullptr)
+			return false;
+		if(data->size() == 0)
+			return false;
+
+		auto ddata = dynamic_cast<SparseDigitalWaveform*>(data);
+		if(ddata == nullptr)
+			return false;
+	}
+
+	return true;
+}
+
+/**
+	@brief Returns true if every input to the filter is non-NULL and has a non-empty, digital waveform present
+ */
+bool Filter::VerifyAllInputsOKAndSparseOrUniformDigital()
+{
+	for(auto p : m_inputs)
+	{
+		if(p.m_channel == nullptr)
+			return false;
+
+		auto data = p.m_channel->GetData(p.m_stream);
+		if(data == nullptr)
+			return false;
+		if(data->size() == 0)
+			return false;
+
+		auto ddata = dynamic_cast<SparseDigitalWaveform*>(data);
+		auto udata = dynamic_cast<UniformDigitalWaveform*>(data);
+		if( (ddata == nullptr) && (udata == nullptr) )
+			return false;
+	}
+
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Sampling helpers
 
@@ -273,9 +323,9 @@ bool Filter::VerifyAllInputsOKAndDigital()
 
 	The last sample has a duration of 1 unit.
  */
-void Filter::FillDurationsGeneric(WaveformBase& wfm)
+void Filter::FillDurationsGeneric(SparseWaveformBase& wfm)
 {
-	size_t len = wfm.m_offsets.size();
+	size_t len = wfm.size();
 	wfm.m_durations.resize(len);
 	for(size_t i=1; i<len; i++)
 		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
@@ -288,9 +338,9 @@ void Filter::FillDurationsGeneric(WaveformBase& wfm)
 	@brief AVX2 optimized version of FillDurationsGeneric()
  */
 __attribute__((target("avx2")))
-void Filter::FillDurationsAVX2(WaveformBase& wfm)
+void Filter::FillDurationsAVX2(SparseWaveformBase& wfm)
 {
-	size_t len = wfm.m_offsets.size();
+	size_t len = wfm.size();
 	wfm.m_durations.resize(len);
 
 	size_t end = len - (len % 4);
@@ -312,494 +362,86 @@ void Filter::FillDurationsAVX2(WaveformBase& wfm)
 }
 
 /**
-	@brief Samples a digital waveform on the rising edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
+	@brief Find rising edges in a waveform, interpolating to sub-sample resolution as necessary
  */
-void Filter::SampleOnRisingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
-{
-	samples.clear();
-
-	size_t ndata = 0;
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		//Throw away clock samples until we find a rising edge
-		if(!(clock->m_samples[i] && !clock->m_samples[i-1]))
-			continue;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-			ndata ++;
-		if(ndata >= dlen)
-			break;
-
-		//Add the new sample
-		samples.m_offsets.push_back(clkstart);
-		samples.m_samples.push_back(data->m_samples[ndata]);
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples a digital bus waveform on the rising edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnRisingEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
-{
-	samples.clear();
-
-	size_t ndata = 0;
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		//Throw away clock samples until we find a rising edge
-		if(!(clock->m_samples[i] && !clock->m_samples[i-1]))
-			continue;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-			ndata ++;
-		if(ndata >= dlen)
-			break;
-
-		//Add the new sample
-		samples.m_offsets.push_back(clkstart);
-		samples.m_samples.push_back(data->m_samples[ndata]);
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples a digital waveform on the falling edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnFallingEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
-{
-	samples.clear();
-
-	size_t ndata = 0;
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		//Throw away clock samples until we find a falling edge
-		if(!(!clock->m_samples[i] && clock->m_samples[i-1]))
-			continue;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-			ndata ++;
-		if(ndata >= dlen)
-			break;
-
-		//Add the new sample
-		samples.m_offsets.push_back(clkstart);
-		samples.m_samples.push_back(data->m_samples[ndata]);
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples an analog waveform on all edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnAnyEdges(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples)
-{
-	samples.clear();
-
-	//TODO: split up into blocks and multithread?
-	//TODO: AVX vcompress
-
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-
-	//Optimizations for dense packed data
-	//Clock is typically generated from a CDR PLL and is thus rarely, if ever, dense packed.
-	//Not worth special casing there, but data coming from a scope etc is typically dense packed.
-	if(data->m_densePacked)
-	{
-		int64_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			//This is a bit more math but is often faster than a division
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			int64_t clkstart2 = clkstart - data->m_triggerPhase;
-			while(((ndata+1) * data->m_timescale) < clkstart2)
-				ndata ++;
-			if((size_t)ndata >= dlen)
-				break;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(data->m_samples[ndata]);
-		}
-	}
-
-	//Generic implementation
-	else
-	{
-		size_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-				ndata ++;
-			if(ndata >= dlen)
-				break;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(data->m_samples[ndata]);
-		}
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples an analog waveform on all edges of a clock, interpolating linearly to get sub-sample accuracy.
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnAnyEdgesWithInterpolation(AnalogWaveform* data, DigitalWaveform* clock, AnalogWaveform& samples)
-{
-	samples.clear();
-
-	//TODO: split up into blocks and multithread?
-	//TODO: AVX vcompress
-
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-
-	//Optimizations for dense packed data
-	//Clock is typically generated from a CDR PLL and is thus rarely, if ever, dense packed.
-	//Not worth special casing there, but data coming from a scope etc is typically dense packed.
-	if(data->m_densePacked)
-	{
-		int64_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			//This is a bit more math but is often faster than a division
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			int64_t clkstart2 = clkstart - data->m_triggerPhase;
-			while(((ndata+1) * data->m_timescale) < clkstart2)
-				ndata ++;
-			if((size_t)ndata >= dlen)
-				break;
-
-			//Find the fractional position of the clock edge
-			int64_t tsample = ndata * data->m_timescale + data->m_triggerPhase;
-			int64_t delta = clkstart - tsample;
-			float frac = delta * 1.0 / data->m_timescale;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(InterpolateValue(data, ndata, frac));
-		}
-	}
-
-	//Generic implementation
-	else
-	{
-		size_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-				ndata ++;
-			if(ndata >= dlen)
-				break;
-
-			//Find the fractional position of the clock edge
-			int64_t tsample = data->m_offsets[ndata] * data->m_timescale + data->m_triggerPhase;
-			int64_t delta = clkstart - tsample;
-			float frac = delta * 1.0 / data->m_timescale;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(InterpolateValue(data, ndata, frac));
-		}
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples a digital waveform on all edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnAnyEdges(DigitalWaveform* data, DigitalWaveform* clock, DigitalWaveform& samples)
-{
-	samples.clear();
-
-	//TODO: split up into blocks and multithread?
-	//TODO: AVX vcompress
-
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-
-	//Optimizations for dense packed data
-	//Clock is typically generated from a CDR PLL and is thus rarely, if ever, dense packed.
-	//Not worth special casing there, but data coming from a scope etc is typically dense packed.
-	if(data->m_densePacked)
-	{
-		int64_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			//This is a bit more math but is often faster than a division
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			int64_t clkstart2 = clkstart - data->m_triggerPhase;
-			while(((ndata+1) * data->m_timescale) < clkstart2)
-				ndata ++;
-			if((size_t)ndata >= dlen)
-				break;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(data->m_samples[ndata]);
-		}
-	}
-
-	//Generic implementation
-	else
-	{
-		size_t ndata = 0;
-		for(size_t i=1; i<len; i++)
-		{
-			//Throw away clock samples until we find an edge
-			if(clock->m_samples[i] == clock->m_samples[i-1])
-				continue;
-
-			//Throw away data samples until the data is synced with us
-			int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-			while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-				ndata ++;
-			if(ndata >= dlen)
-				break;
-
-			//Add the new sample
-			samples.m_offsets.push_back(clkstart);
-			samples.m_samples.push_back(data->m_samples[ndata]);
-		}
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Samples a digital waveform on all edges of a clock
-
-	The sampling rate of the data and clock signals need not be equal or uniform.
-
-	The sampled waveform has a time scale in femtoseconds regardless of the incoming waveform's time scale.
-
-	@param data		The data signal to sample
-	@param clock	The clock signal to use
-	@param samples	Output waveform
- */
-void Filter::SampleOnAnyEdges(DigitalBusWaveform* data, DigitalWaveform* clock, DigitalBusWaveform& samples)
-{
-	samples.clear();
-
-	size_t ndata = 0;
-	size_t len = clock->m_offsets.size();
-	size_t dlen = data->m_samples.size();
-	for(size_t i=1; i<len; i++)
-	{
-		//Throw away clock samples until we find an edge
-		if(clock->m_samples[i] == clock->m_samples[i-1])
-			continue;
-
-		//Throw away data samples until the data is synced with us
-		int64_t clkstart = clock->m_offsets[i] * clock->m_timescale + clock->m_triggerPhase;
-		while( (ndata+1 < dlen) && ((data->m_offsets[ndata+1] * data->m_timescale + data->m_triggerPhase) < clkstart) )
-			ndata ++;
-		if(ndata >= dlen)
-			break;
-
-		//Add the new sample
-		samples.m_offsets.push_back(clkstart);
-		samples.m_samples.push_back(data->m_samples[ndata]);
-	}
-
-	//Compute sample durations
-	if(g_hasAvx2)
-		FillDurationsAVX2(samples);
-	else
-		FillDurationsGeneric(samples);
-}
-
-/**
-	@brief Find rising edges in a waveform, interpolating as necessary
- */
-void Filter::FindRisingEdges(AnalogWaveform* data, float threshold, vector<int64_t>& edges)
+void Filter::FindRisingEdges(UniformAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
 	bool last = false;
 	int64_t phoff = data->m_triggerPhase;
-	size_t len = data->m_samples.size();
+	size_t len = data->size();
 	float fscale = data->m_timescale;
 
-	if(data->m_densePacked)
+	for(size_t i=1; i<len; i++)
 	{
-		for(size_t i=1; i<len; i++)
+		bool value = data->m_samples[i] > threshold;
+
+		//Save the last value
+		if(first)
 		{
-			bool value = data->m_samples[i] > threshold;
-
-			//Save the last value
-			if(first)
-			{
-				last = value;
-				first = false;
-				continue;
-			}
-			if(!value)
-				last = false;
-
-			//Skip samples with no rising edge
-			if(!value || last)
-				continue;
-
-			//Midpoint of the sample, plus the zero crossing
-			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
-			edges.push_back(t);
-			last = true;
+			last = value;
+			first = false;
+			continue;
 		}
+		if(!value)
+			last = false;
+
+		//Skip samples with no rising edge
+		if(!value || last)
+			continue;
+
+		//Midpoint of the sample, plus the zero crossing
+		int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+		int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
+		edges.push_back(t);
+		last = true;
 	}
-	else
+}
+
+/**
+	@brief Find rising edges in a waveform, interpolating to sub-sample resolution as necessary
+ */
+void Filter::FindRisingEdges(SparseAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	int64_t phoff = data->m_triggerPhase;
+	size_t len = data->size();
+	float fscale = data->m_timescale;
+
+	for(size_t i=1; i<len; i++)
 	{
-		for(size_t i=1; i<len; i++)
+		bool value = data->m_samples[i] > threshold;
+
+		//Save the last value
+		if(first)
 		{
-			bool value = data->m_samples[i] > threshold;
-
-			//Save the last value
-			if(first)
-			{
-				last = value;
-				first = false;
-				continue;
-			}
-
-			if(!value)
-				last = false;
-
-			//Skip samples with no rising edge
-			if(!value || last)
-				continue;
-
-			//Midpoint of the sample, plus the zero crossing
-			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
-			edges.push_back(t);
-			last = true;
+			last = value;
+			first = false;
+			continue;
 		}
+
+		if(!value)
+			last = false;
+
+		//Skip samples with no rising edge
+		if(!value || last)
+			continue;
+
+		//Midpoint of the sample, plus the zero crossing
+		int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+		int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
+		edges.push_back(t);
+		last = true;
 	}
 }
 
 /**
 	@brief Find zero crossings in a waveform, interpolating as necessary
  */
-void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int64_t>& edges)
+void Filter::FindZeroCrossings(SparseAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
 {
 	pair<WaveformBase*, float> cachekey(data, threshold);
 
@@ -821,55 +463,80 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 	size_t len = data->m_samples.size();
 	float fscale = data->m_timescale;
 
-	if(data->m_densePacked)
+	for(size_t i=1; i<len; i++)
 	{
-		for(size_t i=1; i<len; i++)
+		bool value = data->m_samples[i] > threshold;
+
+		//Save the last value
+		if(first)
 		{
-			bool value = data->m_samples[i] > threshold;
-
-			//Save the last value
-			if(first)
-			{
-				last = value;
-				first = false;
-				continue;
-			}
-
-			//Skip samples with no transition
-			if(last == value)
-				continue;
-
-			//Midpoint of the sample, plus the zero crossing
-			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
-			edges.push_back(t);
 			last = value;
+			first = false;
+			continue;
+		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		//Midpoint of the sample, plus the zero crossing
+		int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+		int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
+		edges.push_back(t);
+		last = value;
+	}
+
+	//Add to cache
+	lock_guard<mutex> lock(m_cacheMutex);
+	m_zeroCrossingCache[cachekey] = edges;
+}
+
+/**
+	@brief Find zero crossings in a waveform, interpolating as necessary
+ */
+void Filter::FindZeroCrossings(UniformAnalogWaveform* data, float threshold, std::vector<int64_t>& edges)
+{
+	pair<WaveformBase*, float> cachekey(data, threshold);
+
+	//Check cache
+	{
+		lock_guard<mutex> lock(m_cacheMutex);
+		auto it = m_zeroCrossingCache.find(cachekey);
+		if(it != m_zeroCrossingCache.end())
+		{
+			edges = it->second;
+			return;
 		}
 	}
-	else
+
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = false;
+	int64_t phoff = data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	float fscale = data->m_timescale;
+
+	for(size_t i=1; i<len; i++)
 	{
-		for(size_t i=1; i<len; i++)
+		bool value = data->m_samples[i] > threshold;
+
+		//Save the last value
+		if(first)
 		{
-			bool value = data->m_samples[i] > threshold;
-
-			//Save the last value
-			if(first)
-			{
-				last = value;
-				first = false;
-				continue;
-			}
-
-			//Skip samples with no transition
-			if(last == value)
-				continue;
-
-			//Midpoint of the sample, plus the zero crossing
-			int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
-			int64_t t = phoff + data->m_timescale * data->m_offsets[i-1] + tfrac;
-			edges.push_back(t);
 			last = value;
+			first = false;
+			continue;
 		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		//Midpoint of the sample, plus the zero crossing
+		int64_t tfrac = fscale * InterpolateTime(data, i-1, threshold);
+		int64_t t = phoff + data->m_timescale*(i-1) + tfrac;
+		edges.push_back(t);
+		last = value;
 	}
 
 	//Add to cache
@@ -880,8 +547,21 @@ void Filter::FindZeroCrossings(AnalogWaveform* data, float threshold, vector<int
 /**
 	@brief Find edges in a waveform, discarding repeated samples
  */
-void Filter::FindZeroCrossings(DigitalWaveform* data, vector<int64_t>& edges)
+void Filter::FindZeroCrossings(SparseDigitalWaveform* data, vector<int64_t>& edges)
 {
+	pair<WaveformBase*, float> cachekey(data, 0);
+
+	//Check cache
+	{
+		lock_guard<mutex> lock(m_cacheMutex);
+		auto it = m_zeroCrossingCache.find(cachekey);
+		if(it != m_zeroCrossingCache.end())
+		{
+			edges = it->second;
+			return;
+		}
+	}
+
 	//Find times of the zero crossings
 	bool first = true;
 	bool last = data->m_samples[0];
@@ -906,12 +586,47 @@ void Filter::FindZeroCrossings(DigitalWaveform* data, vector<int64_t>& edges)
 		edges.push_back(phoff + data->m_timescale * data->m_offsets[i]);
 		last = value;
 	}
+
+	//Add to cache
+	lock_guard<mutex> lock(m_cacheMutex);
+	m_zeroCrossingCache[cachekey] = edges;
+}
+
+/**
+	@brief Find edges in a waveform, discarding repeated samples
+ */
+void Filter::FindZeroCrossings(UniformDigitalWaveform* data, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Skip samples with no transition
+		if(last == value)
+			continue;
+
+		edges.push_back(phoff + data->m_timescale * i);
+		last = value;
+	}
 }
 
 /**
 	@brief Find rising edges in a waveform
  */
-void Filter::FindRisingEdges(DigitalWaveform* data, vector<int64_t>& edges)
+void Filter::FindRisingEdges(SparseDigitalWaveform* data, vector<int64_t>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
@@ -939,9 +654,39 @@ void Filter::FindRisingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 }
 
 /**
+	@brief Find rising edges in a waveform
+ */
+void Filter::FindRisingEdges(UniformDigitalWaveform* data, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(value && !last)
+			edges.push_back(phoff + data->m_timescale * i);
+
+		last = value;
+	}
+}
+
+/**
 	@brief Find falling edges in a waveform
  */
-void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
+void Filter::FindFallingEdges(SparseDigitalWaveform* data, vector<int64_t>& edges)
 {
 	//Find times of the zero crossings
 	bool first = true;
@@ -963,6 +708,36 @@ void Filter::FindFallingEdges(DigitalWaveform* data, vector<int64_t>& edges)
 		//Save samples with an edge
 		if(!value && last)
 			edges.push_back(phoff + data->m_timescale * data->m_offsets[i]);
+
+		last = value;
+	}
+}
+
+/**
+	@brief Find falling edges in a waveform
+ */
+void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edges)
+{
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	int64_t phoff = data->m_timescale/2 + data->m_triggerPhase;
+	size_t len = data->m_samples.size();
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(!value && last)
+			edges.push_back(phoff + data->m_timescale * i);
 
 		last = value;
 	}
@@ -1048,18 +823,19 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interpolation helpers
 
+
 /**
-	@brief Interpolates the actual time of a threshold crossing between two samples
+	@brief Interpolates the actual time of a differential threshold crossing between two samples
 
 	Simple linear interpolation for now (TODO sinc)
 
 	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
  */
-float Filter::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
+float Filter::InterpolateTime(UniformAnalogWaveform* p, UniformAnalogWaveform* n, size_t a, float voltage)
 {
 	//If the voltage isn't between the two points, abort
-	float fa = cap->m_samples[a];
-	float fb = cap->m_samples[a+1];
+	float fa = p->m_samples[a] - n->m_samples[a];
+	float fb = p->m_samples[a+1] - n->m_samples[a+1];
 	bool ag = (fa > voltage);
 	bool bg = (fb > voltage);
 	if( (ag && bg) || (!ag && !bg) )
@@ -1078,7 +854,7 @@ float Filter::InterpolateTime(AnalogWaveform* cap, size_t a, float voltage)
 
 	@return Interpolated crossing time. 0=a, 1=a+1, fractional values are in between.
  */
-float Filter::InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, float voltage)
+float Filter::InterpolateTime(SparseAnalogWaveform* p, SparseAnalogWaveform* n, size_t a, float voltage)
 {
 	//If the voltage isn't between the two points, abort
 	float fa = p->m_samples[a] - n->m_samples[a];
@@ -1103,9 +879,9 @@ float Filter::InterpolateTime(AnalogWaveform* p, AnalogWaveform* n, size_t a, fl
 						Note that this is in timebase ticks, so if some samples are >1 tick apart it's possible for
 						this value to be outside [0, 1].
  */
-float Filter::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_ticks)
+float Filter::InterpolateValue(SparseAnalogWaveform* cap, size_t index, float frac_ticks)
 {
-	if(index+1 > cap->m_offsets.size())
+	if(index+1 > cap->size())
 		return cap->m_samples[index];
 
 	float frac = frac_ticks / (cap->m_offsets[index+1] - cap->m_offsets[index]);
@@ -1114,173 +890,27 @@ float Filter::InterpolateValue(AnalogWaveform* cap, size_t index, float frac_tic
 	return v1 + (v2-v1)*frac;
 }
 
+/**
+	@brief Interpolates the actual value of a point between two samples
+
+	@param cap			Waveform to work with
+	@param index		Starting position
+	@param frac_ticks	Fractional position of the sample.
+						Note that this is in timebase ticks, so if some samples are >1 tick apart it's possible for
+						this value to be outside [0, 1].
+ */
+float Filter::InterpolateValue(UniformAnalogWaveform* cap, size_t index, float frac_ticks)
+{
+	if(index+1 > cap->size())
+		return cap->m_samples[index];
+
+	float v1 = cap->m_samples[index];
+	float v2 = cap->m_samples[index+1];
+	return v1 + (v2-v1)*frac_ticks;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Measurement helpers
-
-/**
-	@brief Gets the lowest voltage of a waveform
- */
-float Filter::GetMinVoltage(AnalogWaveform* cap)
-{
-	//Loop over samples and find the minimum
-	float tmp = FLT_MAX;
-	for(float f : cap->m_samples)
-	{
-		if(f < tmp)
-			tmp = f;
-	}
-	return tmp;
-}
-
-/**
-	@brief Gets the highest voltage of a waveform
- */
-float Filter::GetMaxVoltage(AnalogWaveform* cap)
-{
-	//Loop over samples and find the maximum
-	float tmp = -FLT_MAX;
-	for(float f : cap->m_samples)
-	{
-		if(f > tmp)
-			tmp = f;
-	}
-	return tmp;
-}
-
-/**
-	@brief Gets the average voltage of a waveform
- */
-float Filter::GetAvgVoltage(AnalogWaveform* cap)
-{
-	//Loop over samples and find the average
-	//TODO: more numerically stable summation algorithm for deep captures
-	double sum = 0;
-	for(float f : cap->m_samples)
-		sum += f;
-	return sum / cap->m_samples.size();
-}
-
-/**
-	@brief Makes a histogram from a waveform with the specified number of bins.
-
-	Any values outside the range are clamped (put in bin 0 or bins-1 as appropriate).
-
-	@param low	Low endpoint of the histogram (volts)
-	@param high High endpoint of the histogram (volts)
-	@param bins	Number of histogram bins
- */
-vector<size_t> Filter::MakeHistogram(AnalogWaveform* cap, float low, float high, size_t bins)
-{
-	vector<size_t> ret;
-	for(size_t i=0; i<bins; i++)
-		ret.push_back(0);
-
-	//Early out if we have zero span
-	if(bins == 0)
-		return ret;
-
-	float delta = high-low;
-
-	for(float v : cap->m_samples)
-	{
-		float fbin = (v-low) / delta;
-		size_t bin = floor(fbin * bins);
-		if(fbin < 0)
-			bin = 0;
-		else
-			bin = min(bin, bins-1);
-		ret[bin] ++;
-	}
-
-	return ret;
-}
-
-/**
-	@brief Makes a histogram from a waveform with the specified number of bins.
-
-	Any values outside the range are discarded.
-
-	@param low	Low endpoint of the histogram (volts)
-	@param high High endpoint of the histogram (volts)
-	@param bins	Number of histogram bins
- */
-vector<size_t> Filter::MakeHistogramClipped(AnalogWaveform* cap, float low, float high, size_t bins)
-{
-	vector<size_t> ret;
-	for(size_t i=0; i<bins; i++)
-		ret.push_back(0);
-
-	//Early out if we have zero span
-	if(bins == 0)
-		return ret;
-
-	float delta = high-low;
-
-	for(float v : cap->m_samples)
-	{
-		float fbin = (v-low) / delta;
-		size_t bin = floor(fbin * bins);
-		if(bin >= bins)	//negative values wrap to huge positive and get caught here
-			continue;
-		ret[bin] ++;
-	}
-
-	return ret;
-}
-
-/**
-	@brief Gets the most probable "0" level for a digital waveform
- */
-float Filter::GetBaseVoltage(AnalogWaveform* cap)
-{
-	float vmin = GetMinVoltage(cap);
-	float vmax = GetMaxVoltage(cap);
-	float delta = vmax - vmin;
-	const int nbins = 100;
-	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
-
-	//Find the highest peak in the first quarter of the histogram
-	size_t binval = 0;
-	int idx = 0;
-	for(int i=0; i<(nbins/4); i++)
-	{
-		if(hist[i] > binval)
-		{
-			binval = hist[i];
-			idx = i;
-		}
-	}
-
-	float fbin = (idx + 0.5f)/nbins;
-	return fbin*delta + vmin;
-}
-
-/**
-	@brief Gets the most probable "1" level for a digital waveform
- */
-float Filter::GetTopVoltage(AnalogWaveform* cap)
-{
-	float vmin = GetMinVoltage(cap);
-	float vmax = GetMaxVoltage(cap);
-	float delta = vmax - vmin;
-	const int nbins = 100;
-	auto hist = MakeHistogram(cap, vmin, vmax, nbins);
-
-	//Find the highest peak in the third quarter of the histogram
-	size_t binval = 0;
-	int idx = 0;
-	for(int i=(nbins*3)/4; i<nbins; i++)
-	{
-		if(hist[i] > binval)
-		{
-			binval = hist[i];
-			idx = i;
-		}
-	}
-
-	float fbin = (idx + 0.5f)/nbins;
-	return fbin*delta + vmin;
-}
 
 void Filter::ClearAnalysisCache()
 {
@@ -1302,13 +932,13 @@ void Filter::ClearAnalysisCache()
 
 	@return	The ready-to-use output waveform
  */
-AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t stream, bool clear)
+UniformAnalogWaveform* Filter::SetupEmptyUniformAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear)
 {
 	//Create the waveform, but only if necessary
-	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(stream));
+	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(stream));
 	if(cap == NULL)
 	{
-		cap = new AnalogWaveform;
+		cap = new UniformAnalogWaveform;
 		SetData(cap, stream);
 	}
 
@@ -1321,11 +951,42 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 
 	//Clear output
 	if(clear)
+		cap->clear();
+
+	return cap;
+}
+
+/**
+	@brief Sets up an analog output waveform and copies basic metadata from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+
+	@param din			Input waveform
+	@param stream		Stream index
+	@param clear		True to clear an existing waveform, false to leave it as-is
+
+	@return	The ready-to-use output waveform
+ */
+SparseAnalogWaveform* Filter::SetupEmptySparseAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear)
+{
+	//Create the waveform, but only if necessary
+	auto cap = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
+	if(cap == NULL)
 	{
-		cap->m_samples.clear();
-		cap->m_offsets.clear();
-		cap->m_durations.clear();
+		cap = new SparseAnalogWaveform;
+		SetData(cap, stream);
 	}
+
+	//Copy configuration
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Bump rev number
+	cap->m_revision ++;
+
+	//Clear output
+	if(clear)
+		cap->clear();
 
 	return cap;
 }
@@ -1340,13 +1001,13 @@ AnalogWaveform* Filter::SetupEmptyOutputWaveform(WaveformBase* din, size_t strea
 
 	@return	The ready-to-use output waveform
  */
-DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size_t stream)
+UniformDigitalWaveform* Filter::SetupEmptyUniformDigitalOutputWaveform(WaveformBase* din, size_t stream)
 {
 	//Create the waveform, but only if necessary
-	DigitalWaveform* cap = dynamic_cast<DigitalWaveform*>(GetData(stream));
+	auto cap = dynamic_cast<UniformDigitalWaveform*>(GetData(stream));
 	if(cap == NULL)
 	{
-		cap = new DigitalWaveform;
+		cap = new UniformDigitalWaveform;
 		SetData(cap, stream);
 	}
 
@@ -1358,9 +1019,40 @@ DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size
 	cap->m_revision ++;
 
 	//Clear output
-	cap->m_samples.clear();
-	cap->m_offsets.clear();
-	cap->m_durations.clear();
+	cap->clear();
+
+	return cap;
+}
+
+/**
+	@brief Sets up an digital output waveform and copies basic metadata from the input.
+
+	A new output waveform is created if necessary, but when possible the existing one is reused.
+
+	@param din			Input waveform
+	@param stream		Stream index
+
+	@return	The ready-to-use output waveform
+ */
+SparseDigitalWaveform* Filter::SetupEmptySparseDigitalOutputWaveform(WaveformBase* din, size_t stream)
+{
+	//Create the waveform, but only if necessary
+	auto cap = dynamic_cast<SparseDigitalWaveform*>(GetData(stream));
+	if(cap == NULL)
+	{
+		cap = new SparseDigitalWaveform;
+		SetData(cap, stream);
+	}
+
+	//Copy configuration
+	cap->m_startTimestamp 		= din->m_startTimestamp;
+	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
+
+	//Bump rev number
+	cap->m_revision ++;
+
+	//Clear output
+	cap->clear();
 
 	return cap;
 }
@@ -1378,52 +1070,23 @@ DigitalWaveform* Filter::SetupEmptyDigitalOutputWaveform(WaveformBase* din, size
 
 	@return	The ready-to-use output waveform
  */
-AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
+SparseAnalogWaveform* Filter::SetupSparseOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
 {
-	auto cap = SetupEmptyOutputWaveform(din, stream, false);
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, stream, false);
 
 	cap->m_timescale 			= din->m_timescale;
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
 
-	size_t len = din->m_offsets.size() - (skipstart + skipend);
-	size_t curlen = cap->m_offsets.size();
-
+	size_t len = din->size() - (skipstart + skipend);
 	cap->Resize(len);
+	cap->PrepareForCpuAccess();
 
-	//If the input waveform is NOT dense packed, no optimizations possible.
-	if(!din->m_densePacked)
-	{
-		memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
-		memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
-		cap->m_densePacked = false;
-	}
+	memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
+	memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
 
-	//Input waveform is dense packed, but output is not.
-	//Need to clear some old stuff but we can produce a dense packed output.
-	//Note that we copy from zero regardless of skipstart to produce a dense packed output.
-	//TODO: AVX2 optimizations here so we don't need to read data we already know the value of
-	else if(!cap->m_densePacked)
-	{
-		memcpy(&cap->m_offsets[0], &din->m_offsets[0], len*sizeof(int64_t));
-		memcpy(&cap->m_durations[0], &din->m_durations[0], len*sizeof(int64_t));
-		cap->m_densePacked = true;
-	}
-
-	//Both waveforms are dense packed, but new size is bigger. Need to copy the additional data.
-	else if(len > curlen)
-	{
-		size_t increase = len - curlen;
-		memcpy(&cap->m_offsets[curlen], &din->m_offsets[curlen], increase*sizeof(int64_t));
-		memcpy(&cap->m_durations[curlen], &din->m_durations[curlen], increase*sizeof(int64_t));
-	}
-
-	//Both waveforms are dense packed, new size is smaller or the same.
-	//This is what we want: no work needed at all!
-	else
-	{
-	}
+	cap->MarkTimestampsModifiedFromCpu();
 
 	return cap;
 }
@@ -1441,13 +1104,13 @@ AnalogWaveform* Filter::SetupOutputWaveform(WaveformBase* din, size_t stream, si
 
 	@return	The ready-to-use output waveform
  */
-DigitalWaveform* Filter::SetupDigitalOutputWaveform(WaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
+SparseDigitalWaveform* Filter::SetupSparseDigitalOutputWaveform(SparseWaveformBase* din, size_t stream, size_t skipstart, size_t skipend)
 {
 	//Create the waveform, but only if necessary
-	DigitalWaveform* cap = dynamic_cast<DigitalWaveform*>(GetData(stream));
+	auto cap = dynamic_cast<SparseDigitalWaveform*>(GetData(stream));
 	if(cap == NULL)
 	{
-		cap = new DigitalWaveform;
+		cap = new SparseDigitalWaveform;
 		SetData(cap, stream);
 	}
 
@@ -1458,42 +1121,13 @@ DigitalWaveform* Filter::SetupDigitalOutputWaveform(WaveformBase* din, size_t st
 	cap->m_triggerPhase			= din->m_triggerPhase;
 
 	size_t len = din->m_offsets.size() - (skipstart + skipend);
-	size_t curlen = cap->m_offsets.size();
-
 	cap->Resize(len);
+	cap->PrepareForCpuAccess();
 
-	//If the input waveform is NOT dense packed, no optimizations possible.
-	if(!din->m_densePacked)
-	{
-		memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
-		memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
-		cap->m_densePacked = false;
-	}
+	memcpy(&cap->m_offsets[0], &din->m_offsets[skipstart], len*sizeof(int64_t));
+	memcpy(&cap->m_durations[0], &din->m_durations[skipstart], len*sizeof(int64_t));
 
-	//Input waveform is dense packed, but output is not.
-	//Need to clear some old stuff but we can produce a dense packed output.
-	//Note that we copy from zero regardless of skipstart to produce a dense packed output.
-	//TODO: AVX2 optimizations here so we don't need to read data we already know the value of
-	else if(!cap->m_densePacked)
-	{
-		memcpy(&cap->m_offsets[0], &din->m_offsets[0], len*sizeof(int64_t));
-		memcpy(&cap->m_durations[0], &din->m_durations[0], len*sizeof(int64_t));
-		cap->m_densePacked = true;
-	}
-
-	//Both waveforms are dense packed, but new size is bigger. Need to copy the additional data.
-	else if(len > curlen)
-	{
-		size_t increase = len - curlen;
-		memcpy(&cap->m_offsets[curlen], &din->m_offsets[curlen], increase*sizeof(int64_t));
-		memcpy(&cap->m_durations[curlen], &din->m_durations[curlen], increase*sizeof(int64_t));
-	}
-
-	//Both waveforms are dense packed, new size is smaller or the same.
-	//This is what we want: no work needed at all!
-	else
-	{
-	}
+	cap->MarkTimestampsModifiedFromCpu();
 
 	return cap;
 }
@@ -1532,10 +1166,23 @@ uint32_t Filter::CRC32(vector<uint8_t>& bytes, size_t start, size_t end)
 
 	Works in timescale units
  */
-int64_t Filter::GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+int64_t Filter::GetNextEventTimestamp(SparseWaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
 {
 	if(i+1 < len)
 		return wfm->m_offsets[i+1];
+	else
+		return timestamp;
+}
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in timescale units
+ */
+int64_t Filter::GetNextEventTimestamp(UniformWaveformBase* /*wfm*/, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return i+1;
 	else
 		return timestamp;
 }
@@ -1545,10 +1192,20 @@ int64_t Filter::GetNextEventTimestamp(WaveformBase* wfm, size_t i, size_t len, i
 
 	Works in timescale units
  */
-void Filter::AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+void Filter::AdvanceToTimestamp(SparseWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
 {
 	while( ((i+1) < len) && (wfm->m_offsets[i+1] <= timestamp) )
 		i ++;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in timescale units
+ */
+void Filter::AdvanceToTimestamp(UniformWaveformBase* /*wfm*/, size_t& i, size_t /*len*/, int64_t timestamp)
+{
+	i = timestamp + 1;
 }
 
 /**
@@ -1556,10 +1213,23 @@ void Filter::AdvanceToTimestamp(WaveformBase* wfm, size_t& i, size_t len, int64_
 
 	Works in native X axis units
  */
-int64_t Filter::GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+int64_t Filter::GetNextEventTimestampScaled(SparseWaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
 {
 	if(i+1 < len)
 		return (wfm->m_offsets[i+1] * wfm->m_timescale) + wfm->m_triggerPhase;
+	else
+		return timestamp;
+}
+
+/**
+	@brief Gets the timestamp of the next event (if any) on a waveform
+
+	Works in native X axis units
+ */
+int64_t Filter::GetNextEventTimestampScaled(UniformWaveformBase* wfm, size_t i, size_t len, int64_t timestamp)
+{
+	if(i+1 < len)
+		return ((i+1) * wfm->m_timescale) + wfm->m_triggerPhase;
 	else
 		return timestamp;
 }
@@ -1569,11 +1239,24 @@ int64_t Filter::GetNextEventTimestampScaled(WaveformBase* wfm, size_t i, size_t 
 
 	Works in native X axis units
  */
-void Filter::AdvanceToTimestampScaled(WaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+void Filter::AdvanceToTimestampScaled(SparseWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
 {
 	timestamp -= wfm->m_triggerPhase;
 
 	while( ((i+1) < len) && ( (wfm->m_offsets[i+1] * wfm->m_timescale) <= timestamp) )
+		i ++;
+}
+
+/**
+	@brief Advance the waveform to a given timestamp
+
+	Works in native X axis units
+ */
+void Filter::AdvanceToTimestampScaled(UniformWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp)
+{
+	timestamp -= wfm->m_triggerPhase;
+
+	while( ((i+1) < len) && ( ( static_cast<int64_t>(i+1) * wfm->m_timescale) <= timestamp) )
 		i ++;
 }
 
@@ -1735,20 +1418,26 @@ void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
  */
 void Filter::AutoscaleVertical(size_t stream)
 {
-	//Autoscaling anything but an analog waveform makes no sense
-	auto waveform = dynamic_cast<AnalogWaveform*>(GetData(stream));
-	if(!waveform)
-		return;
-
-	//Find extrema of the waveform
-	//TODO: vectorize?
 	float vmin = FLT_MAX;
 	float vmax = -FLT_MAX;
-	for(auto s : waveform->m_samples)
+
+	auto swfm = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
+	auto uwfm = dynamic_cast<UniformAnalogWaveform*>(GetData(stream));
+	if(swfm)
 	{
-		float v = s;
-		vmin = min(v, vmin);
-		vmax = max(v, vmax);
+		for(auto s : swfm->m_samples)
+		{
+			vmin = min(s, vmin);
+			vmax = max(s, vmax);
+		}
+	}
+	else if(uwfm)
+	{
+		for(auto s : uwfm->m_samples)
+		{
+			vmin = min(s, vmin);
+			vmax = max(s, vmax);
+		}
 	}
 
 	float range = vmax - vmin;

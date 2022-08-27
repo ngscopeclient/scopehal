@@ -29,25 +29,14 @@
 
 #version 430
 #pragma shader_stage(compute)
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 
-layout(std430, binding=0) restrict writeonly buffer buf_offs
-{
-	int64_t offs[];
-};
-
-layout(std430, binding=1) restrict writeonly buffer buf_durs
-{
-	int64_t durs[];
-};
-
-layout(std430, binding=2) restrict writeonly buffer buf_pout
+layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
 	float pout[];
 };
 
-layout(std430, binding=3) restrict readonly buffer buf_pin
+layout(std430, binding=1) restrict readonly buffer buf_pin
 {
 	int8_t pin[];
 };
@@ -66,7 +55,5 @@ void main()
 	if(gl_GlobalInvocationID.x >= size)
 		return;
 
-	offs[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x;
-	durs[gl_GlobalInvocationID.x] = 1;
 	pout[gl_GlobalInvocationID.x] = gain*pin[gl_GlobalInvocationID.x] - offset;
 }

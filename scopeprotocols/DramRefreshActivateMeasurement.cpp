@@ -77,9 +77,11 @@ void DramRefreshActivateMeasurement::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<SDRAMWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->PrepareForCpuAccess();
 
 	//Measure delay from refreshing a bank until an activation to the same bank
 	int64_t lastRef[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -133,4 +135,6 @@ void DramRefreshActivateMeasurement::Refresh()
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+
+	cap->MarkModifiedFromCpu();
 }

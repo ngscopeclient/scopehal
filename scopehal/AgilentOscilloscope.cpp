@@ -581,7 +581,7 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 		auto channel = m_digitalChannelBase + chan_start + i;
 		if (IsChannelEnabled(channel))
 		{
-			auto cap = new DigitalWaveform;
+			auto cap = new SparseDigitalWaveform;
 			int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
 			cap->m_timescale = fs_per_sample;
 			cap->m_startFemtoseconds = 0;
@@ -589,6 +589,7 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 
 			//Preallocate memory assuming no deduplication possible
 			cap->Resize(data.size());
+			cap->PrepareForCpuAccess();
 
 			//Save the first sample (can't merge with sample -1 because that doesn't exist)
 			size_t k = 0;
@@ -626,6 +627,8 @@ void AgilentOscilloscope::ProcessDigitalWaveforms(
 			cap->m_offsets.shrink_to_fit();
 			cap->m_durations.shrink_to_fit();
 			cap->m_samples.shrink_to_fit();
+			cap->MarkSamplesModifiedFromCpu();
+			cap->MarkTimestampsModifiedFromCpu();
 
 			pending_waveforms[channel].push_back(cap);
 		}
@@ -651,7 +654,7 @@ bool AgilentOscilloscope::AcquireData()
 
 		//Set up the capture we're going to store our data into
 		//(no TDC data available on Agilent scopes?)
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
@@ -664,11 +667,7 @@ bool AgilentOscilloscope::AcquireData()
 			LogError("Waveform preamble length (%lu) does not match data length (%lu)", preamble.length, buf.size());
 		cap->Resize(buf.size());
 		for(size_t j = 0; j < buf.size(); j++)
-		{
-			cap->m_offsets[j] = j;
-			cap->m_durations[j] = 1;
 			cap->m_samples[j] = preamble.yincrement * (buf[j] - preamble.yreference) + preamble.yorigin;
-		}
 
 		//Done, update the data
 		pending_waveforms[i].push_back(cap);

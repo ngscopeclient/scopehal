@@ -72,19 +72,25 @@ string DutyCycleMeasurement::GetProtocolName()
 void DutyCycleMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	din->PrepareForCpuAccess();
 
 	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(din);
+	float midpoint = GetAvgVoltage(sdin, udin);
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	FindZeroCrossings(din, midpoint, edges);
+	if(sdin)
+		FindZeroCrossings(sdin, midpoint, edges);
+	else
+		FindZeroCrossings(udin, midpoint, edges);
 	if(edges.size() < 2)
 	{
 		SetData(NULL, 0);
@@ -92,10 +98,12 @@ void DutyCycleMeasurement::Refresh()
 	}
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	//Figure out edge polarity
-	bool initial_polarity = (din->m_samples[0] > midpoint);
+	bool initial_polarity = (GetValue(sdin, udin, 0) > midpoint);
 
 	size_t elen = edges.size();
 	for(size_t i=0; i < (elen - 2); i+= 2)
@@ -124,8 +132,5 @@ void DutyCycleMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

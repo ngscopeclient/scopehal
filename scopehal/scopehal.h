@@ -76,6 +76,13 @@
 #include <vulkan/vulkan_raii.hpp>
 #pragma GCC diagnostic pop
 
+//must be early because a lot of inline methods in headers rely on these
+extern bool g_hasFMA;
+extern bool g_hasAvx512F;
+extern bool g_hasAvx512VL;
+extern bool g_hasAvx512DQ;
+extern bool g_hasAvx2;
+
 #include "Unit.h"
 #include "Bijection.h"
 #include "IDTable.h"
@@ -165,12 +172,6 @@ uint64_t prev_pow2(uint64_t v);
 std::vector<std::string> explode(const std::string& str, char separator);
 std::string str_replace(const std::string& search, const std::string& replace, const std::string& subject);
 
-extern bool g_hasFMA;
-extern bool g_hasAvx512F;
-extern bool g_hasAvx512VL;
-extern bool g_hasAvx512DQ;
-extern bool g_hasAvx2;
-
 #define FS_PER_SECOND 1e15
 #define SECONDS_PER_FS 1e-15
 
@@ -215,5 +216,10 @@ struct ConvertRawSamplesShaderArgs
 };
 
 uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
+
+//Validation helper for templates
+//Throws compile-time error if specialized for false since there's no implementation
+template<bool> class CompileTimeAssert;
+template<> class CompileTimeAssert<true>{};
 
 #endif

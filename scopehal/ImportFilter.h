@@ -56,7 +56,7 @@ public:
 protected:
 	std::string m_fpname;
 
-	void NormalizeTimebase(WaveformBase* wfm);
+	bool TryNormalizeTimebase(SparseWaveformBase* wfm);
 };
 
 #endif

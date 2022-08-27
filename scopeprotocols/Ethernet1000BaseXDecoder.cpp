@@ -79,12 +79,14 @@ void Ethernet1000BaseXDecoder::Refresh()
 		return;
 	}
 	auto data = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
+	data->PrepareForCpuAccess();
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	size_t len = data->m_samples.size();
 	for(size_t i=0; i < len; i++)
@@ -141,4 +143,5 @@ void Ethernet1000BaseXDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

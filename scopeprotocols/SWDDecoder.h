@@ -70,10 +70,10 @@ public:
 	bool operator==(const SWDSymbol& s) const { return (m_stype == s.m_stype) && (m_data == s.m_data); }
 };
 
-class SWDWaveform : public Waveform<SWDSymbol>
+class SWDWaveform : public SparseWaveform<SWDSymbol>
 {
 public:
-	SWDWaveform () : Waveform<SWDSymbol>() {};
+	SWDWaveform () : SparseWaveform<SWDSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

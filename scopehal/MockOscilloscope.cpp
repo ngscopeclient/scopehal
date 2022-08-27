@@ -373,20 +373,42 @@ void MockOscilloscope::AutoscaleVertical()
 {
 	for(auto c : m_channels)
 	{
-		auto wfm = dynamic_cast<AnalogWaveform*>(c->GetData(0));
-		if(!wfm)
-			continue;
-		if(wfm->m_samples.empty())
-			continue;
+		auto swfm = dynamic_cast<SparseAnalogWaveform*>(c->GetData(0));
+		auto uwfm = dynamic_cast<UniformAnalogWaveform*>(c->GetData(0));
 
-		float vmin = wfm->m_samples[0];
-		float vmax = vmin;
+		float vmin;
+		float vmax;
 
-		for(auto s : wfm->m_samples)
+		if(swfm)
 		{
-			vmin = min(vmin, (float)s);
-			vmax = max(vmax, (float)s);
+			if(swfm->m_samples.empty())
+				continue;
+
+			vmin = vmax = swfm->m_samples[0];
+
+			for(auto s : swfm->m_samples)
+			{
+				vmin = min(vmin, (float)s);
+				vmax = max(vmax, (float)s);
+			}
 		}
+
+		else if(uwfm)
+		{
+			if(uwfm->m_samples.empty())
+				continue;
+
+			vmin = vmax = uwfm->m_samples[0];
+
+			for(auto s : uwfm->m_samples)
+			{
+				vmin = min(vmin, (float)s);
+				vmax = max(vmax, (float)s);
+			}
+		}
+
+		else
+			continue;
 
 		//Calculate bounds
 		c->SetVoltageRange((vmax - vmin) * 1.05, 0);

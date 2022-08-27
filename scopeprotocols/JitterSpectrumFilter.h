@@ -52,7 +52,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(JitterSpectrumFilter)
 
 protected:
-	size_t EstimateUIWidth(AnalogWaveform* din);
+	size_t EstimateUIWidth(SparseAnalogWaveform* din);
 };
 
 #endif

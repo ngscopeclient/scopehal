@@ -276,7 +276,7 @@ protected:
 		double basetime,
 		double* wavetime,
 		int i);
-	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data);
+	std::map<int, SparseDigitalWaveform*> ProcessDigitalWaveform(std::string& data);
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

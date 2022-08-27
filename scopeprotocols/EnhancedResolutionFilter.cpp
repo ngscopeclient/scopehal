@@ -127,10 +127,10 @@ void EnhancedResolutionFilter::OnBitsChanged()
 
 void EnhancedResolutionFilter::UpdateCutoff()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 		return;
 
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
 	int64_t fs_per_sample = din->m_timescale;
 	float sample_hz = FS_PER_SECOND / fs_per_sample;
 

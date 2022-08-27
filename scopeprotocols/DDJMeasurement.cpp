@@ -94,13 +94,12 @@ void DDJMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto tie = GetAnalogInputWaveform(0);
-	auto thresh = GetDigitalInputWaveform(1);
-	auto clk = GetDigitalInputWaveform(2);
+	auto tie = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	tie->PrepareForCpuAccess();
 
 	//Sample the input data
-	DigitalWaveform samples;
-	SampleOnAnyEdges(thresh, clk, samples);
+	SparseDigitalWaveform samples;
+	SampleOnAnyEdgesBase(GetInputWaveform(1), GetInputWaveform(2), samples);
 
 	//DDJ history (8 UIs)
 	uint8_t window = 0;
@@ -124,7 +123,7 @@ void DDJMeasurement::Refresh()
 
 	//Loop over the TIE and threshold waveform and assign jitter to bins
 	size_t nbits = 0;
-	int64_t tfirst = tie->m_offsets[0] * tie->m_timescale + tie->m_triggerPhase;
+	int64_t tfirst = GetOffsetScaled(tie, 0);
 	for(size_t idata=0; idata < samplen; idata ++)
 	{
 		//Sample the next bit in the thresholded waveform
@@ -146,7 +145,7 @@ void DDJMeasurement::Refresh()
 		int64_t target = 0;
 		while( (target < tfirst) && (itie < tielen) )
 		{
-			target = tie->m_offsets[itie] * tie->m_timescale + tie->m_triggerPhase;
+			target = GetOffsetScaled(tie, itie);
 
 			if(target < tstart)
 				itie ++;
@@ -181,12 +180,12 @@ void DDJMeasurement::Refresh()
 			m_table[i] = 0;
 	}
 
-	auto cap = new AnalogWaveform;
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(1);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(tie, 0, true);
+	cap->PrepareForCpuAccess();
 	cap->m_samples.push_back(ddjmax - ddjmin);
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = tie->m_startTimestamp;
 	cap->m_startFemtoseconds = tie->m_startFemtoseconds;
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

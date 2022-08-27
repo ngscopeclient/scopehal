@@ -800,8 +800,7 @@ bool Oscilloscope::HasTimebaseControls()
 /**
 	@brief Converts 8-bit ADC samples to floating point
  */
-void Oscilloscope::Convert8BitSamples(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count)
 {
 	//Divide large waveforms (>1M points) into blocks and multithread them
 	//TODO: tune split
@@ -825,26 +824,20 @@ void Oscilloscope::Convert8BitSamples(
 			if(g_hasAvx2)
 			{
 				Convert8BitSamplesAVX2(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 			else
 			{
 				Convert8BitSamplesGeneric(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 		}
 	}
@@ -853,48 +846,28 @@ void Oscilloscope::Convert8BitSamples(
 	else
 	{
 		if(g_hasAvx2)
-			Convert8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+			Convert8BitSamplesAVX2(pout, pin, gain, offset, count);
 		else
-			Convert8BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
+			Convert8BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
 
 /**
 	@brief Generic backend for Convert8BitSamples()
  */
-void Oscilloscope::Convert8BitSamplesGeneric(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert8BitSamplesGeneric(float* pout, int8_t* pin, float gain, float offset, size_t count)
 {
 	for(unsigned int k=0; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 /**
 	@brief Optimized version of Convert8BitSamples()
  */
 __attribute__((target("avx2")))
-void Oscilloscope::Convert8BitSamplesAVX2(
-	int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count)
 {
 	unsigned int end = count - (count % 32);
-
-	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
-	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
-	int64_t __attribute__ ((aligned(32))) count_x4[] =
-	{
-		ibase + 0,
-		ibase + 1,
-		ibase + 2,
-		ibase + 3
-	};
-
-	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
-	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
@@ -904,16 +877,6 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
 		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
-
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
 
 		//Extract the low and high 16 samples from the block
 		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
@@ -929,24 +892,6 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 		__m256i block1_int = _mm256_cvtepi8_epi32(block10_x8);
 		__m256i block2_int = _mm256_cvtepi8_epi32(block23_x8);
 		__m256i block3_int = _mm256_cvtepi8_epi32(block32_x8);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
 
 		//Convert the 32-bit int blocks to float.
 		//Apparently there's no direct epi8 to ps conversion instruction.
@@ -975,18 +920,13 @@ void Oscilloscope::Convert8BitSamplesAVX2(
 
 	//Get any extras we didn't get in the SIMD loop
 	for(unsigned int k=end; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 /**
 	@brief Converts Unsigned 8-bit ADC samples to floating point
  */
-void Oscilloscope::ConvertUnsigned8BitSamples(
-	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float gain, float offset, size_t count)
 {
 	//Divide large waveforms (>1M points) into blocks and multithread them
 	//TODO: tune split
@@ -1010,26 +950,20 @@ void Oscilloscope::ConvertUnsigned8BitSamples(
 			if(g_hasAvx2)
 			{
 				ConvertUnsigned8BitSamplesAVX2(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 			else
 			{
 				ConvertUnsigned8BitSamplesGeneric(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 		}
 	}
@@ -1038,48 +972,28 @@ void Oscilloscope::ConvertUnsigned8BitSamples(
 	else
 	{
 		if(g_hasAvx2)
-			ConvertUnsigned8BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+			ConvertUnsigned8BitSamplesAVX2(pout, pin, gain, offset, count);
 		else
-			ConvertUnsigned8BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
+			ConvertUnsigned8BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
 
 /**
 	@brief Generic backend for ConvertUnsigned8BitSamples()
  */
-void Oscilloscope::ConvertUnsigned8BitSamplesGeneric(
-	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::ConvertUnsigned8BitSamplesGeneric(float* pout, uint8_t* pin, float gain, float offset, size_t count)
 {
 	for(unsigned int k=0; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 /**
 	@brief Optimized version of ConvertUnsigned8BitSamples()
  */
 __attribute__((target("avx2")))
-void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
-	int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(float* pout, uint8_t* pin, float gain, float offset, size_t count)
 {
 	unsigned int end = count - (count % 32);
-
-	int64_t __attribute__ ((aligned(32))) ones_x4[] = {1, 1, 1, 1};
-	int64_t __attribute__ ((aligned(32))) fours_x4[] = {4, 4, 4, 4};
-	int64_t __attribute__ ((aligned(32))) count_x4[] =
-	{
-		ibase + 0,
-		ibase + 1,
-		ibase + 2,
-		ibase + 3
-	};
-
-	__m256i all_ones = _mm256_load_si256(reinterpret_cast<__m256i*>(ones_x4));
-	__m256i all_fours = _mm256_load_si256(reinterpret_cast<__m256i*>(fours_x4));
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
@@ -1089,16 +1003,6 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
 		//Load all 32 raw ADC samples, without assuming alignment
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
 		__m256i raw_samples = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
-
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
 
 		//Extract the low and high 16 samples from the block
 		__m128i block01_x8 = _mm256_extracti128_si256(raw_samples, 0);
@@ -1114,24 +1018,6 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
 		__m256i block1_int = _mm256_cvtepu8_epi32(block10_x8);
 		__m256i block2_int = _mm256_cvtepu8_epi32(block23_x8);
 		__m256i block3_int = _mm256_cvtepu8_epi32(block32_x8);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
 
 		//Convert the 32-bit int blocks to float.
 		//Apparently there's no direct epi8 to ps conversion instruction.
@@ -1160,11 +1046,7 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
 
 	//Get any extras we didn't get in the SIMD loop
 	for(unsigned int k=end; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1173,8 +1055,7 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(
 /**
 	@brief Converts 16-bit ADC samples to floating point
  */
-void Oscilloscope::Convert16BitSamples(
-	int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert16BitSamples(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
 	//Divide large waveforms (>1M points) into blocks and multithread them
 	//TODO: tune split
@@ -1198,53 +1079,41 @@ void Oscilloscope::Convert16BitSamples(
 			if(g_hasAvx512F)
 			{
 				Convert16BitSamplesAVX512F(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 			else if(g_hasAvx2)
 			{
 				if(g_hasFMA)
 				{
 					Convert16BitSamplesFMA(
-						offs + off,
-						durs + off,
 						pout + off,
 						pin + off,
 						gain,
 						offset,
-						nsamp,
-						ibase + off);
+						nsamp);
 				}
 				else
 				{
 					Convert16BitSamplesAVX2(
-						offs + off,
-						durs + off,
 						pout + off,
 						pin + off,
 						gain,
 						offset,
-						nsamp,
-						ibase + off);
+						nsamp);
 				}
 			}
 			else
 			{
 				Convert16BitSamplesGeneric(
-					offs + off,
-					durs + off,
 					pout + off,
 					pin + off,
 					gain,
 					offset,
-					nsamp,
-					ibase + off);
+					nsamp);
 			}
 		}
 	}
@@ -1255,45 +1124,28 @@ void Oscilloscope::Convert16BitSamples(
 		if(g_hasAvx2)
 		{
 			if(g_hasFMA)
-				Convert16BitSamplesFMA(offs, durs, pout, pin, gain, offset, count, ibase);
+				Convert16BitSamplesFMA(pout, pin, gain, offset, count);
 			else
-				Convert16BitSamplesAVX2(offs, durs, pout, pin, gain, offset, count, ibase);
+				Convert16BitSamplesAVX2(pout, pin, gain, offset, count);
 		}
 		else
-			Convert16BitSamplesGeneric(offs, durs, pout, pin, gain, offset, count, ibase);
+			Convert16BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
 
 /**
 	@brief Converts raw ADC samples to floating point
  */
-void Oscilloscope::Convert16BitSamplesGeneric(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert16BitSamplesGeneric(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
 	for(size_t j=0; j<count; j++)
-	{
-		offs[j] = ibase + j;
-		durs[j] = 1;
 		pout[j] = gain*pin[j] - offset;
-	}
 }
 
 __attribute__((target("avx2")))
-void Oscilloscope::Convert16BitSamplesAVX2(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert16BitSamplesAVX2(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
 	size_t end = count - (count % 32);
-
-	__m256i all_ones	= _mm256_set1_epi64x(1);
-	__m256i all_fours	= _mm256_set1_epi64x(4);
-	int64_t __attribute__ ((aligned(32))) count_x4[] =
-	{
-		ibase + 0,
-		ibase + 1,
-		ibase + 2,
-		ibase + 3
-	};
-	__m256i counts = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
 
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
@@ -1304,34 +1156,6 @@ void Oscilloscope::Convert16BitSamplesAVX2(
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
 		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
 		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
-
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts);
-		counts = _mm256_add_epi64(counts, all_fours);
 
 		//Extract the low and high halves (8 samples each) from the input blocks
 		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
@@ -1372,31 +1196,13 @@ void Oscilloscope::Convert16BitSamplesAVX2(
 
 	//Get any extras we didn't get in the SIMD loop
 	for(size_t k=end; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 __attribute__((target("avx2,fma")))
-void Oscilloscope::Convert16BitSamplesFMA(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert16BitSamplesFMA(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
 	size_t end = count - (count % 64);
-
-	__m256i all_ones	= _mm256_set1_epi64x(1);
-	__m256i all_fours	= _mm256_set1_epi64x(4);
-	__m256i all_eights	= _mm256_set1_epi64x(8);
-	int64_t __attribute__ ((aligned(32))) count_x4[] =
-	{
-		ibase + 0,
-		ibase + 1,
-		ibase + 2,
-		ibase + 3
-	};
-	__m256i counts1 = _mm256_load_si256(reinterpret_cast<__m256i*>(count_x4));
-	__m256i counts2 = _mm256_add_epi64(counts1, all_fours);
 
 	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
 	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
@@ -1409,41 +1215,6 @@ void Oscilloscope::Convert16BitSamplesFMA(
 		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
 		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 32));
 		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 48));
-
-		//Fill offset
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 4), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 8), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 12), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 16), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 20), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 24), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 28), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 32), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 36), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 40), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 44), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 48), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 52), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 56), counts1);
-		counts1 = _mm256_add_epi64(counts1, all_eights);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(offs + k + 60), counts2);
-		counts2 = _mm256_add_epi64(counts2, all_eights);
 
 		//Extract the low and high halves (8 samples each) from the input blocks
 		__m128i block0_i16 = _mm256_extracti128_si256(raw_samples1, 0);
@@ -1486,25 +1257,6 @@ void Oscilloscope::Convert16BitSamplesFMA(
 		block6_float = _mm256_fmsub_ps(block6_float, gains, offsets);
 		block7_float = _mm256_fmsub_ps(block7_float, gains, offsets);
 
-		//Fill duration
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 4), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 8), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 12), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 16), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 20), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 24), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 28), all_ones);
-
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 32), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 36), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 40), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 44), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 48), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 52), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 56), all_ones);
-		_mm256_store_si256(reinterpret_cast<__m256i*>(durs + k + 60), all_ones);
-
 		//All done, store back to the output buffer
 		_mm256_store_ps(pout + k, 		block0_float);
 		_mm256_store_ps(pout + k + 8,	block1_float);
@@ -1519,35 +1271,13 @@ void Oscilloscope::Convert16BitSamplesFMA(
 
 	//Get any extras we didn't get in the SIMD loop
 	for(size_t k=end; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }
 
 __attribute__((target("avx512f")))
-void Oscilloscope::Convert16BitSamplesAVX512F(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase)
+void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
 	size_t end = count - (count % 64);
-
-	__m512i all_ones	= _mm512_set1_epi64(1);
-	__m512i all_8s		= _mm512_set1_epi64(8);
-	__m512i all_16s		= _mm512_set1_epi64(16);
-	int64_t __attribute__ ((aligned(32))) count_x8[] =
-	{
-		ibase + 0,
-		ibase + 1,
-		ibase + 2,
-		ibase + 3,
-		ibase + 4,
-		ibase + 5,
-		ibase + 6,
-		ibase + 7,
-	};
-	__m512i counts1 = _mm512_load_si512(reinterpret_cast<__m512i*>(count_x8));
-	__m512i counts2 = _mm512_add_epi64(counts1, all_8s);
 
 	__m512 gains = _mm512_set1_ps(gain);
 	__m512 offsets = _mm512_set1_ps(offset);
@@ -1558,24 +1288,6 @@ void Oscilloscope::Convert16BitSamplesAVX512F(
 		//(on most modern Intel processors, load and loadu have same latency/throughput)
 		__m512i raw_samples1 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k));
 		__m512i raw_samples2 = _mm512_loadu_si512(reinterpret_cast<__m512i*>(pin + k + 32));
-
-		//Fill offset
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k), counts1);
-		counts1 = _mm512_add_epi64(counts1, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 8), counts2);
-		counts2 = _mm512_add_epi64(counts2, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 16), counts1);
-		counts1 = _mm512_add_epi64(counts1, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 24), counts2);
-		counts2 = _mm512_add_epi64(counts2, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 32), counts1);
-		counts1 = _mm512_add_epi64(counts1, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 40), counts2);
-		counts2 = _mm512_add_epi64(counts2, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 48), counts1);
-		counts1 = _mm512_add_epi64(counts1, all_16s);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(offs + k + 56), counts2);
-		counts2 = _mm512_add_epi64(counts2, all_16s);
 
 		//Extract the high and low halves (16 samples each) from the input blocks
 		__m256i block0_i16 = _mm512_extracti64x4_epi64(raw_samples1, 0);
@@ -1602,17 +1314,6 @@ void Oscilloscope::Convert16BitSamplesAVX512F(
 		block2_float = _mm512_fmsub_ps(block2_float, gains, offsets);
 		block3_float = _mm512_fmsub_ps(block3_float, gains, offsets);
 
-		//Fill duration
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 8), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 16), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 24), all_ones);
-
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 32), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 40), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 48), all_ones);
-		_mm512_store_si512(reinterpret_cast<__m512i*>(durs + k + 56), all_ones);
-
 		//All done, store back to the output buffer
 		_mm512_store_ps(pout + k, 		block0_float);
 		_mm512_store_ps(pout + k + 16,	block1_float);
@@ -1622,9 +1323,5 @@ void Oscilloscope::Convert16BitSamplesAVX512F(
 
 	//Get any extras we didn't get in the SIMD loop
 	for(size_t k=end; k<count; k++)
-	{
-		offs[k] = ibase + k;
-		durs[k] = 1;
 		pout[k] = pin[k] * gain - offset;
-	}
 }

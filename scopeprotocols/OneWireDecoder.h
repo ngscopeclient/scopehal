@@ -64,10 +64,10 @@ public:
 	}
 };
 
-class OneWireWaveform : public Waveform<OneWireSymbol>
+class OneWireWaveform : public SparseWaveform<OneWireSymbol>
 {
 public:
-	OneWireWaveform () : Waveform<OneWireSymbol>() {};
+	OneWireWaveform () : SparseWaveform<OneWireSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

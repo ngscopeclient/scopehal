@@ -89,6 +89,8 @@ void ADL5205Decoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
+	din->PrepareForCpuAccess();
 	ADL5205Symbol samp;
 	int phase = 0;
 	int64_t offset = 0;
@@ -150,6 +152,9 @@ void ADL5205Decoder::Refresh()
 				break;
 		}
 	}
+
+	cap->MarkSamplesModifiedFromCpu();
+	cap->MarkTimestampsModifiedFromCpu();
 
 	SetData(cap, 0);
 }

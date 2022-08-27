@@ -78,10 +78,10 @@ public:
 	virtual ~VideoScanlinePacket();
 };
 
-class DVIWaveform : public Waveform<DVISymbol>
+class DVIWaveform : public SparseWaveform<DVISymbol>
 {
 public:
-	DVIWaveform () : Waveform<DVISymbol>() {};
+	DVIWaveform () : SparseWaveform<DVISymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

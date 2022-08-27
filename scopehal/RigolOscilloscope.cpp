@@ -730,7 +730,7 @@ bool RigolOscilloscope::AcquireData()
 	else if(m_protocol == MSO5)
 		maxpoints = GetSampleDepth();	 //You can use 250E6 points too, but it is very slow
 	unsigned char* temp_buf = new unsigned char[maxpoints + 1];
-	map<int, vector<AnalogWaveform*>> pending_waveforms;
+	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
 		if(!enabled[i])
@@ -784,11 +784,10 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		//Set up the capture we're going to store our data into
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
-		cap->m_densePacked = true;
 		double t = GetTime();
 		cap->m_startFemtoseconds = (t - floor(t)) * FS_PER_SECOND;
 
@@ -851,16 +850,16 @@ bool RigolOscilloscope::AcquireData()
 
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
+			cap->PrepareForCpuAccess();
 			for(size_t j = 0; j < header_blocksize; j++)
 			{
 				float v = (static_cast<float>(temp_buf[j]) - ydelta) * yincrement;
 				if(m_protocol == DS_OLD)
 					v = (128 - static_cast<float>(temp_buf[j])) * yincrement - ydelta;
 				//LogDebug("V = %.3f, temp=%d, delta=%f, inc=%f\n", v, temp_buf[j], ydelta, yincrement);
-				cap->m_offsets[npoint + j] = npoint + j;
-				cap->m_durations[npoint + j] = 1;
 				cap->m_samples[npoint + j] = v;
 			}
+			cap->MarkSamplesModifiedFromCpu();
 
 			npoint += header_blocksize;
 		}

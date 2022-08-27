@@ -76,23 +76,49 @@ string CurrentShuntFilter::GetProtocolName()
 void CurrentShuntFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size() ;
-
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	auto din = GetInputWaveform(0);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto len = din->size();
 
 	float rshunt = m_parameters[m_resistanceName].GetFloatVal();
-
-	float* fsrc = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
-	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 	float ishunt = 1.0f / rshunt;
-	for(size_t i=0; i<len; i++)
-		fdst[i] = fsrc[i] * ishunt;
+
+	din->PrepareForCpuAccess();
+
+	if(udin)
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(sdin, 0);
+		cap->PrepareForCpuAccess();
+
+		float* fsrc = (float*)__builtin_assume_aligned(udin->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fsrc[i] * ishunt;
+
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fsrc = (float*)__builtin_assume_aligned(sdin->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fsrc[i] * ishunt;
+
+		cap->MarkModifiedFromCpu();
+	}
 }

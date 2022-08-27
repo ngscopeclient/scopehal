@@ -78,7 +78,7 @@ string DownconvertFilter::GetProtocolName()
 void DownconvertFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		SetData(NULL, 1);
@@ -86,7 +86,8 @@ void DownconvertFilter::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Calculate phase velocity
 	double lo_freq = m_parameters[m_freqname].GetFloatVal();
@@ -97,31 +98,39 @@ void DownconvertFilter::Refresh()
 	double trigger_phase_rad = din->m_triggerPhase * lo_rad_per_fs;
 
 	//Do the actual mixing
-	auto cap_i = SetupOutputWaveform(din, 0, 0, 0);
-	auto cap_q = SetupOutputWaveform(din, 1, 0, 0);
+	auto cap_i = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	auto cap_q = SetupEmptyUniformAnalogOutputWaveform(din, 1);
+	cap_i->PrepareForCpuAccess();
+	cap_q->PrepareForCpuAccess();
+	size_t len = din->size();
+	cap_i->Resize(len);
+	cap_q->Resize(len);
 
-	if(g_hasAvx2 && din->m_densePacked)
+	if(g_hasAvx2)
 		DoFilterKernelAVX2DensePacked(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
 	else
 		DoFilterKernelGeneric(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
+
+	cap_i->MarkModifiedFromCpu();
+	cap_q->MarkModifiedFromCpu();
 }
 
 void DownconvertFilter::DoFilterKernelGeneric(
-	AnalogWaveform* din,
-	AnalogWaveform* cap_i,
-	AnalogWaveform* cap_q,
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap_i,
+	UniformAnalogWaveform* cap_q,
 	float lo_rad_per_sample,
 	float trigger_phase_rad)
 {
-	size_t len = din->m_samples.size();
+	size_t len = din->size();
 
 	//Initial sample
-	double phase = lo_rad_per_sample * din->m_offsets[0] + trigger_phase_rad;
+	double phase = lo_rad_per_sample + trigger_phase_rad;
 	float samp = din->m_samples[0];
 	cap_i->m_samples[0] 	= samp * sin(phase);
 	cap_q->m_samples[0] 	= samp * cos(phase);
 
-	if(din->m_densePacked)
+	//if(din->m_densePacked)
 	{
 		for(size_t i=1; i<len; i++)
 		{
@@ -132,6 +141,7 @@ void DownconvertFilter::DoFilterKernelGeneric(
 			cap_q->m_samples[i] 	= samp * cos(phase);
 		}
 	}
+	/*
 	else
 	{
 		for(size_t i=1; i<len; i++)
@@ -143,18 +153,18 @@ void DownconvertFilter::DoFilterKernelGeneric(
 			cap_i->m_samples[i] 	= samp * sin(phase);
 			cap_q->m_samples[i] 	= samp * cos(phase);
 		}
-	}
+	}*/
 }
 
 __attribute__((target("avx2")))
 void DownconvertFilter::DoFilterKernelAVX2DensePacked(
-	AnalogWaveform* din,
-	AnalogWaveform* cap_i,
-	AnalogWaveform* cap_q,
+	UniformAnalogWaveform* din,
+	UniformAnalogWaveform* cap_i,
+	UniformAnalogWaveform* cap_q,
 	float lo_rad_per_sample,
 	float trigger_phase_rad)
 {
-	size_t len = din->m_samples.size();
+	size_t len = din->size();
 	size_t len_rounded = len - (len % 8);
 
 	//Grab a few pointers and helpful values for the vector loop

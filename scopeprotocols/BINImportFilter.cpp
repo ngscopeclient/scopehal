@@ -155,19 +155,20 @@ void BINImportFilter::OnFileNameChanged()
 		if(dh.type == 6)
 		{
 			//Create 8 streams of digital data
-			vector<DigitalWaveform*> wfms;
+			vector<UniformDigitalWaveform*> wfms;
 			for(size_t j=0; j<8; j++)
 			{
 				AddStream(Unit(Unit::UNIT_VOLTS), name + "[" + to_string(j) + "]", Stream::STREAM_TYPE_DIGITAL);
 
-				auto wfm = new DigitalWaveform;
+				auto wfm = new UniformDigitalWaveform;
 				wfm->m_timescale = wh.interval * FS_PER_SECOND;
 				wfm->m_startTimestamp = timestamp;
 				wfm->m_startFemtoseconds = fs;
 				wfm->m_triggerPhase = 0;
-				wfm->m_densePacked = true;
 				SetData(wfm, m_streams.size()-1);
 				wfms.push_back(wfm);
+
+				wfm->PrepareForCpuAccess();
 			}
 
 			for(size_t j=0; j<wh.buffers; j++)
@@ -190,9 +191,6 @@ void BINImportFilter::OnFileNameChanged()
 
 					for(size_t m=0; m<8; m++)
 					{
-						wfms[m]->m_offsets.push_back(k);
-						wfms[m]->m_durations.push_back(1);
-
 						if(s & (1 << m) )
 							wfms[m]->m_samples.push_back(true);
 						else
@@ -202,6 +200,9 @@ void BINImportFilter::OnFileNameChanged()
 					fpos += dh.depth;
 				}
 			}
+
+			for(auto w : wfms)
+				w->MarkModifiedFromCpu();
 		}
 
 		//Analog waveform
@@ -210,12 +211,12 @@ void BINImportFilter::OnFileNameChanged()
 			//Create the stream and a waveform for it
 			AddStream(Unit(Unit::UNIT_VOLTS), name, Stream::STREAM_TYPE_ANALOG);
 
-			auto wfm = new AnalogWaveform;
+			auto wfm = new UniformAnalogWaveform;
 			wfm->m_timescale = wh.interval * FS_PER_SECOND;
 			wfm->m_startTimestamp = timestamp;
 			wfm->m_startFemtoseconds = fs;
 			wfm->m_triggerPhase = 0;
-			wfm->m_densePacked = true;
+			wfm->PrepareForCpuAccess();
 			SetData(wfm, m_streams.size()-1);
 
 			for(size_t j=0; j<wh.buffers; j++)
@@ -235,15 +236,12 @@ void BINImportFilter::OnFileNameChanged()
 				for(size_t k=0; k<wh.samples; k++)
 				{
 					float* sample_f = (float*)(f.c_str() + fpos);
-
-					//Push sample to waveform
-					wfm->m_offsets.push_back(k);
 					wfm->m_samples.push_back(*sample_f);
-					wfm->m_durations.push_back(1);
-
 					fpos += dh.depth;
 				}
 			}
+
+			wfm->MarkModifiedFromCpu();
 		}
 
 		AutoscaleVertical(i);

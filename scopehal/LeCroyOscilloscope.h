@@ -304,7 +304,7 @@ protected:
 		double basetime,
 		double* wavetime
 		);
-	std::map<int, DigitalWaveform*> ProcessDigitalWaveform(std::string& data, int64_t analog_hoff);
+	std::map<int, SparseDigitalWaveform*> ProcessDigitalWaveform(std::string& data, int64_t analog_hoff);
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;

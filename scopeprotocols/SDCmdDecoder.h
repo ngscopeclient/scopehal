@@ -79,10 +79,10 @@ public:
 	}
 };
 
-class SDCmdWaveform : public Waveform<SDCmdSymbol>
+class SDCmdWaveform : public SparseWaveform<SDCmdSymbol>
 {
 public:
-	SDCmdWaveform (FilterParameter& cardTypeParam) : Waveform<SDCmdSymbol>(), m_cardTypeParam(cardTypeParam) {};
+	SDCmdWaveform (FilterParameter& cardTypeParam) : SparseWaveform<SDCmdSymbol>(), m_cardTypeParam(cardTypeParam) {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 

@@ -70,10 +70,10 @@ public:
 	}
 };
 
-class MDIOWaveform : public Waveform<MDIOSymbol>
+class MDIOWaveform : public SparseWaveform<MDIOSymbol>
 {
 public:
-	MDIOWaveform () : Waveform<MDIOSymbol>() {};
+	MDIOWaveform () : SparseWaveform<MDIOSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

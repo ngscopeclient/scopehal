@@ -107,11 +107,16 @@ void DVIDecoder::Refresh()
 	auto dgreen = dynamic_cast<TMDSWaveform*>(GetInputWaveform(1));
 	auto dred = dynamic_cast<TMDSWaveform*>(GetInputWaveform(2));
 
+	dblue->PrepareForCpuAccess();
+	dgreen->PrepareForCpuAccess();
+	dred->PrepareForCpuAccess();
+
 	//Create the capture
-	DVIWaveform* cap = new DVIWaveform;
+	auto cap = new DVIWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = dblue->m_startTimestamp;
 	cap->m_startFemtoseconds = dblue->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	size_t iblue = 0;
 	size_t igreen = 0;
@@ -268,6 +273,8 @@ void DVIDecoder::Refresh()
 		delete current_packet;
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color DVIWaveform::GetColor(size_t i)

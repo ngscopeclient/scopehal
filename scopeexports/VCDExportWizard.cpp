@@ -197,15 +197,22 @@ void VCDExportWizard::on_apply()
 	Unit fs(Unit::UNIT_FS);
 
 	//Get waveforms for each stream
-	vector<DigitalWaveform*> waveforms;
+	vector<SparseDigitalWaveform*> sparsewaveforms;
+	vector<UniformDigitalWaveform*> uniformwaveforms;
 	vector<size_t> indexes;
 	vector<size_t> lens;
 	for(auto s : streams)
 	{
-		auto wfm = dynamic_cast<DigitalWaveform*>(s.GetData());	//chooser does not allow us to select anything else
-		waveforms.push_back(wfm);
+		auto data = s.GetData();
+
+		auto swfm = dynamic_cast<SparseDigitalWaveform*>(data);
+		sparsewaveforms.push_back(swfm);
+
+		auto uwfm = dynamic_cast<UniformDigitalWaveform*>(data);
+		uniformwaveforms.push_back(uwfm);
+
 		indexes.push_back(0);
-		lens.push_back(wfm->m_offsets.size());
+		lens.push_back(data->size());
 	}
 
 	//Write header section
@@ -279,13 +286,22 @@ void VCDExportWizard::on_apply()
 		//Print signal values
 		fprintf(fp, "#%ld\n", timestamp);
 		for(size_t i=0; i<streams.size(); i++)
-			fprintf(fp,"%d%s\n", (bool)waveforms[i]->m_samples[indexes[i]], ids[i].c_str());
+		{
+			if(sparsewaveforms[i])
+				fprintf(fp,"%d%s\n", sparsewaveforms[i]->m_samples[indexes[i]], ids[i].c_str());
+			else
+				fprintf(fp,"%d%s\n", uniformwaveforms[i]->m_samples[indexes[i]], ids[i].c_str());
+		}
 
 		//Get timestamp of next event on any channel
 		int64_t next = timestamp;
 		for(size_t i=0; i<streams.size(); i++)
 		{
-			int64_t t = Filter::GetNextEventTimestampScaled(waveforms[i], indexes[i], lens[i], timestamp);
+			int64_t t;
+			if(sparsewaveforms[i])
+				t = Filter::GetNextEventTimestampScaled(sparsewaveforms[i], indexes[i], lens[i], timestamp);
+			else
+				t = Filter::GetNextEventTimestampScaled(uniformwaveforms[i], indexes[i], lens[i], timestamp);
 			if(i == 0)
 				next = t;
 			else
@@ -299,7 +315,12 @@ void VCDExportWizard::on_apply()
 		//Move on
 		timestamp = next;
 		for(size_t i=0; i<streams.size(); i++)
-			Filter::AdvanceToTimestampScaled(waveforms[i], indexes[i], lens[i], timestamp);
+		{
+			if(sparsewaveforms[i])
+				Filter::AdvanceToTimestampScaled(sparsewaveforms[i], indexes[i], lens[i], timestamp);
+			else
+				Filter::AdvanceToTimestampScaled(uniformwaveforms[i], indexes[i], lens[i], timestamp);
+		}
 	}
 
 	fclose(fp);

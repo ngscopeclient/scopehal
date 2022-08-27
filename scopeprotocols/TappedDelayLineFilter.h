@@ -56,22 +56,22 @@ public:
 	static void DoFilterKernel(
 		int64_t tap_delay,
 		float* taps,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 protected:
 
 	static void DoFilterKernelGeneric(
 		int64_t tap_delay,
 		float* taps,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 	static void DoFilterKernelAVX2(
 		int64_t tap_delay,
 		float* taps,
-		AnalogWaveform* din,
-		AnalogWaveform* cap);
+		UniformAnalogWaveform* din,
+		UniformAnalogWaveform* cap);
 
 	std::string m_tapDelayName;
 	std::string m_tap0Name;

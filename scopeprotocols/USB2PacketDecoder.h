@@ -95,10 +95,10 @@ public:
 	}
 };
 
-class USB2PacketWaveform : public Waveform<USB2PacketSymbol>
+class USB2PacketWaveform : public SparseWaveform<USB2PacketSymbol>
 {
 public:
-	USB2PacketWaveform () : Waveform<USB2PacketSymbol>() {};
+	USB2PacketWaveform () : SparseWaveform<USB2PacketSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

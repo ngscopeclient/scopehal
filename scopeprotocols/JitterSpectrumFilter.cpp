@@ -80,7 +80,7 @@ string JitterSpectrumFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
+size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 {
 	//Make a histogram of sample durations.
 	//Sample no more than 5K UIs since this is just a rough estimate.
@@ -163,15 +163,16 @@ size_t JitterSpectrumFilter::EstimateUIWidth(AnalogWaveform* din)
 void JitterSpectrumFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndSparseAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInput(0).GetData());
+	din->PrepareForCpuAccess();
 
 	//Get an initial estimate of the UI width for the waveform
-	size_t inlen = din->m_samples.size();
+	size_t inlen = din->size();
 	size_t ui_width = EstimateUIWidth(din);
 
 	//Loop over the input and copy samples.

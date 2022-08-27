@@ -71,7 +71,7 @@ vector<float> DigitalToNRZFilter::GetVoltageLevels()
 	return ret;
 }
 
-size_t DigitalToNRZFilter::GetVoltageCode(size_t i, DigitalWaveform& samples)
+size_t DigitalToNRZFilter::GetVoltageCode(size_t i, SparseDigitalWaveform& samples)
 {
 	return samples.m_samples[i];
 }

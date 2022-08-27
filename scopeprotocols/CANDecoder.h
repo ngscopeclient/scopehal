@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -76,10 +76,10 @@ public:
 	}
 };
 
-class CANWaveform : public Waveform<CANSymbol>
+class CANWaveform : public SparseWaveform<CANSymbol>
 {
 public:
-	CANWaveform () : Waveform<CANSymbol>() {};
+	CANWaveform () : SparseWaveform<CANSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

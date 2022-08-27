@@ -71,10 +71,10 @@ public:
 	}
 };
 
-class SDRAMWaveform : public Waveform<SDRAMSymbol>
+class SDRAMWaveform : public SparseWaveform<SDRAMSymbol>
 {
 public:
-	SDRAMWaveform () : Waveform<SDRAMSymbol>() {};
+	SDRAMWaveform () : SparseWaveform<SDRAMSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

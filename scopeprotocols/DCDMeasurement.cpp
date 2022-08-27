@@ -82,7 +82,9 @@ void DCDMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
+
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
 	float* table = ddj->GetDDJTable();
 
@@ -114,7 +116,8 @@ void DCDMeasurement::Refresh()
 	float falling_avg = falling_sum / falling_count;
 	float dcd = fabs(rising_avg - falling_avg);
 
-	auto cap = new AnalogWaveform;
+	auto cap = new SparseAnalogWaveform;
+	cap->PrepareForCpuAccess();
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(1);
 	cap->m_samples.push_back(dcd);
@@ -122,4 +125,6 @@ void DCDMeasurement::Refresh()
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

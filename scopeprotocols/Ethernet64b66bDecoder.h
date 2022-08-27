@@ -56,10 +56,10 @@ public:
 	}
 };
 
-class Ethernet64b66bWaveform : public Waveform<Ethernet64b66bSymbol>
+class Ethernet64b66bWaveform : public SparseWaveform<Ethernet64b66bSymbol>
 {
 public:
-	Ethernet64b66bWaveform () : Waveform<Ethernet64b66bSymbol>() {};
+	Ethernet64b66bWaveform () : SparseWaveform<Ethernet64b66bSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

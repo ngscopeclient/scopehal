@@ -69,10 +69,10 @@ public:
 	}
 };
 
-class SDDataWaveform : public Waveform<SDDataSymbol>
+class SDDataWaveform : public SparseWaveform<SDDataSymbol>
 {
 public:
-	SDDataWaveform () : Waveform<SDDataSymbol>() {};
+	SDDataWaveform () : SparseWaveform<SDDataSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

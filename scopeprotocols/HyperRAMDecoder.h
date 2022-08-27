@@ -66,10 +66,10 @@ public:
 	}
 };
 
-class HyperRAMWaveform : public Waveform<HyperRAMSymbol>
+class HyperRAMWaveform : public SparseWaveform<HyperRAMSymbol>
 {
 public:
-	HyperRAMWaveform () : Waveform<HyperRAMSymbol>() {};
+	HyperRAMWaveform () : SparseWaveform<HyperRAMSymbol>() {};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };

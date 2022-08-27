@@ -825,30 +825,19 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sample format conversion
 public:
-	static void Convert8BitSamples(
-		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert8BitSamplesGeneric(
-		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert8BitSamplesAVX2(
-		int64_t* offs, int64_t* durs, float* pout, int8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	static void Convert8BitSamples(float* pout, int8_t* pin, float gain, float offset, size_t count);
+	static void Convert8BitSamplesGeneric(float* pout, int8_t* pin, float gain, float offset, size_t count);
+	static void Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, float offset, size_t count);
 
-	static void ConvertUnsigned8BitSamples(
-		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void ConvertUnsigned8BitSamplesGeneric(
-		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void ConvertUnsigned8BitSamplesAVX2(
-		int64_t* offs, int64_t* durs, float* pout, uint8_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	static void ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned8BitSamplesGeneric(float* pout, uint8_t* pin, float gain, float offset, size_t count);
+	static void ConvertUnsigned8BitSamplesAVX2(float* pout, uint8_t* pin, float gain, float offset, size_t count);
 
-	static void Convert16BitSamples(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert16BitSamplesGeneric(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert16BitSamplesAVX2(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert16BitSamplesAVX512F(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
-	static void Convert16BitSamplesFMA(
-		int64_t* offs, int64_t* durs, float* pout, int16_t* pin, float gain, float offset, size_t count, int64_t ibase);
+	static void Convert16BitSamples(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesGeneric(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesAVX2(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesFMA(float* pout, int16_t* pin, float gain, float offset, size_t count);
+	static void Convert16BitSamplesAVX512F(float* pout, int16_t* pin, float gain, float offset, size_t count);
 
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

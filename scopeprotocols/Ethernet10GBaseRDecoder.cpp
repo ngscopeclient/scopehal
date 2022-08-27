@@ -80,12 +80,14 @@ void Ethernet10GBaseRDecoder::Refresh()
 	}
 
 	auto data = dynamic_cast<Ethernet64b66bWaveform*>(GetInputWaveform(0));
+	data->PrepareForCpuAccess();
 
 	//Create the output capture
 	auto cap = new EthernetWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	size_t len = data->m_samples.size();
 	for(size_t i=0; i < len; i++)
@@ -366,4 +368,5 @@ void Ethernet10GBaseRDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

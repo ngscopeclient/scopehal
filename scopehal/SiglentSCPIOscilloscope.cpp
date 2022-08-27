@@ -1672,12 +1672,11 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 	for(size_t j = 0; j < num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		AnalogWaveform* cap = new AnalogWaveform;
+		auto cap = new UniformAnalogWaveform;
 		cap->m_timescale = round(interval);
 
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
-		cap->m_densePacked = true;
 
 		//Parse the time
 		if(num_sequences > 1)
@@ -1686,40 +1685,38 @@ vector<WaveformBase*> SiglentSCPIOscilloscope::ProcessAnalogWaveform(const char*
 			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
 
 		cap->Resize(num_per_segment);
+		cap->PrepareForCpuAccess();
 
 		//Convert raw ADC samples to volts
 		if(m_highDefinition)
 		{
-			Convert16BitSamples((int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
+			Convert16BitSamples(
+				cap->m_samples.GetCpuPointer(),
 				wdata + j * num_per_segment,
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 		}
 		else
 		{
-			Convert8BitSamples((int64_t*)&cap->m_offsets[0],
-				(int64_t*)&cap->m_durations[0],
-				(float*)&cap->m_samples[0],
+			Convert8BitSamples(
+				cap->m_samples.GetCpuPointer(),
 				bdata + j * num_per_segment,
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 		}
 
+		cap->MarkSamplesModifiedFromCpu();
 		ret.push_back(cap);
 	}
 
 	return ret;
 }
 
-map<int, DigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& /*data*/)
+map<int, SparseDigitalWaveform*> SiglentSCPIOscilloscope::ProcessDigitalWaveform(string& /*data*/)
 {
-	map<int, DigitalWaveform*> ret;
+	map<int, SparseDigitalWaveform*> ret;
 
 	// Digital channels not yet implemented
 	return ret;
@@ -1934,26 +1931,24 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				std::vector<WaveformBase*> ret;
 				if(m_channelsEnabled[i])
 				{
-					AnalogWaveform* cap = new AnalogWaveform;
+					auto cap = new UniformAnalogWaveform;
 					cap->m_timescale = FS_PER_SECOND / m_sampleRate;
 					// no high res timer on scope ?
 					cap->m_triggerPhase = h_off_frac;
 					cap->m_startTimestamp = time(NULL);
-					;
-					cap->m_densePacked = true;
 					// Fixme
 					cap->m_startFemtoseconds = (start - floor(start)) * FS_PER_SECOND;
 
 					cap->Resize(m_analogWaveformDataSize[i]);
+					cap->PrepareForCpuAccess();
 
-					Convert8BitSamples((int64_t*)&cap->m_offsets[0],
-						(int64_t*)&cap->m_durations[0],
-						(float*)&cap->m_samples[0],
+					Convert8BitSamples(
+						cap->m_samples.GetCpuPointer(),
 						(int8_t*)m_analogWaveformData[i],
 						m_channelVoltageRanges[i] / (8 * 25),
 						m_channelOffsets[i],
-						m_analogWaveformDataSize[i],
-						0);
+						m_analogWaveformDataSize[i]);
+					cap->MarkSamplesModifiedFromCpu();
 					ret.push_back(cap);
 				}
 				waveforms[i] = ret;

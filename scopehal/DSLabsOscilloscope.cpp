@@ -338,7 +338,7 @@ bool DSLabsOscilloscope::AcquireData()
 
 	//Analog channels get processed separately
 	vector<uint8_t*> abufs;
-	vector<AnalogWaveform*> awfms;
+	vector<UniformAnalogWaveform*> awfms;
 	vector<float> scales;
 	vector<float> offsets;
 
@@ -378,11 +378,10 @@ bool DSLabsOscilloscope::AcquireData()
 				return false;
 
 			//Create our waveform
-			AnalogWaveform* cap = new AnalogWaveform;
+			auto cap = new UniformAnalogWaveform;
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = true;
 			cap->m_startFemtoseconds = fs;
 			if (clipping)
 				cap->m_flags |= WaveformBase::WAVEFORM_CLIPPING;
@@ -405,13 +404,13 @@ bool DSLabsOscilloscope::AcquireData()
 				return false;
 
 			//Create buffers for output waveforms
-			DigitalWaveform* cap = new DigitalWaveform;
+			auto cap = new SparseDigitalWaveform;
 			s[m_channels[chnum]] = cap;
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
-			cap->m_densePacked = false;
 			cap->m_startFemtoseconds = fs;
+			cap->PrepareForCpuAccess();
 
 			//Preallocate memory assuming no deduplication possible
 			cap->Resize(memdepth);
@@ -454,6 +453,8 @@ bool DSLabsOscilloscope::AcquireData()
 			cap->m_offsets.shrink_to_fit();
 			cap->m_durations.shrink_to_fit();
 			cap->m_samples.shrink_to_fit();
+			cap->MarkSamplesModifiedFromCpu();
+			cap->MarkTimestampsModifiedFromCpu();
 
 			delete[] buf;
 		}
@@ -464,15 +465,14 @@ bool DSLabsOscilloscope::AcquireData()
 	for(size_t i=0; i<awfms.size(); i++)
 	{
 		auto cap = awfms[i];
+		cap->PrepareForCpuAccess();
 		ConvertUnsigned8BitSamples(
-			(int64_t*)&cap->m_offsets[0],
-			(int64_t*)&cap->m_durations[0],
-			(float*)&cap->m_samples[0],
+			cap->m_samples.GetCpuPointer(),
 			abufs[i],
 			scales[i],
 			offsets[i],
-			cap->m_offsets.size(),
-			0);
+			cap->size());
+		cap->MarkSamplesModifiedFromCpu();
 		delete[] abufs[i];
 	}
 
