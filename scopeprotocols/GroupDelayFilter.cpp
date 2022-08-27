@@ -76,16 +76,19 @@ string GroupDelayFilter::GetProtocolName()
 void GroupDelayFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto ang = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	auto uang = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sang = dynamic_cast<SparseAnalogWaveform*>(din);
+	din->PrepareForCpuAccess();
 
 	//We need meaningful data
-	size_t len = ang->m_samples.size();
+	size_t len = din->size();
 	if(len == 0)
 	{
 		SetData(NULL, 0);
@@ -95,17 +98,18 @@ void GroupDelayFilter::Refresh()
 		len --;
 
 	//Create the output and copy timestamps
-	auto cap = SetupOutputWaveform(ang, 0, 1, 0);
-	int64_t* vfreq = (int64_t*)&ang->m_offsets[0];
-	float* vang = (float*)&ang->m_samples[0];
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->PrepareForCpuAccess();
+	cap->Resize(len);
+	cap->m_timescale = 1;
 
 	//Main output loop
 	for(size_t i=0; i<len; i++)
 	{
 		//Subtract phase angles, wrapping correctly around singularities
 		//(assume +/- 180 deg range)
-		float phase_hi = vang[i+1];
-		float phase_lo = vang[i];
+		float phase_hi = GetValue(sang, uang, i+1);
+		float phase_lo = GetValue(sang, uang, i);
 		if(fabs(phase_lo - phase_hi) > 180)
 		{
 			if(phase_lo < phase_hi)
@@ -116,11 +120,16 @@ void GroupDelayFilter::Refresh()
 		float dphase = phase_hi - phase_lo;
 
 		//convert frequency to degrees/sec since input channel angles are in degrees
-		float dfreq = (vfreq[i+1] - vfreq[i]) * ang->m_timescale;
+		float dfreq = (::GetOffset(sang, uang, i+1) - ::GetOffset(sang, uang, i)) * din->m_timescale;
 		dfreq *= 360;
 
 		//Calculate final group delay
 		float delay = (-dphase / dfreq) * FS_PER_SECOND;
+
+		cap->m_offsets[i] = GetOffsetScaled(sang, uang, i);
+		cap->m_durations[i] = GetDurationScaled(sang, uang, i);
 		cap->m_samples[i] = delay;
 	}
+
+	cap->MarkModifiedFromCpu();
 }
