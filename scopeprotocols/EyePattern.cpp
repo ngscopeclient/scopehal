@@ -366,14 +366,17 @@ void EyePattern::Refresh()
 	}
 
 	//Get the input data
-	auto waveform = GetAnalogInputWaveform(0);
-	auto clock = GetDigitalInputWaveform(1);
+	auto waveform = GetInputWaveform(0);
+	auto clock = GetInputWaveform(1);
 	double start = GetTime();
+
+	waveform->PrepareForCpuAccess();
+	clock->PrepareForCpuAccess();
 
 	SetYAxisUnits(GetInput(0).GetYAxisUnits(), 0);
 
 	//If center of the eye was changed, reset existing eye data
-	auto = dynamic_cast<EyeWaveform*>(GetData(0));
+	auto cap = dynamic_cast<EyeWaveform*>(GetData(0));
 	double center = m_parameters[m_centerName].GetFloatVal();
 	if(cap)
 	{
@@ -407,18 +410,20 @@ void EyePattern::Refresh()
 
 	//Find all toggles in the clock
 	vector<int64_t> clock_edges;
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clock);
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clock);
 	switch(m_parameters[m_polarityName].GetIntVal())
 	{
 		case CLOCK_RISING:
-			FindRisingEdges(clock, clock_edges);
+			FindRisingEdges(sclk, uclk, clock_edges);
 			break;
 
 		case CLOCK_FALLING:
-			FindFallingEdges(clock, clock_edges);
+			FindFallingEdges(sclk, uclk, clock_edges);
 			break;
 
 		case CLOCK_BOTH:
-			FindZeroCrossings(clock, clock_edges);
+			FindZeroCrossings(sclk, uclk, clock_edges);
 			break;
 	}
 
@@ -451,24 +456,26 @@ void EyePattern::Refresh()
 
 	//Process the eye
 	size_t cend = clock_edges.size() - 1;
-	size_t wend = waveform->m_samples.size()-1;
+	size_t wend = waveform->size()-1;
 	int32_t ymax = m_height - 1;
 	int32_t xmax = m_width - 1;
+	auto swfm = dynamic_cast<SparseAnalogWaveform*>(waveform);
+	auto uwfm = dynamic_cast<UniformAnalogWaveform*>(waveform);
 	if(m_xscale > FLT_EPSILON)
 	{
 		//Optimized inner loop for dense packed waveforms
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
-		if(waveform->m_densePacked)
+		if(uwfm)
 		{
 			if(g_hasAvx2)
-				DensePackedInnerLoopAVX2(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+				DensePackedInnerLoopAVX2(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 			else
-				DensePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+				DensePackedInnerLoop(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 		}
 
 		//Normal main loop
 		else
-			SparsePackedInnerLoop(waveform, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
+			SparsePackedInnerLoop(swfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 	}
 
 	//Rightmost column of the eye has some rounding artifacts.
@@ -849,24 +856,26 @@ void EyePattern::RecalculateUIWidth()
 		return;
 	}
 
-	auto clock = GetDigitalInputWaveform(1);
+	auto clock = GetInputWaveform(1);
 	if(!clock)
 		return;
 
 	//Find all toggles in the clock
 	vector<int64_t> clock_edges;
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clock);
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clock);
 	switch(m_parameters[m_polarityName].GetIntVal())
 	{
 		case CLOCK_RISING:
-			FindRisingEdges(clock, clock_edges);
+			FindRisingEdges(sclk, uclk, clock_edges);
 			break;
 
 		case CLOCK_FALLING:
-			FindFallingEdges(clock, clock_edges);
+			FindFallingEdges(sclk, uclk, clock_edges);
 			break;
 
 		case CLOCK_BOTH:
-			FindZeroCrossings(clock, clock_edges);
+			FindZeroCrossings(sclk, uclk, clock_edges);
 			break;
 	}
 

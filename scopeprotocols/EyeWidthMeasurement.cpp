@@ -92,7 +92,10 @@ void EyeWidthMeasurement::Refresh()
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	din->PrepareForCpuAccess();
+	cap->PrepareForCpuAccess();
+	cap->m_timescale = 1;
 
 	//Make sure voltages are in the right order
 	float vstart = m_parameters[m_startname].GetFloatVal();
@@ -153,8 +156,5 @@ void EyeWidthMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

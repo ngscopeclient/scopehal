@@ -88,15 +88,16 @@ void EyePeriodMeasurement::Refresh()
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	din->PrepareForCpuAccess();
+	cap->PrepareForCpuAccess();
+	cap->m_timescale = 1;
+
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(2 * din->m_uiWidth);
 	cap->m_samples.push_back(din->m_uiWidth);
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

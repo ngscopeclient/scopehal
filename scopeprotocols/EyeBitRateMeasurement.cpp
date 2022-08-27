@@ -88,18 +88,19 @@ void EyeBitRateMeasurement::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
+	cap->m_timescale = 1;
+	cap->MarkModifiedFromCpu();
+
+	//Do the actual bit rate measurement
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(2 * din->m_uiWidth);
 	m_value = FS_PER_SECOND / din->m_uiWidth;
 	cap->m_samples.push_back(m_value);
 
 	SetData(cap, 0);
-
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

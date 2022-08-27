@@ -919,6 +919,33 @@ public:
 	static void FindFallingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
 
+	static void FindRisingEdges(
+		SparseDigitalWaveform* sdata, UniformDigitalWaveform* udata, std::vector<int64_t>& edges)
+	{
+		if(sdata)
+			FindRisingEdges(sdata, edges);
+		else
+			FindRisingEdges(udata, edges);
+	}
+
+	static void FindFallingEdges(
+		SparseDigitalWaveform* sdata, UniformDigitalWaveform* udata, std::vector<int64_t>& edges)
+	{
+		if(sdata)
+			FindFallingEdges(sdata, edges);
+		else
+			FindFallingEdges(udata, edges);
+	}
+
+	static void FindZeroCrossings(
+		SparseDigitalWaveform* sdata, UniformDigitalWaveform* udata, std::vector<int64_t>& edges)
+	{
+		if(sdata)
+			FindZeroCrossings(sdata, edges);
+		else
+			FindZeroCrossings(udata, edges);
+	}
+
 	static void ClearAnalysisCache();
 
 	//Checksum helpers
