@@ -128,24 +128,29 @@ void JtagDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto tdi = GetDigitalInputWaveform(0);
-	auto tdo = GetDigitalInputWaveform(1);
-	auto tms = GetDigitalInputWaveform(2);
-	auto tck = GetDigitalInputWaveform(3);
+	auto tdi = GetInputWaveform(0);
+	auto tdo = GetInputWaveform(1);
+	auto tms = GetInputWaveform(2);
+	auto tck = GetInputWaveform(3);
+	tdi->PrepareForCpuAccess();
+	tdo->PrepareForCpuAccess();
+	tms->PrepareForCpuAccess();
+	tck->PrepareForCpuAccess();
 
 	//Sample the data stream at each clock edge
-	DigitalWaveform dtdi;
-	DigitalWaveform dtdo;
-	DigitalWaveform dtms;
-	SampleOnRisingEdges(tdi, tck, dtdi);
-	SampleOnRisingEdges(tdo, tck, dtdo);
-	SampleOnRisingEdges(tms, tck, dtms);
+	SparseDigitalWaveform dtdi;
+	SparseDigitalWaveform dtdo;
+	SparseDigitalWaveform dtms;
+	SampleOnRisingEdgesBase(tdi, tck, dtdi);
+	SampleOnRisingEdgesBase(tdo, tck, dtdo);
+	SampleOnRisingEdgesBase(tms, tck, dtms);
 
 	//Create the capture
 	auto cap = new JtagWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = tck->m_startTimestamp;
 	cap->m_startFemtoseconds = tck->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Table for state transitions
 	JtagSymbol::JtagState state_if_tms_high[] =
@@ -211,9 +216,9 @@ void JtagDecoder::Refresh()
 	vector<uint8_t> ibytes;
 	vector<uint8_t> obytes;
 	string irval = "??";
-	size_t len = dtms.m_samples.size();
-	len = min(len, dtdi.m_samples.size());
-	len = min(len, dtdo.m_samples.size());
+	size_t len = dtms.size();
+	len = min(len, dtdi.size());
+	len = min(len, dtdo.size());
 	for(size_t i=0; i<len; i++)
 	{
 		//Update the state
@@ -325,6 +330,7 @@ void JtagDecoder::Refresh()
 	//LogDebug("%zu packets\n", m_packets.size());
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color JtagWaveform::GetColor(size_t i)

@@ -90,8 +90,12 @@ void JitterFilter::Refresh()
 		return;
 	}
 
-	auto din = GetDigitalInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
+	din->PrepareForCpuAccess();
+
+	size_t len = din->size();
 
 	float pjfreq = m_parameters[m_pjfreqname].GetIntVal();
 	float stdev = m_parameters[m_stdevname].GetFloatVal();
@@ -101,10 +105,13 @@ void JitterFilter::Refresh()
 	normal_distribution<> noise(0, stdev);
 
 	//Copy the initial configuration over
-	auto cap = SetupEmptyDigitalOutputWaveform(din, 0);
+	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
 	cap->Resize(len);
-	cap->m_samples.CopyFrom(din->m_samples);
-	cap->m_densePacked = false;
+	if(sdin)
+		cap->m_samples.CopyFrom(sdin->m_samples);
+	else
+		cap->m_samples.CopyFrom(udin->m_samples);
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 0;
 
@@ -117,7 +124,7 @@ void JitterFilter::Refresh()
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 	for(size_t i=0; i<len; i++)
 	{
-		size_t tstart = din->m_offsets[i] * din->m_timescale + din->m_triggerPhase;
+		size_t tstart = GetOffsetScaled(sdin, udin, i);
 
 		size_t rj = noise(rng);
 		size_t pj = sin(tstart * radians_per_fs + startPhase) * pjamp;
@@ -125,7 +132,7 @@ void JitterFilter::Refresh()
 
 		//Add jitter to the start time
 		cap->m_offsets[i] = tstart + tj;
-		cap->m_durations[i] = din->m_durations[i] * din->m_timescale;
+		cap->m_durations[i] = GetDurationScaled(sdin, udin, i);
 
 		//Update duration of previous sample
 		if(i > 0)
