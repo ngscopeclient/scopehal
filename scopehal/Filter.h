@@ -263,6 +263,24 @@ public:
 	static void AdvanceToTimestampScaled(SparseWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 	static void AdvanceToTimestampScaled(UniformWaveformBase* wfm, size_t& i, size_t len, int64_t timestamp);
 
+	static void AdvanceToTimestampScaled(
+		SparseWaveformBase* swfm, UniformWaveformBase* uwfm, size_t& i, size_t len, int64_t timestamp)
+	{
+		if(swfm)
+			AdvanceToTimestampScaled(swfm, i, len, timestamp);
+		else
+			AdvanceToTimestampScaled(uwfm, i, len, timestamp);
+	}
+
+	static int64_t GetNextEventTimestampScaled(
+		SparseWaveformBase* swfm, UniformWaveformBase* uwfm, size_t i, size_t len, int64_t timestamp)
+	{
+		if(swfm)
+			return GetNextEventTimestampScaled(swfm, i, len, timestamp);
+		else
+			return GetNextEventTimestampScaled(uwfm, i, len, timestamp);
+	}
+
 protected:
 	UniformAnalogWaveform* SetupEmptyUniformAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);
 	SparseAnalogWaveform* SetupEmptySparseAnalogOutputWaveform(WaveformBase* din, size_t stream, bool clear=true);

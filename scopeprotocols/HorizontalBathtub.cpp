@@ -83,6 +83,7 @@ void HorizontalBathtub::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 	float threshold = m_parameters[m_voltageName].GetFloatVal();
 
 	//Find the eye bin for this height
@@ -100,7 +101,10 @@ void HorizontalBathtub::Refresh()
 	double fs_per_pixel = fs_per_width / din->GetWidth();
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
+	cap->m_triggerPhase = -din->m_uiWidth;
+	cap->m_timescale = fs_per_pixel;
 
 	//Extract the single scanline we're interested in
 	//TODO: support a range of voltages
@@ -108,11 +112,7 @@ void HorizontalBathtub::Refresh()
 	size_t len = din->GetWidth();
 	cap->Resize(len);
 	for(size_t i=0; i<len; i++)
-	{
-		cap->m_offsets[i] = i*fs_per_pixel - din->m_uiWidth;
-		cap->m_durations[i] = fs_per_pixel;
 		cap->m_samples[i] = row[i];
-	}
 
 	//Move from the center out and integrate BER
 	float sumleft = 0;
@@ -149,9 +149,5 @@ void HorizontalBathtub::Refresh()
 	}
 
 	SetData(cap, 0);
-
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

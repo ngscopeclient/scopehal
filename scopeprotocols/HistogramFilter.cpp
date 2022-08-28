@@ -105,31 +105,31 @@ void HistogramFilter::ClearSweeps()
 void HistogramFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+
 	m_xAxisUnit = GetInput(0).GetYAxisUnits();
 
 	//Calculate min/max of the input data
-	float nmin = FLT_MAX;
-	float nmax = -FLT_MAX;
-	for(float v : din->m_samples)
-	{
-		nmin = min(nmin, v);
-		nmax = max(nmax, v);
-	}
+	float nmin = GetMinVoltage(sdin, udin);
+	float nmax = GetMaxVoltage(sdin, udin);
 
 	//Calculate bin count
-	auto cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
+	cap->PrepareForCpuAccess();
 
 	//If the signal is outside our current range, extend our range
 	bool reallocate = false;
 	float range = m_max - m_min;
-	if( (nmin < m_min) || (nmax > m_max) || (cap == NULL) )
+	if( (nmin < m_min) || (nmax > m_max) || (cap == nullptr) )
 	{
 		m_min = min(nmin, m_min);
 		m_max = max(nmax, m_max);
@@ -146,7 +146,7 @@ void HistogramFilter::Refresh()
 	//Calculate histogram for our incoming data
 	//For now, 100fs per bin target
 	size_t bins = ceil(range) / 100;
-	auto data = MakeHistogram(din, m_min, m_max, bins);
+	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
 
 	//Calculate bin configuration.
 	//Clip bin size to nearest ps (this will stop being a problem when we move to fs)
@@ -156,19 +156,15 @@ void HistogramFilter::Refresh()
 	if(reallocate)
 	{
 		//Reallocate our waveform
-		cap = new AnalogWaveform;
-		cap->m_timescale = 1;
+		cap = new UniformAnalogWaveform;
+		cap->m_timescale = binsize;
 		cap->m_startTimestamp = din->m_startTimestamp;
 		cap->m_startFemtoseconds = din->m_startFemtoseconds;
+		cap->m_triggerPhase = m_min;
 		SetData(cap, 0);
 
-		//Set up timestamps and initial values
-		for(size_t i=0; i<bins; i++)
-		{
-			cap->m_offsets.push_back(m_min + binsize*i);
-			cap->m_durations.push_back(binsize);
-			cap->m_samples.push_back(0);
-		}
+		cap->Resize(bins);
+		cap->PrepareForCpuAccess();
 
 		m_histogram.clear();
 		for(size_t i=0; i<bins; i++)
@@ -190,4 +186,6 @@ void HistogramFilter::Refresh()
 	vmax *= 1.05;
 	m_range = vmax + 2;
 	m_midpoint = m_range/2;
+
+	cap->MarkModifiedFromCpu();
 }

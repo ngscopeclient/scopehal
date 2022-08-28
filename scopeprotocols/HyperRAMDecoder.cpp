@@ -86,12 +86,34 @@ void HyperRAMDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto csn = GetDigitalInputWaveform(1);
-	auto rwds = GetDigitalInputWaveform(2);
-	vector<DigitalWaveform*> data;
+	auto clk = GetInputWaveform(0);
+	auto csn = GetInputWaveform(1);
+	auto rwds = GetInputWaveform(2);
+	vector<WaveformBase*> data;
 	for (int i = 0; i < 8; i++)
-		data.push_back(GetDigitalInputWaveform(i + 3));
+		data.push_back(GetInputWaveform(i + 3));
+
+	//Prepare inputs
+	clk->PrepareForCpuAccess();
+	csn->PrepareForCpuAccess();
+	rwds->PrepareForCpuAccess();
+	for (int i = 0; i < 8; i++)
+		data[i]->PrepareForCpuAccess();
+
+	//Inputs can be sparse or uniform
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clk);
+	auto scsn = dynamic_cast<SparseDigitalWaveform*>(csn);
+	auto srwds = dynamic_cast<SparseDigitalWaveform*>(rwds);
+	vector<SparseDigitalWaveform*> sdata;
+	for (int i = 0; i < 8; i++)
+		sdata.push_back(dynamic_cast<SparseDigitalWaveform*>(data[i]));
+
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clk);
+	auto ucsn = dynamic_cast<UniformDigitalWaveform*>(csn);
+	auto urwds = dynamic_cast<UniformDigitalWaveform*>(rwds);
+	vector<UniformDigitalWaveform*> udata;
+	for (int i = 0; i < 8; i++)
+		udata.push_back(dynamic_cast<UniformDigitalWaveform*>(data[i]));
 
 	//Create the capture
 	auto cap = new HyperRAMWaveform;
@@ -99,6 +121,7 @@ void HyperRAMDecoder::Refresh()
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	enum
 	{
@@ -134,20 +157,20 @@ void HyperRAMDecoder::Refresh()
 	int64_t ca_byte     = 0;
 	int64_t clk_time    = 0;
 	int64_t last_clk    = 0;
-	bool last_clkval	= clk->m_samples[0];
+	bool last_clkval	= GetValue(sclk, uclk, 0);
 
-	size_t clklen = clk->m_samples.size();
-	size_t cslen = csn->m_samples.size();
-	size_t rwdslen = rwds->m_samples.size();
+	size_t clklen = clk->size();
+	size_t cslen = csn->size();
+	size_t rwdslen = rwds->size();
 
 	while(true)
 	{
 		//Get the current samples
-		bool cur_cs = csn->m_samples[ics];
-		bool cur_rwds = rwds->m_samples[irwds];
+		bool cur_cs = GetValue(scsn, ucsn, ics);
+		bool cur_rwds = GetValue(srwds, urwds, irwds);
 		uint8_t cur_data = 0;
 		for (int i = 0; i < 8; i++)
-			cur_data |= data[i]->m_samples[idata[i]] << i;
+			cur_data |= GetValue(sdata[i], udata[i], idata[i]) << i;
 
 		auto deselect = [&]()
 		{
@@ -265,8 +288,8 @@ void HyperRAMDecoder::Refresh()
 				{
 					// The symbol should continue until the next RWDS edge in this transaction, if available.
 					// The final symbol may not have an RWDS edge after it, so use clk_time in that case.
-					auto next_rwds = GetNextEventTimestampScaled(rwds, irwds, rwdslen, timestamp);
-					auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
+					auto next_rwds = GetNextEventTimestampScaled(srwds, urwds, irwds, rwdslen, timestamp);
+					auto next_cs = GetNextEventTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
 					auto duration = next_rwds - timestamp;
 					if (next_rwds == timestamp || next_rwds > next_cs)
 						duration = clk_time;
@@ -287,8 +310,8 @@ void HyperRAMDecoder::Refresh()
 				}
 				else if (event_type == EVENT_CLK)
 				{
-					auto next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
-					auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
+					auto next_clk = GetNextEventTimestampScaled(sclk, uclk, iclk, clklen, timestamp);
+					auto next_cs = GetNextEventTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
 					auto sym_end = timestamp + (next_clk - timestamp) / 2;
 					if (next_clk == timestamp || next_clk > next_cs)
 						sym_end = timestamp + clk_time/2;
@@ -303,9 +326,9 @@ void HyperRAMDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		auto next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
-		auto next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
-		auto next_rwds = GetNextEventTimestampScaled(rwds, irwds, rwdslen, timestamp);
+		auto next_cs = GetNextEventTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
+		auto next_clk = GetNextEventTimestampScaled(sclk, uclk, iclk, clklen, timestamp);
+		auto next_rwds = GetNextEventTimestampScaled(srwds, urwds, irwds, rwdslen, timestamp);
 
 		// Find soonest event
 		auto next_timestamp = next_cs;
@@ -326,15 +349,15 @@ void HyperRAMDecoder::Refresh()
 			break;
 
 		timestamp = next_timestamp;
-		AdvanceToTimestampScaled(csn, ics, cslen, timestamp);
-		AdvanceToTimestampScaled(clk, iclk, clklen, timestamp);
-		AdvanceToTimestampScaled(rwds, irwds, rwdslen, timestamp);
+		AdvanceToTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
+		AdvanceToTimestampScaled(sclk, uclk, iclk, clklen, timestamp);
+		AdvanceToTimestampScaled(srwds, urwds, irwds, rwdslen, timestamp);
 
 		// Keep track of the time between clock edges
 		if (event_type == EVENT_CLK)
 		{
 			//See if we actually have a toggle. If not, this is a no-op event
-			bool clkval = clk->m_samples[iclk];
+			bool clkval = GetValue(sclk, uclk, iclk);
 			if(clkval == last_clkval)
 				event_type = EVENT_NONE;
 			else
@@ -353,10 +376,11 @@ void HyperRAMDecoder::Refresh()
 		if (state == STATE_READ && event_type == EVENT_RWDS)
 			data_timestamp += clk_time / 2;
 		for (int i = 0; i < 8; i++)
-			AdvanceToTimestampScaled(data[i], idata[i], data[i]->m_samples.size(), data_timestamp);
+			AdvanceToTimestampScaled(sdata[i], udata[i], idata[i], data[i]->size(), data_timestamp);
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
