@@ -82,28 +82,36 @@ void OneWireDecoder::Refresh()
 	}
 
 	//Set up the output waveform
-	auto din = GetDigitalInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
+
 	auto cap = new OneWireWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	//Get timestamps and durations of all low-going pulses
 	vector<int64_t> starts;
 	vector<int64_t> lens;
-	size_t len = din->m_samples.size();
+	size_t len = din->size();
 	bool last = true;
 	int64_t tstart = 0;
 	for(size_t i=0; i<len; i++)
 	{
+		bool v = GetValue(sdin, udin, i);
+
 		//High? See if a pulse ended
-		if(din->m_samples[i])
+		if(v)
 		{
 			if(!last)
 			{
 				starts.push_back(tstart);
-				lens.push_back(din->m_offsets[i] + din->m_durations[i] - tstart);
+				lens.push_back(::GetOffset(sdin, udin, i) + GetDuration(sdin, udin, i) - tstart);
 			}
 		}
 
@@ -111,10 +119,10 @@ void OneWireDecoder::Refresh()
 		else
 		{
 			if(last)
-				tstart = din->m_offsets[i];
+				tstart = ::GetOffset(sdin, udin, i);
 		}
 
-		last = din->m_samples[i];
+		last = v;
 	}
 
 	enum
@@ -263,6 +271,8 @@ void OneWireDecoder::Refresh()
 				break;
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color OneWireWaveform::GetColor(size_t i)

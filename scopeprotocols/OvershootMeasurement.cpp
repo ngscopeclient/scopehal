@@ -70,23 +70,28 @@ string OvershootMeasurement::GetProtocolName()
 void OvershootMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Figure out the nominal top of the waveform
-	float top = GetTopVoltage(din);
-	float base = GetBaseVoltage(din);
+	float top = GetTopVoltage(sdin, udin);
+	float base = GetBaseVoltage(sdin, udin);
 	float midpoint = (top+base)/2;
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
 
 	int64_t		tmax = 0;
 	float		vmax = 0;
@@ -95,14 +100,14 @@ void OvershootMeasurement::Refresh()
 	for(size_t i=0; i < len; i++)
 	{
 		//If we're below the midpoint, reset everything and add a new sample
-		float v = din->m_samples[i];
+		float v = GetValue(sdin, udin, i);
 		if(v < midpoint)
 		{
 			//Add a sample for the current value (if any)
 			if(tmax > 0)
 			{
 				//Update duration of the previous sample
-				size_t off = cap->m_offsets.size();
+				size_t off = cap->size();
 				if(off > 0)
 					cap->m_durations[off-1] = tmax - cap->m_offsets[off-1];
 
@@ -122,15 +127,12 @@ void OvershootMeasurement::Refresh()
 		{
 			if(v > vmax)
 			{
-				tmax = din->m_offsets[i];
+				tmax = ::GetOffset(sdin, udin, i);
 				vmax = v;
 			}
 		}
 	}
 	SetData(cap, 0);
 
-	//Copy start time etc from the input.
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }
