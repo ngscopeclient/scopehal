@@ -162,45 +162,42 @@ void PRBSGeneratorFilter::Refresh()
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
 	//Create the two output waveforms
-	DigitalWaveform* dat = dynamic_cast<DigitalWaveform*>(GetData(0));
+	auto dat = dynamic_cast<UniformDigitalWaveform*>(GetData(0));
 	if(!dat)
 	{
-		dat = new DigitalWaveform;
+		dat = new UniformDigitalWaveform;
 		SetData(dat, 0);
 	}
+	dat->PrepareForCpuAccess();
 	dat->m_timescale = samplePeriod;
 	dat->m_triggerPhase = 0;
 	dat->m_startTimestamp = floor(t);
 	dat->m_startFemtoseconds = fs;
-	dat->m_densePacked = true;
 	dat->Resize(depth);
 
-	DigitalWaveform* clk = dynamic_cast<DigitalWaveform*>(GetData(1));
+	auto clk = dynamic_cast<UniformDigitalWaveform*>(GetData(1));
 	if(!clk)
 	{
-		clk = new DigitalWaveform;
+		clk = new UniformDigitalWaveform;
 		SetData(clk, 1);
 	}
+	clk->PrepareForCpuAccess();
 	clk->m_timescale = samplePeriod;
 	clk->m_triggerPhase = samplePeriod / 2;
 	clk->m_startTimestamp = floor(t);
 	clk->m_startFemtoseconds = fs;
-	clk->m_densePacked = true;
 	clk->Resize(depth);
 
 	bool lastclk = false;
 	uint32_t prbs = rand();
 	for(size_t i=0; i<depth; i++)
 	{
-		//Fill clock
-		clk->m_offsets[i] = i;
-		clk->m_durations[i] = 1;
 		clk->m_samples[i] = lastclk;
 		lastclk = !lastclk;
 
-		//Fill data
-		dat->m_offsets[i] = i;
-		dat->m_durations[i] = 1;
 		dat->m_samples[i] = RunPRBS(prbs, poly);
 	}
+
+	clk->MarkModifiedFromCpu();
+	dat->MarkModifiedFromCpu();
 }

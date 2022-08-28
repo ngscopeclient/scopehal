@@ -77,7 +77,7 @@ void PeakHoldFilter::ClearSweeps()
 void PeakHoldFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
@@ -87,48 +87,94 @@ void PeakHoldFilter::Refresh()
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
 
 	//Create waveform if we don't have one already
-	size_t len = din->m_samples.size();
-	auto cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	size_t len = din->size();
 	bool first = false;
-	if(cap == NULL)
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	if(sdin)
 	{
-		cap = new AnalogWaveform;
-		cap->Resize(len);
-		SetData(cap, 0);
-		first = true;
+		auto cap = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
+		if(cap == NULL)
+		{
+			cap = new SparseAnalogWaveform;
+			cap->Resize(len);
+			SetData(cap, 0);
+			first = true;
+		}
+
+		//If sample size changed, clear it out
+		if(cap->size() != len)
+		{
+			cap->Resize(len);
+			first = true;
+		}
+
+		//Copy our time scales from the input
+		cap->m_timescale = din->m_timescale;
+		cap->m_startTimestamp = din->m_startTimestamp;
+		cap->m_startFemtoseconds = din->m_startFemtoseconds;
+
+		//Copy timestamps from the input
+		cap->CopyTimestamps(sdin);
+
+		//First waveform just copies the input
+		if(first)
+		{
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = sdin->m_samples[i];
+		}
+
+		//otherwise actually do peak holding
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = max((float)cap->m_samples[i], (float)sdin->m_samples[i]);
+		}
+
+		FindPeaks(cap);
 	}
-
-	//If sample size changed, clear it out
-	if(cap->m_samples.size() != len)
-	{
-		cap->Resize(len);
-		first = true;
-	}
-
-	//Copy timestamps from the input
-	cap->CopyTimestamps(din);
-
-	//First waveform just copies the input
-	if(first)
-	{
-		for(size_t i=0; i<len; i++)
-			cap->m_samples[i] = din->m_samples[i];
-	}
-
-	//otherwise actually do peak holding
 	else
 	{
-		for(size_t i=0; i<len; i++)
-			cap->m_samples[i] = max((float)cap->m_samples[i], (float)din->m_samples[i]);
+		auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
+		if(cap == NULL)
+		{
+			cap = new UniformAnalogWaveform;
+			cap->Resize(len);
+			SetData(cap, 0);
+			first = true;
+		}
+
+		//If sample size changed, clear it out
+		if(cap->size() != len)
+		{
+			cap->Resize(len);
+			first = true;
+		}
+
+		//Copy our time scales from the input
+		cap->m_timescale = din->m_timescale;
+		cap->m_startTimestamp = din->m_startTimestamp;
+		cap->m_startFemtoseconds = din->m_startFemtoseconds;
+
+		//First waveform just copies the input
+		if(first)
+		{
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = udin->m_samples[i];
+		}
+
+		//otherwise actually do peak holding
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = max((float)cap->m_samples[i], (float)udin->m_samples[i]);
+		}
+
+		FindPeaks(cap);
 	}
-
-	FindPeaks(cap);
-
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 }

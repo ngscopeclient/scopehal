@@ -92,10 +92,14 @@ void PAM4DemodulatorFilter::Refresh()
 	}
 
 	//Sample the input data
-	auto din = GetAnalogInputWaveform(0);
-	auto clk = GetDigitalInputWaveform(1);
-	AnalogWaveform samples;
-	SampleOnAnyEdgesWithInterpolation(din, clk, samples);
+	auto din = GetInputWaveform(0);
+	auto clk = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clk->PrepareForCpuAccess();
+
+	SparseAnalogWaveform samples;
+	SampleOnAnyEdgesBaseWithInterpolation(din, clk, samples);
+	samples.PrepareForCpuAccess();
 	size_t len = samples.m_samples.size();
 
 	//Get the thresholds
@@ -107,20 +111,20 @@ void PAM4DemodulatorFilter::Refresh()
 	};
 
 	//Create the captures
-	auto dcap = new DigitalWaveform;
+	auto dcap = new SparseDigitalWaveform;
 	dcap->m_timescale = 1;
 	dcap->m_startTimestamp = din->m_startTimestamp;
 	dcap->m_startFemtoseconds = din->m_startFemtoseconds;
 	dcap->m_triggerPhase = 0;
-	dcap->m_densePacked = false;
+	dcap->PrepareForCpuAccess();
 	SetData(dcap, 0);
 
-	auto ccap = new DigitalWaveform;
+	auto ccap = new SparseDigitalWaveform;
 	ccap->m_timescale = 1;
 	ccap->m_startTimestamp = din->m_startTimestamp;
 	ccap->m_startFemtoseconds = din->m_startFemtoseconds;
 	ccap->m_triggerPhase = 0;
-	ccap->m_densePacked = false;
+	ccap->PrepareForCpuAccess();
 	SetData(ccap, 1);
 
 	//Decode the input data, one symbol (two output bits) at a time
@@ -179,4 +183,7 @@ void PAM4DemodulatorFilter::Refresh()
 			dcap->m_samples[i*2 + 1] = 0;
 		}
 	}
+
+	ccap->MarkModifiedFromCpu();
+	dcap->MarkModifiedFromCpu();
 }

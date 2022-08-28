@@ -925,6 +925,42 @@ public:
 	}
 
 	/**
+		@brief Samples an analog waveform on all edges of a clock, interpolating linearly to get sub-sample accuracy.
+
+		The sampling rate of the data and clock signals need not be equal or uniform.
+
+		The sampled waveform is sparse and has a time scale in femtoseconds,
+		regardless of the incoming waveform's time scale and sampling uniformity.
+
+		@param data		The data signal to sample. Can be be sparse or uniform of any type.
+		@param clock	The clock signal to use. Must be sparse or uniform digital.
+		@param samples	Output waveform. Must be sparse and same data type as data.
+	 */
+	template<class T>
+	__attribute__((noinline))
+	static void SampleOnAnyEdgesBaseWithInterpolation(WaveformBase* data, WaveformBase* clock, SparseWaveform<T>& samples)
+	{
+		data->PrepareForCpuAccess();
+		clock->PrepareForCpuAccess();
+		samples.PrepareForCpuAccess();
+
+		auto udata = dynamic_cast<UniformWaveform<T>*>(data);
+		auto sdata = dynamic_cast<SparseWaveform<T>*>(data);
+
+		auto uclock = dynamic_cast<UniformDigitalWaveform*>(clock);
+		auto sclock = dynamic_cast<SparseDigitalWaveform*>(clock);
+
+		if(udata && uclock)
+			SampleOnAnyEdgesWithInterpolation(udata, uclock, samples);
+		else if(udata && sclock)
+			SampleOnAnyEdgesWithInterpolation(udata, sclock, samples);
+		else if(sdata && sclock)
+			SampleOnAnyEdgesWithInterpolation(sdata, sclock, samples);
+		else if(sdata && uclock)
+			SampleOnAnyEdgesWithInterpolation(sdata, uclock, samples);
+	}
+
+	/**
 		@brief Prepares a sparse or uniform analog waveform for CPU access
 	 */
 	template<class T>
@@ -975,6 +1011,15 @@ public:
 			FindFallingEdges(sdata, edges);
 		else
 			FindFallingEdges(udata, edges);
+	}
+
+	static void FindZeroCrossings(
+		SparseAnalogWaveform* sdata, UniformAnalogWaveform* udata, float threshold, std::vector<int64_t>& edges)
+	{
+		if(sdata)
+			FindZeroCrossings(sdata, threshold, edges);
+		else
+			FindZeroCrossings(udata, threshold, edges);
 	}
 
 	static void FindZeroCrossings(

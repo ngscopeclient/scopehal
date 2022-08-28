@@ -79,21 +79,24 @@ void PCIe128b130bDecoder::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new PCIe128b130bWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
-	DigitalWaveform data;
-	SampleOnAnyEdges(din, clkin, data);
+	SparseDigitalWaveform data;
+	SampleOnAnyEdgesBase(din, clkin, data);
 
 	//Look at each phase and figure out block alignment
-	size_t end = data.m_offsets.size() - 130;
+	size_t end = data.size() - 130;
 	size_t best_offset = 0;
 	size_t best_errors = end;
 	for(size_t offset=0; offset < 130; offset ++)
@@ -215,6 +218,7 @@ void PCIe128b130bDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color PCIe128b130bWaveform::GetColor(size_t i)

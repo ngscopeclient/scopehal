@@ -84,15 +84,16 @@ void ParallelBus::Refresh()
 	int width = m_parameters[m_widthname].GetIntVal();
 
 	//Make sure we have an input for each channel in use
-	vector<DigitalWaveform*> inputs;
+	vector<SparseDigitalWaveform*> inputs;
 	for(int i=0; i<width; i++)
 	{
-		auto din = GetDigitalInputWaveform(i);
+		auto din = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(i));
 		if(din == NULL)
 		{
 			SetData(NULL, 0);
 			return;
 		}
+		din->PrepareForCpuAccess();
 		inputs.push_back(din);
 	}
 	if(inputs.empty())
@@ -108,7 +109,8 @@ void ParallelBus::Refresh()
 
 	//Merge all of our samples
 	//TODO: handle variable sample rates etc
-	auto cap = new DigitalBusWaveform;
+	auto cap = new SparseDigitalBusWaveform;
+	cap->PrepareForCpuAccess();
 	cap->Resize(len);
 	cap->CopyTimestamps(inputs[0]);
 	#pragma omp parallel for
@@ -135,4 +137,6 @@ void ParallelBus::Refresh()
 			m_inputs[i].m_channel = NULL;
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }

@@ -91,12 +91,14 @@ void PCIeDataLinkDecoder::Refresh()
 		return;
 	}
 	auto data = dynamic_cast<PCIeLogicalWaveform*>(GetInputWaveform(0));
+	data->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new PCIeDataLinkWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	enum
@@ -621,6 +623,8 @@ void PCIeDataLinkDecoder::Refresh()
 				break;	//end STATE_END
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 /**

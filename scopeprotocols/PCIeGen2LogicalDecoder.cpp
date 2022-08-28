@@ -111,7 +111,11 @@ void PCIeGen2LogicalDecoder::Refresh()
 	ssize_t nports = m_parameters[m_portCountName].GetIntVal();
 	vector<IBM8b10bWaveform*> inputs;
 	for(ssize_t i=0; i<nports; i++)
-		inputs.push_back(dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(i)));
+	{
+		auto wfm = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(i));
+		inputs.push_back(wfm);
+		wfm->PrepareForCpuAccess();
+	}
 
 	if(nports == 0)
 	{
@@ -127,6 +131,7 @@ void PCIeGen2LogicalDecoder::Refresh()
 	cap->m_startTimestamp = in0->m_startTimestamp;
 	cap->m_startFemtoseconds = in0->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	//Find the first comma symbol in each lane so we can synchronize them to each other
 	//TODO: this might fail if we have a partial set of commas right at the start of the capture and there's a few symbols
@@ -316,6 +321,7 @@ void PCIeGen2LogicalDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)

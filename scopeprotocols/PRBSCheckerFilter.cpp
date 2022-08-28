@@ -127,10 +127,14 @@ void PRBSCheckerFilter::Refresh()
 
 	//Sample the input data stream
 	//TODO: allow single rate clocks too?
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
-	DigitalWaveform data;
-	SampleOnAnyEdges(din, clkin, data);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
+
+	SparseDigitalWaveform data;
+	data.PrepareForCpuAccess();
+	SampleOnAnyEdgesBase(din, clkin, data);
 
 	auto poly = static_cast<PRBSGeneratorFilter::Polynomials>(m_parameters[m_polyname].GetIntVal());
 
@@ -146,17 +150,9 @@ void PRBSCheckerFilter::Refresh()
 	}
 
 	//Create the output "error found" waveform
-	auto dout = dynamic_cast<DigitalWaveform*>(GetData(0));
-	if(!dout)
-	{
-		dout = new DigitalWaveform;
-		SetData(dout, 0);
-	}
+	auto dout = SetupEmptySparseDigitalOutputWaveform(din, 0);
+	dout->PrepareForCpuAccess();
 	dout->m_timescale = 1;
-	dout->m_triggerPhase = 0;
-	dout->m_startTimestamp = data.m_startTimestamp;
-	dout->m_startFemtoseconds = data.m_startFemtoseconds;
-	dout->m_densePacked = true;
 	dout->Resize(len);
 
 	//Read the first N bits of state into the seed
@@ -179,4 +175,6 @@ void PRBSCheckerFilter::Refresh()
 		bool value = PRBSGeneratorFilter::RunPRBS(prbs, poly);
 		dout->m_samples[i] = (value != data.m_samples[i]);
 	}
+
+	dout->MarkModifiedFromCpu();
 }

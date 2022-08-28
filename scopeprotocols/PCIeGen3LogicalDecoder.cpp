@@ -88,7 +88,11 @@ void PCIeGen3LogicalDecoder::Refresh()
 	ssize_t nports = m_parameters[m_portCountName].GetIntVal();
 	vector<PCIe128b130bWaveform*> inputs;
 	for(ssize_t i=0; i<nports; i++)
-		inputs.push_back(dynamic_cast<PCIe128b130bWaveform*>(GetInputWaveform(i)));
+	{
+		auto din = dynamic_cast<PCIe128b130bWaveform*>(GetInputWaveform(i));
+		inputs.push_back(din);
+		din->PrepareForCpuAccess();
+	}
 
 	if(nports == 0)
 	{
@@ -104,6 +108,7 @@ void PCIeGen3LogicalDecoder::Refresh()
 	cap->m_startTimestamp = in0->m_startTimestamp;
 	cap->m_startFemtoseconds = in0->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	//Find the first skip ordered set in each lane so we can synchronize them to each other
 	//TODO: this might fail if we have a partial set of SOS's right at the start of the capture and there's a few
@@ -475,6 +480,7 @@ void PCIeGen3LogicalDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 /**

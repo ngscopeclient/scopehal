@@ -85,18 +85,23 @@ string PhaseMeasurement::GetProtocolName()
 void PhaseMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	float vmax = GetTopVoltage(din);
-	float vmin = GetBaseVoltage(din);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	float vmax = GetTopVoltage(sdin, udin);
+	float vmin = GetBaseVoltage(sdin, udin);
 	float vavg = (vmax + vmin) / 2;
 	vector<int64_t> edges;
-	FindZeroCrossings(din, vavg, edges);
+	FindZeroCrossings(sdin, udin, vavg, edges);
 	size_t edgelen = edges.size();
 
 	//Auto: use median of interval between pairs of zero crossings
@@ -121,11 +126,11 @@ void PhaseMeasurement::Refresh()
 
 	//Create the output
 	size_t outlen = edgelen/2;
-	auto cap = SetupEmptyOutputWaveform(din, 0, true);
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
 	cap->m_triggerPhase = 1;
 	cap->Resize(outlen);
-	cap->m_densePacked = false;
 
 	//Main measurement loop, update once per cycle at the zero crossing.
 	//This isn't quite as nice as the original implementation measuring instantaneous phase within a single cycle,
@@ -149,4 +154,6 @@ void PhaseMeasurement::Refresh()
 		if(i > 0)
 			cap->m_durations[i-1] = tnow - cap->m_offsets[i-1];
 	}
+
+	cap->MarkModifiedFromCpu();
 }

@@ -85,12 +85,14 @@ void PCIeTransportDecoder::Refresh()
 		return;
 	}
 	auto data = dynamic_cast<PCIeDataLinkWaveform*>(GetInputWaveform(0));
+	data->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new PCIeTransportWaveform;
 	cap->m_timescale = data->m_timescale;
 	cap->m_startTimestamp = data->m_startTimestamp;
 	cap->m_startFemtoseconds = data->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	enum
@@ -905,6 +907,8 @@ void PCIeTransportDecoder::Refresh()
 				break;
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color PCIeTransportWaveform::GetColor(size_t i)
