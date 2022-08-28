@@ -96,8 +96,15 @@ void QuadratureDecoder::Refresh()
 		return;
 	}
 
-	auto a = GetDigitalInputWaveform(0);
-	auto b = GetDigitalInputWaveform(1);
+	auto a = GetInputWaveform(0);
+	auto b = GetInputWaveform(1);
+	a->PrepareForCpuAccess();
+	b->PrepareForCpuAccess();
+
+	auto sa = dynamic_cast<SparseDigitalWaveform*>(a);
+	auto sb = dynamic_cast<SparseDigitalWaveform*>(b);
+	auto ua = dynamic_cast<UniformDigitalWaveform*>(a);
+	auto ub = dynamic_cast<UniformDigitalWaveform*>(b);
 
 	float phase_per_pulse = 360 / m_parameters[m_pulseratename].GetFloatVal();
 
@@ -107,10 +114,8 @@ void QuadratureDecoder::Refresh()
 	int64_t debounce_samples = debounce_fs / a->m_timescale;
 
 	//Create the output waveform
-	auto cap = new AnalogWaveform;
-	cap->m_timescale = a->m_timescale;
-	cap->m_startTimestamp = a->m_startTimestamp;
-	cap->m_startFemtoseconds = a->m_startFemtoseconds;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(a, 0);
+	cap->PrepareForCpuAccess();
 
 	//Seed with initial point at time zero
 	int64_t last_edge = 0;
@@ -121,8 +126,8 @@ void QuadratureDecoder::Refresh()
 	int64_t timestamp = 0;
 	size_t ia = 0;
 	size_t ib = 0;
-	size_t alen = a->m_offsets.size();
-	size_t blen = b->m_offsets.size();
+	size_t alen = a->size();
+	size_t blen = b->size();
 
 	float phase = 0;
 
@@ -134,18 +139,18 @@ void QuadratureDecoder::Refresh()
 		STATE_B_HIGH
 	} state = STATE_BOTH_LOW;
 
-	if(a->m_samples[0] && b->m_samples[0])
+	if(GetValue(sa, ua, 0) && GetValue(sb, ub, 0))
 		state = STATE_BOTH_HIGH;
 
 	while(true)
 	{
-		bool ca = a->m_samples[ia];
-		bool cb = b->m_samples[ib];
+		bool ca = GetValue(sa, ua, ia);
+		bool cb = GetValue(sb, ub, ib);
 
 		//TODO: add mode to say look for both edges or only rising
 
 		//Lagging phase
-		size_t ilast = cap->m_durations.size() - 1;
+		size_t ilast = cap->size() - 1;
 		bool edge = false;
 		bool phase_positive = true;
 
@@ -266,14 +271,14 @@ void QuadratureDecoder::Refresh()
 
 		//Get timestamps of next event on each channel.
 		//If we can't move forward, stop.
-		int64_t next_a = GetNextEventTimestamp(a, ia, alen, timestamp);
-		int64_t next_b = GetNextEventTimestamp(b, ib, blen, timestamp);
+		int64_t next_a = GetNextEventTimestamp(sa, ua, ia, alen, timestamp);
+		int64_t next_b = GetNextEventTimestamp(sb, ub, ib, blen, timestamp);
 		int64_t next_timestamp = min(next_a, next_b);
 		if(next_timestamp == timestamp)
 			break;
 		timestamp = next_timestamp;
-		AdvanceToTimestamp(a, ia, alen, timestamp);
-		AdvanceToTimestamp(b, ib, blen, timestamp);
+		AdvanceToTimestamp(sa, ua, ia, alen, timestamp);
+		AdvanceToTimestamp(sb, ub, ib, blen, timestamp);
 	}
 
 	//If less than 2 samples, stop

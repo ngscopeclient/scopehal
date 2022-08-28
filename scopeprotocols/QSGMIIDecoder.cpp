@@ -95,7 +95,8 @@ void QSGMIIDecoder::Refresh()
 
 	//Get the input waveform
 	auto din = dynamic_cast<IBM8b10bWaveform*>(GetInputWaveform(0));
-	size_t len = din->m_offsets.size();
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
 
 	//Create the captures
 	//Output is time aligned with the input
@@ -108,7 +109,7 @@ void QSGMIIDecoder::Refresh()
 		cap->m_startTimestamp = din->m_startTimestamp;
 		cap->m_startFemtoseconds = din->m_startFemtoseconds;
 		cap->m_triggerPhase = 0;
-		cap->m_densePacked = false;
+		cap->PrepareForCpuAccess();
 
 		caps.push_back(cap);
 
@@ -155,4 +156,7 @@ void QSGMIIDecoder::Refresh()
 		else
 			caps[nlane]->m_durations.push_back(din->m_offsets[i+4] - din->m_offsets[i]);
 	}
+
+	for(size_t i=0; i<4; i++)
+		caps[i]->MarkModifiedFromCpu();
 }

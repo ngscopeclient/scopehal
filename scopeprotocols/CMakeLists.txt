@@ -101,11 +101,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	PkPkMeasurement.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
-	ReferencePlaneExtensionFilter.cpp
-	RjBUjFilter.cpp
-	QuadratureDecoder.cpp
 	QSGMIIDecoder.cpp
 	QSPIDecoder.cpp
+	QuadratureDecoder.cpp
+	ReferencePlaneExtensionFilter.cpp
+	RjBUjFilter.cpp
 	RiseMeasurement.cpp
     ScaleFilter.cpp
 	SDCmdDecoder.cpp
