@@ -96,19 +96,23 @@ void IBM8b10bDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new IBM8b10bWaveform(m_parameters[m_displayformat]);
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
 	//TODO: allow single rate clocks too?
-	DigitalWaveform data;
-	SampleOnAnyEdges(din, clkin, data);
+	SparseDigitalWaveform data;
+	SampleOnAnyEdgesBase(din, clkin, data);
+	data.PrepareForCpuAccess();
 
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
@@ -369,6 +373,7 @@ void IBM8b10bDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color IBM8b10bWaveform::GetColor(size_t i)

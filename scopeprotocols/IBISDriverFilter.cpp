@@ -153,10 +153,12 @@ void IBISDriverFilter::Refresh()
 	}
 
 	//Get the input and sample it
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
-	DigitalWaveform samples;
-	SampleOnAnyEdges(din, clkin, samples);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
+	SparseDigitalWaveform samples;
+	SampleOnAnyEdgesBase(din, clkin, samples);
 
 	size_t rate = m_parameters[m_sampleRate].GetIntVal();
 	if(rate == 0)
@@ -167,9 +169,8 @@ void IBISDriverFilter::Refresh()
 	size_t samplePeriod = FS_PER_SECOND / rate;
 
 	//Configure output waveform
-	auto cap = SetupEmptyOutputWaveform(din, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_timescale = samplePeriod;
-	cap->m_densePacked = true;
 
 	//Round length to integer number of complete cycles
 	size_t len = samples.m_samples.size();
@@ -230,10 +231,6 @@ void IBISDriverFilter::Refresh()
 	size_t iedge = 0;
 	for(size_t i=0; i<caplen; i++)
 	{
-		//Default fill of timestamps etc
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
-
 		//Timestamp of the current output sample
 		int64_t tnow = cap->m_timescale*i + cap->m_triggerPhase;
 
@@ -265,4 +262,6 @@ void IBISDriverFilter::Refresh()
 			v = falling.InterpolateVoltage(corner, rel_sec);
 		cap->m_samples[i] = v;
 	}
+
+	cap->MarkModifiedFromCpu();
 }

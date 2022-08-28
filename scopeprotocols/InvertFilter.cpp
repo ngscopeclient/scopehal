@@ -78,19 +78,41 @@ void InvertFilter::SetDefaultName()
 void InvertFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	size_t len = din->size();
 
-	//Negate each sample
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
-	float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	float* a = (float*)__builtin_assume_aligned(&din->m_samples[0], 16);
-	for(size_t i=0; i<len; i++)
-		out[i] = -a[i];
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+
+	if(sdin)
+	{
+		//Negate each sample
+		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
+		cap->PrepareForCpuAccess();
+		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+		float* a = (float*)__builtin_assume_aligned(&sdin->m_samples[0], 16);
+		for(size_t i=0; i<len; i++)
+			out[i] = -a[i];
+
+		cap->MarkModifiedFromCpu();
+	}
+	else if(udin)
+	{
+		//Negate each sample
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+		float* a = (float*)__builtin_assume_aligned(&udin->m_samples[0], 16);
+		for(size_t i=0; i<len; i++)
+			out[i] = -a[i];
+
+		cap->MarkModifiedFromCpu();
+	}
 }

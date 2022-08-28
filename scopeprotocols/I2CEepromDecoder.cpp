@@ -130,6 +130,7 @@ void I2CEepromDecoder::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
+	din->PrepareForCpuAccess();
 
 	//Pull out our settings
 	uint8_t base_addr = m_parameters[m_baseaddrname].GetIntVal() | m_parameters[m_addrpinname].GetIntVal();
@@ -144,6 +145,7 @@ void I2CEepromDecoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Mask for device address
 	uint8_t base_mask;
@@ -498,6 +500,7 @@ void I2CEepromDecoder::Refresh()
 		delete pack;
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color I2CEepromWaveform::GetColor(size_t i)

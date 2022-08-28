@@ -82,7 +82,8 @@ void ISIMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
 	float* table = ddj->GetDDJTable();
 
@@ -115,12 +116,10 @@ void ISIMeasurement::Refresh()
 
 	float isi = max(rising_pp, falling_pp);
 
-	auto cap = new AnalogWaveform;
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(1);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->m_samples.push_back(isi);
 	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }

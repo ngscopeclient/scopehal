@@ -78,10 +78,12 @@ void IPv4Decoder::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<EthernetWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 	size_t len = din->m_samples.size();
 
 	//Loop over the events and process stuff
 	auto cap = new IPv4Waveform;
+	cap->PrepareForCpuAccess();
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
@@ -400,6 +402,7 @@ void IPv4Decoder::Refresh()
 	//TODO: packet decode too
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color IPv4Waveform::GetColor(size_t i)
