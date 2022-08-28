@@ -77,22 +77,27 @@ string NoiseFilter::GetProtocolName()
 void NoiseFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
 
 	float stdev = m_parameters[m_stdevname].GetFloatVal();
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	cap->Resize(len);
+	cap->PrepareForCpuAccess();
 
 	if(g_hasAvx2)
 		CopyWithAwgnAVX2((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
 	else
 		CopyWithAwgnNative((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
+
+	cap->MarkModifiedFromCpu();
 }
 
 void NoiseFilter::CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma)
