@@ -91,8 +91,10 @@ void MDIODecoder::Refresh()
 	}
 
 	//Get the input data
-	auto mdio = GetDigitalInputWaveform(0);
-	auto mdc = GetDigitalInputWaveform(1);
+	auto mdio = GetInputWaveform(0);
+	auto mdc = GetInputWaveform(1);
+	mdio->PrepareForCpuAccess();
+	mdc->PrepareForCpuAccess();
 
 	int phytype = m_parameters[m_typename].GetIntVal();
 
@@ -101,14 +103,15 @@ void MDIODecoder::Refresh()
 	cap->m_timescale = 1;	//SampleOnRisingEdges() gives us fs level timestamps
 	cap->m_startTimestamp = mdc->m_startTimestamp;
 	cap->m_startFemtoseconds = mdc->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Maintain MMD state across transactions
 	int mmd_dev = 0;
 	bool mmd_is_reg = false;
 
 	//Sample the data stream at each clock edge
-	DigitalWaveform dmdio;
-	SampleOnRisingEdges(mdio, mdc, dmdio);
+	SparseDigitalWaveform dmdio;
+	SampleOnRisingEdgesBase(mdio, mdc, dmdio);
 	size_t dlen = dmdio.m_samples.size();
 	for(size_t i=0; i<dlen; i++)
 	{
@@ -605,6 +608,7 @@ void MDIODecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 vector<string> MDIODecoder::GetHeaders()

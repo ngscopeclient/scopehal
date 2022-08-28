@@ -72,15 +72,16 @@ string MovingAverageFilter::GetProtocolName()
 
 void MovingAverageFilter::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
 	size_t depth = m_parameters[m_depthname].GetIntVal();
 	if(len < depth)
 	{
@@ -91,27 +92,52 @@ void MovingAverageFilter::Refresh()
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
-	//Do the average
-	auto cap = new AnalogWaveform;
-	size_t nsamples = len - depth;
 	size_t off = depth/2;
-	cap->Resize(nsamples);
-	//#pragma omp parallel for
-	for(size_t i=0; i<nsamples; i++)
+	size_t nsamples = len - 2*off;
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	if(sdin)
 	{
-		float v = 0;
-		for(size_t j=0; j<depth; j++)
-			v += din->m_samples[i+j];
-		v /= depth;
+		//Do the average
+		auto cap = SetupSparseOutputWaveform(sdin, 0, off, off);
+		cap->PrepareForCpuAccess();
 
-		cap->m_offsets[i] = din->m_offsets[i+off];
-		cap->m_durations[i] = din->m_durations[i+off];
-		cap->m_samples[i] = v;
+		//#pragma omp parallel for
+		for(size_t i=0; i<nsamples; i++)
+		{
+			float v = 0;
+			for(size_t j=0; j<depth; j++)
+				v += sdin->m_samples[i+j];
+			v /= depth;
+
+			cap->m_offsets[i] = sdin->m_offsets[i+off];
+			cap->m_durations[i] = sdin->m_durations[i+off];
+			cap->m_samples[i] = v;
+		}
+		SetData(cap, 0);
+
+		cap->MarkModifiedFromCpu();
 	}
-	SetData(cap, 0);
+	else
+	{
+		//Do the average
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+		cap->PrepareForCpuAccess();
+		cap->Resize(nsamples);
+		//#pragma omp parallel for
+		for(size_t i=0; i<nsamples; i++)
+		{
+			float v = 0;
+			for(size_t j=0; j<depth; j++)
+				v += udin->m_samples[i+j];
+			v /= depth;
 
-	//Copy our time scales from the input
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+			cap->m_samples[i] = v;
+		}
+		SetData(cap, 0);
+
+		cap->MarkModifiedFromCpu();
+	}
 }

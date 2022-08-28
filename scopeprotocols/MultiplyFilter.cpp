@@ -71,29 +71,56 @@ string MultiplyFilter::GetProtocolName()
 void MultiplyFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto a = GetAnalogInputWaveform(0);
-	auto b = GetAnalogInputWaveform(1);
-	auto len = min(a->m_samples.size(), b->m_samples.size());
+	auto a = GetInputWaveform(0);
+	auto b = GetInputWaveform(1);
+	auto len = min(a->size(), b->size());
+	a->PrepareForCpuAccess();
+	b->PrepareForCpuAccess();
 
 	//Multiply the units
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
 
-	//Set up the output waveform
-	auto cap = SetupOutputWaveform(a, 0, 0, 0);
-	cap->m_samples.resize(len);
-	cap->m_offsets.resize(len);
-	cap->m_durations.resize(len);
+	//Type conversion
+	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
+	auto sb = dynamic_cast<SparseAnalogWaveform*>(b);
+	auto ua = dynamic_cast<UniformAnalogWaveform*>(a);
+	auto ub = dynamic_cast<UniformAnalogWaveform*>(b);
 
-	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
-	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
-	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
-	for(size_t i=0; i<len; i++)
-		fdst[i] = fa[i] * fb[i];
+	if(sa && sb)
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sa, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fa = (float*)__builtin_assume_aligned(sa->m_samples.GetCpuPointer(), 16);
+		float* fb = (float*)__builtin_assume_aligned(sb->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fa[i] * fb[i];
+
+		cap->MarkModifiedFromCpu();
+	}
+	else if(ua && ub)
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(sa, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fa = (float*)__builtin_assume_aligned(ua->m_samples.GetCpuPointer(), 16);
+		float* fb = (float*)__builtin_assume_aligned(ub->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fa[i] * fb[i];
+
+		cap->MarkModifiedFromCpu();
+	}
 }

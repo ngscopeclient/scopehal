@@ -130,6 +130,8 @@ void MultimeterTrendFilter::OnDataReady(double prival, double secval)
 
 void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, double now)
 {
+	wfm->PrepareForCpuAccess();
+
 	//Remove old samples
 	size_t nmax = 4096;
 	while(wfm->m_samples.size() > nmax)
@@ -161,4 +163,6 @@ void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, d
 	len = wfm->m_samples.size();
 	for(size_t i=0; i<len; i++)
 		wfm->m_offsets[i] -= dt;
+
+	wfm->MarkModifiedFromCpu();
 }

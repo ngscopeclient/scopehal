@@ -84,14 +84,18 @@ void MilStd1553Decoder::Refresh()
 	ClearPackets();
 
 	//Get the input data
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Copy our time scales from the input
 	auto cap = new MilStd1553Waveform;
@@ -100,6 +104,7 @@ void MilStd1553Decoder::Refresh()
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = din->m_triggerPhase;
 	SetData(cap, 0);
+	cap->PrepareForCpuAccess();
 
 	enum
 	{
@@ -151,18 +156,18 @@ void MilStd1553Decoder::Refresh()
 	Packet* pack = NULL;
 	for(size_t i=0; i<len; i++)
 	{
-		int64_t timestamp = din->m_offsets[i];
+		int64_t timestamp = ::GetOffset(sdin, udin, i);
 		int64_t duration = timestamp - tbitstart;
 
 		//Determine the current line state
 		bool current_bit = last_bit;
 		bool valid = false;
-		if(din->m_samples[i] > high)
+		if(GetValue(sdin, udin, i) > high)
 		{
 			current_bit = true;
 			valid = true;
 		}
-		else if(din->m_samples[i] < low)
+		else if(GetValue(sdin, udin, i) < low)
 		{
 			current_bit = false;
 			valid = true;
@@ -671,6 +676,8 @@ void MilStd1553Decoder::Refresh()
 
 		last_bit = current_bit;
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color MilStd1553Waveform::GetColor(size_t i)
