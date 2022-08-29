@@ -92,12 +92,14 @@ void SWDMemAPDecoder::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
+	din->PrepareForCpuAccess();
 
 	//Set up output
 	auto cap = new SWDMemAPWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Main decode loop
 	SWDMemAPSymbol samp;
@@ -336,6 +338,8 @@ void SWDMemAPDecoder::Refresh()
 		delete pack;
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color SWDMemAPWaveform::GetColor(size_t /*i*/)

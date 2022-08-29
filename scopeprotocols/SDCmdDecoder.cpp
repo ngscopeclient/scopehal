@@ -89,11 +89,15 @@ void SDCmdDecoder::Refresh()
 	}
 
 	//Sample the input data
-	auto cmd = GetDigitalInputWaveform(0);
-	auto clk = GetDigitalInputWaveform(1);
-	DigitalWaveform dcmd;
-	SampleOnRisingEdges(cmd, clk, dcmd);
-	size_t len = dcmd.m_samples.size();
+	auto cmd = GetInputWaveform(0);
+	auto clk = GetInputWaveform(1);
+	cmd->PrepareForCpuAccess();
+	clk->PrepareForCpuAccess();
+
+	SparseDigitalWaveform dcmd;
+	dcmd.PrepareForCpuAccess();
+	SampleOnRisingEdgesBase(cmd, clk, dcmd);
+	size_t len = dcmd.size();
 
 	//Create the capture
 	auto cap = new SDCmdWaveform(m_parameters[m_cardtypename]);
@@ -368,6 +372,8 @@ void SDCmdDecoder::Refresh()
 
 	if(pack)
 		delete pack;
+
+	cap->MarkModifiedFromCpu();
 }
 
 bool SDCmdDecoder::GetShowDataColumn()

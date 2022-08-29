@@ -80,12 +80,33 @@ public:
 	/**
 		@brief Creates an S-parameter vector from analog waveforms in dB / degree format
 	 */
-	template<class T>
-	SParameterVector(const T* wmag, const T* wang)
+	SParameterVector(const WaveformBase* wmag, const WaveformBase* wang)
 	{
-		AssertTypeIsAnalogWaveform(wmag);
-		AssertTypeIsAnalogWaveform(wang);
+		auto umag = dynamic_cast<const UniformAnalogWaveform*>(wmag);
+		auto smag = dynamic_cast<const SparseAnalogWaveform*>(wmag);
 
+		auto uang = dynamic_cast<const UniformAnalogWaveform*>(wang);
+		auto sang = dynamic_cast<const SparseAnalogWaveform*>(wang);
+
+		if(umag && uang)
+			ConvertFromWaveforms(umag, uang);
+		else
+			ConvertFromWaveforms(smag, sang);
+	}
+
+	/**
+		@brief Creates an S-parameter vector from analog waveforms in dB / degree format
+	 */
+	SParameterVector(const SparseAnalogWaveform* wmag, const SparseAnalogWaveform* wang)
+	{
+		ConvertFromWaveforms(wmag, wang);
+	}
+
+	/**
+		@brief Creates an S-parameter vector from analog waveforms in dB / degree format
+	 */
+	SParameterVector(const UniformAnalogWaveform* wmag, const UniformAnalogWaveform* wang)
+	{
 		ConvertFromWaveforms(wmag, wang);
 	}
 

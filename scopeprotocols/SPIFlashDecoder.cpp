@@ -140,6 +140,13 @@ void SPIFlashDecoder::Refresh()
 		return;
 	}
 
+	if(din)
+		din->PrepareForCpuAccess();
+	if(dout)
+		dout->PrepareForCpuAccess();
+	if(dquad)
+		dquad->PrepareForCpuAccess();
+
 	size_t iquad = 0;
 	size_t quadlen = 0;
 	if(dquad)
@@ -151,6 +158,7 @@ void SPIFlashDecoder::Refresh()
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = din->m_triggerPhase;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	//Number of address bytes used (for generic flash only, not W25N)
@@ -996,6 +1004,8 @@ void SPIFlashDecoder::Refresh()
 				break;
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color SPIFlashWaveform::GetColor(size_t i)

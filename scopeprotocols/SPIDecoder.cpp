@@ -83,9 +83,20 @@ void SPIDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto csn = GetDigitalInputWaveform(1);
-	auto data = GetDigitalInputWaveform(2);
+	auto clk = GetInputWaveform(0);
+	auto csn = GetInputWaveform(1);
+	auto data = GetInputWaveform(2);
+
+	clk->PrepareForCpuAccess();
+	csn->PrepareForCpuAccess();
+	data->PrepareForCpuAccess();
+
+	auto sclk = dynamic_cast<SparseDigitalWaveform*>(clk);
+	auto uclk = dynamic_cast<UniformDigitalWaveform*>(clk);
+	auto scsn = dynamic_cast<SparseDigitalWaveform*>(csn);
+	auto ucsn = dynamic_cast<UniformDigitalWaveform*>(csn);
+	auto sdata = dynamic_cast<SparseDigitalWaveform*>(data);
+	auto udata = dynamic_cast<UniformDigitalWaveform*>(data);
 
 	//Create the capture
 	auto cap = new SPIWaveform;
@@ -93,6 +104,7 @@ void SPIDecoder::Refresh()
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	//TODO: different cpha/cpol modes
 
@@ -118,16 +130,16 @@ void SPIDecoder::Refresh()
 
 	int64_t timestamp	= 0;
 
-	size_t clklen = clk->m_samples.size();
-	size_t cslen = csn->m_samples.size();
-	size_t datalen = data->m_samples.size();
+	size_t clklen = clk->size();
+	size_t cslen = csn->size();
+	size_t datalen = data->size();
 
 	while(true)
 	{
 		//Get the current samples
-		bool cur_cs = csn->m_samples[ics];
-		bool cur_clk = clk->m_samples[iclk];
-		bool cur_data = data->m_samples[idata];
+		bool cur_cs = GetValue(scsn, ucsn, ics);
+		bool cur_clk = GetValue(sclk, uclk, iclk);
+		bool cur_data = GetValue(sdata, udata, idata);
 
 		switch(state)
 		{
@@ -230,8 +242,8 @@ void SPIDecoder::Refresh()
 		}
 
 		//Get timestamps of next event on each channel
-		int64_t next_cs = GetNextEventTimestampScaled(csn, ics, cslen, timestamp);
-		int64_t next_clk = GetNextEventTimestampScaled(clk, iclk, clklen, timestamp);
+		int64_t next_cs = GetNextEventTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
+		int64_t next_clk = GetNextEventTimestampScaled(sclk, uclk, iclk, clklen, timestamp);
 
 		//If we can't move forward, stop (don't bother looking for glitches on data)
 		int64_t next_timestamp = min(next_clk, next_cs);
@@ -240,12 +252,14 @@ void SPIDecoder::Refresh()
 
 		//All good, move on
 		timestamp = next_timestamp;
-		AdvanceToTimestampScaled(csn, ics, cslen, timestamp);
-		AdvanceToTimestampScaled(clk, iclk, clklen, timestamp);
-		AdvanceToTimestampScaled(data, idata, datalen, timestamp);
+		AdvanceToTimestampScaled(scsn, ucsn, ics, cslen, timestamp);
+		AdvanceToTimestampScaled(sclk, uclk, iclk, clklen, timestamp);
+		AdvanceToTimestampScaled(sdata, udata, idata, datalen, timestamp);
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color SPIWaveform::GetColor(size_t i)

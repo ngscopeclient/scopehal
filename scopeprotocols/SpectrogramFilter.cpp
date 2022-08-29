@@ -169,23 +169,23 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
 void SpectrogramFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not a sliding window
-	size_t inlen = din->m_samples.size();
+	size_t inlen = din->size();
 	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
 	if(fftlen != m_cachedFFTLength)
 		ReallocateBuffers(fftlen);
 	size_t nblocks = inlen / fftlen;
 
 	//Figure out range of the FFTs
-	double fs_per_sample = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	double fs_per_sample = din->m_timescale;
 	float scale = 2.0 / fftlen;
 	double sample_ghz = 1e6 / fs_per_sample;
 	double bin_hz = round((0.5f * sample_ghz * 1e9f) / fftlen);
@@ -203,14 +203,14 @@ void SpectrogramFilter::Refresh()
 		nblocks,
 		nouts,
 		fmax,
-		din->m_offsets[0] * din->m_timescale,
+		din->m_triggerPhase,
 		fs_per_sample * nblocks * fftlen
 		);
+	cap->PrepareForCpuAccess();
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
 	cap->m_timescale = bin_hz;
-	cap->m_densePacked = true;
 	SetData(cap, 0);
 
 	//Run the FFTs
@@ -232,6 +232,8 @@ void SpectrogramFilter::Refresh()
 		else
 			ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 void SpectrogramFilter::ProcessSpectrumGeneric(

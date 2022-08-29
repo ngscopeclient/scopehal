@@ -90,31 +90,38 @@ void SDDataDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto data3 = GetDigitalInputWaveform(1);
-	auto data2 = GetDigitalInputWaveform(2);
-	auto data1 = GetDigitalInputWaveform(3);
-	auto data0 = GetDigitalInputWaveform(4);
+	auto clk = GetInputWaveform(0);
+	auto data3 = GetInputWaveform(1);
+	auto data2 = GetInputWaveform(2);
+	auto data1 = GetInputWaveform(3);
+	auto data0 = GetInputWaveform(4);
 	auto cmdbus = dynamic_cast<SDCmdDecoder*>(GetInput(5).m_channel);
 
+	clk->PrepareForCpuAccess();
+	data3->PrepareForCpuAccess();
+	data2->PrepareForCpuAccess();
+	data1->PrepareForCpuAccess();
+	data0->PrepareForCpuAccess();
+
 	//Sample the data
-	DigitalWaveform d0;
-	DigitalWaveform d1;
-	DigitalWaveform d2;
-	DigitalWaveform d3;
-	SampleOnRisingEdges(data0, clk, d0);
-	SampleOnRisingEdges(data1, clk, d1);
-	SampleOnRisingEdges(data2, clk, d2);
-	SampleOnRisingEdges(data3, clk, d3);
-	size_t len = min(d0.m_samples.size(), d1.m_samples.size());
-	len = min(len, d2.m_samples.size());
-	len = min(len, d3.m_samples.size());
+	SparseDigitalWaveform d0;
+	SparseDigitalWaveform d1;
+	SparseDigitalWaveform d2;
+	SparseDigitalWaveform d3;
+	SampleOnRisingEdgesBase(data0, clk, d0);
+	SampleOnRisingEdgesBase(data1, clk, d1);
+	SampleOnRisingEdgesBase(data2, clk, d2);
+	SampleOnRisingEdgesBase(data3, clk, d3);
+	size_t len = min(d0.size(), d1.size());
+	len = min(len, d2.size());
+	len = min(len, d3.size());
 
 	//Create the capture
 	auto cap = new SDDataWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	Packet* pack = NULL;
 	Packet* last_cmdbus_packet = NULL;
@@ -250,6 +257,8 @@ void SDDataDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color SDDataWaveform::GetColor(size_t i)

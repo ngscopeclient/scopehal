@@ -132,26 +132,29 @@ bool SParameterDeEmbedFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 void SParameterDeEmbedFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Use S11a magnitude as timebase reference for our output
-	auto base = GetAnalogInputWaveform(0);
+	auto base = GetInputWaveform(0);
+
+	for(size_t i=0; i<16; i++)
+		GetInputWaveform(i)->PrepareForCpuAccess();
 
 	//Combined network
-	SParameterVector s11c(GetAnalogInputWaveform(0), GetAnalogInputWaveform(1));
-	SParameterVector s12c(GetAnalogInputWaveform(2), GetAnalogInputWaveform(3));
-	SParameterVector s21c(GetAnalogInputWaveform(4), GetAnalogInputWaveform(5));
-	SParameterVector s22c(GetAnalogInputWaveform(6), GetAnalogInputWaveform(7));
+	SParameterVector s11c(GetInputWaveform(0), GetInputWaveform(1));
+	SParameterVector s12c(GetInputWaveform(2), GetInputWaveform(3));
+	SParameterVector s21c(GetInputWaveform(4), GetInputWaveform(5));
+	SParameterVector s22c(GetInputWaveform(6), GetInputWaveform(7));
 
 	//Known network
-	SParameterVector s11k(GetAnalogInputWaveform(8), GetAnalogInputWaveform(9));
-	SParameterVector s12k(GetAnalogInputWaveform(10), GetAnalogInputWaveform(11));
-	SParameterVector s21k(GetAnalogInputWaveform(12), GetAnalogInputWaveform(13));
-	SParameterVector s22k(GetAnalogInputWaveform(14), GetAnalogInputWaveform(15));
+	SParameterVector s11k(GetInputWaveform(8), GetInputWaveform(9));
+	SParameterVector s12k(GetInputWaveform(10), GetInputWaveform(11));
+	SParameterVector s21k(GetInputWaveform(12), GetInputWaveform(13));
+	SParameterVector s22k(GetInputWaveform(14), GetInputWaveform(15));
 
 	//Vectors for output
 	size_t npoints = s11c.size();
@@ -216,18 +219,27 @@ void SParameterDeEmbedFilter::Refresh()
 	}
 
 	//Waveforms for output
-	auto s11o_mag = SetupEmptyOutputWaveform(base, 0);
-	auto s11o_ang = SetupEmptyOutputWaveform(base, 1);
-	auto s12o_mag = SetupEmptyOutputWaveform(base, 2);
-	auto s12o_ang = SetupEmptyOutputWaveform(base, 3);
-	auto s21o_mag = SetupEmptyOutputWaveform(base, 4);
-	auto s21o_ang = SetupEmptyOutputWaveform(base, 5);
-	auto s22o_mag = SetupEmptyOutputWaveform(base, 6);
-	auto s22o_ang = SetupEmptyOutputWaveform(base, 7);
+	auto s11o_mag = SetupEmptySparseAnalogOutputWaveform(base, 0);
+	auto s11o_ang = SetupEmptySparseAnalogOutputWaveform(base, 1);
+	auto s12o_mag = SetupEmptySparseAnalogOutputWaveform(base, 2);
+	auto s12o_ang = SetupEmptySparseAnalogOutputWaveform(base, 3);
+	auto s21o_mag = SetupEmptySparseAnalogOutputWaveform(base, 4);
+	auto s21o_ang = SetupEmptySparseAnalogOutputWaveform(base, 5);
+	auto s22o_mag = SetupEmptySparseAnalogOutputWaveform(base, 6);
+	auto s22o_ang = SetupEmptySparseAnalogOutputWaveform(base, 7);
 
 	//Copy the output
 	s11o.ConvertToWaveforms(s11o_mag, s11o_ang);
 	s12o.ConvertToWaveforms(s12o_mag, s12o_ang);
 	s21o.ConvertToWaveforms(s21o_mag, s21o_ang);
 	s22o.ConvertToWaveforms(s22o_mag, s22o_ang);
+
+	s11o_mag->MarkModifiedFromCpu();
+	s11o_ang->MarkModifiedFromCpu();
+	s12o_mag->MarkModifiedFromCpu();
+	s12o_ang->MarkModifiedFromCpu();
+	s21o_mag->MarkModifiedFromCpu();
+	s21o_ang->MarkModifiedFromCpu();
+	s22o_mag->MarkModifiedFromCpu();
+	s22o_ang->MarkModifiedFromCpu();
 }

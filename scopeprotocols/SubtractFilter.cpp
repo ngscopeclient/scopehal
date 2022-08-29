@@ -87,20 +87,19 @@ string SubtractFilter::GetProtocolName()
 void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din_p = GetAnalogInputWaveform(0);
-	auto din_n = GetAnalogInputWaveform(1);
-
-	//We need offset/duration on the CPU for SetupOutputWaveform() to work
-	din_p->m_offsets.PrepareForCpuAccess();
-	din_n->m_offsets.PrepareForCpuAccess();
-	din_p->m_durations.PrepareForCpuAccess();
-	din_n->m_durations.PrepareForCpuAccess();
+	//Get inputs
+	auto din_p = GetInputWaveform(0);
+	auto din_n = GetInputWaveform(1);
+	auto sdin_p = dynamic_cast<SparseAnalogWaveform*>(din_p);
+	auto sdin_n = dynamic_cast<SparseAnalogWaveform*>(din_n);
+	auto udin_p = dynamic_cast<UniformAnalogWaveform*>(din_p);
+	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Set up units and complain if they're inconsistent
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
@@ -113,22 +112,42 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 	}
 
 	//We need meaningful data
-	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
+	size_t len = min(din_p->size(), din_n->size());
 
-	//Create the output and copy timestamps
-	auto cap = SetupOutputWaveform(din_p, 0, 0, 0);
+	//Setup output waveform
+	UniformAnalogWaveform* ucap = nullptr;
+	SparseAnalogWaveform* scap = nullptr;
+	if(sdin_p && sdin_n)
+		scap = SetupSparseOutputWaveform(sdin_p, 0, 0, 0);
+	else if(udin_p && udin_n)
+	{
+		ucap = SetupEmptyUniformAnalogOutputWaveform(sdin_p, 0);
+		ucap->Resize(len);
+	}
+
+	//Mixed sparse/uniform not allowed
+	else
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
 	//Special case if input units are degrees: we want to do modular arithmetic
 	//TODO: vectorized version of this
 	if(GetYAxisUnits(0) == Unit::UNIT_DEGREES)
 	{
 		//Waveform data must be on CPU
-		din_p->m_samples.PrepareForCpuAccess();
-		din_n->m_samples.PrepareForCpuAccess();
+		din_p->PrepareForCpuAccess();
+		din_n->PrepareForCpuAccess();
+		if(scap)
+			scap->PrepareForCpuAccess();
+		else
+			ucap->PrepareForCpuAccess();
 
-		float* out = (float*)&cap->m_samples[0];
-		float* a = (float*)&din_p->m_samples[0];
-		float* b = (float*)&din_n->m_samples[0];
+		float* out = scap ? scap->m_samples.GetCpuPointer() : ucap->m_samples.GetCpuPointer();
+		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
+		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
+
 		for(size_t i=0; i<len; i++)
 		{
 			out[i] 		= a[i] - b[i];
@@ -137,15 +156,28 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 			if(out[i] > 180)
 				out[i] -= 360;
 		}
+
+		if(scap)
+			scap->m_samples.MarkModifiedFromCpu();
+		else
+			ucap->m_samples.MarkModifiedFromCpu();
 	}
 
 	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
+		//Waveform data must be on GPU
+		din_p->PrepareForGpuAccess();
+		din_n->PrepareForGpuAccess();
+		if(scap)
+			scap->PrepareForGpuAccess();
+		else
+			ucap->PrepareForGpuAccess();
+
 		//Update our descriptor sets with current buffers
-		m_computePipeline.BindBuffer(0, din_p->m_samples);
-		m_computePipeline.BindBuffer(1, din_n->m_samples);
-		m_computePipeline.BindBuffer(2, cap->m_samples, true);
+		m_computePipeline.BindBuffer(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples);
+		m_computePipeline.BindBuffer(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples);
+		m_computePipeline.BindBuffer(2, scap ? scap->m_samples : ucap->m_samples, true);
 		m_computePipeline.UpdateDescriptors();
 
 		//Dispatch the compute operation and block until it completes
@@ -154,24 +186,36 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 
-		//Data was updated GPU side
-		cap->m_samples.MarkModifiedFromGpu();
+		if(scap)
+			scap->m_samples.MarkModifiedFromGpu();
+		else
+			ucap->m_samples.MarkModifiedFromGpu();
 	}
 
 	//Software fallback
 	else
 	{
 		//Waveform data must be on CPU
-		din_p->m_samples.PrepareForCpuAccess();
-		din_n->m_samples.PrepareForCpuAccess();
+		din_p->PrepareForCpuAccess();
+		din_n->PrepareForCpuAccess();
+		if(scap)
+			scap->PrepareForCpuAccess();
+		else
+			ucap->PrepareForCpuAccess();
 
-		float* out = (float*)&cap->m_samples[0];
-		float* a = (float*)&din_p->m_samples[0];
-		float* b = (float*)&din_n->m_samples[0];
+		float* out = scap ? scap->m_samples.GetCpuPointer() : ucap->m_samples.GetCpuPointer();
+		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
+		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
+
 		if(g_hasAvx2)
 			InnerLoopAVX2(out, a, b, len);
 		else
 			InnerLoop(out, a, b, len);
+
+		if(scap)
+			scap->m_samples.MarkModifiedFromCpu();
+		else
+			ucap->m_samples.MarkModifiedFromCpu();
 	}
 }
 

@@ -95,18 +95,22 @@ void SWDDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto clk = GetDigitalInputWaveform(0);
-	auto data = GetDigitalInputWaveform(1);
+	auto clk = GetInputWaveform(0);
+	auto data = GetInputWaveform(1);
+	clk->PrepareForCpuAccess();
+	data->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new SWDWaveform;
+	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = clk->m_startTimestamp;
 	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
 
 	//Sample SWDIO on SWCLK edges
-	DigitalWaveform samples;
-	SampleOnRisingEdges(data, clk, samples);
+	SparseDigitalWaveform samples;
+	samples.PrepareForCpuAccess();
+	SampleOnRisingEdgesBase(data, clk, samples);
 
 	//Loop over the data and look for transactions
 	enum
@@ -132,7 +136,7 @@ void SWDDecoder::Refresh()
 	bool writing = 0;
 	uint32_t ticks_to_zero = 0;
 
-	size_t len = samples.m_samples.size();
+	size_t len = samples.size();
 	int64_t last_dur = 0;
 	int64_t dur;
 	int64_t off;
@@ -432,6 +436,8 @@ void SWDDecoder::Refresh()
 		last_dur = dur;
 	}
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color SWDWaveform::GetColor(size_t i)

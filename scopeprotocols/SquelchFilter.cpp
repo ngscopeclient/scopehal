@@ -82,22 +82,29 @@ string SquelchFilter::GetProtocolName()
 void SquelchFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din_i = GetAnalogInputWaveform(0);
-	auto din_q = GetAnalogInputWaveform(1);
-	size_t len = min(din_i->m_samples.size(), din_q->m_samples.size());
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
+
+	size_t len = min(din_i->size(), din_q->size());
 
 	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
 	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
 	size_t holdtime_samples = holdtime_fs / din_i->m_timescale;
 
-	auto dout_i = SetupOutputWaveform(din_i, 0, 0, 0);
-	auto dout_q = SetupOutputWaveform(din_q, 1, 0, 0);
+	auto dout_i = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
+	auto dout_q = SetupEmptyUniformAnalogOutputWaveform(din_q, 1);
+	dout_i->Resize(len);
+	dout_q->Resize(len);
+	dout_i->PrepareForCpuAccess();
+	dout_q->PrepareForCpuAccess();
 
 	bool open = false;
 	float tsq = threshold * threshold;
@@ -133,4 +140,6 @@ void SquelchFilter::Refresh()
 		}
 	}
 
+	dout_i->MarkModifiedFromCpu();
+	dout_q->MarkModifiedFromCpu();
 }
