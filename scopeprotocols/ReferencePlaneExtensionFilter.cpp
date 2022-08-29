@@ -93,7 +93,7 @@ void ReferencePlaneExtensionFilter::OnPortCountChanged()
 void ReferencePlaneExtensionFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
@@ -106,39 +106,74 @@ void ReferencePlaneExtensionFilter::Refresh()
 		{
 			//Copy magnitude channel as-is
 			size_t imag = (to*nports + from) * 2;
-			auto mag_in = GetAnalogInputWaveform(imag);
-			auto mag_out = SetupOutputWaveform(mag_in, imag, 0, 0);
-			memcpy(&mag_out->m_samples[0], &mag_in->m_samples[0], sizeof(float) * mag_in->m_samples.size());
-
-			//TODO: Copy magnitude data to parameters
+			auto mag_in = GetInputWaveform(imag);
+			auto smag_in = dynamic_cast<SparseAnalogWaveform*>(mag_in);
+			auto umag_in = dynamic_cast<UniformAnalogWaveform*>(mag_in);
+			if(smag_in)
+			{
+				auto mag_out = SetupSparseOutputWaveform(smag_in, imag, 0, 0);
+				mag_out->m_samples.CopyFrom(smag_in->m_samples);
+			}
+			else
+			{
+				auto mag_out = SetupEmptyUniformAnalogOutputWaveform(umag_in, imag);
+				mag_out->Resize(umag_in->size());
+				mag_out->m_samples.CopyFrom(umag_in->m_samples);
+			}
 
 			//Copy magnitude gain/offset
 			SetVoltageRange(imag, GetInput(imag).GetVoltageRange());
 			SetOffset(imag, GetInput(imag).GetOffset());
 
-			//Shift the angle data
+			//Time shift, in fs, for this port pair
+			int64_t phase_fs =
+				m_parameters[m_portParamNames[to]].GetIntVal() + m_parameters[m_portParamNames[from]].GetIntVal();
+
+			//Prepare to shift the angle data
 			size_t iang = imag + 1;
-			auto ang_in = GetAnalogInputWaveform(iang);
-			auto ang_out = SetupOutputWaveform(ang_in, iang, 0, 0);
-			size_t alen = ang_in->m_samples.size();
-			for(size_t i=0; i<alen; i++)
+			auto ang_in = GetInputWaveform(iang);
+			ang_in->PrepareForCpuAccess();
+			auto sang_in = dynamic_cast<SparseAnalogWaveform*>(ang_in);
+			auto uang_in = dynamic_cast<UniformAnalogWaveform*>(ang_in);
+			size_t alen = ang_in->size();
+
+			if(sang_in)
 			{
-				//Frequency of this point
-				int64_t freq = (ang_in->m_timescale * ang_in->m_offsets[i]) + ang_in->m_triggerPhase;
-				double period_fs = FS_PER_SECOND / freq;
+				auto ang_out = SetupSparseOutputWaveform(sang_in, iang, 0, 0);
+				ang_out->PrepareForCpuAccess();
 
-				int64_t phase_fs =
-					m_parameters[m_portParamNames[to]].GetIntVal() +
-					m_parameters[m_portParamNames[from]].GetIntVal();
+				for(size_t i=0; i<alen; i++)
+				{
+					//Frequency of this point
+					int64_t freq = GetOffsetScaled(sang_in, i);
+					double period_fs = FS_PER_SECOND / freq;
 
-				double phase_frac = fmodf(phase_fs / period_fs, 1);
-				double phase_deg = phase_frac * 360;
+					double phase_frac = fmodf(phase_fs / period_fs, 1);
+					double phase_deg = phase_frac * 360;
 
-				double phase_shifted = ang_in->m_samples[i] + phase_deg;
-				ang_out->m_samples[i] = phase_shifted;
+					double phase_shifted = sang_in->m_samples[i] + phase_deg;
+					ang_out->m_samples[i] = phase_shifted;
+				}
 			}
+			else if(uang_in)
+			{
+				auto ang_out = SetupEmptyUniformAnalogOutputWaveform(uang_in, iang);
+				ang_out->PrepareForCpuAccess();
+				ang_out->Resize(alen);
 
-			//TODO: Copy angle data to parameters
+				for(size_t i=0; i<alen; i++)
+				{
+					//Frequency of this point
+					int64_t freq = GetOffsetScaled(uang_in, i);
+					double period_fs = FS_PER_SECOND / freq;
+
+					double phase_frac = fmodf(phase_fs / period_fs, 1);
+					double phase_deg = phase_frac * 360;
+
+					double phase_shifted = uang_in->m_samples[i] + phase_deg;
+					ang_out->m_samples[i] = phase_shifted;
+				}
+			}
 
 			//Copy angle gain/offset
 			SetVoltageRange(iang, GetInput(iang).GetVoltageRange());

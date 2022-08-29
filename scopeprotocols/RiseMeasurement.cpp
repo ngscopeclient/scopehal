@@ -90,19 +90,22 @@ string RiseMeasurement::GetProtocolName()
 void RiseMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	size_t len = din->size();
+	din->PrepareForCpuAccess();
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Get the base/top (we use these for calculating percentages)
-	float base = GetBaseVoltage(din);
-	float top = GetTopVoltage(din);
+	float base = GetBaseVoltage(sdin, udin);
+	float top = GetTopVoltage(sdin, udin);
 
 	//Find the actual levels we use for our time gate
 	float delta = top - base;
@@ -110,7 +113,9 @@ void RiseMeasurement::Refresh()
 	float vend = base + m_parameters[m_endname].GetFloatVal()*delta;
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	float last = 1e20;
 	double tedge = 0;
@@ -121,15 +126,15 @@ void RiseMeasurement::Refresh()
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
 	for(size_t i=0; i < len; i++)
 	{
-		float cur = din->m_samples[i];
-		int64_t tnow = din->m_offsets[i] * din->m_timescale;
+		float cur = GetValue(sdin, udin, i);
+		int64_t tnow = ::GetOffsetScaled(sdin, udin, i);
 
 		//Find start of edge
 		if(state == 0)
 		{
 			if( (cur > vstart) && (last <= vstart) )
 			{
-				tedge = tnow - din->m_timescale + InterpolateTime(din, i-1, vstart)*din->m_timescale;
+				tedge = tnow - din->m_timescale + InterpolateTime(sdin, udin, i-1, vstart)*din->m_timescale;
 				state = 1;
 			}
 		}
@@ -139,7 +144,7 @@ void RiseMeasurement::Refresh()
 		{
 			if( (cur > vend) && (last <= vend) )
 			{
-				double dt = InterpolateTime(din, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
+				double dt = InterpolateTime(sdin, udin, i-1, vend)*din->m_timescale + tnow - din->m_timescale - tedge;
 
 				cap->m_offsets.push_back(tlast);
 				cap->m_durations.push_back(tnow-tlast);
@@ -154,9 +159,5 @@ void RiseMeasurement::Refresh()
 	}
 
 	SetData(cap, 0);
-
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

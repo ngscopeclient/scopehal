@@ -84,24 +84,30 @@ void RjBUjFilter::Refresh()
 	}
 
 	//Get the input data
-	auto tie = GetAnalogInputWaveform(0);
-	auto thresh = GetDigitalInputWaveform(1);
-	auto clk = GetDigitalInputWaveform(2);
+	auto tie = dynamic_cast<SparseAnalogWaveform*>(GetInputWaveform(0));
+	auto thresh = GetInputWaveform(1);
+	auto clk = GetInputWaveform(2);
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(3).m_channel);
 	float* table = ddj->GetDDJTable();
 
+	tie->PrepareForCpuAccess();
+	thresh->PrepareForCpuAccess();
+	clk->PrepareForCpuAccess();
+
 	//Sample the input data
-	DigitalWaveform samples;
-	SampleOnAnyEdges(thresh, clk, samples);
+	SparseDigitalWaveform samples;
+	SampleOnAnyEdgesBase(thresh, clk, samples);
+	samples.PrepareForCpuAccess();
 
 	//Set up output waveform
-	auto cap = SetupOutputWaveform(tie, 0, 0, 0);
+	auto cap = SetupSparseOutputWaveform(tie, 0, 0, 0);
+	cap->PrepareForCpuAccess();
 
 	//DDJ history (8 UIs)
 	uint8_t window = 0;
 
-	size_t tielen = tie->m_samples.size();
-	size_t samplen = samples.m_samples.size();
+	size_t tielen = tie->size();
+	size_t samplen = samples.size();
 
 	size_t itie = 0;
 
@@ -147,4 +153,6 @@ void RjBUjFilter::Refresh()
 		float uj = tie->m_samples[itie] - table[window];
 		cap->m_samples[itie] = uj;
 	}
+
+	cap->MarkModifiedFromCpu();
 }

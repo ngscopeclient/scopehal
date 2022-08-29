@@ -105,8 +105,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	QSPIDecoder.cpp
 	QuadratureDecoder.cpp
 	ReferencePlaneExtensionFilter.cpp
-	RjBUjFilter.cpp
 	RiseMeasurement.cpp
+	RjBUjFilter.cpp
     ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
