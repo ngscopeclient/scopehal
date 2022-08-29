@@ -90,21 +90,31 @@ void TIEMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto clk_analog = GetAnalogInputWaveform(0);
-	auto clk_digital = GetDigitalInputWaveform(0);
-	WaveformBase* clk = GetInputWaveform(0);
-	auto golden = GetDigitalInputWaveform(1);
-	size_t len = min(clk->m_offsets.size(), golden->m_offsets.size());
+	auto clk = GetInputWaveform(0);
+	auto uaclk = dynamic_cast<UniformAnalogWaveform*>(clk);
+	auto saclk = dynamic_cast<SparseAnalogWaveform*>(clk);
+	auto udclk = dynamic_cast<UniformDigitalWaveform*>(clk);
+	auto sdclk = dynamic_cast<SparseDigitalWaveform*>(clk);
+	auto golden = GetInputWaveform(1);
+	auto sgolden = dynamic_cast<SparseAnalogWaveform*>(golden);
+	auto ugolden = dynamic_cast<UniformAnalogWaveform*>(golden);
+	size_t len = min(clk->size(), golden->size());
+
+	clk->PrepareForCpuAccess();
+	golden->PrepareForCpuAccess();
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(clk, 0);
+	cap->m_timescale = 1;
+	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	if(clk_analog)
-		FindZeroCrossings(clk_analog, m_parameters[m_threshname].GetFloatVal(), edges);
+	if(uaclk || saclk)
+		FindZeroCrossings(saclk, uaclk, m_parameters[m_threshname].GetFloatVal(), edges);
 	else
-		FindZeroCrossings(clk_digital, edges);
+		FindZeroCrossings(sdclk, udclk, edges);
 
 	//Ignore edges before things have stabilized
 	int64_t skip_time = m_parameters[m_skipname].GetIntVal();
@@ -117,7 +127,7 @@ void TIEMeasurement::Refresh()
 		if(iedge >= len)
 			break;
 
-		int64_t prev_edge = golden->m_offsets[iedge] * golden->m_timescale;
+		int64_t prev_edge = ::GetOffsetScaled(sgolden, ugolden, iedge);
 		int64_t next_edge = prev_edge;
 		size_t jedge = iedge;
 
@@ -127,7 +137,7 @@ void TIEMeasurement::Refresh()
 		while(true)
 		{
 			prev_edge = next_edge;
-			next_edge = golden->m_offsets[jedge] * golden->m_timescale;
+			next_edge = ::GetOffsetScaled(sgolden, ugolden, jedge);
 
 			//First golden edge is after this signal edge
 			if(prev_edge > atime)
@@ -169,7 +179,7 @@ void TIEMeasurement::Refresh()
 		else
 		{
 			//Update the last sample
-			size_t end = cap->m_durations.size();
+			size_t end = cap->size();
 			if(end)
 				cap->m_durations[end-1] = atime - tlast;
 
@@ -183,9 +193,5 @@ void TIEMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = clk->m_startTimestamp;
-	cap->m_startFemtoseconds = clk->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
+	cap->MarkModifiedFromCpu();
 }

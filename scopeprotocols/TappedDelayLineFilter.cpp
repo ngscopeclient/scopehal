@@ -123,6 +123,8 @@ void TappedDelayLineFilter::Refresh()
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 
+	din->PrepareForCpuAccess();
+
 	//Set up output
 	int64_t tap_delay = m_parameters[m_tapDelayName].GetIntVal();
 	const int64_t tap_count = 8;
@@ -148,7 +150,7 @@ void TappedDelayLineFilter::Refresh()
 	//Run the actual filter
 	DoFilterKernel(tap_delay, taps, din, cap);
 
-	cap->MarkSamplesModifiedByCpu();
+	cap->MarkModifiedFromCpu();
 }
 
 void TappedDelayLineFilter::DoFilterKernel(
@@ -207,8 +209,8 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 	{ taps[7], taps[6], taps[5], taps[4], taps[3], taps[2], taps[1], taps[0] };
 
 	//I/O pointers
-	float* pin = din->GetCpuPointer();
-	float* pout = cap->GetCpuPointer();
+	float* pin = din->m_samples.GetCpuPointer();
+	float* pout = cap->m_samples.GetCpuPointer();
 	size_t end_rounded = end - (end % 8);
 	size_t i=0;
 

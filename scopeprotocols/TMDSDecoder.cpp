@@ -84,18 +84,21 @@ void TMDSDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
 
 	//Create the capture
 	auto cap = new TMDSWaveform;
 	cap->m_timescale = 1;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Record the value of the data stream at each clock edge
-	DigitalWaveform sampdata;
-	SampleOnAnyEdges(din, clkin, sampdata);
+	SparseDigitalWaveform sampdata;
+	SampleOnAnyEdgesBase(din, clkin, sampdata);
 
 	/*
 		Look for preamble data. We need this to synchronize. (HDMI 1.4 spec section 5.4.2)
@@ -245,6 +248,7 @@ void TMDSDecoder::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color TMDSWaveform::GetColor(size_t i)

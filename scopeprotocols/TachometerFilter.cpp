@@ -76,19 +76,23 @@ string TachometerFilter::GetProtocolName()
 void TachometerFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	//Find average voltage of the waveform and use that as the zero crossing
-	float midpoint = GetAvgVoltage(din);
+	float midpoint = GetAvgVoltage(sdin, udin);
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
-	FindZeroCrossings(din, midpoint, edges);
+	FindZeroCrossings(sdin, udin, midpoint, edges);
 	if(edges.size() < 2)
 	{
 		SetData(NULL, 0);
@@ -96,7 +100,9 @@ void TachometerFilter::Refresh()
 	}
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	int64_t pulses_per_rev = m_parameters[m_ticksname].GetIntVal();
 	float pulses_to_rpm = 60.0f / pulses_per_rev;
@@ -119,8 +125,5 @@ void TachometerFilter::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

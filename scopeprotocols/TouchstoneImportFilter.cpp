@@ -94,6 +94,8 @@ void TouchstoneImportFilter::OnFileNameChanged()
 	//Recreate our output streams
 	SetupStreams();
 
+	const float angscale = 180 / M_PI;	//we use degrees for display
+
 	//Run the actual import
 	for(size_t to=0; to < nports; to++)
 	{
@@ -106,26 +108,26 @@ void TouchstoneImportFilter::OnFileNameChanged()
 			size_t base = (to*nports + from) * 2;
 
 			//Create new waveform for magnitude and phase channels
-			auto mwfm = new AnalogWaveform;
+			auto mwfm = new SparseAnalogWaveform;
 			mwfm->m_timescale = 1;
 			mwfm->m_startTimestamp = timestamp;
 			mwfm->m_startFemtoseconds = fs;
 			mwfm->m_triggerPhase = 0;
-			mwfm->m_densePacked = false;	//don't assume uniform frequency spacing
 			mwfm->Resize(nsamples);
 			SetData(mwfm, base);
 
-			auto pwfm = new AnalogWaveform;
+			auto pwfm = new SparseAnalogWaveform;
 			pwfm->m_timescale = 1;
 			pwfm->m_startTimestamp = timestamp;
 			pwfm->m_startFemtoseconds = fs;
 			pwfm->m_triggerPhase = 0;
-			pwfm->m_densePacked = false;	//don't assume uniform frequency spacing
 			pwfm->Resize(nsamples);
 			SetData(pwfm, base + 1);
 
+			mwfm->PrepareForCpuAccess();
+			pwfm->PrepareForCpuAccess();
+
 			//Populate them
-			float angscale = 180 / M_PI;	//we use degrees for display
 			for(size_t i=0; i<nsamples; i++)
 			{
 				auto& point = vec[i];
@@ -147,6 +149,9 @@ void TouchstoneImportFilter::OnFileNameChanged()
 					pwfm->m_durations[i-1] = pwfm->m_offsets[i] - pwfm->m_offsets[i-1];
 				}
 			}
+
+			mwfm->MarkModifiedFromCpu();
+			pwfm->MarkModifiedFromCpu();
 		}
 	}
 }

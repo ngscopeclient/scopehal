@@ -77,43 +77,88 @@ string ThresholdFilter::GetProtocolName()
 
 void ThresholdFilter::Refresh()
 {
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	auto len = din->size();
 
 	//Setup
 	float midpoint = m_parameters[m_threshname].GetFloatVal();
 	float hys = m_parameters[m_hysname].GetFloatVal();
-	auto cap = SetupDigitalOutputWaveform(din, 0, 0, 0);
 
-	//Threshold all of our samples
-	//Optimized inner loop if no hysteresis
-	if(hys == 0)
+	din->PrepareForCpuAccess();
+
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
+
+	if(sdin)
 	{
-		#pragma omp parallel for
-		for(size_t i=0; i<len; i++)
-			cap->m_samples[i] = din->m_samples[i] > midpoint;
+		auto cap = SetupSparseDigitalOutputWaveform(sdin, 0, 0, 0);
+		cap->PrepareForCpuAccess();
+
+		//Threshold all of our samples
+		//Optimized inner loop if no hysteresis
+		if(hys == 0)
+		{
+			#pragma omp parallel for
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = sdin->m_samples[i] > midpoint;
+		}
+		else
+		{
+			bool cur = sdin->m_samples[0] > midpoint;
+			float thresh_rising = midpoint + hys/2;
+			float thresh_falling = midpoint - hys/2;
+
+			for(size_t i=0; i<len; i++)
+			{
+				float f = sdin->m_samples[i];
+				if(cur && (f < thresh_falling))
+					cur = false;
+				else if(!cur && (f > thresh_rising))
+					cur = true;
+				cap->m_samples[i] = cur;
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
 	}
 	else
 	{
-		bool cur = din->m_samples[0] > midpoint;
-		float thresh_rising = midpoint + hys/2;
-		float thresh_falling = midpoint - hys/2;
+		auto cap = SetupEmptyUniformDigitalOutputWaveform(din, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
 
-		for(size_t i=0; i<len; i++)
+		//Threshold all of our samples
+		//Optimized inner loop if no hysteresis
+		if(hys == 0)
 		{
-			float f = din->m_samples[i];
-			if(cur && (f < thresh_falling))
-				cur = false;
-			else if(!cur && (f > thresh_rising))
-				cur = true;
-			cap->m_samples[i] = cur;
+			#pragma omp parallel for
+			for(size_t i=0; i<len; i++)
+				cap->m_samples[i] = udin->m_samples[i] > midpoint;
 		}
+		else
+		{
+			bool cur = udin->m_samples[0] > midpoint;
+			float thresh_rising = midpoint + hys/2;
+			float thresh_falling = midpoint - hys/2;
+
+			for(size_t i=0; i<len; i++)
+			{
+				float f = udin->m_samples[i];
+				if(cur && (f < thresh_falling))
+					cur = false;
+				else if(!cur && (f > thresh_rising))
+					cur = true;
+				cap->m_samples[i] = cur;
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
 	}
 }

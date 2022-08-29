@@ -69,21 +69,24 @@ string TopMeasurement::GetProtocolName()
 void TopMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t len = din->m_samples.size();
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	size_t len = din->size();
 
 	//Make a histogram of the waveform
-	float min = GetMinVoltage(din);
-	float max = GetMaxVoltage(din);
+	float min = GetMinVoltage(sdin, udin);
+	float max = GetMaxVoltage(sdin, udin);
 	size_t nbins = 64;
-	vector<size_t> hist = MakeHistogram(din, min, max, nbins);
+	vector<size_t> hist = MakeHistogram(sdin, udin, min, max, nbins);
 
 	//Set temporary midpoint and range
 	float range = (max - min);
@@ -105,7 +108,9 @@ void TopMeasurement::Refresh()
 	float global_top = fbin*range + min;
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	float last = min;
 	int64_t tedge = 0;
@@ -116,8 +121,8 @@ void TopMeasurement::Refresh()
 	for(size_t i=0; i < len; i++)
 	{
 		//Wait for a rising edge
-		float cur = din->m_samples[i];
-		int64_t tnow = din->m_offsets[i] * din->m_timescale;
+		float cur = GetValue(sdin, udin, i);
+		int64_t tnow = ::GetOffsetScaled(sdin, udin, i);
 
 		if( (cur > midpoint) && (last <= midpoint) )
 		{
@@ -144,8 +149,5 @@ void TopMeasurement::Refresh()
 
 	SetData(cap, 0);
 
-	//Copy start time etc from the input. Timestamps are in femtoseconds.
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

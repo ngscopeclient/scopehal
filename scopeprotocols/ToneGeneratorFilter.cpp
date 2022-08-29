@@ -109,18 +109,18 @@ void ToneGeneratorFilter::Refresh()
 	double t = GetTime();
 	int64_t fs = (t - floor(t)) * FS_PER_SECOND;
 
-	AnalogWaveform* cap = dynamic_cast<AnalogWaveform*>(GetData(0));
+	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 	if(!cap)
 	{
-		cap = new AnalogWaveform;
+		cap = new UniformAnalogWaveform;
 		SetData(cap, 0);
 	}
 	cap->m_timescale = samplePeriod;
 	cap->m_triggerPhase = 0;
 	cap->m_startTimestamp = floor(t);
 	cap->m_startFemtoseconds = fs;
-	cap->m_densePacked = true;
 	cap->Resize(depth);
+	cap->PrepareForCpuAccess();
 
 	double samples_per_cycle = samplerate * 1.0 / freq;
 	double radians_per_sample = 2 * M_PI / samples_per_cycle;
@@ -129,10 +129,7 @@ void ToneGeneratorFilter::Refresh()
 	float scale = amplitude / 2;
 
 	for(size_t i=0; i<depth; i++)
-	{
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
-
 		cap->m_samples[i] = bias + (scale * sin(i*radians_per_sample + startphase));
-	}
+
+	cap->MarkModifiedFromCpu();
 }

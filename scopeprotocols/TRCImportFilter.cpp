@@ -209,12 +209,11 @@ void TRCImportFilter::OnFileNameChanged()
 	size_t num_per_segment = num_samples /* / num_sequences*/;
 
 	//Create output waveform
-	auto wfm = new AnalogWaveform;
+	auto wfm = new UniformAnalogWaveform;
 	wfm->m_timescale = round(interval);
 	wfm->m_startTimestamp = ttime;
 	wfm->m_startFemtoseconds = basetime * FS_PER_SECOND;
 	wfm->m_triggerPhase = h_off_frac;
-	wfm->m_densePacked = true;
 	SetData(wfm, 0);
 
 	wfm->Resize(num_per_segment);
@@ -239,10 +238,8 @@ void TRCImportFilter::OnFileNameChanged()
 			LogTrace("GPU path\n");
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline16Bit->BindBuffer(0, wfm->m_offsets, true);
-			m_computePipeline16Bit->BindBuffer(1, wfm->m_durations, true);
-			m_computePipeline16Bit->BindBuffer(2, wfm->m_samples, true);
-			m_computePipeline16Bit->BindBuffer(3, buf);
+			m_computePipeline16Bit->BindBuffer(0, wfm->m_samples, true);
+			m_computePipeline16Bit->BindBuffer(1, buf);
 			m_computePipeline16Bit->UpdateDescriptors();
 
 			ConvertRawSamplesShaderArgs args;
@@ -261,29 +258,24 @@ void TRCImportFilter::OnFileNameChanged()
 				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
 			}
 
-			wfm->m_offsets.MarkModifiedFromGpu();
-			wfm->m_durations.MarkModifiedFromGpu();
-			wfm->m_samples.MarkModifiedFromGpu();
+			wfm->MarkModifiedFromGpu();
 		}
 
 		//Software fallback
 		else
 		{
+			wfm->PrepareForCpuAccess();
+
 			LogTrace("Fallback path\n");
 
 			Oscilloscope::Convert16BitSamples(
-				(int64_t*)&wfm->m_offsets[0],
-				(int64_t*)&wfm->m_durations[0],
 				(float*)&wfm->m_samples[0],
 				&buf[0],
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 
-			wfm->m_offsets.MarkModifiedFromCpu();
-			wfm->m_durations.MarkModifiedFromCpu();
-			wfm->m_samples.MarkModifiedFromCpu();
+			wfm->MarkModifiedFromCpu();
 		}
 	}
 
@@ -307,10 +299,8 @@ void TRCImportFilter::OnFileNameChanged()
 			LogTrace("GPU path\n");
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline8Bit->BindBuffer(0, wfm->m_offsets, true);
-			m_computePipeline8Bit->BindBuffer(1, wfm->m_durations, true);
-			m_computePipeline8Bit->BindBuffer(2, wfm->m_samples, true);
-			m_computePipeline8Bit->BindBuffer(3, buf);
+			m_computePipeline8Bit->BindBuffer(0, wfm->m_samples, true);
+			m_computePipeline8Bit->BindBuffer(1, buf);
 			m_computePipeline8Bit->UpdateDescriptors();
 
 			ConvertRawSamplesShaderArgs args;
@@ -329,28 +319,23 @@ void TRCImportFilter::OnFileNameChanged()
 				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
 			}
 
-			wfm->m_offsets.MarkModifiedFromGpu();
-			wfm->m_durations.MarkModifiedFromGpu();
-			wfm->m_samples.MarkModifiedFromGpu();
+			wfm->MarkModifiedFromGpu();
 		}
 
 		//Software fallback
 		else
 		{
+			wfm->PrepareForCpuAccess();
+
 			LogTrace("Fallback path\n");
 			Oscilloscope::Convert8BitSamples(
-				(int64_t*)&wfm->m_offsets[0],
-				(int64_t*)&wfm->m_durations[0],
 				(float*)&wfm->m_samples[0],
 				&buf[0],
 				v_gain,
 				v_off,
-				num_per_segment,
-				0);
+				num_per_segment);
 
-			wfm->m_offsets.MarkModifiedFromCpu();
-			wfm->m_durations.MarkModifiedFromCpu();
-			wfm->m_samples.MarkModifiedFromCpu();
+			wfm->MarkModifiedFromCpu();
 		}
 	}
 }

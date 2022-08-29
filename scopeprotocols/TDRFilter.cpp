@@ -102,14 +102,14 @@ void TDRFilter::SetDefaultName()
 void TDRFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto len = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto len = din->size();
 
 	//Extract parameters
 	auto mode = static_cast<OutputMode>(m_parameters[m_modeName].GetIntVal());
@@ -125,7 +125,9 @@ void TDRFilter::Refresh()
 		SetYAxisUnits(Unit(Unit::UNIT_RHO), 0);
 
 	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din, 0, 0, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	cap->Resize(len);
+	cap->PrepareForCpuAccess();
 
 	float pulseScale = 1.0 / pulseAmplitude;
 	for(size_t i=0; i<len; i++)
@@ -147,4 +149,6 @@ void TDRFilter::Refresh()
 		AutoscaleVertical(0);
 		m_oldMode = mode;
 	}
+
+	cap->MarkModifiedFromCpu();
 }

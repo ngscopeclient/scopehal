@@ -91,14 +91,14 @@ void TDRStepDeEmbedFilter::ClearSweeps()
 void TDRStepDeEmbedFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din = GetAnalogInputWaveform(0);
-	auto cap = SetupEmptyOutputWaveform(din, 0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 
 	//Calculate the nominal low and high voltages
 	Unit volts(Unit::UNIT_VOLTS);
@@ -182,10 +182,9 @@ void TDRStepDeEmbedFilter::Refresh()
 	auto& s22 = params[SPair(2, 2)];
 
 	//Generate the output
-	float fs_per_sample = din->m_timescale * (din->m_offsets[1] - din->m_offsets[0]);
+	float fs_per_sample = din->m_timescale;
 	float sample_ghz = 1e6 / fs_per_sample;
 	float bin_hz = round((0.5f * sample_ghz * 1e9f) / nouts);
-	cap->m_densePacked = true;
 	cap->m_timescale = bin_hz;
 	cap->Resize(nouts);
 	for(size_t i=0; i<nouts; i++)
@@ -248,8 +247,6 @@ void TDRStepDeEmbedFilter::Refresh()
 		//Save output
 		s21.m_points.push_back(SParameterPoint(freq, mag, angle));
 		cap->m_samples[i] = 10 * log10(mag);
-		cap->m_offsets[i] = i;
-		cap->m_durations[i] = 1;
 
 		//Clear other S-parameters
 		s11.m_points.push_back(SParameterPoint(freq, 0, 0));

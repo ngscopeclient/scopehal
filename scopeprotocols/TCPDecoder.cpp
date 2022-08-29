@@ -80,6 +80,7 @@ void TCPDecoder::Refresh()
 
 	//Get the input data (TODO: support IPv6 too)
 	auto din = dynamic_cast<IPv4Waveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 	size_t len = din->m_samples.size();
 
 	//Loop over the events and process stuff
@@ -88,6 +89,7 @@ void TCPDecoder::Refresh()
 	cap->m_triggerPhase = din->m_triggerPhase;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	int state = 0;
@@ -390,6 +392,7 @@ void TCPDecoder::Refresh()
 	}
 
 	//TODO: packet decode too
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color TCPWaveform::GetColor(size_t i)
