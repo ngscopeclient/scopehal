@@ -78,32 +78,31 @@ string UartClockRecoveryFilter::GetProtocolName()
 void UartClockRecoveryFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = GetInputWaveform(0);
 
 	//Look up the nominal baud rate and convert to time
 	int64_t baud = m_parameters[m_baudname].GetIntVal();
 	int64_t fs = static_cast<int64_t>(FS_PER_SECOND / baud);
 
 	//Create the output waveform and copy our timescales
-	auto cap = new DigitalWaveform;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	cap->m_triggerPhase = 0;
-	cap->m_timescale = 1;		//recovered clock time scale is single femtoseconds
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
 
 	//Find times of the zero crossings
 	const float threshold = m_parameters[m_threshname].GetFloatVal();
-	FindZeroCrossings(din, threshold, edges);
+	FindZeroCrossingsBase(din, threshold, edges);
 
 	//Actual DLL logic
 	size_t nedge = 0;
@@ -143,4 +142,5 @@ void UartClockRecoveryFilter::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

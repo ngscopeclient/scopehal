@@ -95,6 +95,7 @@ void USB2PacketDecoder::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<USB2PCSWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 	size_t len = din->m_samples.size();
 
 	//Make the capture and copy our time scales from the input
@@ -102,6 +103,7 @@ void USB2PacketDecoder::Refresh()
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	enum
 	{
@@ -341,6 +343,8 @@ void USB2PacketDecoder::Refresh()
 
 	//Decode packets in the capture
 	FindPackets(cap);
+
+	cap->MarkModifiedFromCpu();
 }
 
 /**

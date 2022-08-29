@@ -79,9 +79,11 @@ void USB2ActivityDecoder::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<USB2PCSWaveform*>(GetInputWaveform(0));
-	size_t len = din->m_samples.size();
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
 
-	auto cap = new DigitalWaveform;
+	auto cap = SetupEmptySparseDigitalOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
 
 	//Start low, go high when we see a SYNC, low at EOP
 	int64_t last = 0;
@@ -105,9 +107,6 @@ void USB2ActivityDecoder::Refresh()
 		}
 	}
 
-	//Done, copy our time scales from the input
 	SetData(cap, 0);
-	cap->m_timescale = din->m_timescale;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->MarkModifiedFromCpu();
 }

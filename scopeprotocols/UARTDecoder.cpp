@@ -96,7 +96,10 @@ void UARTDecoder::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetDigitalInputWaveform(0);
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
 
 	//Get the bit period
 	float bit_period = FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal();
@@ -105,32 +108,34 @@ void UARTDecoder::Refresh()
 
 	//UART processing
 	auto cap = new ByteWaveform(m_displaycolor);
+	cap->PrepareForCpuAccess();
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->m_triggerPhase = din->m_triggerPhase;
 
 	//Time-domain processing to reflect potentially variable sampling rate for RLE captures
 	int64_t next_value = 0;
 	size_t isample = 0;
 	int64_t tlast = 0;
 	Packet* pack = NULL;
-	size_t len = din->m_samples.size();
+	size_t len = din->size();
 	while(isample < len)
 	{
 		//Wait for signal to go high (idle state)
-		while( (isample < len) && !din->m_samples[isample])
+		while( (isample < len) && !GetValue(sdin, udin, isample))
 			isample ++;
 		if(isample >= len)
 			break;
 
 		//Wait for a falling edge (start bit)
-		while( (isample < len) && din->m_samples[isample])
+		while( (isample < len) && GetValue(sdin, udin, isample))
 			isample ++;
 		if(isample >= len)
 			break;
 
 		//Time of the start bit
-		int64_t tstart = din->m_offsets[isample];
+		int64_t tstart = ::GetOffset(sdin, udin, isample);
 
 		//The next data bit should be measured 1.5 bit periods after the falling edge
 		next_value = tstart + scaledbitper + scaledbitper/2;
@@ -140,13 +145,13 @@ void UARTDecoder::Refresh()
 		for(int ibit=0; ibit<8; ibit++)
 		{
 			//Find the sample of interest
-			while( (isample < len) && ((din->m_offsets[isample] + din->m_durations[isample]) < next_value))
+			while( (isample < len) && ((::GetOffset(sdin, udin, isample) + GetDuration(sdin, udin, isample)) < next_value))
 				isample ++;
 			if(isample >= len)
 				break;
 
 			//Got the sample
-			dval = (dval >> 1) | (din->m_samples[isample] ? 0x80 : 0);
+			dval = (dval >> 1) | (GetValue(sdin, udin, isample) ? 0x80 : 0);
 
 			//Go on to the next bit
 			next_value += scaledbitper;
@@ -157,7 +162,7 @@ void UARTDecoder::Refresh()
 			break;
 
 		//All good, read the stop bit
-		while( (isample < len) && ((din->m_offsets[isample] + din->m_durations[isample]) < next_value))
+		while( (isample < len) && ((::GetOffset(sdin, udin, isample) + GetDuration(sdin, udin, isample)) < next_value))
 			isample ++;
 		if(isample >= len)
 			break;
@@ -184,7 +189,7 @@ void UARTDecoder::Refresh()
 		if(pack == NULL)
 		{
 			pack = new Packet;
-			pack->m_offset = tstart * din->m_timescale;
+			pack->m_offset = tstart * din->m_timescale + din->m_triggerPhase;
 		}
 
 		//Append to the existing packet
@@ -195,7 +200,7 @@ void UARTDecoder::Refresh()
 	//If we have a packet in progress, add it
 	if(pack)
 	{
-		pack->m_len = (din->m_offsets[len-1] * din->m_timescale) - pack->m_offset;
+		pack->m_len = ::GetOffsetScaled(sdin, udin, len-1) - pack->m_offset;
 		FinishPacket(pack);
 	}
 

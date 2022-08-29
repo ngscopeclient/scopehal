@@ -133,8 +133,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	TopMeasurement.cpp
 	TouchstoneImportFilter.cpp
 	TRCImportFilter.cpp
-	UARTDecoder.cpp
 	UartClockRecoveryFilter.cpp
+	UARTDecoder.cpp
 	UndershootMeasurement.cpp
 	UpsampleFilter.cpp
 	USB2ActivityDecoder.cpp

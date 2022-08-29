@@ -78,13 +78,15 @@ void USB2PCSDecoder::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<USB2PMAWaveform*>(GetInputWaveform(0));
-	size_t len = din->m_samples.size();
+	din->PrepareForCpuAccess();
+	size_t len = din->size();
 
 	//Make the capture and copy our time scales from the input
 	auto cap = new USB2PCSWaveform;
 	cap->m_timescale = din->m_timescale;
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
+	cap->PrepareForCpuAccess();
 
 	//Initialize the current sample to idle at the start of the capture
 	int64_t offset = 0;
@@ -127,6 +129,7 @@ void USB2PCSDecoder::Refresh()
 
 	//Done
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
 
 void USB2PCSDecoder::RefreshIterationIdle(

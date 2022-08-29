@@ -995,6 +995,17 @@ public:
 	static void FindFallingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
 
+	static void FindZeroCrossingsBase(WaveformBase* data, float threshold, std::vector<int64_t>& edges)
+	{
+		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
+		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+
+		if(udata)
+			FindZeroCrossings(udata, threshold, edges);
+		else
+			FindZeroCrossings(sdata, threshold, edges);
+	}
+
 	static void FindRisingEdges(
 		SparseDigitalWaveform* sdata, UniformDigitalWaveform* udata, std::vector<int64_t>& edges)
 	{

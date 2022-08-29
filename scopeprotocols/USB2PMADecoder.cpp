@@ -80,16 +80,23 @@ string USB2PMADecoder::GetProtocolName()
 void USB2PMADecoder::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din_p = GetAnalogInputWaveform(0);
-	auto din_n = GetAnalogInputWaveform(1);
-	size_t len = min(din_p->m_samples.size(), din_n->m_samples.size());
+	auto din_p = GetInputWaveform(0);
+	auto din_n = GetInputWaveform(1);
+	din_p->PrepareForCpuAccess();
+	din_n->PrepareForCpuAccess();
+	size_t len = min(din_p->size(), din_n->size());
+
+	auto sdin_p = dynamic_cast<SparseAnalogWaveform*>(din_p);
+	auto sdin_n = dynamic_cast<SparseAnalogWaveform*>(din_n);
+	auto udin_p = dynamic_cast<UniformAnalogWaveform*>(din_p);
+	auto udin_n = dynamic_cast<UniformAnalogWaveform*>(din_n);
 
 	//Figure out our speed so we know what's going on
 	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
@@ -113,14 +120,16 @@ void USB2PMADecoder::Refresh()
 		break;
 	}
 
-
 	//Figure out the line state for each input (no clock recovery yet)
 	auto cap = new USB2PMAWaveform;
+	cap->PrepareForCpuAccess();
 	for(size_t i=0; i<len; i++)
 	{
-		bool bp = (din_p->m_samples[i] > threshold);
-		bool bn = (din_n->m_samples[i] > threshold);
-		float vdiff = din_p->m_samples[i] - din_n->m_samples[i];
+		auto vp = GetValue(sdin_p, udin_p, i);
+		auto vn = GetValue(sdin_n, udin_n, i);
+		bool bp = (vp > threshold);
+		bool bn = (vn > threshold);
+		float vdiff = vp - vn;
 
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
 		if(fabs(vdiff) > threshold)
@@ -148,18 +157,18 @@ void USB2PMADecoder::Refresh()
 		//First sample goes as-is
 		if(cap->m_samples.empty())
 		{
-			cap->m_offsets.push_back(din_p->m_offsets[i]);
-			cap->m_durations.push_back(din_p->m_durations[i]);
+			cap->m_offsets.push_back(::GetOffset(sdin_p, udin_p, i));
+			cap->m_durations.push_back(GetDuration(sdin_p, udin_p, i));
 			cap->m_samples.push_back(type);
 			continue;
 		}
 
 		//Type match? Extend the existing sample
-		size_t iold = cap->m_samples.size()-1;
+		size_t iold = cap->size()-1;
 		auto oldtype = cap->m_samples[iold];
 		if(oldtype == type)
 		{
-			cap->m_durations[iold] += din_p->m_durations[i];
+			cap->m_durations[iold] += GetDuration(sdin_p, udin_p, i);
 			continue;
 		}
 
@@ -170,13 +179,13 @@ void USB2PMADecoder::Refresh()
 			(last_fs < transition_time))
 		{
 			cap->m_samples[iold].m_type = type;
-			cap->m_durations[iold] += din_p->m_durations[i];
+			cap->m_durations[iold] += GetDuration(sdin_p, udin_p, i);
 			continue;
 		}
 
 		//Not a match. Add a new sample.
-		cap->m_offsets.push_back(din_p->m_offsets[i]);
-		cap->m_durations.push_back(din_p->m_durations[i]);
+		cap->m_offsets.push_back(::GetOffset(sdin_p, udin_p, i));
+		cap->m_durations.push_back(GetDuration(sdin_p, udin_p, i));
 		cap->m_samples.push_back(type);
 	}
 
@@ -187,6 +196,8 @@ void USB2PMADecoder::Refresh()
 	cap->m_timescale = din_p->m_timescale;
 	cap->m_startTimestamp = din_p->m_startTimestamp;
 	cap->m_startFemtoseconds = din_p->m_startFemtoseconds;
+	cap->m_triggerPhase = din_p->m_triggerPhase;
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color USB2PMAWaveform::GetColor(size_t i)

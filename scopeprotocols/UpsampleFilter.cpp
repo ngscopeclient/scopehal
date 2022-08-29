@@ -102,17 +102,18 @@ string UpsampleFilter::GetProtocolName()
 void UpsampleFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
 
-	//Current resampling implementation assumes input is dense, fail if it's not
-	if(!din->m_densePacked)
+	//Current resampling implementation assumes input is uniform, fail if it's not
+	if(!din)
 	{
 		SetData(NULL, 0);
 		return;
@@ -138,8 +139,9 @@ void UpsampleFilter::Refresh()
 	}
 
 	//Create the output and configure it
-	auto cap = new AnalogWaveform;
-	cap->m_densePacked = true;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
+	cap->m_timescale = din->m_timescale / upsample_factor;
 
 	//Fill the output buffer with default values
 	size_t len = din->m_samples.size();
@@ -150,8 +152,6 @@ void UpsampleFilter::Refresh()
 	{
 		for(size_t j=0; j<upsample_factor; j++)
 		{
-			cap->m_offsets[iout] = iout;
-			cap->m_durations[iout] = 1;
 			cap->m_samples[iout] = 0;
 			iout ++;
 		}
@@ -183,11 +183,6 @@ void UpsampleFilter::Refresh()
 		}
 	}
 
-	//Copy our time scales from the input, and correct for the upsampling
-	cap->m_timescale = din->m_timescale / upsample_factor;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = din->m_triggerPhase;
-
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }
