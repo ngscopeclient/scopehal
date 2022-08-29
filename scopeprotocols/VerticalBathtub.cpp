@@ -84,6 +84,7 @@ void VerticalBathtub::Refresh()
 
 	//Get the input data
 	auto eye = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
+	eye->PrepareForCpuAccess();
 	int64_t timestamp = m_parameters[m_timeName].GetIntVal();
 
 	//Find the eye bin for this column
@@ -96,11 +97,10 @@ void VerticalBathtub::Refresh()
 		return;
 
 	//Create the output
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptySparseAnalogOutputWaveform(eye, 0);
 	cap->m_timescale = eye->m_timescale;
-	cap->m_startTimestamp = eye->m_startTimestamp;
-	cap->m_startFemtoseconds = eye->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 
 	//Eye height config
 	auto range = GetInput(0).GetVoltageRange();
@@ -154,4 +154,6 @@ void VerticalBathtub::Refresh()
 		else
 			samp = log10(samp);
 	}
+
+	cap->MarkModifiedFromCpu();
 }

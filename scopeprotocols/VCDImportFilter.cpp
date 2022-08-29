@@ -243,15 +243,15 @@ void VCDImportFilter::OnFileNameChanged()
 					//Create the waveform
 					WaveformBase* wfm;
 					if(width == 1)
-						wfm = new DigitalWaveform;
+						wfm = new SparseDigitalWaveform;
 					else
-						wfm = new DigitalBusWaveform;
+						wfm = new SparseDigitalBusWaveform;
+					wfm->PrepareForCpuAccess();
 
 					wfm->m_timescale = timescale;
 					wfm->m_startTimestamp = timestamp;
 					wfm->m_startFemtoseconds = fs;
 					wfm->m_triggerPhase = 0;
-					wfm->m_densePacked = false;
 					waveforms[symbol] = wfm;
 					widths[symbol] = width;
 					SetData(wfm, m_streams.size() - 1);
@@ -269,7 +269,7 @@ void VCDImportFilter::OnFileNameChanged()
 					{
 						auto ispace = s.find(' ');
 						auto symbol = s.substr(ispace + 1);
-						auto wfm = dynamic_cast<DigitalBusWaveform*>(waveforms[symbol]);
+						auto wfm = dynamic_cast<SparseDigitalBusWaveform*>(waveforms[symbol]);
 						if(wfm)
 						{
 							//Parse the sample data (skipping the leading 'b')
@@ -288,7 +288,7 @@ void VCDImportFilter::OnFileNameChanged()
 								sample.push_back(false);
 
 							//Extend the previous sample, if there is one
-							auto len = wfm->m_samples.size();
+							auto len = wfm->size();
 							if(len)
 							{
 								auto last = len-1;
@@ -299,6 +299,7 @@ void VCDImportFilter::OnFileNameChanged()
 							wfm->m_offsets.push_back(current_time);
 							wfm->m_durations.push_back(1);
 							wfm->m_samples.push_back(sample);
+							wfm->MarkModifiedFromCpu();
 						}
 						else
 							LogError("Symbol \"%s\" is not a valid digital bus waveform\n", symbol.c_str());
@@ -308,11 +309,11 @@ void VCDImportFilter::OnFileNameChanged()
 					else
 					{
 						auto symbol = s.substr(1);
-						auto wfm = dynamic_cast<DigitalWaveform*>(waveforms[symbol]);
+						auto wfm = dynamic_cast<SparseDigitalWaveform*>(waveforms[symbol]);
 						if(wfm)
 						{
 							//Extend the previous sample, if there is one
-							auto len = wfm->m_samples.size();
+							auto len = wfm->size();
 							if(len)
 							{
 								auto last = len-1;
@@ -323,6 +324,7 @@ void VCDImportFilter::OnFileNameChanged()
 							wfm->m_offsets.push_back(current_time);
 							wfm->m_durations.push_back(1);
 							wfm->m_samples.push_back(s[0] == '1');
+							wfm->MarkModifiedFromCpu();
 						}
 						else
 							LogError("Symbol \"%s\" is not a valid digital waveform\n", symbol.c_str());

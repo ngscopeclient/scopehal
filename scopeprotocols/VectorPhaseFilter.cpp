@@ -74,21 +74,23 @@ string VectorPhaseFilter::GetProtocolName()
 void VectorPhaseFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto a = GetAnalogInputWaveform(0);
-	auto b = GetAnalogInputWaveform(1);
-	auto len = min(a->m_samples.size(), b->m_samples.size());
+	auto a = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	a->PrepareForCpuAccess();
+	b->PrepareForCpuAccess();
+	auto len = min(a->size(), b->size());
 
 	//Set up the output waveform
-	auto cap = new AnalogWaveform;
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
+	cap->PrepareForCpuAccess();
 	cap->Resize(len);
-	cap->CopyTimestamps(a);
 
 	float* fa = (float*)&a->m_samples[0];
 	float* fb = (float*)&b->m_samples[0];
@@ -96,10 +98,5 @@ void VectorPhaseFilter::Refresh()
 	for(size_t i=0; i<len; i++)
 		cap->m_samples[i] = atan2(fa[i], fb[i]) * scale;
 
-	//Copy our time scales from the input
-	cap->m_timescale 		= a->m_timescale;
-	cap->m_startTimestamp 	= a->m_startTimestamp;
-	cap->m_startFemtoseconds = a->m_startFemtoseconds;
-
-	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

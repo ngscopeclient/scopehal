@@ -100,6 +100,8 @@ void VICPDecoder::Refresh()
 		SetData(nullptr, 0);
 		return;
 	}
+	tx->PrepareForCpuAccess();
+	rx->PrepareForCpuAccess();
 
 	//Create the waveform. Call SetData() early on so we can use GetText() in the packet decode
 	auto cap = new VICPWaveform;
@@ -107,6 +109,7 @@ void VICPDecoder::Refresh()
 	cap->m_startTimestamp = tx->m_startTimestamp;
 	cap->m_startFemtoseconds = tx->m_startFemtoseconds;
 	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
 	SetData(cap, 0);
 
 	size_t txlen = tx->m_samples.size();
@@ -471,6 +474,8 @@ void VICPDecoder::Refresh()
 			}
 		}
 	}
+
+	cap->MarkModifiedFromCpu();
 }
 
 Gdk::Color VICPWaveform::GetColor(size_t i)

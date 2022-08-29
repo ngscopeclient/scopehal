@@ -146,8 +146,8 @@ set(SCOPEPROTOCOLS_SOURCES
 	VectorPhaseFilter.cpp
 	VerticalBathtub.cpp
 	VICPDecoder.cpp
-	WaveformGenerationFilter.cpp
 	Waterfall.cpp
+	WaveformGenerationFilter.cpp
 	WAVImportFilter.cpp
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp

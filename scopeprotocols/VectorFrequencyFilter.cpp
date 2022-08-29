@@ -71,17 +71,20 @@ string VectorFrequencyFilter::GetProtocolName()
 void VectorFrequencyFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din_i = GetAnalogInputWaveform(0);
-	auto din_q = GetAnalogInputWaveform(1);
-	size_t len = min(din_i->m_samples.size(), din_q->m_samples.size());
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	size_t len = min(din_i->size(), din_q->size());
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
 
-	auto dout = SetupOutputWaveform(din_i, 0, 0, 0);
+	auto dout = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
+	dout->PrepareForCpuAccess();
 
 	//Calculate scaling factor from rad/sample to Hz
 	float sample_hz = FS_PER_SECOND / din_i->m_timescale;
@@ -97,6 +100,8 @@ void VectorFrequencyFilter::Refresh()
 		if(dphase > M_PI)
 			dphase -= 2*M_PI;
 
-		dout->m_samples[i] = dphase * scale / (din_i->m_durations[i]);;
+		dout->m_samples[i] = dphase * scale;
 	}
+
+	dout->MarkModifiedFromCpu();
 }
