@@ -127,6 +127,9 @@ public:
 
 	virtual size_t size() const  =0;
 
+	virtual bool empty()
+	{ return size() == 0; }
+
 	virtual std::string GetText(size_t /*i*/)
 	{
 		return "(unimplemented)";
