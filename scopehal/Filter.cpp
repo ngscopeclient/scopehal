@@ -946,6 +946,7 @@ UniformAnalogWaveform* Filter::SetupEmptyUniformAnalogOutputWaveform(WaveformBas
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
+	cap->m_timescale			= din->m_timescale;
 
 	//Bump rev number
 	cap->m_revision ++;
@@ -982,6 +983,7 @@ SparseAnalogWaveform* Filter::SetupEmptySparseAnalogOutputWaveform(WaveformBase*
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
+	cap->m_timescale			= din->m_timescale;
 
 	//Bump rev number
 	cap->m_revision ++;
@@ -1017,6 +1019,7 @@ UniformDigitalWaveform* Filter::SetupEmptyUniformDigitalOutputWaveform(WaveformB
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
+	cap->m_timescale			= din->m_timescale;
 
 	//Bump rev number
 	cap->m_revision ++;
@@ -1051,6 +1054,7 @@ SparseDigitalWaveform* Filter::SetupEmptySparseDigitalOutputWaveform(WaveformBas
 	cap->m_startTimestamp 		= din->m_startTimestamp;
 	cap->m_startFemtoseconds	= din->m_startFemtoseconds;
 	cap->m_triggerPhase			= din->m_triggerPhase;
+	cap->m_timescale			= din->m_timescale;
 
 	//Bump rev number
 	cap->m_revision ++;
