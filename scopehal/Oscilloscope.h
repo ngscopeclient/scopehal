@@ -39,6 +39,7 @@
 class Instrument;
 
 #include "SCPITransport.h"
+#include "WaveformPool.h"
 
 /**
 	@brief Generic representation of an oscilloscope, logic analyzer, or spectrum analyzer.
@@ -895,6 +896,33 @@ protected:
 
 	//The trigger
 	Trigger* m_trigger;
+
+	//Pool for reusing memory allocations
+	WaveformPool m_analogWaveformPool;
+
+	WaveformPool m_digitalWaveformPool;
+
+	UniformAnalogWaveform* AllocateAnalogWaveform()
+	{
+		auto p = m_analogWaveformPool.Get();
+		auto ret = dynamic_cast<UniformAnalogWaveform*>(p);
+		if(ret)
+			return ret;
+
+		//Delete garbage if somebody pushed the wrong type of waveform
+		if(p)
+			delete p;
+
+		//Pool was empty, allocate a new waveform
+		return new UniformAnalogWaveform;
+	}
+
+public:
+	void AddWaveformToAnalogPool(WaveformBase* w)
+	{ m_analogWaveformPool.Add(w); }
+
+	void AddWaveformToDigitalPool(WaveformBase* w)
+	{ m_digitalWaveformPool.Add(w); }
 
 public:
 	typedef Oscilloscope* (*CreateProcType)(SCPITransport*);

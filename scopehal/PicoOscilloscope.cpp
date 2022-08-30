@@ -490,7 +490,7 @@ bool PicoOscilloscope::AcquireData()
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
-			auto cap = new UniformAnalogWaveform;
+			auto cap = AllocateAnalogWaveform();
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);

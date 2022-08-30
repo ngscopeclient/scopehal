@@ -2414,7 +2414,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	for(size_t j=0; j<num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform();
 		cap->m_timescale = round(interval);
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
