@@ -93,8 +93,8 @@ void ThresholdFilter::Refresh()
 
 	din->PrepareForCpuAccess();
 
-	auto sdin = dynamic_cast<SparseDigitalWaveform*>(din);
-	auto udin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
 
 	if(sdin)
 	{
