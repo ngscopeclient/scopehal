@@ -112,15 +112,16 @@ string Waterfall::GetProtocolName()
 void Waterfall::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
 	//Get the input data
-	auto din = GetAnalogInputWaveform(0);
-	size_t inlen = din->m_samples.size();
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForCpuAccess();
+	size_t inlen = din->size();
 
 	//Initialize the capture
 	//TODO: timestamps? do we need those?
@@ -128,6 +129,7 @@ void Waterfall::Refresh()
 	if(cap == NULL)
 		cap = new WaterfallWaveform(m_width, m_height);
 	cap->m_timescale = din->m_timescale;
+	cap->PrepareForCpuAccess();
 	float* data = cap->GetData();
 
 	//Move the whole waterfall down by one row
@@ -168,4 +170,5 @@ void Waterfall::Refresh()
 	}
 
 	SetData(cap, 0);
+	cap->MarkModifiedFromCpu();
 }

@@ -100,10 +100,14 @@ void WaveformGenerationFilter::Refresh()
 	}
 
 	//Get the input and sample it
-	auto din = GetDigitalInputWaveform(0);
-	auto clkin = GetDigitalInputWaveform(1);
-	DigitalWaveform samples;
-	SampleOnAnyEdges(din, clkin, samples);
+	auto din = GetInputWaveform(0);
+	auto clkin = GetInputWaveform(1);
+	din->PrepareForCpuAccess();
+	clkin->PrepareForCpuAccess();
+
+	SparseDigitalWaveform samples;
+	samples.PrepareForCpuAccess();
+	SampleOnAnyEdgesBase(din, clkin, samples);
 
 	size_t rate = m_parameters[m_sampleRate].GetIntVal();
 	if(rate == 0)
@@ -116,9 +120,9 @@ void WaveformGenerationFilter::Refresh()
 	size_t edgeSamples = floor(edgeTime / samplePeriod);
 
 	//Configure output waveform
-	auto cap = SetupEmptyOutputWaveform(din, 0);
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	cap->PrepareForCpuAccess();
 	cap->m_timescale = samplePeriod;
-	cap->m_densePacked = true;
 
 	size_t bitsPerSymbol = GetBitsPerSymbol();
 	auto levels = GetVoltageLevels();
@@ -174,4 +178,6 @@ void WaveformGenerationFilter::Refresh()
 
 		vlast = v;
 	}
+
+	cap->MarkModifiedFromCpu();
 }

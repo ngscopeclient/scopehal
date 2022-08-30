@@ -605,13 +605,13 @@ void WFMImportFilter::OnFileNameChanged()
 	//TODO: handle multi channel etc
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	auto wfm = new AnalogWaveform;
+	auto wfm = new UniformAnalogWaveform;
 	wfm->m_timescale = FS_PER_SECOND * (spacing+1) * xscale;
 	wfm->Resize(numRealSamples);
 	wfm->m_startTimestamp = gmtSec;
 	wfm->m_startFemtoseconds = fracSec * FS_PER_SECOND;
 	wfm->m_triggerPhase = triggerPhase * wfm->m_timescale;
-	wfm->m_densePacked = true;
+	wfm->PrepareForCpuAccess();
 	SetData(wfm, 0);
 
 	//Read sample data
@@ -626,13 +626,10 @@ void WFMImportFilter::OnFileNameChanged()
 
 	//Read sample data
 	for(size_t i=0; i<numRealSamples; i++)
-	{
-		wfm->m_offsets[i] = i;
-		wfm->m_durations[i] = 1;
 		wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
-	}
 
 	//Done, set scale
+	wfm->MarkModifiedFromCpu();
 	AutoscaleVertical(0);
 
 	//Clean up

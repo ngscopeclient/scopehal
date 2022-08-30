@@ -190,17 +190,17 @@ void WAVImportFilter::OnFileNameChanged()
 	//Configure output streams
 	SetupStreams(nchans);
 
-	vector<AnalogWaveform*> wfms;
+	vector<UniformAnalogWaveform*> wfms;
 	for(size_t i=0; i<nchans; i++)
 	{
 		//Create new waveform for channel
-		auto wfm = new AnalogWaveform;
+		auto wfm = new UniformAnalogWaveform;
 		wfm->m_timescale = interval;
 		wfm->m_startTimestamp = timestamp;
 		wfm->m_startFemtoseconds = fs;
 		wfm->m_triggerPhase = 0;
-		wfm->m_densePacked = true;
 		wfm->Resize(nsamples);
+		wfm->PrepareForCpuAccess();
 		wfms.push_back(wfm);
 		SetData(wfm, i);
 	}
@@ -216,7 +216,6 @@ void WAVImportFilter::OnFileNameChanged()
 	fclose(fp);
 	fp = NULL;
 
-	//TODO: vectorized offset/duration fill if possible
 	//TODO: vectorized shuffling for the common case of 2 channel?
 
 	//Crunch the samples
@@ -226,8 +225,6 @@ void WAVImportFilter::OnFileNameChanged()
 		for(size_t j=0; j<nchans; j++)
 		{
 			auto wfm = wfms[j];
-			wfm->m_offsets[i] = i;
-			wfm->m_durations[i] = 0;
 
 			//Floating point samples can be read as is
 			if(afmt == 3)
@@ -255,6 +252,9 @@ void WAVImportFilter::OnFileNameChanged()
 			}
 		}
 	}
+
+	for(auto w : wfms)
+		w->MarkModifiedFromCpu();
 
 	//Done, clean up
 	delete[] buf;

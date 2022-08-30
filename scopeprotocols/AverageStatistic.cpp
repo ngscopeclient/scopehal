@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,11 +44,6 @@ string AverageStatistic::GetStatisticName()
 
 bool AverageStatistic::Calculate(StreamDescriptor stream, double& value)
 {
-	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(stream.GetData());
-	if(!data)
-		return false;
-
 	//Start integrating from the past value, if we have one
 	value = 0;
 	size_t count = 0;
@@ -58,10 +53,23 @@ bool AverageStatistic::Calculate(StreamDescriptor stream, double& value)
 		count = m_pastCounts[stream];
 	}
 
+	//Get input data
+	auto w = stream.GetData();
+	auto udata = dynamic_cast<UniformAnalogWaveform*>(w);
+	auto sdata = dynamic_cast<SparseAnalogWaveform*>(w);
+
 	//Add new sample data
-	for(auto sample : data->m_samples)
-		value += (float)sample;
-	count += data->m_samples.size();
+	if(udata)
+	{
+		for(auto sample : udata->m_samples)
+			value += sample;
+	}
+	else if(sdata)
+	{
+		for(auto sample : sdata->m_samples)
+			value += sample;
+	}
+	count += w->size();
 
 	//Average and save
 	m_pastCounts[stream] = count;

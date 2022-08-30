@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,22 +43,29 @@ string MaximumStatistic::GetStatisticName()
 
 bool MaximumStatistic::Calculate(StreamDescriptor stream, double& value)
 {
-	//Can't do anything if we have no data
-	auto data = dynamic_cast<AnalogWaveform*>(stream.GetData());
-	if(!data)
-		return false;
-
-	//Starting value is previous minimum, if we have one
+	//Starting value is previous maximum, if we have one
 	value = -1e20;
 	if(m_pastMaximums.find(stream) != m_pastMaximums.end())
 		value = m_pastMaximums[stream];
 
-	for(auto sample : data->m_samples)
+	//Get input data
+	auto w = stream.GetData();
+	auto udata = dynamic_cast<UniformAnalogWaveform*>(w);
+	auto sdata = dynamic_cast<SparseAnalogWaveform*>(w);
+
+	//Add new sample data
+	if(udata)
 	{
-		if((float)sample > value)
-			value = sample;
+		for(auto sample : udata->m_samples)
+			value = max(value, (double)sample);
+	}
+	else if(sdata)
+	{
+		for(auto sample : sdata->m_samples)
+			value += max(value, (double)sample);
 	}
 
 	m_pastMaximums[stream] = value;
+
 	return true;
 }

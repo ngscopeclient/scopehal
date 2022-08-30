@@ -80,14 +80,16 @@ string WindowedAutocorrelationFilter::GetProtocolName()
 void WindowedAutocorrelationFilter::Refresh()
 {
 	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndAnalog())
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	auto din_i = GetAnalogInputWaveform(0);
-	auto din_q = GetAnalogInputWaveform(1);
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
 
 	//Copy the units
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
@@ -108,9 +110,11 @@ void WindowedAutocorrelationFilter::Refresh()
 	}
 
 	//Set up the output waveform
-	auto cap = SetupOutputWaveform(din_i, 0, 0, 2*period_samples);
-
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
 	size_t end = len - 2*period_samples;
+	cap->PrepareForCpuAccess();
+	cap->Resize(end);
+
 	for(size_t i=0; i < end; i ++)
 	{
 		complex<float> total = 0;
@@ -129,4 +133,6 @@ void WindowedAutocorrelationFilter::Refresh()
 
 		cap->m_samples[i] = v;
 	}
+
+	cap->MarkModifiedFromCpu();
 }

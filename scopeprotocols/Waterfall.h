@@ -48,6 +48,34 @@ public:
 	float* GetData()
 	{ return m_outdata; }
 
+	//Unused virtual methods from WaveformBase that we have to override
+	virtual void clear()
+	{}
+
+	virtual void Resize(size_t /*unused*/)
+	{}
+
+	virtual void PrepareForCpuAccess()
+	{}
+
+	virtual void PrepareForGpuAccess()
+	{}
+
+	virtual void MarkSamplesModifiedFromCpu()
+	{}
+
+	virtual void MarkSamplesModifiedFromGpu()
+	{}
+
+	virtual void MarkModifiedFromCpu()
+	{}
+
+	virtual void MarkModifiedFromGpu()
+	{}
+
+	virtual size_t size() const
+	{ return 0; }
+
 protected:
 	size_t m_width;
 	size_t m_height;
