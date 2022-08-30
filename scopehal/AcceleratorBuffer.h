@@ -406,6 +406,8 @@ public:
 			//Default to doubling in size each time to avoid excessive copying.
 			if(m_capacity == 0)
 				reserve(size);
+			else if(size > m_capacity*2)
+				reserve(size);
 			else
 				reserve(m_capacity * 2);
 		}
