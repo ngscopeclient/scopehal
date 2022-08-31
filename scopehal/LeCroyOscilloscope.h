@@ -78,6 +78,8 @@ public:
 
 	virtual void FlushConfigCache();
 
+	void ForceHDMode(bool mode);
+
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);

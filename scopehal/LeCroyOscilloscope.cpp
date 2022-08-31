@@ -5175,3 +5175,17 @@ bool LeCroyOscilloscope::IsCDRLocked()
 
 	return false;
 }
+
+/**
+	@brief Forces 16-bit transfer mode on/off when connecting to a scope regardless of ADC resolution
+ */
+void LeCroyOscilloscope::ForceHDMode(bool mode)
+{
+	m_highDefinition = mode;
+
+	if(m_highDefinition)
+		m_transport->SendCommandQueued("COMM_FORMAT DEF9,WORD,BIN");
+	else
+		m_transport->SendCommandQueued("COMM_FORMAT DEF9,BYTE,BIN");
+
+}
