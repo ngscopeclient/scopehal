@@ -62,7 +62,7 @@ bool MinimumStatistic::Calculate(StreamDescriptor stream, double& value)
 	else if(sdata)
 	{
 		for(auto sample : sdata->m_samples)
-			value += min(value, (double)sample);
+			value = min(value, (double)sample);
 	}
 
 	m_pastMinimums[stream] = value;

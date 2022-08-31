@@ -62,7 +62,7 @@ bool MaximumStatistic::Calculate(StreamDescriptor stream, double& value)
 	else if(sdata)
 	{
 		for(auto sample : sdata->m_samples)
-			value += max(value, (double)sample);
+			value = max(value, (double)sample);
 	}
 
 	m_pastMaximums[stream] = value;
