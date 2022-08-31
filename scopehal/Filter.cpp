@@ -774,15 +774,27 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 	config += tmp;
 	for(size_t i=0; i<GetStreamCount(); i++)
 	{
-		snprintf(tmp, sizeof(tmp), "            stream%zu:\n", i);
-		config += tmp;
+		switch(m_streams[i].m_stype)
+		{
+			case Stream::STREAM_TYPE_DIGITAL:
+			case Stream::STREAM_TYPE_DIGITAL_BUS:
+			case Stream::STREAM_TYPE_TRIGGER:
+			case Stream::STREAM_TYPE_PROTOCOL:
+				break;
 
-		snprintf(tmp, sizeof(tmp), "                index:           %zu\n", i);
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                vrange:          %f\n", GetVoltageRange(i));
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                offset:          %f\n", GetOffset(i));
-		config += tmp;
+			default:
+				snprintf(tmp, sizeof(tmp), "            stream%zu:\n", i);
+				config += tmp;
+
+				snprintf(tmp, sizeof(tmp), "                index:           %zu\n", i);
+				config += tmp;
+
+				snprintf(tmp, sizeof(tmp), "                vrange:          %f\n", GetVoltageRange(i));
+				config += tmp;
+				snprintf(tmp, sizeof(tmp), "                offset:          %f\n", GetOffset(i));
+				config += tmp;
+				break;
+		}
 	}
 
 	return config;
