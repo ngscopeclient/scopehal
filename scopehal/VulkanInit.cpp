@@ -113,7 +113,7 @@ bool VulkanInit()
 	{
 		//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
 		//If we want to support llvmpipe, we need to stick to 1.0
-		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, VK_API_VERSION_1_1);
+		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, VK_API_VERSION_1_0);
 		vk::InstanceCreateInfo instanceInfo({}, &appInfo);
 
 		//Create the instance
