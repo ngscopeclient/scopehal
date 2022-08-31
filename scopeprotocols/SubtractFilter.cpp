@@ -121,7 +121,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		scap = SetupSparseOutputWaveform(sdin_p, 0, 0, 0);
 	else if(udin_p && udin_n)
 	{
-		ucap = SetupEmptyUniformAnalogOutputWaveform(sdin_p, 0);
+		ucap = SetupEmptyUniformAnalogOutputWaveform(udin_p, 0);
 		ucap->Resize(len);
 	}
 
