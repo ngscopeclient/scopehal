@@ -161,6 +161,7 @@ void InitializeSearchPaths();
 void InitializePlugins();
 void DetectCPUFeatures();
 void DetectGPUFeatures();
+std::string GetDirOfCurrentExecutable();
 
 void ScopehalStaticCleanup();
 

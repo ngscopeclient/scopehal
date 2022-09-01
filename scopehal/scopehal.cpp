@@ -790,7 +790,10 @@ string ReadFile(const string& path)
 	return ret;
 }
 
-void InitializeSearchPaths()
+/**
+	@brief Gets the path to the directory containing the current executable
+ */
+string GetDirOfCurrentExecutable()
 {
 	string binRootDir;
 	//Search in the directory of the glscopeclient binary first
@@ -821,6 +824,14 @@ void InitializeSearchPaths()
 		binRootDir = dirname(binDir);
 	}
 #endif
+
+	return binRootDir;
+}
+
+void InitializeSearchPaths()
+{
+	string binRootDir = GetDirOfCurrentExecutable();
+
 	// Add the share directories associated with the binary location
 	if(binRootDir.size() > 0)
 	{
