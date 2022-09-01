@@ -237,7 +237,12 @@ class UniformWaveform : public UniformWaveformBase
 public:
 
 	UniformWaveform()
-	{}
+	{
+		//Default data to CPU/GPU mirror
+		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
+		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
+		m_samples.PrepareForCpuAccess();
+	}
 
 	/**
 		@brief Creates a uniform waveform as a copy of a sparse one which happens to be sampled at uniform rate.
