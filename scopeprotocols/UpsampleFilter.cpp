@@ -161,7 +161,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 
 		//Dispatch the compute operation and block until it completes
 		cmdBuf.begin({});
-		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(imax, 64), upsample_factor);
+		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(imax, 64), GetComputeBlockCount(upsample_factor, 1));
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 
