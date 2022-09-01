@@ -51,7 +51,7 @@ TRCImportFilter::TRCImportFilter(const string& color)
 			"shaders/Convert16BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
-	if(g_hasShaderInt64)
+	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
 		m_computePipeline8Bit = make_unique<ComputePipeline>(
 			"shaders/Convert8BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
@@ -294,7 +294,7 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 
 		//The accelerated filter needs int64 support
-		if(g_hasShaderInt64 && g_gpuFilterEnabled)
+		if(g_hasShaderInt64 && g_hasShaderInt8 && g_gpuFilterEnabled)
 		{
 			LogTrace("GPU path\n");
 

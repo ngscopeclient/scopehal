@@ -100,6 +100,7 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
 //Feature flags indicating that we have support for specific data types etc on the GPU
 bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
+bool g_hasShaderInt8 = false;
 
 /**
 	@brief Initialize a Vulkan context for compute
@@ -111,10 +112,41 @@ bool VulkanInit()
 
 	try
 	{
+		auto extensions = g_vkContext.enumerateInstanceExtensionProperties();
+		bool hasPhysicalDeviceProperties2 = false;
+		for(auto e : extensions)
+		{
+			if(!strcmp((char*)e.extensionName, "VK_KHR_get_physical_device_properties2"))
+			{
+				LogDebug("VK_KHR_get_physical_device_properties2: supported\n");
+				hasPhysicalDeviceProperties2 = true;
+			}
+		}
+
 		//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
-		//If we want to support llvmpipe, we need to stick to 1.0
-		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, VK_API_VERSION_1_0);
-		vk::InstanceCreateInfo instanceInfo({}, &appInfo);
+		//But if Vulkan 1.2 is available, request it.
+		//TODO: If we want to support llvmpipe, we need to stick to 1.0
+		auto apiVersion = VK_API_VERSION_1_1;
+		auto availableVersion = g_vkContext.enumerateInstanceVersion();
+		uint32_t loader_major = VK_VERSION_MAJOR(availableVersion);
+		uint32_t loader_minor = VK_VERSION_MINOR(availableVersion);
+		bool vulkan12Available = false;
+		LogDebug("Loader/API support available for Vulkan %d.%d\n", loader_major, loader_minor);
+		if( (loader_major >= 1) || ( (loader_major == 1) && (loader_minor >= 2) ) )
+		{
+			apiVersion = VK_API_VERSION_1_2;
+			vulkan12Available = true;
+			LogDebug("Vulkan 1.2 support available, requesting it\n");
+		}
+		else
+			LogDebug("Vulkan 1.2 support not available\n");
+
+		//Request VK_KHR_get_physical_device_properties2 if available
+		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, apiVersion);
+		vector<const char*> extensionsToUse;
+		if(hasPhysicalDeviceProperties2)
+			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
+		vk::InstanceCreateInfo instanceInfo({}, &appInfo, {}, extensionsToUse);
 
 		//Create the instance
 		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
@@ -208,10 +240,39 @@ bool VulkanInit()
 				else
 					LogDebug("int64:                  no\n");
 
-				if(features.shaderInt16)
-					LogDebug("int16:                  yes\n");
-				else
-					LogDebug("int16:                  no\n");
+				if(hasPhysicalDeviceProperties2)
+				{
+					//Get more details
+					auto features2 = device.getFeatures2<
+						vk::PhysicalDeviceFeatures2,
+						vk::PhysicalDevice16BitStorageFeatures,
+						vk::PhysicalDevice8BitStorageFeatures,
+						vk::PhysicalDeviceVulkan12Features
+						>();
+					auto storageFeatures16 = std::get<1>(features2);
+					auto storageFeatures8 = std::get<2>(features2);
+					auto vulkan12Features = std::get<3>(features2);
+
+					if(features.shaderInt16)
+					{
+						if(storageFeatures16.storageBuffer16BitAccess)
+							LogDebug("int16:                  yes (allowed in SSBOs)\n");
+						else
+							LogDebug("int16:                  yes (but not allowed in SSBOs)\n");
+					}
+					else
+						LogDebug("int16:                  no\n");
+
+					if(vulkan12Features.shaderInt8)
+					{
+						if(storageFeatures8.uniformAndStorageBuffer8BitAccess)
+							LogDebug("int8:                   yes (allowed in SSBOs)\n");
+						else
+							LogDebug("int8:                   yes (but not allowed in SSBOs)\n");
+					}
+					else
+						LogDebug("int8:                   no\n");
+				}
 
 				const size_t k = 1024LL;
 				const size_t m = k*k;
@@ -330,6 +391,10 @@ bool VulkanInit()
 
 				//See if the device has good integer data type support. If so, enable it
 				vk::PhysicalDeviceFeatures enabledFeatures;
+				vk::PhysicalDevice16BitStorageFeatures features16bit;
+				vk::PhysicalDevice8BitStorageFeatures features8bit;
+				vk::PhysicalDeviceVulkan12Features featuresVulkan12;
+				void* pNext = nullptr;
 				if(device.getFeatures().shaderInt64)
 				{
 					enabledFeatures.shaderInt64 = true;
@@ -339,8 +404,67 @@ bool VulkanInit()
 				if(device.getFeatures().shaderInt16)
 				{
 					enabledFeatures.shaderInt16 = true;
-					g_hasShaderInt16 = true;
 					LogDebug("Enabling 16-bit integer support\n");
+				}
+				if(hasPhysicalDeviceProperties2)
+				{
+					//Get more details
+					auto features2 = device.getFeatures2<
+						vk::PhysicalDeviceFeatures2,
+						vk::PhysicalDevice16BitStorageFeatures,
+						vk::PhysicalDevice8BitStorageFeatures,
+						vk::PhysicalDeviceVulkan12Features
+						>();
+					auto storageFeatures16 = std::get<1>(features2);
+					auto storageFeatures8 = std::get<2>(features2);
+					auto vulkan12Features = std::get<3>(features2);
+
+					//Enable 16 bit SSBOs
+					if(storageFeatures16.storageBuffer16BitAccess)
+					{
+						features16bit.storageBuffer16BitAccess = true;
+						features16bit.pNext = pNext;
+						pNext = &features16bit;
+						LogDebug("Enabling 16-bit integer support for SSBOs\n");
+						g_hasShaderInt16 = true;
+					}
+
+					//Vulkan 1.2 allows some stuff to be done simpler
+					if(vulkan12Available)
+					{
+						if(storageFeatures16.storageBuffer16BitAccess)
+
+						//Enable 8 bit shader variables
+						if(vulkan12Features.shaderInt8)
+						{
+							featuresVulkan12.shaderInt8 = true;
+							LogDebug("Enabling 8-bit integer support\n");
+						}
+
+						//Enable 8 bit SSBOs
+						if(storageFeatures8.uniformAndStorageBuffer8BitAccess)
+						{
+							featuresVulkan12.uniformAndStorageBuffer8BitAccess = true;
+							LogDebug("Enabling 8-bit integer support for SSBOs\n");
+							g_hasShaderInt8 = true;
+						}
+
+						featuresVulkan12.pNext = pNext;
+						pNext = &featuresVulkan12;
+					}
+
+					//Nope, need to use the old way
+					else
+					{
+						//Enable 8 bit SSBOs
+						if(storageFeatures8.storageBuffer8BitAccess)
+						{
+							features8bit.storageBuffer8BitAccess = true;
+							features8bit.pNext = pNext;
+							pNext = &features8bit;
+							LogDebug("Enabling 8-bit integer support for SSBOs\n");
+						}
+					}
 				}
 
 				//Initialize the device
@@ -351,8 +475,8 @@ bool VulkanInit()
 					qinfo,
 					{},
 					{},
-					&enabledFeatures
-					);
+					&enabledFeatures,
+					pNext);
 				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
 
 				//Figure out what memory types to use for various purposes

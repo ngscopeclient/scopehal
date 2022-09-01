@@ -206,6 +206,7 @@ extern bool g_gpuFilterEnabled;
 extern bool g_gpuScopeDriverEnabled;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
+extern bool g_hasShaderInt8;
 
 //Shader args for frequently used kernels
 struct ConvertRawSamplesShaderArgs
