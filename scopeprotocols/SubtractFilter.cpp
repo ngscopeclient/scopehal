@@ -166,14 +166,6 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
-		//Waveform data must be on GPU
-		din_p->PrepareForGpuAccess();
-		din_n->PrepareForGpuAccess();
-		if(scap)
-			scap->PrepareForGpuAccess();
-		else
-			ucap->PrepareForGpuAccess();
-
 		//Update our descriptor sets with current buffers
 		m_computePipeline.BindBuffer(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples);
 		m_computePipeline.BindBuffer(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples);
