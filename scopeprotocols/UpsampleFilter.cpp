@@ -65,6 +65,7 @@ float blackman(float x, float width)
 
 UpsampleFilter::UpsampleFilter(const string& color)
 	: Filter(color, CAT_MATH)
+	, m_computePipeline("shaders/UpsampleFilter.spv", 3, sizeof(UpsampleFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("din");
@@ -72,6 +73,10 @@ UpsampleFilter::UpsampleFilter(const string& color)
 	m_factorname = "Upsample factor";
 	m_parameters[m_factorname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_factorname].SetIntVal(10);
+
+	//Use pinned memory for filter kernel
+	m_filter.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_filter.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,27 +104,18 @@ string UpsampleFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void UpsampleFilter::Refresh()
+void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
 	//Get the input data
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-
 	//Current resampling implementation assumes input is uniform, fail if it's not
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	if(!din)
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	//Configuration parameters that eventually have to be user specified
+	//Configuration parameters (TODO: allow window to be user specified)
 	size_t upsample_factor = m_parameters[m_factorname].GetIntVal();
 	size_t window = 5;
 	size_t kernel = window*upsample_factor;
@@ -130,59 +126,84 @@ void UpsampleFilter::Refresh()
 	}
 
 	//Create the interpolation filter
+	//TODO: if upsampling factor and window size have not changed, keep the same filter coefficients
+	//(no need to push every time)
 	float frac_kernel = kernel * 1.0f / upsample_factor;
-	vector<float> filter;
+	m_filter.resize(kernel);
+	m_filter.PrepareForCpuAccess();
 	for(size_t i=0; i<kernel; i++)
 	{
 		float frac = i*1.0f / upsample_factor;
-		filter.push_back(sinc(frac, frac_kernel) * blackman(frac, frac_kernel));
+		m_filter[i] = sinc(frac, frac_kernel) * blackman(frac, frac_kernel);
 	}
+	m_filter.MarkModifiedFromCpu();
 
 	//Create the output and configure it
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-	cap->PrepareForCpuAccess();
 	cap->m_timescale = din->m_timescale / upsample_factor;
-
-	//Fill the output buffer with default values
-	size_t len = din->m_samples.size();
-	size_t outlen = len*upsample_factor;
-	cap->Resize(outlen);
-	size_t iout = 0;
-	for(size_t i=0; i < len; i++)
-	{
-		for(size_t j=0; j<upsample_factor; j++)
-		{
-			cap->m_samples[iout] = 0;
-			iout ++;
-		}
-	}
-
-	//Logically, we upsample by inserting zeroes, then convolve with the sinc filter.
-	//Optimization: don't actually waste time multiplying by zero
-	//TODO: move to GPU
+	size_t len = din->size();
 	size_t imax = len - window;
-	#pragma omp parallel for
-	for(size_t i=0; i < imax; i++)
+	size_t outlen = imax*upsample_factor;
+	cap->Resize(outlen);
+
+	if(g_gpuFilterEnabled)
 	{
-		size_t offset = i * upsample_factor;
-		for(size_t j=0; j<upsample_factor; j++)
-		{
-			size_t start = 0;
-			size_t sstart = 0;
-			if(j > 0)
-			{
-				sstart = 1;
-				start = upsample_factor - j;
-			}
+		//Update our descriptor sets with current buffers
+		m_computePipeline.BindBuffer(0, din->m_samples);
+		m_computePipeline.BindBuffer(1, m_filter);
+		m_computePipeline.BindBuffer(2, cap->m_samples, true);
+		m_computePipeline.UpdateDescriptors();
 
-			float f = 0;
-			for(size_t k = start; k<kernel; k += upsample_factor, sstart ++)
-				f += filter[k] * din->m_samples[i + sstart];
+		UpsampleFilterArgs args;
+		args.imax = imax;
+		args.upsample_factor = upsample_factor;
+		args.kernel = kernel;
 
-			cap->m_samples[offset + j] = f;
-		}
+		//Dispatch the compute operation and block until it completes
+		cmdBuf.begin({});
+		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(imax, 64), upsample_factor);
+		cmdBuf.end();
+		SubmitAndBlock(cmdBuf, queue);
+
+		cap->MarkModifiedFromGpu();
 	}
 
-	SetData(cap, 0);
-	cap->MarkModifiedFromCpu();
+	else
+	{
+		din->PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
+
+		//Logically, we upsample by inserting zeroes, then convolve with the sinc filter.
+		//Optimization: don't actually waste time multiplying by zero
+		#pragma omp parallel for
+		for(size_t i=0; i < imax; i++)
+		{
+			size_t offset = i * upsample_factor;
+			for(size_t j=0; j<upsample_factor; j++)
+			{
+				size_t start = 0;
+				size_t sstart = 0;
+				if(j > 0)
+				{
+					sstart = 1;
+					start = upsample_factor - j;
+				}
+
+				float f = 0;
+				for(size_t k = start; k<kernel; k += upsample_factor, sstart ++)
+					f += m_filter[k] * din->m_samples[i + sstart];
+
+				cap->m_samples[offset + j] = f;
+			}
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
 }
+
+Filter::DataLocation UpsampleFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+

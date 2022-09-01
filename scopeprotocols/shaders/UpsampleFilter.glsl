@@ -27,41 +27,51 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of UpsampleFilter
- */
-#ifndef UpsampleFilter_h
-#define UpsampleFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-struct UpsampleFilterArgs
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t imax;
-	uint32_t upsample_factor;
-	uint32_t kernel;
+	float din[];
 };
 
-class UpsampleFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_fkernel
 {
-public:
-	UpsampleFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-	virtual DataLocation GetInputLocation();
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(UpsampleFilter)
-
-protected:
-	std::string m_factorname;
-
-	AcceleratorBuffer<float> m_filter;
-
-	ComputePipeline m_computePipeline;
+	float fkernel[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint imax;
+	uint upsample_factor;
+	uint kernel;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	if(gl_GlobalInvocationID.x >= imax)				//i
+		return;
+	if(gl_GlobalInvocationID.y >= upsample_factor)	//j
+		return;
+
+	uint start = 0;
+	uint sstart = 0;
+	if(gl_GlobalInvocationID.y > 0)
+	{
+		sstart = 1;
+		start = upsample_factor - gl_GlobalInvocationID.y;
+	}
+
+	float f = 0;
+	for(uint k = start; k<kernel; k += upsample_factor, sstart ++)
+		f += fkernel[k] * din[gl_GlobalInvocationID.x + sstart];
+
+	dout[gl_GlobalInvocationID.x*upsample_factor + gl_GlobalInvocationID.y] = f;
+}

@@ -32,6 +32,7 @@ add_compute_shaders(
 		Convert8BitSamples.glsl
 		Convert16BitSamples.glsl
 		SubtractFilter.glsl
+		UpsampleFilter.glsl
 	)
 
 add_dependencies(scopeprotocols protocolshaders)
