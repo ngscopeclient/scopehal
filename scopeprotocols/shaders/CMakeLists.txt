@@ -13,7 +13,7 @@ function(add_compute_shaders target)
 			OUTPUT ${outfile}
 			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
 			COMMENT "Compile shader ${base}"
-			COMMAND glslc --target-env=vulkan1.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/${source} -o ${outfile})
+			COMMAND ${Vulkan_GLSLC_EXECUTABLE} --target-env=vulkan1.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/${source} -o ${outfile})
 
 		install(FILES ${outfile} DESTINATION share/glscopeclient/shaders)
 
