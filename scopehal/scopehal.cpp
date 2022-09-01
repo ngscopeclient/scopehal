@@ -795,6 +795,30 @@ string ReadFile(const string& path)
  */
 string GetDirOfCurrentExecutable()
 {
+#ifdef _WIN32
+	TCHAR binPath[MAX_PATH];
+	if(GetModuleFileName(NULL, binPath, MAX_PATH) == 0)
+		LogError("Error: GetModuleFileName() failed.\n");
+	else if(!PathRemoveFileSpec(binPath) )
+		LogError("Error: PathRemoveFileSpec() failed.\n");
+	else
+		return binPath;
+#else
+	char binDir[1024] = {0};
+	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
+	if ( readlinkReturn <= 0 )
+		LogError("Error: readlink() failed.\n");
+	else if ( (unsigned) readlinkReturn > (sizeof(binDir) - 1) )
+		LogError("Error: readlink() returned a path larger than our buffer.\n");
+	else
+		return dirname(binDir);
+#endif
+
+	return "";
+}
+
+void InitializeSearchPaths()
+{
 	string binRootDir;
 	//Search in the directory of the glscopeclient binary first
 #ifdef _WIN32
@@ -806,6 +830,7 @@ string GetDirOfCurrentExecutable()
 	else
 	{
 		g_searchPaths.push_back(binPath);
+
 		// On mingw, binPath would typically be /mingw64/bin now
 		//and our data files in /mingw64/share. Strip back one more layer
 		// of hierarchy so we can start appending.
@@ -824,13 +849,6 @@ string GetDirOfCurrentExecutable()
 		binRootDir = dirname(binDir);
 	}
 #endif
-
-	return binRootDir;
-}
-
-void InitializeSearchPaths()
-{
-	string binRootDir = GetDirOfCurrentExecutable();
 
 	// Add the share directories associated with the binary location
 	if(binRootDir.size() > 0)
