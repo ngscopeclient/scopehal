@@ -194,12 +194,10 @@ extern std::vector<cl::Device> g_contextDevices;
 extern size_t g_maxClLocalSizeX;
 #endif
 
-//Vulkan config
+//Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
-extern std::unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
 extern size_t g_computeQueueType;
-
 void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
 //Enable flags for various features

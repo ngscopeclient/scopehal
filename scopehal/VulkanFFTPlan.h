@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,103 +30,86 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of FFTFilter
+	@brief Declaration of VulkanFFTPlan
  */
-#ifndef FFTFilter_h
-#define FFTFilter_h
+#ifndef VulkanFFTPlan_h
+#define VulkanFFTPlan_h
 
-#include <ffts.h>
+#include <vkFFT.h>
+#include "AcceleratorBuffer.h"
 
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
+extern std::unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
+extern std::unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
+extern std::unique_ptr<vk::raii::Queue> g_vkFFTQueue;
+extern std::mutex g_vkFFTMutex;
+extern vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 
-#include "VulkanFFTPlan.h"
-
-class FFTFilter : public PeakDetectionFilter
+/**
+	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
+ */
+class VulkanFFTPlan
 {
 public:
-	FFTFilter(const std::string& color);
-	virtual ~FFTFilter();
 
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
-
-	enum WindowFunction
+	VulkanFFTPlan(size_t size)
+		: m_size(size)
+		, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 	{
-		WINDOW_RECTANGULAR,
-		WINDOW_HANN,
-		WINDOW_HAMMING,
-		WINDOW_BLACKMAN_HARRIS
-	};
+		memset(&m_app, 0, sizeof(m_app));
+		memset(&m_config, 0, sizeof(m_config));
 
-	enum RoundingMode
+		std::lock_guard<std::mutex> lock(g_vkFFTMutex);
+
+		//Only 1D FFTs supported for now
+		m_config.FFTdim = 1;
+		m_config.size[0] = size;
+		m_config.size[1] = 1;
+		m_config.size[2] = 1;
+
+		//Extract raw handles of all of our Vulkan infrastructure
+		m_physicalDevice = **g_vkfftPhysicalDevice;
+		m_device = **g_vkComputeDevice;
+		m_pool = **g_vkFFTCommandPool;
+		m_queue = **g_vkFFTQueue;
+		m_rawfence = *m_fence;
+
+		m_config.physicalDevice = &m_physicalDevice;
+		m_config.device = &m_device;
+		m_config.queue = &m_queue;
+		m_config.commandPool = &m_pool;
+		m_config.fence = &m_rawfence;
+		m_config.isCompilerInitialized = 1;
+
+		//single buffer of full size
+		uint64_t bsize = size;
+		m_config.bufferSize = &bsize;
+
+		auto err = initializeVkFFT(&m_app, m_config);
+		if(VKFFT_SUCCESS != err)
+			LogError("Failed to initialize vkFFT (code %d)\n", err);
+	}
+
+	~VulkanFFTPlan()
 	{
-		ROUND_TRUNCATE,
-		ROUND_ZERO_PAD
-	};
+		deleteVkFFT(&m_app);
+	}
 
-	//Window function helpers
-	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
-	static void HannWindow(const float* data, size_t len, float* out);
-	static void HammingWindow(const float* data, size_t len, float* out);
-	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
-	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
-	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
-	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
-
-	PROTOCOL_DECODER_INITPROC(FFTFilter)
+	size_t size() const
+	{ return m_size; }
 
 protected:
-	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t nouts, float scale);
+	VkFFTApplication m_app;
+	VkFFTConfiguration m_config;
+	size_t m_size;
 
-	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
+	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper object?
+	VkPhysicalDevice m_physicalDevice;
+	VkDevice m_device;
+	VkCommandPool m_pool;
+	VkQueue m_queue;
 
-	void DoRefresh(
-		WaveformBase* din,
-		AcceleratorBuffer<float>& data,
-		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
-
-	size_t m_cachedNumPoints;
-	size_t m_cachedNumPointsFFT;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
-	ffts_plan_t* m_plan;
-
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-	std::string m_roundingName;
-
-	#ifdef HAVE_CLFFT
-	cl::CommandQueue* m_queue;
-
-	clfftPlanHandle m_clfftPlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-	cl::Kernel* m_cosineSumWindowKernel;
-	cl::Kernel* m_blackmanHarrisWindowKernel;
-
-	cl::Program* m_normalizeProgram;
-	cl::Kernel* m_normalizeMagnitudeKernel;
-	cl::Kernel* m_normalizeLogMagnitudeKernel;
-
-	#endif
-
-	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
+	vk::raii::Fence m_fence;
+	VkFence m_rawfence;
 };
 
 #endif

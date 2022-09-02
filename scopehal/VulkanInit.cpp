@@ -34,6 +34,7 @@
  */
 #include "scopehal.h"
 #include <glslang_c_interface.h>
+#include <vkFFT.h>
 
 using namespace std;
 
@@ -66,7 +67,7 @@ unique_ptr<vk::raii::CommandPool> g_vkTransferCommandPool;
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
  */
-std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
+unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 
 /**
 	@brief Queue for AcceleratorBuffer transfers
@@ -74,12 +75,12 @@ std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
  */
-std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
+unique_ptr<vk::raii::Queue> g_vkTransferQueue;
 
 /**
 	@brief Mutex for interlocking access to g_vkTransferCommandBuffer and g_vkTransferCommandPool
  */
-std::mutex g_vkTransferMutex;
+mutex g_vkTransferMutex;
 
 /**
 	@brief Vulkan memory type for CPU-based memory that is also GPU-readable
@@ -96,6 +97,26 @@ size_t g_vkLocalMemoryType;
  */
 size_t g_computeQueueType;
 
+/**
+	@brief Command buffer for submitting vkFFT calls to
+ */
+unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
+
+/**
+	@brief Command buffer for submitting vkFFT calls to
+ */
+unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
+
+/**
+	@brief Command queue for submitting vkFFT calls to
+ */
+unique_ptr<vk::raii::Queue> g_vkFFTQueue;
+
+/**
+	@brief Mutex for controlling access to g_vkfFFT*
+ */
+mutex g_vkFFTMutex;
+
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 //Feature flags indicating that we have support for specific data types etc on the GPU
@@ -104,6 +125,11 @@ bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
 
 void VulkanCleanup();
+
+/**
+	@brief vkFFT is weird and needs to hold onto the *physical* device...
+ */
+vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 
 /**
 	@brief Initialize a Vulkan context for compute
@@ -161,7 +187,7 @@ bool VulkanInit()
 
 			size_t bestDevice = 0;
 
-			vk::raii::PhysicalDevices devices(*g_vkInstance);
+			static vk::raii::PhysicalDevices devices(*g_vkInstance);
 			for(size_t i=0; i<devices.size(); i++)
 			{
 				auto device = devices[i];
@@ -354,6 +380,7 @@ bool VulkanInit()
 			LogDebug("Selected device %zu\n", bestDevice);
 			{
 				auto device = devices[bestDevice];
+				g_vkfftPhysicalDevice = &devices[bestDevice];
 
 				LogIndenter li3;
 
@@ -541,11 +568,12 @@ bool VulkanInit()
 				LogDebug("Using type %zu for pinned host memory\n", g_vkPinnedMemoryType);
 				LogDebug("Using type %zu for card-local memory\n", g_vkLocalMemoryType);
 
-				//Make a CommandPool
+				//Make a CommandPool for transfers and another one for vkFFT
 				vk::CommandPoolCreateInfo poolInfo(
 					vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 					g_computeQueueType );
 				g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+				g_vkFFTCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 				//Make a CommandBuffer for memory transfers that we can use implicitly during buffer management
 				vk::CommandBufferAllocateInfo bufinfo(**g_vkTransferCommandPool, vk::CommandBufferLevel::ePrimary, 1);
@@ -554,6 +582,12 @@ bool VulkanInit()
 
 				//Make a Queue for memory transfers that we can use implicitly during buffer management
 				g_vkTransferQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
+
+				//And again for FFTs
+				bufinfo = vk::CommandBufferAllocateInfo(**g_vkFFTCommandPool, vk::CommandBufferLevel::ePrimary, 1);
+				g_vkFFTCommandBuffer = make_unique<vk::raii::CommandBuffer>(
+					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+				g_vkFFTQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
 			}
 		}
 	}
@@ -580,8 +614,15 @@ bool VulkanInit()
 	g_gpuScopeDriverEnabled = true;
 
 	//Initialize the glsl compiler since vkFFT does JIT generation of kernels
-	int ret = glslang_initialize_process();
-	LogDebug("ret = %zu\n", ret);
+	if(1 != glslang_initialize_process())
+		LogError("Failed to initialize glslang compiler\n");
+
+	//Print out vkFFT version for debugging
+	int vkfftver = VkFFTGetVersion();
+	int vkfft_major = vkfftver / 10000;
+	int vkfft_minor = (vkfftver / 100) % 100;
+	int vkfft_patch = vkfftver % 100;
+	LogDebug("vkFFT version: %d.%d.%d\n", vkfft_major, vkfft_minor, vkfft_patch);
 
 	return true;
 }
@@ -617,9 +658,14 @@ void VulkanCleanup()
 {
 	glslang_finalize_process();
 
+	g_vkFFTQueue = nullptr;
+	g_vkFFTCommandBuffer = nullptr;
+	g_vkFFTCommandPool = nullptr;
+
 	g_vkTransferQueue = nullptr;
 	g_vkTransferCommandBuffer = nullptr;
 	g_vkTransferCommandPool = nullptr;
+
 	g_vkComputeDevice = nullptr;
 	g_vkInstance = nullptr;
 }

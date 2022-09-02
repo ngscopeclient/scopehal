@@ -377,6 +377,16 @@ void FFTFilter::DoRefresh(
 			break;
 	}
 
+	//Update our FFT plan if it's out of date
+	if(m_vkPlan)
+	{
+		if(m_vkPlan->size() != nouts)
+			m_vkPlan = nullptr;
+	}
+	if(!m_vkPlan)
+		m_vkPlan = make_unique<VulkanFFTPlan>(nouts);
+
+
 	#ifdef HAVE_CLFFT
 		if(g_clContext && m_windowProgram && m_normalizeProgram)
 		{
