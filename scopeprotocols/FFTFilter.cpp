@@ -71,129 +71,17 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
 	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
 
-	#ifdef HAVE_CLFFT
+	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
-		m_clfftPlan = 0;
-
-		m_windowProgram = NULL;
-		m_rectangularWindowKernel = NULL;
-		m_cosineSumWindowKernel = NULL;
-		m_blackmanHarrisWindowKernel = NULL;
-
-		m_normalizeProgram = NULL;
-		m_normalizeLogMagnitudeKernel = NULL;
-		m_normalizeMagnitudeKernel = NULL;
-
-		m_queue = NULL;
-
-		try
-		{
-			//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
-			//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
-			if(g_clContext)
-			{
-				m_queue = new cl::CommandQueue(*g_clContext, g_contextDevices[0], 0);
-
-				//Compile window functions
-				string kernelSource = ReadDataFile("kernels/WindowFunctions.cl");
-				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-				m_windowProgram = new cl::Program(*g_clContext, sources);
-				m_windowProgram->build(g_contextDevices);
-
-				//Extract each kernel
-				m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
-				m_cosineSumWindowKernel = new cl::Kernel(*m_windowProgram, "CosineSumWindow");
-				m_blackmanHarrisWindowKernel = new cl::Kernel(*m_windowProgram, "BlackmanHarrisWindow");
-
-				//Compile normalization kernels
-				kernelSource = ReadDataFile("kernels/FFTNormalization.cl");
-				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
-				m_normalizeProgram = new cl::Program(*g_clContext, sources2);
-				m_normalizeProgram->build(g_contextDevices);
-
-				//Extract normalization kernels
-				m_normalizeLogMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToLogMagnitude");
-				m_normalizeMagnitudeKernel = new cl::Kernel(*m_normalizeProgram, "NormalizeToMagnitude");
-			}
-		}
-		catch(const cl::Error& e)
-		{
-			LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
-
-			if(e.err() == CL_BUILD_PROGRAM_FAILURE)
-			{
-				LogError("Failed to build OpenCL program for FFT\n");
-
-				string log;
-				if(m_windowProgram)
-				{
-					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-					LogDebug("Window program build log:\n");
-					LogDebug("%s\n", log.c_str());
-				}
-				else
-					LogDebug("Window program object not present\n");
-
-				if(m_normalizeProgram)
-				{
-					m_normalizeProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-					LogDebug("Normalize program build log:\n");
-					LogDebug("%s\n", log.c_str());
-				}
-				else
-					LogDebug("Normalize program object not present\n");
-			}
-
-			delete m_windowProgram;
-			delete m_rectangularWindowKernel;
-			delete m_cosineSumWindowKernel;
-			delete m_blackmanHarrisWindowKernel;
-
-			delete m_normalizeProgram;
-			delete m_normalizeLogMagnitudeKernel;
-			delete m_normalizeMagnitudeKernel;
-
-			m_windowProgram = NULL;
-			m_rectangularWindowKernel = NULL;
-			m_cosineSumWindowKernel = NULL;
-			m_blackmanHarrisWindowKernel = NULL;
-
-			m_normalizeProgram = NULL;
-			m_normalizeLogMagnitudeKernel = NULL;
-			m_normalizeMagnitudeKernel = NULL;
-		}
-
-	#endif
+	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 FFTFilter::~FFTFilter()
 {
 	if(m_plan)
 		ffts_free(m_plan);
-
-	#ifdef HAVE_CLFFT
-		if(m_clfftPlan != 0)
-			clfftDestroyPlan(&m_clfftPlan);
-
-		delete m_windowProgram;
-		delete m_rectangularWindowKernel;
-		delete m_cosineSumWindowKernel;
-		delete m_blackmanHarrisWindowKernel;
-		delete m_normalizeProgram;
-		delete m_normalizeLogMagnitudeKernel;
-		delete m_normalizeMagnitudeKernel;
-
-		m_windowProgram = NULL;
-		m_rectangularWindowKernel = NULL;
-		m_cosineSumWindowKernel = NULL;
-		m_blackmanHarrisWindowKernel = NULL;
-		m_normalizeProgram = NULL;
-		m_normalizeLogMagnitudeKernel = NULL;
-		m_normalizeMagnitudeKernel = NULL;
-
-		delete m_queue;
-
-	#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -238,6 +126,12 @@ string FFTFilter::GetProtocolName()
 	return "FFT";
 }
 
+Filter::DataLocation FFTFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -253,54 +147,21 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 		m_cachedNumPointsFFT = npoints;
 
 		if(m_plan)
-		{
 			ffts_free(m_plan);
-
-			#ifdef HAVE_CLFFT
-				if(m_clfftPlan != 0)
-					clfftDestroyPlan(&m_clfftPlan);
-			#endif
-		}
-
 		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-
-		//This must be the last block since we return on error
-		#ifdef HAVE_CLFFT
-
-			if(g_clContext)
-			{
-				lock_guard<mutex> lock(g_clfftMutex);
-
-				//Set up the FFT object
-				if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftPlan, (*g_clContext)(), CLFFT_1D, &npoints))
-				{
-					LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
-					delete m_windowProgram;
-					m_windowProgram = 0;
-					return;
-				}
-				clfftSetPlanBatchSize(m_clfftPlan, 1);
-				clfftSetPlanPrecision(m_clfftPlan, CLFFT_SINGLE);
-				clfftSetLayout(m_clfftPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
-				clfftSetResultLocation(m_clfftPlan, CLFFT_OUTOFPLACE);
-
-				//Initialize the plan
-				cl_command_queue q = (*m_queue)();
-				auto err = clfftBakePlan(m_clfftPlan, 1, &q, NULL, NULL);
-				if(CLFFT_SUCCESS != err)
-				{
-					LogError("clfftBakePlan failed (%d) Disabling clFFT and falling back to ffts\n", err);
-					delete m_windowProgram;
-					m_windowProgram = 0;
-					return;
-				}
-			}
-
-		#endif
 	}
+
+	//Update our FFT plan if it's out of date
+	if(m_vkPlan)
+	{
+		if(m_vkPlan->size() != npoints)
+			m_vkPlan = nullptr;
+	}
+	if(!m_vkPlan)
+		m_vkPlan = make_unique<VulkanFFTPlan>(npoints, VulkanFFTPlan::FLAG_FORWARD_ONLY);
 }
 
-void FFTFilter::Refresh()
+void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -325,7 +186,7 @@ void FFTFilter::Refresh()
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
-	DoRefresh(din, din->m_samples, din->m_timescale, npoints, nouts, true);
+	DoRefresh(din, din->m_samples, din->m_timescale, npoints, nouts, true, cmdBuf, queue);
 }
 
 void FFTFilter::DoRefresh(
@@ -334,7 +195,9 @@ void FFTFilter::DoRefresh(
 	double fs_per_sample,
 	size_t npoints,
 	size_t nouts,
-	bool log_output)
+	bool log_output,
+	vk::raii::CommandBuffer& cmdBuf,
+	vk::raii::Queue& queue)
 {
 	//Look up some parameters
 	double sample_ghz = 1e6 / fs_per_sample;
@@ -377,96 +240,12 @@ void FFTFilter::DoRefresh(
 			break;
 	}
 
-	//Update our FFT plan if it's out of date
-	if(m_vkPlan)
+	if(g_gpuFilterEnabled)
 	{
-		if(m_vkPlan->size() != nouts)
-			m_vkPlan = nullptr;
-	}
-	if(!m_vkPlan)
-		m_vkPlan = make_unique<VulkanFFTPlan>(nouts);
-
-
-	#ifdef HAVE_CLFFT
-		if(g_clContext && m_windowProgram && m_normalizeProgram)
-		{
-			try
-			{
-				//Make buffers
-				cl::Buffer inbuf(*m_queue, data.begin(), data.end(), true, true, NULL);
-				cl::Buffer windowoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-				cl::Buffer fftoutbuf(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
-				cl::Buffer outbuf(*m_queue, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
-
-				//Apply the window function
-				cl::Kernel* windowKernel = NULL;
-				float windowscale = 2 * M_PI / numActualSamples;
-				switch(window)
-				{
-					case WINDOW_RECTANGULAR:
-						windowKernel = m_rectangularWindowKernel;
-						break;
-
-					case WINDOW_HAMMING:
-						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(4, 25.0f / 46.0f);
-						windowKernel->setArg(5, 1.0f - (25.0f / 46.0f));
-						break;
-
-					case WINDOW_HANN:
-						windowKernel = m_cosineSumWindowKernel;
-						windowKernel->setArg(4, 0.5f);
-						windowKernel->setArg(5, 0.5f);
-						break;
-
-					case WINDOW_BLACKMAN_HARRIS:
-					default:
-						windowKernel = m_blackmanHarrisWindowKernel;
-						break;
-				}
-				windowKernel->setArg(0, inbuf);
-				windowKernel->setArg(1, windowoutbuf);
-				windowKernel->setArg(2, numActualSamples);
-				if(window != WINDOW_RECTANGULAR)
-					windowKernel->setArg(3, windowscale);
-				m_queue->enqueueNDRangeKernel(*windowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
-
-				//Run the FFT
-				cl_command_queue q = (*m_queue)();
-				cl_mem inbufs[1] = { windowoutbuf() };
-				cl_mem outbufs[1] = { fftoutbuf() };
-				if(CLFFT_SUCCESS != clfftEnqueueTransform(
-					m_clfftPlan, CLFFT_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
-				{
-					LogError("clfftEnqueueTransform failed\n");
-					abort();
-				}
-
-				//Normalize output
-				cl::Kernel* normalizeKernel = NULL;
-				if(log_output)
-					normalizeKernel = m_normalizeLogMagnitudeKernel;
-				else
-					normalizeKernel = m_normalizeMagnitudeKernel;
-				float fscale = scale*scale / 50;
-				normalizeKernel->setArg(0, fftoutbuf);
-				normalizeKernel->setArg(1, outbuf);
-				normalizeKernel->setArg(2, fscale);
-				m_queue->enqueueNDRangeKernel(
-					*normalizeKernel, cl::NullRange, cl::NDRange(nouts, 1), cl::NullRange, NULL);
-
-				//Map/unmap the buffer to synchronize output with the CPU
-				void* ptr = m_queue->enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, nouts * sizeof(float));
-				m_queue->enqueueUnmapMemObject(outbuf, ptr);
-			}
-			catch(const cl::Error& e)
-			{
-				LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
-			}
-		}
-		else
-		{
-	#endif
+		data.PrepareForCpuAccess();
+		m_rdinbuf.PrepareForCpuAccess();
+		m_rdoutbuf.PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
 
 		//Copy the input with windowing, then zero pad to the desired input length if needed
 		ApplyWindow(
@@ -496,11 +275,45 @@ void FFTFilter::DoRefresh(
 				NormalizeOutputLinear(cap->m_samples, nouts, scale);
 		}
 
-	#ifdef HAVE_CLFFT
-		}
-	#endif
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		data.PrepareForCpuAccess();
+		m_rdinbuf.PrepareForCpuAccess();
+		m_rdoutbuf.PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
 
-	cap->MarkModifiedFromCpu();
+		//Copy the input with windowing, then zero pad to the desired input length if needed
+		ApplyWindow(
+			(float*)&data[0],
+			numActualSamples,
+			&m_rdinbuf[0],
+			window);
+		if(npoints > m_cachedNumPoints)
+			memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+
+		//Calculate the FFT
+		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
+
+		//Normalize magnitudes
+		if(log_output)
+		{
+			if(g_hasAvx2 && g_hasFMA)
+				NormalizeOutputLogAVX2FMA(cap->m_samples, nouts, scale);
+			else
+				NormalizeOutputLog(cap->m_samples, nouts, scale);
+		}
+		else
+		{
+			if(g_hasAvx2)
+				NormalizeOutputLinearAVX2(cap->m_samples, nouts, scale);
+			else
+				NormalizeOutputLinear(cap->m_samples, nouts, scale);
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
 
 	//Peak search
 	FindPeaks(cap);

@@ -49,7 +49,8 @@ public:
 	FFTFilter(const std::string& color);
 	virtual ~FFTFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
 
@@ -96,12 +97,18 @@ protected:
 	void DoRefresh(
 		WaveformBase* din,
 		AcceleratorBuffer<float>& data,
-		double fs_per_sample, size_t npoints, size_t nouts, bool log_output);
+		double fs_per_sample,
+		size_t npoints,
+		size_t nouts,
+		bool log_output,
+		vk::raii::CommandBuffer& cmdBuf,
+		vk::raii::Queue& queue
+		);
 
 	size_t m_cachedNumPoints;
 	size_t m_cachedNumPointsFFT;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
+	AcceleratorBuffer<float> m_rdinbuf;
+	AcceleratorBuffer<float> m_rdoutbuf;
 	ffts_plan_t* m_plan;
 
 	float m_range;
@@ -109,22 +116,6 @@ protected:
 
 	std::string m_windowName;
 	std::string m_roundingName;
-
-	#ifdef HAVE_CLFFT
-	cl::CommandQueue* m_queue;
-
-	clfftPlanHandle m_clfftPlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-	cl::Kernel* m_cosineSumWindowKernel;
-	cl::Kernel* m_blackmanHarrisWindowKernel;
-
-	cl::Program* m_normalizeProgram;
-	cl::Kernel* m_normalizeMagnitudeKernel;
-	cl::Kernel* m_normalizeLogMagnitudeKernel;
-
-	#endif
 
 	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
 };

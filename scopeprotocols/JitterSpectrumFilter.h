@@ -43,7 +43,8 @@ public:
 	JitterSpectrumFilter(const std::string& color);
 	virtual ~JitterSpectrumFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual DataLocation GetInputLocation();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

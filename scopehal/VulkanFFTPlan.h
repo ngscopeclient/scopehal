@@ -51,7 +51,12 @@ class VulkanFFTPlan
 {
 public:
 
-	VulkanFFTPlan(size_t size)
+	enum VulkanFFTPlanFlags
+	{
+		FLAG_FORWARD_ONLY
+	};
+
+	VulkanFFTPlan(size_t size, int flags)
 		: m_size(size)
 		, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 	{
@@ -79,6 +84,9 @@ public:
 		m_config.commandPool = &m_pool;
 		m_config.fence = &m_rawfence;
 		m_config.isCompilerInitialized = 1;
+
+		if(flags & FLAG_FORWARD_ONLY)
+			m_config.makeForwardPlanOnly = 1;
 
 		//single buffer of full size
 		uint64_t bsize = size;

@@ -77,6 +77,12 @@ string JitterSpectrumFilter::GetProtocolName()
 	return "Jitter Spectrum";
 }
 
+Filter::DataLocation JitterSpectrumFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -160,7 +166,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 	return ui_width;
 }
 
-void JitterSpectrumFilter::Refresh()
+void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndSparseAnalog())
@@ -207,5 +213,5 @@ void JitterSpectrumFilter::Refresh()
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 
 	//and do the actual FFT processing
-	DoRefresh(din, extended_samples, ui_width_final, npoints, nouts, false);
+	DoRefresh(din, extended_samples, ui_width_final, npoints, nouts, false, cmdBuf, queue);
 }
