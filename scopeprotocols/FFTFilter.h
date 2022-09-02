@@ -41,6 +41,8 @@
 #include <clFFT.h>
 #endif
 
+#include <vkFFT.h>
+
 class FFTFilter : public PeakDetectionFilter
 {
 public:

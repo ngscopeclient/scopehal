@@ -151,7 +151,7 @@ add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget ${YAML_LIBRARIES}
 	${LXI_LIBRARIES} ${LINUXGPIB_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES}
-	${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES} ${Vulkan_LIBRARIES})
+	${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES} ${Vulkan_LIBRARIES} glslang)
 
 target_include_directories(scopehal
 PUBLIC
@@ -161,6 +161,9 @@ PUBLIC
 	${OpenCL_INCLUDE_DIR}
 	${CLFFT_INCLUDE_DIR}
 	${YAML_INCLUDES}
+
+	# TODO: this needs to come from FindPackage etc
+	/usr/include/glslang/Include/
 	)
 
 target_include_directories(scopehal

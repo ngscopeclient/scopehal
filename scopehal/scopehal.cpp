@@ -105,6 +105,8 @@ size_t g_maxClLocalSizeX = 0;
 
 AlignedAllocator<float, 32> g_floatVectorAllocator;
 
+void VulkanCleanup();
+
 /**
 	@brief Static initialization for SCPI transports
  */
@@ -368,11 +370,7 @@ void DetectGPUFeatures()
 
 void ScopehalStaticCleanup()
 {
-	g_vkTransferQueue = nullptr;
-	g_vkTransferCommandBuffer = nullptr;
-	g_vkTransferCommandPool = nullptr;
-	g_vkComputeDevice = nullptr;
-	g_vkInstance = nullptr;
+	VulkanCleanup();
 
 	#ifdef HAVE_OPENCL
 	#ifdef HAVE_CLFFT

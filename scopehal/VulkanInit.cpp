@@ -33,6 +33,7 @@
 	@brief Vulkan initialization
  */
 #include "scopehal.h"
+#include <glslang_c_interface.h>
 
 using namespace std;
 
@@ -101,6 +102,8 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
 bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
+
+void VulkanCleanup();
 
 /**
 	@brief Initialize a Vulkan context for compute
@@ -576,6 +579,10 @@ bool VulkanInit()
 	g_gpuFilterEnabled = true;
 	g_gpuScopeDriverEnabled = true;
 
+	//Initialize the glsl compiler since vkFFT does JIT generation of kernels
+	int ret = glslang_initialize_process();
+	LogDebug("ret = %zu\n", ret);
+
 	return true;
 }
 
@@ -604,4 +611,15 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
 
 	//By default, assume A is good enough
 	return false;
+}
+
+void VulkanCleanup()
+{
+	glslang_finalize_process();
+
+	g_vkTransferQueue = nullptr;
+	g_vkTransferCommandBuffer = nullptr;
+	g_vkTransferCommandPool = nullptr;
+	g_vkComputeDevice = nullptr;
+	g_vkInstance = nullptr;
 }

@@ -164,11 +164,23 @@ add_library(scopeprotocols SHARED
 
 target_link_libraries(scopeprotocols
 	scopehal
-	${LIBFFTS_LIBRARIES})
+	${LIBFFTS_LIBRARIES}
+	SPIRV
+	glslang
+	Vulkan::Vulkan
+	MachineIndependent
+	OGLCompiler
+	GenericCodeGen
+	OSDependent
+	)
 
 target_include_directories(scopeprotocols
 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-       ${LIBFFTS_INCLUDE_DIR})
+       ${LIBFFTS_INCLUDE_DIR}
+       )
+
+# Setup for vkfft
+target_compile_definitions(scopeprotocols PUBLIC -DVK_API_VERSION=10 -DVKFFT_BACKEND=0)
 
 install(TARGETS scopeprotocols LIBRARY)
 
