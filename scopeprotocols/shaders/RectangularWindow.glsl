@@ -27,109 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FFTFilter
- */
-#ifndef FFTFilter_h
-#define FFTFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-#include <ffts.h>
-
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
-#include "VulkanFFTPlan.h"
-
-struct WindowFunctionArgs
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t numActualSamples;
-	uint32_t npoints;
+	float din[];
+};
+
+layout(std430, binding=1) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint numActualSamples;
+	uint npoints;
+
+	//not used in rectangular window, only for interface compatibility
 	float scale;
 	float alpha0;
 	float alpha1;
 };
 
-class FFTFilter : public PeakDetectionFilter
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	FFTFilter(const std::string& color);
-	virtual ~FFTFilter();
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= npoints)
+		return;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-	virtual DataLocation GetInputLocation();
+	//If off end of input, zero fill
+	else if(gl_GlobalInvocationID.x >= numActualSamples)
+		dout[gl_GlobalInvocationID.x] = 0;
 
-	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
-
-	enum WindowFunction
-	{
-		WINDOW_RECTANGULAR,
-		WINDOW_HANN,
-		WINDOW_HAMMING,
-		WINDOW_BLACKMAN_HARRIS
-	};
-
-	enum RoundingMode
-	{
-		ROUND_TRUNCATE,
-		ROUND_ZERO_PAD
-	};
-
-	//Window function helpers
-	static void ApplyWindow(const float* data, size_t len, float* out, WindowFunction func);
-	static void HannWindow(const float* data, size_t len, float* out);
-	static void HammingWindow(const float* data, size_t len, float* out);
-	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
-	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
-	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
-	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
-
-	PROTOCOL_DECODER_INITPROC(FFTFilter)
-
-protected:
-	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-	void NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t nouts, float scale);
-
-	void ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nouts);
-
-	void DoRefresh(
-		WaveformBase* din,
-		AcceleratorBuffer<float>& data,
-		double fs_per_sample,
-		size_t npoints,
-		size_t nouts,
-		bool log_output,
-		vk::raii::CommandBuffer& cmdBuf,
-		vk::raii::Queue& queue
-		);
-
-	size_t m_cachedNumPoints;
-	size_t m_cachedNumPointsFFT;
-	AcceleratorBuffer<float> m_rdinbuf;
-	AcceleratorBuffer<float> m_rdoutbuf;
-	ffts_plan_t* m_plan;
-
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-	std::string m_roundingName;
-
-	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
-
-	ComputePipeline m_blackmanHarrisComputePipeline;
-	ComputePipeline m_rectangularComputePipeline;
-};
-
-#endif
+	//Nope, copy it
+	else
+		dout[gl_GlobalInvocationID.x] = din[gl_GlobalInvocationID.x];
+}

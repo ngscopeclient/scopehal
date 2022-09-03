@@ -29,8 +29,10 @@ endfunction()
 add_compute_shaders(
 	protocolshaders
 	SOURCES
+		BlackmanHarrisWindow.glsl
 		Convert8BitSamples.glsl
 		Convert16BitSamples.glsl
+		RectangularWindow.glsl
 		SubtractFilter.glsl
 		UpsampleFilter.glsl
 	)

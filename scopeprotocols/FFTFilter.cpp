@@ -44,6 +44,8 @@ FFTFilter::FFTFilter(const string& color)
 	: PeakDetectionFilter(color, CAT_RF)
 	, m_windowName("Window")
 	, m_roundingName("Length Rounding")
+	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
@@ -211,9 +213,6 @@ void FFTFilter::DoRefresh(
 	cap->m_timescale = bin_hz;
 	cap->Resize(nouts);
 
-	din->PrepareForCpuAccess();
-	cap->PrepareForCpuAccess();
-
 	//Output scale is based on the number of points we FFT that contain actual sample data.
 	//(If we're zero padding, the zeroes don't contribute any power)
 	size_t numActualSamples = min(data.size(), npoints);
@@ -242,22 +241,90 @@ void FFTFilter::DoRefresh(
 
 	if(g_gpuFilterEnabled)
 	{
-		data.PrepareForCpuAccess();
+		WindowFunctionArgs args;
+		args.numActualSamples = numActualSamples;
+		args.npoints = npoints;
+
+		args.scale = 2 * M_PI / numActualSamples;
+		args.alpha0 = 0;
+		args.alpha1 = 0;
+
+		//Apply the window function
+		switch(window)
+		{
+			case WINDOW_BLACKMAN_HARRIS:
+
+				//Update our descriptor sets with current buffers
+				m_blackmanHarrisComputePipeline.BindBuffer(0, data);
+				m_blackmanHarrisComputePipeline.BindBuffer(1, m_rdinbuf);
+				m_blackmanHarrisComputePipeline.UpdateDescriptors();
+
+				//Dispatch the compute operation and block until it completes
+				cmdBuf.begin({});
+				m_blackmanHarrisComputePipeline.Dispatch(
+					cmdBuf,
+					args,
+					GetComputeBlockCount(npoints, 64),
+					1);
+				cmdBuf.end();
+				SubmitAndBlock(cmdBuf, queue);
+
+				m_rdinbuf.MarkModifiedFromGpu();
+				break;
+
+			case WINDOW_RECTANGULAR:
+
+				//Update our descriptor sets with current buffers
+				m_rectangularComputePipeline.BindBuffer(0, data);
+				m_rectangularComputePipeline.BindBuffer(1, m_rdinbuf);
+				m_rectangularComputePipeline.UpdateDescriptors();
+
+				//Dispatch the compute operation and block until it completes
+				cmdBuf.begin({});
+				m_rectangularComputePipeline.Dispatch(
+					cmdBuf,
+					args,
+					GetComputeBlockCount(npoints, 64),
+					1);
+				cmdBuf.end();
+				SubmitAndBlock(cmdBuf, queue);
+
+				m_rdinbuf.MarkModifiedFromGpu();
+				break;
+
+			/*
+			case WINDOW_HANN:
+				return HannWindow(data, len, out);
+
+			case WINDOW_HAMMING:
+				return HammingWindow(data, len, out);
+
+				*/
+
+			default:
+
+				data.PrepareForCpuAccess();
+
+				//Copy the input with windowing, then zero pad to the desired input length if needed
+				ApplyWindow(
+					(float*)&data[0],
+					numActualSamples,
+					&m_rdinbuf[0],
+					window);
+				if(npoints > m_cachedNumPoints)
+					memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
+
+				break;
+
+		}
+
 		m_rdinbuf.PrepareForCpuAccess();
 		m_rdoutbuf.PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		//Copy the input with windowing, then zero pad to the desired input length if needed
-		ApplyWindow(
-			(float*)&data[0],
-			numActualSamples,
-			&m_rdinbuf[0],
-			window);
-		if(npoints > m_cachedNumPoints)
-			memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
 
 		//Calculate the FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
+
+		cap->PrepareForCpuAccess();
 
 		//Normalize magnitudes
 		if(log_output)
