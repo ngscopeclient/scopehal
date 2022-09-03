@@ -149,9 +149,30 @@ configure_file(config.h.in config.h)
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
-target_link_libraries(scopehal ${SIGCXX_LIBRARIES} ${GTKMM_LIBRARIES} xptools log graphwidget ${YAML_LIBRARIES}
-	${LXI_LIBRARIES} ${LINUXGPIB_LIBRARIES} ${WIN_LIBS} ${LIN_LIBS} ${LIBFFTS_LIBRARIES} ${OpenCL_LIBRARIES}
-	${CLFFT_LIBRARIES} ${OpenMP_CXX_LIBRARIES} ${Vulkan_LIBRARIES} glslang)
+target_link_libraries(scopehal
+	${SIGCXX_LIBRARIES}
+	${GTKMM_LIBRARIES}
+	xptools
+	log
+	graphwidget
+	${YAML_LIBRARIES}
+	${LXI_LIBRARIES}
+	${LINUXGPIB_LIBRARIES}
+	${WIN_LIBS}
+	${LIN_LIBS}
+	${LIBFFTS_LIBRARIES}
+	${OpenCL_LIBRARIES}
+	${CLFFT_LIBRARIES}
+	${OpenMP_CXX_LIBRARIES}
+	${Vulkan_LIBRARIES}
+	SPIRV
+	glslang
+	Vulkan::Vulkan
+	OGLCompiler
+	GenericCodeGen
+	MachineIndependent
+	OSDependent
+	)
 
 target_include_directories(scopehal
 PUBLIC
@@ -169,6 +190,7 @@ PUBLIC
 target_include_directories(scopehal
 PUBLIC SYSTEM
 	${CMAKE_CURRENT_SOURCE_DIR}/../OpenCL-CLHPP/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 	)
 
 if(${HAS_LXI})

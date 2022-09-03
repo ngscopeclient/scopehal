@@ -165,13 +165,6 @@ add_library(scopeprotocols SHARED
 target_link_libraries(scopeprotocols
 	scopehal
 	${LIBFFTS_LIBRARIES}
-	SPIRV
-	glslang
-	Vulkan::Vulkan
-	MachineIndependent
-	OGLCompiler
-	GenericCodeGen
-	OSDependent
 	)
 
 target_include_directories(scopeprotocols
