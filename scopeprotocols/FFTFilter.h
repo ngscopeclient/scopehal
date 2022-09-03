@@ -95,6 +95,9 @@ public:
 
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 
+	void SetWindowFunction(WindowFunction f)
+	{ m_parameters[m_windowName].SetIntVal(f); }
+
 protected:
 	void NormalizeOutputLog(AcceleratorBuffer<float>& data, size_t nouts, float scale);
 	void NormalizeOutputLogAVX2FMA(AcceleratorBuffer<float>& data, size_t nouts, float scale);

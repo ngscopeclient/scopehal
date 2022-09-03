@@ -676,9 +676,9 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	__m256 two_x8		= { 2, 2, 2, 2, 2, 2, 2, 2 };
 	__m256 six_x8		= { 6, 6, 6, 6, 6, 6, 6, 6 };
 
-	size_t i;
+	size_t i=0;
 	size_t len_rounded = len - (len % 8);
-	for(i=0; i<len_rounded; i += 8)
+	for(; i<len_rounded; i += 8)
 	{
 		__m256 vscale		= _mm256_mul_ps(count_x8, scale_x8);
 		__m256 vscale_x2	= _mm256_mul_ps(vscale, two_x8);
@@ -694,9 +694,9 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 		w					= _mm256_add_ps(w, term2);
 		w					= _mm256_add_ps(w, term3);
 
-		__m256 din			= _mm256_load_ps(aligned_data + i);
+		__m256 din			= _mm256_loadu_ps(aligned_data + i);
 		__m256 dout			= _mm256_mul_ps(din, w);
-		_mm256_store_ps(aligned_out + i, dout);
+		_mm256_storeu_ps(aligned_out + i, dout);
 
 		count_x8 = _mm256_add_ps(count_x8, eights_x8);
 	}
@@ -708,7 +708,7 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 			alpha0 -
 			alpha1 * cosf(num) +
 			alpha2 * cosf(2*num) -
-			alpha3 * cosf(3*num);
+			alpha3 * cosf(6*num);
 		out[i] = w * data[i];
 	}
 }
