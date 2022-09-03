@@ -29,8 +29,10 @@
 
 #include "../scopehal/scopehal.h"
 #include "DownconvertFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
 #include "avx_mathfun.h"
+#endif
 
 using namespace std;
 
@@ -106,9 +108,11 @@ void DownconvertFilter::Refresh()
 	cap_i->Resize(len);
 	cap_q->Resize(len);
 
+	#ifdef __x86_64__
 	if(g_hasAvx2)
 		DoFilterKernelAVX2DensePacked(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
 	else
+	#endif
 		DoFilterKernelGeneric(din, cap_i, cap_q, lo_rad_per_sample, trigger_phase_rad);
 
 	cap_i->MarkModifiedFromCpu();
@@ -156,6 +160,7 @@ void DownconvertFilter::DoFilterKernelGeneric(
 	}*/
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 	UniformAnalogWaveform* din,
@@ -233,3 +238,4 @@ void DownconvertFilter::DoFilterKernelAVX2DensePacked(
 		cap_q->m_samples[i] 	= samp * cos(nphase);
 	}
 }
+#endif /* __x86_64__ */

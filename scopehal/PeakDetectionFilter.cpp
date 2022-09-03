@@ -30,7 +30,6 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
 #include "PeakDetectionFilter.h"
-#include <immintrin.h>
 
 using namespace std;
 

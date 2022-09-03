@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "GroupDelayFilter.h"
-#include <immintrin.h>
 
 using namespace std;
 

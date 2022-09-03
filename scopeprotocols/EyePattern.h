@@ -233,6 +233,7 @@ protected:
 		float yoff
 		);
 
+#ifdef __x86_64__
 	void DensePackedInnerLoopAVX2(
 		UniformAnalogWaveform* waveform,
 		std::vector<int64_t>& clock_edges,
@@ -245,6 +246,7 @@ protected:
 		float yscale,
 		float yoff
 		);
+#endif
 
 	size_t m_height;
 	size_t m_width;

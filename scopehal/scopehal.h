@@ -77,11 +77,13 @@
 #pragma GCC diagnostic pop
 
 //must be early because a lot of inline methods in headers rely on these
+#ifdef __x86_64__
 extern bool g_hasFMA;
 extern bool g_hasAvx512F;
 extern bool g_hasAvx512VL;
 extern bool g_hasAvx512DQ;
 extern bool g_hasAvx2;
+#endif
 
 #include "Unit.h"
 #include "Bijection.h"

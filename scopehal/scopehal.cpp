@@ -82,11 +82,13 @@
 
 using namespace std;
 
+#ifdef __x86_64__
 bool g_hasAvx512F = false;
 bool g_hasAvx512DQ = false;
 bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 bool g_hasFMA = false;
+#endif
 bool g_disableOpenCL = false;
 
 ///@brief True if filters can use GPU acceleration
@@ -135,6 +137,7 @@ void DetectCPUFeatures()
 	LogDebug("Detecting CPU features...\n");
 	LogIndenter li;
 
+#ifdef __x86_64__
 	//Check CPU features
 	g_hasAvx512F = __builtin_cpu_supports("avx512f");
 	g_hasAvx512VL = __builtin_cpu_supports("avx512vl");
@@ -159,7 +162,8 @@ void DetectCPUFeatures()
 		g_hasAvx2 = g_hasAvx512F = g_hasAvx512DQ = g_hasAvx512VL = false;
 		LogWarning("AVX2/AVX512 detected but disabled on MinGW64/GCC (see https://github.com/azonenberg/scopehal-apps/issues/295)\n");
 	}
-#endif
+#endif /* defined(_WIN32) && defined(__GNUC__) */
+#endif /* __x86_64__ */
 }
 
 /**

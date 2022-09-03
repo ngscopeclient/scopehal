@@ -35,7 +35,6 @@
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "WindowTrigger.h"
-#include <immintrin.h>
 
 using namespace std;
 

@@ -51,7 +51,9 @@ public:
 	PROTOCOL_DECODER_INITPROC(NoiseFilter)
 
 protected:
+#ifdef __x86_64__
 	void CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma);
+#endif
 	void CopyWithAwgnNative(float* dest, float* src, size_t len, float sigma);
 
 	std::string m_stdevname;

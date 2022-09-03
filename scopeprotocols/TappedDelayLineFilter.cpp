@@ -29,7 +29,9 @@
 
 #include "scopeprotocols.h"
 #include "TappedDelayLineFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 using namespace std;
 
@@ -159,9 +161,11 @@ void TappedDelayLineFilter::DoFilterKernel(
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
+	#ifdef __x86_64__
 	if(g_hasAvx2)
 		DoFilterKernelAVX2(tap_delay, taps, din, cap);
 	else
+	#endif
 		DoFilterKernelGeneric(tap_delay, taps, din, cap);
 }
 
@@ -189,6 +193,7 @@ void TappedDelayLineFilter::DoFilterKernelGeneric(
 	}
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void TappedDelayLineFilter::DoFilterKernelAVX2(
 	int64_t tap_delay,
@@ -283,3 +288,4 @@ void TappedDelayLineFilter::DoFilterKernelAVX2(
 		cap->m_samples[i]	= v;
 	}
 }
+#endif /* __x86_64__ */

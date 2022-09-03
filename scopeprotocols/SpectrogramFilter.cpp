@@ -30,8 +30,10 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
 #include "SpectrogramFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
 #include "../scopehal/avx_mathfun.h"
+#endif
 #include "FFTFilter.h"
 
 using namespace std;
@@ -227,9 +229,11 @@ void SpectrogramFilter::Refresh()
 		//Do the actual FFT
 		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
 
+		#ifdef __x86_64__
 		if(g_hasAvx2 && g_hasFMA)
 			ProcessSpectrumAVX2FMA(nblocks, block, nouts, minscale, range, scale, data);
 		else
+		#endif
 			ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
 	}
 
@@ -265,6 +269,7 @@ void SpectrogramFilter::ProcessSpectrumGeneric(
 	}
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2,fma")))
 void SpectrogramFilter::ProcessSpectrumAVX2FMA(
 	size_t nblocks,
@@ -354,3 +359,4 @@ void SpectrogramFilter::ProcessSpectrumAVX2FMA(
 			pout[i*nblocks] = (dbm - minscale) * irange;
 	}
 }
+#endif /* __x86_64__ */

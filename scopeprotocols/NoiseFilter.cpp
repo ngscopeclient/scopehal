@@ -29,8 +29,10 @@
 
 #include "../scopehal/scopehal.h"
 #include "NoiseFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
 #include "avx_mathfun.h"
+#endif
 
 using namespace std;
 
@@ -92,9 +94,11 @@ void NoiseFilter::Refresh()
 	cap->Resize(len);
 	cap->PrepareForCpuAccess();
 
+	#ifdef __x86_64__
 	if(g_hasAvx2)
 		CopyWithAwgnAVX2((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
 	else
+	#endif
 		CopyWithAwgnNative((float*)&cap->m_samples[0], (float*)&din->m_samples[0], len, stdev);
 
 	cap->MarkModifiedFromCpu();
@@ -113,6 +117,7 @@ void NoiseFilter::CopyWithAwgnNative(float* dest, float* src, size_t len, float 
 #pragma GCC diagnostic pop
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void NoiseFilter::CopyWithAwgnAVX2(float* dest, float* src, size_t len, float sigma)
 {
@@ -190,3 +195,4 @@ void NoiseFilter::CopyWithAwgnAVX2(float* dest, float* src, size_t len, float si
 		dest[i] = src[i] + noise(rng);
 #pragma GCC diagnostic pop
 }
+#endif /* __x86_64__ */

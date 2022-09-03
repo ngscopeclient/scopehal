@@ -38,6 +38,8 @@
   * Moved a bunch of implementation stuff to a source file
 */
 
+#ifdef __x86_64__
+
 #include "avx_mathfun.h"
 
 /* natural logarithm computed for 8 simultaneous float
@@ -550,4 +552,6 @@ void _mm256_sincos_ps(v8sf x, v8sf *s, v8sf *c)\
   *s = _mm256_xor_ps(xmm1, sign_bit_sin);
   *c = _mm256_xor_ps(xmm2, sign_bit_cos);
 }
+
+#endif /* __x86_64__ */
 

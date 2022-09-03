@@ -67,11 +67,13 @@ protected:
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
 
+#ifdef __x86_64__
 	static void DoFilterKernelAVX2(
 		int64_t tap_delay,
 		float* taps,
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
+#endif
 
 	std::string m_tapDelayName;
 	std::string m_tap0Name;

@@ -30,8 +30,10 @@
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
 #include "FFTFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
 #include "../scopehal/avx_mathfun.h"
+#endif
 
 extern std::mutex g_clfftMutex;
 
@@ -378,16 +380,20 @@ void FFTFilter::DoRefresh(
 		//Normalize magnitudes
 		if(log_output)
 		{
+			#ifdef __x86_64__
 			if(g_hasAvx2 && g_hasFMA)
 				NormalizeOutputLogAVX2FMA(cap->m_samples, nouts, scale);
 			else
+			#endif
 				NormalizeOutputLog(cap->m_samples, nouts, scale);
 		}
 		else
 		{
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 				NormalizeOutputLinearAVX2(cap->m_samples, nouts, scale);
 			else
+			#endif
 				NormalizeOutputLinear(cap->m_samples, nouts, scale);
 		}
 
@@ -435,6 +441,7 @@ void FFTFilter::NormalizeOutputLinear(AcceleratorBuffer<float>& data, size_t nou
 	}
 }
 
+#ifdef __x86_64__
 /**
 	@brief Normalize FFT output and convert to dBm (optimized AVX2 implementation)
  */
@@ -555,6 +562,7 @@ void FFTFilter::NormalizeOutputLinearAVX2(AcceleratorBuffer<float>& data, size_t
 		pout[k] = sqrtf(real*real + imag*imag) * scale;
 	}
 }
+#endif /* __x86_64__ */
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Window functions
@@ -564,9 +572,11 @@ void FFTFilter::ApplyWindow(const float* data, size_t len, float* out, WindowFun
 	switch(func)
 	{
 		case WINDOW_BLACKMAN_HARRIS:
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 				return BlackmanHarrisWindowAVX2(data, len, out);
 			else
+			#endif
 				return BlackmanHarrisWindow(data, len, out);
 
 		case WINDOW_HANN:
@@ -595,6 +605,7 @@ void FFTFilter::CosineSumWindow(const float* data, size_t len, float* out, float
 	}
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0)
 {
@@ -630,6 +641,7 @@ void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, f
 		out[i] = w * data[i];
 	}
 }
+#endif /* __x86_64__ */
 
 void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 {
@@ -651,6 +663,7 @@ void FFTFilter::BlackmanHarrisWindow(const float* data, size_t len, float* out)
 	}
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out)
 {
@@ -706,19 +719,24 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 		out[i] = w * data[i];
 	}
 }
+#endif /* __x86_64__ */
 
 void FFTFilter::HannWindow(const float* data, size_t len, float* out)
 {
+	#ifdef __x86_64__
 	if(g_hasAvx2)
 		CosineSumWindowAVX2(data, len, out, 0.5);
 	else
+	#endif
 		CosineSumWindow(data, len, out, 0.5);
 }
 
 void FFTFilter::HammingWindow(const float* data, size_t len, float* out)
 {
+	#ifdef __x86_64__
 	if(g_hasAvx2)
 		CosineSumWindowAVX2(data, len, out, 25.0f / 46);
 	else
+	#endif
 		CosineSumWindow(data, len, out, 25.0f / 46);
 }

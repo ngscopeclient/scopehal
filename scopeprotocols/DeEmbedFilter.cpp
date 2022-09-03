@@ -29,7 +29,9 @@
 
 #include "../scopehal/scopehal.h"
 #include "DeEmbedFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 extern std::mutex g_clfftMutex;
 
@@ -508,9 +510,11 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
 		//Do the actual filter operation
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			MainLoopAVX2(nouts);
 		else
+		#endif
 			MainLoop(nouts);
 
 		//Calculate the inverse FFT
@@ -665,6 +669,7 @@ void DeEmbedFilter::MainLoop(size_t nouts)
 	}
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 {
@@ -739,3 +744,4 @@ void DeEmbedFilter::MainLoopAVX2(size_t nouts)
 		m_forwardOutBuf[i*2 + 1] = real_orig*sinval + imag_orig*cosval;
 	}
 }
+#endif /* __x86_64__ */
