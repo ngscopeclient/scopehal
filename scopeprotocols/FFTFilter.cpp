@@ -692,7 +692,7 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 		term3 				= _mm256_mul_ps(term3, alpha3_x8);
 		__m256 w			= _mm256_sub_ps(alpha0_x8, term1);
 		w					= _mm256_add_ps(w, term2);
-		w					= _mm256_add_ps(w, term3);
+		w					= _mm256_sub_ps(w, term3);
 
 		__m256 din			= _mm256_loadu_ps(aligned_data + i);
 		__m256 dout			= _mm256_mul_ps(din, w);
