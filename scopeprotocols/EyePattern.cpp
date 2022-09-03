@@ -30,7 +30,9 @@
 #include "../scopehal/scopehal.h"
 #include "EyePattern.h"
 #include <algorithm>
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 using namespace std;
 
@@ -467,9 +469,11 @@ void EyePattern::Refresh()
 		//We can assume m_offsets[i] = i and m_durations[i] = 0 for all input
 		if(uwfm)
 		{
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 				DensePackedInnerLoopAVX2(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 			else
+			#endif
 				DensePackedInnerLoop(uwfm, clock_edges, data, wend, cend, xmax, ymax, xtimescale, yscale, yoff);
 		}
 
@@ -504,6 +508,7 @@ void EyePattern::Refresh()
 	LogTrace("Refresh took %.3f ms (avg %.3f)\n", dt * 1000, (total_time * 1000) / total_frames);
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void EyePattern::DensePackedInnerLoopAVX2(
 	UniformAnalogWaveform* waveform,
@@ -685,6 +690,7 @@ void EyePattern::DensePackedInnerLoopAVX2(
 		pix[m_width] += bin2;
 	}
 }
+#endif /* __x86_64__ */
 
 void EyePattern::DensePackedInnerLoop(
 	UniformAnalogWaveform* waveform,

@@ -137,6 +137,7 @@ protected:
 		float scale,
 		float* data);
 
+#ifdef __x86_64__
 	void ProcessSpectrumAVX2FMA(
 		size_t nblocks,
 		size_t block,
@@ -145,6 +146,7 @@ protected:
 		float range,
 		float scale,
 		float* data);
+#endif
 
 	size_t m_cachedFFTLength;
 

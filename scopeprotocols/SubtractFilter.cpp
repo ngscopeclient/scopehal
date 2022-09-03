@@ -29,7 +29,9 @@
 
 #include "../scopehal/scopehal.h"
 #include "SubtractFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 using namespace std;
 
@@ -199,9 +201,11 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
 		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
 
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			InnerLoopAVX2(out, a, b, len);
 		else
+		#endif
 			InnerLoop(out, a, b, len);
 
 		if(scap)
@@ -222,6 +226,7 @@ void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
 		out[i] 		= a[i] - b[i];
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 {
@@ -240,6 +245,7 @@ void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 	for(size_t i=end; i<len; i++)
 		out[i] 		= a[i] - b[i];
 }
+#endif /* __x86_64__ */
 
 Filter::DataLocation SubtractFilter::GetInputLocation()
 {

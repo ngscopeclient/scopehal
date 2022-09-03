@@ -88,6 +88,7 @@ protected:
 		UniformAnalogWaveform* cap);
 #endif
 
+#ifdef __x86_64__
 	void DoFilterKernelAVX2(
 		std::vector<float>& coefficients,
 		UniformAnalogWaveform* din,
@@ -97,6 +98,7 @@ protected:
 		std::vector<float>& coefficients,
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
+#endif
 
 	std::string m_filterTypeName;
 	std::string m_filterLengthName;

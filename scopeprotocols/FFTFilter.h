@@ -77,9 +77,13 @@ public:
 	static void HannWindow(const float* data, size_t len, float* out);
 	static void HammingWindow(const float* data, size_t len, float* out);
 	static void CosineSumWindow(const float* data, size_t len, float* out, float alpha0);
+#ifdef __x86_64__
 	static void CosineSumWindowAVX2(const float* data, size_t len, float* out, float alpha0);
+#endif
 	static void BlackmanHarrisWindow(const float* data, size_t len, float* out);
+#ifdef __x86_64__
 	static void BlackmanHarrisWindowAVX2(const float* data, size_t len, float* out);
+#endif
 
 	PROTOCOL_DECODER_INITPROC(FFTFilter)
 

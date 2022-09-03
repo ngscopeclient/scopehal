@@ -42,7 +42,9 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 #include <omp.h>
 
 #include "EdgeTrigger.h"
@@ -821,6 +823,7 @@ void Oscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, floa
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 			{
 				Convert8BitSamplesAVX2(
@@ -831,6 +834,7 @@ void Oscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, floa
 					nsamp);
 			}
 			else
+			#endif /* __x86_64__ */
 			{
 				Convert8BitSamplesGeneric(
 					pout + off,
@@ -845,9 +849,11 @@ void Oscilloscope::Convert8BitSamples(float* pout, int8_t* pin, float gain, floa
 	//Small waveforms get done single threaded to avoid overhead
 	else
 	{
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			Convert8BitSamplesAVX2(pout, pin, gain, offset, count);
 		else
+		#endif
 			Convert8BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
@@ -861,6 +867,7 @@ void Oscilloscope::Convert8BitSamplesGeneric(float* pout, int8_t* pin, float gai
 		pout[k] = pin[k] * gain - offset;
 }
 
+#ifdef __x86_64__
 /**
 	@brief Optimized version of Convert8BitSamples()
  */
@@ -922,6 +929,7 @@ void Oscilloscope::Convert8BitSamplesAVX2(float* pout, int8_t* pin, float gain, 
 	for(unsigned int k=end; k<count; k++)
 		pout[k] = pin[k] * gain - offset;
 }
+#endif /* __x86_64__ */
 
 /**
 	@brief Converts Unsigned 8-bit ADC samples to floating point
@@ -947,6 +955,7 @@ void Oscilloscope::ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float g
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 			{
 				ConvertUnsigned8BitSamplesAVX2(
@@ -957,6 +966,7 @@ void Oscilloscope::ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float g
 					nsamp);
 			}
 			else
+			#endif
 			{
 				ConvertUnsigned8BitSamplesGeneric(
 					pout + off,
@@ -971,9 +981,11 @@ void Oscilloscope::ConvertUnsigned8BitSamples(float* pout, uint8_t* pin, float g
 	//Small waveforms get done single threaded to avoid overhead
 	else
 	{
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			ConvertUnsigned8BitSamplesAVX2(pout, pin, gain, offset, count);
 		else
+		#endif
 			ConvertUnsigned8BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
@@ -987,6 +999,7 @@ void Oscilloscope::ConvertUnsigned8BitSamplesGeneric(float* pout, uint8_t* pin, 
 		pout[k] = pin[k] * gain - offset;
 }
 
+#ifdef __x86_64__
 /**
 	@brief Optimized version of ConvertUnsigned8BitSamples()
  */
@@ -1048,6 +1061,7 @@ void Oscilloscope::ConvertUnsigned8BitSamplesAVX2(float* pout, uint8_t* pin, flo
 	for(unsigned int k=end; k<count; k++)
 		pout[k] = pin[k] * gain - offset;
 }
+#endif /* __x86_64__ */
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers for converting raw 16-bit ADC samples to fp32 waveforms
@@ -1076,6 +1090,7 @@ void Oscilloscope::Convert16BitSamples(float* pout, int16_t* pin, float gain, fl
 				nsamp = count - i*blocksize;
 
 			size_t off = i*blocksize;
+			#ifdef __x86_64__
 			if(g_hasAvx512F)
 			{
 				Convert16BitSamplesAVX512F(
@@ -1107,6 +1122,7 @@ void Oscilloscope::Convert16BitSamples(float* pout, int16_t* pin, float gain, fl
 				}
 			}
 			else
+			#endif /* __x86_64__ */
 			{
 				Convert16BitSamplesGeneric(
 					pout + off,
@@ -1121,6 +1137,7 @@ void Oscilloscope::Convert16BitSamples(float* pout, int16_t* pin, float gain, fl
 	//Small waveforms get done single threaded to avoid overhead
 	else
 	{
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 		{
 			if(g_hasFMA)
@@ -1129,6 +1146,7 @@ void Oscilloscope::Convert16BitSamples(float* pout, int16_t* pin, float gain, fl
 				Convert16BitSamplesAVX2(pout, pin, gain, offset, count);
 		}
 		else
+		#endif /* __x86_64__ */
 			Convert16BitSamplesGeneric(pout, pin, gain, offset, count);
 	}
 }
@@ -1142,6 +1160,7 @@ void Oscilloscope::Convert16BitSamplesGeneric(float* pout, int16_t* pin, float g
 		pout[j] = gain*pin[j] - offset;
 }
 
+#ifdef __x86_64__
 __attribute__((target("avx2")))
 void Oscilloscope::Convert16BitSamplesAVX2(float* pout, int16_t* pin, float gain, float offset, size_t count)
 {
@@ -1325,3 +1344,5 @@ void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, int16_t* pin, float g
 	for(size_t k=end; k<count; k++)
 		pout[k] = pin[k] * gain - offset;
 }
+#endif /* __x86_64__ */
+

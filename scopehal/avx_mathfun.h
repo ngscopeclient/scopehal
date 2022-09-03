@@ -38,6 +38,8 @@
   * Moved a bunch of implementation stuff to a source file
 */
 
+#ifdef __x86_64__
+
 #include <immintrin.h>
 
 /* yes I know, the top of this file is quite ugly */
@@ -65,3 +67,5 @@ void _mm256_sincos_ps(v8sf xx, v8sf*, v8sf*);
 #define _PS256_CONST_TYPE(Name, Type, Val)                                 \
     int _pi32_256_tmp_##Name[8] ALIGN32_END = { Val, Val, Val, Val, Val, Val, Val, Val }; \
     v8sf _ps256_##Name = _mm256_load_ps((float*)&_pi32_256_tmp_##Name)
+
+#endif /* __x86_64__ */

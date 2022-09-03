@@ -29,7 +29,9 @@
 
 #include "scopeprotocols.h"
 #include "FIRFilter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 using namespace std;
 
@@ -233,11 +235,13 @@ void FIRFilter::DoFilterKernel(
 	else
 	#endif
 
+	#ifdef __x86_64__
 	if(g_hasAvx512F)
 		DoFilterKernelAVX512F(coefficients, din, cap);
 	else if(g_hasAvx2)
 		DoFilterKernelAVX2(coefficients, din, cap);
 	else
+	#endif
 		DoFilterKernelGeneric(coefficients, din, cap);
 }
 
@@ -320,6 +324,7 @@ void FIRFilter::DoFilterKernelGeneric(
 	}
 }
 
+#ifdef __x86_64__
 /**
 	@brief Optimized FIR implementation
 
@@ -490,6 +495,7 @@ void FIRFilter::DoFilterKernelAVX512F(
 		cap->m_samples[i]	= v;
 	}
 }
+#endif /* __x86_64__ */
 
 /**
 	@brief Calculates FIR coefficients

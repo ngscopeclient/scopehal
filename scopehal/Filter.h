@@ -667,9 +667,11 @@ public:
 		}
 
 		//Compute sample durations
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			FillDurationsAVX2(samples);
 		else
+		#endif
 			FillDurationsGeneric(samples);
 
 		samples.MarkModifiedFromCpu();
@@ -761,9 +763,11 @@ public:
 		}
 
 		//Compute sample durations
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			FillDurationsAVX2(samples);
 		else
+		#endif
 			FillDurationsGeneric(samples);
 
 		samples.MarkModifiedFromCpu();
@@ -855,9 +859,11 @@ public:
 		}
 
 		//Compute sample durations
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			FillDurationsAVX2(samples);
 		else
+		#endif
 			FillDurationsGeneric(samples);
 
 		samples.MarkModifiedFromCpu();
@@ -916,9 +922,11 @@ public:
 		}
 
 		//Compute sample durations
+		#ifdef __x86_64__
 		if(g_hasAvx2)
 			FillDurationsAVX2(samples);
 		else
+		#endif
 			FillDurationsGeneric(samples);
 
 		samples.MarkModifiedFromCpu();
@@ -1050,7 +1058,9 @@ public:
 protected:
 	//Helpers for sparse waveforms
 	static void FillDurationsGeneric(SparseWaveformBase& wfm);
+#ifdef __x86_64__
 	static void FillDurationsAVX2(SparseWaveformBase& wfm);
+#endif
 
 public:
 	sigc::signal<void> signal_outputsChanged()

@@ -53,7 +53,9 @@ public:
 
 protected:
 	void InnerLoop(float* out, float* a, float* b, size_t len);
+#ifdef __x86_64__
 	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+#endif
 
 	ComputePipeline m_computePipeline;
 };

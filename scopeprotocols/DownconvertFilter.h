@@ -61,12 +61,14 @@ protected:
 		float lo_rad_per_sample,
 		float trigger_phase_rad);
 
+#ifdef __x86_64__
 	void DoFilterKernelAVX2DensePacked(
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap_i,
 		UniformAnalogWaveform* cap_q,
 		float lo_rad_per_sample,
 		float trigger_phase_rad);
+#endif
 };
 
 #endif

@@ -35,7 +35,9 @@
 
 #include "scopehal.h"
 #include "Filter.h"
+#ifdef __x86_64__
 #include <immintrin.h>
+#endif
 
 using namespace std;
 
@@ -334,6 +336,7 @@ void Filter::FillDurationsGeneric(SparseWaveformBase& wfm)
 	wfm.m_durations[len-1] = 1;
 }
 
+#ifdef __x86_64__
 /**
 	@brief AVX2 optimized version of FillDurationsGeneric()
  */
@@ -360,6 +363,7 @@ void Filter::FillDurationsAVX2(SparseWaveformBase& wfm)
 	//Constant duration of last sample
 	wfm.m_durations[len-1] = 1;
 }
+#endif /* __x86_64__ */
 
 /**
 	@brief Find rising edges in a waveform, interpolating to sub-sample resolution as necessary
