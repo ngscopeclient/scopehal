@@ -46,6 +46,7 @@ FFTFilter::FFTFilter(const string& color)
 	, m_roundingName("Length Rounding")
 	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
@@ -241,13 +242,26 @@ void FFTFilter::DoRefresh(
 
 	if(g_gpuFilterEnabled)
 	{
+		//Configure the window
 		WindowFunctionArgs args;
 		args.numActualSamples = numActualSamples;
 		args.npoints = npoints;
-
 		args.scale = 2 * M_PI / numActualSamples;
-		args.alpha0 = 0;
-		args.alpha1 = 0;
+		switch(window)
+		{
+			case WINDOW_HANN:
+				args.alpha0 = 0.5;
+				break;
+
+			case WINDOW_HAMMING:
+				args.alpha0 = 25.0f / 46;
+				break;
+
+			default:
+				args.alpha0 = 0;
+				break;
+		}
+		args.alpha1 = 1 - args.alpha0;
 
 		//Apply the window function
 		switch(window)
@@ -272,6 +286,29 @@ void FFTFilter::DoRefresh(
 				m_rdinbuf.MarkModifiedFromGpu();
 				break;
 
+			case WINDOW_HANN:
+			case WINDOW_HAMMING:
+
+				//Update our descriptor sets with current buffers
+				m_cosineSumComputePipeline.BindBuffer(0, data);
+				m_cosineSumComputePipeline.BindBuffer(1, m_rdinbuf);
+				m_cosineSumComputePipeline.UpdateDescriptors();
+
+				//Dispatch the compute operation and block until it completes
+				cmdBuf.begin({});
+				m_cosineSumComputePipeline.Dispatch(
+					cmdBuf,
+					args,
+					GetComputeBlockCount(npoints, 64),
+					1);
+				cmdBuf.end();
+				SubmitAndBlock(cmdBuf, queue);
+
+				m_rdinbuf.MarkModifiedFromGpu();
+
+				break;
+
+			default:
 			case WINDOW_RECTANGULAR:
 
 				//Update our descriptor sets with current buffers
@@ -291,31 +328,6 @@ void FFTFilter::DoRefresh(
 
 				m_rdinbuf.MarkModifiedFromGpu();
 				break;
-
-			/*
-			case WINDOW_HANN:
-				return HannWindow(data, len, out);
-
-			case WINDOW_HAMMING:
-				return HammingWindow(data, len, out);
-
-				*/
-
-			default:
-
-				data.PrepareForCpuAccess();
-
-				//Copy the input with windowing, then zero pad to the desired input length if needed
-				ApplyWindow(
-					(float*)&data[0],
-					numActualSamples,
-					&m_rdinbuf[0],
-					window);
-				if(npoints > m_cachedNumPoints)
-					memset(&m_rdinbuf[m_cachedNumPoints], 0, (npoints - m_cachedNumPoints) * sizeof(float));
-
-				break;
-
 		}
 
 		m_rdinbuf.PrepareForCpuAccess();

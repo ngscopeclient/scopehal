@@ -32,6 +32,7 @@ add_compute_shaders(
 		BlackmanHarrisWindow.glsl
 		Convert8BitSamples.glsl
 		Convert16BitSamples.glsl
+		CosineSumWindow.glsl
 		RectangularWindow.glsl
 		SubtractFilter.glsl
 		UpsampleFilter.glsl
