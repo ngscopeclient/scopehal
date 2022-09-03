@@ -510,6 +510,8 @@ bool DemoOscilloscope::AcquireData()
 			default:
 				break;
 		}
+
+		waveforms[i]->MarkModifiedFromCpu();
 	}
 
 	SequenceSet s;
