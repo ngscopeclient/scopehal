@@ -48,13 +48,13 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	if(g_hasShaderInt64 && g_hasShaderInt16)
 	{
 		m_computePipeline16Bit = make_unique<ComputePipeline>(
-			"shaders/Convert16BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
+			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
 	if(g_hasShaderInt64 && g_hasShaderInt8)
 	{
 		m_computePipeline8Bit = make_unique<ComputePipeline>(
-			"shaders/Convert8BitSamples.spv", 4, sizeof(ConvertRawSamplesShaderArgs) );
+			"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
 	//Make a command buffer for our accelerated stuff
