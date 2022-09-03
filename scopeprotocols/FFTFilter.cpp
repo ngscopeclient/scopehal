@@ -601,9 +601,6 @@ void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, f
 	float alpha1 = 1 - alpha0;
 	float scale = 2.0f * (float)M_PI / len;
 
-	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
-	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
-
 	__m256 count_x8		= { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f };
 	__m256 eights_x8	= { 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f };
 	__m256 scale_x8		= { scale, scale, scale, scale, scale, scale, scale, scale };
@@ -619,9 +616,9 @@ void FFTFilter::CosineSumWindowAVX2(const float* data, size_t len, float* out, f
 		__m256 rhs 		= _mm256_mul_ps(vcos, alpha1_x8);
 		__m256 w		= _mm256_sub_ps(alpha0_x8, rhs);
 
-		__m256 din		= _mm256_load_ps(aligned_data + i);
+		__m256 din		= _mm256_loadu_ps(data + i);
 		__m256 dout		= _mm256_mul_ps(din, w);
-		_mm256_store_ps(aligned_out + i, dout);
+		_mm256_storeu_ps(out + i, dout);
 
 		count_x8 = _mm256_add_ps(count_x8, eights_x8);
 	}
@@ -663,9 +660,6 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 	float alpha3 = 0.01168;
 	float scale = 2 *(float)M_PI / len;
 
-	float* aligned_data = (float*)__builtin_assume_aligned(data, 32);
-	float* aligned_out = (float*)__builtin_assume_aligned(out, 32);
-
 	__m256 count_x8		= { 0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f };
 	__m256 eights_x8	= { 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f, 8.0f };
 	__m256 scale_x8		= { scale, scale, scale, scale, scale, scale, scale, scale };
@@ -694,9 +688,9 @@ void FFTFilter::BlackmanHarrisWindowAVX2(const float* data, size_t len, float* o
 		w					= _mm256_add_ps(w, term2);
 		w					= _mm256_sub_ps(w, term3);
 
-		__m256 din			= _mm256_loadu_ps(aligned_data + i);
+		__m256 din			= _mm256_loadu_ps(data + i);
 		__m256 dout			= _mm256_mul_ps(din, w);
-		_mm256_storeu_ps(aligned_out + i, dout);
+		_mm256_storeu_ps(out + i, dout);
 
 		count_x8 = _mm256_add_ps(count_x8, eights_x8);
 	}
