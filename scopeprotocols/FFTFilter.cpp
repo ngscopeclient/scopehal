@@ -81,6 +81,8 @@ FFTFilter::FFTFilter(const string& color)
 
 	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
 
 FFTFilter::~FFTFilter()
@@ -151,19 +153,32 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 	{
 		m_cachedNumPointsFFT = npoints;
 
-		if(m_plan)
-			ffts_free(m_plan);
-		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+
+		if(g_gpuFilterEnabled)
+			m_plan = nullptr;
+		else
+		{
+			if(m_plan)
+				ffts_free(m_plan);
+			m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+		}
 	}
 
 	//Update our FFT plan if it's out of date
-	if(m_vkPlan)
+	if(!g_gpuFilterEnabled)
+		m_vkPlan = nullptr;
+	else
 	{
-		if(m_vkPlan->size() != npoints)
-			m_vkPlan = nullptr;
+		if(m_vkPlan)
+		{
+			if(m_vkPlan->size() != npoints)
+				m_vkPlan = nullptr;
+		}
+		if(!m_vkPlan)
+			m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::FLAG_FORWARD_ONLY);
 	}
-	if(!m_vkPlan)
-		m_vkPlan = make_unique<VulkanFFTPlan>(npoints, VulkanFFTPlan::FLAG_FORWARD_ONLY);
+
+	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
 
 void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
@@ -187,7 +202,7 @@ void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 
 	//Reallocate buffers if size has changed
 	const size_t nouts = npoints/2 + 1;
-	if(m_cachedNumPoints != npoints_raw)
+	if( (m_cachedNumPoints != npoints_raw) || (m_cachedGpuFilterEnabled != g_gpuFilterEnabled) )
 		ReallocateBuffers(npoints_raw, npoints, nouts);
 	LogTrace("Output: %zu\n", nouts);
 
@@ -332,27 +347,32 @@ void FFTFilter::DoRefresh(
 				break;
 		}
 
-		m_rdinbuf.PrepareForCpuAccess();
+		//Do the actual FFT operation
+		cmdBuf.begin({});
+		m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
+		cmdBuf.end();
+		SubmitAndBlock(cmdBuf, queue);
+
 		m_rdoutbuf.PrepareForCpuAccess();
-
-		//Calculate the FFT
-		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
-
 		cap->PrepareForCpuAccess();
 
 		//Normalize magnitudes
 		if(log_output)
 		{
+			#ifdef __x86_64__
 			if(g_hasAvx2 && g_hasFMA)
 				NormalizeOutputLogAVX2FMA(cap->m_samples, nouts, scale);
 			else
+			#endif
 				NormalizeOutputLog(cap->m_samples, nouts, scale);
 		}
 		else
 		{
+			#ifdef __x86_64__
 			if(g_hasAvx2)
 				NormalizeOutputLinearAVX2(cap->m_samples, nouts, scale);
 			else
+			#endif
 				NormalizeOutputLinear(cap->m_samples, nouts, scale);
 		}
 

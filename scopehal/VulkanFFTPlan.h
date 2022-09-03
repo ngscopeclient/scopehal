@@ -66,8 +66,8 @@ public:
 		FLAG_FORWARD_ONLY
 	};
 
-	VulkanFFTPlan(size_t size, int flags)
-		: m_size(size)
+	VulkanFFTPlan(size_t npoints, size_t nouts, int flags)
+		: m_size(npoints)
 		, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 	{
 		memset(&m_app, 0, sizeof(m_app));
@@ -77,11 +77,11 @@ public:
 
 		//Only 1D FFTs supported for now
 		m_config.FFTdim = 1;
-		m_config.size[0] = size;
+		m_config.size[0] = npoints;
 		m_config.size[1] = 1;
 		m_config.size[2] = 1;
 
-		//Extract raw handles of all of our Vulkan infrastructure
+		//Extract raw handles of all of our Vulkan objects
 		m_physicalDevice = **g_vkfftPhysicalDevice;
 		m_device = **g_vkComputeDevice;
 		m_pool = **g_vkFFTCommandPool;
@@ -94,17 +94,49 @@ public:
 		m_config.commandPool = &m_pool;
 		m_config.fence = &m_rawfence;
 		m_config.isCompilerInitialized = 1;
+		m_config.isInputFormatted = 1;
+		m_config.performR2C = 1;				//real to complex transform
 
 		if(flags & FLAG_FORWARD_ONLY)
 			m_config.makeForwardPlanOnly = 1;
 
-		//single buffer of full size
-		uint64_t bsize = size;
-		m_config.bufferSize = &bsize;
+		//output is complex buffer of full size
+		m_bsize = 2 * nouts * sizeof(float);
+		m_config.bufferSize = &m_bsize;
+
+		//input is real buffer of full size
+		m_isize = npoints * sizeof(float);
+		m_config.inputBufferSize = &m_isize;
 
 		auto err = initializeVkFFT(&m_app, m_config);
 		if(VKFFT_SUCCESS != err)
 			LogError("Failed to initialize vkFFT (code %d)\n", err);
+	}
+
+	void AppendForward(
+		AcceleratorBuffer<float>& dataIn,
+		AcceleratorBuffer<float>& dataOut,
+		vk::raii::CommandBuffer& cmdBuf)
+	{
+		dataIn.PrepareForGpuAccess();
+		dataOut.PrepareForGpuAccess();
+
+		//Extract raw handles of all of our Vulkan objects
+		VkBuffer inbuf = dataIn.GetBuffer();
+		VkBuffer outbuf = dataOut.GetBuffer();
+		VkCommandBuffer cmd = *cmdBuf;
+
+		VkFFTLaunchParams params;
+		memset(&params, 0, sizeof(params));
+		params.inputBuffer = &inbuf;
+		params.buffer = &outbuf;
+		params.commandBuffer = &cmd;
+
+		auto err = VkFFTAppend(&m_app, -1, &params);
+		if(VKFFT_SUCCESS != err)
+			LogError("Failed to append vkFFT transform (code %d)\n", err);
+
+		dataOut.MarkModifiedFromGpu();
 	}
 
 	~VulkanFFTPlan()
@@ -128,6 +160,9 @@ protected:
 
 	vk::raii::Fence m_fence;
 	VkFence m_rawfence;
+
+	uint64_t m_bsize;
+	uint64_t m_isize;
 };
 
 #endif

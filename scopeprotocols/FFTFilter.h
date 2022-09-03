@@ -138,6 +138,8 @@ protected:
 	ComputePipeline m_blackmanHarrisComputePipeline;
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_cosineSumComputePipeline;
+
+	bool m_cachedGpuFilterEnabled;
 };
 
 #endif

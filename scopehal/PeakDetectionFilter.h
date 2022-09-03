@@ -66,11 +66,14 @@ public:
 		//input must be analog
 		AssertTypeIsAnalogWaveform(cap);
 
-		size_t nouts = cap->m_samples.size();
+		size_t nouts = cap->size();
 		if(max_peaks == 0)
 			m_peaks.clear();
 		else
 		{
+			//We're looking for peaks on the CPU
+			cap->PrepareForCpuAccess();
+
 			//Get peak search width in bins
 			int64_t search_bins = ceil(search_hz / cap->m_timescale);
 			int64_t search_rad = search_bins/2;
