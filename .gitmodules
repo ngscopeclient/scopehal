@@ -10,3 +10,6 @@
 [submodule "OpenCL-CLHPP"]
 	path = OpenCL-CLHPP
 	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git
+[submodule "VkFFT"]
+	path = VkFFT
+	url = https://github.com/DTolm/VkFFT
