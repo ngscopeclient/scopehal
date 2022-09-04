@@ -142,6 +142,19 @@ void VulkanCleanup();
 vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 
 /**
+	@brief Allocates a queue index for Vulkan compute queues
+ */
+int AllocateVulkanComputeQueue()
+{
+	static mutex allocMutex;
+
+	lock_guard<mutex> lock(allocMutex);
+
+	static int nextQueue = 0;
+	return (nextQueue ++);
+}
+
+/**
 	@brief Initialize a Vulkan context for compute
  */
 bool VulkanInit()
@@ -388,6 +401,7 @@ bool VulkanInit()
 			}
 
 			LogDebug("Selected device %zu\n", bestDevice);
+			int computeQueueCount = 1;
 			{
 				auto device = devices[bestDevice];
 				g_vkfftPhysicalDevice = &devices[bestDevice];
@@ -424,6 +438,7 @@ bool VulkanInit()
 						if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
 						{
 							g_computeQueueType = j;
+							computeQueueCount = f.queueCount;
 							break;
 						}
 					}
@@ -508,8 +523,11 @@ bool VulkanInit()
 				}
 
 				//Initialize the device
-				float queuePriority = 0;
-				vk::DeviceQueueCreateInfo qinfo( {}, g_computeQueueType, 1, &queuePriority);
+				//Create as many compute queues as we're allowed to, and make them all equal priority.
+				vector<float> queuePriority;
+				for(int i=0; i<computeQueueCount; i++)
+					queuePriority.push_back(0.5);
+				vk::DeviceQueueCreateInfo qinfo( {}, g_computeQueueType, computeQueueCount, &queuePriority[0]);
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
@@ -591,13 +609,15 @@ bool VulkanInit()
 					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 
 				//Make a Queue for memory transfers that we can use implicitly during buffer management
-				g_vkTransferQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
+				g_vkTransferQueue = make_unique<vk::raii::Queue>(
+					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
 
 				//And again for FFTs
 				bufinfo = vk::CommandBufferAllocateInfo(**g_vkFFTCommandPool, vk::CommandBufferLevel::ePrimary, 1);
 				g_vkFFTCommandBuffer = make_unique<vk::raii::CommandBuffer>(
 					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-				g_vkFFTQueue = make_unique<vk::raii::Queue>(*g_vkComputeDevice, g_computeQueueType, 0);
+				g_vkFFTQueue = make_unique<vk::raii::Queue>(
+					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
 			}
 		}
 	}

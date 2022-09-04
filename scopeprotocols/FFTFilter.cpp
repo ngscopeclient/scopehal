@@ -142,9 +142,6 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 {
 	m_cachedNumPoints = npoints_raw;
 
-	m_rdinbuf.resize(npoints);
-	m_rdoutbuf.resize(2*nouts);
-
 	if(m_cachedNumPointsFFT != npoints)
 	{
 		m_cachedNumPointsFFT = npoints;
@@ -184,6 +181,9 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 		if(!m_vkPlan)
 			m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::FLAG_FORWARD_ONLY);
 	}
+
+	m_rdinbuf.resize(npoints);
+	m_rdoutbuf.resize(2*nouts);
 
 	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
