@@ -148,23 +148,23 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 
 	if(g_gpuFilterEnabled)
 	{
+		cmdBuf.begin({});
+
 		//Update our descriptor sets with current buffers
-		m_computePipeline.BindBuffer(0, din->m_samples);
-		m_computePipeline.BindBuffer(1, m_filter);
-		m_computePipeline.BindBuffer(2, cap->m_samples, true);
-		m_computePipeline.UpdateDescriptors();
+		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, m_filter, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
 
 		UpsampleFilterArgs args;
 		args.imax = imax;
 		args.upsample_factor = upsample_factor;
 		args.kernel = kernel;
 
-		//Dispatch the compute operation and block until it completes
-		cmdBuf.begin({});
 		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(imax, 64), GetComputeBlockCount(upsample_factor, 1));
+
+		//Done, submit to the queue and wait
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
-
 		cap->MarkModifiedFromGpu();
 	}
 

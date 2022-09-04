@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* LIBSCOPEHAL v0.1                                                                                                      *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,34 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@brief Kernels to normalize FFT output and calculate scalar magnitude
- */
+#version 430
+#pragma shader_stage(compute)
 
-__kernel void NormalizeToMagnitude(
-	__global float* din,
-	__global float* dout,
-	float scale)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	unsigned long i = get_global_id(0);
+	float din[];
+};
 
-	float real = din[i*2];
-	float imag = din[i*2 + 1];
-
-	dout[i] = sqrt(real*real + imag*imag) * scale;
-}
-
-__kernel void NormalizeToLogMagnitude(
-	__global float* din,
-	__global float* dout,
-	float scale)
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	unsigned long i = get_global_id(0);
+	float dout[];
+};
 
-	float real = din[i*2];
-	float imag = din[i*2 + 1];
+layout(std430, push_constant) uniform constants
+{
+	uint npoints;
+	float scale;
+};
 
-	float v = real*real + imag*imag;
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-	dout[i] = 10 * log10(v * scale) + 30;
+void main()
+{
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= npoints)
+		return;
+
+	float real = din[gl_GlobalInvocationID.x*2];
+	float imag = din[gl_GlobalInvocationID.x*2 + 1];
+
+	dout[gl_GlobalInvocationID.x] = sqrt(real*real + imag*imag) * scale;
 }

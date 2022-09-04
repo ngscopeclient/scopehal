@@ -168,15 +168,13 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 	//Just regular subtraction, use the GPU filter
 	else if(g_gpuFilterEnabled)
 	{
-		//Update our descriptor sets with current buffers
-		m_computePipeline.BindBuffer(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples);
-		m_computePipeline.BindBuffer(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples);
-		m_computePipeline.BindBuffer(2, scap ? scap->m_samples : ucap->m_samples, true);
-		m_computePipeline.UpdateDescriptors();
-
-		//Dispatch the compute operation and block until it completes
 		cmdBuf.begin({});
+
+		m_computePipeline.BindBufferNonblocking(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, scap ? scap->m_samples : ucap->m_samples, cmdBuf, true);
 		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, GetComputeBlockCount(len, 64));
+
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 

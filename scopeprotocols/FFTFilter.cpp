@@ -49,6 +49,8 @@ FFTFilter::FFTFilter(const string& color)
 	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_complexToMagnitudeComputePipeline("shaders/ComplexToMagnitude.spv", 2, sizeof(ComplexToMagnitudeArgs))
+	, m_complexToLogMagnitudeComputePipeline("shaders/ComplexToLogMagnitude.spv", 2, sizeof(ComplexToMagnitudeArgs))
 {
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_ANALOG);
@@ -75,12 +77,6 @@ FFTFilter::FFTFilter(const string& color)
 	m_parameters[m_roundingName].AddEnumValue("Down (Truncate)", ROUND_TRUNCATE);
 	m_parameters[m_roundingName].AddEnumValue("Up (Zero Pad)", ROUND_ZERO_PAD);
 	m_parameters[m_roundingName].SetIntVal(ROUND_TRUNCATE);
-
-	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-
-	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
@@ -153,14 +149,20 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 	{
 		m_cachedNumPointsFFT = npoints;
 
-
 		if(g_gpuFilterEnabled)
 			m_plan = nullptr;
+
+		//CPU fallback
 		else
 		{
 			if(m_plan)
 				ffts_free(m_plan);
 			m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+
+			m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+			m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+			m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+			m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 		}
 	}
 
@@ -169,6 +171,11 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 		m_vkPlan = nullptr;
 	else
 	{
+		m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+		m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+		m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+		m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
 		if(m_vkPlan)
 		{
 			if(m_vkPlan->size() != npoints)
@@ -280,103 +287,58 @@ void FFTFilter::DoRefresh(
 		}
 		args.alpha1 = 1 - args.alpha0;
 
+		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+		cmdBuf.begin({});
+
 		//Apply the window function
+		ComputePipeline* wpipe = nullptr;
 		switch(window)
 		{
 			case WINDOW_BLACKMAN_HARRIS:
-
-				//Update our descriptor sets with current buffers
-				m_blackmanHarrisComputePipeline.BindBuffer(0, data);
-				m_blackmanHarrisComputePipeline.BindBuffer(1, m_rdinbuf);
-				m_blackmanHarrisComputePipeline.UpdateDescriptors();
-
-				//Dispatch the compute operation and block until it completes
-				cmdBuf.begin({});
-				m_blackmanHarrisComputePipeline.Dispatch(
-					cmdBuf,
-					args,
-					GetComputeBlockCount(npoints, 64),
-					1);
-				cmdBuf.end();
-				SubmitAndBlock(cmdBuf, queue);
-
-				m_rdinbuf.MarkModifiedFromGpu();
+				wpipe = &m_blackmanHarrisComputePipeline;
 				break;
 
 			case WINDOW_HANN:
 			case WINDOW_HAMMING:
-
-				//Update our descriptor sets with current buffers
-				m_cosineSumComputePipeline.BindBuffer(0, data);
-				m_cosineSumComputePipeline.BindBuffer(1, m_rdinbuf);
-				m_cosineSumComputePipeline.UpdateDescriptors();
-
-				//Dispatch the compute operation and block until it completes
-				cmdBuf.begin({});
-				m_cosineSumComputePipeline.Dispatch(
-					cmdBuf,
-					args,
-					GetComputeBlockCount(npoints, 64),
-					1);
-				cmdBuf.end();
-				SubmitAndBlock(cmdBuf, queue);
-
-				m_rdinbuf.MarkModifiedFromGpu();
-
+				wpipe = &m_cosineSumComputePipeline;
 				break;
 
 			default:
 			case WINDOW_RECTANGULAR:
-
-				//Update our descriptor sets with current buffers
-				m_rectangularComputePipeline.BindBuffer(0, data);
-				m_rectangularComputePipeline.BindBuffer(1, m_rdinbuf);
-				m_rectangularComputePipeline.UpdateDescriptors();
-
-				//Dispatch the compute operation and block until it completes
-				cmdBuf.begin({});
-				m_rectangularComputePipeline.Dispatch(
-					cmdBuf,
-					args,
-					GetComputeBlockCount(npoints, 64),
-					1);
-				cmdBuf.end();
-				SubmitAndBlock(cmdBuf, queue);
-
-				m_rdinbuf.MarkModifiedFromGpu();
+				wpipe = &m_rectangularComputePipeline;
 				break;
 		}
+		wpipe->BindBufferNonblocking(0, data, cmdBuf);
+		wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
+		wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+		wpipe->AddComputeMemoryBarrier(cmdBuf);
+		m_rdinbuf.MarkModifiedFromGpu();
 
 		//Do the actual FFT operation
-		cmdBuf.begin({});
 		m_vkPlan->AppendForward(m_rdinbuf, m_rdoutbuf, cmdBuf);
+
+		//Convert complex to real
+		ComputePipeline& pipe = log_output ?
+			m_complexToLogMagnitudeComputePipeline : m_complexToMagnitudeComputePipeline;
+		ComplexToMagnitudeArgs cargs;
+		cargs.npoints = nouts;
+		if(log_output)
+		{
+			const float impedance = 50;
+			cargs.scale = scale * scale / impedance;
+		}
+		else
+			cargs.scale = scale;
+		pipe.BindBuffer(0, m_rdoutbuf);
+		pipe.BindBuffer(1, cap->m_samples);
+		pipe.AddComputeMemoryBarrier(cmdBuf);
+		pipe.Dispatch(cmdBuf, cargs, GetComputeBlockCount(nouts, 64));
+
+		//Done, block until the compute operations finish
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
 
-		m_rdoutbuf.PrepareForCpuAccess();
-		cap->PrepareForCpuAccess();
-
-		//Normalize magnitudes
-		if(log_output)
-		{
-			#ifdef __x86_64__
-			if(g_hasAvx2 && g_hasFMA)
-				NormalizeOutputLogAVX2FMA(cap->m_samples, nouts, scale);
-			else
-			#endif
-				NormalizeOutputLog(cap->m_samples, nouts, scale);
-		}
-		else
-		{
-			#ifdef __x86_64__
-			if(g_hasAvx2)
-				NormalizeOutputLinearAVX2(cap->m_samples, nouts, scale);
-			else
-			#endif
-				NormalizeOutputLinear(cap->m_samples, nouts, scale);
-		}
-
-		cap->MarkModifiedFromCpu();
+		cap->MarkModifiedFromGpu();
 	}
 	else
 	{

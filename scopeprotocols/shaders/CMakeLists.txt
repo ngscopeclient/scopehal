@@ -30,6 +30,8 @@ add_compute_shaders(
 	protocolshaders
 	SOURCES
 		BlackmanHarrisWindow.glsl
+		ComplexToLogMagnitude.glsl
+		ComplexToMagnitude.glsl
 		Convert8BitSamples.glsl
 		Convert16BitSamples.glsl
 		CosineSumWindow.glsl

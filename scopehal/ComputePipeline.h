@@ -60,10 +60,31 @@ public:
 	}
 
 	/**
-		@brief Pushes pending descriptor changes to the device
+		@brief Binds a buffer to a descriptor slot
 	 */
-	void UpdateDescriptors()
-	{ g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr); }
+	template<class T>
+	void BindBufferNonblocking(size_t i, AcceleratorBuffer<T>& buf, vk::raii::CommandBuffer& cmdBuf, bool outputOnly = false)
+	{
+		buf.PrepareForGpuAccessNonblocking(outputOnly, cmdBuf);
+
+		m_bufferInfo[i] = buf.GetBufferInfo();
+		m_writeDescriptors[i] =
+			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+	}
+
+	/**
+		@brief Helper function to insert a memory barrier in a command buffer
+	 */
+	void AddComputeMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
+	{
+		cmdBuf.pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eComputeShader,
+			{},
+			vk::MemoryBarrier(vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eShaderRead),
+			{},
+			{});
+	}
 
 	/**
 		@brief Dispatches a compute operation to a command buffer
@@ -71,6 +92,7 @@ public:
 	template<class T>
 	void Dispatch(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
 	{
+		g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr);
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
 		cmdBuf.pushConstants<T>(
 			**m_pipelineLayout,

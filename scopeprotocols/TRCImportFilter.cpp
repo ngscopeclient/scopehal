@@ -235,12 +235,11 @@ void TRCImportFilter::OnFileNameChanged()
 		//The accelerated filter needs int64 and int16 support
 		if(g_hasShaderInt64 && g_hasShaderInt16 && g_gpuFilterEnabled)
 		{
-			LogTrace("GPU path\n");
+			m_commandBuffer->begin({});
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline16Bit->BindBuffer(0, wfm->m_samples, true);
-			m_computePipeline16Bit->BindBuffer(1, buf);
-			m_computePipeline16Bit->UpdateDescriptors();
+			m_computePipeline16Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
+			m_computePipeline16Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
 
 			ConvertRawSamplesShaderArgs args;
 			args.size = num_per_segment;
@@ -249,7 +248,6 @@ void TRCImportFilter::OnFileNameChanged()
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			m_commandBuffer->begin({});
 			m_computePipeline16Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
 			m_commandBuffer->end();
 
@@ -265,8 +263,6 @@ void TRCImportFilter::OnFileNameChanged()
 		else
 		{
 			wfm->PrepareForCpuAccess();
-
-			LogTrace("Fallback path\n");
 
 			Oscilloscope::Convert16BitSamples(
 				(float*)&wfm->m_samples[0],
@@ -296,12 +292,11 @@ void TRCImportFilter::OnFileNameChanged()
 		//The accelerated filter needs int64 support
 		if(g_hasShaderInt64 && g_hasShaderInt8 && g_gpuFilterEnabled)
 		{
-			LogTrace("GPU path\n");
+			m_commandBuffer->begin({});
 
 			//Update our descriptor sets with current buffers
-			m_computePipeline8Bit->BindBuffer(0, wfm->m_samples, true);
-			m_computePipeline8Bit->BindBuffer(1, buf);
-			m_computePipeline8Bit->UpdateDescriptors();
+			m_computePipeline8Bit->BindBufferNonblocking(0, wfm->m_samples, *m_commandBuffer, true);
+			m_computePipeline8Bit->BindBufferNonblocking(1, buf, *m_commandBuffer);
 
 			ConvertRawSamplesShaderArgs args;
 			args.size = num_per_segment;
@@ -310,7 +305,6 @@ void TRCImportFilter::OnFileNameChanged()
 
 			//Dispatch the compute operation and block until it completes
 			//We are in an event handler, so use the global transfer queue here
-			m_commandBuffer->begin({});
 			m_computePipeline8Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
 			m_commandBuffer->end();
 
@@ -327,7 +321,6 @@ void TRCImportFilter::OnFileNameChanged()
 		{
 			wfm->PrepareForCpuAccess();
 
-			LogTrace("Fallback path\n");
 			Oscilloscope::Convert8BitSamples(
 				(float*)&wfm->m_samples[0],
 				&buf[0],

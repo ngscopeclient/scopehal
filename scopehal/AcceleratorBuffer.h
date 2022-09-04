@@ -783,6 +783,33 @@ public:
 			CopyToGpu();
 	}
 
+	/**
+		@brief Prepares the buffer to be accessed from the GPU
+
+		This MUST be called prior to accessing the GPU-side buffer to ensure that m_gpuPhysMem is valid and up to date.
+
+		@param outputOnly	True if the buffer is output-only for the shader, so there's no need to copy anything
+							to the GPU even if data is stale.
+	 */
+	void PrepareForGpuAccessNonblocking(bool outputOnly, vk::raii::CommandBuffer& cmdBuf)
+	{
+		//Early out if no content
+		if(m_capacity == 0)
+			return;
+
+		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
+		if(m_gpuAccessHint == HINT_NEVER)
+			SetGpuAccessHint(HINT_UNLIKELY, true);
+
+		//If we don't have a buffer, allocate one unless our CPU buffer is pinned and GPU-readable
+		if(!HasGpuBuffer() && (m_cpuMemoryType != MEM_TYPE_CPU_DMA_CAPABLE) )
+			AllocateGpuBuffer(m_capacity);
+
+		//Make sure the GPU-side buffer is up to date
+		if(m_gpuPhysMemIsStale && !outputOnly)
+			CopyToGpuNonblocking(cmdBuf);
+	}
+
 protected:
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -833,6 +860,31 @@ protected:
 
 		m_gpuPhysMemIsStale = false;
 	}
+
+
+	/**
+		@brief Copy the buffer contents from CPU to GPU without blocking on the CPU.
+
+		Inserts a memory barrier to ensure that GPU-side access is synchronized.
+	 */
+	void CopyToGpuNonblocking(vk::raii::CommandBuffer& cmdBuf)
+	{
+		//Make the transfer request
+		vk::BufferCopy region(0, 0, m_size * sizeof(T));
+		cmdBuf.copyBuffer(**m_cpuBuffer, **m_gpuBuffer, {region});
+
+		//Add the barrier
+		cmdBuf.pipelineBarrier(
+			vk::PipelineStageFlagBits::eTransfer,
+			vk::PipelineStageFlagBits::eComputeShader,
+			{},
+			vk::MemoryBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead),
+			{},
+			{});
+
+		m_gpuPhysMemIsStale = false;
+	}
+
 
 protected:
 
