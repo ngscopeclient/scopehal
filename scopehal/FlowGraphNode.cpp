@@ -179,7 +179,7 @@ void FlowGraphNode::SetInput(const string& name, StreamDescriptor stream, bool f
 	}
 
 	//Not found
-	LogError("Invalid channel name\n");
+	LogError("Invalid channel name \"%s\" in FlowGraphNode::SetInput()\n", name.c_str());
 }
 
 /**
