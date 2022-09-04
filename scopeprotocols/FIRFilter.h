@@ -43,7 +43,8 @@ class FIRFilter : public Filter
 public:
 	FIRFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
@@ -65,6 +66,15 @@ public:
 		FILTER_TYPE_NOTCH
 	};
 
+	void SetFilterType(FilterType type)
+	{ m_parameters[m_filterTypeName].SetIntVal(type); }
+
+	void SetFreqLow(float freq)
+	{ m_parameters[m_freqLowName].SetFloatVal(freq); }
+
+	void SetFreqHigh(float freq)
+	{ m_parameters[m_freqHighName].SetFloatVal(freq); }
+
 protected:
 
 	static void CalculateFilterCoefficients(
@@ -80,13 +90,6 @@ protected:
 		std::vector<float>& coefficients,
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
-
-#ifdef HAVE_OPENCL
-	void DoFilterKernelOpenCL(
-		std::vector<float>& coefficients,
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-#endif
 
 #ifdef __x86_64__
 	void DoFilterKernelAVX2(

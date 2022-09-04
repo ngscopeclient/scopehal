@@ -114,10 +114,10 @@ void EnhancedResolutionFilter::SetDefaultName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EnhancedResolutionFilter::Refresh()
+void EnhancedResolutionFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	UpdateCutoff();
-	FIRFilter::Refresh();
+	FIRFilter::Refresh(cmdBuf, queue);
 }
 
 void EnhancedResolutionFilter::OnBitsChanged()

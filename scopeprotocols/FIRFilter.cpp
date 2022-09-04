@@ -133,10 +133,16 @@ string FIRFilter::GetProtocolName()
 	return "FIR Filter";
 }
 
+Filter::DataLocation FIRFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void FIRFilter::Refresh()
+void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Sanity check
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -229,12 +235,6 @@ void FIRFilter::DoFilterKernel(
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
-	#ifdef HAVE_OPENCL
-	if(g_clContext && m_kernel)
-		DoFilterKernelOpenCL(coefficients, din, cap);
-	else
-	#endif
-
 	#ifdef __x86_64__
 	if(g_hasAvx512F)
 		DoFilterKernelAVX512F(coefficients, din, cap);
@@ -244,61 +244,6 @@ void FIRFilter::DoFilterKernel(
 	#endif
 		DoFilterKernelGeneric(coefficients, din, cap);
 }
-
-#ifdef HAVE_OPENCL
-void FIRFilter::DoFilterKernelOpenCL(
-		std::vector<float>& coefficients,
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap)
-{
-	//Setup
-	size_t len = din->m_samples.size();
-	size_t filterlen = coefficients.size();
-	size_t end = len - filterlen;
-
-	//Round size up to next multiple of block size
-	//Max size of 1024 is set by buffer size in kernel, but go smaller if the implementation requires
-	size_t blocksize = min((size_t)1024, g_maxClLocalSizeX);
-	size_t globalsize = (end + blocksize);
-	globalsize -= (globalsize % blocksize);
-
-	//Allocate min/max buffer (first stage reduction on GPU, rest on CPU)
-	size_t nblocks = globalsize / blocksize;
-	vector<float> minmax;
-	minmax.resize(2 * nblocks);
-
-	try
-	{
-		//Allocate memory and copy to the GPU
-		cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-		cl::Buffer inbuf(queue, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
-		cl::Buffer coeffbuf(queue, coefficients.begin(), coefficients.end(), true, true, NULL);
-		cl::Buffer outbuf(queue, cap->m_samples.begin(), cap->m_samples.end(), false, true, NULL);
-		cl::Buffer minmaxbuf(queue, minmax.begin(), minmax.end(), false, true, NULL);
-
-		//Run the filter
-		m_kernel->setArg(0, inbuf);
-		m_kernel->setArg(1, coeffbuf);
-		m_kernel->setArg(2, outbuf);
-		m_kernel->setArg(3, filterlen);
-		m_kernel->setArg(4, end);
-		m_kernel->setArg(5, minmaxbuf);
-		queue.enqueueNDRangeKernel(
-			*m_kernel, cl::NullRange, cl::NDRange(globalsize, 1), cl::NDRange(blocksize, 1), NULL);
-
-		//Map/unmap the buffer to synchronize output with the CPU
-		void* ptr = queue.enqueueMapBuffer(outbuf, true, CL_MAP_READ, 0, end * sizeof(float));
-		void* ptr2 = queue.enqueueMapBuffer(minmaxbuf, true, CL_MAP_READ, 0, 2 * nblocks * sizeof(float));
-		queue.enqueueUnmapMemObject(outbuf, ptr);
-		queue.enqueueUnmapMemObject(minmaxbuf, ptr2);
-	}
-	catch(const cl::Error& e)
-	{
-		LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
-	}
-}
-#endif
-
 
 /**
 	@brief Performs a FIR filter (does not assume symmetric)
