@@ -27,90 +27,40 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of FIRFilter
- */
-#ifndef FIRFilter_h
-#define FIRFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-struct FIRFilterArgs
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t end;
-	uint32_t filterlen;
+	float din[];
 };
 
-/**
-	@brief Performs an arbitrary FIR filter with tap delay equal to the sample rate
- */
-class FIRFilter : public Filter
+layout(std430, binding=1) restrict readonly buffer buf_taps
 {
-public:
-	FIRFilter(const std::string& color);
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-	virtual DataLocation GetInputLocation();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(FIRFilter)
-
-	void DoFilterKernel(
-		vk::raii::CommandBuffer& cmdBuf,
-		vk::raii::Queue& queue,
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-
-	enum FilterType
-	{
-		FILTER_TYPE_LOWPASS,
-		FILTER_TYPE_HIGHPASS,
-		FILTER_TYPE_BANDPASS,
-		FILTER_TYPE_NOTCH
-	};
-
-	void SetFilterType(FilterType type)
-	{ m_parameters[m_filterTypeName].SetIntVal(type); }
-
-	void SetFreqLow(float freq)
-	{ m_parameters[m_freqLowName].SetFloatVal(freq); }
-
-	void SetFreqHigh(float freq)
-	{ m_parameters[m_freqHighName].SetFloatVal(freq); }
-
-protected:
-
-	void CalculateFilterCoefficients(float fa, float fb, float stopbandAtten, FilterType type);
-
-	static float Bessel(float x);
-
-	void DoFilterKernelGeneric(
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-
-#ifdef __x86_64__
-	void DoFilterKernelAVX2(
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-
-	void DoFilterKernelAVX512F(
-		UniformAnalogWaveform* din,
-		UniformAnalogWaveform* cap);
-#endif
-
-	std::string m_filterTypeName;
-	std::string m_filterLengthName;
-	std::string m_stopbandAttenName;
-	std::string m_freqLowName;
-	std::string m_freqHighName;
-
-	ComputePipeline m_computePipeline;
-
-	AcceleratorBuffer<float> m_coefficients;
+	float taps[];
 };
 
-#endif
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint end;
+	uint filterlen;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= end)
+		return;
+
+	float temp = 0;
+	for(uint i=0; i<filterlen; i++)
+		temp += din[gl_GlobalInvocationID.x + i] * taps[i];
+	dout[gl_GlobalInvocationID.x] = temp;
+}

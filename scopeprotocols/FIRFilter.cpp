@@ -39,17 +39,13 @@ using namespace std;
 // Construction / destruction
 
 FIRFilter::FIRFilter(const string& color)
-	: Filter(
-		color,
-		CAT_MATH,
-		Unit(Unit::UNIT_FS),
-		"kernels/FIRFilter.cl",
-		"FIRFilter")
+	: Filter(color, CAT_MATH, Unit(Unit::UNIT_FS))
 	, m_filterTypeName("Filter Type")
 	, m_filterLengthName("Length")
 	, m_stopbandAttenName("Stopband Attenuation")
 	, m_freqLowName("Frequency Low")
 	, m_freqHighName("Frequency High")
+	, m_computePipeline("shaders/FIRFilter.spv", 3, sizeof(FIRFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("in");
@@ -72,6 +68,9 @@ FIRFilter::FIRFilter(const string& color)
 
 	m_parameters[m_freqHighName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_parameters[m_freqHighName].SetFloatVal(100e6);
+
+	m_coefficients.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_coefficients.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,7 +152,6 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 
 	//Get input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
 
 	//Assume the input is dense packed, get the sample frequency
 	int64_t fs_per_sample = din->m_timescale;
@@ -203,59 +201,76 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 	}
 
 	//Create the filter coefficients (TODO: cache this)
-	vector<float> coeffs;
-	coeffs.resize(filterlen);
-	CalculateFilterCoefficients(
-		coeffs,
-		flo / nyquist,
-		fhi / nyquist,
-		atten,
-		type
-		);
+	m_coefficients.resize(filterlen);
+	CalculateFilterCoefficients(flo / nyquist, fhi / nyquist, atten, type);
 
 	//Set up output
 	m_xAxisUnit = m_inputs[0].m_channel->GetXAxisUnits();
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	size_t radius = (filterlen - 1) / 2;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-
 	cap->Resize(din->size() - filterlen);
-	cap->PrepareForCpuAccess();
 
 	//Run the actual filter
-	DoFilterKernel(coeffs, din, cap);
-	cap->MarkModifiedFromCpu();
+	DoFilterKernel(cmdBuf, queue, din, cap);
 
 	//Shift output to compensate for filter group delay
 	cap->m_triggerPhase = (radius * fs_per_sample) + din->m_triggerPhase;
 }
 
 void FIRFilter::DoFilterKernel(
-	vector<float>& coefficients,
+	vk::raii::CommandBuffer& cmdBuf,
+	vk::raii::Queue& queue,
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
-	#ifdef __x86_64__
-	if(g_hasAvx512F)
-		DoFilterKernelAVX512F(coefficients, din, cap);
-	else if(g_hasAvx2)
-		DoFilterKernelAVX2(coefficients, din, cap);
+	if(g_gpuFilterEnabled)
+	{
+		cmdBuf.begin({});
+
+		FIRFilterArgs args;
+		args.end = din->size() - m_coefficients.size();
+		args.filterlen = m_coefficients.size();
+
+		m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(1, m_coefficients, cmdBuf);
+		m_computePipeline.BindBufferNonblocking(2, cap->m_samples, cmdBuf, true);
+		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(args.end, 64));
+
+		cmdBuf.end();
+		SubmitAndBlock(cmdBuf, queue);
+
+		cap->m_samples.MarkModifiedFromGpu();
+	}
+
 	else
-	#endif
-		DoFilterKernelGeneric(coefficients, din, cap);
+	{
+		din->PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
+
+		#ifdef __x86_64__
+		if(g_hasAvx512F)
+			DoFilterKernelAVX512F(din, cap);
+		else if(g_hasAvx2)
+			DoFilterKernelAVX2(din, cap);
+		else
+		#endif
+			DoFilterKernelGeneric(din, cap);
+
+		cap->MarkModifiedFromCpu();
+	}
 }
 
 /**
 	@brief Performs a FIR filter (does not assume symmetric)
  */
 void FIRFilter::DoFilterKernelGeneric(
-	vector<float>& coefficients,
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
 	//Setup
-	size_t len = din->m_samples.size();
-	size_t filterlen = coefficients.size();
+	size_t len = din->size();
+	size_t filterlen = m_coefficients.size();
 	size_t end = len - filterlen;
 
 	//Do the filter
@@ -263,7 +278,7 @@ void FIRFilter::DoFilterKernelGeneric(
 	{
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
-			v += din->m_samples[i + j] * coefficients[j];
+			v += din->m_samples[i + j] * m_coefficients[j];
 
 		cap->m_samples[i]	= v;
 	}
@@ -277,13 +292,12 @@ void FIRFilter::DoFilterKernelGeneric(
  */
 __attribute__((target("avx2")))
 void FIRFilter::DoFilterKernelAVX2(
-	vector<float>& coefficients,
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
 	//Save some pointers and sizes
-	size_t len = din->m_samples.size();
-	size_t filterlen = coefficients.size();
+	size_t len = din->size();
+	size_t filterlen = m_coefficients.size();
 	size_t end = len - filterlen;
 	size_t end_rounded = end - (end % 64);
 	float* pin = (float*)&din->m_samples[0];
@@ -296,7 +310,7 @@ void FIRFilter::DoFilterKernelAVX2(
 		float* base = pin + i;
 
 		//First tap
-		__m256 coeff		= _mm256_set1_ps(coefficients[0]);
+		__m256 coeff		= _mm256_set1_ps(m_coefficients[0]);
 
 		__m256 vin_a		= _mm256_loadu_ps(base + 0);
 		__m256 vin_b		= _mm256_loadu_ps(base + 8);
@@ -319,7 +333,7 @@ void FIRFilter::DoFilterKernelAVX2(
 		//Subsequent taps
 		for(size_t j=1; j<filterlen; j++)
 		{
-			coeff			= _mm256_set1_ps(coefficients[j]);
+			coeff			= _mm256_set1_ps(m_coefficients[j]);
 
 			vin_a			= _mm256_loadu_ps(base + j + 0);
 			vin_b			= _mm256_loadu_ps(base + j + 8);
@@ -365,7 +379,7 @@ void FIRFilter::DoFilterKernelAVX2(
 	{
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
-			v += din->m_samples[i + j] * coefficients[j];
+			v += din->m_samples[i + j] * m_coefficients[j];
 
 		cap->m_samples[i]	= v;
 	}
@@ -376,13 +390,12 @@ void FIRFilter::DoFilterKernelAVX2(
  */
 __attribute__((target("avx512f")))
 void FIRFilter::DoFilterKernelAVX512F(
-	vector<float>& coefficients,
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
 	//Save some pointers and sizes
-	size_t len = din->m_samples.size();
-	size_t filterlen = coefficients.size();
+	size_t len = din->size();
+	size_t filterlen = m_coefficients.size();
 	size_t end = len - filterlen;
 	size_t end_rounded = end - (end % 64);
 	float* pin = (float*)&din->m_samples[0];
@@ -395,7 +408,7 @@ void FIRFilter::DoFilterKernelAVX512F(
 		float* base = pin + i;
 
 		//First tap
-		__m512 coeff		= _mm512_set1_ps(coefficients[0]);
+		__m512 coeff		= _mm512_set1_ps(m_coefficients[0]);
 
 		__m512 vin_a		= _mm512_loadu_ps(base + 0);
 		__m512 vin_b		= _mm512_loadu_ps(base + 16);
@@ -410,7 +423,7 @@ void FIRFilter::DoFilterKernelAVX512F(
 		//Subsequent taps
 		for(size_t j=1; j<filterlen; j++)
 		{
-			coeff			= _mm512_set1_ps(coefficients[j]);
+			coeff			= _mm512_set1_ps(m_coefficients[j]);
 
 			vin_a			= _mm512_loadu_ps(base + j + 0);
 			vin_b			= _mm512_loadu_ps(base + j + 16);
@@ -435,7 +448,7 @@ void FIRFilter::DoFilterKernelAVX512F(
 	{
 		float v = 0;
 		for(size_t j=0; j<filterlen; j++)
-			v += din->m_samples[i + j] * coefficients[j];
+			v += din->m_samples[i + j] * m_coefficients[j];
 
 		cap->m_samples[i]	= v;
 	}
@@ -449,21 +462,19 @@ void FIRFilter::DoFilterKernelAVX512F(
 
 	Cutoff frequencies are specified in fractions of the Nyquist limit (Fsample/2).
 
-	@param coefficients		Output buffer
 	@param fa				Left side passband (0 for LPF)
 	@param fb				Right side passband (1 for HPF)
 	@param stopbandAtten	Stop-band attenuation, in dB
 	@param type				Type of filter
  */
 void FIRFilter::CalculateFilterCoefficients(
-	vector<float>& coefficients,
 	float fa,
 	float fb,
 	float stopbandAtten,
 	FilterType type)
 {
 	//Calculate the impulse response of the filter
-	size_t len = coefficients.size();
+	size_t len = m_coefficients.size();
 	size_t np = (len - 1) / 2;
 	vector<float> impulse;
 	impulse.push_back(fb-fa);
@@ -484,16 +495,18 @@ void FIRFilter::CalculateFilterCoefficients(
 	if(type == FILTER_TYPE_NOTCH)
 	{
 		for(size_t j=0; j<=np; j++)
-			coefficients[np+j] = -impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
-		coefficients[np] += 1;
+			m_coefficients[np+j] = -impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
+		m_coefficients[np] += 1;
 	}
 	else
 	{
 		for(size_t j=0; j<=np; j++)
-			coefficients[np+j] = impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
+			m_coefficients[np+j] = impulse[j] * Bessel(alpha * sqrt(1 - ((j*j*1.0)/(np*np)))) / ia;
 	}
 	for(size_t j=0; j<=np; j++)
-		coefficients[j] = coefficients[len-1-j];
+		m_coefficients[j] = m_coefficients[len-1-j];
+
+	m_coefficients.MarkModifiedFromCpu();
 }
 
 /**
