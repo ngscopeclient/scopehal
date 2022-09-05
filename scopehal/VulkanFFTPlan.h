@@ -112,6 +112,9 @@ public:
 
 			//input is real buffer of full size
 			m_isize = npoints * sizeof(float);
+
+			m_config.bufferSize = &m_bsize;
+			m_config.inputBufferSize = &m_isize;
 		}
 		else
 		{
@@ -122,10 +125,11 @@ public:
 
 			//output is real buffer of full size
 			m_bsize = npoints * sizeof(float);
-		}
 
-		m_config.bufferSize = &m_bsize;
-		m_config.inputBufferSize = &m_isize;
+			m_config.bufferSize = &m_bsize;
+			m_config.inputBufferSize = &m_isize;
+			m_config.inverseReturnToInputBuffer = 1;
+		}
 
 		auto err = initializeVkFFT(&m_app, m_config);
 		if(VKFFT_SUCCESS != err)
@@ -175,8 +179,8 @@ public:
 
 		VkFFTLaunchParams params;
 		memset(&params, 0, sizeof(params));
-		params.inputBuffer = &inbuf;
-		params.buffer = &outbuf;
+		params.inputBuffer = &outbuf;		//inverse transform writes to *input* buffer when returnToInputBuffer is set
+		params.buffer = &inbuf;
 		params.commandBuffer = &cmd;
 
 		auto err = VkFFTAppend(&m_app, 1, &params);

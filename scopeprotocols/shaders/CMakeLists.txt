@@ -35,6 +35,8 @@ add_compute_shaders(
 		Convert8BitSamples.glsl
 		Convert16BitSamples.glsl
 		CosineSumWindow.glsl
+		DeEmbedFilter.glsl
+		DeEmbedNormalization.glsl
 		FIRFilter.glsl
 		RectangularWindow.glsl
 		SubtractFilter.glsl

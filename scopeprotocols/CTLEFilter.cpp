@@ -115,7 +115,7 @@ void CTLEFilter::InterpolateSparameters(float bin_hz, bool /*invert*/, size_t no
 	}
 }
 
-void CTLEFilter::Refresh()
+void CTLEFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Pull out our settings
 	float dcgain_db = m_parameters[m_dcGainName].GetFloatVal();
@@ -139,6 +139,6 @@ void CTLEFilter::Refresh()
 	}
 
 	//Do the actual refresh operation
-	DoRefresh(false);
+	DoRefresh(false, cmdBuf, queue);
 }
 

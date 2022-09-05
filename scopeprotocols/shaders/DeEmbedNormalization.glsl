@@ -27,33 +27,34 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "ChannelEmulationFilter.h"
-#include <ffts.h>
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-ChannelEmulationFilter::ChannelEmulationFilter(const string& color)
-	: DeEmbedFilter(color)
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	m_parameters[m_maxGainName].MarkHidden();
-}
+	float din[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string ChannelEmulationFilter::GetProtocolName()
+layout(std430, binding=1) restrict writeonly buffer buf_dout
 {
-	return "Channel Emulation";
-}
+	float dout[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void ChannelEmulationFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+layout(std430, push_constant) uniform constants
 {
-	DoRefresh(false, cmdBuf, queue);
+	uint outlen;
+	uint istart;
+	float scale;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= outlen)
+		return;
+
+	//Nope, copy and rescale
+	dout[gl_GlobalInvocationID.x] = din[gl_GlobalInvocationID.x + istart] * scale;
 }

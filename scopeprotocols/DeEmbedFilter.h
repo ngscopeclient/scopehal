@@ -36,7 +36,14 @@
 #define DeEmbedFilter_h
 
 #include "../scopehal/AlignedAllocator.h"
-#include <ffts.h>
+#include "FFTFilter.h"
+
+struct DeEmbedNormalizationArgs
+{
+	uint32_t outlen;
+	uint32_t istart;
+	float scale;
+};
 
 class DeEmbedFilter : public Filter
 {
@@ -44,7 +51,8 @@ public:
 	DeEmbedFilter(const std::string& color);
 	virtual ~DeEmbedFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
 
@@ -54,7 +62,7 @@ public:
 
 protected:
 	virtual int64_t GetGroupDelay();
-	void DoRefresh(bool invert = true);
+	void DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
 	std::string m_maxGainName;
@@ -70,16 +78,16 @@ protected:
 	float m_cachedMaxGain;
 
 	double m_cachedBinSize;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamSines;
-	std::vector<float, AlignedAllocator<float, 64> > m_resampledSparamCosines;
+	AcceleratorBuffer<float> m_resampledSparamSines;
+	AcceleratorBuffer<float> m_resampledSparamCosines;
 
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;
 	size_t m_cachedNumPoints;
 
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardInBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_forwardOutBuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_reverseOutBuf;
+	AcceleratorBuffer<float> m_forwardInBuf;
+	AcceleratorBuffer<float> m_forwardOutBuf;
+	AcceleratorBuffer<float> m_reverseOutBuf;
 
 	void MainLoop(size_t nouts);
 #ifdef __x86_64__
@@ -90,6 +98,12 @@ protected:
 	WaveformCacheKey m_angleKey;
 
 	SParameterVector m_cachedSparams;
+
+	ComputePipeline m_rectangularComputePipeline;
+	ComputePipeline m_deEmbedComputePipeline;
+	ComputePipeline m_normalizeComputePipeline;
+	std::unique_ptr<VulkanFFTPlan> m_vkForwardPlan;
+	std::unique_ptr<VulkanFFTPlan> m_vkReversePlan;
 };
 
 #endif

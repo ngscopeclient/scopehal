@@ -27,33 +27,46 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "ChannelEmulationFilter.h"
-#include <ffts.h>
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-ChannelEmulationFilter::ChannelEmulationFilter(const string& color)
-	: DeEmbedFilter(color)
+layout(std430, binding=0) restrict buffer buf_data
 {
-	m_parameters[m_maxGainName].MarkHidden();
-}
+	float data[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string ChannelEmulationFilter::GetProtocolName()
+layout(std430, binding=1) restrict readonly buffer buf_sines
 {
-	return "Channel Emulation";
-}
+	float sines[];
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void ChannelEmulationFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+layout(std430, binding=2) restrict readonly buffer buf_cosines
 {
-	DoRefresh(false, cmdBuf, queue);
+	float cosines[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint len;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= len)
+		return;
+
+	//Sin/cos values from rotation matrix
+	float sinval = sines[gl_GlobalInvocationID.x];
+	float cosval = cosines[gl_GlobalInvocationID.x];
+
+	//Uncorrected complex value
+	float real_orig = data[gl_GlobalInvocationID.x*2 + 0];
+	float imag_orig = data[gl_GlobalInvocationID.x*2 + 1];
+
+	//Apply the matrix and write back in place
+	data[gl_GlobalInvocationID.x*2 + 0] = real_orig*cosval - imag_orig*sinval;
+	data[gl_GlobalInvocationID.x*2 + 1] = real_orig*sinval + imag_orig*cosval;
 }

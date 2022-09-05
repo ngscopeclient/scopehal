@@ -40,6 +40,9 @@ using namespace std;
 
 DeEmbedFilter::DeEmbedFilter(const string& color)
 	: Filter(color, CAT_ANALYSIS)
+	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_deEmbedComputePipeline("shaders/DeEmbedFilter.spv", 3, sizeof(uint32_t))
+	, m_normalizeComputePipeline("shaders/DeEmbedNormalization.spv", 2, sizeof(DeEmbedNormalizationArgs))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("signal");
@@ -67,6 +70,16 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
+
+	m_forwardInBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardInBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_forwardOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_forwardOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_reverseOutBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_reverseOutBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
 }
 
 DeEmbedFilter::~DeEmbedFilter()
@@ -119,18 +132,24 @@ string DeEmbedFilter::GetProtocolName()
 	return "De-Embed";
 }
 
+Filter::DataLocation DeEmbedFilter::GetInputLocation()
+{
+	//We explicitly manage our input memory and don't care where it is when Refresh() is called
+	return LOC_DONTCARE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DeEmbedFilter::Refresh()
+void DeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
-	DoRefresh(true);
+	DoRefresh(true, cmdBuf, queue);
 }
 
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
-void DeEmbedFilter::DoRefresh(bool invert)
+void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -145,7 +164,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		SetData(NULL, 0);
 		return;
 	}
-	din->PrepareForCpuAccess();
 	const size_t npoints_raw = din->size();
 
 	//Zero pad to next power of two up
@@ -156,10 +174,23 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//Format the input data as raw samples for the FFT
 	size_t nouts = npoints/2 + 1;
 
+	//Invalidate old vkFFT plans if size has changed
+	if(m_vkForwardPlan)
+	{
+		if(m_vkForwardPlan->size() != npoints)
+			m_vkForwardPlan = nullptr;
+	}
+	if(m_vkReversePlan)
+	{
+		if(m_vkReversePlan->size() != npoints)
+			m_vkReversePlan = nullptr;
+	}
+
 	//Set up the FFT and allocate buffers if we change point count
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
+		//Delete old FFTS plan objects
 		if(m_forwardPlan)
 		{
 			ffts_free(m_forwardPlan);
@@ -178,8 +209,22 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		m_cachedNumPoints = npoints;
 		sizechange = true;
 
-		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+		//Make new plans
+		//(save time, don't make FFTS plans if using vkFFT)
+		if(!g_gpuFilterEnabled)
+		{
+			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+		}
+	}
+
+	//Set up new FFT plans
+	if(g_gpuFilterEnabled)
+	{
+		if(!m_vkForwardPlan)
+			m_vkForwardPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+		if(!m_vkReversePlan)
+			m_vkReversePlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_REVERSE);
 	}
 
 	//Calculate size of each bin
@@ -224,25 +269,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		InterpolateSparameters(bin_hz, invert, nouts);
 	}
 
-	//Copy the input, then fill any extra space with zeroes
-	memcpy(&m_forwardInBuf[0], &din->m_samples[0], npoints_raw*sizeof(float));
-	for(size_t i=npoints_raw; i<npoints; i++)
-		m_forwardInBuf[i] = 0;
-
-	//Do the forward FFT
-	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
-
-	//Do the actual filter operation
-	#ifdef __x86_64__
-	if(g_hasAvx2)
-		MainLoopAVX2(nouts);
-	else
-	#endif
-		MainLoop(nouts);
-
-	//Calculate the inverse FFT
-	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
-
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	int64_t groupdelay_fs = GetGroupDelay();
 	if(m_parameters[m_groupDelayTruncModeName].GetIntVal() == TRUNC_MANUAL)
@@ -274,17 +300,90 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		cap->m_triggerPhase = -groupdelay_fs;
 	else
 		cap->m_triggerPhase = groupdelay_fs;
-
-	//Copy waveform data after rescaling
-	//TODO: vectorize this
 	float scale = 1.0f / npoints;
 	size_t outlen = iend - istart;
 	cap->Resize(outlen);
-	cap->PrepareForCpuAccess();
-	for(size_t i=0; i<outlen; i++)
-		cap->m_samples[i] = m_reverseOutBuf[i+istart] * scale;
 
-	cap->MarkModifiedFromCpu();
+	if(g_gpuFilterEnabled)
+	{
+		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+		cmdBuf.begin({});
+
+		//Copy and zero-pad the input as needed
+		WindowFunctionArgs args;
+		args.numActualSamples = npoints_raw;
+		args.npoints = npoints;
+		args.scale = 0;
+		args.alpha0 = 0;
+		args.alpha1 = 0;
+		m_rectangularComputePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+		m_rectangularComputePipeline.BindBufferNonblocking(1, m_forwardInBuf, cmdBuf, true);
+		m_rectangularComputePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(npoints, 64));
+		m_rectangularComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_forwardInBuf.MarkModifiedFromGpu();
+
+		//Do the actual FFT operation
+		m_vkForwardPlan->AppendForward(m_forwardInBuf, m_forwardOutBuf, cmdBuf);
+
+		//Apply the interpolated S-parameters
+		m_deEmbedComputePipeline.BindBufferNonblocking(0, m_forwardOutBuf, cmdBuf);
+		m_deEmbedComputePipeline.BindBufferNonblocking(1, m_resampledSparamSines, cmdBuf);
+		m_deEmbedComputePipeline.BindBufferNonblocking(2, m_resampledSparamCosines, cmdBuf);
+		m_deEmbedComputePipeline.Dispatch(cmdBuf, (uint32_t)nouts, GetComputeBlockCount(npoints, 64));
+		m_deEmbedComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+		m_forwardOutBuf.MarkModifiedFromGpu();
+
+		//Do the actual FFT operation
+		m_vkReversePlan->AppendReverse(m_forwardOutBuf, m_reverseOutBuf, cmdBuf);
+
+		//Copy and normalize output
+		//TODO: is there any way to fold this into vkFFT? They can normalize, but offset might be tricky...
+		DeEmbedNormalizationArgs nargs;
+		nargs.outlen = outlen;
+		nargs.istart = istart;
+		nargs.scale = scale;
+		m_normalizeComputePipeline.BindBufferNonblocking(0, m_reverseOutBuf, cmdBuf);
+		m_normalizeComputePipeline.BindBufferNonblocking(1, cap->m_samples, cmdBuf, true);
+		m_normalizeComputePipeline.Dispatch(cmdBuf, nargs, GetComputeBlockCount(npoints, 64));
+		m_normalizeComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+
+		//Done, block until the compute operations finish
+		cmdBuf.end();
+		SubmitAndBlock(cmdBuf, queue);
+	}
+	else
+	{
+		din->PrepareForCpuAccess();
+		m_forwardInBuf.PrepareForCpuAccess();
+		m_forwardOutBuf.PrepareForCpuAccess();
+		m_reverseOutBuf.PrepareForCpuAccess();
+		cap->PrepareForCpuAccess();
+
+		//Copy the input, then fill any extra space with zeroes
+		memcpy(m_forwardInBuf.GetCpuPointer(), din->m_samples.GetCpuPointer(), npoints_raw*sizeof(float));
+		for(size_t i=npoints_raw; i<npoints; i++)
+			m_forwardInBuf[i] = 0;
+
+		//Do the forward FFT
+		ffts_execute(m_forwardPlan, m_forwardInBuf.GetCpuPointer(), m_forwardOutBuf.GetCpuPointer());
+
+		//Apply the interpolated S-parameters
+		#ifdef __x86_64__
+		if(g_hasAvx2)
+			MainLoopAVX2(nouts);
+		else
+		#endif
+			MainLoop(nouts);
+
+		//Calculate the inverse FFT
+		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
+
+		//Copy waveform data after rescaling
+		for(size_t i=0; i<outlen; i++)
+			cap->m_samples[i] = m_reverseOutBuf[i+istart] * scale;
+
+		cap->MarkModifiedFromCpu();
+	}
 }
 
 /**
@@ -321,6 +420,12 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 	auto wang = GetInputWaveform(2);
 	wmag->PrepareForCpuAccess();
 	wang->PrepareForCpuAccess();
+
+	m_resampledSparamSines.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_resampledSparamSines.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_resampledSparamCosines.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_resampledSparamCosines.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	auto smag = dynamic_cast<SparseAnalogWaveform*>(wmag);
 	auto sang = dynamic_cast<SparseAnalogWaveform*>(wang);
@@ -369,6 +474,9 @@ void DeEmbedFilter::InterpolateSparameters(float bin_hz, bool invert, size_t nou
 			m_resampledSparamCosines[i] = cos(ang) * mag;
 		}
 	}
+
+	m_resampledSparamSines.MarkModifiedFromCpu();
+	m_resampledSparamCosines.MarkModifiedFromCpu();
 }
 
 void DeEmbedFilter::MainLoop(size_t nouts)
