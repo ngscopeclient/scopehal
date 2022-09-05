@@ -33,8 +33,6 @@
 #include <immintrin.h>
 #endif
 
-extern std::mutex g_clfftMutex;
-
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,113 +67,10 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
-
-	#ifdef HAVE_CLFFT
-
-		m_clfftForwardPlan = 0;
-		m_clfftReversePlan = 0;
-
-		m_windowProgram = NULL;
-		m_deembedProgram = NULL;
-		m_rectangularWindowKernel = NULL;
-		m_deembedKernel = NULL;
-
-		m_sinbuf = NULL;
-		m_cosbuf = NULL;
-		m_fftoutbuf = NULL;
-		m_windowbuf = NULL;
-
-		try
-		{
-			//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
-			//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
-			if(g_clContext)
-			{
-				//Load window function kernel
-				string kernelSource = ReadDataFile("kernels/WindowFunctions.cl");
-				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-				m_windowProgram = new cl::Program(*g_clContext, sources);
-				m_windowProgram->build(g_contextDevices);
-				m_rectangularWindowKernel = new cl::Kernel(*m_windowProgram, "RectangularWindow");
-
-				kernelSource = ReadDataFile("kernels/DeEmbedFilter.cl");
-				cl::Program::Sources sources2(1, make_pair(&kernelSource[0], kernelSource.length()));
-				m_deembedProgram = new cl::Program(*g_clContext, sources2);
-				m_deembedProgram->build(g_contextDevices);
-				m_deembedKernel = new cl::Kernel(*m_deembedProgram, "DeEmbed");
-			}
-		}
-		catch(const cl::Error& e)
-		{
-			LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
-
-			if(e.err() == CL_BUILD_PROGRAM_FAILURE)
-			{
-				LogError("Failed to build OpenCL program for de-embed\n");
-
-				string log;
-				if(m_windowProgram)
-				{
-					m_windowProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-					LogDebug("Window program build log:\n");
-					LogDebug("%s\n", log.c_str());
-				}
-
-				if(m_deembedProgram)
-				{
-					m_deembedProgram->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-					LogDebug("De-embed program build log:\n");
-					LogDebug("%s\n", log.c_str());
-				}
-			}
-
-			delete m_windowProgram;
-			delete m_rectangularWindowKernel;
-
-			delete m_deembedProgram;
-			delete m_deembedKernel;
-
-			m_windowProgram = NULL;
-			m_deembedProgram = NULL;
-			m_rectangularWindowKernel = NULL;
-			m_deembedKernel = NULL;
-		}
-
-	#endif
 }
 
 DeEmbedFilter::~DeEmbedFilter()
 {
-#ifdef HAVE_CLFFT
-	if(m_clfftForwardPlan != 0)
-		clfftDestroyPlan(&m_clfftForwardPlan);
-	if(m_clfftReversePlan != 0)
-		clfftDestroyPlan(&m_clfftReversePlan);
-
-	delete m_windowProgram;
-	delete m_rectangularWindowKernel;
-
-	delete m_deembedProgram;
-	delete m_deembedKernel;
-
-	delete m_sinbuf;
-	delete m_cosbuf;
-
-	delete m_fftoutbuf;
-	delete m_windowbuf;
-
-	m_windowProgram = NULL;
-	m_deembedProgram = NULL;
-	m_rectangularWindowKernel = NULL;
-	m_deembedKernel = NULL;
-
-	m_sinbuf = NULL;
-	m_cosbuf = NULL;
-
-	m_fftoutbuf = NULL;
-	m_windowbuf = NULL;
-#endif
-
 	if(m_forwardPlan)
 		ffts_free(m_forwardPlan);
 	if(m_reversePlan)
@@ -259,7 +154,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 	//LogTrace("Rounded to %zu\n", npoints);
 
 	//Format the input data as raw samples for the FFT
-	//TODO: handle non-uniform sample rates and resample?
 	size_t nouts = npoints/2 + 1;
 
 	//Set up the FFT and allocate buffers if we change point count
@@ -277,8 +171,6 @@ void DeEmbedFilter::DoRefresh(bool invert)
 			m_reversePlan = nullptr;
 		}
 
-		bool cl_ok = false;
-
 		m_forwardInBuf.resize(npoints);
 		m_forwardOutBuf.resize(2 * nouts);
 		m_reverseOutBuf.resize(npoints);
@@ -286,99 +178,8 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		m_cachedNumPoints = npoints;
 		sizechange = true;
 
-		#ifdef HAVE_CLFFT
-
-			if(npoints > 16777216)
-			{
-				LogWarning("Input is more than 16M points - GPU accelerated FFT unavailable. Falling back to CPU FFT\n");
-				//TODO: chunk based processing (see https://github.com/glscopeclient/scopehal/issues/625)
-
-				delete m_windowProgram;
-				m_windowProgram = 0;
-				cl_ok = false;
-			}
-
-			else if(g_clContext)
-			{
-				try
-				{
-					lock_guard<mutex> lock(g_clfftMutex);
-					cl_ok = true;
-
-					if(m_clfftForwardPlan != 0)
-						clfftDestroyPlan(&m_clfftForwardPlan);
-					if(m_clfftReversePlan != 0)
-						clfftDestroyPlan(&m_clfftReversePlan);
-
-					//Set up the FFT object
-					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftForwardPlan, (*g_clContext)(), CLFFT_1D, &npoints))
-					{
-						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
-						delete m_windowProgram;
-						m_windowProgram = 0;
-						cl_ok = false;
-					}
-					clfftSetPlanBatchSize(m_clfftForwardPlan, 1);
-					clfftSetPlanPrecision(m_clfftForwardPlan, CLFFT_SINGLE);
-					clfftSetLayout(m_clfftForwardPlan, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
-					clfftSetResultLocation(m_clfftForwardPlan, CLFFT_OUTOFPLACE);
-
-					if(CLFFT_SUCCESS != clfftCreateDefaultPlan(&m_clfftReversePlan, (*g_clContext)(), CLFFT_1D, &npoints))
-					{
-						LogError("clfftCreateDefaultPlan failed! Disabling clFFT and falling back to ffts\n");
-						delete m_windowProgram;
-						m_windowProgram = 0;
-						cl_ok = false;
-					}
-					clfftSetPlanBatchSize(m_clfftReversePlan, 1);
-					clfftSetPlanPrecision(m_clfftReversePlan, CLFFT_SINGLE);
-					clfftSetLayout(m_clfftReversePlan, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
-					clfftSetResultLocation(m_clfftReversePlan, CLFFT_OUTOFPLACE);
-					clfftSetPlanScale(m_clfftReversePlan, CLFFT_BACKWARD, 1);
-
-					//Initialize the plan
-					cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-					cl_command_queue q = queue();
-					auto err = clfftBakePlan(m_clfftForwardPlan, 1, &q, NULL, NULL);
-					if(CLFFT_SUCCESS != err)
-					{
-						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
-						delete m_windowProgram;
-						m_windowProgram = 0;
-						cl_ok = false;
-					}
-					err = clfftBakePlan(m_clfftReversePlan, 1, &q, NULL, NULL);
-					if(CLFFT_SUCCESS != err)
-					{
-						LogError("clfftBakePlan failed (%d)! Disabling clFFT and falling back to ffts\n", err);
-						delete m_windowProgram;
-						m_windowProgram = 0;
-						cl_ok = false;
-					}
-
-					//Need to block while mutex is still locked
-					//to ensure we don't have two bake operations in progress at once
-					queue.finish();
-
-					//Allocate buffers
-					delete m_windowbuf;
-					delete m_fftoutbuf;
-					m_windowbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * npoints);
-					m_fftoutbuf = new cl::Buffer(*g_clContext, CL_MEM_READ_WRITE, sizeof(float) * 2 * nouts);
-				}
-				catch(const cl::Error& e)
-				{
-					LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
-				}
-			}
-
-		#endif
-
-		if(!cl_ok)
-		{
-			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
-			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
-		}
+		m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+		m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
 	}
 
 	//Calculate size of each bin
@@ -421,108 +222,26 @@ void DeEmbedFilter::DoRefresh(bool invert)
 		m_resampledSparamCosines.clear();
 		m_resampledSparamSines.clear();
 		InterpolateSparameters(bin_hz, invert, nouts);
-
-		#ifdef HAVE_CLFFT
-			if(g_clContext && (m_windowProgram != nullptr) )
-			{
-				delete m_sinbuf;
-				delete m_cosbuf;
-
-				m_sinbuf = new cl::Buffer(
-					*g_clContext, m_resampledSparamSines.begin(), m_resampledSparamSines.end(), true, true, NULL);
-				m_cosbuf = new cl::Buffer(
-					*g_clContext, m_resampledSparamCosines.begin(), m_resampledSparamCosines.end(), true, true, NULL);
-			}
-		#endif
 	}
 
-	#ifdef HAVE_CLFFT
-		if(g_clContext && m_windowProgram && m_deembedProgram)
-		{
-			try
-			{
-				//Set up buffers
-				cl::Buffer inbuf(*g_clContext, din->m_samples.begin(), din->m_samples.end(), true, true, NULL);
-				cl::Buffer ifftoutbuf(*g_clContext, m_reverseOutBuf.begin(), m_reverseOutBuf.end(), false, true, NULL);
+	//Copy the input, then fill any extra space with zeroes
+	memcpy(&m_forwardInBuf[0], &din->m_samples[0], npoints_raw*sizeof(float));
+	for(size_t i=npoints_raw; i<npoints; i++)
+		m_forwardInBuf[i] = 0;
 
-				//Copy and zero pad input
-				cl::CommandQueue queue(*g_clContext, g_contextDevices[0], 0);
-				m_rectangularWindowKernel->setArg(0, inbuf);
-				m_rectangularWindowKernel->setArg(1, *m_windowbuf);
-				m_rectangularWindowKernel->setArg(2, npoints_raw);
-				queue.enqueueNDRangeKernel(
-					*m_rectangularWindowKernel, cl::NullRange, cl::NDRange(npoints, 1), cl::NullRange, NULL);
+	//Do the forward FFT
+	ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
 
-				//Do the FFT
-				cl_command_queue q = queue();
-				cl_mem inbufs[1] = { (*m_windowbuf)() };
-				cl_mem outbufs[1] = { (*m_fftoutbuf)() };
-				if(CLFFT_SUCCESS != clfftEnqueueTransform(
-					m_clfftForwardPlan, CLFFT_FORWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
-				{
-					LogError("clfftEnqueueTransform failed\n");
-					abort();
-				}
-
-				//Do the de-embed
-				const size_t blocksize = 256;
-				size_t nouts_rounded = nouts;
-				if(nouts % blocksize)
-					nouts_rounded = (nouts_rounded - (nouts_rounded % blocksize) ) + blocksize;
-				m_deembedKernel->setArg(0, *m_fftoutbuf);
-				m_deembedKernel->setArg(1, *m_sinbuf);
-				m_deembedKernel->setArg(2, *m_cosbuf);
-				m_deembedKernel->setArg(3, nouts);
-				queue.enqueueNDRangeKernel(
-					*m_deembedKernel, cl::NullRange, cl::NDRange(nouts_rounded, 1), cl::NDRange(blocksize, 1), NULL);
-
-				//Do the inverse FFT
-				inbufs[0] = (*m_fftoutbuf)();
-				outbufs[0] = ifftoutbuf();
-				if(CLFFT_SUCCESS != clfftEnqueueTransform(
-					m_clfftReversePlan, CLFFT_BACKWARD, 1, &q, 0, NULL, NULL, inbufs, outbufs, NULL) )
-				{
-					LogError("clfftEnqueueTransform failed\n");
-					abort();
-				}
-
-				//Sync IFFT output
-				void* ptr = queue.enqueueMapBuffer(ifftoutbuf, true, CL_MAP_READ, 0, npoints * sizeof(float));
-				if(ptr == NULL)
-					LogError("memory map failed\n");
-				queue.enqueueUnmapMemObject(ifftoutbuf, ptr);
-			}
-			catch(const cl::Error& e)
-			{
-				LogFatal("OpenCL error: %s (%d)\n", e.what(), e.err() );
-			}
-		}
-		else
-		{
+	//Do the actual filter operation
+	#ifdef __x86_64__
+	if(g_hasAvx2)
+		MainLoopAVX2(nouts);
+	else
 	#endif
+		MainLoop(nouts);
 
-		//Copy the input, then fill any extra space with zeroes
-		memcpy(&m_forwardInBuf[0], &din->m_samples[0], npoints_raw*sizeof(float));
-		for(size_t i=npoints_raw; i<npoints; i++)
-			m_forwardInBuf[i] = 0;
-
-		//Do the forward FFT
-		ffts_execute(m_forwardPlan, &m_forwardInBuf[0], &m_forwardOutBuf[0]);
-
-		//Do the actual filter operation
-		#ifdef __x86_64__
-		if(g_hasAvx2)
-			MainLoopAVX2(nouts);
-		else
-		#endif
-			MainLoop(nouts);
-
-		//Calculate the inverse FFT
-		ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
-
-	#ifdef HAVE_CLFFT
-		}
-	#endif
+	//Calculate the inverse FFT
+	ffts_execute(m_reversePlan, &m_forwardOutBuf[0], &m_reverseOutBuf[0]);
 
 	//Calculate maximum group delay for the first few S-parameter bins (approx propagation delay of the channel)
 	int64_t groupdelay_fs = GetGroupDelay();

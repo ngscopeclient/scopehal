@@ -38,10 +38,6 @@
 #include "../scopehal/AlignedAllocator.h"
 #include <ffts.h>
 
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
 class DeEmbedFilter : public Filter
 {
 public:
@@ -89,22 +85,6 @@ protected:
 #ifdef __x86_64__
 	void MainLoopAVX2(size_t nouts);
 #endif
-
-	#ifdef HAVE_CLFFT
-	clfftPlanHandle m_clfftForwardPlan;
-	clfftPlanHandle m_clfftReversePlan;
-
-	cl::Program* m_windowProgram;
-	cl::Kernel* m_rectangularWindowKernel;
-
-	cl::Program* m_deembedProgram;
-	cl::Kernel* m_deembedKernel;
-
-	cl::Buffer* m_sinbuf;
-	cl::Buffer* m_cosbuf;
-	cl::Buffer* m_windowbuf;
-	cl::Buffer* m_fftoutbuf;
-	#endif
 
 	WaveformCacheKey m_magKey;
 	WaveformCacheKey m_angleKey;
