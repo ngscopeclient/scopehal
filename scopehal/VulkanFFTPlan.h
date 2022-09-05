@@ -98,8 +98,8 @@ public:
 		m_config.isCompilerInitialized = 1;
 		m_config.isInputFormatted = 1;
 
-		//Enable this once upstream fixes their issues and builds properly with binary releases of the Vulkan SDK
-		//m_config.disableSetLocale = 1;
+		//We have "C" locale all the time internally, so no need to setlocale() in the library
+		m_config.disableSetLocale = 1;
 
 		m_config.performR2C = 1;				//real time domain / complex frequency domain points
 
