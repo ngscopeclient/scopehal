@@ -97,7 +97,11 @@ public:
 		m_config.fence = &m_rawfence;
 		m_config.isCompilerInitialized = 1;
 		m_config.isInputFormatted = 1;
-		m_config.performR2C = 1;				//real to complex transform
+
+		//Enable this once upstream fixes their issues and builds properly with binary releases of the Vulkan SDK
+		//m_config.disableSetLocale = 1;
+
+		m_config.performR2C = 1;				//real time domain / complex frequency domain points
 
 		if(dir == DIRECTION_FORWARD)
 		{
