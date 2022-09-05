@@ -61,12 +61,14 @@ class VulkanFFTPlan
 {
 public:
 
-	enum VulkanFFTPlanFlags
+	enum VulkanFFTPlanDirection
 	{
-		FLAG_FORWARD_ONLY
+		DIRECTION_FORWARD,
+		DIRECTION_REVERSE
 	};
 
-	VulkanFFTPlan(size_t npoints, size_t nouts, int flags)
+	__attribute__((noinline))
+	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir)
 		: m_size(npoints)
 		, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 	{
@@ -97,15 +99,28 @@ public:
 		m_config.isInputFormatted = 1;
 		m_config.performR2C = 1;				//real to complex transform
 
-		if(flags & FLAG_FORWARD_ONLY)
+		if(dir == DIRECTION_FORWARD)
+		{
 			m_config.makeForwardPlanOnly = 1;
 
-		//output is complex buffer of full size
-		m_bsize = 2 * nouts * sizeof(float);
-		m_config.bufferSize = &m_bsize;
+			//output is complex buffer of full size
+			m_bsize = 2 * nouts * sizeof(float);
 
-		//input is real buffer of full size
-		m_isize = npoints * sizeof(float);
+			//input is real buffer of full size
+			m_isize = npoints * sizeof(float);
+		}
+		else
+		{
+			m_config.makeInversePlanOnly = 1;
+
+			//input is complex buffer of full size
+			m_isize = 2 * nouts * sizeof(float);
+
+			//output is real buffer of full size
+			m_bsize = npoints * sizeof(float);
+		}
+
+		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
 
 		auto err = initializeVkFFT(&m_app, m_config);
@@ -113,6 +128,7 @@ public:
 			LogError("Failed to initialize vkFFT (code %d)\n", err);
 	}
 
+	__attribute__((noinline))
 	void AppendForward(
 		AcceleratorBuffer<float>& dataIn,
 		AcceleratorBuffer<float>& dataOut,
@@ -133,6 +149,33 @@ public:
 		params.commandBuffer = &cmd;
 
 		auto err = VkFFTAppend(&m_app, -1, &params);
+		if(VKFFT_SUCCESS != err)
+			LogError("Failed to append vkFFT transform (code %d)\n", err);
+
+		dataOut.MarkModifiedFromGpu();
+	}
+
+	__attribute__((noinline))
+	void AppendReverse(
+		AcceleratorBuffer<float>& dataIn,
+		AcceleratorBuffer<float>& dataOut,
+		vk::raii::CommandBuffer& cmdBuf)
+	{
+		dataIn.PrepareForGpuAccess();
+		dataOut.PrepareForGpuAccess();
+
+		//Extract raw handles of all of our Vulkan objects
+		VkBuffer inbuf = dataIn.GetBuffer();
+		VkBuffer outbuf = dataOut.GetBuffer();
+		VkCommandBuffer cmd = *cmdBuf;
+
+		VkFFTLaunchParams params;
+		memset(&params, 0, sizeof(params));
+		params.inputBuffer = &inbuf;
+		params.buffer = &outbuf;
+		params.commandBuffer = &cmd;
+
+		auto err = VkFFTAppend(&m_app, 1, &params);
 		if(VKFFT_SUCCESS != err)
 			LogError("Failed to append vkFFT transform (code %d)\n", err);
 

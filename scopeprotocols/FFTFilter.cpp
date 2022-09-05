@@ -179,7 +179,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 				m_vkPlan = nullptr;
 		}
 		if(!m_vkPlan)
-			m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::FLAG_FORWARD_ONLY);
+			m_vkPlan = make_unique<VulkanFFTPlan>(npoints, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
 	}
 
 	m_rdinbuf.resize(npoints);
