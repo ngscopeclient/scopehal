@@ -7,9 +7,6 @@
 [submodule "graphwidget"]
 	path = graphwidget
 	url = ../graphwidget.git
-[submodule "OpenCL-CLHPP"]
-	path = OpenCL-CLHPP
-	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git
 [submodule "VkFFT"]
 	path = VkFFT
 	url = ../VkFFT.git

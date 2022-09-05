@@ -102,9 +102,7 @@ public:
 	Filter(
 		const std::string& color,
 		Category cat,
-		Unit xunit = Unit::UNIT_FS,
-		const std::string& kernelPath = "",
-		const std::string& kernelName = "");
+		Unit xunit = Unit::UNIT_FS);
 	virtual ~Filter();
 
 	//Get all currently existing filters
@@ -1076,16 +1074,6 @@ protected:
 		Starts at 0 for the first filter of a given class type created, then increments
 	 */
 	unsigned int m_instanceNum;
-
-protected:
-
-#ifdef HAVE_OPENCL
-
-	//OpenCL state
-	cl::Program* m_program;
-	cl::Kernel* m_kernel;
-
-#endif
 
 public:
 	typedef Filter* (*CreateProcType)(const std::string&);

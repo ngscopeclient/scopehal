@@ -158,7 +158,4 @@ public:
 	AlignedAllocator& operator=(const AlignedAllocator&) = delete;
 };
 
-//Global allocator for AVX helpers
-extern AlignedAllocator<float, 32> g_floatVectorAllocator;
-
 #endif

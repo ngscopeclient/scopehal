@@ -55,9 +55,7 @@ map<string, unsigned int> Filter::m_instanceCount;
 Filter::Filter(
 	const string& color,
 	Category cat,
-	Unit xunit,
-	const string& kernelPath,
-	const string& kernelName)
+	Unit xunit)
 	: OscilloscopeChannel(NULL, "", color, xunit, 0)	//TODO: handle this better?
 	, m_category(cat)
 	, m_usingDefault(true)
@@ -68,59 +66,10 @@ Filter::Filter(
 	//Create default stream gain/offset
 	m_ranges.push_back(0);
 	m_offsets.push_back(0);
-
-	//Load our OpenCL kernel, if we have one
-	#ifdef HAVE_OPENCL
-
-		m_kernel = NULL;
-		m_program = NULL;
-
-		//Important to check g_clContext - OpenCL enabled at compile time does not guarantee that we have any
-		//usable OpenCL devices actually present on the system. We might also have disabled it via --noopencl.
-		if(kernelPath != "" && g_clContext)
-		{
-			try
-			{
-				string kernelSource = ReadDataFile(kernelPath);
-				cl::Program::Sources sources(1, make_pair(&kernelSource[0], kernelSource.length()));
-				m_program = new cl::Program(*g_clContext, sources);
-				m_program->build(g_contextDevices);
-				m_kernel = new cl::Kernel(*m_program, kernelName.c_str());
-			}
-			catch(const cl::Error& e)
-			{
-				LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
-
-				if(e.err() == CL_BUILD_PROGRAM_FAILURE)
-				{
-					LogError("Failed to build OpenCL program from %s\n", kernelPath.c_str());
-					string log;
-					m_program->getBuildInfo<string>(g_contextDevices[0], CL_PROGRAM_BUILD_LOG, &log);
-					LogDebug("Build log:\n");
-					LogDebug("%s\n", log.c_str());
-				}
-
-				delete m_program;
-				delete m_kernel;
-				m_program = NULL;
-				m_kernel = NULL;
-				return;
-			}
-
-		}
-
-	#endif
 }
 
 Filter::~Filter()
 {
-	#ifdef HAVE_OPENCL
-		delete m_kernel;
-		delete m_program;
-		m_kernel = NULL;
-		m_program = NULL;
-	#endif
-
 	m_filters.erase(this);
 }
 

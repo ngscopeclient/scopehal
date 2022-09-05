@@ -36,18 +36,6 @@
 #include "scopeprotocols.h"
 
 /**
-	@brief Mutex used to ensure two clfftBakePlan() calls are not in progress simultaneously
-
-	Per docs this SHOULD be thread safe...
-
-	But we get assertion failures if we try:
-		glscopeclient: /build/clfft-8xRwfG/clfft-2.12.2/src/library/repo.cpp:217:
-		clfftStatus FFTRepo::setclProgram(clfftGenerators, const FFTKernelSignatureHeader*, _cl_program* const&,
-		_cl_device_id* const&, _cl_context* const&): Assertion `NULL == p' failed.
- */
-std::mutex g_clfftMutex;
-
-/**
 	@brief Static initialization for protocol list
  */
 void ScopeProtocolStaticInit()

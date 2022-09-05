@@ -89,7 +89,6 @@ bool g_hasAvx512VL = false;
 bool g_hasAvx2 = false;
 bool g_hasFMA = false;
 #endif
-bool g_disableOpenCL = false;
 
 ///@brief True if filters can use GPU acceleration
 bool g_gpuFilterEnabled = false;
@@ -98,14 +97,6 @@ bool g_gpuFilterEnabled = false;
 bool g_gpuScopeDriverEnabled = false;
 
 vector<string> g_searchPaths;
-
-#ifdef HAVE_OPENCL
-cl::Context* g_clContext = NULL;
-vector<cl::Device> g_contextDevices;
-size_t g_maxClLocalSizeX = 0;
-#endif
-
-AlignedAllocator<float, 32> g_floatVectorAllocator;
 
 void VulkanCleanup();
 
@@ -166,221 +157,9 @@ void DetectCPUFeatures()
 #endif /* __x86_64__ */
 }
 
-/**
-	@brief Static initialization for OpenCL
- */
-void DetectGPUFeatures()
-{
-	#ifdef HAVE_OPENCL
-		try
-		{
-			LogDebug("Detecting OpenCL devices...\n");
-
-			LogIndenter li;
-
-			if(g_disableOpenCL)
-			{
-				LogNotice("g_disableOpenCL set, disabling OpenCL\n");
-				return;
-			}
-
-			//Find platforms and print info
-			vector<cl::Platform> platforms;
-			cl::Platform::get(&platforms);
-			if(platforms.empty())
-			{
-				LogNotice("No platforms found, disabling OpenCL\n");
-				return;
-			}
-			else
-			{
-				for(size_t i=0; i<platforms.size(); i++)
-				{
-					LogDebug("Platform %zu\n", i);
-					LogIndenter li2;
-
-					string name;
-					string profile;
-					string vendor;
-					string version;
-					platforms[i].getInfo(CL_PLATFORM_NAME, &name);
-					platforms[i].getInfo(CL_PLATFORM_PROFILE, &profile);
-					platforms[i].getInfo(CL_PLATFORM_VENDOR, &vendor);
-					platforms[i].getInfo(CL_PLATFORM_VERSION, &version);
-					LogDebug("CL_PLATFORM_NAME    = %s\n", name.c_str());
-					LogDebug("CL_PLATFORM_PROFILE = %s\n", profile.c_str());
-					LogDebug("CL_PLATFORM_VENDOR  = %s\n", vendor.c_str());
-					LogDebug("CL_PLATFORM_VERSION = %s\n", version.c_str());
-
-					vector<cl::Device> devices;
-					platforms[i].getDevices(CL_DEVICE_TYPE_GPU, &devices);
-					if(devices.empty())
-						LogDebug("No GPUs found\n");
-					for(size_t j=0; j<devices.size(); j++)
-					{
-						LogDebug("Device %zu\n", j);
-						LogIndenter li3;
-
-						string dname;
-						string dcvers;
-						string dprof;
-						string dvendor;
-						string dversion;
-						string ddversion;
-						string extensions;
-						unsigned long globalCacheSize;
-						unsigned long globalCacheLineSize;
-						unsigned long globalMemSize;
-						unsigned long localMemSize;
-						unsigned int maxClock;
-						unsigned int maxComputeUnits;
-						unsigned int maxConstantArgs;
-						unsigned long maxConstantBuffer;
-						unsigned long maxMemAllocSize;
-						size_t maxParameterSize;
-						size_t maxWorkGroupSize;
-						size_t maxWorkItemSizes[3];
-						devices[j].getInfo(CL_DEVICE_NAME, &dname);
-						devices[j].getInfo(CL_DEVICE_OPENCL_C_VERSION, &dcvers);
-						devices[j].getInfo(CL_DEVICE_PROFILE, &dprof);
-						devices[j].getInfo(CL_DEVICE_VENDOR, &dvendor);
-						devices[j].getInfo(CL_DEVICE_VERSION, &dversion);
-						devices[j].getInfo(CL_DRIVER_VERSION, &ddversion);
-						devices[j].getInfo(CL_DEVICE_EXTENSIONS, &extensions);
-						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, &globalCacheSize);
-						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, &globalCacheLineSize);
-						devices[j].getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &globalMemSize);
-						devices[j].getInfo(CL_DEVICE_LOCAL_MEM_SIZE, &localMemSize);
-						devices[j].getInfo(CL_DEVICE_MAX_CLOCK_FREQUENCY, &maxClock);
-						devices[j].getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &maxComputeUnits);
-						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_ARGS, &maxConstantArgs);
-						devices[j].getInfo(CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, &maxConstantBuffer);
-						devices[j].getInfo(CL_DEVICE_MAX_MEM_ALLOC_SIZE, &maxMemAllocSize);
-						devices[j].getInfo(CL_DEVICE_MAX_PARAMETER_SIZE, &maxParameterSize);
-						devices[j].getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &maxWorkGroupSize);
-						devices[j].getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &maxWorkItemSizes);
-
-						float k = 1024;
-						float m = k*k;
-						float g = m*k;
-
-						LogDebug("CL_DRIVER_VERSION                   = %s\n", ddversion.c_str());
-						LogDebug("CL_DEVICE_NAME                      = %s\n", dname.c_str());
-						LogDebug("CL_DEVICE_OPENCL_C_VERSION          = %s\n", dcvers.c_str());
-						LogDebug("CL_DEVICE_PROFILE                   = %s\n", dprof.c_str());
-						LogDebug("CL_DEVICE_VENDOR                    = %s\n", dvendor.c_str());
-						LogDebug("CL_DEVICE_VERSION                   = %s\n", dversion.c_str());
-						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHE_SIZE     = %.3f MB\n", globalCacheSize / m);
-						LogDebug("CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE = %lu\n", globalCacheLineSize);
-						LogDebug("CL_DEVICE_GLOBAL_MEM_SIZE           = %.2f GB\n", globalMemSize / g);
-						LogDebug("CL_DEVICE_LOCAL_MEM_SIZE            = %.2f kB\n", localMemSize / k);
-						LogDebug("CL_DEVICE_MAX_CLOCK_FREQUENCY       = %u MHz\n", maxClock);
-						LogDebug("CL_DEVICE_MAX_COMPUTE_UNITS         = %u\n", maxComputeUnits);
-						LogDebug("CL_DEVICE_MAX_CONSTANT_ARGS         = %u\n", maxConstantArgs);
-						LogDebug("CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE  = %.2f kB\n", maxConstantBuffer / k);
-						LogDebug("CL_DEVICE_MAX_MEM_ALLOC_SIZE        = %.2f GB\n", maxMemAllocSize / g);
-						LogDebug("CL_DEVICE_MAX_PARAMETER_SIZE        = %zu\n", maxParameterSize);
-						LogDebug("CL_DEVICE_MAX_WORK_GROUP_SIZE       = %zu\n", maxWorkGroupSize);
-						LogDebug("CL_DEVICE_MAX_WORK_ITEM_SIZES       = %zu, %zu, %zu\n",
-							maxWorkItemSizes[0], maxWorkItemSizes[1], maxWorkItemSizes[2]);
-
-						vector<string> extensionlist;
-						string tmp;
-						for(size_t f=0; f<extensions.size(); f++)
-						{
-							if(isspace(extensions[f]))
-							{
-								if(tmp != "")
-									extensionlist.push_back(tmp);
-								tmp = "";
-							}
-							else
-								tmp += extensions[f];
-						}
-
-						{
-							LogDebug("CL_DEVICE_EXTENSIONS:\n");
-							LogIndenter li4;
-							for(auto e : extensionlist)
-								LogDebug("%s\n", e.c_str());
-						}
-
-						//For now, create a context on the first device of the first detected platform
-						//and hope for the best.
-						//TODO: multi-device support?
-						if(!g_clContext && !devices.empty())
-						{
-							vector<cl::Device> devs;
-							devs.push_back(devices[0]);
-
-							//Passing CL_CONTEXT_PLATFORM as parameters seems to make context creation fail. Weird.
-							g_clContext = new cl::Context(devs, NULL, NULL, NULL);
-							g_contextDevices = g_clContext->getInfo<CL_CONTEXT_DEVICES>();
-
-							//Save some settings about the OpenCL implementation so that we can tune appropriately
-							g_maxClLocalSizeX = maxWorkItemSizes[0];
-						}
-					}
-				}
-			}
-		}
-		catch(const cl::Error& e)
-		{
-			//CL_PLATFORM_NOT_FOUND_KHR is an expected error if there's no GPU on the system
-			if( (string(e.what()) == "clGetPlatformIDs") && (e.err() == -1001) )
-				LogNotice("No platforms found, disabling OpenCL\n");
-			else
-				LogError("OpenCL error: %s (%d)\n", e.what(), e.err() );
-			delete g_clContext;
-			g_clContext = NULL;
-			return;
-		}
-
-		#ifdef HAVE_CLFFT
-
-			if(g_clContext)
-			{
-				clfftSetupData data;
-				clfftInitSetupData(&data);
-				if(CLFFT_SUCCESS != clfftSetup(&data))
-				{
-					LogError("clFFT init failed, aborting\n");
-					abort();
-				}
-
-				cl_uint major;
-				cl_uint minor;
-				cl_uint patch;
-				if(CLFFT_SUCCESS != clfftGetVersion(&major, &minor, &patch))
-				{
-					LogError("clFFT version query failed, aborting\n");
-					abort();
-				}
-				LogDebug("clFFT version: %d.%d.%d\n", major, minor, patch);
-			}
-			else
-				LogDebug("clFFT: present at compile time, but cannot use because no OpenCL devices found\n");
-
-		#else
-			LogNotice("clFFT support: not present at compile time\n");
-		#endif
-
-	#else
-		LogNotice("OpenCL support: not present at compile time. GPU acceleration disabled.\n");
-	#endif
-
-	LogDebug("\n");
-}
-
 void ScopehalStaticCleanup()
 {
 	VulkanCleanup();
-
-	#ifdef HAVE_OPENCL
-	#ifdef HAVE_CLFFT
-	clfftTeardown();
-	#endif
-	#endif
 }
 
 /**
@@ -390,7 +169,6 @@ void DriverStaticInit()
 {
 	InitializeSearchPaths();
 	DetectCPUFeatures();
-	DetectGPUFeatures();
 
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);

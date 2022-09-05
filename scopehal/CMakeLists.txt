@@ -38,22 +38,6 @@ else()
 	set(LINUXGPIB_LIBRARIES "")
 endif()
 
-if(OpenCL_FOUND)
-	set(HAVE_OPENCL 1)
-else()
-	set(HAVE_OPENCL 0)
-	set(OpenCL_LIBRARIES "")
-	set(OpenCL_INCLUDE_DIR "")
-endif()
-
-if(CLFFT_FOUND)
-	set(HAVE_CLFFT 1)
-else()
-	set(HAVE_CLFFT 0)
-	set(CLFFT_LIBRARIES "")
-	set(CLFFT_INCLUDE_DIR "")
-endif()
-
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
@@ -161,8 +145,6 @@ target_link_libraries(scopehal
 	${WIN_LIBS}
 	${LIN_LIBS}
 	${LIBFFTS_LIBRARIES}
-	${OpenCL_LIBRARIES}
-	${CLFFT_LIBRARIES}
 	${OpenMP_CXX_LIBRARIES}
 	${Vulkan_LIBRARIES}
 	SPIRV
@@ -179,8 +161,6 @@ PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
 	${LIBFFTS_INCLUDE_DIR}
-	${OpenCL_INCLUDE_DIR}
-	${CLFFT_INCLUDE_DIR}
 	${YAML_INCLUDES}
 
 	# TODO: this needs to come from FindPackage etc
@@ -189,7 +169,6 @@ PUBLIC
 
 target_include_directories(scopehal
 PUBLIC SYSTEM
-	${CMAKE_CURRENT_SOURCE_DIR}/../OpenCL-CLHPP/include
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 	)
 

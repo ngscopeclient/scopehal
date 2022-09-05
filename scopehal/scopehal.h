@@ -55,19 +55,6 @@
 #include "../graphwidget/Graph.h"
 
 #include "config.h"
-#ifdef HAVE_OPENCL
-#define CL_TARGET_OPENCL_VERSION 120
-#define CL_HPP_MINIMUM_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_TARGET_OPENCL_VERSION CL_TARGET_OPENCL_VERSION
-#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY
-#define CL_HPP_ENABLE_EXCEPTIONS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wignored-attributes"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <CL/opencl.hpp>
-#pragma GCC diagnostic pop
-#endif
 
 //Vulkan is now a mandatory dependency, so no compile time enable flag
 //(disable some warnings in Vulkan headers that we can't do anything about)
@@ -162,7 +149,6 @@ bool VulkanInit();
 void InitializeSearchPaths();
 void InitializePlugins();
 void DetectCPUFeatures();
-void DetectGPUFeatures();
 std::string GetDirOfCurrentExecutable();
 
 void ScopehalStaticCleanup();
@@ -186,15 +172,6 @@ std::string str_replace(const std::string& search, const std::string& replace, c
 #endif
 
 extern std::vector<std::string> g_searchPaths;
-
-//Set true prior to calling DetectGPUFeatures() to force OpenCL to not be used
-extern bool g_disableOpenCL;
-
-#ifdef HAVE_OPENCL
-extern cl::Context* g_clContext;
-extern std::vector<cl::Device> g_contextDevices;
-extern size_t g_maxClLocalSizeX;
-#endif
 
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
