@@ -45,13 +45,13 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	m_parameters[m_fpname].m_fileFilterName = "Teledyne LeCroy waveform files (*.trc)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &TRCImportFilter::OnFileNameChanged));
 
-	if(g_hasShaderInt64 && g_hasShaderInt16)
+	if(g_hasShaderInt16)
 	{
 		m_computePipeline16Bit = make_unique<ComputePipeline>(
 			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 	}
 
-	if(g_hasShaderInt64 && g_hasShaderInt8)
+	if(g_hasShaderInt8)
 	{
 		m_computePipeline8Bit = make_unique<ComputePipeline>(
 			"shaders/Convert8BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
@@ -232,8 +232,8 @@ void TRCImportFilter::OnFileNameChanged()
 			return;
 		}
 
-		//The accelerated filter needs int64 and int16 support
-		if(g_hasShaderInt64 && g_hasShaderInt16 && g_gpuFilterEnabled)
+		//The accelerated filter needs int16 support
+		if(g_hasShaderInt16 && g_gpuFilterEnabled)
 		{
 			m_commandBuffer->begin({});
 
@@ -289,8 +289,8 @@ void TRCImportFilter::OnFileNameChanged()
 			return;
 		}
 
-		//The accelerated filter needs int64 support
-		if(g_hasShaderInt64 && g_hasShaderInt8 && g_gpuFilterEnabled)
+		//The accelerated filter needs int8 support
+		if(g_hasShaderInt8 && g_gpuFilterEnabled)
 		{
 			m_commandBuffer->begin({});
 
