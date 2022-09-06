@@ -44,6 +44,7 @@ set(SCOPEHAL_SOURCES
 	avx_mathfun.cpp
 	VulkanInit.cpp
 
+	FileSystem.cpp
 	Unit.cpp
 
 	SCPITransport.cpp

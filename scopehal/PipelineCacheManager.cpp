@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "PipelineCacheManager.h"
+#include "FileSystem.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -52,6 +53,7 @@ unique_ptr<PipelineCacheManager> g_pipelineCacheMgr;
 PipelineCacheManager::PipelineCacheManager()
 {
 	FindPath();
+	LoadFromDisk();
 }
 
 /**
@@ -84,7 +86,7 @@ void PipelineCacheManager::FindPath()
 
 	// Ensure the directory exists
 	const auto result = CreateDirectoryW(directory, NULL);
-	m_cacheRootDir = NarrowPath(directory);
+	m_cacheRootDir = NarrowPath(directory) + "\\";
 
 	if(!result && GetLastError() != ERROR_ALREADY_EXISTS)
 	{
@@ -96,7 +98,7 @@ void PipelineCacheManager::FindPath()
 	// Ensure all directories in path exist
 	CreateDirectory("~/.cache");
 	CreateDirectory("~/.cache/glscopeclient");
-	m_cacheRootDir = ExpandPath("~/.cache/glscopeclient");
+	m_cacheRootDir = ExpandPath("~/.cache/glscopeclient") + "/";
 #endif
 
 	LogNotice("Cache root directory is %s\n", m_cacheRootDir.c_str());
@@ -174,6 +176,67 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
  */
 void PipelineCacheManager::LoadFromDisk()
 {
+	lock_guard<mutex> lock(m_mutex);
+
+	LogTrace("Loading pipeline cache\n");
+	LogIndenter li;
+
+	PipelineCacheFileHeader header;
+
+	//Load raw binary blobs (mostly for vkFFT)
+	auto prefix = m_cacheRootDir + "shader_raw_";
+	auto files = Glob(prefix + "*", false);
+	for(auto f : files)
+	{
+		//Extract the key from the file name
+		auto key = f.substr(prefix.length());
+		key = key.substr(0, key.length() - 4);
+
+		LogTrace("Loading cache object %s (from %s)\n", key.c_str(), f.c_str());
+		LogIndenter li2;
+
+		//Read the header and make sure it checks out
+		FILE* fp = fopen(f.c_str(), "rb");
+		if(1 != fread(&header, sizeof(header), 1, fp))
+		{
+			LogWarning("Read cache header failed (%s)\n", f.c_str());
+			fclose(fp);
+			continue;
+		}
+		if(0 != memcmp(header.cache_uuid, g_vkComputeDeviceUuid, 16))
+		{
+			LogTrace("Rejecting cache file (%s) due to mismatching UUID\n", f.c_str());
+			fclose(fp);
+			continue;
+		}
+		if(header.driver_ver != g_vkComputeDeviceDriverVer)
+		{
+			LogTrace("Rejecting cache file (%s) due to mismatching driver version\n", f.c_str());
+			fclose(fp);
+			continue;
+		}
+
+		//All good. Read the file content
+		auto p = make_shared< vector<uint32_t> >();
+		p->resize(header.len / 4);
+		if(header.len != fread(&((*p)[0]), 1, header.len, fp))
+		{
+			LogWarning("Read cache content failed (%s)\n", f.c_str());
+			fclose(fp);
+			continue;
+		}
+		fclose(fp);
+
+		//Verify the CRC
+		if(header.crc != CRC32((uint8_t*)&((*p)[0]), 0, header.len-1))
+		{
+			LogWarning("Rejecting cache file (%s) due to bad CRC\n", f.c_str());
+			continue;
+		}
+
+		//Done, add to cache if we get this far
+		m_rawDataCache[key] = p;
+	}
 }
 
 /**
@@ -181,5 +244,36 @@ void PipelineCacheManager::LoadFromDisk()
  */
 void PipelineCacheManager::SaveToDisk()
 {
-	string rootDir = "";
+	lock_guard<mutex> lock(m_mutex);
+
+	PipelineCacheFileHeader header;
+	memcpy(header.cache_uuid, g_vkComputeDeviceUuid, 16);
+	header.driver_ver = g_vkComputeDeviceDriverVer;
+
+	//Save raw data
+	for(auto it : m_rawDataCache)
+	{
+		auto key = it.first;
+		auto& vec = *it.second;
+		auto fname = m_cacheRootDir + "shader_raw_" + key + ".bin";
+		FILE* fp = fopen(fname.c_str(), "wb");
+
+		//Write the cache header
+		header.len = vec.size() * sizeof(uint32_t);
+		header.crc = CRC32((uint8_t*)&vec[0], 0, header.len-1);
+		if(1 != fwrite(&header, sizeof(header), 1, fp))
+		{
+			LogWarning("Write cache header failed (%s)\n", fname.c_str());
+			fclose(fp);
+			continue;
+		}
+
+		//Write the data
+		if(header.len != fwrite(&vec[0], 1, header.len, fp))
+			LogWarning("Write cache data failed (%s)\n", fname.c_str());
+
+		fclose(fp);
+	}
+
+	//TODO: Save Vulkan shader cache
 }

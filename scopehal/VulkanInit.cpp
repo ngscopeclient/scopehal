@@ -128,6 +128,16 @@ unique_ptr<vk::raii::Queue> g_vkFFTQueue;
  */
 mutex g_vkFFTMutex;
 
+/**
+	@brief UUID of g_vkComputeDevice
+ */
+uint8_t g_vkComputeDeviceUuid[16];
+
+/**
+	@brief Driver version of g_vkComputeDevice
+ */
+uint32_t g_vkComputeDeviceDriverVer;
+
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 //Feature flags indicating that we have support for specific data types etc on the GPU
@@ -444,6 +454,11 @@ bool VulkanInit()
 						}
 					}
 				}
+
+				//Save settings
+				auto properties = device.getProperties();
+				g_vkComputeDeviceDriverVer = properties.driverVersion;
+				memcpy(g_vkComputeDeviceUuid, properties.pipelineCacheUUID, 16);
 
 				//See if the device has good integer data type support. If so, enable it
 				vk::PhysicalDeviceFeatures enabledFeatures;

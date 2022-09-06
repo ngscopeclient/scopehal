@@ -120,14 +120,9 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	else
 		m_config.saveApplicationToString = 1;
 
-	double start = GetTime();
-
 	auto err = initializeVkFFT(&m_app, m_config);
 	if(VKFFT_SUCCESS != err)
 		LogError("Failed to initialize vkFFT (code %d)\n", err);
-
-	double dt = GetTime() - start;
-	LogNotice("initializeVkFFT for %zu points took %.2f ms\n", npoints, dt * 1000);
 
 	//Add to cache if it wasn't there already
 	if(cacheBlob == nullptr)

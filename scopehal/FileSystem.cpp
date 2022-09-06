@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* glscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,64 +27,103 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef PipelineCacheManager_h
-#define PipelineCacheManager_h
+#include "FileSystem.h"
 
-#include <vulkan/vulkan_raii.hpp>
-#include <memory>
-#include <string>
-#include <vector>
-#include <map>
-
-#pragma pack(push, 1)
-struct PipelineCacheFileHeader
-{
-	uint8_t		cache_uuid[16];
-	uint32_t	driver_ver;
-	uint32_t	len;
-	uint32_t	crc;
-};
-#pragma pack(pop)
-
-/**
-	@brief Helper for managing Vulkan / vkFFT pipeline cache objects
-
-	The cache is stored on disk under the .cache/glscopeclient directory on Linux, or FIXME on Windows.
-
-	Raw data: $cachedir/shader_raw_[key].bin
-	Compute shader data: $cachedir/shader_compute_[key].bin
- */
-class PipelineCacheManager
-{
-public:
-	PipelineCacheManager();
-	~PipelineCacheManager();
-
-	std::shared_ptr< std::vector<uint32_t> > LookupRaw(const std::string& key);
-	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint32_t> > value);
-
-	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key);
-
-	void LoadFromDisk();
-	void SaveToDisk();
-	void Clear();
-
-protected:
-	void FindPath();
-
-	///@brief Mutex to interlock access to the STL containers
-	std::mutex m_mutex;
-
-	///@brief Vulkan pipeline cache objects
-	std::map<std::string, std::shared_ptr<vk::raii::PipelineCache> > m_vkCache;
-
-	///@brief The actual cache data store
-	std::map<std::string, std::shared_ptr<std::vector<uint32_t> > > m_rawDataCache;
-
-	///@brief Root directory of the cache
-	std::string m_cacheRootDir;
-};
-
-extern std::unique_ptr<PipelineCacheManager> g_pipelineCacheMgr;
-
+#ifdef _WIN32
+#include <windows.h>
+#include <shlwapi.h>
+#include <fileapi.h>
+#include <shellapi.h>
+#else
+#include <glob.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <ftw.h>
+#include <stdio.h>
 #endif
+
+using namespace std;
+
+vector<string> Glob(const string& pathPattern, bool onlyDirectories)
+{
+	vector<string> result{ };
+
+#ifdef _WIN32
+	WIN32_FIND_DATA findData{ };
+	HANDLE fileSearch{ };
+
+	fileSearch = FindFirstFileEx(
+		pathPattern.c_str(),
+		FindExInfoStandard,
+		&findData,
+		onlyDirectories ? FindExSearchLimitToDirectories : FindExSearchNameMatch,
+		NULL,
+		0
+	);
+
+	if(fileSearch != INVALID_HANDLE_VALUE)
+	{
+		while(FindNextFile(fileSearch, &findData))
+		{
+			const auto* dir = findData.cFileName;
+
+			if(!strcmp(dir, "..") || !strcmp(dir, "."))
+				continue;
+
+			if(!onlyDirectories || (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+			{
+				result.push_back(string{dir});
+			}
+		}
+	}
+#else
+	glob_t globResult{ };
+
+// GLOB_ONLYDIR is only a performance flag, it doesn't promise only dirs
+#ifdef GLOB_ONLYDIR
+	glob(pathPattern.c_str(), onlyDirectories ? GLOB_ONLYDIR : 0, NULL, &globResult);
+#else
+	glob(pathPattern.c_str(), 0, NULL, &globResult);
+#endif
+
+	if(globResult.gl_pathc > 0)
+	{
+		for(auto ix = 0U; ix < globResult.gl_pathc; ++ix)
+		{
+			const auto* dir = globResult.gl_pathv[ix];
+			result.push_back(string{dir});
+		}
+	}
+
+	globfree(&globResult);
+#endif
+
+	return result;
+}
+
+void RemoveDirectory(const string& basePath)
+{
+#ifdef _WIN32
+	SHFILEOPSTRUCT deleteDir = {
+		NULL,
+		FO_DELETE,
+		basePath.c_str(),
+		NULL,
+		FOF_SILENT | FOF_NOERRORUI | FOF_NOCONFIRMATION,
+		FALSE,
+		NULL,
+		NULL
+	};
+
+	SHFileOperation(&deleteDir);
+#else
+	const auto deleteTree =
+		[](const char* path, const struct stat*, int, struct FTW*) -> int
+		{
+			::remove(path);
+			return 0;
+		};
+
+	nftw(basePath.c_str(), deleteTree, 32, FTW_DEPTH);
+#endif
+}

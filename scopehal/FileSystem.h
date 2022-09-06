@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* glscopeclient                                                                                                        *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2020 Andrew D. Zonenberg                                                                          *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,64 +27,22 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef PipelineCacheManager_h
-#define PipelineCacheManager_h
+/**
+	@file
+	@author Katharina B
+	@brief Common file system utilities
+ */
 
-#include <vulkan/vulkan_raii.hpp>
-#include <memory>
+#ifndef FileSystem_h
+#define FileSystem_h
+
 #include <string>
 #include <vector>
-#include <map>
 
-#pragma pack(push, 1)
-struct PipelineCacheFileHeader
-{
-	uint8_t		cache_uuid[16];
-	uint32_t	driver_ver;
-	uint32_t	len;
-	uint32_t	crc;
-};
-#pragma pack(pop)
+// Find all files/directories matching given pattern
+std::vector<std::string> Glob(const std::string& pathPattern, bool onlyDirectories);
 
-/**
-	@brief Helper for managing Vulkan / vkFFT pipeline cache objects
+// Remove given directory and all its contents
+void RemoveDirectory(const std::string& basePath);
 
-	The cache is stored on disk under the .cache/glscopeclient directory on Linux, or FIXME on Windows.
-
-	Raw data: $cachedir/shader_raw_[key].bin
-	Compute shader data: $cachedir/shader_compute_[key].bin
- */
-class PipelineCacheManager
-{
-public:
-	PipelineCacheManager();
-	~PipelineCacheManager();
-
-	std::shared_ptr< std::vector<uint32_t> > LookupRaw(const std::string& key);
-	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint32_t> > value);
-
-	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key);
-
-	void LoadFromDisk();
-	void SaveToDisk();
-	void Clear();
-
-protected:
-	void FindPath();
-
-	///@brief Mutex to interlock access to the STL containers
-	std::mutex m_mutex;
-
-	///@brief Vulkan pipeline cache objects
-	std::map<std::string, std::shared_ptr<vk::raii::PipelineCache> > m_vkCache;
-
-	///@brief The actual cache data store
-	std::map<std::string, std::shared_ptr<std::vector<uint32_t> > > m_rawDataCache;
-
-	///@brief Root directory of the cache
-	std::string m_cacheRootDir;
-};
-
-extern std::unique_ptr<PipelineCacheManager> g_pipelineCacheMgr;
-
-#endif
+#endif // FileSystem_h
