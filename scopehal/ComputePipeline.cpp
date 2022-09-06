@@ -57,7 +57,10 @@ ComputePipeline::~ComputePipeline()
 void ComputePipeline::DeferredInit()
 {
 	//Look up the pipeline cache to see if we have a binary etc to use
-	auto cache = g_pipelineCacheMgr->Lookup(BaseName(m_shaderPath));
+	time_t tstamp = 0;
+	int64_t fs = 0;
+	GetTimestampOfFile(FindDataFile(m_shaderPath), tstamp, fs);
+	auto cache = g_pipelineCacheMgr->Lookup(BaseName(m_shaderPath), tstamp);
 
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(m_shaderPath);

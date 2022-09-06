@@ -40,6 +40,7 @@
 struct PipelineCacheFileHeader
 {
 	uint8_t		cache_uuid[16];
+	time_t		file_mtime;
 	int32_t		vkfft_ver;
 	uint32_t	driver_ver;
 	uint32_t	len;
@@ -64,7 +65,7 @@ public:
 	std::shared_ptr< std::vector<uint8_t> > LookupRaw(const std::string& key);
 	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint8_t> > value);
 
-	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key);
+	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key, time_t target);
 
 	void LoadFromDisk();
 	void SaveToDisk();
@@ -81,6 +82,9 @@ protected:
 
 	///@brief The actual cache data store
 	std::map<std::string, std::shared_ptr<std::vector<uint8_t> > > m_rawDataCache;
+
+	///@brief Modification timestamps of the files
+	std::map<std::string, time_t> m_vkCacheTimestamps;
 
 	///@brief Root directory of the cache
 	std::string m_cacheRootDir;

@@ -66,7 +66,7 @@ void main()
 	float real_orig = data[gl_GlobalInvocationID.x*2 + 0];
 	float imag_orig = data[gl_GlobalInvocationID.x*2 + 1];
 
-	//Apply the matrix and write back in place
+	//Apply the matrix and write back (in place)
 	data[gl_GlobalInvocationID.x*2 + 0] = real_orig*cosval - imag_orig*sinval;
 	data[gl_GlobalInvocationID.x*2 + 1] = real_orig*sinval + imag_orig*cosval;
 }

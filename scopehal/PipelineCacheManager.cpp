@@ -150,15 +150,20 @@ void PipelineCacheManager::StoreRaw(const string& key, shared_ptr< vector<uint8_
 
 	If not found, a new cache object is created and returned.
  */
-shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& key)
+shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& key, time_t target)
 {
 	lock_guard<mutex> lock(m_mutex);
 
 	//Already in the cache? Return that copy
 	if(m_vkCache.find(key) != m_vkCache.end())
 	{
-		LogTrace("Hit for pipeline %s\n", key.c_str());
-		return m_vkCache[key];
+		if(m_vkCacheTimestamps[key] != target)
+			LogTrace("Ignoring out of date cache entry for %s\n", key.c_str());
+		else
+		{
+			LogTrace("Hit for pipeline %s\n", key.c_str());
+			return m_vkCache[key];
+		}
 	}
 
 	//Nope, make a new empty cache object and return it
@@ -166,6 +171,7 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 	vk::PipelineCacheCreateInfo info({},{});
 	auto ret = make_shared<vk::raii::PipelineCache>(*g_vkComputeDevice, info);
 	m_vkCache[key] = ret;
+	m_vkCacheTimestamps[key] = target;
 	return ret;
 }
 
@@ -203,9 +209,6 @@ void PipelineCacheManager::LoadFromDisk()
 		else
 			key = key.substr(shaderPrefix.length());
 
-		LogTrace("Loading cache object %s (from %s)\n", key.c_str(), f.c_str());
-		LogIndenter li2;
-
 		//Read the header and make sure it checks out
 		FILE* fp = fopen(f.c_str(), "rb");
 		if(1 != fread(&header, sizeof(header), 1, fp))
@@ -214,6 +217,10 @@ void PipelineCacheManager::LoadFromDisk()
 			fclose(fp);
 			continue;
 		}
+
+		LogTrace("Loading cache object %s (from %s, timestamp %zu)\n", key.c_str(), f.c_str(), (size_t)header.file_mtime);
+		LogIndenter li2;
+
 		if(0 != memcmp(header.cache_uuid, g_vkComputeDeviceUuid, 16))
 		{
 			LogTrace("Rejecting cache file (%s) due to mismatching UUID\n", f.c_str());
@@ -260,6 +267,7 @@ void PipelineCacheManager::LoadFromDisk()
 			vk::PipelineCacheCreateInfo info({}, vec.size(), &vec[0]);
 			auto ret = make_shared<vk::raii::PipelineCache>(*g_vkComputeDevice, info);
 			m_vkCache[key] = ret;
+			m_vkCacheTimestamps[key] = header.file_mtime;
 		}
 	}
 }
@@ -291,6 +299,7 @@ void PipelineCacheManager::SaveToDisk()
 		//Write the cache header
 		header.len = vec.size();
 		header.crc = CRC32(vec);
+		header.file_mtime = 0;	//not used
 		if(1 != fwrite(&header, sizeof(header), 1, fp))
 		{
 			LogWarning("Write cache header failed (%s)\n", fname.c_str());
@@ -321,6 +330,7 @@ void PipelineCacheManager::SaveToDisk()
 		//Write the cache header
 		header.len = vec.size();
 		header.crc = CRC32(vec);
+		header.file_mtime = m_vkCacheTimestamps[key];
 		if(1 != fwrite(&header, sizeof(header), 1, fp))
 		{
 			LogWarning("Write cache header failed (%s)\n", fname.c_str());
