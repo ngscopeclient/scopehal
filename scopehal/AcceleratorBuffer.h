@@ -486,6 +486,9 @@ protected:
 	__attribute__((noinline))
 	void Reallocate(size_t size)
 	{
+		if(size == 0)
+			return;
+
 		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM.
 		//Allocate a GPU-local buffer, copy data to it, then free the CPU-side buffer
 		if(m_cpuAccessHint == HINT_NEVER)
@@ -555,7 +558,7 @@ protected:
 			else
 			{
 				//If we have an existing buffer with valid content, save it and copy content over
-				if( (m_gpuPhysMem != nullptr) && !m_gpuPhysMemIsStale)
+				if( (m_gpuPhysMem != nullptr) && !m_gpuPhysMemIsStale && (m_size != 0))
 				{
 					auto pOld = std::move(m_gpuPhysMem);
 					//auto type = m_gpuMemoryType;
