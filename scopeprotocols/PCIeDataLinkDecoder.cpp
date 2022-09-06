@@ -668,7 +668,7 @@ uint32_t PCIeDataLinkDecoder::CalculateTlpCRC(Packet* pack)
 	if(len == 0)
 		return 0xffffffff;
 	else
-		return CRC32(pack->m_data, 0, len - 1);
+		return CRC32(&pack->m_data[0], 0, len - 1);
 }
 
 Gdk::Color PCIeDataLinkWaveform::GetColor(size_t i)

@@ -209,4 +209,7 @@ std::string ExpandPath(const std::string& in);
 void CreateDirectory(const std::string& path);
 #endif
 
+//Checksum helpers
+uint32_t CRC32(uint8_t* bytes, size_t start, size_t end);
+
 #endif

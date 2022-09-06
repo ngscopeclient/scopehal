@@ -458,7 +458,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 				//Start of FCS? Record start time
 				if(segment.m_data.empty())
 				{
-					crc_expected = CRC32(bytes, crcstart, i-1);
+					crc_expected = CRC32(&bytes[0], crcstart, i-1);
 
 					start = starts[i];
 					cap->m_offsets.push_back(start / cap->m_timescale);
