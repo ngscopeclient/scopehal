@@ -1398,7 +1398,12 @@ void Filter::AutoscaleVertical(size_t stream)
 float Filter::GetVoltageRange(size_t stream)
 {
 	if(m_ranges[stream] == 0)
+	{
+		if(GetData(stream) == nullptr)
+			return 1;
+
 		AutoscaleVertical(stream);
+	}
 
 	return m_ranges[stream];
 }
@@ -1411,7 +1416,12 @@ void Filter::SetVoltageRange(float range, size_t stream)
 float Filter::GetOffset(size_t stream)
 {
 	if(m_ranges[stream] == 0)
+	{
+		if(GetData(stream) == nullptr)
+			return 0;
+
 		AutoscaleVertical(stream);
+	}
 
 	return m_offsets[stream];
 }
