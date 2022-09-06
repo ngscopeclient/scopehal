@@ -34,16 +34,35 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize)
+ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize)
+	: m_shaderPath(shaderPath)
+	, m_numSSBOs(numSSBOs)
+	, m_pushConstantSize(pushConstantSize)
+{
+	m_writeDescriptors.resize(numSSBOs);
+	m_bufferInfo.resize(numSSBOs);
+}
+
+ComputePipeline::~ComputePipeline()
+{
+	//Make sure we destroy some objects in a particular order
+	//TODO: how much of this really is important?
+	m_computePipeline = nullptr;
+	m_descriptorSetLayout = nullptr;
+	m_pipelineLayout = nullptr;
+	m_shaderModule = nullptr;
+}
+
+void ComputePipeline::DeferredInit()
 {
 	//Load the shader module
-	auto srcvec = ReadDataFileUint32(shaderPath);
+	auto srcvec = ReadDataFileUint32(m_shaderPath);
 	vk::ShaderModuleCreateInfo info({}, srcvec);
 	m_shaderModule = make_unique<vk::raii::ShaderModule>(*g_vkComputeDevice, info);
 
 	//Configure shader input bindings
 	vector<vk::DescriptorSetLayoutBinding> bindings;
-	for(size_t i=0; i<numSSBOs; i++)
+	for(size_t i=0; i<m_numSSBOs; i++)
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
 			i, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
@@ -52,7 +71,7 @@ ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs,
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
 
 	//Configure push constants
-	vk::PushConstantRange range(vk::ShaderStageFlagBits::eCompute, 0, pushConstantSize);
+	vk::PushConstantRange range(vk::ShaderStageFlagBits::eCompute, 0, m_pushConstantSize);
 
 	//Make the pipeline layout
 	vk::PipelineLayoutCreateInfo linfo(
@@ -68,7 +87,7 @@ ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs,
 		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
 
 	//Descriptor pool for our shader parameters
-	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, numSSBOs);
+	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
 	vk::DescriptorPoolCreateInfo poolInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
 			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
@@ -80,17 +99,4 @@ ComputePipeline::ComputePipeline(const std::string& shaderPath, size_t numSSBOs,
 	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
 	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
 		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
-
-	m_writeDescriptors.resize(numSSBOs);
-	m_bufferInfo.resize(numSSBOs);
-}
-
-ComputePipeline::~ComputePipeline()
-{
-	//Make sure we destroy some objects in a particular order
-	//TODO: how much of this really is important?
-	m_computePipeline = nullptr;
-	m_descriptorSetLayout = nullptr;
-	m_pipelineLayout = nullptr;
-	m_shaderModule = nullptr;
 }

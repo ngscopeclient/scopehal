@@ -52,6 +52,9 @@ public:
 	template<class T>
 	void BindBuffer(size_t i, AcceleratorBuffer<T>& buf, bool outputOnly = false)
 	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+
 		buf.PrepareForGpuAccess(outputOnly);
 
 		m_bufferInfo[i] = buf.GetBufferInfo();
@@ -65,6 +68,9 @@ public:
 	template<class T>
 	void BindBufferNonblocking(size_t i, AcceleratorBuffer<T>& buf, vk::raii::CommandBuffer& cmdBuf, bool outputOnly = false)
 	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+
 		buf.PrepareForGpuAccessNonblocking(outputOnly, cmdBuf);
 
 		m_bufferInfo[i] = buf.GetBufferInfo();
@@ -92,6 +98,9 @@ public:
 	template<class T>
 	void Dispatch(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
 	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+
 		g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr);
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
 		cmdBuf.pushConstants<T>(
@@ -109,6 +118,12 @@ public:
 	}
 
 protected:
+	void DeferredInit();
+
+	std::string m_shaderPath;
+	size_t m_numSSBOs;
+	size_t m_pushConstantSize;
+
 	std::unique_ptr<vk::raii::ShaderModule> m_shaderModule;
 	std::unique_ptr<vk::raii::Pipeline> m_computePipeline;
 	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
