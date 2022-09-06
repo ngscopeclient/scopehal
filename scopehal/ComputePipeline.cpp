@@ -28,6 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "PipelineCacheManager.h"
 
 using namespace std;
 
@@ -55,6 +56,11 @@ ComputePipeline::~ComputePipeline()
 
 void ComputePipeline::DeferredInit()
 {
+	double start = GetTime();
+
+	//Look up the pipeline cache to see if we have a binary etc to use
+	auto cache = g_pipelineCacheMgr->Lookup(m_shaderPath);
+
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(m_shaderPath);
 	vk::ShaderModuleCreateInfo info({}, srcvec);
@@ -84,7 +90,7 @@ void ComputePipeline::DeferredInit()
 	vk::PipelineShaderStageCreateInfo stageinfo({}, vk::ShaderStageFlagBits::eCompute, **m_shaderModule, "main");
 	vk::ComputePipelineCreateInfo pinfo({}, stageinfo, **m_pipelineLayout);
 	m_computePipeline = make_unique<vk::raii::Pipeline>(
-		std::move(g_vkComputeDevice->createComputePipelines(nullptr, pinfo).front()));	//TODO: pipeline cache
+		std::move(g_vkComputeDevice->createComputePipelines(*cache, pinfo).front()));
 
 	//Descriptor pool for our shader parameters
 	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
@@ -99,4 +105,7 @@ void ComputePipeline::DeferredInit()
 	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
 	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
 		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
+
+	auto dt = GetTime() - start;
+	LogVerbose("Created compute pipeline for %s in %.3f ms\n", m_shaderPath.c_str(), dt * 1000);
 }

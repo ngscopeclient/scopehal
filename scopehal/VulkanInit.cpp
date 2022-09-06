@@ -34,6 +34,7 @@
  */
 #include "scopehal.h"
 #include <glslang_c_interface.h>
+#include "PipelineCacheManager.h"
 
 //Lots of warnings here, disable them
 #pragma GCC diagnostic push
@@ -647,6 +648,9 @@ bool VulkanInit()
 	if(1 != glslang_initialize_process())
 		LogError("Failed to initialize glslang compiler\n");
 
+	//Initialize our pipeline cache manager and load existing cache data
+	g_pipelineCacheMgr = make_unique<PipelineCacheManager>();
+
 	//Print out vkFFT version for debugging
 	int vkfftver = VkFFTGetVersion();
 	int vkfft_major = vkfftver / 10000;
@@ -684,8 +688,13 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
 	return false;
 }
 
+/**
+	@brief Free all global Vulkan resources in the correct order
+ */
 void VulkanCleanup()
 {
+	g_pipelineCacheMgr = nullptr;
+
 	glslang_finalize_process();
 
 	g_vkFFTQueue = nullptr;

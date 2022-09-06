@@ -71,13 +71,12 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
+#include <sys/stat.h>
+#include <wordexp.h>
 #else
 #include <windows.h>
 #include <shlwapi.h>
-#endif
-
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
+#include <shlobj.h>
 #endif
 
 using namespace std;
@@ -833,3 +832,56 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize)
 		ret ++;
 	return ret;
 }
+
+
+#ifdef _WIN32
+
+string NarrowPath(wchar_t* wide)
+{
+	char narrow[MAX_PATH];
+	const auto len = wcstombs(narrow, wide, MAX_PATH);
+
+	if(len == static_cast<size_t>(-1))
+		throw runtime_error("Failed to convert wide string");
+
+	return std::string(narrow);
+}
+#endif
+
+#ifndef _WIN32
+// POSIX-specific filesystem helpers. These will be moved to xptools in a generalized form later.
+
+// Expand things like ~ in path
+string ExpandPath(const string& in)
+{
+	wordexp_t result;
+	wordexp(in.c_str(), &result, 0);
+	auto expanded = result.we_wordv[0];
+	string out{ expanded };
+	wordfree(&result);
+	return out;
+}
+
+void CreateDirectory(const string& path)
+{
+	const auto expanded = ExpandPath(path);
+
+	struct stat fst{ };
+
+	// Check if it exists
+	if(stat(expanded.c_str(), &fst) != 0)
+	{
+		// If not, create it
+		if(mkdir(expanded.c_str(), 0755) != 0 && errno != EEXIST)
+		{
+			perror("");
+			throw runtime_error("failed to create preferences directory");
+		}
+	}
+	else if(!S_ISDIR(fst.st_mode))
+	{
+		// Exists, but is not a directory
+		throw runtime_error("preferences directory exists but is not a directory");
+	}
+}
+#endif

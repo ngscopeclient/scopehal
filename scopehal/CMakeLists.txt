@@ -124,9 +124,10 @@ set(SCOPEHAL_SOURCES
 
 	TestWaveformSource.cpp
 
+	ComputePipeline.cpp
 	ExportWizard.cpp
 	FilterGraphExecutor.cpp
-	ComputePipeline.cpp
+	PipelineCacheManager.cpp
 	)
 
 configure_file(config.h.in config.h)

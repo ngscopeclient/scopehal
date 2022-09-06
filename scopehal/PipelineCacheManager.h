@@ -30,6 +30,12 @@
 #ifndef PipelineCacheManager_h
 #define PipelineCacheManager_h
 
+#include <vulkan/vulkan_raii.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+#include <map>
+
 /**
 	@brief Helper for managing Vulkan / vkFFT pipeline cache objects
 
@@ -37,7 +43,8 @@
 
 	Structure is $cachedir/shaders/[key].yml
 
-	YAML schema for each file:
+	YAML schema for compute shader cache entry:
+		type: compute_shader
 		devname: xxx
 		driver_ver: xxx
 		uuid: xxx
@@ -51,19 +58,31 @@ public:
 	PipelineCacheManager();
 	~PipelineCacheManager();
 
-	std::shared_ptr< std::vector<uint8_t> > Lookup(const std::string& key);
-	void Store(const std::string& key, std::shared_ptr< std::vector<uint8_t> > value);
+	std::shared_ptr< std::vector<uint8_t> > LookupRaw(const std::string& key);
+	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint8_t> > value);
+
+	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key);
 
 	void LoadFromDisk();
 	void SaveToDisk();
+	void Clear();
 
 protected:
+	void FindPath();
 
-	///@brief Mutex to interlock access to the cache
+	///@brief Mutex to interlock access to the STL containers
 	std::mutex m_mutex;
 
+	///@brief Vulkan pipeline cache objects
+	std::map<std::string, std::shared_ptr<vk::raii::PipelineCache> > m_vkCache;
+
 	///@brief The actual cache data store
-	std::map<std::string, std::shared_ptr<std::vector<uint8_t> > > m_cache;
+	std::map<std::string, std::shared_ptr<std::vector<uint8_t> > > m_rawDataCache;
+
+	///@brief Root directory of the cache
+	std::string m_cacheRootDir;
 };
+
+extern std::unique_ptr<PipelineCacheManager> g_pipelineCacheMgr;
 
 #endif

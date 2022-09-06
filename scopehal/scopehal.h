@@ -202,4 +202,11 @@ uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 template<bool> class CompileTimeAssert;
 template<> class CompileTimeAssert<true>{};
 
+#ifdef _WIN32
+std::string NarrowPath(wchar_t* wide)
+#else
+std::string ExpandPath(const std::string& in);
+void CreateDirectory(const std::string& path);
+#endif
+
 #endif
