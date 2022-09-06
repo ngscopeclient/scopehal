@@ -56,10 +56,8 @@ ComputePipeline::~ComputePipeline()
 
 void ComputePipeline::DeferredInit()
 {
-	double start = GetTime();
-
 	//Look up the pipeline cache to see if we have a binary etc to use
-	auto cache = g_pipelineCacheMgr->Lookup(m_shaderPath);
+	auto cache = g_pipelineCacheMgr->Lookup(BaseName(m_shaderPath));
 
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(m_shaderPath);
@@ -105,7 +103,4 @@ void ComputePipeline::DeferredInit()
 	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
 	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
 		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
-
-	auto dt = GetTime() - start;
-	LogVerbose("Created compute pipeline for %s in %.3f ms\n", m_shaderPath.c_str(), dt * 1000);
 }

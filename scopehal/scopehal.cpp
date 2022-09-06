@@ -889,7 +889,7 @@ void CreateDirectory(const string& path)
 /**
 	@brief Calculates a CRC32 checksum using the standard Ethernet polynomial
  */
-uint32_t CRC32(uint8_t* bytes, size_t start, size_t end)
+uint32_t CRC32(const uint8_t* bytes, size_t start, size_t end)
 {
 	uint32_t poly = 0xedb88320;
 
@@ -910,4 +910,9 @@ uint32_t CRC32(uint8_t* bytes, size_t start, size_t end)
 				((crc & 0x0000ff00) << 8) |
 				((crc & 0x00ff0000) >> 8) |
 				 (crc >> 24) );
+}
+
+uint32_t CRC32(const vector<uint8_t>& bytes)
+{
+	return CRC32(&bytes[0], 0, bytes.size()-1);
 }

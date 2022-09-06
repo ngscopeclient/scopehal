@@ -127,8 +127,8 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	//Add to cache if it wasn't there already
 	if(cacheBlob == nullptr)
 	{
-		auto vec = make_shared<vector<uint32_t> >();
-		vec->resize(m_app.applicationStringSize / sizeof(uint32_t));
+		auto vec = make_shared<vector<uint8_t> >();
+		vec->resize(m_app.applicationStringSize);
 		memcpy(&(*vec)[0], m_app.saveApplicationString, m_app.applicationStringSize);
 		g_pipelineCacheMgr->StoreRaw(cacheKey, vec);
 	}

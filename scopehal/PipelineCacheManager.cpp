@@ -102,7 +102,7 @@ void PipelineCacheManager::FindPath()
 	m_cacheRootDir = ExpandPath("~/.cache/glscopeclient") + "/";
 #endif
 
-	LogNotice("Cache root directory is %s\n", m_cacheRootDir.c_str());
+	LogTrace("Cache root directory is %s\n", m_cacheRootDir.c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,7 +121,7 @@ void PipelineCacheManager::Clear()
 /**
 	@brief Look up a blob which may or may not be in the cache
  */
-shared_ptr< vector<uint32_t> > PipelineCacheManager::LookupRaw(const string& key)
+shared_ptr< vector<uint8_t> > PipelineCacheManager::LookupRaw(const string& key)
 {
 	lock_guard<mutex> lock(m_mutex);
 	if(m_rawDataCache.find(key) != m_rawDataCache.end())
@@ -137,12 +137,12 @@ shared_ptr< vector<uint32_t> > PipelineCacheManager::LookupRaw(const string& key
 /**
 	@brief Store a raw blob to the cache
  */
-void PipelineCacheManager::StoreRaw(const string& key, shared_ptr< vector<uint32_t> > value)
+void PipelineCacheManager::StoreRaw(const string& key, shared_ptr< vector<uint8_t> > value)
 {
 	lock_guard<mutex> lock(m_mutex);
 	m_rawDataCache[key] = value;
 
-	LogTrace("Store raw: %s (%zu words)\n", key.c_str(), value->size());
+	LogTrace("Store raw: %s (%zu bytes)\n", key.c_str(), value->size());
 }
 
 /**
@@ -185,14 +185,23 @@ void PipelineCacheManager::LoadFromDisk()
 	PipelineCacheFileHeader header;
 	int vkfft_expected = VkFFTGetVersion();
 
+	string rawPrefix = "raw_";
+	string shaderPrefix = "pipeline_";
+	string shaderSuffix = ".bin";
+
 	//Load raw binary blobs (mostly for vkFFT)
-	auto prefix = m_cacheRootDir + "shader_raw_";
+	auto prefix = m_cacheRootDir + "shader_";
 	auto files = Glob(prefix + "*", false);
 	for(auto f : files)
 	{
 		//Extract the key from the file name
 		auto key = f.substr(prefix.length());
-		key = key.substr(0, key.length() - 4);
+		key = key.substr(0, key.length() - shaderSuffix.length());
+		bool typeIsRaw = (key.find(rawPrefix) == 0);
+		if(typeIsRaw)
+			key = key.substr(rawPrefix.length());
+		else
+			key = key.substr(shaderPrefix.length());
 
 		LogTrace("Loading cache object %s (from %s)\n", key.c_str(), f.c_str());
 		LogIndenter li2;
@@ -225,8 +234,8 @@ void PipelineCacheManager::LoadFromDisk()
 		}
 
 		//All good. Read the file content
-		auto p = make_shared< vector<uint32_t> >();
-		p->resize(header.len / 4);
+		auto p = make_shared< vector<uint8_t> >();
+		p->resize(header.len);
 		if(header.len != fread(&((*p)[0]), 1, header.len, fp))
 		{
 			LogWarning("Read cache content failed (%s)\n", f.c_str());
@@ -236,14 +245,22 @@ void PipelineCacheManager::LoadFromDisk()
 		fclose(fp);
 
 		//Verify the CRC
-		if(header.crc != CRC32((uint8_t*)&((*p)[0]), 0, header.len-1))
+		if(header.crc != CRC32(*p))
 		{
 			LogWarning("Rejecting cache file (%s) due to bad CRC\n", f.c_str());
 			continue;
 		}
 
 		//Done, add to cache if we get this far
-		m_rawDataCache[key] = p;
+		if(typeIsRaw)
+			m_rawDataCache[key] = p;
+		else
+		{
+			vector<uint8_t>& vec = *p;
+			vk::PipelineCacheCreateInfo info({}, vec.size(), &vec[0]);
+			auto ret = make_shared<vk::raii::PipelineCache>(*g_vkComputeDevice, info);
+			m_vkCache[key] = ret;
+		}
 	}
 }
 
@@ -253,6 +270,9 @@ void PipelineCacheManager::LoadFromDisk()
 void PipelineCacheManager::SaveToDisk()
 {
 	lock_guard<mutex> lock(m_mutex);
+
+	LogTrace("Saving cache\n");
+	LogIndenter li;
 
 	PipelineCacheFileHeader header;
 	memcpy(header.cache_uuid, g_vkComputeDeviceUuid, 16);
@@ -265,11 +285,12 @@ void PipelineCacheManager::SaveToDisk()
 		auto key = it.first;
 		auto& vec = *it.second;
 		auto fname = m_cacheRootDir + "shader_raw_" + key + ".bin";
+		LogTrace("Saving shader %s (%zu bytes)\n", fname.c_str(), vec.size());
 		FILE* fp = fopen(fname.c_str(), "wb");
 
 		//Write the cache header
-		header.len = vec.size() * sizeof(uint32_t);
-		header.crc = CRC32((uint8_t*)&vec[0], 0, header.len-1);
+		header.len = vec.size();
+		header.crc = CRC32(vec);
 		if(1 != fwrite(&header, sizeof(header), 1, fp))
 		{
 			LogWarning("Write cache header failed (%s)\n", fname.c_str());
@@ -284,5 +305,33 @@ void PipelineCacheManager::SaveToDisk()
 		fclose(fp);
 	}
 
-	//TODO: Save Vulkan shader cache
+	//Save Vulkan shader cache
+	for(auto it : m_vkCache)
+	{
+		auto key = it.first;
+		auto pcache = it.second;
+		auto fname = m_cacheRootDir + "shader_pipeline_" + key + ".bin";
+
+		//Extract the raw shader content
+		auto vec = pcache->getData();
+		LogTrace("Saving shader %s (%zu bytes)\n", fname.c_str(), vec.size());
+
+		FILE* fp = fopen(fname.c_str(), "wb");
+
+		//Write the cache header
+		header.len = vec.size();
+		header.crc = CRC32(vec);
+		if(1 != fwrite(&header, sizeof(header), 1, fp))
+		{
+			LogWarning("Write cache header failed (%s)\n", fname.c_str());
+			fclose(fp);
+			continue;
+		}
+
+		//Write the data
+		if(header.len != fwrite(&vec[0], 1, header.len, fp))
+			LogWarning("Write cache data failed (%s)\n", fname.c_str());
+
+		fclose(fp);
+	}
 }
