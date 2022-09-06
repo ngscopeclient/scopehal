@@ -41,7 +41,9 @@
 
 	The cache is stored on disk under the .cache/glscopeclient directory on Linux, or FIXME on Windows.
 
-	Structure is $cachedir/shaders/[key].yml
+	Raw data: $cachedir/shaders/raw_[key].bin
+
+	Compute shader data: $cachedir/shaders/compute_[key].bin
 
 	YAML schema for compute shader cache entry:
 		type: compute_shader
@@ -58,8 +60,8 @@ public:
 	PipelineCacheManager();
 	~PipelineCacheManager();
 
-	std::shared_ptr< std::vector<uint8_t> > LookupRaw(const std::string& key);
-	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint8_t> > value);
+	std::shared_ptr< std::vector<uint32_t> > LookupRaw(const std::string& key);
+	void StoreRaw(const std::string& key, std::shared_ptr< std::vector<uint32_t> > value);
 
 	std::shared_ptr<vk::raii::PipelineCache> Lookup(const std::string& key);
 
@@ -77,7 +79,7 @@ protected:
 	std::map<std::string, std::shared_ptr<vk::raii::PipelineCache> > m_vkCache;
 
 	///@brief The actual cache data store
-	std::map<std::string, std::shared_ptr<std::vector<uint8_t> > > m_rawDataCache;
+	std::map<std::string, std::shared_ptr<std::vector<uint32_t> > > m_rawDataCache;
 
 	///@brief Root directory of the cache
 	std::string m_cacheRootDir;

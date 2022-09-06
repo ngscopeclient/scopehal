@@ -128,6 +128,7 @@ set(SCOPEHAL_SOURCES
 	ExportWizard.cpp
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
+	VulkanFFTPlan.cpp
 	)
 
 configure_file(config.h.in config.h)

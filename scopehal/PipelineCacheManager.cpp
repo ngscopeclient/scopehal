@@ -118,16 +118,28 @@ void PipelineCacheManager::Clear()
 /**
 	@brief Look up a blob which may or may not be in the cache
  */
-shared_ptr< vector<uint8_t> > PipelineCacheManager::LookupRaw(const string& key)
+shared_ptr< vector<uint32_t> > PipelineCacheManager::LookupRaw(const string& key)
 {
+	lock_guard<mutex> lock(m_mutex);
+	if(m_rawDataCache.find(key) != m_rawDataCache.end())
+	{
+		LogTrace("Hit for raw %s\n", key.c_str());
+		return m_rawDataCache[key];
+	}
+
+	LogTrace("Miss for raw %s\n", key.c_str());
 	return nullptr;
 }
 
 /**
 	@brief Store a raw blob to the cache
  */
-void PipelineCacheManager::StoreRaw(const string& key, shared_ptr< vector<uint8_t> > value)
+void PipelineCacheManager::StoreRaw(const string& key, shared_ptr< vector<uint32_t> > value)
 {
+	lock_guard<mutex> lock(m_mutex);
+	m_rawDataCache[key] = value;
+
+	LogTrace("Store raw: %s (%zu words)\n", key.c_str(), value->size());
 }
 
 /**
@@ -142,12 +154,12 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 	//Already in the cache? Return that copy
 	if(m_vkCache.find(key) != m_vkCache.end())
 	{
-		LogTrace("Hit for %s\n", key.c_str());
+		LogTrace("Hit for pipeline %s\n", key.c_str());
 		return m_vkCache[key];
 	}
 
 	//Nope, make a new empty cache object and return it
-	LogTrace("Miss for %s\n", key.c_str());
+	LogTrace("Miss for pipeline %s\n", key.c_str());
 	vk::PipelineCacheCreateInfo info({},{});
 	auto ret = make_shared<vk::raii::PipelineCache>(*g_vkComputeDevice, info);
 	m_vkCache[key] = ret;
