@@ -30,6 +30,7 @@
 #include "scopehal.h"
 #include "PipelineCacheManager.h"
 #include "FileSystem.h"
+#include "VulkanFFTPlan.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -182,6 +183,7 @@ void PipelineCacheManager::LoadFromDisk()
 	LogIndenter li;
 
 	PipelineCacheFileHeader header;
+	int vkfft_expected = VkFFTGetVersion();
 
 	//Load raw binary blobs (mostly for vkFFT)
 	auto prefix = m_cacheRootDir + "shader_raw_";
@@ -206,6 +208,12 @@ void PipelineCacheManager::LoadFromDisk()
 		if(0 != memcmp(header.cache_uuid, g_vkComputeDeviceUuid, 16))
 		{
 			LogTrace("Rejecting cache file (%s) due to mismatching UUID\n", f.c_str());
+			fclose(fp);
+			continue;
+		}
+		if(header.vkfft_ver != vkfft_expected)
+		{
+			LogTrace("Rejecting cache file (%s) due to mismatching vkFFT version\n", f.c_str());
 			fclose(fp);
 			continue;
 		}
@@ -249,6 +257,7 @@ void PipelineCacheManager::SaveToDisk()
 	PipelineCacheFileHeader header;
 	memcpy(header.cache_uuid, g_vkComputeDeviceUuid, 16);
 	header.driver_ver = g_vkComputeDeviceDriverVer;
+	header.vkfft_ver = VkFFTGetVersion();
 
 	//Save raw data
 	for(auto it : m_rawDataCache)

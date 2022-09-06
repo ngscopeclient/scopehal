@@ -40,6 +40,7 @@
 struct PipelineCacheFileHeader
 {
 	uint8_t		cache_uuid[16];
+	int32_t		vkfft_ver;
 	uint32_t	driver_ver;
 	uint32_t	len;
 	uint32_t	crc;
