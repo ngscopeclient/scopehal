@@ -350,6 +350,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 		//Done, block until the compute operations finish
 		cmdBuf.end();
 		SubmitAndBlock(cmdBuf, queue);
+		cap->MarkModifiedFromGpu();
 	}
 	else
 	{
