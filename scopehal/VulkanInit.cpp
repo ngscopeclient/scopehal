@@ -250,6 +250,11 @@ bool VulkanInit()
 		if(hasPhysicalDeviceProperties2)
 			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
 
+		//Required for MoltenVK
+		#ifdef __APPLE__
+		extensionsToUse.push(back("VK_KHR_portability_enumeration");
+		#endif
+
 		//See what extensions are required
 		uint32_t glfwRequiredCount = 0;
 		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
