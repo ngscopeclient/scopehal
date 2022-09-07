@@ -146,10 +146,11 @@ uint32_t g_vkComputeDeviceDriverVer;
 
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
-//Feature flags indicating that we have support for specific data types etc on the GPU
+//Feature flags indicating that we have support for specific data types / features on the GPU
 bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
+bool g_hasDebugUtils = false;
 
 void VulkanCleanup();
 
@@ -206,6 +207,11 @@ bool VulkanInit()
 				LogDebug("VK_KHR_get_physical_device_properties2: supported\n");
 				hasPhysicalDeviceProperties2 = true;
 			}
+			if(!strcmp((char*)e.extensionName, "VK_EXT_debug_utils"))
+			{
+				LogDebug("VK_EXT_debug_utils: supported\n");
+				g_hasDebugUtils = true;
+			}
 		}
 
 		//Vulkan 1.1 is the highest version supported on all targeted platforms (limited mostly by MoltenVK)
@@ -249,6 +255,10 @@ bool VulkanInit()
 		vector<const char*> extensionsToUse;
 		if(hasPhysicalDeviceProperties2)
 			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
+
+		//Request debug utilities if available
+		if(g_hasDebugUtils)
+			extensionsToUse.push_back("VK_EXT_debug_utils");
 
 		//Required for MoltenVK
 		#ifdef __APPLE__
