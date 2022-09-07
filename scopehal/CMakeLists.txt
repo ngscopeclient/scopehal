@@ -157,6 +157,7 @@ target_link_libraries(scopehal
 	GenericCodeGen
 	MachineIndependent
 	OSDependent
+	glfw
 	)
 
 target_include_directories(scopehal

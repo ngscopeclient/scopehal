@@ -41,8 +41,8 @@
 #include <sys/mman.h>
 #endif
 
-extern size_t g_vkPinnedMemoryType;
-extern size_t g_vkLocalMemoryType;
+extern uint32_t g_vkPinnedMemoryType;
+extern uint32_t g_vkLocalMemoryType;
 extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
 extern std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 extern std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;

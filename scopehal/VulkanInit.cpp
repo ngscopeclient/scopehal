@@ -35,6 +35,7 @@
 #include "scopehal.h"
 #include <glslang_c_interface.h>
 #include "PipelineCacheManager.h"
+#include <GLFW/glfw3.h>
 
 //Lots of warnings here, disable them
 #pragma GCC diagnostic push
@@ -96,17 +97,22 @@ mutex g_vkTransferMutex;
 /**
 	@brief Vulkan memory type for CPU-based memory that is also GPU-readable
  */
-size_t g_vkPinnedMemoryType;
+uint32_t g_vkPinnedMemoryType;
 
 /**
 	@brief Vulkan memory type for GPU-based memory (generally not CPU-readable, except on integrated cards)
  */
-size_t g_vkLocalMemoryType;
+uint32_t g_vkLocalMemoryType;
 
 /**
 	@brief Vulkan queue type for submitting compute operations (may or may not be render capable)
  */
-size_t g_computeQueueType;
+uint32_t g_computeQueueType;
+
+/**
+	@brief Vulkan queue type for submitting rendering operations
+ */
+uint32_t g_renderQueueType;
 
 /**
 	@brief Command buffer for submitting vkFFT calls to
@@ -166,6 +172,22 @@ int AllocateVulkanComputeQueue()
 }
 
 /**
+	@brief Allocates a queue index for Vulkan render queues
+ */
+int AllocateVulkanRenderQueue()
+{
+	//If compute and rendering use the same kind of queue, make sure we don't double count!
+	if(g_computeQueueType == g_renderQueueType)
+		return AllocateVulkanComputeQueue();
+
+	//No, allocate from the other queue type
+	static mutex allocMutex;
+	lock_guard<mutex> lock(allocMutex);
+	static int nextQueue = 0;
+	return (nextQueue ++);
+}
+
+/**
 	@brief Initialize a Vulkan context for compute
  */
 bool VulkanInit()
@@ -204,14 +226,48 @@ bool VulkanInit()
 		else
 			LogDebug("Vulkan 1.2 support not available\n");
 
-		//Request VK_KHR_get_physical_device_properties2 if available
+		//Log glfw version
+		LogDebug("Initializing glfw %s\n", glfwGetVersionString());
+
+		//Initialize glfw
+		glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
+		glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
+		glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
+		if(!glfwInit())
+		{
+			LogError("glfw init failed\n");
+			return false;
+		}
+		if(!glfwVulkanSupported())
+		{
+			LogError("glfw vulkan support not available\n");
+			return false;
+		}
+
+		//Request VK_KHR_get_physical_device_properties2 if available, plus all extensions needed by glfw
 		vk::ApplicationInfo appInfo("libscopehal", 1, "Vulkan.hpp", 1, apiVersion);
 		vector<const char*> extensionsToUse;
 		if(hasPhysicalDeviceProperties2)
 			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
-		vk::InstanceCreateInfo instanceInfo({}, &appInfo, {}, extensionsToUse);
+
+		//See what extensions are required
+		uint32_t glfwRequiredCount = 0;
+		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
+		if(glfwExtensions == nullptr)
+		{
+			LogError("glfwGetRequiredInstanceExtensions failed\n");
+			return false;
+		}
+		LogDebug("GLFW required extensions:\n");
+		for(size_t i=0; i<glfwRequiredCount; i++)
+		{
+			LogIndenter li2;
+			LogDebug("%s\n", glfwExtensions[i]);
+			extensionsToUse.push_back(glfwExtensions[i]);
+		}
 
 		//Create the instance
+		vk::InstanceCreateInfo instanceInfo({}, &appInfo, {}, extensionsToUse);
 		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
 
 		//Look at our physical devices and print info out for each one
@@ -234,6 +290,8 @@ bool VulkanInit()
 				//TODO: preference to override this
 				if(IsDevicePreferred(devices[bestDevice].getProperties(), devices[i].getProperties()))
 					bestDevice = i;
+
+				//TODO: check that the extensions we need are supported
 
 				//TODO: sparse properties
 
@@ -413,6 +471,7 @@ bool VulkanInit()
 
 			LogDebug("Selected device %zu\n", bestDevice);
 			int computeQueueCount = 1;
+			int renderQueueCount = 1;
 			{
 				auto device = devices[bestDevice];
 				g_vkfftPhysicalDevice = &devices[bestDevice];
@@ -421,10 +480,13 @@ bool VulkanInit()
 
 				//Look at queue families
 				auto families = device.getQueueFamilyProperties();
-				LogDebug("Queue families\n");
+				LogDebug("Queue families (%zu total)\n", families.size());
+				bool foundCompute = false;
+				bool foundRender = false;
+				g_computeQueueType = 0;
+				g_renderQueueType = 0;
 				{
 					LogIndenter li4;
-					g_computeQueueType = 0;
 					for(size_t j=0; j<families.size(); j++)
 					{
 						LogDebug("Queue type %zu\n", j);
@@ -443,16 +505,56 @@ bool VulkanInit()
 							LogDebug("Sparse binding\n");
 						if(f.queueFlags & vk::QueueFlagBits::eProtected)
 							LogDebug("Protected\n");
-						//TODO: VIDEO_DECODE_BIT_KHR, VIDEO_ENCODE_BIT_KHR
+						#ifdef VK_ENABLE_BETA_EXTENSIONS
+							if(f.queueFlags & vk::QueueFlagBits::eVideoDecodeKHR)
+								LogDebug("Video decode\n");
+							if(f.queueFlags & vk::QueueFlagBits::eVideoEncodeKHR)
+								LogDebug("Video encode\n");
+						#endif
+
+						//TODO: pick a queue type to use just for transfers that is different from the others, if possible
 
 						//Pick the first type that supports compute and transfers
 						if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
 						{
-							g_computeQueueType = j;
-							computeQueueCount = f.queueCount;
-							break;
+							if(!foundCompute)
+							{
+								foundCompute = true;
+								g_computeQueueType = j;
+								computeQueueCount = f.queueCount;
+
+								LogDebug("Using this queue type for compute\n");
+							}
+						}
+
+						//Pick the first type that supports graphics and transfers, and that we can render to
+						if( (f.queueFlags & vk::QueueFlagBits::eGraphics) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
+						{
+							if(!foundRender)
+							{
+								//Check if we can render to this device
+								if(GLFW_TRUE == glfwGetPhysicalDevicePresentationSupport(**g_vkInstance, *device, j))
+								{
+									foundRender = true;
+									g_renderQueueType = j;
+									renderQueueCount = f.queueCount;
+
+									LogDebug("Using this queue type for rendering\n");
+								}
+							}
 						}
 					}
+				}
+
+				if(!foundCompute)
+				{
+					LogError("Failed to find suitable compute queue type\n");
+					return false;
+				}
+				if(!foundRender)
+				{
+					LogError("Failed to find suitable render queue type\n");
+					return false;
 				}
 
 				//Save settings
@@ -538,12 +640,25 @@ bool VulkanInit()
 					}
 				}
 
-				//Initialize the device
-				//Create as many compute queues as we're allowed to, and make them all equal priority.
-				vector<float> queuePriority;
+				//Request as many compute queues as we're allowed to, and make them all equal priority.
+				vector<float> computeQueuePriority;
 				for(int i=0; i<computeQueueCount; i++)
-					queuePriority.push_back(0.5);
-				vk::DeviceQueueCreateInfo qinfo( {}, g_computeQueueType, computeQueueCount, &queuePriority[0]);
+					computeQueuePriority.push_back(0.5);
+				vector<vk::DeviceQueueCreateInfo> qinfo;
+				qinfo.push_back(vk::DeviceQueueCreateInfo(
+					{}, g_computeQueueType, computeQueueCount, &computeQueuePriority[0]));
+
+				//If render queue is a different type than compute, create a bunch of those queues
+				vector<float> renderQueuePriority;
+				for(int i=0; i<renderQueueCount; i++)
+					renderQueuePriority.push_back(0.5);
+				if(g_computeQueueType != g_renderQueueType)
+				{
+					qinfo.push_back(vk::DeviceQueueCreateInfo(
+						{}, g_renderQueueType, renderQueueCount, &renderQueuePriority[0]));
+				}
+
+				//Initialize the device
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
@@ -609,8 +724,8 @@ bool VulkanInit()
 					}
 				}
 
-				LogDebug("Using type %zu for pinned host memory\n", g_vkPinnedMemoryType);
-				LogDebug("Using type %zu for card-local memory\n", g_vkLocalMemoryType);
+				LogDebug("Using type %u for pinned host memory\n", g_vkPinnedMemoryType);
+				LogDebug("Using type %u for card-local memory\n", g_vkLocalMemoryType);
 
 				//Make a CommandPool for transfers and another one for vkFFT
 				vk::CommandPoolCreateInfo poolInfo(
@@ -708,6 +823,8 @@ bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::Physical
  */
 void VulkanCleanup()
 {
+	glfwTerminate();
+
 	g_pipelineCacheMgr = nullptr;
 
 	glslang_finalize_process();

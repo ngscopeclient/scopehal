@@ -176,12 +176,14 @@ extern std::vector<std::string> g_searchPaths;
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
-extern size_t g_computeQueueType;
+extern uint32_t g_computeQueueType;
+extern uint32_t g_renderQueueType;
 extern uint8_t g_vkComputeDeviceUuid[16];
 extern uint32_t g_vkComputeDeviceDriverVer;
 
 void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 int AllocateVulkanComputeQueue();
+int AllocateVulkanRenderQueue();
 
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
