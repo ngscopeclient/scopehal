@@ -271,6 +271,8 @@ bool VulkanInit()
 			extensionsToUse.push_back("VK_KHR_xlib_surface");
 		if(hasXcbSurface)
 			extensionsToUse.push_back("VK_KHR_xcb_surface");
+		if(hasXlibSurface || hasXcbSurface)
+			extensionsToUse.push_back("VK_KHR_surface");
 
 		//Request debug utilities if available
 		if(g_hasDebugUtils)
