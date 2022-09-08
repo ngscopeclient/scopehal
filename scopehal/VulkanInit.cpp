@@ -674,11 +674,13 @@ bool VulkanInit()
 				}
 
 				//Initialize the device
+				vector<const char*> devextensions;
+				devextensions.push_back("VK_KHR_swapchain");
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
 					{},
-					{},
+					devextensions,
 					&enabledFeatures,
 					pNext);
 				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
