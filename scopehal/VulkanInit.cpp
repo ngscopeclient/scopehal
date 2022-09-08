@@ -200,6 +200,8 @@ bool VulkanInit()
 	{
 		auto extensions = g_vkContext.enumerateInstanceExtensionProperties();
 		bool hasPhysicalDeviceProperties2 = false;
+		bool hasXlibSurface = false;
+		bool hasXcbSurface = false;
 		for(auto e : extensions)
 		{
 			if(!strcmp((char*)e.extensionName, "VK_KHR_get_physical_device_properties2"))
@@ -211,6 +213,16 @@ bool VulkanInit()
 			{
 				LogDebug("VK_EXT_debug_utils: supported\n");
 				g_hasDebugUtils = true;
+			}
+			if(!strcmp((char*)e.extensionName, "VK_KHR_xcb_surface"))
+			{
+				LogDebug("VK_KHR_xcb_surface: supported\n");
+				hasXcbSurface = true;
+			}
+			if(!strcmp((char*)e.extensionName, "VK_KHR_xlib_surface"))
+			{
+				LogDebug("VK_KHR_xlib_surface: supported\n");
+				hasXlibSurface = true;
 			}
 		}
 
@@ -255,6 +267,10 @@ bool VulkanInit()
 		vector<const char*> extensionsToUse;
 		if(hasPhysicalDeviceProperties2)
 			extensionsToUse.push_back("VK_KHR_get_physical_device_properties2");
+		if(hasXlibSurface)
+			extensionsToUse.push_back("VK_KHR_xlib_surface");
+		if(hasXcbSurface)
+			extensionsToUse.push_back("VK_KHR_xcb_surface");
 
 		//Request debug utilities if available
 		if(g_hasDebugUtils)
