@@ -96,8 +96,8 @@ void TIEMeasurement::Refresh()
 	auto udclk = dynamic_cast<UniformDigitalWaveform*>(clk);
 	auto sdclk = dynamic_cast<SparseDigitalWaveform*>(clk);
 	auto golden = GetInputWaveform(1);
-	auto sgolden = dynamic_cast<SparseAnalogWaveform*>(golden);
-	auto ugolden = dynamic_cast<UniformAnalogWaveform*>(golden);
+	auto sgolden = dynamic_cast<SparseDigitalWaveform*>(golden);
+	auto ugolden = dynamic_cast<UniformDigitalWaveform*>(golden);
 	size_t len = min(clk->size(), golden->size());
 
 	clk->PrepareForCpuAccess();
