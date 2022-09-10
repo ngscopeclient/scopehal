@@ -37,6 +37,10 @@
 
 #include "AlignedAllocator.h"
 
+#ifdef _WIN32
+#undef MemoryBarrier
+#endif
+
 #ifndef _WIN32
 #include <sys/mman.h>
 #endif
