@@ -190,8 +190,11 @@ int AllocateVulkanRenderQueue()
 
 /**
 	@brief Initialize a Vulkan context for compute
+
+	@param skipGLFW Do not initalize GLFW (workaround for what looks like gtk or video driver bug).
+			This should only be set true in glscopeclient.
  */
-bool VulkanInit()
+bool VulkanInit(bool skipGLFW)
 {
 	LogDebug("Initializing Vulkan\n");
 	LogIndenter li;
@@ -244,22 +247,27 @@ bool VulkanInit()
 		else
 			LogDebug("Vulkan 1.2 support not available\n");
 
-		//Log glfw version
-		LogDebug("Initializing glfw %s\n", glfwGetVersionString());
+		if(skipGLFW)
+			LogDebug("Skipping GLFW init to work around gtk gl/vulkan interop bug\n");
+		else
+		{
+			//Log glfw version
+			LogDebug("Initializing glfw %s\n", glfwGetVersionString());
 
-		//Initialize glfw
-		glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
-		glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
-		glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
-		if(!glfwInit())
-		{
-			LogError("glfw init failed\n");
-			return false;
-		}
-		if(!glfwVulkanSupported())
-		{
-			LogError("glfw vulkan support not available\n");
-			return false;
+			//Initialize glfw
+			glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
+			glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
+			glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
+			if(!glfwInit())
+			{
+				LogError("glfw init failed\n");
+				return false;
+			}
+			if(!glfwVulkanSupported())
+			{
+				LogError("glfw vulkan support not available\n");
+				return false;
+			}
 		}
 
 		//Request VK_KHR_get_physical_device_properties2 if available, plus all extensions needed by glfw
@@ -284,19 +292,22 @@ bool VulkanInit()
 		#endif
 
 		//See what extensions are required
-		uint32_t glfwRequiredCount = 0;
-		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
-		if(glfwExtensions == nullptr)
+		if(!skipGLFW)
 		{
-			LogError("glfwGetRequiredInstanceExtensions failed\n");
-			return false;
-		}
-		LogDebug("GLFW required extensions:\n");
-		for(size_t i=0; i<glfwRequiredCount; i++)
-		{
-			LogIndenter li2;
-			LogDebug("%s\n", glfwExtensions[i]);
-			extensionsToUse.push_back(glfwExtensions[i]);
+			uint32_t glfwRequiredCount = 0;
+			auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwRequiredCount);
+			if(glfwExtensions == nullptr)
+			{
+				LogError("glfwGetRequiredInstanceExtensions failed\n");
+				return false;
+			}
+			LogDebug("GLFW required extensions:\n");
+			for(size_t i=0; i<glfwRequiredCount; i++)
+			{
+				LogIndenter li2;
+				LogDebug("%s\n", glfwExtensions[i]);
+				extensionsToUse.push_back(glfwExtensions[i]);
+			}
 		}
 
 		//Create the instance
@@ -563,7 +574,7 @@ bool VulkanInit()
 						//Pick the first type that supports graphics and transfers, and that we can render to
 						if( (f.queueFlags & vk::QueueFlagBits::eGraphics) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
 						{
-							if(!foundRender)
+							if(!foundRender && !skipGLFW)
 							{
 								//Check if we can render to this device
 								if(GLFW_TRUE == glfwGetPhysicalDevicePresentationSupport(**g_vkInstance, *device, j))
@@ -584,7 +595,7 @@ bool VulkanInit()
 					LogError("Failed to find suitable compute queue type\n");
 					return false;
 				}
-				if(!foundRender)
+				if(!foundRender && !skipGLFW)
 				{
 					LogError("Failed to find suitable render queue type\n");
 					return false;

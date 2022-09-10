@@ -145,7 +145,7 @@ std::string to_string_hex(uint64_t n, bool zeropad = false, int len = 0);
 void TransportStaticInit();
 void DriverStaticInit();
 
-bool VulkanInit();
+bool VulkanInit(bool skipGLFW = false);
 void InitializeSearchPaths();
 void InitializePlugins();
 void DetectCPUFeatures();
