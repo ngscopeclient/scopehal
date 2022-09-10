@@ -124,7 +124,6 @@ void HistogramFilter::Refresh()
 
 	//Calculate bin count
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
-	cap->PrepareForCpuAccess();
 
 	//If the signal is outside our current range, extend our range
 	bool reallocate = false;
@@ -149,7 +148,6 @@ void HistogramFilter::Refresh()
 	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
 
 	//Calculate bin configuration.
-	//Clip bin size to nearest ps (this will stop being a problem when we move to fs)
 	float binsize = range / bins;
 
 	//Reallocate the histogram if we changed it
