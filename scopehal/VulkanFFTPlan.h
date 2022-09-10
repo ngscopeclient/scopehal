@@ -89,11 +89,12 @@ protected:
 	VkFFTConfiguration m_config;
 	size_t m_size;
 
-	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper object?
+	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper objects?
 	VkPhysicalDevice m_physicalDevice;
 	VkDevice m_device;
 	VkCommandPool m_pool;
 	VkQueue m_queue;
+	VkPipelineCache m_pipelineCache;
 
 	vk::raii::Fence m_fence;
 	VkFence m_rawfence;

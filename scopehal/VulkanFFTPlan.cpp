@@ -55,26 +55,6 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_config.size[1] = 1;
 	m_config.size[2] = 1;
 
-	//Extract raw handles of all of our Vulkan objects
-	m_physicalDevice = **g_vkfftPhysicalDevice;
-	m_device = **g_vkComputeDevice;
-	m_pool = **g_vkFFTCommandPool;
-	m_queue = **g_vkFFTQueue;
-	m_rawfence = *m_fence;
-
-	m_config.physicalDevice = &m_physicalDevice;
-	m_config.device = &m_device;
-	m_config.queue = &m_queue;
-	m_config.commandPool = &m_pool;
-	m_config.fence = &m_rawfence;
-	m_config.isCompilerInitialized = 1;
-	m_config.isInputFormatted = 1;
-
-	//We have "C" locale all the time internally, so no need to setlocale() in the library
-	m_config.disableSetLocale = 1;
-
-	m_config.performR2C = 1;				//real time domain / complex frequency domain points
-
 	string cacheKey;
 	if(dir == DIRECTION_FORWARD)
 	{
@@ -107,6 +87,28 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 
 		cacheKey = string("VkFFT_INV_") + to_string(npoints);
 	}
+
+	//Extract raw handles of all of our Vulkan objects
+	m_physicalDevice = **g_vkfftPhysicalDevice;
+	m_device = **g_vkComputeDevice;
+	m_pool = **g_vkFFTCommandPool;
+	m_queue = **g_vkFFTQueue;
+	m_rawfence = *m_fence;
+	m_pipelineCache = **g_pipelineCacheMgr->Lookup(cacheKey + ".spv", VkFFTGetVersion());
+
+	m_config.physicalDevice = &m_physicalDevice;
+	m_config.device = &m_device;
+	m_config.queue = &m_queue;
+	m_config.commandPool = &m_pool;
+	m_config.fence = &m_rawfence;
+	m_config.isCompilerInitialized = 1;
+	m_config.isInputFormatted = 1;
+	m_config.pipelineCache = &m_pipelineCache;
+
+	//We have "C" locale all the time internally, so no need to setlocale() in the library
+	m_config.disableSetLocale = 1;
+
+	m_config.performR2C = 1;				//real time domain / complex frequency domain points
 
 	//Load from cache
 	auto cacheBlob = g_pipelineCacheMgr->LookupRaw(cacheKey);
