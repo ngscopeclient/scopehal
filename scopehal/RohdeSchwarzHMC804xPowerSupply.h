@@ -78,7 +78,7 @@ protected:
 	int GetStatusRegister(int chan);
 
 	//Helpers for controlling stuff
-	bool SelectChannel(int chan);
+	void SelectChannel(int chan);
 
 	int m_channelCount;
 

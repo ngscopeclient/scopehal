@@ -88,11 +88,12 @@ bool RohdeSchwarzHMC804xPowerSupply::IsPowerConstantCurrent(int chan)
 
 int RohdeSchwarzHMC804xPowerSupply::GetStatusRegister(int chan)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	SelectChannel(chan);
 
 	//Get status register
-	m_transport->SendCommand("stat:ques:cond?");
-	string ret = m_transport->ReadReply();
+	auto ret = m_transport->SendCommandQueuedWithReply("stat:ques:cond?");
 	return atoi(ret.c_str());
 }
 
@@ -110,125 +111,131 @@ string RohdeSchwarzHMC804xPowerSupply::GetPowerChannelName(int chan)
 
 double RohdeSchwarzHMC804xPowerSupply::GetPowerVoltageActual(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("meas:volt?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("meas:volt?");
 	return atof(ret.c_str());
 }
 
 double RohdeSchwarzHMC804xPowerSupply::GetPowerVoltageNominal(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("volt?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("volt?");
 	return atof(ret.c_str());
 }
 
 double RohdeSchwarzHMC804xPowerSupply::GetPowerCurrentActual(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("meas:curr?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("meas:curr?");
 	return atof(ret.c_str());
 }
 
 double RohdeSchwarzHMC804xPowerSupply::GetPowerCurrentNominal(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("curr?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("curr?");
 	return atof(ret.c_str());
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::GetPowerChannelActive(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("outp?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("outp?");
 	return atoi(ret.c_str()) ? true : false;
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::IsSoftStartEnabled(int chan)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	SelectChannel(chan);
-	m_transport->SendCommand("volt:ramp?");
-	string ret = m_transport->ReadReply();
+	auto ret = m_transport->SendCommandQueuedWithReply("volt:ramp?");
 	return atoi(ret.c_str()) ? true : false;
 }
 
 void RohdeSchwarzHMC804xPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	SelectChannel(chan);
 
 	if(enable)
-		m_transport->SendCommand("fuse on");
+		m_transport->SendCommandQueued("fuse on");
 	else
-		m_transport->SendCommand("fuse off");
+		m_transport->SendCommandQueued("fuse off");
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::GetPowerOvercurrentShutdownEnabled(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("fuse:stat?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("fuse:stat?");
 	return atoi(ret.c_str()) ? true : false;
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::GetPowerOvercurrentShutdownTripped(int chan)
 {
-	SelectChannel(chan);
-	m_transport->SendCommand("fuse:trip?");
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	string ret = m_transport->ReadReply();
+	SelectChannel(chan);
+	auto ret = m_transport->SendCommandQueuedWithReply("fuse:trip?");
 	return atoi(ret.c_str()) ? true : false;
 }
 
 void RohdeSchwarzHMC804xPowerSupply::SetPowerVoltage(int chan, double volts)
 {
-	SelectChannel(chan);
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
+	SelectChannel(chan);
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "volt %.3f\n", volts);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 void RohdeSchwarzHMC804xPowerSupply::SetPowerCurrent(int chan, double amps)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	SelectChannel(chan);
 
 	char cmd[128];
 	snprintf(cmd, sizeof(cmd), "curr %.3f\n", amps);
-	m_transport->SendCommand(cmd);
+	m_transport->SendCommandQueued(cmd);
 }
 
 void RohdeSchwarzHMC804xPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
 	SelectChannel(chan);
 
 	if(on)
-		m_transport->SendCommand("outp on");
+		m_transport->SendCommandQueued("outp on");
 	else
-		m_transport->SendCommand("outp off");
+		m_transport->SendCommandQueued("outp off");
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::GetMasterPowerEnable()
 {
-	//not uspported in single channel device, return "always on"
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	//not supported in single channel device, return "always on"
 	if(m_channelCount == 1)
 		return true;
 
-	m_transport->SendCommand("outp:mast?");
-
-	string ret = m_transport->ReadReply();
+	auto ret = m_transport->SendCommandQueuedWithReply("outp:mast?");
 	return atoi(ret.c_str()) ? true : false;
-
-	return false;
 }
 
 void RohdeSchwarzHMC804xPowerSupply::SetMasterPowerEnable(bool enable)
@@ -238,32 +245,24 @@ void RohdeSchwarzHMC804xPowerSupply::SetMasterPowerEnable(bool enable)
 		return;
 
 	if(enable)
-		m_transport->SendCommand("outp:mast on");
+		m_transport->SendCommandQueued("outp:mast on");
 	else
-		m_transport->SendCommand("outp:mast off");
+		m_transport->SendCommandQueued("outp:mast off");
 }
 
-bool RohdeSchwarzHMC804xPowerSupply::SelectChannel(int chan)
+void RohdeSchwarzHMC804xPowerSupply::SelectChannel(int chan)
 {
 	//per HMC804x SCPI manual page 26, this command is neither supported nor required
 	//for the single channel device
 	if(m_channelCount == 1)
-		return true;
+		return;
 
 	//Early-out if we're already on the requested channel
 	if(m_activeChannel == chan)
-		return true;
+		return;
 
 	string cmd = "inst:nsel 1";
 	cmd[cmd.length()-1] += chan;
-	if(m_transport->SendCommand(cmd))
-	{
-		m_activeChannel = chan;
-		return true;
-	}
-	else
-	{
-		m_activeChannel = -1;
-		return false;
-	}
+	m_transport->SendCommandQueued(cmd);
+	m_activeChannel = chan;
 }
