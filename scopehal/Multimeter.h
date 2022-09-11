@@ -70,6 +70,7 @@ public:
 	//Meter operating mode
 	virtual MeasurementTypes GetMeterMode() =0;
 	virtual MeasurementTypes GetSecondaryMeterMode();
+	virtual std::string ModeToText(MeasurementTypes type);
 	virtual void SetMeterMode(MeasurementTypes type) =0;
 	virtual void SetSecondaryMeterMode(MeasurementTypes type);
 

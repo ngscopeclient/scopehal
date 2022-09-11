@@ -30,6 +30,8 @@
 #include "scopehal.h"
 #include "Multimeter.h"
 
+using namespace std;
+
 Multimeter::Multimeter()
 {
 }
@@ -79,6 +81,33 @@ Unit Multimeter::GetSecondaryMeterUnit()
 		case Multimeter::AC_RMS_AMPLITUDE:
 		default:
 			return Unit(Unit::UNIT_VOLTS);
+	}
+}
+
+/**
+	@brief Converts a meter mode to human readable text
+ */
+string Multimeter::ModeToText(MeasurementTypes type)
+{
+	switch(GetMeterMode())
+	{
+		case Multimeter::FREQUENCY:
+			return "Frequency";
+		case Multimeter::TEMPERATURE:
+			return "Temperature";
+		case Multimeter::DC_CURRENT:
+			return "DC Current";
+		case Multimeter::AC_CURRENT:
+			return "AC Current";
+		case Multimeter::DC_VOLTAGE:
+			return "DC Voltage";
+		case Multimeter::DC_RMS_AMPLITUDE:
+			return "DC RMS Amplitude";
+		case Multimeter::AC_RMS_AMPLITUDE:
+			return "AC RMS Amplitude";
+
+		default:
+			return "";
 	}
 }
 
