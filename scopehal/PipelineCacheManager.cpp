@@ -200,6 +200,9 @@ void PipelineCacheManager::LoadFromDisk()
 	auto files = Glob(prefix + "*", false);
 	for(auto f : files)
 	{
+		if(f.find(prefix) == string::npos)
+			f = prefix + f;
+
 		//Extract the key from the file name
 		auto key = f.substr(prefix.length());
 		key = key.substr(0, key.length() - shaderSuffix.length());
