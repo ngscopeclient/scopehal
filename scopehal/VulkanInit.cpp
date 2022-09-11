@@ -263,7 +263,6 @@ bool VulkanInit(bool skipGLFW)
 			//Initialize glfw
 			glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
 			glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
-			glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
 			if(!glfwInit())
 			{
 				LogError("glfw init failed\n");
