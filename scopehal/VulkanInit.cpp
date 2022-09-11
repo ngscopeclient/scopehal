@@ -164,6 +164,9 @@ vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
  */
 int AllocateVulkanComputeQueue()
 {
+#ifdef __APPLE__
+	return 0;
+#endif
 	static mutex allocMutex;
 
 	lock_guard<mutex> lock(allocMutex);
@@ -177,6 +180,9 @@ int AllocateVulkanComputeQueue()
  */
 int AllocateVulkanRenderQueue()
 {
+#ifdef __APPLE__
+	return 0;
+#endif
 	//If compute and rendering use the same kind of queue, make sure we don't double count!
 	if(g_computeQueueType == g_renderQueueType)
 		return AllocateVulkanComputeQueue();
