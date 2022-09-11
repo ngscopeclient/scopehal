@@ -136,6 +136,39 @@ configure_file(config.h.in config.h)
 
 add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
+
+if(WIN32)
+# mingw64 build using 
+# https://sdk.lunarg.com/sdk/download/1.3.224.1/windows/VulkanSDK-1.3.224.1-Installer.exe
+# https://github.com/KhronosGroup/glslang.git (tags/sdk-1.3.224.1) static lib (SPIRV* glslang OGLCompiler GenericCodeGen MachineIndependent OSDependent)
+target_link_libraries(scopehal
+	${SIGCXX_LIBRARIES}
+	${GTKMM_LIBRARIES}
+	xptools
+	log
+	graphwidget
+	${YAML_LIBRARIES}
+	${LXI_LIBRARIES}
+	${LINUXGPIB_LIBRARIES}
+	${WIN_LIBS}
+	${LIN_LIBS}
+	${LIBFFTS_LIBRARIES}
+	${OpenMP_CXX_LIBRARIES}
+	${Vulkan_LIBRARIES}
+	SPIRV
+	SPIRV-Tools-opt
+	SPIRV-Tools
+	glslang
+	Vulkan::Vulkan
+	-Wl,--start-group 
+	OGLCompiler
+	GenericCodeGen
+	MachineIndependent
+	-Wl,--end-group
+	OSDependent
+	glfw
+	)
+else()
 target_link_libraries(scopehal
 	${SIGCXX_LIBRARIES}
 	${GTKMM_LIBRARIES}
@@ -159,6 +192,7 @@ target_link_libraries(scopehal
 	OSDependent
 	glfw
 	)
+endif()
 
 target_include_directories(scopehal
 PUBLIC
