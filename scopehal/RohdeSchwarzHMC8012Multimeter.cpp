@@ -95,9 +95,25 @@ bool RohdeSchwarzHMC8012Multimeter::GetMeterAutoRange()
 
 	switch(m_mode)
 	{
+		case AC_RMS_AMPLITUDE:
+			reply = m_transport->SendCommandQueuedWithReply("SENSE:VOLT:AC:RANGE:AUTO?");
+			break;
+
+		case DC_VOLTAGE:
+			reply = m_transport->SendCommandQueuedWithReply("SENSE:VOLT:DC:RANGE:AUTO?");
+			break;
+
+		case AC_CURRENT:
+			reply = m_transport->SendCommandQueuedWithReply("SENSE:CURR:AC:RANGE:AUTO?");
+			break;
+
 		case DC_CURRENT:
 			reply = m_transport->SendCommandQueuedWithReply("SENSE:CURR:DC:RANGE:AUTO?");
 			break;
+
+		//no autoranging in temperature mode
+		case TEMPERATURE:
+			return false;
 
 		//TODO
 		default:
@@ -112,12 +128,25 @@ void RohdeSchwarzHMC8012Multimeter::SetMeterAutoRange(bool enable)
 {
 	switch(m_mode)
 	{
-		case DC_CURRENT:
-			if(enable)
-				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 1");
-			else
-				m_transport->SendCommandQueued("SENSE:CURR:DC:RANGE:AUTO 0");
+		case AC_RMS_AMPLITUDE:
+			m_transport->SendCommandQueued(string("SENSE:VOLT:AC:RANGE:AUTO ") + to_string(enable));
 			break;
+
+		case DC_VOLTAGE:
+			m_transport->SendCommandQueued(string("SENSE:VOLT:DC:RANGE:AUTO ") + to_string(enable));
+			break;
+
+		case AC_CURRENT:
+			m_transport->SendCommandQueued(string("SENSE:CURR:AC:RANGE:AUTO ") + to_string(enable));
+			break;
+
+		case DC_CURRENT:
+			m_transport->SendCommandQueued(string("SENSE:CURR:DC:RANGE:AUTO ") + to_string(enable));
+			break;
+
+		//no autoranging in temperature mode
+		case TEMPERATURE:
+			return;
 
 		default:
 			LogError("SetMeterAutoRange not implemented yet for modes other than DC_CURRENT\n");
