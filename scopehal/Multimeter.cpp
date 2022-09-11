@@ -89,7 +89,7 @@ Unit Multimeter::GetSecondaryMeterUnit()
  */
 string Multimeter::ModeToText(MeasurementTypes type)
 {
-	switch(GetMeterMode())
+	switch(type)
 	{
 		case Multimeter::FREQUENCY:
 			return "Frequency";
