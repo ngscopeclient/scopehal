@@ -163,6 +163,17 @@ bool RohdeSchwarzHMC804xPowerSupply::IsSoftStartEnabled(int chan)
 	return atoi(ret.c_str()) ? true : false;
 }
 
+void RohdeSchwarzHMC804xPowerSupply::SetSoftStartEnabled(int chan, bool enable)
+{
+	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
+
+	SelectChannel(chan);
+	if(enable)
+		m_transport->SendCommandQueued("volt:ramp on");
+	else
+		m_transport->SendCommandQueued("volt:ramp off");
+}
+
 void RohdeSchwarzHMC804xPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());

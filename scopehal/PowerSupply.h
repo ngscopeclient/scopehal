@@ -66,6 +66,7 @@ public:
 
 	//Soft start
 	virtual bool IsSoftStartEnabled(int chan) =0;
+	virtual void SetSoftStartEnabled(int chan, bool enable) =0;
 };
 
 #endif

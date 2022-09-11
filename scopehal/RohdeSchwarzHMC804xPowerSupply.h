@@ -73,6 +73,7 @@ public:
 	virtual void SetMasterPowerEnable(bool enable);
 
 	virtual bool IsSoftStartEnabled(int chan);
+	virtual void SetSoftStartEnabled(int chan, bool enable);
 
 protected:
 	int GetStatusRegister(int chan);
