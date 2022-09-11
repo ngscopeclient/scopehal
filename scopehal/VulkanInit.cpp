@@ -288,7 +288,7 @@ bool VulkanInit(bool skipGLFW)
 
 		//Required for MoltenVK
 		#ifdef __APPLE__
-		extensionsToUse.push(back("VK_KHR_portability_enumeration");
+		extensionsToUse.push_back("VK_KHR_portability_enumeration");
 		#endif
 
 		//See what extensions are required
@@ -311,7 +311,7 @@ bool VulkanInit(bool skipGLFW)
 		}
 
 		//Create the instance
-		vk::InstanceCreateInfo instanceInfo({}, &appInfo, {}, extensionsToUse);
+		vk::InstanceCreateInfo instanceInfo(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, {}, extensionsToUse);
 		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
 
 		//Look at our physical devices and print info out for each one
