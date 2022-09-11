@@ -201,7 +201,7 @@ void PipelineCacheManager::LoadFromDisk()
 	for(auto f : files)
 	{
 		if(f.find(prefix) == string::npos)
-			f = prefix + f;
+			f = m_cacheRootDir + f;
 
 		//Extract the key from the file name
 		auto key = f.substr(prefix.length());
