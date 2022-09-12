@@ -90,6 +90,8 @@ public:
 		SHAPE_ARB
 	};
 
+	std::string GetNameOfShape(WaveShape shape);
+
 	//Channel info
 	virtual int GetFunctionChannelCount() =0;
 	virtual std::string GetFunctionChannelName(int chan) =0;
