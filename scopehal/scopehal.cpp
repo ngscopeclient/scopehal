@@ -583,7 +583,7 @@ string GetDirOfCurrentExecutable()
 		LogError("Error: PathRemoveFileSpec() failed.\n");
 	else
 		return binPath;
-#elifdef __APPLE__
+#elif defined(__APPLE__)
 	char binDir[1024] = {0};
 	uint32_t size = sizeof(binDir) - 1;
 	if (_NSGetExecutablePath(binDir, &size) != 0) {
