@@ -215,7 +215,7 @@ void WFMImportFilter::OnFileNameChanged()
 		LogDebug("Dataset type:         Normal\n");
 	else
 	{
-		LogError("Unrecognized dataset type\n");
+		LogError("Unrecognized dataset type %d\n", datasetType);
 		fclose(fp);
 		return;
 	}
