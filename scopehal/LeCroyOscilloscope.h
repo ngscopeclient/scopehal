@@ -157,9 +157,10 @@ public:
 	virtual FunctionGenerator::WaveShape GetFunctionChannelShape(int chan);
 	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
 	virtual float GetFunctionChannelRiseTime(int chan);
-	virtual void SetFunctionChannelRiseTime(int chan, float sec);
+	virtual void SetFunctionChannelRiseTime(int chan, float fs);
 	virtual float GetFunctionChannelFallTime(int chan);
-	virtual void SetFunctionChannelFallTime(int chan, float sec);
+	virtual void SetFunctionChannelFallTime(int chan, float fs);
+	virtual bool HasFunctionRiseFallTimeControls(int chan);
 	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
 	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 

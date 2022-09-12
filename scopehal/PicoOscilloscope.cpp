@@ -1514,25 +1514,9 @@ void PicoOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
 	}
 }
 
-float PicoOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+bool PicoOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 {
-	//not supported
-	return 0;
-}
-
-void PicoOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
-{
-	//not supported
-}
-
-float PicoOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
-{
-	//not supported
-	return 0;
-}
-
-void PicoOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
-{
+	return false;
 }
 
 FunctionGenerator::OutputImpedance PicoOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)

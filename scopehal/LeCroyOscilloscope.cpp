@@ -2003,45 +2003,44 @@ void LeCroyOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 
 float LeCroyOscilloscope::GetFunctionChannelDutyCycle(int /*chan*/)
 {
-	//app.wavesource.dutycycle
-	LogWarning("LeCroyOscilloscope::GetFunctionChannelDutyCycle unimplemented\n");
-	return false;
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.WaveSource.DutyCycle'");
+	return stof(str);
 }
 
 void LeCroyOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float /*duty*/)
 {
 	//app.wavesource.dutycycle
+	LogWarning("LeCroyOscilloscope::SetFunctionChannelDutyCycle unimplemented\n");
 }
 
 float LeCroyOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
 {
-	//app.wavesource.amplitude
-	LogWarning("LeCroyOscilloscope::GetFunctionChannelAmplitude unimplemented\n");
-	return 0;
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.WaveSource.Amplitude'");
+	return stof(str);
 }
 
 void LeCroyOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float /*amplitude*/)
 {
 	//app.wavesource.amplitude
+	LogWarning("LeCroyOscilloscope::SetFunctionChannelAmplitude unimplemented\n");
 }
 
 float LeCroyOscilloscope::GetFunctionChannelOffset(int /*chan*/)
 {
-	//app.wavesource.offset
-	LogWarning("LeCroyOscilloscope::GetFunctionChannelOffset unimplemented\n");
-	return 0;
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.WaveSource.Offset'");
+	return stof(str);
 }
 
 void LeCroyOscilloscope::SetFunctionChannelOffset(int /*chan*/, float /*offset*/)
 {
 	//app.wavesource.offset
+	LogWarning("LeCroyOscilloscope::SetFunctionChannelOffset unimplemented\n");
 }
 
 float LeCroyOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
 {
-	//app.wavesource.frequency
-	LogWarning("LeCroyOscilloscope::GetFunctionChannelFrequency unimplemented\n");
-	return 0;
+	auto str = m_transport->SendCommandQueuedWithReply("VBS? 'return = app.WaveSource.Frequency'");
+	return stof(str);
 }
 
 void LeCroyOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
@@ -2062,6 +2061,12 @@ FunctionGenerator::WaveShape LeCroyOscilloscope::GetFunctionChannelShape(int /*c
 void LeCroyOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape /*shape*/)
 {
 	//app.wavesource.shape
+	LogWarning("LeCroyOscilloscope::SetFunctionChannelShape unimplemented\n");
+}
+
+bool LeCroyOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
+{
+	return true;
 }
 
 float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
@@ -2071,10 +2076,10 @@ float LeCroyOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
 	return 0;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float sec)
+void LeCroyOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float fs)
 {
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", sec);
+	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.risetime = %f'", fs * SECONDS_PER_FS);
 	m_transport->SendCommandQueued(tmp);
 }
 
@@ -2085,10 +2090,10 @@ float LeCroyOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
 	return 0;
 }
 
-void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float sec)
+void LeCroyOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float fs)
 {
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", sec);
+	snprintf(tmp, sizeof(tmp), "VBS 'app.wavesource.falltime = %f'", fs * SECONDS_PER_FS);
 	m_transport->SendCommandQueued(tmp);
 }
 

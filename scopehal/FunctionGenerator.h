@@ -115,11 +115,19 @@ public:
 	virtual WaveShape GetFunctionChannelShape(int chan) =0;
 	virtual void SetFunctionChannelShape(int chan, WaveShape shape) =0;
 
-	virtual float GetFunctionChannelRiseTime(int chan) =0;
-	virtual void SetFunctionChannelRiseTime(int chan, float sec) =0;
+	virtual float GetFunctionChannelRiseTime(int chan);
+	virtual void SetFunctionChannelRiseTime(int chan, float fs);
 
-	virtual float GetFunctionChannelFallTime(int chan) =0;
-	virtual void SetFunctionChannelFallTime(int chan, float sec) =0;
+	virtual float GetFunctionChannelFallTime(int chan);
+	virtual void SetFunctionChannelFallTime(int chan, float fs);
+
+	/**
+		@brief Determines if the function generator allows control over rise/fall times
+
+		If this function returns false, GetFunctionChannelRiseTime() and GetFunctionChannelFallTime()
+		will always return 0, and SetFunctionChannelRiseTime() and SetFunctionChannelFallTime() are no-ops.
+	 */
+	virtual bool HasFunctionRiseFallTimeControls(int chan) =0;
 
 	enum OutputImpedance
 	{

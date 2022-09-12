@@ -3793,25 +3793,9 @@ void TektronixOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shap
 	}
 }
 
-float TektronixOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+bool TektronixOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 {
-	//not supported
-	return 0;
-}
-
-void TektronixOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
-{
-	//not supported
-}
-
-float TektronixOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
-{
-	//not supported
-	return 0;
-}
-
-void TektronixOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
-{
+	return false;
 }
 
 FunctionGenerator::OutputImpedance TektronixOscilloscope::GetFunctionChannelOutputImpedance(int /*chan*/)

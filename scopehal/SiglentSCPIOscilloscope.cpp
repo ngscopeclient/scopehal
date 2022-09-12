@@ -4917,26 +4917,9 @@ void SiglentSCPIOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerato
 	m_awgShape[chan] = shape;
 }
 
-float SiglentSCPIOscilloscope::GetFunctionChannelRiseTime(int /*chan*/)
+bool SiglentSCPIOscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 {
-	//not supported
-	return 0;
-}
-
-void SiglentSCPIOscilloscope::SetFunctionChannelRiseTime(int /*chan*/, float /*sec*/)
-{
-	//not supported
-}
-
-float SiglentSCPIOscilloscope::GetFunctionChannelFallTime(int /*chan*/)
-{
-	//not supported
-	return 0;
-}
-
-void SiglentSCPIOscilloscope::SetFunctionChannelFallTime(int /*chan*/, float /*sec*/)
-{
-	//not supported
+	return false;
 }
 
 FunctionGenerator::OutputImpedance SiglentSCPIOscilloscope::GetFunctionChannelOutputImpedance(int chan)

@@ -190,3 +190,21 @@ string FunctionGenerator::GetNameOfShape(WaveShape shape)
 			return "Unknown";
 	}
 }
+
+float FunctionGenerator::GetFunctionChannelRiseTime(int /*chan*/)
+{
+	return 0;
+}
+
+void FunctionGenerator::SetFunctionChannelRiseTime(int /*chan*/, float /*fs*/)
+{
+}
+
+float FunctionGenerator::GetFunctionChannelFallTime(int /*chan*/)
+{
+	return 0;
+}
+
+void FunctionGenerator::SetFunctionChannelFallTime(int /*chan*/, float /*fs*/)
+{
+}
