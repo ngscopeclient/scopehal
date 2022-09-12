@@ -165,6 +165,9 @@ vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 int AllocateVulkanComputeQueue()
 {
 #ifdef __APPLE__
+	LogWarning(
+		"AllocateVulkanComputeQueue needs to be fixed on Apple, returning 0 for now. "
+		"See https://github.com/glscopeclient/scopehal/issues/685\n");
 	return 0;
 #endif
 	static mutex allocMutex;
@@ -181,6 +184,9 @@ int AllocateVulkanComputeQueue()
 int AllocateVulkanRenderQueue()
 {
 #ifdef __APPLE__
+	LogWarning(
+		"AllocateVulkanRenderQueue needs to be fixed on Apple, returning 0 for now. "
+		"See https://github.com/glscopeclient/scopehal/issues/685\n");
 	return 0;
 #endif
 	//If compute and rendering use the same kind of queue, make sure we don't double count!
