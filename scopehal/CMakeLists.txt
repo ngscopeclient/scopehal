@@ -3,6 +3,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
 find_library(LINUXGPIB_LIB gpib)
+find_package(glfw3 REQUIRED)
 
 
 # Additional Windows/Linux libraries
@@ -183,13 +184,9 @@ target_link_libraries(scopehal
 	${LIBFFTS_LIBRARIES}
 	${OpenMP_CXX_LIBRARIES}
 	${Vulkan_LIBRARIES}
-	SPIRV
-	glslang
 	Vulkan::Vulkan
-	OGLCompiler
-	GenericCodeGen
-	MachineIndependent
-	OSDependent
+	Vulkan::glslang
+	Vulkan::shaderc_combined
 	glfw
 	)
 endif()
@@ -202,7 +199,9 @@ PUBLIC
 	${YAML_INCLUDES}
 
 	# TODO: this needs to come from FindPackage etc
-	/usr/include/glslang/Include/
+	/usr/include/glslang/Include
+	# for macOS:
+	/usr/local/include/glslang/Include
 	)
 
 target_include_directories(scopehal

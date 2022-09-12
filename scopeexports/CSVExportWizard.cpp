@@ -304,7 +304,7 @@ void CSVExportWizard::on_apply()
 
 	//Write data
 	//TODO: lots of redundant casting, this can probably be optimized!
-	int64_t lastTimestamp = LONG_LONG_MIN;
+	int64_t lastTimestamp = INT64_MIN;
 	auto timebaseSparse = dynamic_cast<SparseWaveformBase*>(timebaseWaveform);
 	auto timebaseUniform = dynamic_cast<UniformWaveformBase*>(timebaseWaveform);
 	auto timebaseSparseAnalog = dynamic_cast<SparseAnalogWaveform*>(timebaseWaveform);

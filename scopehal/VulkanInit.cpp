@@ -164,6 +164,9 @@ vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
  */
 int AllocateVulkanComputeQueue()
 {
+#ifdef __APPLE__
+	return 0;
+#endif
 	static mutex allocMutex;
 
 	lock_guard<mutex> lock(allocMutex);
@@ -177,6 +180,9 @@ int AllocateVulkanComputeQueue()
  */
 int AllocateVulkanRenderQueue()
 {
+#ifdef __APPLE__
+	return 0;
+#endif
 	//If compute and rendering use the same kind of queue, make sure we don't double count!
 	if(g_computeQueueType == g_renderQueueType)
 		return AllocateVulkanComputeQueue();
@@ -257,7 +263,6 @@ bool VulkanInit(bool skipGLFW)
 			//Initialize glfw
 			glfwInitHint(GLFW_JOYSTICK_HAT_BUTTONS, GLFW_FALSE);
 			glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
-			glfwInitHint(GLFW_COCOA_MENUBAR, GLFW_FALSE);
 			if(!glfwInit())
 			{
 				LogError("glfw init failed\n");
@@ -288,7 +293,7 @@ bool VulkanInit(bool skipGLFW)
 
 		//Required for MoltenVK
 		#ifdef __APPLE__
-		extensionsToUse.push(back("VK_KHR_portability_enumeration");
+		extensionsToUse.push_back("VK_KHR_portability_enumeration");
 		#endif
 
 		//See what extensions are required
@@ -311,7 +316,7 @@ bool VulkanInit(bool skipGLFW)
 		}
 
 		//Create the instance
-		vk::InstanceCreateInfo instanceInfo({}, &appInfo, {}, extensionsToUse);
+		vk::InstanceCreateInfo instanceInfo(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, {}, extensionsToUse);
 		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
 
 		//Look at our physical devices and print info out for each one

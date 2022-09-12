@@ -89,6 +89,10 @@ bool g_hasAvx2 = false;
 bool g_hasFMA = false;
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 ///@brief True if filters can use GPU acceleration
 bool g_gpuFilterEnabled = false;
 
@@ -249,17 +253,14 @@ void InitializePlugins()
 	search_dirs.push_back("/usr/local/lib/scopehal/plugins/");
 
 	//current binary dir
-	char selfPath[1024] = "";
-	ssize_t readlinkReturn = readlink("/proc/self/exe", selfPath, (sizeof(selfPath) - 1) );
-	if ( readlinkReturn > 0)
+	string binDir = GetDirOfCurrentExecutable();
+	if ( !binDir.empty() )
 	{
-		string dir = dirname(selfPath);
-
 		//If the binary directory is under /usr, do *not* search it!
 		//We're probably in /usr/bin and we really do not want to be dlopen-ing every single thing in there.
 		//See https://github.com/azonenberg/scopehal-apps/issues/393
-		if(dir.find("/usr") != 0)
-			search_dirs.push_back(dir);
+		if(binDir.find("/usr") != 0)
+			search_dirs.push_back(binDir);
 	}
 
 	//Home directory
@@ -582,6 +583,15 @@ string GetDirOfCurrentExecutable()
 		LogError("Error: PathRemoveFileSpec() failed.\n");
 	else
 		return binPath;
+#elifdef __APPLE__
+	char binDir[1024] = {0};
+	uint32_t size = sizeof(binDir) - 1;
+	if (_NSGetExecutablePath(binDir, &size) != 0) {
+		// Buffer size is too small.
+		LogError("Error: _NSGetExecutablePath() returned a path larger than our buffer.\n");
+		return "";
+	}
+	return dirname(binDir);
 #else
 	char binDir[1024] = {0};
 	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
@@ -616,16 +626,10 @@ void InitializeSearchPaths()
 		binRootDir = dirname(binPath);
 	}
 #else
-	char binDir[1024] = {0};
-	ssize_t readlinkReturn = readlink("/proc/self/exe", binDir, (sizeof(binDir) - 1) );
-	if ( readlinkReturn <= 0 )
-		LogError("Error: readlink() failed.\n");
-	else if ( (unsigned) readlinkReturn > (sizeof(binDir) - 1) )
-		LogError("Error: readlink() returned a path larger than our buffer.\n");
-	else
+	binRootDir = GetDirOfCurrentExecutable();
+	if( !binRootDir.empty() )
 	{
-		g_searchPaths.push_back(dirname(binDir));
-		binRootDir = dirname(binDir);
+		g_searchPaths.push_back(binRootDir);
 	}
 #endif
 
