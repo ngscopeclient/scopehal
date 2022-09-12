@@ -51,7 +51,7 @@ class CDRNRZPatternTrigger;
 class LeCroyOscilloscope
 	: public virtual SCPIOscilloscope
 	, public virtual SCPIMultimeter
-	, public FunctionGenerator
+	, public virtual SCPIFunctionGenerator
 {
 public:
 	LeCroyOscilloscope(SCPITransport* transport);

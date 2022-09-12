@@ -59,7 +59,7 @@ class WindowTrigger;
  */
 class TektronixOscilloscope
 	: public virtual SCPIOscilloscope
-	, public FunctionGenerator
+	, public virtual SCPIFunctionGenerator
 	, public virtual SCPIMultimeter
 {
 public:

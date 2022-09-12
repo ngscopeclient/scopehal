@@ -37,8 +37,8 @@ class EdgeTrigger;
 /**
 	@brief PicoOscilloscope - driver for talking to the scopehal-pico-bridge daemons
  */
-class PicoOscilloscope 	: public RemoteBridgeOscilloscope
-						, public FunctionGenerator
+class PicoOscilloscope 	: public virtual RemoteBridgeOscilloscope
+						, public virtual SCPIFunctionGenerator
 {
 public:
 	PicoOscilloscope(SCPITransport* transport);

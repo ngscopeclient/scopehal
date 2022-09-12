@@ -104,6 +104,7 @@ extern bool g_hasAvx2;
 #include "PowerSupply.h"
 #include "RFSignalGenerator.h"
 #include "SCPIInstrument.h"
+#include "SCPIFunctionGenerator.h"
 #include "SCPIMultimeter.h"
 #include "SCPIOscilloscope.h"
 #include "SCPIRFSignalGenerator.h"

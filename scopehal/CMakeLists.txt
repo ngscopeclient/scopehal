@@ -88,6 +88,7 @@ set(SCOPEHAL_SOURCES
 	OscilloscopeChannel.cpp
 	PowerSupply.cpp
 	RFSignalGenerator.cpp
+	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
 	SCPIMultimeter.cpp
 	SCPIOscilloscope.cpp
@@ -139,7 +140,7 @@ add_library(scopehal SHARED
 	${SCOPEHAL_SOURCES})
 
 if(WIN32)
-# mingw64 build using 
+# mingw64 build using
 # https://sdk.lunarg.com/sdk/download/1.3.224.1/windows/VulkanSDK-1.3.224.1-Installer.exe
 # https://github.com/KhronosGroup/glslang.git (tags/sdk-1.3.224.1) static lib (SPIRV* glslang OGLCompiler GenericCodeGen MachineIndependent OSDependent)
 target_link_libraries(scopehal
@@ -161,7 +162,7 @@ target_link_libraries(scopehal
 	SPIRV-Tools
 	glslang
 	Vulkan::Vulkan
-	-Wl,--start-group 
+	-Wl,--start-group
 	OGLCompiler
 	GenericCodeGen
 	MachineIndependent
