@@ -41,3 +41,56 @@ RFSignalGenerator::RFSignalGenerator()
 RFSignalGenerator::~RFSignalGenerator()
 {
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Placeholder implementations for optional features not all instruments may have
+
+float RFSignalGenerator::GetSweepStartFrequency(int /*chan*/)
+{
+	return 0;
+}
+
+float RFSignalGenerator::GetSweepStopFrequency(int /*chan*/)
+{
+	return 0;
+}
+
+void RFSignalGenerator::SetSweepStartFrequency(int /*chan*/, float /*freq*/)
+{
+	//no-op in base class
+}
+
+void RFSignalGenerator::SetSweepStopFrequency(int /*chan*/, float /*freq*/)
+{
+	//no-op in base class
+}
+
+float RFSignalGenerator::GetSweepStartLevel(int /*chan*/)
+{
+	return 0;
+}
+
+float RFSignalGenerator::GetSweepStopLevel(int /*chan*/)
+{
+	return 0;
+}
+
+void RFSignalGenerator::SetSweepStartLevel(int /*chan*/, float /*level*/)
+{
+	//no-op in base class
+}
+
+void RFSignalGenerator::SetSweepStopLevel(int /*chan*/, float /*level*/)
+{
+	//no-op in base class
+}
+
+float RFSignalGenerator::GetSweepDwellTime(int /*chan*/)
+{
+	return 0;
+}
+
+void RFSignalGenerator::SetSweepDwellTime(int /*chan*/, float /*fs*/)
+{
+	//no-op in base class
+}

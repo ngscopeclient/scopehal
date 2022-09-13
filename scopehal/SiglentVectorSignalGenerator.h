@@ -47,7 +47,7 @@ public:
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
 
-	//Vector signal generator
+	//RF signal generator base stuff
 	virtual int GetChannelCount();
 	virtual std::string GetChannelName(int chan);
 	virtual bool GetChannelOutputEnable(int chan);
@@ -56,7 +56,22 @@ public:
 	virtual void SetChannelOutputPower(int chan, float power);
 	virtual float GetChannelCenterFrequency(int chan);
 	virtual void SetChannelCenterFrequency(int chan, float freq);
+
+	//Vector modulation
 	virtual bool IsVectorModulationAvailable(int chan);
+
+	//Sweep
+	virtual bool IsSweepAvailable(int chan);
+	virtual float GetSweepStartFrequency(int chan);
+	virtual float GetSweepStopFrequency(int chan);
+	virtual void SetSweepStartFrequency(int chan, float freq);
+	virtual void SetSweepStopFrequency(int chan, float freq);
+	virtual float GetSweepStartLevel(int chan);
+	virtual float GetSweepStopLevel(int chan);
+	virtual void SetSweepStartLevel(int chan, float level);
+	virtual void SetSweepStopLevel(int chan, float level);
+	virtual void SetSweepDwellTime(int chan, float fs);
+	virtual float GetSweepDwellTime(int chan);
 
 public:
 	static std::string GetDriverNameInternal();

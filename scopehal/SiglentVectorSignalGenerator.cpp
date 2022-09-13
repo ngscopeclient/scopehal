@@ -40,7 +40,6 @@ SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transp
 	, SCPIInstrument(transport)
 {
 	//TODO: query options to figure out what we actually have
-	//m_transport->SendCommand("*OPT?");
 }
 
 SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()
@@ -90,27 +89,25 @@ string SiglentVectorSignalGenerator::GetSerial()
 
 bool SiglentVectorSignalGenerator::GetChannelOutputEnable(int /*chan*/)
 {
-	m_transport->SendCommand("OUTP?");
-	return (stoi(m_transport->ReadReply()) == 1);
+	return (stoi(m_transport->SendCommandQueuedWithReply("OUTP?")) == 1);
 }
 
 void SiglentVectorSignalGenerator::SetChannelOutputEnable(int /*chan*/, bool on)
 {
 	if(on)
-		m_transport->SendCommand("OUTP ON");
+		m_transport->SendCommandQueued("OUTP ON");
 	else
-		m_transport->SendCommand("OUTP OFF");
+		m_transport->SendCommandQueued("OUTP OFF");
 }
 
 float SiglentVectorSignalGenerator::GetChannelOutputPower(int /*chan*/)
 {
-	m_transport->SendCommand("SOUR:POW?");
-	return stof(m_transport->ReadReply());
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:POW?"));
 }
 
 void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float power)
 {
-	m_transport->SendCommand(string("SOUR:POW ") + to_string(power));
+	m_transport->SendCommandQueued(string("SOUR:POW ") + to_string(power));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,20 +115,79 @@ void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float pow
 
 float SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
 {
-	m_transport->SendCommand("SOUR:FREQ?");
-	return stof(m_transport->ReadReply());
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:FREQ?"));
 }
 
 void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float freq)
 {
-	m_transport->SendCommand(string("SOUR:FREQ ") + to_string(freq));
+	m_transport->SendCommandQueued(string("SOUR:FREQ ") + to_string(freq));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vector modulation
 
-bool SiglentVectorSignalGenerator::IsVectorModulationAvailable(int chan)
+bool SiglentVectorSignalGenerator::IsVectorModulationAvailable(int /*chan*/)
 {
-	//TODO
+	if(m_model.find("-V") != string::npos)
+		return true;
+	else
+		return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Sweeping
+
+bool SiglentVectorSignalGenerator::IsSweepAvailable(int /*chan*/)
+{
 	return true;
+}
+
+float SiglentVectorSignalGenerator::GetSweepStartFrequency(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:STAR:FREQ?"));
+}
+
+float SiglentVectorSignalGenerator::GetSweepStopFrequency(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:STOP:FREQ?"));
+}
+
+void SiglentVectorSignalGenerator::SetSweepStartFrequency(int /*chan*/, float freq)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:STAR:FREQ ") + to_string(freq));
+}
+
+void SiglentVectorSignalGenerator::SetSweepStopFrequency(int /*chan*/, float freq)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:STOP:FREQ ") + to_string(freq));
+}
+
+float SiglentVectorSignalGenerator::GetSweepStartLevel(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:STAR:LEV?"));
+}
+
+float SiglentVectorSignalGenerator::GetSweepStopLevel(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:STOP:LEV?"));
+}
+
+void SiglentVectorSignalGenerator::SetSweepStartLevel(int /*chan*/, float level)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:STAR:LEV ") + to_string(level));
+}
+
+void SiglentVectorSignalGenerator::SetSweepStopLevel(int /*chan*/, float level)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:STOP:LEV ") + to_string(level));
+}
+
+void SiglentVectorSignalGenerator::SetSweepDwellTime(int /*chan*/, float fs)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:DWEL ") + to_string(fs * SECONDS_PER_FS));
+}
+
+float SiglentVectorSignalGenerator::GetSweepDwellTime(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:DWEL?")) * FS_PER_SECOND;
 }

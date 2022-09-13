@@ -109,7 +109,85 @@ public:
 	 */
 	virtual bool IsVectorModulationAvailable(int chan) =0;
 
-	//TODO: Modulation
+	/**
+		@brief Checks if an instrument supports sweeping the center frequency
+	 */
+	virtual bool IsSweepAvailable(int chan) =0;
+
+	/**
+		@brief Gets the start of a frequency sweep, in Hz
+
+		@param chan		Zero-based channel index
+	 */
+	virtual float GetSweepStartFrequency(int chan);
+
+	/**
+		@brief Gets the end of a frequency sweep, in Hz
+
+		@param chan		Zero-based channel index
+	 */
+	virtual float GetSweepStopFrequency(int chan);
+
+	/**
+		@brief Sets the start of a frequency sweep
+
+		@param chan		Zero-based channel index
+		@param freq		Start frequency, in Hz
+	 */
+	virtual void SetSweepStartFrequency(int chan, float freq);
+
+	/**
+		@brief Sets the stop of a frequency sweep
+
+		@param chan		Zero-based channel index
+		@param freq		Stop frequency, in Hz
+	 */
+	virtual void SetSweepStopFrequency(int chan, float freq);
+
+	/**
+		@brief Gets the start of a power sweep, in dBm
+
+		@param chan		Zero-based channel index
+	 */
+	virtual float GetSweepStartLevel(int chan);
+
+	/**
+		@brief Gets the end of a power sweep, in dBm
+
+		@param chan		Zero-based channel index
+	 */
+	virtual float GetSweepStopLevel(int chan);
+
+	/**
+		@brief Sets the start of a power sweep
+
+		@param chan		Zero-based channel index
+		@param level	Start power, in dBm
+	 */
+	virtual void SetSweepStartLevel(int chan, float level);
+
+	/**
+		@brief Sets the stop of a power sweep
+
+		@param chan		Zero-based channel index
+		@param level	Stop power, in dBm
+	 */
+	virtual void SetSweepStopLevel(int chan, float level);
+
+	/**
+		@brief Sets the dwell time for each step in a sweep
+
+		@param chan		Zero-based channel index
+		@param step		Step, in femtoseconds
+	 */
+	virtual void SetSweepDwellTime(int chan, float fs);
+
+	/**
+		@brief Gets the dwell time for each step in a sweep, in femtoseconds
+
+		@param chan		Zero-based channel index
+	 */
+	virtual float GetSweepDwellTime(int chan);
 };
 
 #endif
