@@ -56,6 +56,7 @@ public:
 	virtual void SetChannelOutputPower(int chan, float power);
 	virtual float GetChannelCenterFrequency(int chan);
 	virtual void SetChannelCenterFrequency(int chan, float freq);
+	virtual bool IsVectorModulationAvailable(int chan);
 
 public:
 	static std::string GetDriverNameInternal();

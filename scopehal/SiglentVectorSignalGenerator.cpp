@@ -126,3 +126,12 @@ void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float
 {
 	m_transport->SendCommand(string("SOUR:FREQ ") + to_string(freq));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Vector modulation
+
+bool SiglentVectorSignalGenerator::IsVectorModulationAvailable(int chan)
+{
+	//TODO
+	return true;
+}

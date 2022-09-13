@@ -102,6 +102,13 @@ public:
 	 */
 	virtual void SetChannelCenterFrequency(int chan, float freq) =0;
 
+	/**
+		@brief Checks if an instrument is vector modulation capable
+
+		@param chan		Zero-based channel index
+	 */
+	virtual bool IsVectorModulationAvailable(int chan) =0;
+
 	//TODO: Modulation
 };
 
