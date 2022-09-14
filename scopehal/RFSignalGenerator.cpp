@@ -94,3 +94,52 @@ void RFSignalGenerator::SetSweepDwellTime(int /*chan*/, float /*fs*/)
 {
 	//no-op in base class
 }
+
+void RFSignalGenerator::SetSweepPoints(int /*chan*/, int /*npoints*/)
+{
+}
+
+int RFSignalGenerator::GetSweepPoints(int /*chan*/)
+{
+	return 0;
+}
+
+RFSignalGenerator::SweepShape RFSignalGenerator::GetSweepShape(int /*chan*/)
+{
+	return SWEEP_SHAPE_TRIANGLE;
+}
+
+void RFSignalGenerator::SetSweepShape(int /*chan*/, SweepShape /*shape*/)
+{
+	//no-op in base class
+}
+
+RFSignalGenerator::SweepSpacing RFSignalGenerator::GetSweepSpacing(int /*chan*/)
+{
+	return SWEEP_SPACING_LINEAR;
+}
+
+void RFSignalGenerator::SetSweepSpacing(int /*chan*/, SweepSpacing /*shape*/)
+{
+	//no-op in base class
+}
+
+RFSignalGenerator::SweepDirection RFSignalGenerator::GetSweepDirection(int /*chan*/)
+{
+	return SWEEP_DIR_FWD;
+}
+
+void RFSignalGenerator::SetSweepDirection(int /*chan*/, SweepDirection /*dir*/)
+{
+	//no-op in base class
+}
+
+RFSignalGenerator::SweepType RFSignalGenerator::GetSweepType(int /*chan*/)
+{
+	return SWEEP_TYPE_NONE;
+}
+
+void RFSignalGenerator::SetSweepType(int /*chan*/, SweepType /*type*/)
+{
+	//no-op in base class
+}

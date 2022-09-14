@@ -102,6 +102,7 @@ void SiglentVectorSignalGenerator::SetChannelOutputEnable(int /*chan*/, bool on)
 
 float SiglentVectorSignalGenerator::GetChannelOutputPower(int /*chan*/)
 {
+	//FIXME: this does not return actual current value if sweeping
 	return stof(m_transport->SendCommandQueuedWithReply("SOUR:POW?"));
 }
 
@@ -120,6 +121,7 @@ float SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
 
 void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float freq)
 {
+	//FIXME: this does not return actual current value if sweeping
 	m_transport->SendCommandQueued(string("SOUR:FREQ ") + to_string(freq));
 }
 
@@ -190,4 +192,132 @@ void SiglentVectorSignalGenerator::SetSweepDwellTime(int /*chan*/, float fs)
 float SiglentVectorSignalGenerator::GetSweepDwellTime(int /*chan*/)
 {
 	return stof(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:DWEL?")) * FS_PER_SECOND;
+}
+
+void SiglentVectorSignalGenerator::SetSweepPoints(int /*chan*/, int npoints)
+{
+	m_transport->SendCommandQueued(string("SOUR:SWE:STEP:POIN ") + to_string(npoints));
+}
+
+int SiglentVectorSignalGenerator::GetSweepPoints(int /*chan*/)
+{
+	return stoi(m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:POIN?"));
+}
+
+RFSignalGenerator::SweepShape SiglentVectorSignalGenerator::GetSweepShape(int /*chan*/)
+{
+	auto shape = m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:SHAP?");
+	if(shape.find("SAW") == 0)
+		return SWEEP_SHAPE_SAWTOOTH;
+	else
+		return SWEEP_SHAPE_TRIANGLE;
+}
+
+void SiglentVectorSignalGenerator::SetSweepShape(int /*chan*/, SweepShape shape)
+{
+	switch(shape)
+	{
+		case SWEEP_SHAPE_SAWTOOTH:
+			//Error in SSG5000X programming guide: short form of "sawtooth" is documented as "SAWtooth".
+			//The actual value accepted by firmware is SAWTooth.
+			m_transport->SendCommandQueued("SOUR:SWE:STEP:SHAP SAWT");
+			break;
+
+		case SWEEP_SHAPE_TRIANGLE:
+			m_transport->SendCommandQueued("SOUR:SWE:STEP:SHAP TRI");
+			break;
+
+		default:
+			break;
+	}
+}
+
+RFSignalGenerator::SweepSpacing SiglentVectorSignalGenerator::GetSweepSpacing(int /*chan*/)
+{
+	auto shape = m_transport->SendCommandQueuedWithReply("SOUR:SWE:STEP:SPAC?");
+	if(shape.find("LIN") == 0)
+		return SWEEP_SPACING_LINEAR;
+	else
+		return SWEEP_SPACING_LOG;
+}
+
+void SiglentVectorSignalGenerator::SetSweepSpacing(int /*chan*/, SweepSpacing shape)
+{
+	switch(shape)
+	{
+		case SWEEP_SPACING_LINEAR:
+			m_transport->SendCommandQueued("SOUR:SWE:STEP:SPAC LIN");
+			break;
+
+		case SWEEP_SPACING_LOG:
+			m_transport->SendCommandQueued("SOUR:SWE:STEP:SPAC LOG");
+			break;
+
+		default:
+			break;
+	}
+}
+
+RFSignalGenerator::SweepDirection SiglentVectorSignalGenerator::GetSweepDirection(int /*chan*/)
+{
+	auto dir = m_transport->SendCommandQueuedWithReply("SOUR:SWE:DIR?");
+	if(dir.find("FWD") == 0)
+		return SWEEP_DIR_FWD;
+	else
+		return SWEEP_DIR_REV;
+}
+
+void SiglentVectorSignalGenerator::SetSweepDirection(int /*chan*/, SweepDirection dir)
+{
+	switch(dir)
+	{
+		case SWEEP_DIR_FWD:
+			m_transport->SendCommandQueued("SOUR:SWE:DIR FWD");
+			break;
+
+		case SWEEP_DIR_REV:
+			m_transport->SendCommandQueued("SOUR:SWE:DIR REV");
+			break;
+
+		default:
+			break;
+	}
+}
+
+RFSignalGenerator::SweepType SiglentVectorSignalGenerator::GetSweepType(int /*chan*/)
+{
+	auto shape = m_transport->SendCommandQueuedWithReply("SOUR:SWE:STAT?");
+	if(shape.find("FREQ") == 0)
+		return SWEEP_TYPE_FREQ;
+	else if(shape.find("LEV_FREQ") == 0)
+		return SWEEP_TYPE_FREQ_LEVEL;
+	else if(shape.find("LEV") == 0)
+		return SWEEP_TYPE_LEVEL;
+	else
+		return SWEEP_TYPE_NONE;
+}
+
+void SiglentVectorSignalGenerator::SetSweepType(int /*chan*/, SweepType type)
+{
+	switch(type)
+	{
+		case SWEEP_TYPE_NONE:
+			m_transport->SendCommandQueued("SOUR:SWE:STAT OFF");
+			break;
+
+		case SWEEP_TYPE_FREQ:
+			m_transport->SendCommandQueued("SOUR:SWE:STAT FREQ");
+			break;
+
+		case SWEEP_TYPE_LEVEL:
+			m_transport->SendCommandQueued("SOUR:SWE:STAT LEV");
+			break;
+
+		case SWEEP_TYPE_FREQ_LEVEL:
+			m_transport->SendCommandQueued("SOUR:SWE:STAT LEV_FREQ");
+			break;
+
+		default:
+			break;
+	}
 }

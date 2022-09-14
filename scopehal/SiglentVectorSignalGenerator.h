@@ -72,6 +72,16 @@ public:
 	virtual void SetSweepStopLevel(int chan, float level);
 	virtual void SetSweepDwellTime(int chan, float fs);
 	virtual float GetSweepDwellTime(int chan);
+	virtual void SetSweepPoints(int chan, int npoints);
+	virtual int GetSweepPoints(int chan);
+	virtual SweepShape GetSweepShape(int chan);
+	virtual void SetSweepShape(int chan, SweepShape shape);
+	virtual SweepSpacing GetSweepSpacing(int chan);
+	virtual void SetSweepSpacing(int chan, SweepSpacing shape);
+	virtual SweepDirection GetSweepDirection(int chan);
+	virtual void SetSweepDirection(int chan, SweepDirection dir);
+	virtual SweepType GetSweepType(int chan);
+	virtual void SetSweepType(int chan, SweepType type);
 
 public:
 	static std::string GetDriverNameInternal();

@@ -39,6 +39,9 @@ public:
 	RFSignalGenerator();
 	virtual ~RFSignalGenerator();
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// General
+
 	/**
 		@brief Returns the number of output channels on the generator
 	 */
@@ -102,6 +105,9 @@ public:
 	 */
 	virtual void SetChannelCenterFrequency(int chan, float freq) =0;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Vector modulation
+
 	/**
 		@brief Checks if an instrument is vector modulation capable
 
@@ -109,10 +115,36 @@ public:
 	 */
 	virtual bool IsVectorModulationAvailable(int chan) =0;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Sweeps
+
 	/**
 		@brief Checks if an instrument supports sweeping the center frequency
 	 */
 	virtual bool IsSweepAvailable(int chan) =0;
+
+	enum SweepType
+	{
+		SWEEP_TYPE_NONE,
+		SWEEP_TYPE_FREQ,
+		SWEEP_TYPE_LEVEL,
+		SWEEP_TYPE_FREQ_LEVEL
+	};
+
+	/**
+		@brief Gets the type of a sweep
+
+		@param chan		Zero-based channel index
+	 */
+	virtual SweepType GetSweepType(int chan);
+
+	/**
+		@brief Sets the type of a sweep
+
+		@param chan		Zero-based channel index
+		@param type		Sweep type
+	 */
+	virtual void SetSweepType(int chan, SweepType type);
 
 	/**
 		@brief Gets the start of a frequency sweep, in Hz
@@ -188,6 +220,87 @@ public:
 		@param chan		Zero-based channel index
 	 */
 	virtual float GetSweepDwellTime(int chan);
+
+	/**
+		@brief Sets the number of frequency points in a sweep
+
+		@param chan		Zero-based channel index
+		@param npoints	Number of points
+	 */
+	virtual void SetSweepPoints(int chan, int npoints);
+
+	/**
+		@brief Gets the number of frequency points in a sweep
+
+		@param chan		Zero-based channel index
+	 */
+	virtual int GetSweepPoints(int chan);
+
+	enum SweepShape
+	{
+		//Ramp up and down
+		SWEEP_SHAPE_TRIANGLE,
+
+		//Ramp up, then jump down
+		SWEEP_SHAPE_SAWTOOTH
+	};
+
+	/**
+		@brief Gets the shape of a sweep
+
+		@param chan		Zero-based channel index
+	 */
+	virtual SweepShape GetSweepShape(int chan);
+
+	/**
+		@brief Sets the shape of a sweep
+
+		@param chan		Zero-based channel index
+		@param shape	Shape of the sweep curve to use
+	 */
+	virtual void SetSweepShape(int chan, SweepShape shape);
+
+	enum SweepSpacing
+	{
+		SWEEP_SPACING_LINEAR,
+		SWEEP_SPACING_LOG
+	};
+
+	/**
+		@brief Gets the spacing of a sweep (log or linear)
+
+		@param chan		Zero-based channel index
+	 */
+	virtual SweepSpacing GetSweepSpacing(int chan);
+
+	/**
+		@brief Sets the spacing of a sweep (log or linear)
+
+		@param chan		Zero-based channel index
+		@param shape	Spacing of the sweep curve to use
+	 */
+	virtual void SetSweepSpacing(int chan, SweepSpacing shape);
+
+	enum SweepDirection
+	{
+		SWEEP_DIR_FWD,
+		SWEEP_DIR_REV
+	};
+
+	/**
+		@brief Gets the direction of a sweep
+
+		@param chan		Zero-based channel index
+	 */
+	virtual SweepDirection GetSweepDirection(int chan);
+
+	/**
+		@brief Sets the direction of a sweep
+
+		@param chan		Zero-based channel index
+		@param dir	Direction of the sweep curve to use
+	 */
+	virtual void SetSweepDirection(int chan, SweepDirection dir);
 };
 
 #endif
