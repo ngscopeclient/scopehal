@@ -103,6 +103,8 @@ void SiglentVectorSignalGenerator::SetChannelOutputEnable(int /*chan*/, bool on)
 float SiglentVectorSignalGenerator::GetChannelOutputPower(int /*chan*/)
 {
 	//FIXME: this does not return actual current value if sweeping
+	//We will be able to use SWE:CURR:LEV in a future firmware (not yet released)
+
 	return stof(m_transport->SendCommandQueuedWithReply("SOUR:POW?"));
 }
 
@@ -122,6 +124,8 @@ float SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
 void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float freq)
 {
 	//FIXME: this does not return actual current value if sweeping
+	//We will be able to use SWE:CURR:FREQ in a future firmware (not yet released)
+
 	m_transport->SendCommandQueued(string("SOUR:FREQ ") + to_string(freq));
 }
 
