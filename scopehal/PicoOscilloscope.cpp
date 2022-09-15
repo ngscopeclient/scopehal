@@ -178,6 +178,10 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
 		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_NEVER);
 	}
+
+	//Default to enabling all analog channels
+	for(size_t i=0; i<m_analogChannelCount; i++)
+		EnableChannel(i);
 }
 
 /**
