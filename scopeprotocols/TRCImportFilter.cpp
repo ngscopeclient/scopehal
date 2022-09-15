@@ -93,7 +93,7 @@ void TRCImportFilter::OnFileNameChanged()
 	LogTrace("Loading TRC waveform %s\n", fname.c_str());
 	LogIndenter li;
 
-	FILE* fp = fopen(fname.c_str(), "r");
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
 		LogError("Couldn't open TRC file \"%s\"\n", fname.c_str());
