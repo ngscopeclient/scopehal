@@ -70,7 +70,7 @@ void WFMImportFilter::OnFileNameChanged()
 	int64_t fs = 0;
 	GetTimestampOfFile(fname, timestamp, fs);
 
-	FILE* fp = fopen(fname.c_str(), "r");
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp)
 	{
 		LogError("Couldn't open WFM file \"%s\"\n", fname.c_str());
