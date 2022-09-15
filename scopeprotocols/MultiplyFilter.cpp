@@ -111,7 +111,7 @@ void MultiplyFilter::Refresh()
 	else if(ua && ub)
 	{
 		//Set up the output waveform
-		auto cap = SetupEmptyUniformAnalogOutputWaveform(sa, 0);
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(ua, 0);
 		cap->Resize(len);
 		cap->PrepareForCpuAccess();
 
