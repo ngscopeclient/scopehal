@@ -72,34 +72,9 @@ string I2CDecoder::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void I2CDecoder::Refresh()
+template<class T, class U>
+void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
 {
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Get the input data
-	auto sda = GetInputWaveform(0);
-	auto scl = GetInputWaveform(1);
-	sda->PrepareForCpuAccess();
-	scl->PrepareForCpuAccess();
-
-	auto usda = dynamic_cast<UniformDigitalWaveform*>(sda);
-	auto uscl = dynamic_cast<UniformDigitalWaveform*>(scl);
-
-	auto ssda = dynamic_cast<SparseDigitalWaveform*>(sda);
-	auto sscl = dynamic_cast<SparseDigitalWaveform*>(scl);
-
-	//Create the capture
-	auto cap = new I2CWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = sda->m_startTimestamp;
-	cap->m_startFemtoseconds = sda->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
-	cap->PrepareForCpuAccess();
-
 	//Loop over the data and look for transactions
 	bool				last_scl = true;
 	bool 				last_sda = true;
@@ -116,8 +91,8 @@ void I2CDecoder::Refresh()
 
 	while(true)
 	{
-		bool cur_sda = GetValue(ssda, usda, isda);
-		bool cur_scl = GetValue(sscl, uscl, iscl);
+		bool cur_sda = sda->m_samples[isda];
+		bool cur_scl = scl->m_samples[iscl];
 
 		//SDA falling with SCL high is beginning of a start condition
 		if(!cur_sda && last_sda && cur_scl)
@@ -214,15 +189,53 @@ void I2CDecoder::Refresh()
 		last_scl = cur_scl;
 
 		//Move on
-		int64_t next_sda = GetNextEventTimestampScaled(ssda, usda, isda, sdalen, timestamp);
-		int64_t next_scl = GetNextEventTimestampScaled(sscl, uscl, iscl, scllen, timestamp);
+		int64_t next_sda = Filter::GetNextEventTimestampScaled(sda, isda, sdalen, timestamp);
+		int64_t next_scl = Filter::GetNextEventTimestampScaled(scl, iscl, scllen, timestamp);
 		int64_t next_timestamp = min(next_sda, next_scl);
 		if(next_timestamp == timestamp)
 			break;
 		timestamp = next_timestamp;
-		AdvanceToTimestampScaled(ssda, usda, isda, sdalen, timestamp);
-		AdvanceToTimestampScaled(sscl, uscl, iscl, scllen, timestamp);
+		Filter::AdvanceToTimestampScaled(sda, isda, sdalen, timestamp);
+		Filter::AdvanceToTimestampScaled(scl, iscl, scllen, timestamp);
 	}
+}
+
+void I2CDecoder::Refresh()
+{
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Get the input data
+	auto sda = GetInputWaveform(0);
+	auto scl = GetInputWaveform(1);
+	sda->PrepareForCpuAccess();
+	scl->PrepareForCpuAccess();
+
+	auto usda = dynamic_cast<UniformDigitalWaveform*>(sda);
+	auto uscl = dynamic_cast<UniformDigitalWaveform*>(scl);
+
+	auto ssda = dynamic_cast<SparseDigitalWaveform*>(sda);
+	auto sscl = dynamic_cast<SparseDigitalWaveform*>(scl);
+
+	//Create the capture
+	auto cap = new I2CWaveform;
+	cap->m_timescale = 1;
+	cap->m_startTimestamp = sda->m_startTimestamp;
+	cap->m_startFemtoseconds = sda->m_startFemtoseconds;
+	cap->m_triggerPhase = 0;
+	cap->PrepareForCpuAccess();
+
+	if(usda && uscl)
+		I2CDecoderInnerLoop(usda, uscl, cap);
+	else if(usda && sscl)
+		I2CDecoderInnerLoop(usda, sscl, cap);
+	else if(ssda && sscl)
+		I2CDecoderInnerLoop(ssda, sscl, cap);
+	else /*if(ssda && uscl)*/
+		I2CDecoderInnerLoop(ssda, uscl, cap);
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
