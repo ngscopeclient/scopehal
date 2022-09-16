@@ -120,7 +120,7 @@ void BurstWidthMeasurement::Refresh()
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
-    //Add an edge at the extreme end to detect end condition
+	//Add an edge at the extreme end to detect end condition
 	edges.push_back(0xFFFFFFFFFFFFFFFF);
 
 	size_t elen = edges.size();
