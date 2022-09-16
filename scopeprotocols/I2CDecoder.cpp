@@ -219,6 +219,7 @@ void I2CDecoder::Refresh()
 		int64_t next_timestamp = min(next_sda, next_scl);
 		if(next_timestamp == timestamp)
 			break;
+		timestamp = next_timestamp;
 		AdvanceToTimestampScaled(ssda, usda, isda, sdalen, timestamp);
 		AdvanceToTimestampScaled(sscl, uscl, iscl, scllen, timestamp);
 	}
