@@ -35,7 +35,9 @@
 
 	Tested on SSG5000X-V series. May also support 3000X but not tested.
  */
-class SiglentVectorSignalGenerator : public virtual SCPIRFSignalGenerator
+class SiglentVectorSignalGenerator
+	: public virtual SCPIRFSignalGenerator
+	, public virtual SCPIFunctionGenerator
 {
 public:
 	SiglentVectorSignalGenerator(SCPITransport* transport);
@@ -82,6 +84,24 @@ public:
 	virtual void SetSweepDirection(int chan, SweepDirection dir);
 	virtual SweepType GetSweepType(int chan);
 	virtual void SetSweepType(int chan, SweepType type);
+
+	//Function generator
+	virtual int GetFunctionChannelCount();
+	virtual std::string GetFunctionChannelName(int chan);
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+	virtual bool HasFunctionDutyCycleControls(int chan);
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+	virtual bool HasFunctionRiseFallTimeControls(int chan);
+	virtual bool HasFunctionImpedanceControls(int chan);
 
 public:
 	static std::string GetDriverNameInternal();

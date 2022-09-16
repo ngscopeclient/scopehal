@@ -208,3 +208,31 @@ float FunctionGenerator::GetFunctionChannelFallTime(int /*chan*/)
 void FunctionGenerator::SetFunctionChannelFallTime(int /*chan*/, float /*fs*/)
 {
 }
+
+bool FunctionGenerator::HasFunctionDutyCycleControls(int /*chan*/)
+{
+	return true;
+}
+
+float FunctionGenerator::GetFunctionChannelDutyCycle(int /*chan*/)
+{
+	return 0.5;
+}
+
+void FunctionGenerator::SetFunctionChannelDutyCycle(int /*chan*/, float /*duty*/)
+{
+}
+
+bool FunctionGenerator::HasFunctionImpedanceControls(int /*chan*/)
+{
+	return true;
+}
+
+FunctionGenerator::OutputImpedance FunctionGenerator::GetFunctionChannelOutputImpedance(int /*chan*/)
+{
+	return IMPEDANCE_50_OHM;
+}
+
+void FunctionGenerator::SetFunctionChannelOutputImpedance(int /*chan*/, OutputImpedance /*z*/)
+{
+}

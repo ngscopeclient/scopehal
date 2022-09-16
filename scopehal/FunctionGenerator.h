@@ -100,8 +100,16 @@ public:
 	virtual bool GetFunctionChannelActive(int chan) =0;
 	virtual void SetFunctionChannelActive(int chan, bool on) =0;
 
-	virtual float GetFunctionChannelDutyCycle(int chan) =0;
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty) =0;
+	/**
+		@brief Determines if the function generator allows control over rise/fall times
+
+		If this function returns false, GetFunctionChannelDutyCycle() will always return 0.5,
+		and SetFunctionChannelRiseTime() and SetFunctionChannelDutyCycle() is a no-op.
+	 */
+	virtual bool HasFunctionDutyCycleControls(int chan);
+
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
 
 	virtual float GetFunctionChannelAmplitude(int chan) =0;
 	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) =0;
@@ -135,8 +143,16 @@ public:
 		IMPEDANCE_50_OHM
 	};
 
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) =0;
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) =0;
+	/**
+		@brief Determines if the function generator allows control over rise/fall times
+
+		If this function returns false, GetFunctionChannelOutputImpedance() will always return IMPEDANCE_50_OHM
+		and SetFunctionChannelOutputImpedance() is a no-op.
+	 */
+	virtual bool HasFunctionImpedanceControls(int chan);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
 
 	//Query the set of available pre-defined waveforms for this generator
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) =0;

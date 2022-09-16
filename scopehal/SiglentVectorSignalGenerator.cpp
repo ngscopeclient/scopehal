@@ -66,7 +66,7 @@ string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)
 
 unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes()
 {
-	return INST_RF_GEN;
+	return INST_RF_GEN | INST_FUNCTION;
 }
 
 string SiglentVectorSignalGenerator::GetName()
@@ -325,3 +325,133 @@ void SiglentVectorSignalGenerator::SetSweepType(int /*chan*/, SweepType type)
 			break;
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function generator
+
+int SiglentVectorSignalGenerator::GetFunctionChannelCount()
+{
+	return 1;
+}
+
+string SiglentVectorSignalGenerator::GetFunctionChannelName(int /*chan*/)
+{
+	return "LFO";
+}
+
+vector<FunctionGenerator::WaveShape> SiglentVectorSignalGenerator::GetAvailableWaveformShapes(int /*chan*/)
+{
+	vector<WaveShape> shapes;
+	shapes.push_back(FunctionGenerator::SHAPE_SINE);
+	shapes.push_back(FunctionGenerator::SHAPE_SQUARE);
+	shapes.push_back(FunctionGenerator::SHAPE_TRIANGLE);
+	shapes.push_back(FunctionGenerator::SHAPE_SAWTOOTH_UP);
+	shapes.push_back(FunctionGenerator::SHAPE_DC);
+	return shapes;
+}
+
+bool SiglentVectorSignalGenerator::GetFunctionChannelActive(int /*chan*/)
+{
+	return (stoi(m_transport->SendCommandQueuedWithReply("SOUR:LFO?")) == 1);
+}
+
+void SiglentVectorSignalGenerator::SetFunctionChannelActive(int /*chan*/, bool on)
+{
+	if(on)
+		m_transport->SendCommandQueued("SOUR:LFO ON");
+	else
+		m_transport->SendCommandQueued("SOUR:LFO OFF");
+}
+
+bool SiglentVectorSignalGenerator::HasFunctionDutyCycleControls(int /*chan*/)
+{
+	return false;
+}
+
+float SiglentVectorSignalGenerator::GetFunctionChannelAmplitude(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:LFO:VOLT?"));
+}
+
+void SiglentVectorSignalGenerator::SetFunctionChannelAmplitude(int /*chan*/, float amplitude)
+{
+	m_transport->SendCommandQueued(string("SOUR:LFO:VOLT ") + to_string(amplitude));
+}
+
+float SiglentVectorSignalGenerator::GetFunctionChannelOffset(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:LFO:OFFSE?"));
+}
+
+void SiglentVectorSignalGenerator::SetFunctionChannelOffset(int /*chan*/, float offset)
+{
+	m_transport->SendCommandQueued(string("SOUR:LFO:OFFSE ") + to_string(offset));
+}
+
+float SiglentVectorSignalGenerator::GetFunctionChannelFrequency(int /*chan*/)
+{
+	return stof(m_transport->SendCommandQueuedWithReply("SOUR:LFO:FREQ?"));
+}
+
+void SiglentVectorSignalGenerator::SetFunctionChannelFrequency(int /*chan*/, float hz)
+{
+	m_transport->SendCommandQueued(string("SOUR:LFO:FREQ ") + to_string(hz));
+}
+
+FunctionGenerator::WaveShape SiglentVectorSignalGenerator::GetFunctionChannelShape(int /*chan*/)
+{
+	auto shape = m_transport->SendCommandQueuedWithReply("SOUR:LFO:SHAP?");
+
+	if(shape.find("SINE") == 0)
+		return FunctionGenerator::SHAPE_SINE;
+	else if(shape.find("SQU") == 0)
+		return FunctionGenerator::SHAPE_SQUARE;
+	else if(shape.find("TRI") == 0)
+		return FunctionGenerator::SHAPE_TRIANGLE;
+	else if(shape.find("SAWT") == 0)
+		return FunctionGenerator::SHAPE_SAWTOOTH_UP;
+	else// if(shape.find("SHAPE_DC") == 0)
+		return FunctionGenerator::SHAPE_DC;
+}
+
+void SiglentVectorSignalGenerator::SetFunctionChannelShape(int /*chan*/, WaveShape shape)
+{
+	switch(shape)
+	{
+		case FunctionGenerator::SHAPE_SINE:
+			m_transport->SendCommandQueued("SOUR:LFO:SHAP SINE");
+			break;
+
+		case FunctionGenerator::SHAPE_SQUARE:
+			m_transport->SendCommandQueued("SOUR:LFO:SHAP SQU");
+			break;
+
+		case FunctionGenerator::SHAPE_TRIANGLE:
+			m_transport->SendCommandQueued("SOUR:LFO:SHAP TRI");
+			break;
+
+		case FunctionGenerator::SHAPE_SAWTOOTH_UP:
+			m_transport->SendCommandQueued("SOUR:LFO:SHAP SAWT");
+			break;
+
+		case FunctionGenerator::SHAPE_DC:
+			m_transport->SendCommandQueued("SOUR:LFO:SHAP DC");
+			break;
+
+		default:
+			break;
+	}
+}
+
+bool SiglentVectorSignalGenerator::HasFunctionRiseFallTimeControls(int /*chan*/)
+{
+	return false;
+}
+
+bool SiglentVectorSignalGenerator::HasFunctionImpedanceControls(int /*chan*/)
+{
+	return false;
+}
+
+//TODO: LFO phase
+//TODO: LFO sweep
