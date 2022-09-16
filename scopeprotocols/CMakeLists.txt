@@ -7,6 +7,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
 	BINImportFilter.cpp
+	BurstWidthMeasurement.cpp
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
 	ClockRecoveryFilter.cpp
