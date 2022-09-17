@@ -322,7 +322,11 @@ bool VulkanInit(bool skipGLFW)
 		}
 
 		//Create the instance
-		vk::InstanceCreateInfo instanceInfo(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, {}, extensionsToUse);
+		vk::InstanceCreateFlags flags = {};
+		#ifdef __APPLE__
+		flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+		#endif
+		vk::InstanceCreateInfo instanceInfo(flags, &appInfo, {}, extensionsToUse);
 		g_vkInstance = make_unique<vk::raii::Instance>(g_vkContext, instanceInfo);
 
 		//Look at our physical devices and print info out for each one
