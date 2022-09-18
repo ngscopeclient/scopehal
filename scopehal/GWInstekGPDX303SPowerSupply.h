@@ -53,6 +53,12 @@ class GWInstekGPDX303SPowerSupply
 
 	virtual unsigned int GetInstrumentTypes();
 
+    //Device capabilities
+	virtual bool SupportsSoftStart();
+	virtual bool SupportsIndividualOutputSwitching();
+	virtual bool SupportsMasterOutputSwitching();
+	virtual bool SupportsOvercurrentShutdown();
+
 	//Channel info
 	virtual int GetPowerChannelCount();
 	virtual std::string GetPowerChannelName(int chan);

@@ -54,6 +54,29 @@ unsigned int GWInstekGPDX303SPowerSupply::GetInstrumentTypes()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Device capabilities
+
+bool GWInstekGPDX303SPowerSupply::SupportsSoftStart()
+{
+	return false;
+}
+
+bool GWInstekGPDX303SPowerSupply::SupportsIndividualOutputSwitching()
+{
+	return false;
+}
+
+bool GWInstekGPDX303SPowerSupply::SupportsMasterOutputSwitching()
+{
+	return true;
+}
+
+bool GWInstekGPDX303SPowerSupply::SupportsOvercurrentShutdown()
+{
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual hardware interfacing
 
 bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)

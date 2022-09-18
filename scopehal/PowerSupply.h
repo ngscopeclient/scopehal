@@ -43,6 +43,39 @@ public:
 	virtual int GetPowerChannelCount() =0;
 	virtual std::string GetPowerChannelName(int chan) =0;
 
+	//Device capabilities
+	/**
+		@brief Determines if the power supply supports soft start
+
+		If this function returns false, IsSoftStartEnabled() will always return false,
+		and SetSoftStartEnabled() is a no-op.
+	 */
+	virtual bool SupportsSoftStart() =0;
+
+	/**
+		@brief Determines if the power supply supports switching individual output channels
+
+		If this function returns false, GetPowerChannelActive() will always return true,
+		and SetPowerChannelActive() is a no-op.
+	 */
+	virtual bool SupportsIndividualOutputSwitching() =0;
+
+	/**
+		@brief Determines if the power supply supports ganged master switching of all outputs
+
+		If this function returns false, GetMasterPowerEnable() will always return true,
+		and SetMasterPowerEnable() is a no-op.
+	 */
+	virtual bool SupportsMasterOutputSwitching() =0;
+
+	/**
+		@brief Determines if the power supply supports shutdown rather than constant-current mode on overcurrent
+
+		If this function returns false, GetPowerOvercurrentShutdownEnabled() and GetPowerOvercurrentShutdownTripped() will always return false,
+		and SetPowerOvercurrentShutdownEnabled() is a no-op.
+	 */
+	virtual bool SupportsOvercurrentShutdown() =0;
+
 	//Read sensors
 	virtual double GetPowerVoltageActual(int chan) =0;				//actual voltage after current limiting
 	virtual double GetPowerVoltageNominal(int chan) =0;				//set point
