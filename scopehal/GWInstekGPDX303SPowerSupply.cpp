@@ -1,3 +1,4 @@
+#include <bitset>
 #include "scopehal.h"
 #include "GWInstekGPDX303SPowerSupply.h"
 
@@ -81,29 +82,31 @@ bool GWInstekGPDX303SPowerSupply::SupportsOvercurrentShutdown()
 
 bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)
 {
-	int reg = GetStatusRegister();
+	auto reg = GetStatusRegister();
 	if (chan >= 2) {
 		// TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S, STATUS? is only documented for two channels in the user manual.
 		LogError("Error: CC/CV status encoding unknown for 3/4 channel scopes.\n");
 	}
-	return (reg & (1 << (7 - chan)));
+	return !reg[7 - chan];
 }
 
-uint8_t GWInstekGPDX303SPowerSupply::GetStatusRegister()
+bitset<8> GWInstekGPDX303SPowerSupply::GetStatusRegister()
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	//Get status register
 	auto ret = m_transport->SendCommandQueuedWithReply("STATUS?");
-	// 8 bits in the following format, 0 being most-significant bit:
+	// 8 ASCII 0/1 characters representing bits in the following format, index 0 being most-significant bit:
 	// Bit    Item     Description
-	// 0      CH1      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
-	// 1      CH2      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
+	// 0      CH1      0=CC mode, 1=CV mode
+	// 1      CH2      0=CC mode, 1=CV mode
 	// 2, 3   Tracking 01=Independent, 11=Tracking series, 10=Tracking parallel
 	// 4      Beep     0=Off, 1=On
 	// 5      Output   0=Off, 1=On
 	// 6, 7   Baud     00=115200bps, 01=57600bps, 10=9600bps
-	return atoi(ret.c_str());
+
+	// Remove trailing newline from status reply and parse as bitset
+	return bitset<8>(ret.substr(0, 8));
 }
 
 int GWInstekGPDX303SPowerSupply::GetPowerChannelCount()
@@ -232,8 +235,8 @@ bool GWInstekGPDX303SPowerSupply::GetMasterPowerEnable()
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-	int reg = GetStatusRegister();
-	return (reg & (1 << (7 - 5)));
+	auto reg = GetStatusRegister();
+	return reg[7-5];
 }
 
 void GWInstekGPDX303SPowerSupply::SetMasterPowerEnable(bool enable)

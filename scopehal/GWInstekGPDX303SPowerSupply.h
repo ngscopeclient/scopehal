@@ -34,6 +34,7 @@
 #include "SCPIPowerSupply.h"
 #include "SCPITransport.h"
 
+#include <bitset>
 #include <string>
 
 /**
@@ -87,7 +88,7 @@ class GWInstekGPDX303SPowerSupply
 	virtual void SetSoftStartEnabled(int chan, bool enable);
 
 protected:
-	uint8_t GetStatusRegister();
+	std::bitset<8> GetStatusRegister();
 
 	int m_channelCount;
 
