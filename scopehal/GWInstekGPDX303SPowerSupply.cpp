@@ -86,7 +86,7 @@ bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)
         // TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S, STATUS? is only documented for two channels in the user manual.
         LogError("Error: CC/CV status encoding unknown for 3/4 channel scopes.\n");
     }
-	return !(reg & (1 << chan));
+	return (reg & (1 << (7 - chan)));
 }
 
 uint8_t GWInstekGPDX303SPowerSupply::GetStatusRegister()
@@ -95,10 +95,10 @@ uint8_t GWInstekGPDX303SPowerSupply::GetStatusRegister()
 
 	//Get status register
 	auto ret = m_transport->SendCommandQueuedWithReply("STATUS?");
-    // 8 bits in the following format:
+    // 8 bits in the following format, 0 being most-significant bit:
     // Bit    Item     Description
-    // 0      CH1      0=CC mode, 1=CV mode
-    // 1      CH2      0=CC mode, 1=CV mode
+    // 0      CH1      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
+    // 1      CH2      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
     // 2, 3   Tracking 01=Independent, 11=Tracking series, 10=Tracking parallel
     // 4      Beep     0=Off, 1=On
     // 5      Output   0=Off, 1=On
@@ -199,7 +199,7 @@ void GWInstekGPDX303SPowerSupply::SetPowerVoltage(int chan, double volts)
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan, volts);
+	snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan+1, volts);
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -208,7 +208,7 @@ void GWInstekGPDX303SPowerSupply::SetPowerCurrent(int chan, double amps)
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan, amps);
+	snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan+1, amps);
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -223,7 +223,7 @@ bool GWInstekGPDX303SPowerSupply::GetMasterPowerEnable()
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	int reg = GetStatusRegister();
-	return (reg & (1 << 5));
+	return (reg & (1 << (7 - 5)));
 }
 
 void GWInstekGPDX303SPowerSupply::SetMasterPowerEnable(bool enable)
