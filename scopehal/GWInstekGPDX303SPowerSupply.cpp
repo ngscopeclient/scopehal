@@ -199,7 +199,12 @@ void GWInstekGPDX303SPowerSupply::SetPowerVoltage(int chan, double volts)
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan+1, volts);
+	if(!m_model.empty() && m_model.back() == 'D') {
+		// The GPD-3303D only claims to support 100mV voltage granularity
+		snprintf(cmd, sizeof(cmd), "VSET%u:%.1f", chan+1, volts);
+	} else {
+		snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan+1, volts);
+	}
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -208,7 +213,12 @@ void GWInstekGPDX303SPowerSupply::SetPowerCurrent(int chan, double amps)
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan+1, amps);
+	if(!m_model.empty() && m_model.back() == 'D') {
+		// The GPD-3303D only claims to support 10mA current granularity
+		snprintf(cmd, sizeof(cmd), "ISET%u:%.2f", chan+1, amps);
+	} else {
+		snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan+1, amps);
+	}
 	m_transport->SendCommandQueued(cmd);
 }
 
