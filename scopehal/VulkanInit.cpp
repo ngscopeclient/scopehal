@@ -144,6 +144,11 @@ uint8_t g_vkComputeDeviceUuid[16];
  */
 uint32_t g_vkComputeDeviceDriverVer;
 
+/**
+	@brief Physical device for g_vkComputeDevice
+ */
+vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
+
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 //Feature flags indicating that we have support for specific data types / features on the GPU
@@ -153,11 +158,6 @@ bool g_hasShaderInt8 = false;
 bool g_hasDebugUtils = false;
 
 void VulkanCleanup();
-
-/**
-	@brief vkFFT is weird and needs to hold onto the *physical* device...
- */
-vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 
 /**
 	@brief Allocates a queue index for Vulkan compute queues
@@ -533,7 +533,7 @@ bool VulkanInit(bool skipGLFW)
 			int renderQueueCount = 1;
 			{
 				auto device = devices[bestDevice];
-				g_vkfftPhysicalDevice = &devices[bestDevice];
+				g_vkComputePhysicalDevice = &devices[bestDevice];
 
 				LogIndenter li3;
 

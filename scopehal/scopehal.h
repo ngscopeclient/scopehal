@@ -181,6 +181,7 @@ extern uint32_t g_computeQueueType;
 extern uint32_t g_renderQueueType;
 extern uint8_t g_vkComputeDeviceUuid[16];
 extern uint32_t g_vkComputeDeviceDriverVer;
+extern vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
 
 void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 int AllocateVulkanComputeQueue();

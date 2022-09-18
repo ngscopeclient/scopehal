@@ -89,7 +89,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	}
 
 	//Extract raw handles of all of our Vulkan objects
-	m_physicalDevice = **g_vkfftPhysicalDevice;
+	m_physicalDevice = **g_vkComputePhysicalDevice;
 	m_device = **g_vkComputeDevice;
 	m_pool = **g_vkFFTCommandPool;
 	m_queue = **g_vkFFTQueue;

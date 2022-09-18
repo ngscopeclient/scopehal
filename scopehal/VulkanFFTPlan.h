@@ -53,7 +53,6 @@ extern std::unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
 extern std::unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
 extern std::unique_ptr<vk::raii::Queue> g_vkFFTQueue;
 extern std::mutex g_vkFFTMutex;
-extern vk::raii::PhysicalDevice* g_vkfftPhysicalDevice;
 
 /**
 	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
