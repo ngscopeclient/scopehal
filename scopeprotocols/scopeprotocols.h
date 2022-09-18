@@ -44,6 +44,7 @@
 #include "AutocorrelationFilter.h"
 #include "BaseMeasurement.h"
 #include "BINImportFilter.h"
+#include "BurstWidthMeasurement.h"
 #include "CANDecoder.h"
 #include "ChannelEmulationFilter.h"
 #include "ClockRecoveryFilter.h"

@@ -45,6 +45,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(BaseMeasurement);
 	AddDecoderClass(BINImportFilter);
+	AddDecoderClass(BurstWidthMeasurement);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
 	AddDecoderClass(ClockRecoveryFilter);
