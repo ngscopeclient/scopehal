@@ -10,13 +10,13 @@ GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transpor
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
-    auto modelNumber = atoi(m_model.c_str() + strlen("GPD-"));
+	auto modelNumber = atoi(m_model.c_str() + strlen("GPD-"));
 	// The GPD-3303S/D models have three channels, but only two are programmable and visible via SCPI
-    if (modelNumber == 3303) {
-        m_channelCount = 2;
-    } else {
-        m_channelCount = modelNumber/1000;
-    }
+	if (modelNumber == 3303) {
+		m_channelCount = 2;
+	} else {
+		m_channelCount = modelNumber/1000;
+	}
 }
 
 GWInstekGPDX303SPowerSupply::~GWInstekGPDX303SPowerSupply()
@@ -73,7 +73,7 @@ bool GWInstekGPDX303SPowerSupply::SupportsMasterOutputSwitching()
 
 bool GWInstekGPDX303SPowerSupply::SupportsOvercurrentShutdown()
 {
-    return false;
+	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,10 +82,10 @@ bool GWInstekGPDX303SPowerSupply::SupportsOvercurrentShutdown()
 bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)
 {
 	int reg = GetStatusRegister();
-    if (chan >= 2) {
-        // TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S, STATUS? is only documented for two channels in the user manual.
-        LogError("Error: CC/CV status encoding unknown for 3/4 channel scopes.\n");
-    }
+	if (chan >= 2) {
+		// TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S, STATUS? is only documented for two channels in the user manual.
+		LogError("Error: CC/CV status encoding unknown for 3/4 channel scopes.\n");
+	}
 	return (reg & (1 << (7 - chan)));
 }
 
@@ -95,14 +95,14 @@ uint8_t GWInstekGPDX303SPowerSupply::GetStatusRegister()
 
 	//Get status register
 	auto ret = m_transport->SendCommandQueuedWithReply("STATUS?");
-    // 8 bits in the following format, 0 being most-significant bit:
-    // Bit    Item     Description
-    // 0      CH1      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
-    // 1      CH2      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
-    // 2, 3   Tracking 01=Independent, 11=Tracking series, 10=Tracking parallel
-    // 4      Beep     0=Off, 1=On
-    // 5      Output   0=Off, 1=On
-    // 6, 7   Baud     00=115200bps, 01=57600bps, 10=9600bps
+	// 8 bits in the following format, 0 being most-significant bit:
+	// Bit    Item     Description
+	// 0      CH1      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
+	// 1      CH2      1=CC mode, 0=CV mode (note: manual specifies CC/CV statuses backwards)
+	// 2, 3   Tracking 01=Independent, 11=Tracking series, 10=Tracking parallel
+	// 4      Beep     0=Off, 1=On
+	// 5      Output   0=Off, 1=On
+	// 6, 7   Baud     00=115200bps, 01=57600bps, 10=9600bps
 	return atoi(ret.c_str());
 }
 
@@ -122,8 +122,8 @@ double GWInstekGPDX303SPowerSupply::GetPowerVoltageActual(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-    char tmpCmd[] = "VOUT1?";
-    tmpCmd[4] += chan;
+	char tmpCmd[] = "VOUT1?";
+	tmpCmd[4] += chan;
 	auto ret = m_transport->SendCommandQueuedWithReply(string(tmpCmd));
 	return atof(ret.c_str());
 }
@@ -132,8 +132,8 @@ double GWInstekGPDX303SPowerSupply::GetPowerVoltageNominal(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-    char tmpCmd[] = "VSET1?";
-    tmpCmd[4] += chan;
+	char tmpCmd[] = "VSET1?";
+	tmpCmd[4] += chan;
 	auto ret = m_transport->SendCommandQueuedWithReply(string(tmpCmd));
 	return atof(ret.c_str());
 }
@@ -142,8 +142,8 @@ double GWInstekGPDX303SPowerSupply::GetPowerCurrentActual(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-    char tmpCmd[] = "IOUT1?";
-    tmpCmd[4] += chan;
+	char tmpCmd[] = "IOUT1?";
+	tmpCmd[4] += chan;
 	auto ret = m_transport->SendCommandQueuedWithReply(string(tmpCmd));
 	return atof(ret.c_str());
 }
@@ -152,46 +152,46 @@ double GWInstekGPDX303SPowerSupply::GetPowerCurrentNominal(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
-    char tmpCmd[] = "ISET1?";
-    tmpCmd[4] += chan;
+	char tmpCmd[] = "ISET1?";
+	tmpCmd[4] += chan;
 	auto ret = m_transport->SendCommandQueuedWithReply(string(tmpCmd));
 	return atof(ret.c_str());
 }
 
 bool GWInstekGPDX303SPowerSupply::GetPowerChannelActive(int chan)
 {
-    (void) chan;
-    return true;
+	(void) chan;
+	return true;
 }
 
 bool GWInstekGPDX303SPowerSupply::IsSoftStartEnabled(int chan)
 {
-    (void) chan;
-    return false;
+	(void) chan;
+	return false;
 }
 
 void GWInstekGPDX303SPowerSupply::SetSoftStartEnabled(int chan, bool enable)
 {
-    (void) chan;
-    (void) enable;
+	(void) chan;
+	(void) enable;
 }
 
 void GWInstekGPDX303SPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
-    (void) chan;
-    (void) enable;
+	(void) chan;
+	(void) enable;
 }
 
 bool GWInstekGPDX303SPowerSupply::GetPowerOvercurrentShutdownEnabled(int chan)
 {
-    (void) chan;
-    return false;
+	(void) chan;
+	return false;
 }
 
 bool GWInstekGPDX303SPowerSupply::GetPowerOvercurrentShutdownTripped(int chan)
 {
-    (void) chan;
-    return false;
+	(void) chan;
+	return false;
 }
 
 void GWInstekGPDX303SPowerSupply::SetPowerVoltage(int chan, double volts)
@@ -214,8 +214,8 @@ void GWInstekGPDX303SPowerSupply::SetPowerCurrent(int chan, double amps)
 
 void GWInstekGPDX303SPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
-    (void) chan;
-    (void) on;
+	(void) chan;
+	(void) on;
 }
 
 bool GWInstekGPDX303SPowerSupply::GetMasterPowerEnable()
@@ -229,8 +229,8 @@ bool GWInstekGPDX303SPowerSupply::GetMasterPowerEnable()
 void GWInstekGPDX303SPowerSupply::SetMasterPowerEnable(bool enable)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
-    if (enable)
-        m_transport->SendCommandQueued("OUT1");
-    else
-        m_transport->SendCommandQueued("OUT0");
+	if (enable)
+		m_transport->SendCommandQueued("OUT1");
+	else
+		m_transport->SendCommandQueued("OUT0");
 }

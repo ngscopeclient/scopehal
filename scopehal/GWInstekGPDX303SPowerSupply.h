@@ -43,7 +43,7 @@ class GWInstekGPDX303SPowerSupply
 	: public virtual SCPIPowerSupply
 	, public virtual SCPIDevice
 {
-    GWInstekGPDX303SPowerSupply(SCPITransport* transport);
+	GWInstekGPDX303SPowerSupply(SCPITransport* transport);
 	virtual ~GWInstekGPDX303SPowerSupply();
 
 	//Device information
@@ -53,7 +53,7 @@ class GWInstekGPDX303SPowerSupply
 
 	virtual unsigned int GetInstrumentTypes();
 
-    //Device capabilities
+	//Device capabilities
 	virtual bool SupportsSoftStart();
 	virtual bool SupportsIndividualOutputSwitching();
 	virtual bool SupportsMasterOutputSwitching();
