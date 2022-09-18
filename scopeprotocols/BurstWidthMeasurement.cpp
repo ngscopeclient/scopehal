@@ -45,7 +45,7 @@ BurstWidthMeasurement::BurstWidthMeasurement(const string& color)
 
 	m_idletime = "Idle Time";
 	m_parameters[m_idletime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_idletime].SetIntVal(10000000000);
+	m_parameters[m_idletime].SetIntVal(1000000000000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,10 +132,6 @@ void BurstWidthMeasurement::Refresh()
 	//between two consecutive edges is greater than the idle time
 	int64_t idletime = m_parameters[m_idletime].GetIntVal();
 
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(0);
-	cap->m_samples.push_back(0);
-
 	for(size_t i = 0; i < (elen - 1); i++)
 	{
 		//Search for a burst or end of waveform
@@ -158,6 +154,13 @@ void BurstWidthMeasurement::Refresh()
 			e1 = e2;
 			e2 = edges[i + 2];
 		}
+	}
+
+	if (cap->size() == 0)
+	{
+		cap->m_offsets.push_back(0);
+		cap->m_durations.push_back(0);
+		cap->m_samples.push_back(0);
 	}
 
 	SetData(cap, 0);
