@@ -129,6 +129,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TDRStepDeEmbedFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
+	TimeOutsideLevelMeasurement.cpp
 	TMDSDecoder.cpp
 	ToneGeneratorFilter.cpp
 	TopMeasurement.cpp

@@ -164,6 +164,7 @@
 #include "TDRStepDeEmbedFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"
+#include "TimeOutsideLevelMeasurement.h"
 #include "TMDSDecoder.h"
 #include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
