@@ -97,6 +97,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 	auto din = GetInputWaveform(0);
 	din->PrepareForCpuAccess();
+
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 
@@ -113,7 +114,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
 
 	bool processhigh = (measurement_type == HIGH_LEVEL) || (measurement_type == BOTH);
-	bool processlow = (measurement_type == LOW_LEVEL) || (measurement_type == BOTH); 
+	bool processlow = (measurement_type == LOW_LEVEL) || (measurement_type == BOTH);
 
 	if (uadin)
 	{
@@ -123,11 +124,15 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 			while (i < length)
 			{
+				//Find index of the sample with value greater than the high threshold
 				if ((uadin->m_samples[i] > highlevel) && (temp1 == 0))
 				{
 					temp1 = i;
 				}
 
+				//Find index of the next sample with value less than or equal to the high threshold
+				//Subtract temp1 from it to get the duration of high time
+				//Sum all such durations to get the time above high threshold
 				if ((((uadin->m_samples[i] <= highlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
 				{
 					temp2 = i;
@@ -146,11 +151,15 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 			while (i < length)
 			{
+				//Find index of the sample with value less than the low threshold
 				if ((uadin->m_samples[i] < lowlevel) && (temp1 == 0))
 				{
 					temp1 = i;
 				}
 
+				//Find index of the next sample with value greater than or equal to the low threshold
+				//Subtract temp1 from it to get the duration of low time
+				//Sum all such durations to get the time below low threshold
 				if ((((uadin->m_samples[i] >= lowlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
 				{
 					temp2 = i;
@@ -167,11 +176,13 @@ void TimeOutsideLevelMeasurement::Refresh()
 	{
 		for(size_t i = 0; i < length; i++)
 		{
+			//Simply sum durations of all samples with value greater than the high threshold
 			if ((processhigh == true) && (sadin->m_samples[i] > highlevel))
 			{
 				hightime += sadin->m_durations[i];
 			}
 
+			//Simply sum durations of all samples with value less than the low threshold
 			if ((processlow == true) && (sadin->m_samples[i] < lowlevel))
 			{
 				lowtime += sadin->m_durations[i];
@@ -179,6 +190,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 		}
 	}
 
+	//Calculate total time
 	int64_t totaltime = (hightime + lowtime) * din->m_timescale;
 
 	//Create the output
