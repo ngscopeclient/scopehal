@@ -106,9 +106,6 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 	int64_t hightime = 0;
 	int64_t lowtime = 0;
-
-	int64_t temp1 = 0;
-	int64_t temp2 = 0;
 	size_t length = uadin->m_samples.size();
 
 	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
@@ -118,62 +115,77 @@ void TimeOutsideLevelMeasurement::Refresh()
 
 	if (uadin)
 	{
-		if (processhigh == true)
-		{
-			size_t i = 0;
-
-			while (i < length)
+		#pragma omp parallel
+		#pragma omp single nowait
+		{			
+			if (processhigh == true)
 			{
-				//Find index of the sample with value greater than the high threshold
-				if ((uadin->m_samples[i] > highlevel) && (temp1 == 0))
+				#pragma omp task
 				{
-					temp1 = i;
-				}
+					size_t i = 0;
+					int64_t temp1 = 0;
+					int64_t temp2 = 0;
 
-				//Find index of the next sample with value less than or equal to the high threshold
-				//Subtract temp1 from it to get the duration of high time
-				//Sum all such durations to get the time above high threshold
-				if ((((uadin->m_samples[i] <= highlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
-				{
-					temp2 = i;
-					hightime += (temp2 - temp1);
-					temp2 = 0;
-					temp1 = 0;
-				}
+					while (i < length)
+					{
+						//Find index of the sample with value greater than the high threshold
+						if ((uadin->m_samples[i] > highlevel) && (temp1 == 0))
+						{
+							temp1 = i;
+						}
 
-				i++;
+						//Find index of the next sample with value less than or equal to the high threshold
+						//Subtract temp1 from it to get the duration of high time
+						//Sum all such durations to get the time above high threshold
+						if ((((uadin->m_samples[i] <= highlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
+						{
+							temp2 = i;
+							hightime += (temp2 - temp1);
+							temp2 = 0;
+							temp1 = 0;
+						}
+
+						i++;
+					}
+				}
 			}
-		}
 
-		if (processlow == true)
-		{
-			size_t i = 0;
-
-			while (i < length)
+			if (processlow == true)
 			{
-				//Find index of the sample with value less than the low threshold
-				if ((uadin->m_samples[i] < lowlevel) && (temp1 == 0))
+				#pragma omp task
 				{
-					temp1 = i;
-				}
+					size_t i = 0;
+					int64_t temp1 = 0;
+					int64_t temp2 = 0;
 
-				//Find index of the next sample with value greater than or equal to the low threshold
-				//Subtract temp1 from it to get the duration of low time
-				//Sum all such durations to get the time below low threshold
-				if ((((uadin->m_samples[i] >= lowlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
-				{
-					temp2 = i;
-					lowtime += (temp2 - temp1);
-					temp2 = 0;
-					temp1 = 0;
-				}
+					while (i < length)
+					{
+						//Find index of the sample with value less than the low threshold
+						if ((uadin->m_samples[i] < lowlevel) && (temp1 == 0))
+						{
+							temp1 = i;
+						}
 
-				i++;
+						//Find index of the next sample with value greater than or equal to the low threshold
+						//Subtract temp1 from it to get the duration of low time
+						//Sum all such durations to get the time below low threshold
+						if ((((uadin->m_samples[i] >= lowlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
+						{
+							temp2 = i;
+							lowtime += (temp2 - temp1);
+							temp2 = 0;
+							temp1 = 0;
+						}
+
+						i++;
+					}
+				}
 			}
 		}
 	}
 	else if (sadin)
 	{
+		#pragma omp parallel for
 		for(size_t i = 0; i < length; i++)
 		{
 			//Simply sum durations of all samples with value greater than the high threshold
