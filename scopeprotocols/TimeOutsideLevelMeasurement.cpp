@@ -44,10 +44,10 @@ TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 	CreateInput("din");
 
 	m_highlevel = "High Level";
-	m_parameters[m_highlevel] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_highlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 
 	m_lowlevel = "Low Level";
-	m_parameters[m_lowlevel] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_lowlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 
 	m_measurement_typename = "Measurement Type";
 	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -100,21 +100,21 @@ void TimeOutsideLevelMeasurement::Refresh()
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 
+	float highlevel = m_parameters[m_highlevel].GetFloatVal();
+	float lowlevel = m_parameters[m_lowlevel].GetFloatVal();
+
+	int64_t hightime = 0;
+	int64_t lowtime = 0;
+
+	int64_t temp1 = 0;
+	int64_t temp2 = 0;
+	size_t length = uadin->m_samples.size();
+	size_t i = 0;
+
+	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
+
     if (uadin)
 	{
-		int64_t highlevel = m_parameters[m_highlevel].GetIntVal();
-		int64_t lowlevel = m_parameters[m_lowlevel].GetIntVal();
-
-		int64_t hightime = 0;
-		int64_t lowtime = 0;
-
-		int64_t temp1 = 0;
-		int64_t temp2 = 0;
-		size_t length = uadin->m_samples.size();
-		size_t i = 0;
-
-		MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
-
 		if ((measurement_type == HIGH_LEVEL) || (measurement_type == BOTH))
 		{
 			while (i < length)
@@ -124,7 +124,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 					temp1 = i;
 				}
 
-				if (((uadin->m_samples[i] <= highlevel) && (temp2 == 0) && (temp1 != 0)) || ((i == (length - 1)) && (temp1 != 0)))  // TODO: Make common case faster
+				if ((((uadin->m_samples[i] <= highlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
 				{
 					temp2 = i;
 					hightime += (temp2 - temp1);
@@ -147,7 +147,7 @@ void TimeOutsideLevelMeasurement::Refresh()
 					temp1 = i;
 				}
 
-				if (((uadin->m_samples[i] >= lowlevel) && (temp2 == 0) && (temp1 != 0)) || ((i == (length - 1)) && (temp1 != 0)))  // TODO: Make common case faster
+				if ((((uadin->m_samples[i] >= lowlevel) && (temp2 == 0)) || (i == (length - 1))) && (temp1 != 0))
 				{
 					temp2 = i;
 					lowtime += (temp2 - temp1);
@@ -170,5 +170,9 @@ void TimeOutsideLevelMeasurement::Refresh()
 		SetData(cap, 0);
 
 		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		// TODO: Process sparse waveforms
 	}
 }
