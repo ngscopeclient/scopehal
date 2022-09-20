@@ -109,14 +109,18 @@ void TimeOutsideLevelMeasurement::Refresh()
 	int64_t temp1 = 0;
 	int64_t temp2 = 0;
 	size_t length = uadin->m_samples.size();
-	size_t i = 0;
 
 	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
 
-    if (uadin)
+	bool processhigh = (measurement_type == HIGH_LEVEL) || (measurement_type == BOTH);
+	bool processlow = (measurement_type == LOW_LEVEL) || (measurement_type == BOTH); 
+
+	if (uadin)
 	{
-		if ((measurement_type == HIGH_LEVEL) || (measurement_type == BOTH))
+		if (processhigh == true)
 		{
+			size_t i = 0;
+
 			while (i < length)
 			{
 				if ((uadin->m_samples[i] > highlevel) && (temp1 == 0))
@@ -136,10 +140,10 @@ void TimeOutsideLevelMeasurement::Refresh()
 			}
 		}
 
-		i = 0;
-
-		if ((measurement_type == LOW_LEVEL) || (measurement_type == BOTH))
+		if (processlow == true)
 		{
+			size_t i = 0;
+
 			while (i < length)
 			{
 				if ((uadin->m_samples[i] < lowlevel) && (temp1 == 0))
@@ -158,21 +162,32 @@ void TimeOutsideLevelMeasurement::Refresh()
 				i++;
 			}
 		}
-
-		int64_t totaltime = (hightime + lowtime) * din->m_timescale;
-
-		//Create the output
-		auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
-		cap->m_timescale = 1;
-		cap->PrepareForCpuAccess();
-		cap->m_samples.push_back(totaltime);
-
-		SetData(cap, 0);
-
-		cap->MarkModifiedFromCpu();
 	}
-	else
+	else if (sadin)
 	{
-		// TODO: Process sparse waveforms
+		for(size_t i = 0; i < length; i++)
+		{
+			if ((processhigh == true) && (sadin->m_samples[i] > highlevel))
+			{
+				hightime += sadin->m_durations[i];
+			}
+
+			if ((processlow == true) && (sadin->m_samples[i] < lowlevel))
+			{
+				lowtime += sadin->m_durations[i];
+			}
+		}
 	}
+
+	int64_t totaltime = (hightime + lowtime) * din->m_timescale;
+
+	//Create the output
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
+	cap->m_samples.push_back(totaltime);
+
+	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
 }
