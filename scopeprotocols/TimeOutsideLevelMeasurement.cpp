@@ -43,17 +43,17 @@ TimeOutsideLevelMeasurement::TimeOutsideLevelMeasurement(const string& color)
 	//Set up channels
 	CreateInput("din");
 
-	m_highlevel = "High Level";
-	m_parameters[m_highlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-
-	m_lowlevel = "Low Level";
-	m_parameters[m_lowlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-
 	m_measurement_typename = "Measurement Type";
 	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_measurement_typename].AddEnumValue("High Level", HIGH_LEVEL);
 	m_parameters[m_measurement_typename].AddEnumValue("Low Level", LOW_LEVEL);
 	m_parameters[m_measurement_typename].AddEnumValue("Both", BOTH);
+
+	m_highlevel = "High Level";
+	m_parameters[m_highlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+
+	m_lowlevel = "Low Level";
+	m_parameters[m_lowlevel] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +80,7 @@ bool TimeOutsideLevelMeasurement::ValidateChannel(size_t i, StreamDescriptor str
 
 string TimeOutsideLevelMeasurement::GetProtocolName()
 {
-	return "Time Outside Value";
+	return "Time Outside Level";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
