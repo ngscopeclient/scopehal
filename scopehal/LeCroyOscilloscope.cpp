@@ -1456,7 +1456,12 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 			ret.push_back(1000);
 			break;
 
+		case MODEL_WAVEMASTER_8ZI:
+		case MODEL_WAVEMASTER_8ZI_A:
 		case MODEL_WAVEMASTER_8ZI_B:
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:
 			ret.push_back(1000);
 			if(m_maxBandwidth >= 4000)
 				ret.push_back(3000);
@@ -1466,6 +1471,8 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 				ret.push_back(6000);
 			if(m_maxBandwidth >= 13000)
 				ret.push_back(8000);
+			if(m_maxBandwidth >= 16000)
+				ret.push_back(13000);
 			break;
 
 		case MODEL_WAVEPRO_HD:
@@ -1536,6 +1543,10 @@ int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 		return 4000;
 	else if(sbw == "6GHZ")
 		return 6000;
+	else if(sbw == "8GHZ")
+		return 8000;
+	else if(sbw == "13GHZ")
+		return 13000;
 
 	LogWarning("LeCroyOscilloscope::GetChannelBandwidthLimit got invalid BW limit %s\n", reply.c_str());
 	return 0;
