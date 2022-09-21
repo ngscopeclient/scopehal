@@ -493,7 +493,7 @@ vector<unsigned int> RigolOscilloscope::GetChannelBandwidthLimiters(size_t i)
 	return ret;
 }
 
-int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int RigolOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);

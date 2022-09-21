@@ -369,7 +369,7 @@ void RohdeSchwarzOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	PushFloat(cmd, atten);
 }
 
-int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int RohdeSchwarzOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);

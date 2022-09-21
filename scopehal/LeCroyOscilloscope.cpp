@@ -1508,7 +1508,7 @@ vector<unsigned int> LeCroyOscilloscope::GetChannelBandwidthLimiters(size_t /*i*
 	return ret;
 }
 
-int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if(i > m_analogChannelCount)
 		return 0;

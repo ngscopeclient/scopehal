@@ -232,7 +232,7 @@ public:
 
 		@return Bandwidth limit, in MHz. Zero means "no bandwidth limit".
 	 */
-	virtual int GetChannelBandwidthLimit(size_t i) =0;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) =0;
 
 	/**
 		@brief Sets the bandwidth limit for an input channel.

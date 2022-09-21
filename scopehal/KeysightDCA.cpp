@@ -293,7 +293,7 @@ void KeysightDCA::SetChannelAttenuation(size_t i, double atten)
 	m_channelAttenuations[i] = atten;
 }
 
-int KeysightDCA::GetChannelBandwidthLimit(size_t i)
+unsigned int KeysightDCA::GetChannelBandwidthLimit(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -309,7 +309,7 @@ int KeysightDCA::GetChannelBandwidthLimit(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	int bwl = 0;
+	unsigned int bwl = 0;
 	// TODO: figure out how to map these to numbers, or see if we need API changes
 	if (reply == "HIGH") {
 

@@ -391,7 +391,7 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelAttenuations[i] = atten;
 }
 
-int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -407,7 +407,7 @@ int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 		reply = m_transport->ReadReply();
 	}
 
-	int bwl;
+	unsigned int bwl;
 	if(reply == "1")
 		bwl = 25;
 	else

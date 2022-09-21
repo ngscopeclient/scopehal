@@ -1050,7 +1050,7 @@ vector<unsigned int> SiglentSCPIOscilloscope::GetChannelBandwidthLimiters(size_t
 	return ret;
 }
 
-int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int SiglentSCPIOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	if(i > m_analogChannelCount)
 		return 0;

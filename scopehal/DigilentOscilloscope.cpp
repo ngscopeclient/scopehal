@@ -231,7 +231,7 @@ void DigilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_transport->SendCommand(buf);
 }
 
-int DigilentOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int DigilentOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	return 0;
 }

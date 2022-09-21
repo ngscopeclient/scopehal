@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -87,7 +87,7 @@ public:
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
 	virtual double GetChannelAttenuation(size_t i);
 	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual int GetChannelBandwidthLimit(size_t i);
+	virtual unsigned int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
 	virtual float GetChannelVoltageRange(size_t i, size_t stream);
 	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);

@@ -262,7 +262,7 @@ void DemoOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelAttenuation[i] = atten;
 }
 
-int DemoOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int DemoOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	return m_channelBandwidth[i];
 }

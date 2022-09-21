@@ -260,7 +260,7 @@ void DSLabsOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelOffsets[i] *= delta;
 }
 
-int DSLabsOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int DSLabsOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	return 0;
 }

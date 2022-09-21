@@ -808,7 +808,7 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 }
 
-int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	//If not analog, return default
 	if(!IsAnalog(i))

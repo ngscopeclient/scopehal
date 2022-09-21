@@ -245,7 +245,7 @@ void MockOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelAttenuation[i] = atten;
 }
 
-int MockOscilloscope::GetChannelBandwidthLimit(size_t i)
+unsigned int MockOscilloscope::GetChannelBandwidthLimit(size_t i)
 {
 	return m_channelBandwidth[i];
 }

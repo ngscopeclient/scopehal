@@ -504,7 +504,7 @@ void AntikernelLogicAnalyzer::SetChannelAttenuation(size_t /*i*/, double /*atten
 	//no-op, all channels are digital
 }
 
-int AntikernelLogicAnalyzer::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int AntikernelLogicAnalyzer::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	return 0;
 }

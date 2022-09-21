@@ -409,7 +409,7 @@ void PicoOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	m_channelOffsets[i] *= delta;
 }
 
-int PicoOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int PicoOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	return 0;
 }

@@ -235,7 +235,7 @@ void AntikernelLabsOscilloscope::SetChannelAttenuation(size_t /*i*/, double /*at
 	LogWarning("AntikernelLabsOscilloscope::SetChannelAttenuation unimplemented\n");
 }
 
-int AntikernelLabsOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
+unsigned int AntikernelLabsOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 {
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
