@@ -164,6 +164,7 @@ void ScopeProtocolStaticInit()
 	//AddDecoderClass(TDRStepDeEmbedFilter);
 	AddDecoderClass(ThresholdFilter);
 	AddDecoderClass(TIEMeasurement);
+	AddDecoderClass(TimeOutsideLevelMeasurement);
 	AddDecoderClass(TMDSDecoder);
 	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
