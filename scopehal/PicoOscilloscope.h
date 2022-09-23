@@ -74,6 +74,7 @@ public:
 	virtual void PushTrigger();
 
 	//Timebase
+	virtual bool CanInterleave();
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();

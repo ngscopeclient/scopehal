@@ -626,6 +626,11 @@ bool PicoOscilloscope::IsTriggerArmed()
 	return m_triggerArmed;
 }
 
+bool PicoOscilloscope::CanInterleave()
+{
+	return false;
+}
+
 vector<uint64_t> PicoOscilloscope::GetSampleRatesNonInterleaved()
 {
 	vector<uint64_t> ret;
