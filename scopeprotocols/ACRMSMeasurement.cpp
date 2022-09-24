@@ -169,7 +169,7 @@ void ACRMSMeasurement::Refresh()
 			int64_t end = edges[i + 2] / din->m_timescale;
 			int64_t j = 0;
 
-            //Simply sum the squares of all values in a cycle after subtracting the DC value
+			//Simply sum the squares of all values in a cycle after subtracting the DC value
 			if(uadin)
 			{
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
@@ -189,7 +189,7 @@ void ACRMSMeasurement::Refresh()
 			//on which AC RMS calculation was performed
 			int64_t delta = j - start - 1;
 
-            if (delta != 0)
+			if (delta != 0)
 			{
 				//Divide by total number of samples for one cycle
 				temp /= delta;
