@@ -40,6 +40,12 @@ class ACRMSMeasurement : public Filter
 public:
 	ACRMSMeasurement(const std::string& color);
 
+	enum MeasurementType
+	{
+		AVERAGE_RMS,
+		CYCLE_RMS
+	};
+
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
@@ -47,6 +53,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(ACRMSMeasurement)
+
+protected:
+	std::string m_measurement_typename;
 };
 
 #endif
