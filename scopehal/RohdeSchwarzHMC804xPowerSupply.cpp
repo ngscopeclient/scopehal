@@ -72,11 +72,6 @@ string RohdeSchwarzHMC804xPowerSupply::GetSerial()
 	return m_serial;
 }
 
-unsigned int RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypes()
-{
-	return INST_PSU;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device capabilities
 

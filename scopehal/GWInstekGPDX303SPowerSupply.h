@@ -48,44 +48,30 @@ class GWInstekGPDX303SPowerSupply
 	virtual ~GWInstekGPDX303SPowerSupply();
 
 	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	virtual unsigned int GetInstrumentTypes();
+	std::string GetName() override;
+	std::string GetVendor() override;
+	std::string GetSerial() override;
 
 	//Device capabilities
-	virtual bool SupportsSoftStart();
-	virtual bool SupportsIndividualOutputSwitching();
-	virtual bool SupportsMasterOutputSwitching();
-	virtual bool SupportsOvercurrentShutdown();
+	bool SupportsMasterOutputSwitching() override;
 
 	//Channel info
-	virtual int GetPowerChannelCount();
-	virtual std::string GetPowerChannelName(int chan);
+	int GetPowerChannelCount() override;
+	std::string GetPowerChannelName(int chan) override;
 
 	//Read sensors
-	virtual double GetPowerVoltageActual(int chan);				//actual voltage after current limiting
-	virtual double GetPowerVoltageNominal(int chan);			//set point
-	virtual double GetPowerCurrentActual(int chan);				//actual current drawn by the load
-	virtual double GetPowerCurrentNominal(int chan);			//current limit
-	virtual bool GetPowerChannelActive(int chan);
+	double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting
+	double GetPowerVoltageNominal(int chan) override;	//set point
+	double GetPowerCurrentActual(int chan) override;	//actual current drawn by the load
+	double GetPowerCurrentNominal(int chan) override;	//current limit
 
 	//Configuration
-	virtual bool GetPowerOvercurrentShutdownEnabled(int chan);	//shut channel off entirely on overload,
-																//rather than current limiting
-	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable);
-	virtual bool GetPowerOvercurrentShutdownTripped(int chan);
-	virtual void SetPowerVoltage(int chan, double volts);
-	virtual void SetPowerCurrent(int chan, double amps);
-	virtual void SetPowerChannelActive(int chan, bool on);
-	virtual bool IsPowerConstantCurrent(int chan);
+	void SetPowerVoltage(int chan, double volts) override;
+	void SetPowerCurrent(int chan, double amps) override;
+	bool IsPowerConstantCurrent(int chan) override;
 
-	virtual bool GetMasterPowerEnable();
-	virtual void SetMasterPowerEnable(bool enable);
-
-	virtual bool IsSoftStartEnabled(int chan);
-	virtual void SetSoftStartEnabled(int chan, bool enable);
+	bool GetMasterPowerEnable() override;
+	void SetMasterPowerEnable(bool enable) override;
 
 protected:
 	std::bitset<8> GetStatusRegister();

@@ -39,6 +39,8 @@ public:
 	PowerSupply();
 	virtual ~PowerSupply();
 
+	virtual unsigned int GetInstrumentTypes();
+
 	//Channel info
 	virtual int GetPowerChannelCount() =0;
 	virtual std::string GetPowerChannelName(int chan) =0;
@@ -50,7 +52,7 @@ public:
 		If this function returns false, IsSoftStartEnabled() will always return false,
 		and SetSoftStartEnabled() is a no-op.
 	 */
-	virtual bool SupportsSoftStart() =0;
+	virtual bool SupportsSoftStart();
 
 	/**
 		@brief Determines if the power supply supports switching individual output channels
@@ -58,7 +60,7 @@ public:
 		If this function returns false, GetPowerChannelActive() will always return true,
 		and SetPowerChannelActive() is a no-op.
 	 */
-	virtual bool SupportsIndividualOutputSwitching() =0;
+	virtual bool SupportsIndividualOutputSwitching();
 
 	/**
 		@brief Determines if the power supply supports ganged master switching of all outputs
@@ -66,7 +68,7 @@ public:
 		If this function returns false, GetMasterPowerEnable() will always return true,
 		and SetMasterPowerEnable() is a no-op.
 	 */
-	virtual bool SupportsMasterOutputSwitching() =0;
+	virtual bool SupportsMasterOutputSwitching();
 
 	/**
 		@brief Determines if the power supply supports shutdown rather than constant-current mode on overcurrent
@@ -74,32 +76,32 @@ public:
 		If this function returns false, GetPowerOvercurrentShutdownEnabled() and GetPowerOvercurrentShutdownTripped() will always return false,
 		and SetPowerOvercurrentShutdownEnabled() is a no-op.
 	 */
-	virtual bool SupportsOvercurrentShutdown() =0;
+	virtual bool SupportsOvercurrentShutdown();
 
 	//Read sensors
 	virtual double GetPowerVoltageActual(int chan) =0;				//actual voltage after current limiting
 	virtual double GetPowerVoltageNominal(int chan) =0;				//set point
 	virtual double GetPowerCurrentActual(int chan) =0;				//actual current drawn by the load
 	virtual double GetPowerCurrentNominal(int chan) =0;				//current limit
-	virtual bool GetPowerChannelActive(int chan) =0;
+	virtual bool GetPowerChannelActive(int chan);
 
 	//Configuration
-	virtual bool GetPowerOvercurrentShutdownEnabled(int chan) =0;	//shut channel off entirely on overload,
-																	//rather than current limiting
-	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable) =0;
-	virtual bool GetPowerOvercurrentShutdownTripped(int chan) =0;
+	virtual bool GetPowerOvercurrentShutdownEnabled(int chan);	//shut channel off entirely on overload,
+																//rather than current limiting
+	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable);
+	virtual bool GetPowerOvercurrentShutdownTripped(int chan);
 	virtual void SetPowerVoltage(int chan, double volts) =0;
 	virtual void SetPowerCurrent(int chan, double amps) =0;
-	virtual void SetPowerChannelActive(int chan, bool on) =0;
+	virtual void SetPowerChannelActive(int chan, bool on);
 
 	virtual bool IsPowerConstantCurrent(int chan) =0;				//true = CC, false = CV
 
-	virtual bool GetMasterPowerEnable() =0;
-	virtual void SetMasterPowerEnable(bool enable) = 0;
+	virtual bool GetMasterPowerEnable();
+	virtual void SetMasterPowerEnable(bool enable);
 
 	//Soft start
-	virtual bool IsSoftStartEnabled(int chan) =0;
-	virtual void SetSoftStartEnabled(int chan, bool enable) =0;
+	virtual bool IsSoftStartEnabled(int chan);
+	virtual void SetSoftStartEnabled(int chan, bool enable);
 };
 
 #endif

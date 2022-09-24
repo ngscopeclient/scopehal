@@ -42,44 +42,42 @@ public:
 	virtual ~RohdeSchwarzHMC804xPowerSupply();
 
 	//Device information
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-
-	virtual unsigned int GetInstrumentTypes();
+	std::string GetName() override;
+	std::string GetVendor() override;
+	std::string GetSerial() override;
 
 	//Device capabilities
-	virtual bool SupportsSoftStart();
-	virtual bool SupportsIndividualOutputSwitching();
-	virtual bool SupportsMasterOutputSwitching();
-	virtual bool SupportsOvercurrentShutdown();
+	bool SupportsSoftStart() override;
+	bool SupportsIndividualOutputSwitching() override;
+	bool SupportsMasterOutputSwitching() override;
+	bool SupportsOvercurrentShutdown() override;
 
 	//Channel info
-	virtual int GetPowerChannelCount();
-	virtual std::string GetPowerChannelName(int chan);
+	int GetPowerChannelCount() override;
+	std::string GetPowerChannelName(int chan) override;
 
 	//Read sensors
-	virtual double GetPowerVoltageActual(int chan);				//actual voltage after current limiting
-	virtual double GetPowerVoltageNominal(int chan);			//set point
-	virtual double GetPowerCurrentActual(int chan);				//actual current drawn by the load
-	virtual double GetPowerCurrentNominal(int chan);			//current limit
-	virtual bool GetPowerChannelActive(int chan);
+	double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting
+	double GetPowerVoltageNominal(int chan) override;	//set point
+	double GetPowerCurrentActual(int chan) override;	//actual current drawn by the load
+	double GetPowerCurrentNominal(int chan) override;	//current limit
+	bool GetPowerChannelActive(int chan) override;
 
 	//Configuration
-	virtual bool GetPowerOvercurrentShutdownEnabled(int chan);	//shut channel off entirely on overload,
+	bool GetPowerOvercurrentShutdownEnabled(int chan) override;	//shut channel off entirely on overload,
 																//rather than current limiting
-	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable);
-	virtual bool GetPowerOvercurrentShutdownTripped(int chan);
-	virtual void SetPowerVoltage(int chan, double volts);
-	virtual void SetPowerCurrent(int chan, double amps);
-	virtual void SetPowerChannelActive(int chan, bool on);
-	virtual bool IsPowerConstantCurrent(int chan);
+	void SetPowerOvercurrentShutdownEnabled(int chan, bool enable) override;
+	bool GetPowerOvercurrentShutdownTripped(int chan) override;
+	void SetPowerVoltage(int chan, double volts) override;
+	void SetPowerCurrent(int chan, double amps) override;
+	void SetPowerChannelActive(int chan, bool on) override;
+	bool IsPowerConstantCurrent(int chan) override;
 
-	virtual bool GetMasterPowerEnable();
-	virtual void SetMasterPowerEnable(bool enable);
+	bool GetMasterPowerEnable() override;
+	void SetMasterPowerEnable(bool enable) override;
 
-	virtual bool IsSoftStartEnabled(int chan);
-	virtual void SetSoftStartEnabled(int chan, bool enable);
+	bool IsSoftStartEnabled(int chan) override;
+	void SetSoftStartEnabled(int chan, bool enable) override;
 
 protected:
 	int GetStatusRegister(int chan);
