@@ -73,7 +73,7 @@ bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 
 string BurstWidthMeasurement::GetProtocolName()
 {
-	return "BurstWidth";
+	return "Burst Width";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -146,7 +146,7 @@ void BurstWidthMeasurement::Refresh()
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(e1 - start);
 		cap->m_samples.push_back(e1 - start);
-		
+
 		//Move edges forward to detect any new burst
 		if (i < (elen - 2))
 		{

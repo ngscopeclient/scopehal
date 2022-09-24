@@ -61,9 +61,7 @@ bool ACRMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
-	{
 		return true;
-	}
 
 	return false;
 }
@@ -73,7 +71,7 @@ bool ACRMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 
 string ACRMSMeasurement::GetProtocolName()
 {
-	return "AC RMS Measurement";
+	return "AC RMS";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -106,16 +104,12 @@ void ACRMSMeasurement::Refresh()
 		if(uadin)
 		{
 			for (size_t i = 0; i < length; i++)
-			{				
 				temp += ((uadin->m_samples[i] - average) * (uadin->m_samples[i] - average));
-			}
 		}
 		else if(sadin)
 		{
 			for (size_t i = 0; i < length; i++)
-			{
 				temp += ((sadin->m_samples[i] - average) * (sadin->m_samples[i] - average));
-			}
 		}
 
 		//Divide by total number of samples
@@ -141,13 +135,9 @@ void ACRMSMeasurement::Refresh()
 
 		//Auto-threshold analog signals at average of the full scale range
 		if(uadin)
-		{
 			FindZeroCrossings(uadin, average, edges);
-		}
 		else if(sadin)
-		{
 			FindZeroCrossings(sadin, average, edges);
-		}
 
 		//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
 		if(edges.size() < 2)
@@ -173,16 +163,12 @@ void ACRMSMeasurement::Refresh()
 			if(uadin)
 			{
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				{
 					temp += ((uadin->m_samples[j] - average) * (uadin->m_samples[j] - average));
-				}
 			}
 			else if(sadin)
 			{
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				{
 					temp += ((sadin->m_samples[j] - average) * (sadin->m_samples[j] - average));
-				}
 			}
 
 			//Get the difference between the end and start of cycle. This would be the number of samples
