@@ -37,3 +37,72 @@ PowerSupply::PowerSupply()
 PowerSupply::~PowerSupply()
 {
 }
+
+
+unsigned int PowerSupply::GetInstrumentTypes()
+{
+	return INST_PSU;
+}
+
+bool PowerSupply::SupportsSoftStart()
+{
+	return false;
+}
+
+bool PowerSupply::SupportsIndividualOutputSwitching()
+{
+	return false;
+}
+
+bool PowerSupply::SupportsMasterOutputSwitching()
+{
+	return false;
+}
+
+bool PowerSupply::SupportsOvercurrentShutdown()
+{
+	return false;
+}
+
+bool PowerSupply::GetPowerChannelActive(int /*chan*/)
+{
+	return true;
+}
+
+//Configuration
+bool PowerSupply::GetPowerOvercurrentShutdownEnabled(int /*chan*/)
+{
+	return false;
+}
+
+void PowerSupply::SetPowerOvercurrentShutdownEnabled(int /*chan*/, bool /*enable*/)
+{
+}
+
+bool PowerSupply::GetPowerOvercurrentShutdownTripped(int /*chan*/)
+{
+	return false;
+}
+
+void PowerSupply::SetPowerChannelActive(int /*chan*/, bool /*on*/)
+{
+}
+
+bool PowerSupply::GetMasterPowerEnable()
+{
+	return true;
+}
+
+void PowerSupply::SetMasterPowerEnable(bool /*enable*/)
+{
+}
+
+//Soft start
+bool PowerSupply::IsSoftStartEnabled(int /*chan*/)
+{
+	return false;
+}
+
+void PowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
+{
+}

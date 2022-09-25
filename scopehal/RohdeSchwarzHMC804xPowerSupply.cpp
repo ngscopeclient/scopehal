@@ -72,9 +72,27 @@ string RohdeSchwarzHMC804xPowerSupply::GetSerial()
 	return m_serial;
 }
 
-unsigned int RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypes()
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Device capabilities
+
+bool RohdeSchwarzHMC804xPowerSupply::SupportsSoftStart()
 {
-	return INST_PSU;
+	return true;
+}
+
+bool RohdeSchwarzHMC804xPowerSupply::SupportsIndividualOutputSwitching()
+{
+	return true;
+}
+
+bool RohdeSchwarzHMC804xPowerSupply::SupportsMasterOutputSwitching()
+{
+	return m_channelCount > 1;
+}
+
+bool RohdeSchwarzHMC804xPowerSupply::SupportsOvercurrentShutdown()
+{
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

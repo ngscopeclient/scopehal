@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,81 +27,60 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef PowerSupply_h
-#define PowerSupply_h
+#ifndef GWInstekGPDX303SPowerSupply_h
+#define GWInstekGPDX303SPowerSupply_h
+
+#include "SCPIDevice.h"
+#include "SCPIPowerSupply.h"
+#include "SCPITransport.h"
+
+#include <bitset>
+#include <string>
 
 /**
-	@brief A generic power supply
+	@brief A GW Instek GPD-(X)303S power supply
  */
-class PowerSupply : public virtual Instrument
+class GWInstekGPDX303SPowerSupply
+	: public virtual SCPIPowerSupply
+	, public virtual SCPIDevice
 {
-public:
-	PowerSupply();
-	virtual ~PowerSupply();
+	GWInstekGPDX303SPowerSupply(SCPITransport* transport);
+	virtual ~GWInstekGPDX303SPowerSupply();
 
-	virtual unsigned int GetInstrumentTypes();
-
-	//Channel info
-	virtual int GetPowerChannelCount() =0;
-	virtual std::string GetPowerChannelName(int chan) =0;
+	//Device information
+	std::string GetName() override;
+	std::string GetVendor() override;
+	std::string GetSerial() override;
 
 	//Device capabilities
-	/**
-		@brief Determines if the power supply supports soft start
+	bool SupportsMasterOutputSwitching() override;
 
-		If this function returns false, IsSoftStartEnabled() will always return false,
-		and SetSoftStartEnabled() is a no-op.
-	 */
-	virtual bool SupportsSoftStart();
-
-	/**
-		@brief Determines if the power supply supports switching individual output channels
-
-		If this function returns false, GetPowerChannelActive() will always return true,
-		and SetPowerChannelActive() is a no-op.
-	 */
-	virtual bool SupportsIndividualOutputSwitching();
-
-	/**
-		@brief Determines if the power supply supports ganged master switching of all outputs
-
-		If this function returns false, GetMasterPowerEnable() will always return true,
-		and SetMasterPowerEnable() is a no-op.
-	 */
-	virtual bool SupportsMasterOutputSwitching();
-
-	/**
-		@brief Determines if the power supply supports shutdown rather than constant-current mode on overcurrent
-
-		If this function returns false, GetPowerOvercurrentShutdownEnabled() and GetPowerOvercurrentShutdownTripped() will always return false,
-		and SetPowerOvercurrentShutdownEnabled() is a no-op.
-	 */
-	virtual bool SupportsOvercurrentShutdown();
+	//Channel info
+	int GetPowerChannelCount() override;
+	std::string GetPowerChannelName(int chan) override;
 
 	//Read sensors
-	virtual double GetPowerVoltageActual(int chan) =0;				//actual voltage after current limiting
-	virtual double GetPowerVoltageNominal(int chan) =0;				//set point
-	virtual double GetPowerCurrentActual(int chan) =0;				//actual current drawn by the load
-	virtual double GetPowerCurrentNominal(int chan) =0;				//current limit
-	virtual bool GetPowerChannelActive(int chan);
+	double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting
+	double GetPowerVoltageNominal(int chan) override;	//set point
+	double GetPowerCurrentActual(int chan) override;	//actual current drawn by the load
+	double GetPowerCurrentNominal(int chan) override;	//current limit
 
 	//Configuration
-	virtual bool GetPowerOvercurrentShutdownEnabled(int chan);	//shut channel off entirely on overload,
-																//rather than current limiting
-	virtual void SetPowerOvercurrentShutdownEnabled(int chan, bool enable);
-	virtual bool GetPowerOvercurrentShutdownTripped(int chan);
-	virtual void SetPowerVoltage(int chan, double volts) =0;
-	virtual void SetPowerCurrent(int chan, double amps) =0;
-	virtual void SetPowerChannelActive(int chan, bool on);
+	void SetPowerVoltage(int chan, double volts) override;
+	void SetPowerCurrent(int chan, double amps) override;
+	bool IsPowerConstantCurrent(int chan) override;
 
-	virtual bool IsPowerConstantCurrent(int chan) =0;				//true = CC, false = CV
+	bool GetMasterPowerEnable() override;
+	void SetMasterPowerEnable(bool enable) override;
 
-	virtual bool GetMasterPowerEnable();
-	virtual void SetMasterPowerEnable(bool enable);
+protected:
+	std::bitset<8> GetStatusRegister();
 
-	//Soft start
-	virtual bool IsSoftStartEnabled(int chan);
-	virtual void SetSoftStartEnabled(int chan, bool enable);
+	int m_channelCount;
+
+public:
+	static std::string GetDriverNameInternal();
+	POWER_INITPROC(GWInstekGPDX303SPowerSupply)
 };
 
 #endif

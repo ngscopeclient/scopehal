@@ -47,11 +47,13 @@
 #include "PicoOscilloscope.h"
 #include "RigolOscilloscope.h"
 #include "RohdeSchwarzOscilloscope.h"
+#include "SCPIPowerSupply.h"
 #include "SiglentSCPIOscilloscope.h"
 #include "TektronixOscilloscope.h"
 
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
+#include "GWInstekGPDX303SPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
 
 #include "SiglentVectorSignalGenerator.h"
@@ -189,6 +191,7 @@ void DriverStaticInit()
 
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
+	AddPowerSupplyDriverClass(GWInstekGPDX303SPowerSupply);
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
