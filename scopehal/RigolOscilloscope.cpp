@@ -82,6 +82,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			// Reset memory depth
 			m_transport->SendCommand("ACQ:MDEP 1M\n");
 
+			string originalBandwidthLimit = m_transport->SendCommandImmediateWithReply("CHAN1:BWL?");
+
 			// Figure out its actual bandwidth since :SYST:OPT:STAT is practically useless
 			m_transport->SendCommand("CHAN1:BWL 200M\n");
 			m_transport->SendCommand("CHAN1:BWL?\n");
@@ -106,6 +108,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 						m_bandwidth = 70;
 				}
 			}
+
+			m_transport->SendCommandImmediate("CHAN1:BWL " + originalBandwidthLimit);
 		}
 	}
 	else
