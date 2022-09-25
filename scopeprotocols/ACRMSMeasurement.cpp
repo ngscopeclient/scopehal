@@ -28,30 +28,31 @@
 ***********************************************************************************************************************/
 
 #include "scopeprotocols.h"
-#include "BurstWidthMeasurement.h"
+#include "ACRMSMeasurement.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-BurstWidthMeasurement::BurstWidthMeasurement(const string& color)
+ACRMSMeasurement::ACRMSMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
 
-	m_idletime = "Idle Time";
-	m_parameters[m_idletime] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_idletime].SetIntVal(1000000000000);
+	m_measurement_typename = "Measurement Type";
+	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_measurement_typename].AddEnumValue("Average", AVERAGE_RMS);
+	m_parameters[m_measurement_typename].AddEnumValue("Per Cycle", CYCLE_RMS);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+bool ACRMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -59,11 +60,8 @@ bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(i > 0)
 		return false;
 
-	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
-		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
-	{
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG)
 		return true;
-	}
 
 	return false;
 }
@@ -71,15 +69,15 @@ bool BurstWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string BurstWidthMeasurement::GetProtocolName()
+string ACRMSMeasurement::GetProtocolName()
 {
-	return "Burst Width";
+	return "AC RMS";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void BurstWidthMeasurement::Refresh()
+void ACRMSMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -90,80 +88,109 @@ void BurstWidthMeasurement::Refresh()
 
 	auto din = GetInputWaveform(0);
 	din->PrepareForCpuAccess();
+
 	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
-	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	vector<int64_t> edges;
 
-	//Auto-threshold analog signals at 50% of full scale range
-	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
-	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+	float average = GetAvgVoltage(sadin, uadin);
+	auto length = din->size();
+	float temp = 0;
 
-	//Just find edges in digital signals
-	else if(uddin)
-		FindZeroCrossings(uddin, edges);
-	else
-		FindZeroCrossings(sddin, edges);
+	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
 
-	//We need at least one full cycle of the waveform to have a meaningful burst width
-	if(edges.size() < 2)
+	if (measurement_type == AVERAGE_RMS)
 	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
-	cap->PrepareForCpuAccess();
-
-	//Add an edge at the extreme end to detect end condition
-	edges.push_back(0xFFFFFFFFFFFFFFFF);
-
-	size_t elen = edges.size();
-	int64_t start = edges[0];
-	int64_t e1 = edges[0];
-	int64_t e2 = edges[1];
-
-	//Get the idle time to look for. A burst will be detected when difference
-	//between two consecutive edges is greater than the idle time
-	int64_t idletime = m_parameters[m_idletime].GetIntVal();
-
-	for(size_t i = 0; i < (elen - 1); i++)
-	{
-		//Search for a burst or end of waveform
-		while(((e2 - e1) < idletime) && (i < (elen - 1)))
+		//Simply sum the squares of all values after subtracting the DC value
+		if(uadin)
 		{
-			e1 = edges[i];
-			e2 = edges[i + 1];
-			i++;
+			for (size_t i = 0; i < length; i++)
+				temp += ((uadin->m_samples[i] - average) * (uadin->m_samples[i] - average));
+		}
+		else if(sadin)
+		{
+			for (size_t i = 0; i < length; i++)
+				temp += ((sadin->m_samples[i] - average) * (sadin->m_samples[i] - average));
 		}
 
-		//Push the burst width
-		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(e1 - start);
-		cap->m_samples.push_back(e1 - start);
+		//Divide by total number of samples
+		temp /= length;
 
-		//Move edges forward to detect any new burst
-		if (i < (elen - 2))
-		{
-			start = e2;
-			e1 = e2;
-			e2 = edges[i + 2];
-		}
+		//Take square root to get the final AC RMS Value
+		temp = sqrt(temp);
+
+		//Create the output as a uniform waveform with single sample
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
+		cap->m_timescale = 1;
+		cap->PrepareForCpuAccess();
+
+		//Push AC RMS value
+		cap->m_samples.push_back(temp);
+
+		SetData(cap, 0);
+		cap->MarkModifiedFromCpu();
 	}
-
-	if (cap->size() == 0)
+	else if (measurement_type == CYCLE_RMS)
 	{
-		cap->m_offsets.push_back(0);
-		cap->m_durations.push_back(0);
-		cap->m_samples.push_back(0);
+		vector<int64_t> edges;
+
+		//Auto-threshold analog signals at average of the full scale range
+		if(uadin)
+			FindZeroCrossings(uadin, average, edges);
+		else if(sadin)
+			FindZeroCrossings(sadin, average, edges);
+
+		//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
+		if(edges.size() < 2)
+		{
+			SetData(NULL, 0);
+			return;
+		}
+
+		//Create the output as a sparse waveform
+		auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+		cap->PrepareForCpuAccess();
+
+		size_t elen = edges.size();
+
+		for(size_t i = 0; i < (elen - 2); i += 2)
+		{
+			//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+			int64_t start = edges[i] / din->m_timescale;
+			int64_t end = edges[i + 2] / din->m_timescale;
+			int64_t j = 0;
+
+			//Simply sum the squares of all values in a cycle after subtracting the DC value
+			if(uadin)
+			{
+				for(j = start; (j <= end) && (j < (int64_t)length); j++)
+					temp += ((uadin->m_samples[j] - average) * (uadin->m_samples[j] - average));
+			}
+			else if(sadin)
+			{
+				for(j = start; (j <= end) && (j < (int64_t)length); j++)
+					temp += ((sadin->m_samples[j] - average) * (sadin->m_samples[j] - average));
+			}
+
+			//Get the difference between the end and start of cycle. This would be the number of samples
+			//on which AC RMS calculation was performed
+			int64_t delta = j - start - 1;
+
+			if (delta != 0)
+			{
+				//Divide by total number of samples for one cycle
+				temp /= delta;
+
+				//Take square root to get the final AC RMS Value of one cycle
+				temp = sqrt(temp);
+
+				//Push values to the waveform
+				cap->m_offsets.push_back(start);
+				cap->m_durations.push_back(delta);
+				cap->m_samples.push_back(temp);
+			}
+		}
+
+		SetData(cap, 0);
+		cap->MarkModifiedFromCpu();
 	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
 }

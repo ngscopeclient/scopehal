@@ -3,6 +3,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleFilter.cpp
+	ACRMSMeasurement.cpp
 	ADL5205Decoder.cpp
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
