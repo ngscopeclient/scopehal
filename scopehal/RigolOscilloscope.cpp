@@ -1074,6 +1074,13 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	if(m_protocol == MSO5)
 	{
+		// The MSO5 series will only process a sample depth setting if the oscilloscope is in auto or normal mode.
+		// It's frustrating, but to accommodate, we'll grab the current mode and status for restoration later, then stick the
+		// scope into auto mode
+		string trigger_sweep_mode = m_transport->SendCommandImmediateWithReply(":TRIG:SWE?");
+		string trigger_status = m_transport->SendCommandImmediateWithReply(":TRIG:STAT?");
+		m_transport->SendCommandImmediate(":TRIG:SWE AUTO");
+		m_transport->SendCommandImmediate(":RUN");
 		switch(depth)
 		{
 			case 1000:
@@ -1111,6 +1118,10 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			default:
 				LogError("Invalid memory depth for channel: %lu\n", depth);
 		}
+		m_transport->SendCommandImmediate(":TRIG:SWE " + trigger_sweep_mode);
+		// This is a little hairy - do we want to stop the instrument again if it was stopped previously? Probably?
+		if(trigger_status == "STOP")
+			m_transport->SendCommandImmediate(":STOP");
 	}
 	else
 	{
