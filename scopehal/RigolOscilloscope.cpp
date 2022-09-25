@@ -797,6 +797,7 @@ bool RigolOscilloscope::AcquireData()
 			if(m_protocol == MSO5)
 			{
 				//Ask for the data block
+				m_transport->SendCommand("*WAI");
 				m_transport->SendCommand("WAV:DATA?");
 			}
 			else if(m_protocol == DS_OLD)
