@@ -35,13 +35,15 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize)
+ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize, size_t numImages)
 	: m_shaderPath(shaderPath)
 	, m_numSSBOs(numSSBOs)
+	, m_numImages(numImages)
 	, m_pushConstantSize(pushConstantSize)
 {
-	m_writeDescriptors.resize(numSSBOs);
+	m_writeDescriptors.resize(numSSBOs + numImages);
 	m_bufferInfo.resize(numSSBOs);
+	m_imageInfo.resize(numImages);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -73,6 +75,11 @@ void ComputePipeline::DeferredInit()
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
 			i, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
+	}
+	for(size_t i=0; i<m_numImages; i++)
+	{
+		bindings.push_back(vk::DescriptorSetLayoutBinding(
+			i + m_numSSBOs, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute));
 	}
 	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
