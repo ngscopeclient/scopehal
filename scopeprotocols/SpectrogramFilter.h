@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 /**
 	@file
 	@author Andrew D. Zonenberg
@@ -159,5 +161,7 @@ protected:
 	std::string m_rangeMinName;
 	std::string m_rangeMaxName;
 };
+
+#endif
 
 #endif

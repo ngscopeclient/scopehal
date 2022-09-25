@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 #include "../scopehal/scopehal.h"
 #include "TDRStepDeEmbedFilter.h"
 #include "FFTFilter.h"
@@ -257,3 +259,5 @@ void TDRStepDeEmbedFilter::Refresh()
 	//Output the resulting data to a Touchstone file
 	params.SaveToFile("/tmp/foo.s2p");
 }
+
+#endif

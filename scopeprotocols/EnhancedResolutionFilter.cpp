@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "EnhancedResolutionFilter.h"
-#include <ffts.h>
 
 using namespace std;
 

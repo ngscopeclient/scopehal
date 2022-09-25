@@ -81,8 +81,10 @@ protected:
 	AcceleratorBuffer<float> m_resampledSparamSines;
 	AcceleratorBuffer<float> m_resampledSparamCosines;
 
+#ifndef _APPLE_SILICON
 	ffts_plan_t* m_forwardPlan;
 	ffts_plan_t* m_reversePlan;
+#endif
 	size_t m_cachedNumPoints;
 
 	AcceleratorBuffer<float> m_forwardInBuf;

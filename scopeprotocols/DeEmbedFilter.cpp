@@ -65,8 +65,10 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 	m_cachedBinSize = 0;
 
+#ifndef _APPLE_SILICON
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
+#endif
 
 	m_cachedNumPoints = 0;
 	m_cachedMaxGain = 0;
@@ -84,6 +86,7 @@ DeEmbedFilter::DeEmbedFilter(const string& color)
 
 DeEmbedFilter::~DeEmbedFilter()
 {
+#ifndef _APPLE_SILICON
 	if(m_forwardPlan)
 		ffts_free(m_forwardPlan);
 	if(m_reversePlan)
@@ -91,6 +94,7 @@ DeEmbedFilter::~DeEmbedFilter()
 
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,6 +194,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 	bool sizechange = false;
 	if(m_cachedNumPoints != npoints)
 	{
+	#ifndef _APPLE_SILICON
 		//Delete old FFTS plan objects
 		if(m_forwardPlan)
 		{
@@ -201,6 +206,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 			ffts_free(m_reversePlan);
 			m_reversePlan = nullptr;
 		}
+	#endif
 
 		m_forwardInBuf.resize(npoints);
 		m_forwardOutBuf.resize(2 * nouts);
@@ -213,8 +219,12 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 		//(save time, don't make FFTS plans if using vkFFT)
 		if(!g_gpuFilterEnabled)
 		{
+		#ifdef _APPLE_SILICON
+			LogFatal("DeEmbedFilter CPU fallback not available on Apple Silicon");
+		#else
 			m_forwardPlan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 			m_reversePlan = ffts_init_1d_real(npoints, FFTS_BACKWARD);
+		#endif
 		}
 	}
 
@@ -353,6 +363,9 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 		cap->MarkModifiedFromGpu();
 	}
 	else
+	#ifdef _APPLE_SILICON
+		LogFatal("DeEmbedFilter CPU fallback not available on Apple Silicon");
+	#else
 	{
 		din->PrepareForCpuAccess();
 		m_forwardInBuf.PrepareForCpuAccess();
@@ -385,6 +398,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 
 		cap->MarkModifiedFromCpu();
 	}
+	#endif
 }
 
 /**

@@ -170,6 +170,25 @@ target_link_libraries(scopehal
 	OSDependent
 	glfw
 	)
+elseif(APPLE_SILICON)
+target_link_libraries(scopehal
+	${SIGCXX_LIBRARIES}
+	${GTKMM_LIBRARIES}
+	xptools
+	log
+	graphwidget
+	${YAML_LIBRARIES}
+	${LXI_LIBRARIES}
+	${LINUXGPIB_LIBRARIES}
+	${WIN_LIBS}
+	${LIN_LIBS}
+	${OpenMP_CXX_LIBRARIES}
+	${Vulkan_LIBRARIES}
+	Vulkan::Vulkan
+	Vulkan::glslang
+	Vulkan::shaderc_combined
+	glfw
+	)
 else()
 target_link_libraries(scopehal
 	${SIGCXX_LIBRARIES}
@@ -192,18 +211,32 @@ target_link_libraries(scopehal
 	)
 endif()
 
-target_include_directories(scopehal
-PUBLIC
-	${CMAKE_CURRENT_SOURCE_DIR}
-	${CMAKE_CURRENT_BINARY_DIR}
-	${LIBFFTS_INCLUDE_DIR}
-	${YAML_INCLUDES}
+if(APPLE_SILICON)
+	target_include_directories(scopehal
+	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_BINARY_DIR}
+		${YAML_INCLUDES}
 
-	# TODO: this needs to come from FindPackage etc
-	/usr/include/glslang/Include
-	# for macOS:
-	/usr/local/include/glslang/Include
-	)
+		# TODO: this needs to come from FindPackage etc
+		/usr/include/glslang/Include
+		# for macOS:
+		/usr/local/include/glslang/Include
+		)
+else()
+	target_include_directories(scopehal
+	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_BINARY_DIR}
+		${LIBFFTS_INCLUDE_DIR}
+		${YAML_INCLUDES}
+
+		# TODO: this needs to come from FindPackage etc
+		/usr/include/glslang/Include
+		# for macOS:
+		/usr/local/include/glslang/Include
+		)
+endif()
 
 target_include_directories(scopehal
 PUBLIC SYSTEM

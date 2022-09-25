@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 /**
 	@file
 	@author Andrew D. Zonenberg
@@ -65,5 +67,7 @@ protected:
 	std::string m_guardIntervalName;
 	std::string m_fftSizeName;
 };
+
+#endif
 
 #endif
