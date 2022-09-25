@@ -12,6 +12,7 @@ GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transpor
 	, SCPIInstrument(transport)
 {
 	auto modelNumber = atoi(m_model.c_str() + strlen("GPD-"));
+
 	// The GPD-3303S/D models have three channels, but only two are programmable and visible via SCPI
 	if (modelNumber == 3303)
 		m_channelCount = 2;
@@ -63,8 +64,11 @@ bool GWInstekGPDX303SPowerSupply::IsPowerConstantCurrent(int chan)
 {
 	auto reg = GetStatusRegister();
 	if(chan >= 2)
-		// TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S, STATUS? is only documented for two channels in the user manual.
+	{
+		// TODO - examine a real-world output of the `STATUS?` command on a GPD-4303S.
+		// STATUS? is only documented for two channels in the user manual.
 		LogError("Error: CC/CV status encoding unknown for 3/4 channel supplies.\n");
+	}
 	return !reg[7 - chan];
 }
 
@@ -133,8 +137,10 @@ void GWInstekGPDX303SPowerSupply::SetPowerVoltage(int chan, double volts)
 {
 	char cmd[128];
 	if(!m_model.empty() && m_model.back() == 'D')
+	{
 		// The GPD-3303D only claims to support 100mV voltage granularity
 		snprintf(cmd, sizeof(cmd), "VSET%u:%.1f", chan+1, volts);
+	}
 	else
 		snprintf(cmd, sizeof(cmd), "VSET%u:%.3f", chan+1, volts);
 	m_transport->SendCommandQueued(cmd);
@@ -144,8 +150,10 @@ void GWInstekGPDX303SPowerSupply::SetPowerCurrent(int chan, double amps)
 {
 	char cmd[128];
 	if(!m_model.empty() && m_model.back() == 'D')
+	{
 		// The GPD-3303D only claims to support 10mA current granularity
 		snprintf(cmd, sizeof(cmd), "ISET%u:%.2f", chan+1, amps);
+	}
 	else
 		snprintf(cmd, sizeof(cmd), "ISET%u:%.3f", chan+1, amps);
 	m_transport->SendCommandQueued(cmd);
