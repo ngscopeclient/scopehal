@@ -82,6 +82,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 			// Reset memory depth
 			m_transport->SendCommand("ACQ:MDEP 1M\n");
 
+			string originalBandwidthLimit = m_transport->SendCommandImmediateWithReply("CHAN1:BWL?");
+
 			// Figure out its actual bandwidth since :SYST:OPT:STAT is practically useless
 			m_transport->SendCommand("CHAN1:BWL 200M\n");
 			m_transport->SendCommand("CHAN1:BWL?\n");
@@ -106,6 +108,8 @@ RigolOscilloscope::RigolOscilloscope(SCPITransport* transport)
 						m_bandwidth = 70;
 				}
 			}
+
+			m_transport->SendCommandImmediate("CHAN1:BWL " + originalBandwidthLimit);
 		}
 	}
 	else
@@ -705,9 +709,6 @@ bool RigolOscilloscope::AcquireData()
 {
 	//LogDebug("Acquiring data\n");
 
-	//TODO
-	bool enabled[4] = {true, true, true, true};
-
 	lock_guard<recursive_mutex> lock(m_mutex);
 	LogIndenter li;
 
@@ -733,7 +734,7 @@ bool RigolOscilloscope::AcquireData()
 	map<int, vector<UniformAnalogWaveform*>> pending_waveforms;
 	for(size_t i = 0; i < m_analogChannelCount; i++)
 	{
-		if(!enabled[i])
+		if(!IsChannelEnabled(i))
 			continue;
 
 		//LogDebug("Channel %zu\n", i);
@@ -797,6 +798,7 @@ bool RigolOscilloscope::AcquireData()
 			if(m_protocol == MSO5)
 			{
 				//Ask for the data block
+				m_transport->SendCommand("*WAI");
 				m_transport->SendCommand("WAV:DATA?");
 			}
 			else if(m_protocol == DS_OLD)
@@ -876,7 +878,7 @@ bool RigolOscilloscope::AcquireData()
 		SequenceSet s;
 		for(size_t j = 0; j < m_analogChannelCount; j++)
 		{
-			if(enabled[j])
+			if(pending_waveforms.count(j) > 0)
 				s[m_channels[j]] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
@@ -1072,6 +1074,13 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	if(m_protocol == MSO5)
 	{
+		// The MSO5 series will only process a sample depth setting if the oscilloscope is in auto or normal mode.
+		// It's frustrating, but to accommodate, we'll grab the current mode and status for restoration later, then stick the
+		// scope into auto mode
+		string trigger_sweep_mode = m_transport->SendCommandImmediateWithReply(":TRIG:SWE?");
+		string trigger_status = m_transport->SendCommandImmediateWithReply(":TRIG:STAT?");
+		m_transport->SendCommandImmediate(":TRIG:SWE AUTO");
+		m_transport->SendCommandImmediate(":RUN");
 		switch(depth)
 		{
 			case 1000:
@@ -1109,6 +1118,10 @@ void RigolOscilloscope::SetSampleDepth(uint64_t depth)
 			default:
 				LogError("Invalid memory depth for channel: %lu\n", depth);
 		}
+		m_transport->SendCommandImmediate(":TRIG:SWE " + trigger_sweep_mode);
+		// This is a little hairy - do we want to stop the instrument again if it was stopped previously? Probably?
+		if(trigger_status == "STOP")
+			m_transport->SendCommandImmediate(":STOP");
 	}
 	else
 	{
