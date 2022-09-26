@@ -106,6 +106,14 @@ public:
 		return m_streams[stream].m_waveform;
 	}
 
+	///Get the flags of a data stream
+	uint8_t GetStreamFlags(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return 0;
+		return m_streams[stream].m_flags;
+	}
+
 	///Detach the capture data from this channel
 	WaveformBase* Detach(size_t stream)
 	{
@@ -216,7 +224,7 @@ protected:
 	/**
 		@brief Adds a new data stream to the channel
 	 */
-	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype);
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
 	/**
 		@brief Display name (user defined, defaults to m_hwname)

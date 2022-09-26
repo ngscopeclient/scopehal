@@ -73,6 +73,14 @@ inline bool StreamDescriptor::operator<(const StreamDescriptor& rhs) const
 	return false;
 }
 
+inline uint8_t StreamDescriptor::GetFlags()
+{
+	if(m_channel == NULL)
+		return 0;
+	else
+		return m_channel->GetStreamFlags(m_stream);
+}
+
 inline float StreamDescriptor::GetVoltageRange()
 {
 	if(m_channel == NULL)
