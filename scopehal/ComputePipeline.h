@@ -64,15 +64,15 @@ public:
 	/**
 		@brief Binds an output image to a descriptor slot
 	 */
-	void BindStorageImage(size_t /*i, Texture* tex*/)
+	void BindStorageImage(size_t i, vk::Sampler sampler, vk::ImageView view, vk::ImageLayout layout)
 	{
 		if(m_computePipeline == nullptr)
 			DeferredInit();
 
-		/*size_t numImage = i - m_numSSBOs;
-		m_imageInfo[numImage] =
+		size_t numImage = i - m_numSSBOs;
+		m_imageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
 		m_writeDescriptors[i] =
-			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_imageInfo[numImage]);*/
+			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_imageInfo[numImage]);
 	}
 
 	/**
