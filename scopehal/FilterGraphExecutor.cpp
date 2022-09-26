@@ -175,7 +175,7 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 	pThis->DoExecutorThread(i);
 }
 
-void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
+void FilterGraphExecutor::DoExecutorThread(size_t i)
 {
 	//Create a queue and command buffer for this thread's accelerated processing
 	vk::CommandPoolCreateInfo poolInfo(
@@ -186,6 +186,33 @@ void FilterGraphExecutor::DoExecutorThread(size_t /*i*/)
 	vk::CommandBufferAllocateInfo bufinfo(*pool, vk::CommandBufferLevel::ePrimary, 1);
 	vk::raii::CommandBuffer cmdbuf(move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 	vk::raii::Queue queue(*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
+
+	if(g_hasDebugUtils)
+	{
+		string prefix = string("FilterGraphExecutor[") + to_string(i) + "]";
+
+		string poolname = prefix + ".pool";
+		string bufname = prefix + ".cmdbuf";
+		string qname = prefix + ".queue";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandPool,
+				reinterpret_cast<int64_t>(static_cast<VkCommandPool>(*pool)),
+				poolname.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(*cmdbuf)),
+				bufname.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eQueue,
+				reinterpret_cast<int64_t>(static_cast<VkQueue>(*queue)),
+				qname.c_str()));
+	}
 
 	//Main loop
 	while(true)

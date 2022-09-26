@@ -490,7 +490,7 @@ bool PicoOscilloscope::AcquireData()
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
-			auto cap = AllocateAnalogWaveform();
+			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
@@ -527,8 +527,9 @@ bool PicoOscilloscope::AcquireData()
 			SparseDigitalWaveform* caps[8];
 			for(size_t j=0; j<8; j++)
 			{
-				caps[j] = new SparseDigitalWaveform;
-				s[m_channels[m_digitalChannelBase + 8*podnum + j] ] = caps[j];
+				auto nchan = m_digitalChannelBase + 8*podnum + j;
+				caps[j] = AllocateDigitalWaveform(m_nickname + "." + GetChannel(nchan)->GetHwname());
+				s[m_channels[nchan] ] = caps[j];
 			}
 
 			//Now that we have the waveform data, unpack it into individual channels

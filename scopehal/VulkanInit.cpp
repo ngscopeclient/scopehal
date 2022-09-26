@@ -339,7 +339,7 @@ bool VulkanInit(bool skipGLFW)
 			static vk::raii::PhysicalDevices devices(*g_vkInstance);
 			for(size_t i=0; i<devices.size(); i++)
 			{
-				auto device = devices[i];
+				auto& device = devices[i];
 				auto features = device.getFeatures();
 				auto properties = device.getProperties();
 				auto memProperties = device.getMemoryProperties();
@@ -532,7 +532,7 @@ bool VulkanInit(bool skipGLFW)
 			int computeQueueCount = 1;
 			int renderQueueCount = 1;
 			{
-				auto device = devices[bestDevice];
+				auto& device = devices[bestDevice];
 				g_vkComputePhysicalDevice = &devices[bestDevice];
 
 				LogIndenter li3;
@@ -811,6 +811,14 @@ bool VulkanInit(bool skipGLFW)
 				g_vkFFTQueue = make_unique<vk::raii::Queue>(
 					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
 			}
+
+			//Destroy other physical devices that we're not using
+			for(size_t i=0; i<devices.size(); i++)
+			{
+				if(i == bestDevice)
+					continue;
+				devices[i].clear();
+			}
 		}
 	}
 	catch ( vk::SystemError & err )
@@ -848,6 +856,46 @@ bool VulkanInit(bool skipGLFW)
 	int vkfft_minor = (vkfftver / 100) % 100;
 	int vkfft_patch = vkfftver % 100;
 	LogDebug("vkFFT version: %d.%d.%d\n", vkfft_major, vkfft_minor, vkfft_patch);
+
+	if(g_hasDebugUtils)
+	{
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDevice,
+				reinterpret_cast<int64_t>(static_cast<VkDevice>(**g_vkComputeDevice)),
+				"g_vkComputeDevice"));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eQueue,
+				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkFFTQueue)),
+				"g_vkFFTQueue"));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eQueue,
+				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkTransferQueue)),
+				"g_vkTransferQueue"));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**g_vkFFTCommandBuffer)),
+				"g_vkFFTCommandBuffer"));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**g_vkTransferCommandBuffer)),
+				"g_vkTransferCommandBuffer"));
+
+		//For some reason this doesn't work?
+		/*g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePhysicalDevice,
+				reinterpret_cast<int64_t>(static_cast<VkPhysicalDevice>(**g_vkComputePhysicalDevice)),
+				"g_vkComputePhysicalDevice"));*/
+	}
 
 	return true;
 }

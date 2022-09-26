@@ -62,7 +62,8 @@ void ComputePipeline::DeferredInit()
 	time_t tstamp = 0;
 	int64_t fs = 0;
 	GetTimestampOfFile(FindDataFile(m_shaderPath), tstamp, fs);
-	auto cache = g_pipelineCacheMgr->Lookup(BaseName(m_shaderPath), tstamp);
+	auto shaderBase = BaseName(m_shaderPath);
+	auto cache = g_pipelineCacheMgr->Lookup(shaderBase, tstamp);
 
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(m_shaderPath);
@@ -119,4 +120,45 @@ void ComputePipeline::DeferredInit()
 	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
 	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
 		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
+
+	//Name the various resources
+	if(g_hasDebugUtils)
+	{
+		string base = string("ComputePipeline.") + shaderBase + ".";
+		string pipelineName = base + ".pipe";
+		string dlName = base + ".dlayout";
+		string plName = base + ".pipelayout";
+		string dsName = base + ".dset";
+		string dpName = base + ".dpool";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePipeline,
+				reinterpret_cast<int64_t>(static_cast<VkPipeline>(**m_computePipeline)),
+				pipelineName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorSetLayout,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorSetLayout>(**m_descriptorSetLayout)),
+				dlName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePipelineLayout,
+				reinterpret_cast<int64_t>(static_cast<VkPipelineLayout>(**m_pipelineLayout)),
+				plName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorPool,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
+				dpName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorSet,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
+				dsName.c_str()));
+	}
 }

@@ -908,19 +908,40 @@ protected:
 
 	WaveformPool m_digitalWaveformPool;
 
-	UniformAnalogWaveform* AllocateAnalogWaveform()
+	UniformAnalogWaveform* AllocateAnalogWaveform(const std::string& name)
 	{
 		auto p = m_analogWaveformPool.Get();
 		auto ret = dynamic_cast<UniformAnalogWaveform*>(p);
 		if(ret)
+		{
+			ret->Rename(name);
 			return ret;
+		}
 
 		//Delete garbage if somebody pushed the wrong type of waveform
 		if(p)
 			delete p;
 
 		//Pool was empty, allocate a new waveform
-		return new UniformAnalogWaveform;
+		return new UniformAnalogWaveform(name);
+	}
+
+	SparseDigitalWaveform* AllocateDigitalWaveform(const std::string& name)
+	{
+		auto p = m_digitalWaveformPool.Get();
+		auto ret = dynamic_cast<SparseDigitalWaveform*>(p);
+		if(ret)
+		{
+			ret->Rename(name);
+			return ret;
+		}
+
+		//Delete garbage if somebody pushed the wrong type of waveform
+		if(p)
+			delete p;
+
+		//Pool was empty, allocate a new waveform
+		return new SparseDigitalWaveform(name);
 	}
 
 public:

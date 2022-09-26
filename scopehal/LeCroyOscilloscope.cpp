@@ -2430,7 +2430,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 	for(size_t j=0; j<num_sequences; j++)
 	{
 		//Set up the capture we're going to store our data into
-		auto cap = AllocateAnalogWaveform();
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(j)->GetHwname());
 		cap->m_timescale = round(interval);
 		cap->m_triggerPhase = h_off_frac;
 		cap->m_startTimestamp = ttime;
@@ -2556,7 +2556,7 @@ map<int, SparseDigitalWaveform*> LeCroyOscilloscope::ProcessDigitalWaveform(stri
 	{
 		if(enabledChannels[i])
 		{
-			auto cap = new SparseDigitalWaveform;
+			auto cap = AllocateDigitalWaveform(m_nickname + "." + GetChannel(m_digitalChannelBase + i)->GetHwname());
 			cap->m_timescale = interval;
 			cap->PrepareForCpuAccess();
 

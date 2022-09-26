@@ -236,12 +236,22 @@ class UniformWaveform : public UniformWaveformBase
 {
 public:
 
-	UniformWaveform()
+	UniformWaveform(const std::string& name = "")
 	{
+		Rename(name);
+
 		//Default data to CPU/GPU mirror
 		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.PrepareForCpuAccess();
+	}
+
+	void Rename(const std::string& name = "")
+	{
+		if(name.empty())
+			m_samples.SetName(std::string("UniformWaveform<") + typeid(S).name() + ">.m_samples");
+		else
+			m_samples.SetName(name + ".m_samples");
 	}
 
 	/**
@@ -252,6 +262,8 @@ public:
 	UniformWaveform(const SparseWaveform<S>& rhs)
 		: UniformWaveformBase(rhs)
 	{
+		m_samples.SetName(std::string("UniformWaveform<") + typeid(S).name() + ">.m_samples");
+
 		m_samples.CopyFrom(rhs.m_samples);
 	}
 
@@ -300,12 +312,30 @@ class SparseWaveform : public SparseWaveformBase
 {
 public:
 
-	SparseWaveform()
+	SparseWaveform(const std::string& name = "")
 	{
+		Rename(name);
+
 		//Default data to CPU/GPU mirror
 		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.PrepareForCpuAccess();
+	}
+
+	void Rename(const std::string& name = "")
+	{
+		if(name.empty())
+		{
+			m_samples.SetName(std::string("UniformWaveform<") + typeid(S).name() + ">.m_samples");
+			m_offsets.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_offsets");
+			m_durations.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_durations");
+		}
+		else
+		{
+			m_samples.SetName(name + ".m_samples");
+			m_offsets.SetName(name + ".m_offsets");
+			m_durations.SetName(name + ".m_durations");
+		}
 	}
 
 	/**
@@ -313,6 +343,10 @@ public:
 	 */
 	SparseWaveform(UniformWaveform<S>& rhs)
 	{
+		m_samples.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_samples");
+		m_offsets.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_offsets");
+		m_durations.SetName(std::string("SparseWaveform<") + typeid(S).name() + ">.m_durations");
+
 		m_samples.SetCpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.SetGpuAccessHint(AcceleratorBuffer<S>::HINT_LIKELY);
 		m_samples.PrepareForCpuAccess();

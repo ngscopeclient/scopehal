@@ -96,6 +96,15 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_rawfence = *m_fence;
 	m_pipelineCache = **g_pipelineCacheMgr->Lookup(cacheKey + ".spv", VkFFTGetVersion());
 
+	if(g_hasDebugUtils)
+	{
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eFence,
+				reinterpret_cast<int64_t>(m_rawfence),
+				"VulkanFFTPlan.m_rawfence"));
+	}
+
 	m_config.physicalDevice = &m_physicalDevice;
 	m_config.device = &m_device;
 	m_config.queue = &m_queue;
