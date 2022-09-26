@@ -101,12 +101,18 @@ void ComputePipeline::DeferredInit()
 		std::move(g_vkComputeDevice->createComputePipelines(*cache, pinfo).front()));
 
 	//Descriptor pool for our shader parameters
-	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
+	vk::DescriptorPoolSize ssboPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
+	vk::DescriptorPoolSize imagePoolSize(vk::DescriptorType::eStorageImage, m_numImages);
+	vk::DescriptorPoolSize poolSizes[2] =
+	{
+		ssboPoolSize,
+		imagePoolSize
+	};
 	vk::DescriptorPoolCreateInfo poolInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
 			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
 		1,
-		poolSize);
+		poolSizes);
 	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
 
 	//Set up descriptors for our buffers
