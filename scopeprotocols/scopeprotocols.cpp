@@ -44,6 +44,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(ACRMSMeasurement);
 	AddDecoderClass(ADL5205Decoder);
+	AddDecoderClass(AreaMeasurement);
 	AddDecoderClass(BaseMeasurement);
 	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(BurstWidthMeasurement);

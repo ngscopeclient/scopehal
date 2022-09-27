@@ -42,6 +42,7 @@
 #include "ACCoupleFilter.h"
 #include "ACRMSMeasurement.h"
 #include "ADL5205Decoder.h"
+#include "AreaMeasurement.h"
 #include "AutocorrelationFilter.h"
 #include "BaseMeasurement.h"
 #include "BINImportFilter.h"

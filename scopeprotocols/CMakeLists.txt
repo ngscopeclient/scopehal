@@ -5,6 +5,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleFilter.cpp
 	ACRMSMeasurement.cpp
 	ADL5205Decoder.cpp
+	AreaMeasurement.cpp
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
 	BINImportFilter.cpp
