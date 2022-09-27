@@ -94,7 +94,7 @@ public:
 	/**
 		@brief Helper function to insert a memory barrier in a command buffer
 	 */
-	void AddComputeMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
+	static void AddComputeMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
 	{
 		cmdBuf.pipelineBarrier(
 			vk::PipelineStageFlagBits::eComputeShader,
