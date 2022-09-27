@@ -35,13 +35,15 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize)
+ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize, size_t numImages)
 	: m_shaderPath(shaderPath)
 	, m_numSSBOs(numSSBOs)
+	, m_numImages(numImages)
 	, m_pushConstantSize(pushConstantSize)
 {
-	m_writeDescriptors.resize(numSSBOs);
+	m_writeDescriptors.resize(numSSBOs + numImages);
 	m_bufferInfo.resize(numSSBOs);
+	m_imageInfo.resize(numImages);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -60,7 +62,8 @@ void ComputePipeline::DeferredInit()
 	time_t tstamp = 0;
 	int64_t fs = 0;
 	GetTimestampOfFile(FindDataFile(m_shaderPath), tstamp, fs);
-	auto cache = g_pipelineCacheMgr->Lookup(BaseName(m_shaderPath), tstamp);
+	auto shaderBase = BaseName(m_shaderPath);
+	auto cache = g_pipelineCacheMgr->Lookup(shaderBase, tstamp);
 
 	//Load the shader module
 	auto srcvec = ReadDataFileUint32(m_shaderPath);
@@ -73,6 +76,11 @@ void ComputePipeline::DeferredInit()
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
 			i, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
+	}
+	for(size_t i=0; i<m_numImages; i++)
+	{
+		bindings.push_back(vk::DescriptorSetLayoutBinding(
+			i + m_numSSBOs, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute));
 	}
 	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
@@ -94,16 +102,63 @@ void ComputePipeline::DeferredInit()
 		std::move(g_vkComputeDevice->createComputePipelines(*cache, pinfo).front()));
 
 	//Descriptor pool for our shader parameters
-	vk::DescriptorPoolSize poolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
+	vk::DescriptorPoolSize ssboPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
+	vk::DescriptorPoolSize imagePoolSize(vk::DescriptorType::eStorageImage, m_numImages);
+	vk::DescriptorPoolSize poolSizes[2] =
+	{
+		ssboPoolSize,
+		imagePoolSize
+	};
 	vk::DescriptorPoolCreateInfo poolInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
 			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
 		1,
-		poolSize);
+		poolSizes);
 	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
 
 	//Set up descriptors for our buffers
 	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
 	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
 		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
+
+	//Name the various resources
+	if(g_hasDebugUtils)
+	{
+		string base = string("ComputePipeline.") + shaderBase + ".";
+		string pipelineName = base + ".pipe";
+		string dlName = base + ".dlayout";
+		string plName = base + ".pipelayout";
+		string dsName = base + ".dset";
+		string dpName = base + ".dpool";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePipeline,
+				reinterpret_cast<int64_t>(static_cast<VkPipeline>(**m_computePipeline)),
+				pipelineName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorSetLayout,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorSetLayout>(**m_descriptorSetLayout)),
+				dlName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePipelineLayout,
+				reinterpret_cast<int64_t>(static_cast<VkPipelineLayout>(**m_pipelineLayout)),
+				plName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorPool,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
+				dpName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDescriptorSet,
+				reinterpret_cast<int64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
+				dsName.c_str()));
+	}
 }

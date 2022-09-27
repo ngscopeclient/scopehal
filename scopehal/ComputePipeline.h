@@ -35,15 +35,14 @@
 /**
 	@brief A ComputePipeline encapsulates a Vulkan compute pipeline and all necessary resources to use it
 
-	For now, only pure compute is supported, and there is no support for accessing images or other non-SSBO
-	data types.
+	Requirement: image bindings are numerically after SSBO bindings
 
 	A ComputePipeline is typically owned by a filter instance.
  */
 class ComputePipeline
 {
 public:
-	ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize);
+	ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize, size_t numImages = 0);
 	virtual ~ComputePipeline();
 
 	/**
@@ -60,6 +59,20 @@ public:
 		m_bufferInfo[i] = buf.GetBufferInfo();
 		m_writeDescriptors[i] =
 			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+	}
+
+	/**
+		@brief Binds an output image to a descriptor slot
+	 */
+	void BindStorageImage(size_t i, vk::Sampler sampler, vk::ImageView view, vk::ImageLayout layout)
+	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+
+		size_t numImage = i - m_numSSBOs;
+		m_imageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
+		m_writeDescriptors[i] =
+			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_imageInfo[numImage]);
 	}
 
 	/**
@@ -81,7 +94,7 @@ public:
 	/**
 		@brief Helper function to insert a memory barrier in a command buffer
 	 */
-	void AddComputeMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
+	static void AddComputeMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
 	{
 		cmdBuf.pipelineBarrier(
 			vk::PipelineStageFlagBits::eComputeShader,
@@ -122,6 +135,7 @@ protected:
 
 	std::string m_shaderPath;
 	size_t m_numSSBOs;
+	size_t m_numImages;
 	size_t m_pushConstantSize;
 
 	std::unique_ptr<vk::raii::ShaderModule> m_shaderModule;
@@ -133,6 +147,7 @@ protected:
 
 	std::vector<vk::WriteDescriptorSet> m_writeDescriptors;
 	std::vector<vk::DescriptorBufferInfo> m_bufferInfo;
+	std::vector<vk::DescriptorImageInfo> m_imageInfo;
 };
 
 #endif

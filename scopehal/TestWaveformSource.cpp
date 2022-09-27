@@ -88,7 +88,7 @@ WaveformBase* TestWaveformSource::GenerateStep(
 	int64_t sampleperiod,
 	size_t depth)
 {
-	auto ret = new UniformAnalogWaveform;
+	auto ret = new UniformAnalogWaveform("Step");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -115,7 +115,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewave(
 	size_t depth,
 	float noise_amplitude)
 {
-	auto ret = new UniformAnalogWaveform;
+	auto ret = new UniformAnalogWaveform("NoisySine");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -146,7 +146,7 @@ WaveformBase* TestWaveformSource::GenerateNoisySinewaveMix(
 	size_t depth,
 	float noise_amplitude)
 {
-	auto ret = new UniformAnalogWaveform;
+	auto ret = new UniformAnalogWaveform("NoisySineMix");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -178,7 +178,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 	float noise_amplitude
 	)
 {
-	auto ret = new UniformAnalogWaveform;
+	auto ret = new UniformAnalogWaveform("PRBS31");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 
@@ -233,7 +233,7 @@ WaveformBase* TestWaveformSource::Generate8b10b(
 	bool lpf,
 	float noise_amplitude)
 {
-	auto ret = new UniformAnalogWaveform;
+	auto ret = new UniformAnalogWaveform("8B10B");
 	ret->m_timescale = sampleperiod;
 	ret->Resize(depth);
 

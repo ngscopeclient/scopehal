@@ -172,6 +172,18 @@ shared_ptr<vk::raii::PipelineCache> PipelineCacheManager::Lookup(const string& k
 	auto ret = make_shared<vk::raii::PipelineCache>(*g_vkComputeDevice, info);
 	m_vkCache[key] = ret;
 	m_vkCacheTimestamps[key] = target;
+
+	//Name it
+	if(g_hasDebugUtils)
+	{
+		string name = string("PipelineCache.") + key;
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::ePipelineCache,
+				reinterpret_cast<int64_t>(static_cast<VkPipelineCache>(**ret)),
+				name.c_str()));
+	}
+
 	return ret;
 }
 

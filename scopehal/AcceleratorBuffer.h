@@ -52,6 +52,8 @@ extern std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 extern std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
 extern std::mutex g_vkTransferMutex;
 
+extern bool g_hasDebugUtils;
+
 template<class T>
 class AcceleratorBuffer;
 
@@ -273,7 +275,7 @@ public:
 	/**
 		@brief Creates a new AcceleratorBuffer with no content
 	 */
-	AcceleratorBuffer()
+	AcceleratorBuffer(const std::string& name = "")
 		: m_cpuMemoryType(MEM_TYPE_NULL)
 		, m_gpuMemoryType(MEM_TYPE_NULL)
 		, m_cpuPtr(nullptr)
@@ -288,6 +290,7 @@ public:
 		, m_size(0)
 		, m_cpuAccessHint(HINT_LIKELY)	//default access hint: CPU-side pinned memory
 		, m_gpuAccessHint(HINT_UNLIKELY)
+		, m_name(name)
 	{
 	}
 
@@ -994,6 +997,9 @@ protected:
 
 			//We now have pinned memory
 			m_cpuMemoryType = MEM_TYPE_CPU_DMA_CAPABLE;
+
+			if(g_hasDebugUtils)
+				UpdateCpuNames();
 		}
 
 		//If frequent CPU access is expected, use normal host memory
@@ -1144,7 +1150,83 @@ protected:
 		m_gpuMemoryType = MEM_TYPE_GPU_ONLY;
 
 		m_gpuBuffer->bindMemory(**m_gpuPhysMem, 0);
+
+		if(g_hasDebugUtils)
+			UpdateGpuNames();
 	}
+
+protected:
+
+	///@brief Friendly name of the buffer (for debug tools)
+	std::string m_name;
+
+	/**
+		@brief Pushes our friendly name to the underlying Vulkan objects
+	 */
+	__attribute__((noinline))
+	void UpdateGpuNames()
+	{
+		std::string sname = m_name;
+		if(sname.empty())
+			sname = "unnamed";
+		std::string prefix = std::string("AcceleratorBuffer.") + sname + ".";
+
+		std::string gpuBufName = prefix + "m_gpuBuffer";
+		std::string gpuPhysName = prefix + "m_gpuPhysMem";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkBuffer>(**m_gpuBuffer)),
+				gpuBufName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDeviceMemory,
+				reinterpret_cast<int64_t>(static_cast<VkDeviceMemory>(**m_gpuPhysMem)),
+				gpuPhysName.c_str()));
+	}
+
+	/**
+		@brief Pushes our friendly name to the underlying Vulkan objects
+	 */
+	__attribute__((noinline))
+	void UpdateCpuNames()
+	{
+		std::string sname = m_name;
+		if(sname.empty())
+			sname = "unnamed";
+		std::string prefix = std::string("AcceleratorBuffer.") + sname + ".";
+
+		std::string cpuBufName = prefix + "m_cpuBuffer";
+		std::string cpuPhysName = prefix + "m_cpuPhysMem";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkBuffer>(**m_cpuBuffer)),
+				cpuBufName.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eDeviceMemory,
+				reinterpret_cast<int64_t>(static_cast<VkDeviceMemory>(**m_cpuPhysMem)),
+				cpuPhysName.c_str()));
+	}
+
+public:
+	void SetName(std::string name)
+	{
+		m_name = name;
+		if(g_hasDebugUtils)
+		{
+			if(m_gpuBuffer != nullptr)
+				UpdateGpuNames();
+			if(m_cpuBuffer != nullptr)
+				UpdateCpuNames();
+		}
+	}
+
 };
 
 #endif
