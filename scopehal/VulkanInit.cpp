@@ -115,26 +115,6 @@ uint32_t g_computeQueueType;
 uint32_t g_renderQueueType;
 
 /**
-	@brief Command buffer for submitting vkFFT calls to
- */
-unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
-
-/**
-	@brief Command buffer for submitting vkFFT calls to
- */
-unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
-
-/**
-	@brief Command queue for submitting vkFFT calls to
- */
-unique_ptr<vk::raii::Queue> g_vkFFTQueue;
-
-/**
-	@brief Mutex for controlling access to g_vkfFFT*
- */
-mutex g_vkFFTMutex;
-
-/**
 	@brief UUID of g_vkComputeDevice
  */
 uint8_t g_vkComputeDeviceUuid[16];
@@ -793,7 +773,6 @@ bool VulkanInit(bool skipGLFW)
 					vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 					g_computeQueueType );
 				g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
-				g_vkFFTCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
 				//Make a CommandBuffer for memory transfers that we can use implicitly during buffer management
 				vk::CommandBufferAllocateInfo bufinfo(**g_vkTransferCommandPool, vk::CommandBufferLevel::ePrimary, 1);
@@ -802,13 +781,6 @@ bool VulkanInit(bool skipGLFW)
 
 				//Make a Queue for memory transfers that we can use implicitly during buffer management
 				g_vkTransferQueue = make_unique<vk::raii::Queue>(
-					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
-
-				//And again for FFTs
-				bufinfo = vk::CommandBufferAllocateInfo(**g_vkFFTCommandPool, vk::CommandBufferLevel::ePrimary, 1);
-				g_vkFFTCommandBuffer = make_unique<vk::raii::CommandBuffer>(
-					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-				g_vkFFTQueue = make_unique<vk::raii::Queue>(
 					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
 			}
 
@@ -868,20 +840,8 @@ bool VulkanInit(bool skipGLFW)
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
 				vk::ObjectType::eQueue,
-				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkFFTQueue)),
-				"g_vkFFTQueue"));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
 				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkTransferQueue)),
 				"g_vkTransferQueue"));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**g_vkFFTCommandBuffer)),
-				"g_vkFFTCommandBuffer"));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
@@ -937,10 +897,6 @@ void VulkanCleanup()
 	g_pipelineCacheMgr = nullptr;
 
 	glslang_finalize_process();
-
-	g_vkFFTQueue = nullptr;
-	g_vkFFTCommandBuffer = nullptr;
-	g_vkFFTCommandPool = nullptr;
 
 	g_vkTransferQueue = nullptr;
 	g_vkTransferCommandBuffer = nullptr;
