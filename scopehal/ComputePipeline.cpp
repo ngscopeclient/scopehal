@@ -123,7 +123,7 @@ void ComputePipeline::DeferredInit()
 	if(g_hasDebugUtils)
 	{
 		string base = string("ComputePipeline.") + shaderBase + ".";
-		string pipelineName = base + ".pipe";
+		string pipelineName = base + "pipe";
 		string dlName = base + "dlayout";
 		string plName = base + "pipelayout";
 		string dsName = base + "dset";
