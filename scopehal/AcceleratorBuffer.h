@@ -888,7 +888,9 @@ protected:
 			vk::PipelineStageFlagBits::eTransfer,
 			vk::PipelineStageFlagBits::eComputeShader,
 			{},
-			vk::MemoryBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead),
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eTransferWrite,
+				vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite),
 			{},
 			{});
 
