@@ -76,6 +76,7 @@ public:
 	bool operator==(const StreamDescriptor& rhs) const;
 	bool operator!=(const StreamDescriptor& rhs) const;
 	bool operator<(const StreamDescriptor& rhs) const;
+	uint8_t GetFlags();
 	float GetVoltageRange();
 	float GetOffset();
 	void SetVoltageRange(float v);

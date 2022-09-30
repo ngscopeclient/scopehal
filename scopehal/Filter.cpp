@@ -1353,9 +1353,9 @@ void Filter::ClearStreams()
 	m_offsets.clear();
 }
 
-void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
+void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
 {
-	OscilloscopeChannel::AddStream(yunit, name, stype);
+	OscilloscopeChannel::AddStream(yunit, name, stype, flags);
 	m_ranges.push_back(0);
 	m_offsets.push_back(0);
 }

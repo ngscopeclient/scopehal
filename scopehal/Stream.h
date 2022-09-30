@@ -74,11 +74,12 @@ public:
 		STREAM_TYPE_UNDEFINED
 	};
 
-	Stream(Unit yunit, std::string name, StreamType type)
+	Stream(Unit yunit, std::string name, StreamType type, uint8_t flags = 0)
 	: m_yAxisUnit(yunit)
 	, m_name(name)
 	, m_waveform(nullptr)
 	, m_stype(type)
+	, m_flags(flags)
 	{}
 
 	///Unit of measurement for our vertical axis
@@ -92,6 +93,20 @@ public:
 
 	///@brief General datatype stored in the stream
 	StreamType m_stype;
+
+	
+	/**
+		@brief Flags that apply to this waveform. Bitfield.
+		STREAM_DO_NOT_INTERPOLATE: *hint* that this stream should not be rendered with interpolation
+		                           even though/if it is analog. E.g. measurement values related to
+		                           discrete parts of a waveform.
+	 */
+	uint8_t m_flags;
+
+	enum
+	{
+		STREAM_DO_NOT_INTERPOLATE = 1
+	};
 };
 
 #endif

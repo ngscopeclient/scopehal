@@ -110,7 +110,7 @@ public:
 	{ return m_filters; }
 
 	virtual void ClearStreams();
-	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype);
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
 	void AddProtocolStream(const std::string& name)
 	{ AddStream(Unit(Unit::UNIT_COUNTS), name, Stream::STREAM_TYPE_PROTOCOL); }
