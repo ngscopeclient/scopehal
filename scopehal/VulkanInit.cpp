@@ -35,6 +35,7 @@
 #include "scopehal.h"
 #include <glslang_c_interface.h>
 #include "PipelineCacheManager.h"
+#include "QueueManager.h"
 #include <GLFW/glfw3.h>
 
 //Lots of warnings here, disable them
@@ -63,7 +64,7 @@ unique_ptr<vk::raii::Instance> g_vkInstance;
 /**
 	@brief The Vulkan device selected for compute operations (may or may not be same device as rendering)
  */
-unique_ptr<vk::raii::Device> g_vkComputeDevice;
+shared_ptr<vk::raii::Device> g_vkComputeDevice;
 
 /**
 	@brief Command pool for AcceleratorBuffer transfers
@@ -87,7 +88,14 @@ unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
 	This is a single global resource interlocked by g_vkTransferMutex and is used for convenience and code simplicity
 	when parallelism isn't that important.
  */
-unique_ptr<vk::raii::Queue> g_vkTransferQueue;
+shared_ptr<QueueHandle> g_vkTransferQueue;
+
+/**
+ * @brief Allocates QueueHandle objects
+ * 
+ * This is a single global resource, all QueueHandles must be obtained through this object.
+ */
+std::unique_ptr<QueueManager> g_vkQueueManager;
 
 /**
 	@brief Mutex for interlocking access to g_vkTransferCommandBuffer and g_vkTransferCommandPool
@@ -105,16 +113,6 @@ uint32_t g_vkPinnedMemoryType;
 uint32_t g_vkLocalMemoryType;
 
 /**
-	@brief Vulkan queue type for submitting compute operations (may or may not be render capable)
- */
-uint32_t g_computeQueueType;
-
-/**
-	@brief Vulkan queue type for submitting rendering operations
- */
-uint32_t g_renderQueueType;
-
-/**
 	@brief Command buffer for submitting vkFFT calls to
  */
 unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
@@ -127,7 +125,7 @@ unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
 /**
 	@brief Command queue for submitting vkFFT calls to
  */
-unique_ptr<vk::raii::Queue> g_vkFFTQueue;
+shared_ptr<QueueHandle> g_vkFFTQueue;
 
 /**
 	@brief Mutex for controlling access to g_vkfFFT*
@@ -158,47 +156,6 @@ bool g_hasShaderInt8 = false;
 bool g_hasDebugUtils = false;
 
 void VulkanCleanup();
-
-/**
-	@brief Allocates a queue index for Vulkan compute queues
- */
-int AllocateVulkanComputeQueue()
-{
-#ifdef __APPLE__
-	LogWarning(
-		"AllocateVulkanComputeQueue needs to be fixed on Apple, returning 0 for now. "
-		"See https://github.com/glscopeclient/scopehal/issues/685\n");
-	return 0;
-#endif
-	static mutex allocMutex;
-
-	lock_guard<mutex> lock(allocMutex);
-
-	static int nextQueue = 0;
-	return (nextQueue ++);
-}
-
-/**
-	@brief Allocates a queue index for Vulkan render queues
- */
-int AllocateVulkanRenderQueue()
-{
-#ifdef __APPLE__
-	LogWarning(
-		"AllocateVulkanRenderQueue needs to be fixed on Apple, returning 0 for now. "
-		"See https://github.com/glscopeclient/scopehal/issues/685\n");
-	return 0;
-#endif
-	//If compute and rendering use the same kind of queue, make sure we don't double count!
-	if(g_computeQueueType == g_renderQueueType)
-		return AllocateVulkanComputeQueue();
-
-	//No, allocate from the other queue type
-	static mutex allocMutex;
-	lock_guard<mutex> lock(allocMutex);
-	static int nextQueue = 0;
-	return (nextQueue ++);
-}
 
 /**
 	@brief Initialize a Vulkan context for compute
@@ -540,10 +497,6 @@ bool VulkanInit(bool skipGLFW)
 				//Look at queue families
 				auto families = device.getQueueFamilyProperties();
 				LogDebug("Queue families (%zu total)\n", families.size());
-				bool foundCompute = false;
-				bool foundRender = false;
-				g_computeQueueType = 0;
-				g_renderQueueType = 0;
 				{
 					LogIndenter li4;
 					for(size_t j=0; j<families.size(); j++)
@@ -570,50 +523,7 @@ bool VulkanInit(bool skipGLFW)
 							if(f.queueFlags & vk::QueueFlagBits::eVideoEncodeKHR)
 								LogDebug("Video encode\n");
 						#endif
-
-						//TODO: pick a queue type to use just for transfers that is different from the others, if possible
-
-						//Pick the first type that supports compute and transfers
-						if( (f.queueFlags & vk::QueueFlagBits::eCompute) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
-						{
-							if(!foundCompute)
-							{
-								foundCompute = true;
-								g_computeQueueType = j;
-								computeQueueCount = f.queueCount;
-
-								LogDebug("Using this queue type for compute\n");
-							}
-						}
-
-						//Pick the first type that supports graphics and transfers, and that we can render to
-						if( (f.queueFlags & vk::QueueFlagBits::eGraphics) && (f.queueFlags & vk::QueueFlagBits::eTransfer) )
-						{
-							if(!foundRender && !skipGLFW)
-							{
-								//Check if we can render to this device
-								if(GLFW_TRUE == glfwGetPhysicalDevicePresentationSupport(**g_vkInstance, *device, j))
-								{
-									foundRender = true;
-									g_renderQueueType = j;
-									renderQueueCount = f.queueCount;
-
-									LogDebug("Using this queue type for rendering\n");
-								}
-							}
-						}
 					}
-				}
-
-				if(!foundCompute)
-				{
-					LogError("Failed to find suitable compute queue type\n");
-					return false;
-				}
-				if(!foundRender && !skipGLFW)
-				{
-					LogError("Failed to find suitable render queue type\n");
-					return false;
 				}
 
 				//Save settings
@@ -699,22 +609,16 @@ bool VulkanInit(bool skipGLFW)
 					}
 				}
 
-				//Request as many compute queues as we're allowed to, and make them all equal priority.
-				vector<float> computeQueuePriority;
-				for(int i=0; i<computeQueueCount; i++)
-					computeQueuePriority.push_back(0.5);
+				//Request all available queues, and make them all equal priority.
 				vector<vk::DeviceQueueCreateInfo> qinfo;
-				qinfo.push_back(vk::DeviceQueueCreateInfo(
-					{}, g_computeQueueType, computeQueueCount, &computeQueuePriority[0]));
-
-				//If render queue is a different type than compute, create a bunch of those queues
-				vector<float> renderQueuePriority;
-				for(int i=0; i<renderQueueCount; i++)
-					renderQueuePriority.push_back(0.5);
-				if(g_computeQueueType != g_renderQueueType)
+				vector<float> queuePriority;
+				for(size_t i=0; i<families.size(); i++)
 				{
+					auto f = families[i];
+					for(size_t j=queuePriority.size(); j<f.queueCount; j++)
+						queuePriority.push_back(0.5);
 					qinfo.push_back(vk::DeviceQueueCreateInfo(
-						{}, g_renderQueueType, renderQueueCount, &renderQueuePriority[0]));
+						{}, i, f.queueCount, &queuePriority[0]));
 				}
 
 				//Initialize the device
@@ -727,7 +631,7 @@ bool VulkanInit(bool skipGLFW)
 					devextensions,
 					&enabledFeatures,
 					pNext);
-				g_vkComputeDevice = make_unique<vk::raii::Device>(device, devinfo);
+				g_vkComputeDevice = make_shared<vk::raii::Device>(device, devinfo);
 
 				//Figure out what memory types to use for various purposes
 				bool foundPinnedType = false;
@@ -788,10 +692,16 @@ bool VulkanInit(bool skipGLFW)
 				LogDebug("Using type %u for pinned host memory\n", g_vkPinnedMemoryType);
 				LogDebug("Using type %u for card-local memory\n", g_vkLocalMemoryType);
 
+				//Make the queue manager
+				g_vkQueueManager = make_unique<QueueManager>(g_vkComputePhysicalDevice, g_vkComputeDevice);
+
+				//Make a Queue for memory transfers that we can use implicitly during buffer management
+				g_vkTransferQueue = g_vkQueueManager->GetTransferQueue("g_vkTransferQueue");
+
 				//Make a CommandPool for transfers and another one for vkFFT
 				vk::CommandPoolCreateInfo poolInfo(
 					vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-					g_computeQueueType );
+					g_vkTransferQueue->m_family );
 				g_vkTransferCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 				g_vkFFTCommandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 
@@ -800,16 +710,11 @@ bool VulkanInit(bool skipGLFW)
 				g_vkTransferCommandBuffer = make_unique<vk::raii::CommandBuffer>(
 					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
 
-				//Make a Queue for memory transfers that we can use implicitly during buffer management
-				g_vkTransferQueue = make_unique<vk::raii::Queue>(
-					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
-
 				//And again for FFTs
 				bufinfo = vk::CommandBufferAllocateInfo(**g_vkFFTCommandPool, vk::CommandBufferLevel::ePrimary, 1);
 				g_vkFFTCommandBuffer = make_unique<vk::raii::CommandBuffer>(
 					std::move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-				g_vkFFTQueue = make_unique<vk::raii::Queue>(
-					*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
+				g_vkFFTQueue = g_vkQueueManager->GetComputeQueue("g_vkFFTQueue");
 			}
 
 			//Destroy other physical devices that we're not using
@@ -864,18 +769,6 @@ bool VulkanInit(bool skipGLFW)
 				vk::ObjectType::eDevice,
 				reinterpret_cast<int64_t>(static_cast<VkDevice>(**g_vkComputeDevice)),
 				"g_vkComputeDevice"));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkFFTQueue)),
-				"g_vkFFTQueue"));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<int64_t>(static_cast<VkQueue>(**g_vkTransferQueue)),
-				"g_vkTransferQueue"));
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
@@ -945,6 +838,8 @@ void VulkanCleanup()
 	g_vkTransferQueue = nullptr;
 	g_vkTransferCommandBuffer = nullptr;
 	g_vkTransferCommandPool = nullptr;
+
+	g_vkQueueManager = nullptr;
 
 	g_vkComputeDevice = nullptr;
 	g_vkInstance = nullptr;

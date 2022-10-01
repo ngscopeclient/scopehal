@@ -178,14 +178,14 @@ void FilterGraphExecutor::ExecutorThread(FilterGraphExecutor* pThis, size_t i)
 void FilterGraphExecutor::DoExecutorThread(size_t i)
 {
 	//Create a queue and command buffer for this thread's accelerated processing
+	std::shared_ptr<QueueHandle> queue(g_vkQueueManager->GetComputeQueue("FilterGraphExecutor[" + to_string(i) + "].queue"));
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_computeQueueType );
+		queue->m_family );
 	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
 
 	vk::CommandBufferAllocateInfo bufinfo(*pool, vk::CommandBufferLevel::ePrimary, 1);
 	vk::raii::CommandBuffer cmdbuf(move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
-	vk::raii::Queue queue(*g_vkComputeDevice, g_computeQueueType, AllocateVulkanComputeQueue());
 
 	if(g_hasDebugUtils)
 	{
@@ -193,7 +193,6 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 
 		string poolname = prefix + ".pool";
 		string bufname = prefix + ".cmdbuf";
-		string qname = prefix + ".queue";
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(
@@ -206,12 +205,6 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 				vk::ObjectType::eCommandBuffer,
 				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(*cmdbuf)),
 				bufname.c_str()));
-
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eQueue,
-				reinterpret_cast<int64_t>(static_cast<VkQueue>(*queue)),
-				qname.c_str()));
 	}
 
 	//Main loop
@@ -251,7 +244,10 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 			}
 
 			//Actually execute the filter
-			f->Refresh(cmdbuf, queue);
+			{
+				QueueLock lock(queue);
+				f->Refresh(cmdbuf, *lock);
+			}
 
 			//Filter execution has completed, remove it from the running list and mark as completed
 			lock_guard<mutex> lock2(m_mutex);
