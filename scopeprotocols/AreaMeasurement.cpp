@@ -93,23 +93,28 @@ void AreaMeasurement::Refresh()
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto length = din->size();
 	float area = 0;
+	float c = 0;
 
 	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
 
 	if (measurement_type == AVERAGE_AREA)
 	{
-		//Simply sum all values
 		if(uadin)
 		{
 			//Create the output as a uniform waveform with single sample
 			auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
 			cap->PrepareForCpuAccess();
 
+			//Perform summation using Kahan Summation Algorithm
 			for (size_t i = 0; i < length; i++)
-			{				
-				area += (fabs(uadin->m_samples[i]) * din->m_timescale) / FS_PER_SECOND;
+			{
+				float y = (fabs(uadin->m_samples[i]) * din->m_timescale) - c;
+				volatile float t = area + y;
+				volatile float z = t - area;
+				c = z - y;
+				area = t;
 
-				cap->m_samples.push_back(area);
+				cap->m_samples.push_back(area / FS_PER_SECOND);
 			}
 
 			SetData(cap, 0);
@@ -121,14 +126,19 @@ void AreaMeasurement::Refresh()
 			auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 			cap->PrepareForCpuAccess();
 
+			//Perform summation using Kahan Summation Algorithm
 			for (size_t i = 0; i < length; i++)
 			{
-				area += (fabs(sadin->m_samples[i]) * sadin->m_durations[i]) / FS_PER_SECOND;
+				float y = (fabs(uadin->m_samples[i]) * sadin->m_durations[i] * din->m_timescale) - c;
+				volatile float t = area + y;
+				volatile float z = t - area;
+				c = z - y;
+				area = t;
 
 				//Push values to the waveform
 				cap->m_offsets.push_back(sadin->m_offsets[i]);
 				cap->m_durations.push_back(sadin->m_durations[i]);
-				cap->m_samples.push_back(area);
+				cap->m_samples.push_back(area / FS_PER_SECOND);
 			}
 
 			SetData(cap, 0);
@@ -142,15 +152,11 @@ void AreaMeasurement::Refresh()
 
 		//Auto-threshold analog signals at average of the full scale range
 		if(uadin)
-		{
 			FindZeroCrossings(uadin, average, edges);
-		}
 		else if(sadin)
-		{
 			FindZeroCrossings(sadin, average, edges);
-		}
 
-		//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
+		//We need at least one full cycle of the waveform
 		if(edges.size() < 2)
 		{
 			SetData(NULL, 0);
@@ -163,6 +169,7 @@ void AreaMeasurement::Refresh()
 
 		size_t elen = edges.size();
 
+		//Calculate area for every cycle and put values in the sparse output waveform
 		for(size_t i = 0; i < (elen - 2); i += 2)
 		{
 			//Measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
@@ -170,20 +177,33 @@ void AreaMeasurement::Refresh()
 			int64_t end = edges[i + 2] / din->m_timescale;
 			int64_t j = 0;
 
-			//Simply sum the squares of all values in a cycle after subtracting the DC value
 			if(uadin)
 			{
+				//Perform summation using Kahan Summation Algorithm
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
-					area += (fabs(uadin->m_samples[j]) * din->m_timescale) / FS_PER_SECOND;
+				{
+					float y = fabs(uadin->m_samples[j]) - c;
+					volatile float t = area + y;
+					volatile float z = t - area;
+					c = z - y;
+					area = t;
+				}
 			}
 			else if(sadin)
 			{
+				//Perform summation using Kahan Summation Algorithm
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
-					area += (fabs(sadin->m_samples[j]) * sadin->m_durations[j]) / FS_PER_SECOND;
+				{
+					float y = ((fabs(sadin->m_samples[j]) * sadin->m_durations[j])) - c;
+					volatile float t = area + y;
+					volatile float z = t - area;
+					c = z - y;
+					area = t;
+				}
 			}
 
 			//Get the difference between the end and start of cycle. This would be the number of samples
-			//on which AC RMS calculation was performed
+			//on which area measurement was performed
 			int64_t delta = j - start - 1;
 
 			if (delta != 0)
@@ -191,7 +211,7 @@ void AreaMeasurement::Refresh()
 				//Push values to the waveform
 				cap->m_offsets.push_back(start);
 				cap->m_durations.push_back(delta);
-				cap->m_samples.push_back(area);
+				cap->m_samples.push_back((area * din->m_timescale)/FS_PER_SECOND);
 			}
 
 			area = 0;
