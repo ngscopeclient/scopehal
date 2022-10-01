@@ -486,8 +486,6 @@ bool VulkanInit(bool skipGLFW)
 			}
 
 			LogDebug("Selected device %zu\n", bestDevice);
-			int computeQueueCount = 1;
-			int renderQueueCount = 1;
 			{
 				auto& device = devices[bestDevice];
 				g_vkComputePhysicalDevice = &devices[bestDevice];
