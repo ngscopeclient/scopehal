@@ -133,6 +133,7 @@ set(SCOPEHAL_SOURCES
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
+	QueueManager.cpp
 	)
 
 configure_file(config.h.in config.h)
