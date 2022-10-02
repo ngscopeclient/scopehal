@@ -211,6 +211,14 @@ PUBLIC SYSTEM
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 	)
 
+# Don't include yaml-cpp in Windows PCH because this seems to give errors about path resolution
+# TODO: fix this for faster builds
+if(${WIN32})
+	set(YAML_PCH_PATH "")
+else()
+	set(YAML_PCH_PATH "${YAML_INCLUDES}/yaml-cpp/yaml.h")
+endif()
+
 target_precompile_headers(scopehal
 PUBLIC
 
@@ -220,9 +228,7 @@ PUBLIC
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
 	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
-	# YAML_INCLUDES isn't set on win32 because we're not using `find_package` above.
-	# Hard-code an include path for now.
-	$<$<BOOL:${WIN32}>:"D:/a/_temp/mingw64/include/yaml-cpp/yaml.h",${YAML_INCLUDES}/yaml-cpp/yaml.h>
+	${YAML_PCH_PATH}
 	)
 
 if(${HAS_LXI})
