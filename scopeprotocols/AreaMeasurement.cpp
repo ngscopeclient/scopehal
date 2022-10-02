@@ -38,7 +38,7 @@ using namespace std;
 AreaMeasurement::AreaMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLT_SEC), "data", Stream::STREAM_TYPE_ANALOG);
 
 	//Set up channels
 	CreateInput("din");
@@ -105,7 +105,7 @@ void AreaMeasurement::Refresh()
 			auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0, true);
 			cap->PrepareForCpuAccess();
 
-			//Perform summation using Kahan Summation Algorithm
+			//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 			for (size_t i = 0; i < length; i++)
 			{
 				float y = (fabs(uadin->m_samples[i]) * din->m_timescale) - c;
@@ -126,7 +126,7 @@ void AreaMeasurement::Refresh()
 			auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 			cap->PrepareForCpuAccess();
 
-			//Perform summation using Kahan Summation Algorithm
+			//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 			for (size_t i = 0; i < length; i++)
 			{
 				float y = (fabs(uadin->m_samples[i]) * sadin->m_durations[i] * din->m_timescale) - c;
@@ -179,7 +179,7 @@ void AreaMeasurement::Refresh()
 
 			if(uadin)
 			{
-				//Perform summation using Kahan Summation Algorithm
+				//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
 				{
 					float y = fabs(uadin->m_samples[j]) - c;
@@ -191,7 +191,7 @@ void AreaMeasurement::Refresh()
 			}
 			else if(sadin)
 			{
-				//Perform summation using Kahan Summation Algorithm
+				//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
 				{
 					float y = ((fabs(sadin->m_samples[j]) * sadin->m_durations[j])) - c;
@@ -211,7 +211,7 @@ void AreaMeasurement::Refresh()
 				//Push values to the waveform
 				cap->m_offsets.push_back(start);
 				cap->m_durations.push_back(delta);
-				cap->m_samples.push_back((area * din->m_timescale)/FS_PER_SECOND);
+				cap->m_samples.push_back((area * din->m_timescale) / FS_PER_SECOND);
 			}
 
 			area = 0;
