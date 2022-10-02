@@ -220,7 +220,9 @@ PUBLIC
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
 	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
-	${YAML_INCLUDES}/yaml-cpp/yaml.h
+	# YAML_INCLUDES isn't set on win32 because we're not using `find_package` above.
+	# Hard-code an include path for now.
+	$<$<BOOL:${WIN32}>:/mingw64/include/yaml-cpp/yaml.h,${YAML_INCLUDES}/yaml-cpp/yaml.h>
 	)
 
 if(${HAS_LXI})
