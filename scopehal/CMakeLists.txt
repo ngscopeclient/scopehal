@@ -211,6 +211,14 @@ PUBLIC SYSTEM
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 	)
 
+target_precompile_headers(scopehal
+PUBLIC
+	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
+	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
+	${YAML_INCLUDES}/yaml-cpp/yaml.h
+	)
+
 if(${HAS_LXI})
 	target_compile_definitions(scopehal PUBLIC HAS_LXI)
 endif()
