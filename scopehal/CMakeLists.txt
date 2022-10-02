@@ -213,6 +213,10 @@ PUBLIC SYSTEM
 
 target_precompile_headers(scopehal
 PUBLIC
+
+	# libstdc++ headers used by vulkan and/or very widely throughout the project
+	${CMAKE_CURRENT_SOURCE_DIR}/scopehal-pch.h
+
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
 	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
