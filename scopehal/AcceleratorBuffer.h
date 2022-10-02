@@ -496,6 +496,20 @@ protected:
 		if(size == 0)
 			return;
 
+		/*
+			If we are a bool[] or similar one-byte type, we are likely going to be accessed from the GPU via a uint32
+			descriptor for at least some shaders (such as rendering).
+
+			Round our actual allocated size to the next multiple of 4 bytes. The padding values are unimportant as the
+			bytes are never written, and the data read from the high bytes in the uint32 is discarded by the GPU.
+			We just need to ensure the memory is allocated so the 32-bit read is legal to perform.
+		 */
+		if( (sizeof(T) == 1) && (m_gpuAccessHint != HINT_NEVER) )
+		{
+			if(size & 3)
+				size = (size | 3) + 1;
+		}
+
 		//If we do not anticipate using the data on the CPU, we shouldn't waste RAM.
 		//Allocate a GPU-local buffer, copy data to it, then free the CPU-side buffer
 		if(m_cpuAccessHint == HINT_NEVER)
