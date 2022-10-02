@@ -76,6 +76,8 @@ public:
 	virtual ~WaveformBase()
 	{}
 
+	virtual void Rename(const std::string& name = "") = 0;
+
 	/**
 		@brief The time scale, in femtoseconds per timestep, used by this channel.
 
@@ -246,7 +248,7 @@ public:
 		m_samples.PrepareForCpuAccess();
 	}
 
-	void Rename(const std::string& name = "")
+	virtual void Rename(const std::string& name = "")
 	{
 		if(name.empty())
 			m_samples.SetName(std::string("UniformWaveform<") + typeid(S).name() + ">.m_samples");
@@ -322,7 +324,7 @@ public:
 		m_samples.PrepareForCpuAccess();
 	}
 
-	void Rename(const std::string& name = "")
+	virtual void Rename(const std::string& name = "")
 	{
 		if(name.empty())
 		{

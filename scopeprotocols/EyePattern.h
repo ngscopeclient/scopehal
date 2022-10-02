@@ -48,6 +48,10 @@ public:
 	EyeWaveform(const EyeWaveform&) =delete;
 	EyeWaveform& operator=(const EyeWaveform&) =delete;
 
+	//nothing to do if not gpu accelerated
+	virtual void Rename(const std::string& /*name*/ = "")
+	{}
+
 	float* GetData()
 	{ return m_outdata; }
 

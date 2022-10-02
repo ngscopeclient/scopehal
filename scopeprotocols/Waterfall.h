@@ -45,6 +45,10 @@ public:
 	WaterfallWaveform(const WaterfallWaveform&) =delete;
 	WaterfallWaveform& operator=(const WaterfallWaveform&) =delete;
 
+	//nothing to do if not gpu accelerated
+	virtual void Rename(const std::string& /*name*/ = "")
+	{}
+
 	float* GetData()
 	{ return m_outdata; }
 
