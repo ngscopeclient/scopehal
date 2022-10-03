@@ -47,7 +47,11 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	memset(&m_app, 0, sizeof(m_app));
 	memset(&m_config, 0, sizeof(m_config));
 
-	lock_guard<mutex> lock(g_vkFFTMutex);
+	//Create a command pool for initialization use
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		g_vkTransferQueue->m_family );
+	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
 
 	//Only 1D FFTs supported for now
 	m_config.FFTdim = 1;
@@ -88,11 +92,14 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		cacheKey = string("VkFFT_INV_") + to_string(npoints);
 	}
 
+	lock_guard<mutex> lock(g_vkTransferMutex);
+	QueueLock queuelock(g_vkTransferQueue);
+
 	//Extract raw handles of all of our Vulkan objects
 	m_physicalDevice = **g_vkComputePhysicalDevice;
 	m_device = **g_vkComputeDevice;
-	m_pool = **g_vkFFTCommandPool;
-	m_queue = **g_vkFFTQueue;
+	VkCommandPool rpool = *pool;
+	VkQueue queue = **queuelock;
 	m_rawfence = *m_fence;
 	m_pipelineCache = **g_pipelineCacheMgr->Lookup(cacheKey + ".spv", VkFFTGetVersion());
 
@@ -107,8 +114,8 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 
 	m_config.physicalDevice = &m_physicalDevice;
 	m_config.device = &m_device;
-	m_config.queue = &m_queue;
-	m_config.commandPool = &m_pool;
+	m_config.queue = &queue;
+	m_config.commandPool = &rpool;
 	m_config.fence = &m_rawfence;
 	m_config.isCompilerInitialized = 1;
 	m_config.isInputFormatted = 1;
@@ -143,6 +150,10 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		memcpy(&(*vec)[0], m_app.saveApplicationString, m_app.applicationStringSize);
 		g_pipelineCacheMgr->StoreRaw(cacheKey, vec);
 	}
+
+	//Done initializing, clear queue pointers to make sure nothing uses it
+	m_config.queue = VK_NULL_HANDLE;
+	m_config.commandPool = VK_NULL_HANDLE;
 }
 
 VulkanFFTPlan::~VulkanFFTPlan()

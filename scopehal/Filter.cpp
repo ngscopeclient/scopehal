@@ -1353,9 +1353,9 @@ void Filter::ClearStreams()
 	m_offsets.clear();
 }
 
-void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
+void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
 {
-	OscilloscopeChannel::AddStream(yunit, name, stype);
+	OscilloscopeChannel::AddStream(yunit, name, stype, flags);
 	m_ranges.push_back(0);
 	m_offsets.push_back(0);
 }
@@ -1365,27 +1365,18 @@ void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
  */
 void Filter::AutoscaleVertical(size_t stream)
 {
-	float vmin = FLT_MAX;
-	float vmax = -FLT_MAX;
+	auto data = GetData(stream);
+	auto swfm = dynamic_cast<SparseAnalogWaveform*>(data);
+	auto uwfm = dynamic_cast<UniformAnalogWaveform*>(data);
+	if(!swfm && !uwfm)
+	{
+		LogTrace("No waveform\n");
+		return;
+	}
+	data->PrepareForCpuAccess();
 
-	auto swfm = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
-	auto uwfm = dynamic_cast<UniformAnalogWaveform*>(GetData(stream));
-	if(swfm)
-	{
-		for(auto s : swfm->m_samples)
-		{
-			vmin = min(s, vmin);
-			vmax = max(s, vmax);
-		}
-	}
-	else if(uwfm)
-	{
-		for(auto s : uwfm->m_samples)
-		{
-			vmin = min(s, vmin);
-			vmax = max(s, vmax);
-		}
-	}
+	float vmin = GetMinVoltage(swfm, uwfm);
+	float vmax = GetMaxVoltage(swfm, uwfm);
 
 	float range = vmax - vmin;
 	if(IsScalarOutput())

@@ -102,13 +102,11 @@ void ComputePipeline::DeferredInit()
 		std::move(g_vkComputeDevice->createComputePipelines(*cache, pinfo).front()));
 
 	//Descriptor pool for our shader parameters
-	vk::DescriptorPoolSize ssboPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs);
-	vk::DescriptorPoolSize imagePoolSize(vk::DescriptorType::eStorageImage, m_numImages);
-	vk::DescriptorPoolSize poolSizes[2] =
-	{
-		ssboPoolSize,
-		imagePoolSize
-	};
+	vector<vk::DescriptorPoolSize> poolSizes;
+	if(m_numSSBOs)
+		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs));
+	if(m_numImages)
+		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, m_numImages));
 	vk::DescriptorPoolCreateInfo poolInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
 			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
@@ -125,11 +123,11 @@ void ComputePipeline::DeferredInit()
 	if(g_hasDebugUtils)
 	{
 		string base = string("ComputePipeline.") + shaderBase + ".";
-		string pipelineName = base + ".pipe";
-		string dlName = base + ".dlayout";
-		string plName = base + ".pipelayout";
-		string dsName = base + ".dset";
-		string dpName = base + ".dpool";
+		string pipelineName = base + "pipe";
+		string dlName = base + "dlayout";
+		string plName = base + "pipelayout";
+		string dsName = base + "dset";
+		string dpName = base + "dpool";
 
 		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
 			vk::DebugUtilsObjectNameInfoEXT(

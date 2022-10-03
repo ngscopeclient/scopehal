@@ -114,9 +114,9 @@ void OscilloscopeChannel::ClearStreams()
 /**
 	@brief Adds a new data stream to the channel
  */
-void OscilloscopeChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype)
+void OscilloscopeChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
 {
-	m_streams.push_back(Stream(yunit, name, stype));
+	m_streams.push_back(Stream(yunit, name, stype, flags));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

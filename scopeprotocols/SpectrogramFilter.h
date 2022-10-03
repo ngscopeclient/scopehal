@@ -49,6 +49,10 @@ public:
 	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
 	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
 
+	//nothing to do if not gpu accelerated
+	virtual void Rename(const std::string& /*name*/ = "")
+	{}
+
 	float* GetData()
 	{ return m_data; }
 

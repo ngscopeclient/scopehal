@@ -43,7 +43,17 @@ class WaveformPool
 public:
 	WaveformPool()
 	: m_maxSize(16)
+	, m_destroyed(false)
 	{}
+
+	~WaveformPool()
+	{
+		for(auto w : m_waveforms)
+			delete w;
+		m_waveforms.clear();
+
+		m_destroyed = true;
+	}
 
 	/**
 		@brief Adds a new waveform to the pool if there's space for it, otherwise free it
@@ -51,6 +61,7 @@ public:
 	void Add(WaveformBase* w)
 	{
 		std::lock_guard<std::mutex> lock(m_mutex);
+		w->Rename("WaveformPool.freelist");
 
 		if(m_waveforms.size() < m_maxSize)
 			m_waveforms.push_back(w);
@@ -71,6 +82,8 @@ public:
 		auto ret = *m_waveforms.begin();
 		ret->m_revision ++;
 		m_waveforms.pop_front();
+
+		ret->Rename("WaveformPool.allocated");
 		return ret;
 	}
 
@@ -80,6 +93,8 @@ protected:
 	std::mutex m_mutex;
 
 	std::list<WaveformBase*> m_waveforms;
+
+	bool m_destroyed;
 };
 
 #endif

@@ -49,11 +49,6 @@
 #include "AcceleratorBuffer.h"
 #include "PipelineCacheManager.h"
 
-extern std::unique_ptr<vk::raii::CommandPool> g_vkFFTCommandPool;
-extern std::unique_ptr<vk::raii::CommandBuffer> g_vkFFTCommandBuffer;
-extern std::unique_ptr<vk::raii::Queue> g_vkFFTQueue;
-extern std::mutex g_vkFFTMutex;
-
 /**
 	@brief RAII wrapper around a VkFFTApplication and VkFFTConfiguration
  */
@@ -91,8 +86,6 @@ protected:
 	//this is ugly but apparently we can't take a pointer to the underlying vk:: c++ wrapper objects?
 	VkPhysicalDevice m_physicalDevice;
 	VkDevice m_device;
-	VkCommandPool m_pool;
-	VkQueue m_queue;
 	VkPipelineCache m_pipelineCache;
 
 	vk::raii::Fence m_fence;
