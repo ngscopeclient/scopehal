@@ -42,8 +42,14 @@ public:
 
 	enum MeasurementType
 	{
-		AVERAGE_AREA,
+		FULL_RECORD,
 		CYCLE_AREA
+	};
+
+	enum AreaType
+	{
+		TRUE_AREA,
+		ABSOLUTE_AREA
 	};
 
 	virtual void Refresh();
@@ -56,6 +62,7 @@ public:
 
 protected:
 	std::string m_measurement_typename;
+	std::string m_area_typename;
 };
 
 #endif

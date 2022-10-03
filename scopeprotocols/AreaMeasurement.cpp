@@ -45,8 +45,13 @@ AreaMeasurement::AreaMeasurement(const string& color)
 
 	m_measurement_typename = "Measurement Type";
 	m_parameters[m_measurement_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_measurement_typename].AddEnumValue("Average", AVERAGE_AREA);
+	m_parameters[m_measurement_typename].AddEnumValue("Full Record", FULL_RECORD);
 	m_parameters[m_measurement_typename].AddEnumValue("Per Cycle", CYCLE_AREA);
+
+	m_area_typename = "Area Type";
+	m_parameters[m_area_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_area_typename].AddEnumValue("True Area", TRUE_AREA);
+	m_parameters[m_area_typename].AddEnumValue("Absolute Area", ABSOLUTE_AREA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,8 +101,9 @@ void AreaMeasurement::Refresh()
 	float c = 0;
 
 	MeasurementType measurement_type = (MeasurementType)m_parameters[m_measurement_typename].GetIntVal();
+	AreaType area_type = (AreaType)m_parameters[m_area_typename].GetIntVal();
 
-	if (measurement_type == AVERAGE_AREA)
+	if (measurement_type == FULL_RECORD)
 	{
 		if(uadin)
 		{
@@ -108,7 +114,7 @@ void AreaMeasurement::Refresh()
 			//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 			for (size_t i = 0; i < length; i++)
 			{
-				float y = (fabs(uadin->m_samples[i]) * din->m_timescale) - c;
+				float y = (((area_type == TRUE_AREA) ? uadin->m_samples[i] : fabs(uadin->m_samples[i])) * din->m_timescale) - c;
 				volatile float t = area + y;
 				volatile float z = t - area;
 				c = z - y;
@@ -129,7 +135,8 @@ void AreaMeasurement::Refresh()
 			//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 			for (size_t i = 0; i < length; i++)
 			{
-				float y = (fabs(uadin->m_samples[i]) * sadin->m_durations[i] * din->m_timescale) - c;
+				float y = (((area_type == TRUE_AREA) ? sadin->m_samples[i] : fabs(sadin->m_samples[i])) * sadin->m_durations[i] 
+																										* din->m_timescale) - c;
 				volatile float t = area + y;
 				volatile float z = t - area;
 				c = z - y;
@@ -182,7 +189,7 @@ void AreaMeasurement::Refresh()
 				//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
 				{
-					float y = fabs(uadin->m_samples[j]) - c;
+					float y = ((area_type == TRUE_AREA) ? uadin->m_samples[j] : fabs(uadin->m_samples[j])) - c;
 					volatile float t = area + y;
 					volatile float z = t - area;
 					c = z - y;
@@ -194,7 +201,7 @@ void AreaMeasurement::Refresh()
 				//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 				for(j = start; (j <= end) && (j < (int64_t)length); j++)
 				{
-					float y = ((fabs(sadin->m_samples[j]) * sadin->m_durations[j])) - c;
+					float y = ((((area_type == TRUE_AREA) ? sadin->m_samples[j] : fabs(sadin->m_samples[j])) * sadin->m_durations[j])) - c;
 					volatile float t = area + y;
 					volatile float z = t - area;
 					c = z - y;
