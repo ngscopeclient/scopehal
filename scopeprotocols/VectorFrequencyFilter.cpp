@@ -85,6 +85,7 @@ void VectorFrequencyFilter::Refresh()
 
 	auto dout = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
 	dout->PrepareForCpuAccess();
+	dout->Resize(len);
 
 	//Calculate scaling factor from rad/sample to Hz
 	float sample_hz = FS_PER_SECOND / din_i->m_timescale;
