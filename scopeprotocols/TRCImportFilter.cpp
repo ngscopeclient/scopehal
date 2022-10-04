@@ -216,6 +216,8 @@ void TRCImportFilter::OnFileNameChanged()
 	wfm->m_startFemtoseconds = basetime * FS_PER_SECOND;
 	wfm->m_triggerPhase = h_off_frac;
 	SetData(wfm, 0);
+	LogTrace("Sample interval: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(wfm->m_timescale).c_str());
+	LogTrace("Trigger phase: %s\n", Unit(Unit::UNIT_FS).PrettyPrint(wfm->m_triggerPhase).c_str());
 
 	wfm->Resize(num_per_segment);
 
@@ -232,9 +234,10 @@ void TRCImportFilter::OnFileNameChanged()
 			fclose(fp);
 			return;
 		}
+		buf.MarkModifiedFromCpu();
 
 		//The accelerated filter needs int16 support
-		if(g_hasShaderInt16 && g_gpuFilterEnabled)
+		/*if(g_hasShaderInt16 && g_gpuFilterEnabled)
 		{
 			m_commandBuffer->begin({});
 
@@ -258,7 +261,7 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 
 		//Software fallback
-		else
+		else*/
 		{
 			wfm->PrepareForCpuAccess();
 
@@ -286,9 +289,10 @@ void TRCImportFilter::OnFileNameChanged()
 			fclose(fp);
 			return;
 		}
+		buf.MarkModifiedFromCpu();
 
 		//The accelerated filter needs int8 support
-		if(g_hasShaderInt8 && g_gpuFilterEnabled)
+		/*if(g_hasShaderInt8 && g_gpuFilterEnabled)
 		{
 			m_commandBuffer->begin({});
 
@@ -312,7 +316,7 @@ void TRCImportFilter::OnFileNameChanged()
 		}
 
 		//Software fallback
-		else
+		else*/
 		{
 			wfm->PrepareForCpuAccess();
 
@@ -326,4 +330,6 @@ void TRCImportFilter::OnFileNameChanged()
 			wfm->MarkModifiedFromCpu();
 		}
 	}
+
+	LogTrace("Loaded %zu samples\n", wfm->size());
 }

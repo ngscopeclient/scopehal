@@ -227,8 +227,7 @@ bool VulkanInit(bool skipGLFW)
 			extensionsToUse.push_back("VK_KHR_xlib_surface");
 		if(hasXcbSurface)
 			extensionsToUse.push_back("VK_KHR_xcb_surface");
-		if(hasXlibSurface || hasXcbSurface)
-			extensionsToUse.push_back("VK_KHR_surface");
+		extensionsToUse.push_back("VK_KHR_surface");
 
 		//Request debug utilities if available
 		if(g_hasDebugUtils)
@@ -599,9 +598,23 @@ bool VulkanInit(bool skipGLFW)
 						{}, i, f.queueCount, &queuePriority[0]));
 				}
 
+				//See if the device has KHR_portability_subset (typically the case for MoltenVK)
+				bool hasPortabilitySubset = false;
+				auto devexts = device.enumerateDeviceExtensionProperties();
+				for(auto ext : devexts)
+				{
+					if(!strcmp(&ext.extensionName[0], "VK_KHR_portability_subset"))
+					{
+						hasPortabilitySubset = true;
+						LogDebug("Device has VK_KHR_portability_subset, requesting it\n");
+					}
+				}
+
 				//Initialize the device
 				vector<const char*> devextensions;
 				devextensions.push_back("VK_KHR_swapchain");
+				if(hasPortabilitySubset)
+					devextensions.push_back("VK_KHR_portability_subset");
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
