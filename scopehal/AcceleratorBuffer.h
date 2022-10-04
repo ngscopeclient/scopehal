@@ -46,6 +46,8 @@
 #include <sys/mman.h>
 #endif
 
+#include <type_traits>
+
 extern uint32_t g_vkPinnedMemoryType;
 extern uint32_t g_vkLocalMemoryType;
 extern std::shared_ptr<vk::raii::Device> g_vkComputeDevice;
@@ -111,6 +113,9 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 
 	This buffer generally provides std::vector semantics, but does *not* initialize memory or call constructors on
 	elements when calling resize() or reserve(). All locations not explicitly written to have undefined values.
+
+	If the element type is not trivially copyable, the data cannot be shared with the GPU. This class still supports
+	non-trivially-copyable types as a convenience for working with waveforms on the CPU.
  */
 template<class T>
 class AcceleratorBuffer
@@ -293,10 +298,15 @@ public:
 		, m_gpuAccessHint(HINT_UNLIKELY)
 		, m_name(name)
 	{
+		//non-trivially-copyable types can't be copied to GPU
+		if(!std::is_trivially_copyable<T>::value)
+			m_gpuAccessHint = HINT_NEVER;
 	}
 
 	~AcceleratorBuffer()
 	{
+		FreeCpuBuffer();
+		FreeGpuBuffer();
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -449,7 +459,7 @@ public:
 	}
 
 	/**
-		@brief Copies our content from another one
+		@brief Copies our content from another AcceleratorBuffer
 	 */
 	 __attribute__((noinline))
 	void CopyFrom(const AcceleratorBuffer<T>& rhs)
@@ -461,7 +471,18 @@ public:
 
 		//Valid data CPU side? Copy it to here
 		if(rhs.HasCpuBuffer() && !rhs.m_cpuPhysMemIsStale)
-			memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+		{
+			//non-trivially-copyable types have to be copied one at a time
+			if(!std::is_trivially_copyable<T>::value)
+			{
+				for(size_t i=0; i<m_size; i++)
+					m_cpuPtr[i] = rhs.m_cpuPtr[i];
+			}
+
+			//Trivially copyable types can be done more efficiently in a block
+			else
+				memcpy(m_cpuPtr, rhs.m_cpuPtr, m_size * sizeof(T));
+		}
 		m_cpuPhysMemIsStale = rhs.m_cpuPhysMemIsStale;
 
 		//Valid data GPU side? Copy it to here
@@ -533,15 +554,25 @@ protected:
 				//New pointer is still valid in this case.
 				if(!m_cpuPhysMemIsStale)
 				{
-					//Disable compiler warning about copying classes that don't have non-default constructors
-					//or assignment operators. This is intentional and guaranteed to be safe;
-					//waveform sample types must be POD and not contain pointer members etc.
-					#pragma GCC diagnostic push
-					#pragma GCC diagnostic ignored "-Wclass-memaccess"
+					//non-trivially-copyable types have to be copied one at a time
+					if(!std::is_trivially_copyable<T>::value)
+					{
+						for(size_t i=0; i<m_size; i++)
+							m_cpuPtr[i] = std::move(pOld[i]);
+					}
 
-					memcpy(m_cpuPtr, pOld, sizeof(T) * m_size);
+					//Trivially copyable types can be done more efficiently in a block
+					//gcc warns about this even though we only call this code if the type is trivially copyable,
+					//so disable the warning.
+					else
+					{
+						#pragma GCC diagnostic push
+						#pragma GCC diagnostic ignored "-Wclass-memaccess"
 
-					#pragma GCC diagnostic pop
+						memcpy(m_cpuPtr, pOld, m_size * sizeof(T));
+
+						#pragma GCC diagnostic pop
+					}
 				}
 
 				//If CPU-side data is stale, just allocate the new buffer but leave it as stale
@@ -680,7 +711,17 @@ public:
 
 		//Don't touch GPU side buffer
 
-		memmove(m_cpuPtr, m_cpuPtr+1, sizeof(T) * (m_size-1));
+		//non-trivially-copyable types have to be copied one at a time
+		if(!std::is_trivially_copyable<T>::value)
+		{
+			for(size_t i=0; i<m_size-1; i++)
+				m_cpuPtr[i] = std::move(m_cpuPtr[i+1]);
+		}
+
+		//Trivially copyable types can be done more efficiently in a block
+		else
+			memmove(m_cpuPtr, m_cpuPtr+1, sizeof(T) * (m_size-1));
+
 		resize(m_size - 1);
 
 		MarkModifiedFromCpu();
@@ -719,6 +760,10 @@ public:
 	 */
 	void SetGpuAccessHint(UsageHint hint, bool reallocateImmediately = false)
 	{
+		//Only trivially copyable datatypes are allowed on the GPU
+		if(!std::is_trivially_copyable<T>::value)
+			hint = HINT_NEVER;
+
 		m_gpuAccessHint = hint;
 
 		if(reallocateImmediately && (m_size != 0))
@@ -836,6 +881,8 @@ protected:
 	 */
 	void CopyToCpu()
 	{
+		assert(std::is_trivially_copyable<T>::value);
+
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 		//Make the transfer request
@@ -855,6 +902,8 @@ protected:
 	 */
 	void CopyToGpu()
 	{
+		assert(std::is_trivially_copyable<T>::value);
+
 		std::lock_guard<std::mutex> lock(g_vkTransferMutex);
 
 		//Make the transfer request
@@ -877,6 +926,8 @@ protected:
 	 */
 	void CopyToGpuNonblocking(vk::raii::CommandBuffer& cmdBuf)
 	{
+		assert(std::is_trivially_copyable<T>::value);
+
 		//Make the transfer request
 		vk::BufferCopy region(0, 0, m_size * sizeof(T));
 		cmdBuf.copyBuffer(**m_cpuBuffer, **m_gpuBuffer, {region});
@@ -910,13 +961,9 @@ protected:
 		if(m_cpuPtr == nullptr)
 			return;
 
-		//If we have shared CPU/GPU buffers, we need to allocate a GPU-only buffer and move our data there
-		if(m_buffersAreSame)
-			LogFatal("FreeCpuBuffer: same buffer not supported\n");
-
 		//We have a buffer on the GPU.
 		//If it's stale, need to push our updated content there before freeing the CPU-side copy
-		else if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale)
+		if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale)
 			CopyToGpu();
 
 		//Free the Vulkan buffer object
@@ -1065,6 +1112,14 @@ protected:
 
 			#endif
 		}
+
+		//Memory has been allocated. Call constructors iff type is not trivially copyable
+		//(This is not exactly 1:1 with having a constructor, but hopefully good enough?)
+		if(!std::is_trivially_copyable<T>::value)
+		{
+			for(size_t i=0; i<size; i++)
+				new(m_cpuPtr +i) T;
+		}
 	}
 
 	/**
@@ -1077,6 +1132,13 @@ protected:
 	__attribute__((noinline))
 	void FreeCpuPointer(T* ptr, MemoryType type, size_t size)
 	{
+		//Call destructors iff type is not trivially copyable
+		if(!std::is_trivially_copyable<T>::value)
+		{
+			for(size_t i=0; i<size; i++)
+				ptr[i].~T();
+		}
+
 		switch(type)
 		{
 			case MEM_TYPE_NULL:
@@ -1131,6 +1193,8 @@ protected:
 	__attribute__((noinline))
 	void AllocateGpuBuffer(size_t size)
 	{
+		assert(std::is_trivially_copyable<T>::value);
+
 		//Make a Vulkan buffer first
 		vk::BufferCreateInfo bufinfo(
 			{},

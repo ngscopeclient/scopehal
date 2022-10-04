@@ -80,7 +80,9 @@ public:
 class EthernetWaveform : public SparseWaveform<EthernetFrameSegment>
 {
 public:
-	EthernetWaveform () : SparseWaveform<EthernetFrameSegment>() {};
+	EthernetWaveform ()
+		: SparseWaveform<EthernetFrameSegment>()
+	{};
 	virtual std::string GetText(size_t) override;
 	virtual Gdk::Color GetColor(size_t) override;
 };
