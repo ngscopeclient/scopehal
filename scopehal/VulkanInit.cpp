@@ -697,7 +697,9 @@ bool VulkanInit(bool skipGLFW)
 				}
 
 				//See if the device has KHR_portability_subset (typically the case for MoltenVK)
+				//or KHR_shader_non_semantic_info (required for debug printf)
 				bool hasPortabilitySubset = false;
+				bool hasNonSemanticInfo = false;
 				auto devexts = device.enumerateDeviceExtensionProperties();
 				for(auto ext : devexts)
 				{
@@ -706,6 +708,11 @@ bool VulkanInit(bool skipGLFW)
 						hasPortabilitySubset = true;
 						LogDebug("Device has VK_KHR_portability_subset, requesting it\n");
 					}
+					if(!strcmp(&ext.extensionName[0], "VK_KHR_shader_non_semantic_info"))
+					{
+						hasNonSemanticInfo = true;
+						LogDebug("Device has KHR_shader_non_semantic_info, requesting it\n");
+					}
 				}
 
 				//Initialize the device
@@ -713,6 +720,8 @@ bool VulkanInit(bool skipGLFW)
 				devextensions.push_back("VK_KHR_swapchain");
 				if(hasPortabilitySubset)
 					devextensions.push_back("VK_KHR_portability_subset");
+				if(hasNonSemanticInfo)
+					devextensions.push_back("VK_KHR_shader_non_semantic_info");
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
