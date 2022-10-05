@@ -49,6 +49,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(BurstWidthMeasurement);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
+	AddDecoderClass(ClipFilter);
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(ComplexImportFilter);
 	AddDecoderClass(CSVImportFilter);
@@ -139,6 +140,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PkPkMeasurement);
 	AddDecoderClass(PRBSCheckerFilter);
 	AddDecoderClass(PRBSGeneratorFilter);
+	AddDecoderClass(PulseWidthMeasurement);
 	AddDecoderClass(ReferencePlaneExtensionFilter);
 	AddDecoderClass(RjBUjFilter);
 	AddDecoderClass(QSGMIIDecoder);
