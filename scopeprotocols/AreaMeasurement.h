@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,107 +30,39 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Unit
+	@brief Declaration of AreaMeasurement
  */
+#ifndef AreaMeasurement_h
+#define AreaMeasurement_h
 
-#ifndef Unit_h
-#define Unit_h
-
-/**
-	@brief A unit of measurement, plus conversion to pretty-printed output
-
-	TODO: add scale factors too?
- */
-class Unit
+class AreaMeasurement : public Filter
 {
 public:
+	AreaMeasurement(const std::string& color);
 
-	enum UnitType
+	enum MeasurementType
 	{
-		UNIT_FS,			//Time. Note that this is not a SI base unit.
-							//Using femtoseconds allows integer math for all known scope timebases,
-							//which keeps things nice and simple.
-		UNIT_HZ,			//Frequency
-		UNIT_VOLTS,			//Voltage
-		UNIT_AMPS,			//Current
-		UNIT_OHMS,			//Resistance
-		UNIT_BITRATE,		//Bits per second
-		UNIT_PERCENT,		//Dimensionless ratio
-		UNIT_DB,			//Dimensionless ratio
-		UNIT_DBM,			//dB mW (more common than dBW)
-		UNIT_COUNTS,		//Dimensionless ratio (histogram)
-		UNIT_COUNTS_SCI,	//Dimensionless ratio (histogram, but scientific notation)
-		UNIT_LOG_BER,		//Dimensionless ratio (log scale)
-		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
-		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
-		UNIT_WATTS,			//Power
-		UNIT_UI,			//Unit interval (relative to signal bit rate)
-		UNIT_DEGREES,		//Angular degrees
-		UNIT_RPM,			//Revolutions per minute
-		UNIT_CELSIUS,		//Degrees Celsius
-		UNIT_RHO,			//Reflection coefficient (dimensionless ratio)
-
-		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
-		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds
-
-		//TODO: more here
+		FULL_RECORD,
+		CYCLE_AREA
 	};
 
-	Unit(Unit::UnitType t)
-	: m_type(t)
-	{}
+	enum AreaType
+	{
+		TRUE_AREA,
+		ABSOLUTE_AREA
+	};
 
-	Unit(const std::string& rhs);
-	std::string ToString() const;
+	virtual void Refresh();
 
-	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true) const;
+	static std::string GetProtocolName();
 
-	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax) const;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	double ParseString(const std::string& str, bool useDisplayLocale = true);
-
-	UnitType GetType()
-	{ return m_type; }
-
-	bool operator==(const Unit& rhs)
-	{ return m_type == rhs.m_type; }
-
-	bool operator!=(const Unit& rhs)
-	{ return m_type != rhs.m_type; }
-
-	bool operator!=(UnitType rhs)
-	{ return m_type != rhs; }
-
-	Unit operator*(const Unit& rhs);
-
-	static void SetLocale(const char* locale);
+	PROTOCOL_DECODER_INITPROC(AreaMeasurement)
 
 protected:
-	UnitType m_type;
-
-	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix) const;
-	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix) const;
-
-#ifdef _WIN32
-	/**
-		@brief String form of m_locale for use on Windows
-	 */
-	static std::string m_slocale;
-
-#else
-	/**
-		@brief The user's requested locale for display
-	 */
-	static locale_t m_locale;
-
-	/**
-		@brief Handle to the "C" locale, used for interchange
-	 */
-	static locale_t m_defaultLocale;
-#endif
-
-	static void SetPrintingLocale();
-	static void SetDefaultLocale();
+	std::string m_measurement_typename;
+	std::string m_area_typename;
 };
 
 #endif

@@ -85,6 +85,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_RHO;
 	else if(rhs == "mV")
 		m_type = UNIT_MILLIVOLTS;
+	else if(rhs == "Vs")
+		m_type = UNIT_VOLT_SEC;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -158,6 +160,9 @@ string Unit::ToString() const
 
 		case UNIT_MILLIVOLTS:
 			return "mV";
+
+		case UNIT_VOLT_SEC:
+			return "Vs";
 
 		default:
 			return "unknown";
@@ -357,6 +362,9 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			suffix = "";
 			prefix = "";
 			scaleFactor = 1;
+			break;
+		case UNIT_VOLT_SEC:
+			suffix = "Vs";
 			break;
 
 		default:
