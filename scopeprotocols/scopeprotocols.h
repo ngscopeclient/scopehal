@@ -190,6 +190,7 @@
 #include "WAVImportFilter.h"
 #include "WFMImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
+#include "WindowFilter.h"
 
 #include "AverageStatistic.h"
 #include "MaximumStatistic.h"

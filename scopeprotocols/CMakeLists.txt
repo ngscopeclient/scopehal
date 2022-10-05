@@ -156,6 +156,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	WAVImportFilter.cpp
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
+	WindowFilter.cpp
 
 	AverageStatistic.cpp
 	MaximumStatistic.cpp
