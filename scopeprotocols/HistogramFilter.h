@@ -46,7 +46,10 @@ public:
 	virtual void SetDefaultName();
 
 	virtual float GetVoltageRange(size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream);
+
 	virtual float GetOffset(size_t stream);
+	virtual void SetOffset(float offset, size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
@@ -55,6 +58,11 @@ public:
 	PROTOCOL_DECODER_INITPROC(HistogramFilter)
 
 protected:
+	std::string m_autorangeName;
+	std::string m_minName;
+	std::string m_maxName;
+	std::string m_binSizeName;
+	
 	float m_midpoint;
 	float m_range;
 
