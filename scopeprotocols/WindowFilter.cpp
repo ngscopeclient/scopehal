@@ -149,8 +149,6 @@ size_t GetIndexNearestAfterTimestamp(WaveformBase* wfm, int64_t time_fs)
 template<class T>
 void DoCopy(T* w_in, T* w_out, size_t start_sample, size_t end_sample)
 {
-	LogDebug("DoCopy: start_sample = %zu, end_sample = %zu, sizeof([0])=%zu\n", start_sample, end_sample, sizeof(w_in->m_samples[0]));
-
 	w_out->Resize(end_sample - start_sample);
 
 	memcpy(__builtin_assume_aligned(&w_out->m_samples[0], 16),
@@ -187,25 +185,21 @@ void WindowFilter::Refresh()
 
 	if(auto uaw = dynamic_cast<UniformAnalogWaveform*>(in))
 	{
-		LogDebug("Case: uaw\n");
 		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG; // TODO: I think this races with WaveformArea::MapAllBuffers
 		DoCopy(uaw, SetupEmptyUniformAnalogOutputWaveform(uaw, 0), start_sample, end_sample);
 	}
 	else if (auto saw = dynamic_cast<SparseAnalogWaveform*>(in))
 	{
-		LogDebug("Case: saw\n");
 		m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG; // TODO: I think this races with WaveformArea::MapAllBuffers
 		DoCopy(saw, SetupSparseOutputWaveform(saw, 0, start_sample, saw->size() - end_sample), start_sample, end_sample);
 	}
 	else if(auto udw = dynamic_cast<UniformDigitalWaveform*>(in))
 	{
-		LogDebug("Case: udw\n");
 		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL; // TODO: I think this races with WaveformArea::MapAllBuffers
 		DoCopy(udw, SetupEmptyUniformDigitalOutputWaveform(udw, 0), start_sample, end_sample);
 	}
 	else if (auto sdw = dynamic_cast<SparseDigitalWaveform*>(in))
 	{
-		LogDebug("Case: sdw\n");
 		m_streams[0].m_stype = Stream::STREAM_TYPE_DIGITAL; // TODO: I think this races with WaveformArea::MapAllBuffers
 		DoCopy(sdw, SetupSparseDigitalOutputWaveform(sdw, 0, start_sample, sdw->size() - end_sample), start_sample, end_sample);
 	}
