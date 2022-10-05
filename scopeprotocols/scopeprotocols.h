@@ -49,6 +49,7 @@
 #include "BurstWidthMeasurement.h"
 #include "CANDecoder.h"
 #include "ChannelEmulationFilter.h"
+#include "ClipFilter.h"
 #include "ClockRecoveryFilter.h"
 #include "ComplexImportFilter.h"
 #include "CSVImportFilter.h"
@@ -140,6 +141,7 @@
 #include "PkPkMeasurement.h"
 #include "PRBSCheckerFilter.h"
 #include "PRBSGeneratorFilter.h"
+#include "PulseWidthMeasurement.h"
 #include "ReferencePlaneExtensionFilter.h"
 #include "RjBUjFilter.h"
 #include "QSGMIIDecoder.h"
@@ -189,6 +191,7 @@
 #include "WAVImportFilter.h"
 #include "WFMImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
+#include "WindowFilter.h"
 
 #include "AverageStatistic.h"
 #include "MaximumStatistic.h"

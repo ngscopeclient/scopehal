@@ -27,49 +27,117 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of HistogramFilter
- */
-#ifndef HistogramFilter_h
-#define HistogramFilter_h
+#include "../scopehal/scopehal.h"
+#include "ClipFilter.h"
 
-class HistogramFilter : public Filter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ClipFilter::ClipFilter(const string& color)
+	: Filter(color, CAT_MATH)
+	, m_clipAboveName("Behavior")
+	, m_clipLevelName("Level")
 {
-public:
-	HistogramFilter(const std::string& color);
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput("din");
 
-	virtual void Refresh();
+	m_parameters[m_clipAboveName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_clipAboveName].AddEnumValue("Clip Above", 1);
+	m_parameters[m_clipAboveName].AddEnumValue("Clip Below", 0);
+	m_parameters[m_clipAboveName].SetIntVal(0);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	m_parameters[m_clipLevelName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_clipLevelName].SetFloatVal(0);
+}
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	virtual float GetOffset(size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+bool ClipFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
 
-	virtual void ClearSweeps();
+	return false;
+}
 
-	PROTOCOL_DECODER_INITPROC(HistogramFilter)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-protected:
-	std::string m_autorangeName;
-	std::string m_minName;
-	std::string m_maxName;
-	std::string m_binSizeName;
-	
-	float m_midpoint;
-	float m_range;
+string ClipFilter::GetProtocolName()
+{
+	return "Clip";
+}
 
-	float m_min;
-	float m_max;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
 
-	std::vector<size_t> m_histogram;
-};
+void ClipFilter::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
-#endif
+	auto din = GetInputWaveform(0);
+	size_t len = din->size();
+
+	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
+
+	bool clipAbove = m_parameters[m_clipAboveName].GetIntVal();
+	float clipLevel = m_parameters[m_clipLevelName].GetFloatVal();
+
+	if(sdin)
+	{
+		//Negate each sample
+		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
+		cap->PrepareForCpuAccess();
+		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+		float* a = (float*)__builtin_assume_aligned(&sdin->m_samples[0], 16);
+		for(size_t i=0; i<len; i++)
+		{
+			float d = a[i];
+
+			if (( clipAbove && d > clipLevel) ||
+				(!clipAbove && d < clipLevel))
+			{
+				d = clipLevel;
+			}
+
+			out[i] = d;
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
+	else if(udin)
+	{
+		//Negate each sample
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+		float* out = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
+		float* a = (float*)__builtin_assume_aligned(&udin->m_samples[0], 16);
+		for(size_t i=0; i<len; i++)
+		{
+			float d = a[i];
+			
+			if (( clipAbove && d > clipLevel) ||
+				(!clipAbove && d < clipLevel))
+			{
+				d = clipLevel;
+			}
+			
+			out[i] = d;
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
+}

@@ -12,6 +12,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	BurstWidthMeasurement.cpp
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
+	ClipFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
 	CSVImportFilter.cpp
@@ -104,13 +105,14 @@ set(SCOPEPROTOCOLS_SOURCES
 	PkPkMeasurement.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
+	PulseWidthMeasurement.cpp
 	QSGMIIDecoder.cpp
 	QSPIDecoder.cpp
 	QuadratureDecoder.cpp
 	ReferencePlaneExtensionFilter.cpp
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
-    ScaleFilter.cpp
+	ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
@@ -155,6 +157,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	WAVImportFilter.cpp
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
+	WindowFilter.cpp
 
 	AverageStatistic.cpp
 	MaximumStatistic.cpp

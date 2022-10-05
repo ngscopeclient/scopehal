@@ -36,9 +36,28 @@ using namespace std;
 // Construction / destruction
 
 HistogramFilter::HistogramFilter(const string& color)
-	: Filter(color, CAT_MATH)
+	: Filter(color, CAT_MATH),
+	  m_autorangeName("Autorange?"),
+	  m_minName("Min Value"),
+	  m_maxName("Max Value"),
+	  m_binSizeName("Bin Size")
 {
 	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
+
+	m_parameters[m_autorangeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_autorangeName].AddEnumValue("Autorange", 1);
+	m_parameters[m_autorangeName].AddEnumValue("Manual Range", 0);
+	m_parameters[m_autorangeName].SetIntVal(1);
+
+	m_parameters[m_minName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_minName].SetIntVal(0);
+
+	m_parameters[m_maxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_maxName].SetIntVal(100);
+
+	m_parameters[m_binSizeName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_binSizeName].SetIntVal(100);
+	// Retain existing default behavior of 100fs bins
 
 	//Set up channels
 	CreateInput("data");
@@ -91,6 +110,16 @@ float HistogramFilter::GetOffset(size_t /*stream*/)
 	return -m_midpoint;
 }
 
+void HistogramFilter::SetVoltageRange(float range, size_t /*stream*/)
+{
+	m_range = range;
+}
+
+void HistogramFilter::SetOffset(float offset, size_t /*stream*/)
+{
+	m_midpoint = -offset;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -125,26 +154,54 @@ void HistogramFilter::Refresh()
 	//Calculate bin count
 	auto cap = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 
-	//If the signal is outside our current range, extend our range
 	bool reallocate = false;
 	float range = m_max - m_min;
-	if( (nmin < m_min) || (nmax > m_max) || (cap == nullptr) )
+
+	if (m_parameters[m_autorangeName].GetIntVal())
 	{
-		m_min = min(nmin, m_min);
-		m_max = max(nmax, m_max);
+		//If the signal is outside our current range, extend our range
+		if( (nmin < m_min) || (nmax > m_max) )
+		{
+			m_min = min(nmin, m_min);
+			m_max = max(nmax, m_max);
 
-		//Extend the range by a bit to avoid constant reallocation
-		range = m_max - m_min;
-		m_min -= 0.05 * range;
-		m_max += 0.05 * range;
-		range = m_max - m_min;
+			//Extend the range by a bit to avoid constant reallocation
+			range = m_max - m_min;
+			m_min -= 0.05 * range;
+			m_max += 0.05 * range;
 
-		reallocate = true;
+			// m_parameters[m_minName].SetFloatVal(m_min);
+			// m_parameters[m_maxName].SetFloatVal(m_max);
+			// TODO: This would be nice UX but locks up the UI on .emit()
+
+			reallocate = true;
+		}
+	}
+	else
+	{
+		float newMin = m_parameters[m_minName].GetFloatVal();
+		float newMax = m_parameters[m_maxName].GetFloatVal();
+
+		m_min = newMin;
+		m_max = newMax;
+
+		reallocate = (newMin != m_min) || (newMax != m_max);
 	}
 
+	reallocate |= (cap == nullptr);
+	// Always need to reallocate if don't have an output yet
+
+	range = m_max - m_min;
+
+	bool didClipRange = (nmin < m_min) || (nmax > m_max);
+
+	size_t bins = ceil(range) / m_parameters[m_binSizeName].GetFloatVal();
+
+	// arbitrary sanity-check bounds
+	if (bins < 1) bins = 1;
+	if (bins > 10000) bins = 10000;
+
 	//Calculate histogram for our incoming data
-	//For now, 100fs per bin target
-	size_t bins = ceil(range) / 100;
 	auto data = MakeHistogram(sdin, udin, m_min, m_max, bins);
 
 	//Calculate bin configuration.
@@ -159,6 +216,7 @@ void HistogramFilter::Refresh()
 		cap->m_startTimestamp = din->m_startTimestamp;
 		cap->m_startFemtoseconds = din->m_startFemtoseconds;
 		cap->m_triggerPhase = m_min;
+		cap->m_flags = 0; // Updated at end
 		SetData(cap, 0);
 
 		cap->Resize(bins);
@@ -184,6 +242,8 @@ void HistogramFilter::Refresh()
 	vmax *= 1.05;
 	m_range = vmax + 2;
 	m_midpoint = m_range/2;
+
+	cap->m_flags |= didClipRange ? WaveformBase::WAVEFORM_CLIPPING : 0;
 
 	cap->MarkModifiedFromCpu();
 }

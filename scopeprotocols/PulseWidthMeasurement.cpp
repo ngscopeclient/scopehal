@@ -27,49 +27,113 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of HistogramFilter
- */
-#ifndef HistogramFilter_h
-#define HistogramFilter_h
+#include "scopeprotocols.h"
+#include "PulseWidthMeasurement.h"
 
-class HistogramFilter : public Filter
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+PulseWidthMeasurement::PulseWidthMeasurement(const string& color)
+	: Filter(color, CAT_MEASUREMENT)
 {
-public:
-	HistogramFilter(const std::string& color);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 
-	virtual void Refresh();
+	//Set up channels
+	CreateInput("din");
+}
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
+bool PulseWidthMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
 
-	virtual float GetOffset(size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	if(i > 0)
+		return false;
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) ||
+		(stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+	{
+		return true;
+	}
 
-	virtual void ClearSweeps();
+	return false;
+}
 
-	PROTOCOL_DECODER_INITPROC(HistogramFilter)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-protected:
-	std::string m_autorangeName;
-	std::string m_minName;
-	std::string m_maxName;
-	std::string m_binSizeName;
-	
-	float m_midpoint;
-	float m_range;
+string PulseWidthMeasurement::GetProtocolName()
+{
+	return "Pulse Width";
+}
 
-	float m_min;
-	float m_max;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
 
-	std::vector<size_t> m_histogram;
-};
+void PulseWidthMeasurement::Refresh()
+{
+	//Make sure we've got valid inputs
+	if(!VerifyAllInputsOK())
+	{
+		SetData(NULL, 0);
+		return;
+	}
 
-#endif
+	auto din = GetInputWaveform(0);
+	din->PrepareForCpuAccess();
+	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
+	vector<int64_t> edges;
+
+	//Auto-threshold analog signals at 50% of full scale range
+	if(uadin)
+		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+	else if(sadin)
+		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+
+	//Just find edges in digital signals
+	else if(uddin)
+		FindZeroCrossings(uddin, edges);
+	else
+		FindZeroCrossings(sddin, edges);
+
+	//We need at least one full cycle of the waveform to have a meaningful frequency
+	if(edges.size() < 2)
+	{
+		SetData(NULL, 0);
+		return;
+	}
+
+	//Create the output
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
+
+	size_t elen = edges.size();
+	for(size_t i=0; i < (elen - 2); i+= 2)
+	{
+		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
+		int64_t start = edges[i];
+		int64_t end = edges[i+1];
+
+		int64_t delta = end - start;
+
+		cap->m_offsets.push_back(start);
+		cap->m_durations.push_back(delta);
+		cap->m_samples.push_back(delta);
+	}
+
+	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
+
+	if (GetVoltageRange(0) == 0)
+		SetVoltageRange(10000000000000, 0);
+}

@@ -30,46 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of HistogramFilter
+	@brief Declaration of WindowFilter
  */
-#ifndef HistogramFilter_h
-#define HistogramFilter_h
+#ifndef WindowFilter_h
+#define WindowFilter_h
 
-class HistogramFilter : public Filter
+class WindowFilter : public Filter
 {
 public:
-	HistogramFilter(const std::string& color);
+	WindowFilter(const std::string& color);
 
 	virtual void Refresh();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
-
-	virtual float GetOffset(size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	virtual void ClearSweeps();
-
-	PROTOCOL_DECODER_INITPROC(HistogramFilter)
+	PROTOCOL_DECODER_INITPROC(WindowFilter)
 
 protected:
-	std::string m_autorangeName;
-	std::string m_minName;
-	std::string m_maxName;
-	std::string m_binSizeName;
-	
-	float m_midpoint;
-	float m_range;
-
-	float m_min;
-	float m_max;
-
-	std::vector<size_t> m_histogram;
+	std::string m_startTimeName;
+	std::string m_durationName;
 };
 
 #endif
