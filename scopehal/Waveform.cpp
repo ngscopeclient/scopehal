@@ -179,7 +179,7 @@ optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zer
 	double ticks = 1.0f * (time_fs - waveform->m_triggerPhase) / waveform->m_timescale;
 
 	if(swaveform)
-		return Filter::InterpolateValue(swaveform, index-1, ticks - swaveform->m_offsets[index-1]);
+		return Filter::InterpolateValue(swaveform, index, ticks - swaveform->m_offsets[index]);
 	else
-		return Filter::InterpolateValue(uwaveform, index-1, ticks - (index-1) );
+		return Filter::InterpolateValue(uwaveform, index, ticks - index );
 }
