@@ -131,7 +131,6 @@ set(SCOPEHAL_SOURCES
 	TestWaveformSource.cpp
 
 	ComputePipeline.cpp
-	ExportWizard.cpp
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
@@ -151,7 +150,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	# graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -179,7 +177,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	# graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}

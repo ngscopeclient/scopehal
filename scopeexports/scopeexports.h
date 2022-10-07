@@ -37,7 +37,10 @@
 #define scopeexports_h
 
 #include "../scopehal/scopehal.h"
-#include "../scopehal/ExportWizard.h"
+
+#include <gtkmm.h>
+
+#include "ExportWizard.h"
 
 void ScopeExportStaticInit();
 

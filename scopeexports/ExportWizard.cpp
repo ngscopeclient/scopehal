@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeexports                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -32,7 +32,8 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of ExportWizard
  */
-#include "scopehal.h"
+#include "scopeexports.h"
+#include "ExportWizard.h"
 
 using namespace std;
 
