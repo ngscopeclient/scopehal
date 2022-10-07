@@ -46,6 +46,7 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <climits>
 
 #include <dirent.h>
 #include <float.h>
