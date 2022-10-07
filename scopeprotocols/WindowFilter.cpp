@@ -77,75 +77,6 @@ string WindowFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-/**
-	@brief Look for a value greater than or equal to "value" in buf and return the index
- */
-template<class T>
-size_t BinarySearchForGequal(T* buf, size_t len, T value)
-{
-	size_t pos = len/2;
-	size_t last_lo = 0;
-	size_t last_hi = len-1;
-
-	if (!len)
-		return 0;
-
-	//Clip if out of range
-	if(buf[0] >= value)
-		return 0;
-	if(buf[last_hi] < value)
-		return len-1;
-
-	while(true)
-	{
-		//Stop if we've bracketed the target
-		if( (last_hi - last_lo) <= 1)
-			break;
-
-		//Move down
-		if(buf[pos] > value)
-		{
-			size_t delta = pos - last_lo;
-			last_hi = pos;
-			pos = last_lo + delta/2;
-		}
-
-		//Move up
-		else
-		{
-			size_t delta = last_hi - pos;
-			last_lo = pos;
-			pos = last_hi - delta/2;
-		}
-	}
-
-	return last_lo;
-}
-
-size_t GetIndexNearestAfterTimestamp(WaveformBase* wfm, int64_t time_fs)
-{
-	//Make sure we have a current copy of the data
-	wfm->PrepareForCpuAccess();
-
-	if (!wfm->size())
-		return 0;
-
-	double ticks = 1.0f * (time_fs - wfm->m_triggerPhase)  / wfm->m_timescale;
-
-	//Find the approximate index of the sample of interest and interpolate the cursor position
-	int64_t target = ceil(ticks);
-
-	if(auto swfm = dynamic_cast<SparseWaveformBase*>(wfm))
-	{
-		return BinarySearchForGequal(
-			swfm->m_offsets.GetCpuPointer(),
-			wfm->size(),
-			target);
-	}
-	else
-		return target;
-}
-
 template<class T>
 void DoCopy(T* w_in, T* w_out, size_t start_sample, size_t end_sample)
 {
@@ -174,8 +105,9 @@ void WindowFilter::Refresh()
 	int64_t start_time = m_parameters[m_startTimeName].GetIntVal();
 	int64_t end_time = start_time + m_parameters[m_durationName].GetIntVal();
 
-	size_t start_sample = GetIndexNearestAfterTimestamp(in, start_time);
-	size_t end_sample = GetIndexNearestAfterTimestamp(in, end_time);
+	bool dontcare;
+	size_t start_sample = GetIndexNearestAtOrBeforeTimestamp(in, start_time, dontcare);
+	size_t end_sample = GetIndexNearestAtOrBeforeTimestamp(in, end_time, dontcare);
 
 	if (start_sample >= in->size())
 		start_sample = in->size() - 1;
