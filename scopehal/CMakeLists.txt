@@ -42,6 +42,7 @@ endif()
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
+	ScopehalUtil.cpp
 	avx_mathfun.cpp
 	VulkanInit.cpp
 
@@ -150,7 +151,7 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
+	# graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -178,7 +179,7 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
+	# graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
