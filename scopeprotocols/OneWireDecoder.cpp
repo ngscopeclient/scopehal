@@ -275,7 +275,7 @@ void OneWireDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color OneWireWaveform::GetColor(size_t i)
+std::string OneWireWaveform::GetColor(size_t i)
 {
 	const OneWireSymbol& s = m_samples[i];
 

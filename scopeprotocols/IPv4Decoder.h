@@ -78,7 +78,7 @@ class IPv4Waveform : public SparseWaveform<IPv4Symbol>
 public:
 	IPv4Waveform () : SparseWaveform<IPv4Symbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class IPv4Decoder : public Filter

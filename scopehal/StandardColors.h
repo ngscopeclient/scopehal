@@ -50,7 +50,7 @@ namespace StandardColors
 		STANDARD_COLOR_COUNT
 	};
 
-	extern Gdk::Color colors[STANDARD_COLOR_COUNT];
+	extern std::string colors[STANDARD_COLOR_COUNT];
 }
 
 #endif // StandardColors_h

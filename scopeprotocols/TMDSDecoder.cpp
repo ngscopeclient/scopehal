@@ -251,7 +251,7 @@ void TMDSDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color TMDSWaveform::GetColor(size_t i)
+std::string TMDSWaveform::GetColor(size_t i)
 {
 	const TMDSSymbol& s = m_samples[i];
 

@@ -159,9 +159,9 @@ void ADL5205Decoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color ADL5205Waveform::GetColor(size_t /*i*/)
+string ADL5205Waveform::GetColor(size_t /*i*/)
 {
-	return Gdk::Color(m_color);
+	return m_color;
 }
 
 string ADL5205Waveform::GetText(size_t i)

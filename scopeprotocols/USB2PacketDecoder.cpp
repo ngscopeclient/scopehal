@@ -815,7 +815,7 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	m_packets.push_back(pack);
 }
 
-Gdk::Color USB2PacketWaveform::GetColor(size_t i)
+std::string USB2PacketWaveform::GetColor(size_t i)
 {
 	auto sample = m_samples[i];
 	switch(sample.m_type)

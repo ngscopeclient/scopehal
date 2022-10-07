@@ -100,7 +100,7 @@ class USB2PacketWaveform : public SparseWaveform<USB2PacketSymbol>
 public:
 	USB2PacketWaveform () : SparseWaveform<USB2PacketSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class USB2PacketDecoder : public PacketDecoder

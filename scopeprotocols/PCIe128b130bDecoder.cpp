@@ -221,7 +221,7 @@ void PCIe128b130bDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color PCIe128b130bWaveform::GetColor(size_t i)
+std::string PCIe128b130bWaveform::GetColor(size_t i)
 {
 	const PCIe128b130bSymbol& s = m_samples[i];
 

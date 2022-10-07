@@ -376,7 +376,7 @@ void IBM8b10bDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color IBM8b10bWaveform::GetColor(size_t i)
+std::string IBM8b10bWaveform::GetColor(size_t i)
 {
 	const IBM8b10bSymbol& s = m_samples[i];
 

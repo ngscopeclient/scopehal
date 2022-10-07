@@ -162,7 +162,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color EthernetAutonegotiationWaveform::GetColor(size_t /*i*/)
+std::string EthernetAutonegotiationWaveform::GetColor(size_t /*i*/)
 {
 	return StandardColors::colors[StandardColors::COLOR_DATA];
 }

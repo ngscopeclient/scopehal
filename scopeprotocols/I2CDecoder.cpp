@@ -241,7 +241,7 @@ void I2CDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color I2CWaveform::GetColor(size_t i)
+std::string I2CWaveform::GetColor(size_t i)
 {
 	const I2CSymbol& s = m_samples[i];
 

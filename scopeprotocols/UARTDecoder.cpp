@@ -228,9 +228,9 @@ void UARTDecoder::FinishPacket(Packet* pack)
 	m_packets.push_back(pack);
 }
 
-Gdk::Color ByteWaveform::GetColor(size_t /*i*/)
+std::string ByteWaveform::GetColor(size_t /*i*/)
 {
-	return Gdk::Color(m_color);
+	return m_color;
 }
 
 string ByteWaveform::GetText(size_t i)

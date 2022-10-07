@@ -66,7 +66,7 @@ class DPhyDataWaveform : public SparseWaveform<DPhyDataSymbol>
 public:
 	DPhyDataWaveform () : SparseWaveform<DPhyDataSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class DPhyDataDecoder : public Filter

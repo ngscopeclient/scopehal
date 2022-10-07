@@ -262,7 +262,7 @@ void SPIDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color SPIWaveform::GetColor(size_t i)
+std::string SPIWaveform::GetColor(size_t i)
 {
 	const SPISymbol& s = m_samples[i];
 	switch(s.m_stype)

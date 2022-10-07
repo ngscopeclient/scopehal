@@ -73,7 +73,7 @@ class I2CEepromWaveform : public SparseWaveform<I2CEepromSymbol>
 public:
 	I2CEepromWaveform (FilterParameter& raw_bits) : SparseWaveform<I2CEepromSymbol>(), m_raw_bits(raw_bits) {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 
 private:
 	FilterParameter& m_raw_bits;

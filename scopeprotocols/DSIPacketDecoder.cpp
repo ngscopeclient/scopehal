@@ -507,7 +507,7 @@ void DSIPacketDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color DSIWaveform::GetColor(size_t i)
+std::string DSIWaveform::GetColor(size_t i)
 {
 	const DSISymbol& s = m_samples[i];
 	switch(s.m_stype)

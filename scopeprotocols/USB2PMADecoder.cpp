@@ -200,7 +200,7 @@ void USB2PMADecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color USB2PMAWaveform::GetColor(size_t i)
+std::string USB2PMAWaveform::GetColor(size_t i)
 {
 	auto sample = m_samples[i];
 	switch(sample.m_type)

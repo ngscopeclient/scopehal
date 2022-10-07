@@ -138,7 +138,7 @@ public:
 		return "(unimplemented)";
 	}
 
-	virtual Gdk::Color GetColor(size_t /*i*/)
+	virtual std::string GetColor(size_t /*i*/)
 	{
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}

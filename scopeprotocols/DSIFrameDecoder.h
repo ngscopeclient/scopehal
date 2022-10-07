@@ -76,7 +76,7 @@ class DSIFrameWaveform : public SparseWaveform<DSIFrameSymbol>
 public:
 	DSIFrameWaveform () : SparseWaveform<DSIFrameSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class DSIFrameDecoder : public PacketDecoder
