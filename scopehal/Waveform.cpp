@@ -51,8 +51,6 @@ size_t BinarySearchForGequal(T* buf, size_t len, T value)
 
 	while(true)
 	{
-		LogIndenter li;
-
 		//Stop if we've bracketed the target
 		if( (last_hi - last_lo) <= 1)
 			break;
@@ -82,7 +80,7 @@ template size_t BinarySearchForGequal<float>(float* buf, size_t len, float value
 
 // Logic to 'step back' one sample is required. Think of the case of a waveform with samples at
 // 0 (duration 2) and 3 (duration 2). If the requested time_fs results in ticks = 1.5, then target
-// = floor(1.5) = 1. Then searching for the index of the offset greater than or equal to 1 yields 
+// = floor(1.5) = 1. Then searching for the index of the offset greater than or equal to 1 yields
 // sample #1 (at time 3.) We must then 'step back' to sample #0 since we want the sample closest
 // BEFORE our selected time. In the case that time_fs is such that it yields a ticks = 3 EXACTLY
 // this is not required.
@@ -177,7 +175,7 @@ optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zer
 				return {};
 			}
 		}
-		
+
 		return GetValue(swaveform, uwaveform, index);
 	}
 
