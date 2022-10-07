@@ -226,7 +226,6 @@ PUBLIC
 
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
-	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
 	${YAML_PCH_PATH}
 	)
 
