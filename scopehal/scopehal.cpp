@@ -111,7 +111,11 @@ void VulkanCleanup();
 void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
+#if !defined(_WIN32) && !defined(__APPLE__)
+// TMC is only supported on Linux for now
+// https://github.com/glscopeclient/scopehal/issues/519
 	AddTransportClass(SCPITMCTransport);
+#endif
 	AddTransportClass(SCPITwinLanTransport);
 	AddTransportClass(SCPIUARTTransport);
 	AddTransportClass(SCPINullTransport);
