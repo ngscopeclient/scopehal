@@ -88,10 +88,15 @@ extern bool g_hasAvx2;
 #include "SCPILinuxGPIBTransport.h"
 #include "SCPILxiTransport.h"
 #include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
 #include "SCPIUARTTransport.h"
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+// TMC is only supported on Linux for now
+// https://github.com/glscopeclient/scopehal/issues/519
+#include "SCPITMCTransport.h"
+#endif
 
 #include "FlowGraphNode.h"
 #include "OscilloscopeChannel.h"

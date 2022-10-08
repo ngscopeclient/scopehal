@@ -37,10 +37,6 @@
 #include "OscilloscopeChannel.h"
 
 #include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <dirent.h>
 
 #ifdef __x86_64__
 #include <immintrin.h>

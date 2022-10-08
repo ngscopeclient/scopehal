@@ -57,7 +57,6 @@ set(SCOPEHAL_SOURCES
 	SCPILinuxGPIBTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
-	SCPITMCTransport.cpp
 	SCPIUARTTransport.cpp
 	SCPIDevice.cpp
 
@@ -135,6 +134,14 @@ set(SCOPEHAL_SOURCES
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
 	)
+
+if(NOT WIN32 AND NOT APPLE)
+	list(APPEND SCOPEHAL_SOURCES
+		# TMC is only supported on Linux for now.
+		# https://github.com/glscopeclient/scopehal/issues/519
+		SCPITMCTransport.cpp
+	)
+endif()
 
 configure_file(config.h.in config.h)
 
