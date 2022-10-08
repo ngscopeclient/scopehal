@@ -261,7 +261,7 @@ void SDDataDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color SDDataWaveform::GetColor(size_t i)
+std::string SDDataWaveform::GetColor(size_t i)
 {
 	const SDDataSymbol& s = m_samples[i];
 	switch(s.m_stype)

@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,35 +30,12 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EthernetAutonegotiationDecoder
+	@brief Declaration of global utility functions
  */
 
-#ifndef EthernetAutonegotiationDecoder_h
-#define EthernetAutonegotiationDecoder_h
+#ifndef ScopehalUtil_h
+#define ScopehalUtil_h
 
-class EthernetAutonegotiationWaveform : public SparseWaveform<uint16_t>
-{
-public:
-	EthernetAutonegotiationWaveform () : SparseWaveform<uint16_t>() {};
-
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
-};
-
-class EthernetAutonegotiationDecoder : public Filter
-{
-public:
-	EthernetAutonegotiationDecoder(const std::string& color);
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(EthernetAutonegotiationDecoder)
-
-protected:
-};
+double GetTime();
 
 #endif

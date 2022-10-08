@@ -49,7 +49,7 @@ SDRAMDecoderBase::~SDRAMDecoderBase()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Pretty printing
 
-Gdk::Color SDRAMWaveform::GetColor(size_t i)
+std::string SDRAMWaveform::GetColor(size_t i)
 {
 	const SDRAMSymbol& s = m_samples[i];
 

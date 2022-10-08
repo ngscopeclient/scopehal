@@ -32,7 +32,7 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of TouchstoneExportWizard
  */
-#include "scopehal.h"
+#include "scopeexports.h"
 #include "TouchstoneExportWizard.h"
 
 using namespace std;

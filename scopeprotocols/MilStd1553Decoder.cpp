@@ -680,7 +680,7 @@ void MilStd1553Decoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color MilStd1553Waveform::GetColor(size_t i)
+std::string MilStd1553Waveform::GetColor(size_t i)
 {
 	const MilStd1553Symbol& s = m_samples[i];
 	switch(s.m_stype)

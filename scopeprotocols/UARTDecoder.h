@@ -43,7 +43,7 @@ class ByteWaveform : public SparseWaveform<char>
 public:
 	ByteWaveform (const std::string& color) : SparseWaveform<char>(), m_color(color) {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 
 private:
 	const std::string& m_color;

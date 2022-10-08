@@ -33,7 +33,6 @@
 	@brief Implementation of global functions
  */
 #include "scopehal.h"
-#include <gtkmm/drawingarea.h>
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
@@ -75,6 +74,7 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <wordexp.h>
+#include <dirent.h>
 #else
 #include <windows.h>
 #include <shlwapi.h>

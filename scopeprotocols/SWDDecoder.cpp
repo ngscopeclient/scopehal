@@ -440,7 +440,7 @@ void SWDDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color SWDWaveform::GetColor(size_t i)
+std::string SWDWaveform::GetColor(size_t i)
 {
 	const SWDSymbol& s = m_samples[i];
 

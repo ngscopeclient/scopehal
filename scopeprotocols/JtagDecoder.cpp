@@ -333,7 +333,7 @@ void JtagDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color JtagWaveform::GetColor(size_t i)
+std::string JtagWaveform::GetColor(size_t i)
 {
 	const JtagSymbol& s = m_samples[i];
 

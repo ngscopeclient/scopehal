@@ -38,6 +38,7 @@
 
 #define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
 
+#include <deque>
 #include <vector>
 #include <string>
 #include <map>
@@ -45,14 +46,16 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <climits>
+#include <set>
+#include <float.h>
 
 #include <sigc++/sigc++.h>
-#include <cairomm/context.h>
 
 #include <yaml-cpp/yaml.h>
 
 #include "../log/log.h"
-#include "../graphwidget/Graph.h"
+#include "ScopehalUtil.h"
 
 #include "config.h"
 
@@ -123,7 +126,6 @@ extern bool g_hasAvx2;
 #include "SParameterSourceFilter.h"
 #include "SParameterFilter.h"
 
-#include "ExportWizard.h"
 #include "FilterGraphExecutor.h"
 
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);

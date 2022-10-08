@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopeexports                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,35 +30,50 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of EthernetAutonegotiationDecoder
+	@brief Declaration of ExportWizard
  */
 
-#ifndef EthernetAutonegotiationDecoder_h
-#define EthernetAutonegotiationDecoder_h
+#ifndef ExportWizard_h
+#define ExportWizard_h
 
-class EthernetAutonegotiationWaveform : public SparseWaveform<uint16_t>
+/**
+	@brief Abstract base class for an export wizard
+ */
+class ExportWizard : public Gtk::Assistant
 {
 public:
-	EthernetAutonegotiationWaveform () : SparseWaveform<uint16_t>() {};
-
-	virtual std::string GetText(size_t) override;
-	virtual std::string GetColor(size_t) override;
-};
-
-class EthernetAutonegotiationDecoder : public Filter
-{
-public:
-	EthernetAutonegotiationDecoder(const std::string& color);
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(EthernetAutonegotiationDecoder)
+	ExportWizard(const std::vector<OscilloscopeChannel*>& channels);
+	virtual ~ExportWizard();
 
 protected:
+	std::vector<OscilloscopeChannel*> m_channels;
+
+	virtual void on_cancel();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dynamic creation and enumeration
+
+public:
+	typedef ExportWizard* (*CreateProcType)(const std::vector<OscilloscopeChannel*>&);
+	static void DoAddExportWizardClass(const std::string& name, CreateProcType proc);
+
+	static void EnumExportWizards(std::vector<std::string>& names);
+	static ExportWizard* CreateExportWizard(const std::string& name, const std::vector<OscilloscopeChannel*>& channels);
+
+protected:
+	//Class enumeration
+	typedef std::map< std::string, CreateProcType > CreateMapType;
+	static CreateMapType m_createprocs;
 };
+
+#define EXPORT_WIZARD_INITPROC(T) \
+	static ExportWizard* CreateInstance(const std::vector<OscilloscopeChannel*>& channels) \
+	{ \
+		return new T(channels); \
+	} \
+	virtual std::string GetExportWizardName() \
+	{ return GetExportName(); }
+
+#define AddExportWizardClass(T) ExportWizard::DoAddExportWizardClass(T::GetExportName(), T::CreateInstance)
 
 #endif

@@ -30,50 +30,15 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ExportWizard
+	@brief Implementation of global utility functions
  */
+ #include "ScopehalUtil.h"
 
-#ifndef ExportWizard_h
-#define ExportWizard_h
-
-/**
-	@brief Abstract base class for an export wizard
- */
-class ExportWizard : public Gtk::Assistant
+double GetTime()
 {
-public:
-	ExportWizard(const std::vector<OscilloscopeChannel*>& channels);
-	virtual ~ExportWizard();
-
-protected:
-	std::vector<OscilloscopeChannel*> m_channels;
-
-	virtual void on_cancel();
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation and enumeration
-
-public:
-	typedef ExportWizard* (*CreateProcType)(const std::vector<OscilloscopeChannel*>&);
-	static void DoAddExportWizardClass(const std::string& name, CreateProcType proc);
-
-	static void EnumExportWizards(std::vector<std::string>& names);
-	static ExportWizard* CreateExportWizard(const std::string& name, const std::vector<OscilloscopeChannel*>& channels);
-
-protected:
-	//Class enumeration
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-	static CreateMapType m_createprocs;
-};
-
-#define EXPORT_WIZARD_INITPROC(T) \
-	static ExportWizard* CreateInstance(const std::vector<OscilloscopeChannel*>& channels) \
-	{ \
-		return new T(channels); \
-	} \
-	virtual std::string GetExportWizardName() \
-	{ return GetExportName(); }
-
-#define AddExportWizardClass(T) ExportWizard::DoAddExportWizardClass(T::GetExportName(), T::CreateInstance)
-
-#endif
+	timespec t;
+	clock_gettime(CLOCK_REALTIME,&t);
+	double d = static_cast<double>(t.tv_nsec) / 1E9f;
+	d += t.tv_sec;
+	return d;
+}

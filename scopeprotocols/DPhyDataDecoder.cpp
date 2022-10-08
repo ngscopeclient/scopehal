@@ -367,7 +367,7 @@ void DPhyDataDecoder::Refresh()
 	SetData(cap, 0);
 }
 
-Gdk::Color DPhyDataWaveform::GetColor(size_t i)
+string DPhyDataWaveform::GetColor(size_t i)
 {
 	const DPhyDataSymbol& s = m_samples[i];
 

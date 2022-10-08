@@ -75,7 +75,7 @@ class USB2PCSWaveform : public SparseWaveform<USB2PCSSymbol>
 public:
 	USB2PCSWaveform () : SparseWaveform<USB2PCSSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class USB2PCSDecoder : public Filter

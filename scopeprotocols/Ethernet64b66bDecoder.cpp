@@ -180,7 +180,7 @@ void Ethernet64b66bDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color Ethernet64b66bWaveform::GetColor(size_t i)
+std::string Ethernet64b66bWaveform::GetColor(size_t i)
 {
 	const Ethernet64b66bSymbol& s = m_samples[i];
 

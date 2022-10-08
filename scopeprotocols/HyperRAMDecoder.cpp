@@ -393,7 +393,7 @@ struct HyperRAMDecoder::CA HyperRAMDecoder::DecodeCA(uint64_t data)
 	};
 }
 
-Gdk::Color HyperRAMWaveform::GetColor(size_t i)
+std::string HyperRAMWaveform::GetColor(size_t i)
 {
 	const HyperRAMSymbol& s = m_samples[i];
 	switch(s.m_stype)

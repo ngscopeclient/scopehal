@@ -623,7 +623,7 @@ vector<string> MDIODecoder::GetHeaders()
 	return ret;
 }
 
-Gdk::Color MDIOWaveform::GetColor(size_t i)
+std::string MDIOWaveform::GetColor(size_t i)
 {
 	const MDIOSymbol& s = m_samples[i];
 

@@ -42,6 +42,7 @@ endif()
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
+	ScopehalUtil.cpp
 	avx_mathfun.cpp
 	VulkanInit.cpp
 
@@ -130,7 +131,6 @@ set(SCOPEHAL_SOURCES
 	TestWaveformSource.cpp
 
 	ComputePipeline.cpp
-	ExportWizard.cpp
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
@@ -150,7 +150,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -178,7 +177,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -228,7 +226,6 @@ PUBLIC
 
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
-	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
 	${YAML_PCH_PATH}
 	)
 

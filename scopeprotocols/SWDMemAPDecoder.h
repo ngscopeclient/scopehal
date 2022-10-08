@@ -65,7 +65,7 @@ class SWDMemAPWaveform : public SparseWaveform<SWDMemAPSymbol>
 public:
 	SWDMemAPWaveform () : SparseWaveform<SWDMemAPSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class SWDMemAPDecoder : public PacketDecoder

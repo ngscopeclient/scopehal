@@ -503,7 +503,7 @@ void I2CEepromDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color I2CEepromWaveform::GetColor(size_t i)
+std::string I2CEepromWaveform::GetColor(size_t i)
 {
 	const I2CEepromSymbol& s = m_samples[i];
 

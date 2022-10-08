@@ -32,7 +32,7 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of VCDExportWizard
  */
-#include "scopehal.h"
+#include "scopeexports.h"
 #include "VCDExportWizard.h"
 
 using namespace std;

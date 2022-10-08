@@ -911,7 +911,7 @@ void PCIeTransportDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color PCIeTransportWaveform::GetColor(size_t i)
+std::string PCIeTransportWaveform::GetColor(size_t i)
 {
 	auto s = m_samples[i];
 

@@ -69,7 +69,7 @@ class SPIWaveform : public SparseWaveform<SPISymbol>
 public:
 	SPIWaveform () : SparseWaveform<SPISymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class SPIDecoder : public Filter
