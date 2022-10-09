@@ -112,6 +112,7 @@ set(SCOPEHAL_SOURCES
 	SiglentSCPIOscilloscope.cpp
 	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp
+	ThunderScopeOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
