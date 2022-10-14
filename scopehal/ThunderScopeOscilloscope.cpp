@@ -328,6 +328,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 	for(size_t i=0; i<awfms.size(); i++)
 	{
 		auto cap = awfms[i];
+		cap->PrepareForCpuAccess();
 		Convert8BitSamples(
 			(float*)&cap->m_samples[0],
 			(int8_t*)abufs[i],
@@ -335,6 +336,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			offsets[i],
 			cap->m_samples.size());
 		delete[] abufs[i];
+		cap->MarkModifiedFromCpu();
 	}
 
 	FilterParameter* param = &m_diag_totalWFMs;
