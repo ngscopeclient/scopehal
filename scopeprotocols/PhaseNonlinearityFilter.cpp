@@ -43,11 +43,11 @@ PhaseNonlinearityFilter::PhaseNonlinearityFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_DEGREES), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("Phase");
 
-	/*
-	m_offsetname = "Offset";
-	m_parameters[m_offsetname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_offsetname].SetFloatVal(0);
-	*/
+	m_parameters[m_refLowName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_refLowName].SetIntVal(1e9);
+
+	m_parameters[m_refHighName] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_HZ));
+	m_parameters[m_refHighName].SetIntVal(2e9);
 
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 }
@@ -110,8 +110,55 @@ void PhaseNonlinearityFilter::Refresh()
 	cap->Resize(len);
 	cap->m_timescale = 1;
 
+	//Calculate the average group delay (ΔPhase / ΔFreq) between our reference frequencies
+	//We need to do a linear search here because we have to unwrap phases as we go.
+	//Note that the value calculated here is in units of degrees per Hz, not cycles per Hz (seconds).
+	//We don't need to convert to time units since we're about to integrate it wrt dFreq to compute the nominal phase.
+	float initialPhase = GetValue(sang, uang, 0);
+	float phase = initialPhase;
+	float phaseLow = 0;
+	float phaseHigh = 0;
+	int64_t freqLow = m_parameters[m_refLowName].GetIntVal();
+	int64_t freqHigh = m_parameters[m_refHighName].GetIntVal();
+	bool foundFreqLow = false;
+	for(size_t i=0; i<len; i++)
+	{
+		//Compute unwrapped phase
+		float phase_hi = GetValue(sang, uang, i+1);
+		float phase_lo = GetValue(sang, uang, i);
+		if(fabs(phase_lo - phase_hi) > 180)
+		{
+			if(phase_lo < phase_hi)
+				phase_lo += 360;
+			else
+				phase_hi += 360;
+		}
+		float dphase = phase_hi - phase_lo;
+		phase += dphase;
+
+		int64_t freq = GetOffsetScaled(sang, uang, i);
+
+		//Find first point above lower ref freq
+		if(!foundFreqLow && (freq > freqLow) )
+		{
+			foundFreqLow = true;
+			freqLow = freq;
+			phaseLow = phase;
+		}
+
+		//Find first point above upper ref freq)
+		if(freq > freqHigh)
+		{
+			phaseHigh = phase;
+			freqHigh = freq;
+			break;
+		}
+	}
+	float groupDelay = (phaseHigh - phaseLow) / (freqHigh - freqLow);
+
 	//Main output loop
-	float phase = GetValue(sang, uang, 0);
+	int64_t initialFreq = GetOffsetScaled(sang, uang, 0);
+	phase = initialPhase;
 	for(size_t i=0; i<len; i++)
 	{
 		//Subtract phase angles, wrapping correctly around singularities
@@ -126,13 +173,15 @@ void PhaseNonlinearityFilter::Refresh()
 				phase_hi += 360;
 		}
 		float dphase = phase_hi - phase_lo;
-
 		phase += dphase;
-		/*
-		cap->m_offsets[i] = GetOffsetScaled(sang, uang, i);
+
+		//Calculate nominal phase for a linear network
+		int64_t freq = GetOffsetScaled(sang, uang, i);
+		float nominalPhase = groupDelay * (freq - initialFreq) + initialPhase;
+
+		cap->m_offsets[i] = freq;
 		cap->m_durations[i] = GetDurationScaled(sang, uang, i);
-		cap->m_samples[i] = phase;
-		*/
+		cap->m_samples[i] = phase - nominalPhase;
 	}
 
 	cap->MarkModifiedFromCpu();
