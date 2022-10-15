@@ -102,6 +102,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
 	PhaseMeasurement.cpp
+	PhaseNonlinearityFilter.cpp
 	PkPkMeasurement.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp

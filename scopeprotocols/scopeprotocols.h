@@ -138,6 +138,7 @@
 #include "PeakHoldFilter.h"
 #include "PeriodMeasurement.h"
 #include "PhaseMeasurement.h"
+#include "PhaseNonlinearityFilter.h"
 #include "PkPkMeasurement.h"
 #include "PRBSCheckerFilter.h"
 #include "PRBSGeneratorFilter.h"
