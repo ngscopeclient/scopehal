@@ -177,6 +177,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);
+	AddDecoderClass(UnwrappedPhaseFilter);
 	AddDecoderClass(UpsampleFilter);
 	AddDecoderClass(USB2ActivityDecoder);
 	AddDecoderClass(USB2PacketDecoder);

@@ -177,6 +177,7 @@
 #include "UARTDecoder.h"
 #include "UartClockRecoveryFilter.h"
 #include "UndershootMeasurement.h"
+#include "UnwrappedPhaseFilter.h"
 #include "UpsampleFilter.h"
 #include "USB2ActivityDecoder.h"
 #include "USB2PacketDecoder.h"
