@@ -142,6 +142,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	UartClockRecoveryFilter.cpp
 	UARTDecoder.cpp
 	UndershootMeasurement.cpp
+	UnwrappedPhaseFilter.cpp
 	UpsampleFilter.cpp
 	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
