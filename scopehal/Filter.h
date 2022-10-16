@@ -109,6 +109,15 @@ public:
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
 
+	/**
+		@brief Removes this filter from the global list
+
+		This is typically used for background filters used in GUI code to query stream names etc,
+		but not actually used in the real filter graph.
+	 */
+	void HideFromList()
+	{ m_filters.erase(this); }
+
 	virtual void ClearStreams();
 	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
