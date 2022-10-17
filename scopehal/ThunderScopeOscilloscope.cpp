@@ -304,7 +304,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			}
 
 			//Create our waveform
-			UniformAnalogWaveform* cap = new UniformAnalogWaveform;
+			UniformAnalogWaveform* cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
