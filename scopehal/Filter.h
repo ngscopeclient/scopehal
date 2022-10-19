@@ -176,9 +176,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Evaluation
 
+protected:
 	//Legacy CPU implementation
 	virtual void Refresh();
 
+public:
 	//GPU accelerated refresh method
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 
