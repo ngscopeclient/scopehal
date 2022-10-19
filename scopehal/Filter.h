@@ -120,7 +120,10 @@ public:
 		but not actually used in the real filter graph.
 	 */
 	void HideFromList()
-	{ m_filters.erase(this); }
+	{
+		m_filters.erase(this);
+		m_instanceCount[GetProtocolDisplayName()] --;
+	}
 
 	virtual void ClearStreams();
 	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
