@@ -176,9 +176,11 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Evaluation
 
-protected:
-	//Legacy CPU implementation
-	virtual void Refresh();
+	virtual void
+	#ifndef _MSC_VER
+	__attribute__((deprecated))
+	#endif
+	 Refresh();
 
 public:
 	//GPU accelerated refresh method
