@@ -109,6 +109,10 @@ public:
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
 
+	//Get all currently existing filters
+	static size_t GetNumInstances()
+	{ return m_filters.size(); }
+
 	/**
 		@brief Removes this filter from the global list
 
