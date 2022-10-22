@@ -666,8 +666,9 @@ bool AgilentOscilloscope::AcquireData()
 		if(preamble.length != buf.size())
 			LogError("Waveform preamble length (%lu) does not match data length (%lu)", preamble.length, buf.size());
 		cap->Resize(buf.size());
-		for(size_t j = 0; j < buf.size(); j++)
-			cap->m_samples[j] = preamble.yincrement * (buf[j] - preamble.yreference) + preamble.yorigin;
+		float gain = preamble.yincrement;
+		float offset = (gain * preamble.yreference) - preamble.yorigin;
+		ConvertUnsigned8BitSamples(cap->m_samples.GetCpuPointer(), buf.data(), gain, offset, buf.size());
 
 		//Done, update the data
 		cap->MarkSamplesModifiedFromCpu();
