@@ -670,6 +670,7 @@ bool AgilentOscilloscope::AcquireData()
 			cap->m_samples[j] = preamble.yincrement * (buf[j] - preamble.yreference) + preamble.yorigin;
 
 		//Done, update the data
+		cap->MarkSamplesModifiedFromCpu();
 		pending_waveforms[i].push_back(cap);
 	}
 
