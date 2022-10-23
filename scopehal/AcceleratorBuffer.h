@@ -112,7 +112,9 @@ std::ptrdiff_t operator-(const AcceleratorBufferIterator<T>& a, const Accelerato
 	Hints can be provided to the buffer about future usage patterns to optimize storage location for best performance.
 
 	This buffer generally provides std::vector semantics, but does *not* initialize memory or call constructors on
-	elements when calling resize() or reserve(). All locations not explicitly written to have undefined values.
+	elements when calling resize() or reserve() unless the element type is not trivially copyable.
+	All locations not explicitly written to have undefined values. Most notably, allocated buffer space between size()
+	and capacity() is undefined and its value may not be coherent between CPU and GPU view of the buffer.
 
 	If the element type is not trivially copyable, the data cannot be shared with the GPU. This class still supports
 	non-trivially-copyable types as a convenience for working with waveforms on the CPU.
@@ -815,7 +817,7 @@ public:
 	void PrepareForCpuAccess()
 	{
 		//Early out if no content
-		if(m_capacity == 0)
+		if(m_size == 0)
 			return;
 
 		//If there's no buffer at all on the CPU, allocate one
@@ -837,7 +839,7 @@ public:
 	void PrepareForGpuAccess(bool outputOnly = false)
 	{
 		//Early out if no content
-		if(m_capacity == 0)
+		if(m_size == 0)
 			return;
 
 		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
@@ -864,7 +866,7 @@ public:
 	void PrepareForGpuAccessNonblocking(bool outputOnly, vk::raii::CommandBuffer& cmdBuf)
 	{
 		//Early out if no content
-		if(m_capacity == 0)
+		if(m_size == 0)
 			return;
 
 		//If our current hint has no GPU access at all, update to say "unlikely" and reallocate
