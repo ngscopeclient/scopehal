@@ -48,15 +48,17 @@ QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family
 : m_family(family)
 , m_index(index)
 , m_mutex()
-, m_name(name)
-, m_needWaitFence(false)
+, m_name()
 , m_device(device)
 , m_queue(make_unique<vk::raii::Queue>(*device, family, index))
-, m_fence(make_unique<vk::raii::Fence>(*device, vk::FenceCreateInfo()))
-{}
+, m_fence(nullptr)
+{
+	AddName(name);
+}
 
 QueueHandle::~QueueHandle()
 {
+	const lock_guard<mutex> lock(m_mutex);
 	m_fence = nullptr;
 	m_queue = nullptr;
 	m_device = nullptr;
@@ -66,7 +68,9 @@ void QueueHandle::AddName(string name)
 {
 	const lock_guard<mutex> lock(m_mutex);
 
-	m_name += ";" + name;
+	if(m_name.size() != 0)
+		m_name += ";";
+	m_name += name;
 
 	if(g_hasDebugUtils)
 	{
@@ -85,8 +89,16 @@ void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 	_waitFence();
 
 	vk::SubmitInfo info({}, {}, *cmdBuf);
+	m_fence = make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo());
+	if(g_hasDebugUtils)
+	{
+		m_device->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eFence,
+				reinterpret_cast<int64_t>(static_cast<VkFence>(**m_fence)),
+				m_name.c_str()));
+	}
 	m_queue->submit(info, **m_fence);
-	m_needWaitFence = true;
 }
 
 void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
@@ -96,21 +108,29 @@ void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 	_waitFence();
 
 	vk::SubmitInfo info({}, {}, *cmdBuf);
+	m_fence = make_unique<vk::raii::Fence>(*m_device, vk::FenceCreateInfo());
+	if(g_hasDebugUtils)
+	{
+		m_device->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eFence,
+				reinterpret_cast<int64_t>(static_cast<VkFence>(**m_fence)),
+				m_name.c_str()));
+	}
 	m_queue->submit(info, **m_fence);
 	_waitFence();
 }
 
 void QueueHandle::_waitFence()
 {
-	if(!m_needWaitFence)
+	if(!m_fence)
 		return;
 	
 	//Wait for any previous submit to finish
 	while(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
 	{}
 
-	m_device->resetFences({**m_fence});
-	m_needWaitFence = false;
+	m_fence = nullptr;
 }
 
 
@@ -140,7 +160,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 		//If handle is unallocated, use it right away
 		if(m_queues[i].Handle.use_count() == 0)
 		{
-			//LogDebug("QueueManager creating family=%zu index=%zu name=%s\n", m_queues[i].Family, m_queues[i].Index, name.c_str());
+			LogDebug("QueueManager creating family=%zu index=%zu name=%s\n", m_queues[i].Family, m_queues[i].Index, name.c_str());
 			m_queues[i].Handle = make_shared<QueueHandle>(
 				m_device, m_queues[i].Family, m_queues[i].Index, name);
 			return m_queues[i].Handle;
@@ -156,7 +176,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	if(chosenIdx < 0)
 		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", flags);
 	
-	//LogDebug("QueueManager reusing handle idx=%zu name=%s for name=%s\n", chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
+	LogDebug("QueueManager reusing handle idx=%zu name=%s for name=%s\n", chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
 	m_queues[chosenIdx].Handle->AddName(name);
 	
 	return m_queues[chosenIdx].Handle;

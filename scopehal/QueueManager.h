@@ -84,7 +84,6 @@ protected:
     friend QueueLock;
     std::mutex m_mutex;
     std::string m_name;
-    bool m_needWaitFence;
     std::shared_ptr<vk::raii::Device> m_device;
     std::unique_ptr<vk::raii::Queue> m_queue;
     std::unique_ptr<vk::raii::Fence> m_fence;
