@@ -116,7 +116,7 @@ class SPIFlashWaveform : public SparseWaveform<SPIFlashSymbol>
 public:
 	SPIFlashWaveform () : SparseWaveform<SPIFlashSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class SPIFlashDecoder : public PacketDecoder

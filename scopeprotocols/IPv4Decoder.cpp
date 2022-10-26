@@ -405,7 +405,7 @@ void IPv4Decoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color IPv4Waveform::GetColor(size_t i)
+std::string IPv4Waveform::GetColor(size_t i)
 {
 	switch(m_samples[i].m_type)
 	{

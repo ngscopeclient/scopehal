@@ -30,10 +30,6 @@
 #ifndef StandardColors_h
 #define StandardColors_h
 
-#include <gtkmm.h>
-
-// TODO: This doesn't seem like it belongs in scopehal
-
 namespace StandardColors
 {
 	enum FilterColor
@@ -50,7 +46,7 @@ namespace StandardColors
 		STANDARD_COLOR_COUNT
 	};
 
-	extern Gdk::Color colors[STANDARD_COLOR_COUNT];
+	extern std::string colors[STANDARD_COLOR_COUNT];
 }
 
 #endif // StandardColors_h

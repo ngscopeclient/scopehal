@@ -1008,7 +1008,7 @@ void SPIFlashDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color SPIFlashWaveform::GetColor(size_t i)
+std::string SPIFlashWaveform::GetColor(size_t i)
 {
 	const SPIFlashSymbol& s = m_samples[i];
 

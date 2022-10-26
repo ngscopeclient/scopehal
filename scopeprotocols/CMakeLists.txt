@@ -5,12 +5,14 @@ set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleFilter.cpp
 	ACRMSMeasurement.cpp
 	ADL5205Decoder.cpp
+	AreaMeasurement.cpp
 	AutocorrelationFilter.cpp
 	BaseMeasurement.cpp
 	BINImportFilter.cpp
 	BurstWidthMeasurement.cpp
 	CANDecoder.cpp
 	ChannelEmulationFilter.cpp
+	ClipFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
 	CSVImportFilter.cpp
@@ -100,16 +102,18 @@ set(SCOPEPROTOCOLS_SOURCES
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
 	PhaseMeasurement.cpp
+	PhaseNonlinearityFilter.cpp
 	PkPkMeasurement.cpp
 	PRBSCheckerFilter.cpp
 	PRBSGeneratorFilter.cpp
+	PulseWidthMeasurement.cpp
 	QSGMIIDecoder.cpp
 	QSPIDecoder.cpp
 	QuadratureDecoder.cpp
 	ReferencePlaneExtensionFilter.cpp
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
-    ScaleFilter.cpp
+	ScaleFilter.cpp
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
@@ -139,6 +143,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	UartClockRecoveryFilter.cpp
 	UARTDecoder.cpp
 	UndershootMeasurement.cpp
+	UnwrappedPhaseFilter.cpp
 	UpsampleFilter.cpp
 	USB2ActivityDecoder.cpp
 	USB2PacketDecoder.cpp
@@ -154,6 +159,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	WAVImportFilter.cpp
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
+	WindowFilter.cpp
 
 	AverageStatistic.cpp
 	MaximumStatistic.cpp

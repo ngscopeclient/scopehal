@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,54 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Implementation of ExportWizard
+	@brief Declaration of ClipFilter
  */
-#include "scopehal.h"
+#ifndef ClipFilter_h
+#define ClipFilter_h
 
-using namespace std;
-
-ExportWizard::CreateMapType ExportWizard::m_createprocs;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-ExportWizard::ExportWizard(const vector<OscilloscopeChannel*>& channels)
-	: m_channels(channels)
+class ClipFilter : public Filter
 {
-}
+public:
+	ClipFilter(const std::string& color);
 
-ExportWizard::~ExportWizard()
-{
-}
+	virtual void Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Object creation
+	static std::string GetProtocolName();
 
-void ExportWizard::DoAddExportWizardClass(const string& name, CreateProcType proc)
-{
-	m_createprocs[name] = proc;
-}
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-void ExportWizard::EnumExportWizards(vector<string>& names)
-{
-	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
-		names.push_back(it->first);
-	std::sort(names.begin(), names.end());
-}
+	PROTOCOL_DECODER_INITPROC(ClipFilter)
 
-ExportWizard* ExportWizard::CreateExportWizard(const string& name, const vector<OscilloscopeChannel*>& channels)
-{
-	if(m_createprocs.find(name) != m_createprocs.end())
-		return m_createprocs[name](channels);
+protected:
+	std::string m_clipAboveName;
+	std::string m_clipLevelName;
+};
 
-	LogError("Invalid export wizard name: %s\n", name.c_str());
-	return NULL;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Event handlers
-
-void ExportWizard::on_cancel()
-{
-	hide();
-}
+#endif

@@ -44,11 +44,13 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(ACRMSMeasurement);
 	AddDecoderClass(ADL5205Decoder);
+	AddDecoderClass(AreaMeasurement);
 	AddDecoderClass(BaseMeasurement);
 	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(BurstWidthMeasurement);
 	AddDecoderClass(CANDecoder);
 	AddDecoderClass(ChannelEmulationFilter);
+	AddDecoderClass(ClipFilter);
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(ComplexImportFilter);
 	AddDecoderClass(CSVImportFilter);
@@ -136,9 +138,11 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(PeakHoldFilter);
 	AddDecoderClass(PeriodMeasurement);
 	AddDecoderClass(PhaseMeasurement);
+	AddDecoderClass(PhaseNonlinearityFilter);
 	AddDecoderClass(PkPkMeasurement);
 	AddDecoderClass(PRBSCheckerFilter);
 	AddDecoderClass(PRBSGeneratorFilter);
+	AddDecoderClass(PulseWidthMeasurement);
 	AddDecoderClass(ReferencePlaneExtensionFilter);
 	AddDecoderClass(RjBUjFilter);
 	AddDecoderClass(QSGMIIDecoder);
@@ -176,6 +180,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);
+	AddDecoderClass(UnwrappedPhaseFilter);
 	AddDecoderClass(UpsampleFilter);
 	AddDecoderClass(USB2ActivityDecoder);
 	AddDecoderClass(USB2PacketDecoder);
@@ -190,6 +195,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(WAVImportFilter);
 	AddDecoderClass(WFMImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
+	AddDecoderClass(WindowFilter);
 
 	AddStatisticClass(AverageStatistic);
 	AddStatisticClass(MaximumStatistic);

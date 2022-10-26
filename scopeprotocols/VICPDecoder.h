@@ -78,7 +78,7 @@ class VICPWaveform : public SparseWaveform<VICPSymbol>
 public:
 	VICPWaveform () : SparseWaveform<VICPSymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 class VICPDecoder : public PacketDecoder

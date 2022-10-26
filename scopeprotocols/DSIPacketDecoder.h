@@ -72,7 +72,7 @@ class DSIWaveform : public SparseWaveform<DSISymbol>
 public:
 	DSIWaveform () : SparseWaveform<DSISymbol>() {};
 	virtual std::string GetText(size_t) override;
-	virtual Gdk::Color GetColor(size_t) override;
+	virtual std::string GetColor(size_t) override;
 };
 
 /**

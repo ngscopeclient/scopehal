@@ -505,7 +505,7 @@ void USB2PCSDecoder::RefreshIterationData(
 	}
 }
 
-Gdk::Color USB2PCSWaveform::GetColor(size_t i)
+std::string USB2PCSWaveform::GetColor(size_t i)
 {
 	auto sample = m_samples[i];
 	switch(sample.m_type)

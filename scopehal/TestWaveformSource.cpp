@@ -196,7 +196,7 @@ WaveformBase* TestWaveformSource::GeneratePRBS31(
 		bool last = value;
 		if(phase_to_next_edge < 0)
 		{
-			uint32_t next = ( (prbs >> 31) ^ (prbs >> 28) ) & 1;
+			uint32_t next = ( (prbs >> 30) ^ (prbs >> 27) ) & 1;
 			prbs = (prbs << 1) | next;
 			value = next;
 

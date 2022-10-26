@@ -333,8 +333,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 					{
 						//Default to unknown LLC
 						pack->m_headers["Ethertype"] = "LLC";
-						pack->m_displayBackgroundColor = Gdk::Color("#33a02c");
-						pack->m_displayForegroundColor = Gdk::Color("#000000");
+						pack->m_displayBackgroundColor = "#33a02c";
+						pack->m_displayForegroundColor = "#000000";
 
 						//Look up the LLC LSAP address to see what it is
 						if( (i+1) < bytes.size() )
@@ -342,8 +342,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 							if(bytes[i+1] == 0x42)
 							{
 								pack->m_headers["Ethertype"] = "STP";
-								pack->m_displayBackgroundColor = Gdk::Color("#fdbf6f");
-								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								pack->m_displayBackgroundColor = "#fdbf6f";
+								pack->m_displayForegroundColor = "#000000";
 							}
 						}
 					}
@@ -354,27 +354,27 @@ void EthernetProtocolDecoder::BytesToFrames(
 						{
 							case 0x0800:
 								pack->m_headers["Ethertype"] = "IPv4";
-								pack->m_displayBackgroundColor = Gdk::Color("#a6cee3");
-								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								pack->m_displayBackgroundColor = "#a6cee3";
+								pack->m_displayForegroundColor = "#000000";
 								break;
 
 							case 0x0806:
 								pack->m_headers["Ethertype"] = "ARP";
-								pack->m_displayBackgroundColor = Gdk::Color("#ffff99");
-								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								pack->m_displayBackgroundColor = "#ffff99";
+								pack->m_displayForegroundColor = "#000000";
 								break;
 
 							//TODO: decoder inner ethertype too?
 							case 0x8100:
 								pack->m_headers["Ethertype"] = "802.1q";
-								pack->m_displayBackgroundColor = Gdk::Color("#b2df8a");
-								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								pack->m_displayBackgroundColor = "#b2df8a";
+								pack->m_displayForegroundColor = "#000000";
 								break;
 
 							case 0x86DD:
 								pack->m_headers["Ethertype"] = "IPv6";
-								pack->m_displayBackgroundColor = Gdk::Color("#1f78b4");
-								pack->m_displayForegroundColor = Gdk::Color("#ffffff");
+								pack->m_displayBackgroundColor = "#1f78b4";
+								pack->m_displayForegroundColor = "#ffffff";
 								break;
 
 							default:
@@ -382,8 +382,8 @@ void EthernetProtocolDecoder::BytesToFrames(
 								segment.m_data[0],
 								segment.m_data[1]);
 								pack->m_headers["Ethertype"] = tmp;
-								pack->m_displayBackgroundColor = Gdk::Color("#fb9a99");
-								pack->m_displayForegroundColor = Gdk::Color("#000000");
+								pack->m_displayBackgroundColor = "#fb9a99";
+								pack->m_displayForegroundColor = "#000000";
 								break;
 						}
 					}
@@ -476,7 +476,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 					{
 						segment.m_type = EthernetFrameSegment::TYPE_FCS_BAD;
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
-						pack->m_displayForegroundColor = Gdk::Color("#ffffff");
+						pack->m_displayForegroundColor = "#ffffff";
 					}
 
 					cap->m_durations.push_back( (ends[i] - start)/ cap->m_timescale);
@@ -498,7 +498,7 @@ void EthernetProtocolDecoder::BytesToFrames(
 	delete pack;
 }
 
-Gdk::Color EthernetWaveform::GetColor(size_t i)
+std::string EthernetWaveform::GetColor(size_t i)
 {
 	switch(m_samples[i].m_type)
 	{

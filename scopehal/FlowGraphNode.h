@@ -122,6 +122,9 @@ public:
 	ParameterMapType::iterator GetParamEnd()
 	{ return m_parameters.end(); }
 
+	size_t GetParamCount()
+	{ return m_parameters.size(); }
+
 	/**
 		@brief Serializes this trigger's configuration to a YAML string.
 

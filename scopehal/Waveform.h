@@ -37,6 +37,7 @@
 #define Waveform_h
 
 #include <vector>
+#include <optional>
 #include <AlignedAllocator.h>
 
 #include "StandardColors.h"
@@ -137,7 +138,7 @@ public:
 		return "(unimplemented)";
 	}
 
-	virtual Gdk::Color GetColor(size_t /*i*/)
+	virtual std::string GetColor(size_t /*i*/)
 	{
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	}
@@ -578,6 +579,29 @@ void AssertSampleTypesAreSame(const UniformWaveform<T>* /*a*/, const SparseWavef
 template<class T>
 void AssertSampleTypesAreSame(const UniformWaveform<T>* /*a*/, const UniformWaveform<T>* /*b*/)
 {}
+
+/**
+	@brief Look for a value greater than or equal to "value" in buf and return the index
+ */
+template<class T>
+size_t BinarySearchForGequal(T* buf, size_t len, T value);
+
+/**
+   @brief Find the index of the sample in a (possibly sparse) waveform that COULD include the time
+   time_fs.
+
+   It is NOT GUARANTEED TO if the waveform is not continuous. Results are clamped to
+   0 and wfm->size(), setting out_of_bounds if that happened. To be sure that the returned index
+   refers to a sample that includes time_fs, check that `GetOffsetScaled(swaveform, index) + 
+   GetDurationScaled(swaveform, index) < time_fs`
+ */
+size_t GetIndexNearestAtOrBeforeTimestamp(WaveformBase* wfm, int64_t time_fs, bool& out_of_bounds);
+
+/**
+	@brief Gets the value of our channel at the specified timestamp (absolute, not waveform ticks)
+	and interpolates if possible.
+ */
+std::optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zero_hold_behavior);
 
 #pragma GCC diagnostic pop
 

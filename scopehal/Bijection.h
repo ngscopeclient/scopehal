@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -36,17 +36,17 @@
 #define Bijection_h
 
 /**
-	@brief A one-to-one mapping from objects of type T1 to type T2, which must be different types
+	@brief A one-to-one mapping from objects of type T1 to type T2 (which must be different types)
 
 	For now insert-only, elements can be inserted or iterated but not removed.
  */
-template<class T1, class T2>
+template<class T1, class T2, typename Compare1 = std::less<T1>, typename Compare2 = std::less<T2> >
 class Bijection
 {
 public:
 
-	typedef std::map<T1, T2> forwardType;
-	typedef std::map<T2, T1> reverseType;
+	typedef std::map<T1, T2, Compare1> forwardType;
+	typedef std::map<T2, T1, Compare2> reverseType;
 
 	typename forwardType::const_iterator begin()
 	{ return m_forwardMap.begin(); }
@@ -65,6 +65,12 @@ public:
 
 	const T2& operator[](T1 key)
 	{ return m_forwardMap[key]; }
+
+	bool HasEntry(T1 key)
+	{ return m_forwardMap.find(key) != m_forwardMap.end(); }
+
+	bool HasEntry(T2 key)
+	{ return m_reverseMap.find(key) != m_reverseMap.end(); }
 
 protected:
 	forwardType m_forwardMap;

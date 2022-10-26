@@ -395,7 +395,7 @@ void TCPDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color TCPWaveform::GetColor(size_t i)
+std::string TCPWaveform::GetColor(size_t i)
 {
 	switch(m_samples[i].m_type)
 	{

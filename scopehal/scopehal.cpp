@@ -33,7 +33,6 @@
 	@brief Implementation of global functions
  */
 #include "scopehal.h"
-#include <gtkmm/drawingarea.h>
 #include <libgen.h>
 
 #include "AgilentOscilloscope.h"
@@ -75,6 +74,7 @@
 #include <dlfcn.h>
 #include <sys/stat.h>
 #include <wordexp.h>
+#include <dirent.h>
 #else
 #include <windows.h>
 #include <shlwapi.h>
@@ -111,7 +111,11 @@ void VulkanCleanup();
 void TransportStaticInit()
 {
 	AddTransportClass(SCPISocketTransport);
+#if !defined(_WIN32) && !defined(__APPLE__)
+// TMC is only supported on Linux for now
+// https://github.com/glscopeclient/scopehal/issues/519
 	AddTransportClass(SCPITMCTransport);
+#endif
 	AddTransportClass(SCPITwinLanTransport);
 	AddTransportClass(SCPIUARTTransport);
 	AddTransportClass(SCPINullTransport);

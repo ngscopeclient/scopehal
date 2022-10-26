@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeexports                                                                                                      *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,50 +30,55 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ExportWizard
+	@brief Implementation of ExportWizard
  */
+#include "scopeexports.h"
+#include "ExportWizard.h"
 
-#ifndef ExportWizard_h
-#define ExportWizard_h
+using namespace std;
 
-/**
-	@brief Abstract base class for an export wizard
- */
-class ExportWizard : public Gtk::Assistant
+ExportWizard::CreateMapType ExportWizard::m_createprocs;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ExportWizard::ExportWizard(const vector<OscilloscopeChannel*>& channels)
+	: m_channels(channels)
 {
-public:
-	ExportWizard(const std::vector<OscilloscopeChannel*>& channels);
-	virtual ~ExportWizard();
+}
 
-protected:
-	std::vector<OscilloscopeChannel*> m_channels;
+ExportWizard::~ExportWizard()
+{
+}
 
-	virtual void on_cancel();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Object creation
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation and enumeration
+void ExportWizard::DoAddExportWizardClass(const string& name, CreateProcType proc)
+{
+	m_createprocs[name] = proc;
+}
 
-public:
-	typedef ExportWizard* (*CreateProcType)(const std::vector<OscilloscopeChannel*>&);
-	static void DoAddExportWizardClass(const std::string& name, CreateProcType proc);
+void ExportWizard::EnumExportWizards(vector<string>& names)
+{
+	for(CreateMapType::iterator it=m_createprocs.begin(); it != m_createprocs.end(); ++it)
+		names.push_back(it->first);
+	std::sort(names.begin(), names.end());
+}
 
-	static void EnumExportWizards(std::vector<std::string>& names);
-	static ExportWizard* CreateExportWizard(const std::string& name, const std::vector<OscilloscopeChannel*>& channels);
+ExportWizard* ExportWizard::CreateExportWizard(const string& name, const vector<OscilloscopeChannel*>& channels)
+{
+	if(m_createprocs.find(name) != m_createprocs.end())
+		return m_createprocs[name](channels);
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-	static CreateMapType m_createprocs;
-};
+	LogError("Invalid export wizard name: %s\n", name.c_str());
+	return NULL;
+}
 
-#define EXPORT_WIZARD_INITPROC(T) \
-	static ExportWizard* CreateInstance(const std::vector<OscilloscopeChannel*>& channels) \
-	{ \
-		return new T(channels); \
-	} \
-	virtual std::string GetExportWizardName() \
-	{ return GetExportName(); }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Event handlers
 
-#define AddExportWizardClass(T) ExportWizard::DoAddExportWizardClass(T::GetExportName(), T::CreateInstance)
-
-#endif
+void ExportWizard::on_cancel()
+{
+	hide();
+}

@@ -342,7 +342,7 @@ void SWDMemAPDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color SWDMemAPWaveform::GetColor(size_t /*i*/)
+std::string SWDMemAPWaveform::GetColor(size_t /*i*/)
 {
 	return StandardColors::colors[StandardColors::COLOR_DATA];
 }

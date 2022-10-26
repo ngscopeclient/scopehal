@@ -55,10 +55,10 @@ public:
 	std::vector<uint8_t> m_data;
 
 	//Text color of the packet
-	Gdk::Color m_displayForegroundColor;
+	std::string m_displayForegroundColor;
 
 	//Background color of the packet
-	Gdk::Color m_displayBackgroundColor;
+	std::string m_displayBackgroundColor;
 };
 
 /**
@@ -100,7 +100,7 @@ public:
 		PROTO_STANDARD_COLOR_COUNT
 	};
 
-	static Gdk::Color m_backgroundColors[PROTO_STANDARD_COLOR_COUNT];
+	static std::string m_backgroundColors[PROTO_STANDARD_COLOR_COUNT];
 
 protected:
 	void ClearPackets();

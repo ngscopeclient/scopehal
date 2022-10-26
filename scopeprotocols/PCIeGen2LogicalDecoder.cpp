@@ -344,7 +344,7 @@ uint8_t PCIeGen2LogicalDecoder::RunScrambler(uint16_t& state)
 	return ret;
 }
 
-Gdk::Color PCIeLogicalWaveform::GetColor(size_t i)
+std::string PCIeLogicalWaveform::GetColor(size_t i)
 {
 	const PCIeLogicalSymbol& s = m_samples[i];
 

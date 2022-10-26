@@ -109,6 +109,22 @@ public:
 	static std::set<Filter*> GetAllInstances()
 	{ return m_filters; }
 
+	//Get all currently existing filters
+	static size_t GetNumInstances()
+	{ return m_filters.size(); }
+
+	/**
+		@brief Removes this filter from the global list
+
+		This is typically used for background filters used in GUI code to query stream names etc,
+		but not actually used in the real filter graph.
+	 */
+	void HideFromList()
+	{
+		m_filters.erase(this);
+		m_instanceCount[GetProtocolDisplayName()] --;
+	}
+
 	virtual void ClearStreams();
 	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
@@ -163,9 +179,13 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Evaluation
 
-	//Legacy CPU implementation
-	virtual void Refresh();
+	virtual void
+	#ifndef _MSC_VER
+	__attribute__((deprecated))
+	#endif
+	 Refresh();
 
+public:
 	//GPU accelerated refresh method
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
 

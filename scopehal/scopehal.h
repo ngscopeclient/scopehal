@@ -38,6 +38,7 @@
 
 #define __USE_MINGW_ANSI_STDIO 1 // Required for MSYS2 mingw64 to support format "%z" ..
 
+#include <deque>
 #include <vector>
 #include <string>
 #include <map>
@@ -45,14 +46,16 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <climits>
+#include <set>
+#include <float.h>
 
 #include <sigc++/sigc++.h>
-#include <cairomm/context.h>
 
 #include <yaml-cpp/yaml.h>
 
 #include "../log/log.h"
-#include "../graphwidget/Graph.h"
+#include "ScopehalUtil.h"
 
 #include "config.h"
 
@@ -85,10 +88,15 @@ extern bool g_hasAvx2;
 #include "SCPILinuxGPIBTransport.h"
 #include "SCPILxiTransport.h"
 #include "SCPINullTransport.h"
-#include "SCPITMCTransport.h"
 #include "SCPIUARTTransport.h"
 #include "VICPSocketTransport.h"
 #include "SCPIDevice.h"
+
+#if !defined(_WIN32) && !defined(__APPLE__)
+// TMC is only supported on Linux for now
+// https://github.com/glscopeclient/scopehal/issues/519
+#include "SCPITMCTransport.h"
+#endif
 
 #include "FlowGraphNode.h"
 #include "OscilloscopeChannel.h"
@@ -123,7 +131,6 @@ extern bool g_hasAvx2;
 #include "SParameterSourceFilter.h"
 #include "SParameterFilter.h"
 
-#include "ExportWizard.h"
 #include "FilterGraphExecutor.h"
 
 #include "QueueManager.h"

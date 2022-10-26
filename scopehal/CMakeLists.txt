@@ -42,11 +42,13 @@ endif()
 set(SCOPEHAL_SOURCES
 	base64.cpp
 	scopehal.cpp
+	ScopehalUtil.cpp
 	avx_mathfun.cpp
 	VulkanInit.cpp
 
 	FileSystem.cpp
 	Unit.cpp
+	Waveform.cpp
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
@@ -55,7 +57,6 @@ set(SCOPEHAL_SOURCES
 	SCPILinuxGPIBTransport.cpp
 	SCPILxiTransport.cpp
 	SCPINullTransport.cpp
-	SCPITMCTransport.cpp
 	SCPIUARTTransport.cpp
 	SCPIDevice.cpp
 
@@ -129,12 +130,19 @@ set(SCOPEHAL_SOURCES
 	TestWaveformSource.cpp
 
 	ComputePipeline.cpp
-	ExportWizard.cpp
 	FilterGraphExecutor.cpp
 	PipelineCacheManager.cpp
 	VulkanFFTPlan.cpp
 	QueueManager.cpp
 	)
+
+if(NOT WIN32 AND NOT APPLE)
+	list(APPEND SCOPEHAL_SOURCES
+		# TMC is only supported on Linux for now.
+		# https://github.com/glscopeclient/scopehal/issues/519
+		SCPITMCTransport.cpp
+	)
+endif()
 
 configure_file(config.h.in config.h)
 
@@ -150,7 +158,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -197,7 +204,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
@@ -261,7 +267,6 @@ PUBLIC
 
 	${Vulkan_INCLUDE_DIR}/vulkan/vulkan_raii.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT/vkFFT.h
-	${GTKMM_INCLUDEDIR}/gtkmm-3.0/gtkmm.h
 	${YAML_PCH_PATH}
 	)
 

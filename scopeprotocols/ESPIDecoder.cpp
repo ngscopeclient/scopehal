@@ -1410,7 +1410,7 @@ uint8_t ESPIDecoder::UpdateCRC8(uint8_t crc, uint8_t data)
 	return crc;
 }
 
-Gdk::Color ESPIWaveform::GetColor(size_t i)
+std::string ESPIWaveform::GetColor(size_t i)
 {
 	const ESPISymbol& s = m_samples[i];
 

@@ -32,7 +32,7 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of CSVExportWizard
  */
-#include "scopehal.h"
+#include "scopeexports.h"
 #include "CSVExportWizard.h"
 
 using namespace std;

@@ -321,7 +321,7 @@ void DPhySymbolDecoder::Refresh()
 }
 
 
-Gdk::Color DPhySymbolWaveform::GetColor(size_t i)
+string DPhySymbolWaveform::GetColor(size_t i)
 {
 	const DPhySymbol& s = m_samples[i];
 

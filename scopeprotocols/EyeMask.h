@@ -35,6 +35,8 @@
 #ifndef EyeMask_h
 #define EyeMask_h
 
+#include <cairomm/cairomm.h>
+
 class EyeDecoder2;
 class EyeWaveform;
 

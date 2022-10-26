@@ -478,7 +478,7 @@ void VICPDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color VICPWaveform::GetColor(size_t i)
+std::string VICPWaveform::GetColor(size_t i)
 {
 	const VICPSymbol& s = m_samples[i];
 

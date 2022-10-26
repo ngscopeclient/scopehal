@@ -536,7 +536,7 @@ void CANDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color CANWaveform::GetColor(size_t i)
+std::string CANWaveform::GetColor(size_t i)
 {
 	const CANSymbol& s = m_samples[i];
 

@@ -277,7 +277,7 @@ void DVIDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-Gdk::Color DVIWaveform::GetColor(size_t i)
+std::string DVIWaveform::GetColor(size_t i)
 {
 	auto s = m_samples[i];
 	switch(s.m_type)
@@ -291,9 +291,9 @@ Gdk::Color DVIWaveform::GetColor(size_t i)
 
 		case DVISymbol::DVI_TYPE_VIDEO:
 			{
-				Gdk::Color ret;
-				ret.set_rgb_p(s.m_red / 255.0f, s.m_green / 255.0f, s.m_blue / 255.0f);
-				return ret;
+				char buf[10];
+				snprintf(buf, sizeof(buf), "#%02X%02X%02X", s.m_red, s.m_green, s.m_blue);
+				return buf;
 			}
 
 		case DVISymbol::DVI_TYPE_ERROR:

@@ -381,7 +381,7 @@ bool SDCmdDecoder::GetShowDataColumn()
 	return false;
 }
 
-Gdk::Color SDCmdWaveform::GetColor(size_t i)
+std::string SDCmdWaveform::GetColor(size_t i)
 {
 	auto s = m_samples[i];
 	switch(s.m_stype)

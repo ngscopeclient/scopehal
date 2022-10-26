@@ -308,7 +308,7 @@ void DPhyEscapeModeDecoder::Refresh()
 	}
 }
 
-Gdk::Color DPhyEscapeModeWaveform::GetColor(size_t i)
+std::string DPhyEscapeModeWaveform::GetColor(size_t i)
 {
 	const DPhyEscapeModeSymbol& s = m_samples[i];
 
