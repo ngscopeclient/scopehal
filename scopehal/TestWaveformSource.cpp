@@ -43,6 +43,7 @@ using namespace std;
 TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	: m_rng(rng)
 {
+#ifndef _APPLE_SILICON
 	m_forwardPlan = NULL;
 	m_reversePlan = NULL;
 
@@ -52,10 +53,12 @@ TestWaveformSource::TestWaveformSource(minstd_rand& rng)
 	m_forwardInBuf = NULL;
 	m_forwardOutBuf = NULL;
 	m_reverseOutBuf = NULL;
+#endif
 }
 
 TestWaveformSource::~TestWaveformSource()
 {
+#ifndef _APPLE_SILICON
 	if(m_forwardPlan)
 		ffts_free(m_forwardPlan);
 	if(m_reversePlan)
@@ -70,6 +73,7 @@ TestWaveformSource::~TestWaveformSource()
 	m_forwardInBuf = NULL;
 	m_forwardOutBuf = NULL;
 	m_reverseOutBuf = NULL;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,6 +304,8 @@ void TestWaveformSource::DegradeSerialData(
 	//RNGs
 	normal_distribution<> noise(0, noise_amplitude);
 
+	// ffts is not available on apple silicon, so for now we only apply noise there
+#ifndef _APPLE_SILICON
 	//Prepare for second pass: reallocate FFT buffer if sample depth changed
 	const size_t npoints = next_pow2(depth);
 	size_t nouts = npoints/2 + 1;
@@ -356,6 +362,7 @@ void TestWaveformSource::DegradeSerialData(
 	}
 
 	else
+#endif
 	{
 		for(size_t i=0; i<depth; i++)
 			cap->m_samples[i] += noise(m_rng);

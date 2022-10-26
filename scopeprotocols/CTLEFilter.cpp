@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "CTLEFilter.h"
-#include <ffts.h>
 #include <complex>
 
 using namespace std;
@@ -141,4 +140,3 @@ void CTLEFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue
 	//Do the actual refresh operation
 	DoRefresh(false, cmdBuf, queue);
 }
-

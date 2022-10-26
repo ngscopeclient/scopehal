@@ -133,6 +133,8 @@ extern bool g_hasAvx2;
 
 #include "FilterGraphExecutor.h"
 
+#include "QueueManager.h"
+
 uint64_t ConvertVectorSignalToScalar(const std::vector<bool>& bits);
 
 std::string GetDefaultChannelColor(int i);
@@ -184,15 +186,12 @@ extern std::vector<std::string> g_searchPaths;
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
-extern uint32_t g_computeQueueType;
-extern uint32_t g_renderQueueType;
 extern uint8_t g_vkComputeDeviceUuid[16];
 extern uint32_t g_vkComputeDeviceDriverVer;
 extern vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
+extern std::unique_ptr<QueueManager> g_vkQueueManager;
 
 void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-int AllocateVulkanComputeQueue();
-int AllocateVulkanRenderQueue();
 
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;

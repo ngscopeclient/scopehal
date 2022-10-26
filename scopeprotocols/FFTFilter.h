@@ -35,7 +35,9 @@
 #ifndef FFTFilter_h
 #define FFTFilter_h
 
+#ifndef _APPLE_SILICON
 #include <ffts.h>
+#endif
 
 #ifdef HAVE_CLFFT
 #include <clFFT.h>
@@ -130,7 +132,9 @@ protected:
 	size_t m_cachedNumPointsFFT;
 	AcceleratorBuffer<float> m_rdinbuf;
 	AcceleratorBuffer<float> m_rdoutbuf;
+#ifndef _APPLE_SILICON
 	ffts_plan_t* m_plan;
+#endif
 
 	float m_range;
 	float m_offset;

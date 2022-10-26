@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 /**
 	@file
 	@author Andrew D. Zonenberg
@@ -68,5 +70,7 @@ protected:
 	std::vector<float, AlignedAllocator<float, 64> > m_stepinbuf;
 	std::vector<float, AlignedAllocator<float, 64> > m_stepoutbuf;
 };
+
+#endif
 
 #endif

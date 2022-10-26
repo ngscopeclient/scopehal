@@ -58,9 +58,10 @@ TRCImportFilter::TRCImportFilter(const string& color)
 	}
 
 	//Make a command buffer for our accelerated stuff
+	//TODO: Should this really be using the global transfer queue?
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_computeQueueType );
+		g_vkTransferQueue->m_family );
 	m_commandPool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
 	vk::CommandBufferAllocateInfo bufinfo(**m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
 	m_commandBuffer = make_unique<vk::raii::CommandBuffer>(
@@ -254,10 +255,7 @@ void TRCImportFilter::OnFileNameChanged()
 			m_computePipeline16Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
 			m_commandBuffer->end();
 
-			{
-				lock_guard<mutex> lock(g_vkTransferMutex);
-				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
-			}
+			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
 
 			wfm->MarkModifiedFromGpu();
 		}
@@ -312,10 +310,7 @@ void TRCImportFilter::OnFileNameChanged()
 			m_computePipeline8Bit->Dispatch(*m_commandBuffer, args, GetComputeBlockCount(len, 64));
 			m_commandBuffer->end();
 
-			{
-				lock_guard<mutex> lock(g_vkTransferMutex);
-				SubmitAndBlock(*m_commandBuffer, *g_vkTransferQueue);
-			}
+			g_vkTransferQueue->SubmitAndBlock(*m_commandBuffer);
 
 			wfm->MarkModifiedFromGpu();
 		}

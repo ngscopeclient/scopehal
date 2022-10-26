@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 #include "../scopehal/scopehal.h"
 #include <complex>
 #include "OFDMDemodulator.h"
@@ -363,3 +365,5 @@ void OFDMDemodulator::Refresh()
 	SetData(NULL, 0);
 	return;
 }
+
+#endif

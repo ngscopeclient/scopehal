@@ -36,6 +36,7 @@
 #define AcceleratorBuffer_h
 
 #include "AlignedAllocator.h"
+#include "QueueManager.h"
 
 #ifdef _WIN32
 #undef MemoryBarrier
@@ -50,9 +51,9 @@
 
 extern uint32_t g_vkPinnedMemoryType;
 extern uint32_t g_vkLocalMemoryType;
-extern std::unique_ptr<vk::raii::Device> g_vkComputeDevice;
+extern std::shared_ptr<vk::raii::Device> g_vkComputeDevice;
 extern std::unique_ptr<vk::raii::CommandBuffer> g_vkTransferCommandBuffer;
-extern std::unique_ptr<vk::raii::Queue> g_vkTransferQueue;
+extern std::shared_ptr<QueueHandle> g_vkTransferQueue;
 extern std::mutex g_vkTransferMutex;
 
 extern bool g_hasDebugUtils;
@@ -499,12 +500,7 @@ public:
 			g_vkTransferCommandBuffer->end();
 
 			//Submit the request and block until it completes
-			vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
-			vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
-			g_vkTransferQueue->submit(info, *fence);
-			while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
-			{}
-
+			g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 		}
 		m_gpuPhysMemIsStale = rhs.m_gpuPhysMemIsStale;
 	}
@@ -630,11 +626,7 @@ protected:
 					g_vkTransferCommandBuffer->end();
 
 					//Submit the request and block until it completes
-					vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
-					vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
-					g_vkTransferQueue->submit(info, *fence);
-					while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
-					{}
+					g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 
 					//make sure buffer is freed before underlying physical memory (pOld) goes out of scope
 					bOld = nullptr;
@@ -903,11 +895,7 @@ protected:
 		g_vkTransferCommandBuffer->end();
 
 		//Submit the request and block until it completes
-		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
-		vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
-		g_vkTransferQueue->submit(info, *fence);
-		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
-		{}
+		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 
 		m_cpuPhysMemIsStale = false;
 	}
@@ -928,11 +916,7 @@ protected:
 		g_vkTransferCommandBuffer->end();
 
 		//Submit the request and block until it completes
-		vk::raii::Fence fence(*g_vkComputeDevice, vk::FenceCreateInfo());
-		vk::SubmitInfo info({}, {}, **g_vkTransferCommandBuffer);
-		g_vkTransferQueue->submit(info, *fence);
-		while(vk::Result::eTimeout == g_vkComputeDevice->waitForFences({*fence}, VK_TRUE, 1000 * 1000))
-		{}
+		g_vkTransferQueue->SubmitAndBlock(*g_vkTransferCommandBuffer);
 
 		m_gpuPhysMemIsStale = false;
 	}

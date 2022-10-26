@@ -50,7 +50,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	//Create a command pool for initialization use
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		g_computeQueueType );
+		g_vkTransferQueue->m_family );
 	vk::raii::CommandPool pool(*g_vkComputeDevice, poolInfo);
 
 	//Only 1D FFTs supported for now
@@ -93,12 +93,13 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	}
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
+	QueueLock queuelock(g_vkTransferQueue);
 
 	//Extract raw handles of all of our Vulkan objects
 	m_physicalDevice = **g_vkComputePhysicalDevice;
 	m_device = **g_vkComputeDevice;
 	VkCommandPool rpool = *pool;
-	VkQueue queue = **g_vkTransferQueue;
+	VkQueue queue = **queuelock;
 	m_rawfence = *m_fence;
 	m_pipelineCache = **g_pipelineCacheMgr->Lookup(cacheKey + ".spv", VkFFTGetVersion());
 

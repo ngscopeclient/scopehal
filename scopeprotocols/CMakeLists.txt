@@ -171,15 +171,23 @@ set(SCOPEPROTOCOLS_SOURCES
 add_library(scopeprotocols SHARED
 	${SCOPEPROTOCOLS_SOURCES})
 
-target_link_libraries(scopeprotocols
-	scopehal
-	${LIBFFTS_LIBRARIES}
-	)
-
-target_include_directories(scopeprotocols
-PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-       ${LIBFFTS_INCLUDE_DIR}
-       )
+if(APPLE_SILICON)
+	target_link_libraries(scopeprotocols
+		scopehal
+		)
+	target_include_directories(scopeprotocols
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+		)
+else()
+	target_link_libraries(scopeprotocols
+		scopehal
+		${LIBFFTS_LIBRARIES}
+		)
+	target_include_directories(scopeprotocols
+	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+		${LIBFFTS_INCLUDE_DIR}
+		)
+endif()
 
 # Setup for vkfft
 target_compile_definitions(scopeprotocols PUBLIC -DVK_API_VERSION=10 -DVKFFT_BACKEND=0)

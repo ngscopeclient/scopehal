@@ -58,7 +58,9 @@ FFTFilter::FFTFilter(const string& color)
 
 	m_cachedNumPoints = 0;
 	m_cachedNumPointsFFT = 0;
+#ifndef _APPLE_SILICON
 	m_plan = NULL;
+#endif
 
 	//Default config
 	m_range = 70;
@@ -81,8 +83,10 @@ FFTFilter::FFTFilter(const string& color)
 
 FFTFilter::~FFTFilter()
 {
+#ifndef _APPLE_SILICON
 	if(m_plan)
 		ffts_free(m_plan);
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,6 +148,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 	{
 		m_cachedNumPointsFFT = npoints;
 
+	#ifndef _APPLE_SILICON
 		if(g_gpuFilterEnabled)
 			m_plan = nullptr;
 
@@ -159,6 +164,10 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 			m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 			m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 		}
+	#else
+		if(!g_gpuFilterEnabled)
+			LogFatal("FFTFilter cpu fallback not available on Apple Silicon (yet?)");
+	#endif
 	}
 
 	//Update our FFT plan if it's out of date
@@ -339,6 +348,9 @@ void FFTFilter::DoRefresh(
 		cap->MarkModifiedFromGpu();
 	}
 	else
+	#ifdef _APPLE_SILICON
+		LogFatal("FFTFilter cpu fallback not available on Apple Silicon (yet?)");
+	#else
 	{
 		data.PrepareForCpuAccess();
 		m_rdinbuf.PrepareForCpuAccess();
@@ -379,6 +391,7 @@ void FFTFilter::DoRefresh(
 
 		cap->MarkModifiedFromCpu();
 	}
+	#endif
 
 	//Peak search
 	FindPeaks(cap);

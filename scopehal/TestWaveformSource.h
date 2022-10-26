@@ -37,7 +37,9 @@
 #define TestWaveformSource_h
 
 #include "../scopehal/AlignedAllocator.h"
+#ifndef _APPLE_SILICON
 #include <ffts.h>
+#endif
 #include <random>
 
 /**
@@ -99,6 +101,7 @@ public:
 protected:
 	std::minstd_rand& m_rng;
 
+#ifndef _APPLE_SILICON
 	//FFT stuff
 	AlignedAllocator<float, 32> m_allocator;
 	ffts_plan_t* m_forwardPlan;
@@ -109,6 +112,7 @@ protected:
 	float* m_forwardInBuf;
 	float* m_forwardOutBuf;
 	float* m_reverseOutBuf;
+#endif
 };
 
 #endif

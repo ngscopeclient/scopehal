@@ -29,7 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "ChannelEmulationFilter.h"
-#include <ffts.h>
 
 using namespace std;
 

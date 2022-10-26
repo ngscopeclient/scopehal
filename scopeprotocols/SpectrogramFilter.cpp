@@ -27,6 +27,8 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
+#ifndef _APPLE_SILICON
+
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
 #include "SpectrogramFilter.h"
@@ -360,3 +362,5 @@ void SpectrogramFilter::ProcessSpectrumAVX2FMA(
 	}
 }
 #endif /* __x86_64__ */
+
+#endif
