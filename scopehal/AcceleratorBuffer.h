@@ -966,7 +966,7 @@ protected:
 
 		//We have a buffer on the GPU.
 		//If it's stale, need to push our updated content there before freeing the CPU-side copy
-		if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale)
+		if( (m_gpuMemoryType != MEM_TYPE_NULL) && m_gpuPhysMemIsStale && !empty())
 			CopyToGpu();
 
 		//Free the Vulkan buffer object
@@ -999,7 +999,7 @@ protected:
 			return;
 
 		//If we have a CPU-side buffer, and it's stale, move our about-to-be-deleted content over before we free it
-		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPhysMemIsStale )
+		if( (m_cpuMemoryType != MEM_TYPE_NULL) && m_cpuPhysMemIsStale && !empty() )
 			CopyToCpu();
 
 		m_gpuBuffer = nullptr;
