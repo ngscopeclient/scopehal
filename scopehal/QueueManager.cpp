@@ -125,7 +125,7 @@ void QueueHandle::_waitFence()
 {
 	if(!m_fence)
 		return;
-	
+
 	//Wait for any previous submit to finish
 	while(vk::Result::eTimeout == m_device->waitForFences({**m_fence}, VK_TRUE, 1000 * 1000))
 	{}
@@ -156,7 +156,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 		//Skip if flags don't match
 		if(!(m_queues[i].Flags & flags))
 			continue;
-		
+
 		//If handle is unallocated, use it right away
 		if(m_queues[i].Handle.use_count() == 0)
 		{
@@ -165,7 +165,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 				m_device, m_queues[i].Family, m_queues[i].Index, name);
 			return m_queues[i].Handle;
 		}
-		
+
 		//Otherwise find the queue with the fewest existing handles
 		if(chosenIdx == -1)
 			chosenIdx = i;
@@ -174,10 +174,11 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	}
 
 	if(chosenIdx < 0)
-		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", flags);
-	
-	LogDebug("QueueManager reusing handle idx=%zu name=%s for name=%s\n", chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
+		LogFatal("Failed to locate a vulkan queue satisfying the flags 0x%x", (unsigned int)flags);
+
+	LogTrace("QueueManager reusing handle idx=%zu name=%s for name=%s\n",
+		chosenIdx, m_queues[chosenIdx].Handle->GetName().c_str(), name.c_str());
 	m_queues[chosenIdx].Handle->AddName(name);
-	
+
 	return m_queues[chosenIdx].Handle;
 }
