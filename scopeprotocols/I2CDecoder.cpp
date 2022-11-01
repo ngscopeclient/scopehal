@@ -45,7 +45,6 @@ using namespace std;
 I2CDecoder::I2CDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
-	AddProtocolStream("data");
 	CreateInput("sda");
 	CreateInput("scl");
 }
@@ -74,6 +73,7 @@ vector<string> I2CDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Op");
 	ret.push_back("Address");
+	ret.push_back("Len");
 	ret.push_back("ASCII");
 	return ret;
 }
@@ -119,6 +119,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 				if(pack)
 				{
 					pack->m_len = timestamp - pack->m_offset;
+					pack->m_headers["Len"] = to_string(pack->m_data.size());
 					m_packets.push_back(pack);
 					pack = nullptr;
 				}
@@ -176,6 +177,7 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 			if(pack)
 			{
 				pack->m_len = timestamp - pack->m_offset;
+				pack->m_headers["Len"] = to_string(pack->m_data.size());
 				m_packets.push_back(pack);
 				pack = nullptr;
 			}
