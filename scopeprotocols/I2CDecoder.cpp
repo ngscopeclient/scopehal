@@ -43,7 +43,7 @@ using namespace std;
 // Construction / destruction
 
 I2CDecoder::I2CDecoder(const string& color)
-	: Filter(color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	AddProtocolStream("data");
 	CreateInput("sda");
@@ -69,12 +69,22 @@ string I2CDecoder::GetProtocolName()
 	return "I2C";
 }
 
+vector<string> I2CDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Op");
+	ret.push_back("Address");
+	return ret;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 template<class T, class U>
-void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
+void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 {
+	Packet* pack = nullptr;
+
 	//Loop over the data and look for transactions
 	bool				last_scl = true;
 	bool 				last_sda = true;
@@ -101,12 +111,35 @@ void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
 
 			//If we're following an ACK, this is a restart
 			if(current_type == I2CSymbol::TYPE_DATA)
+			{
 				current_type = I2CSymbol::TYPE_RESTART;
+
+				//Finish existing packet, if we have one
+				if(pack)
+				{
+					pack->m_len = timestamp - pack->m_offset;
+					m_packets.push_back(pack);
+					pack = nullptr;
+				}
+			}
+
+			//Otherwise, regular start
 			else
 			{
 				tstart = timestamp;
 				current_type = I2CSymbol::TYPE_START;
 			}
+
+			//Create a new packet. If we already have an incomplete one that got aborted, reset it
+			if(pack)
+			{
+				pack->m_data.clear();
+				pack->m_headers.clear();
+			}
+			else
+				pack = new Packet;
+			pack->m_offset = timestamp;
+			pack->m_len = 0;
 		}
 
 		//End a start bit when SDA goes high if the first data bit is a 1
@@ -137,6 +170,14 @@ void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
 			last_was_start	= false;
 
 			tstart = timestamp;
+
+			//Finish existing packet, if we have one
+			if(pack)
+			{
+				pack->m_len = timestamp - pack->m_offset;
+				m_packets.push_back(pack);
+				pack = nullptr;
+			}
 		}
 
 		//On a rising SCL edge, end the current bit
@@ -156,9 +197,31 @@ void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
 					cap->m_offsets.push_back(tstart);
 					cap->m_durations.push_back(timestamp - tstart);
 					if(last_was_start)
+					{
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ADDRESS, current_byte));
+
+						if(pack)
+						{
+							pack->m_headers["Address"] = to_string_hex(current_byte & 0xfe);
+							if(current_byte & 1)
+							{
+								pack->m_headers["Op"] = "Read";
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+							}
+							else
+							{
+								pack->m_headers["Op"] = "Write";
+								pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+							}
+						}
+					}
 					else
+					{
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
+
+						if(pack)
+							pack->m_data.push_back(current_byte);
+					}
 
 					last_was_start	= false;
 
@@ -198,10 +261,15 @@ void I2CDecoderInnerLoop(T* sda, U* scl, I2CWaveform* cap)
 		Filter::AdvanceToTimestampScaled(sda, isda, sdalen, timestamp);
 		Filter::AdvanceToTimestampScaled(scl, iscl, scllen, timestamp);
 	}
+
+	if(pack)
+		delete pack;
 }
 
 void I2CDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -229,13 +297,13 @@ void I2CDecoder::Refresh()
 	cap->PrepareForCpuAccess();
 
 	if(usda && uscl)
-		I2CDecoderInnerLoop(usda, uscl, cap);
+		InnerLoop(usda, uscl, cap);
 	else if(usda && sscl)
-		I2CDecoderInnerLoop(usda, sscl, cap);
+		InnerLoop(usda, sscl, cap);
 	else if(ssda && sscl)
-		I2CDecoderInnerLoop(ssda, sscl, cap);
+		InnerLoop(ssda, sscl, cap);
 	else /*if(ssda && uscl)*/
-		I2CDecoderInnerLoop(ssda, uscl, cap);
+		InnerLoop(ssda, uscl, cap);
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();

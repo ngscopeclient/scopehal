@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -35,6 +35,8 @@
 
 #ifndef I2CDecoder_h
 #define I2CDecoder_h
+
+#include "../scopehal/PacketDecoder.h"
 
 class I2CSymbol
 {
@@ -76,12 +78,14 @@ public:
 	virtual std::string GetColor(size_t) override;
 };
 
-class I2CDecoder : public Filter
+class I2CDecoder : public PacketDecoder
 {
 public:
 	I2CDecoder(const std::string& color);
 
 	virtual void Refresh();
+
+	std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();
 
@@ -90,6 +94,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(I2CDecoder)
 
 protected:
+	template<class T, class U> void InnerLoop(T* sda, U* scl, I2CWaveform* cap);
 };
 
 #endif
