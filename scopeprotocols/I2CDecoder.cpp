@@ -74,6 +74,7 @@ vector<string> I2CDecoder::GetHeaders()
 	vector<string> ret;
 	ret.push_back("Op");
 	ret.push_back("Address");
+	ret.push_back("ASCII");
 	return ret;
 }
 
@@ -220,7 +221,15 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
 
 						if(pack)
+						{
 							pack->m_data.push_back(current_byte);
+							if(isspace(current_byte))
+								pack->m_headers["ASCII"] += ' ';
+							else if(isprint(current_byte))
+								pack->m_headers["ASCII"] += current_byte;
+							else
+								pack->m_headers["ASCII"] += '.';
+						}
 					}
 
 					last_was_start	= false;
