@@ -74,6 +74,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	HyperRAMDecoder.cpp
 	I2CDecoder.cpp
 	I2CEepromDecoder.cpp
+	I2CRegisterDecoder.cpp
 	IBISDriverFilter.cpp
 	IBM8b10bDecoder.cpp
 	InvertFilter.cpp

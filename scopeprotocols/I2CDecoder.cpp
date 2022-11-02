@@ -197,10 +197,19 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 				//Add a sample if the byte is over
 				if(bitcount == 8)
 				{
-					cap->m_offsets.push_back(tstart);
-					cap->m_durations.push_back(timestamp - tstart);
+					int64_t this_len = timestamp - tstart;
+
 					if(last_was_start)
 					{
+						//If the start bit was insanely long, shorten it
+						size_t nlast = cap->m_offsets.size() - 1;
+						if(cap->m_durations[nlast] > 3*this_len)
+						{
+							int64_t tend = cap->m_offsets[nlast] + cap->m_durations[nlast];
+							cap->m_durations[nlast] = this_len;
+							cap->m_offsets[nlast] = tend - this_len;
+						}
+
 						cap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ADDRESS, current_byte));
 
 						if(pack)
@@ -233,6 +242,9 @@ void I2CDecoder::InnerLoop(T* sda, U* scl, I2CWaveform* cap)
 								pack->m_headers["ASCII"] += '.';
 						}
 					}
+
+					cap->m_offsets.push_back(tstart);
+					cap->m_durations.push_back(this_len);
 
 					last_was_start	= false;
 

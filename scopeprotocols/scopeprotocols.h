@@ -110,6 +110,7 @@
 #include "HyperRAMDecoder.h"
 #include "I2CDecoder.h"
 #include "I2CEepromDecoder.h"
+#include "I2CRegisterDecoder.h"
 #include "IBM8b10bDecoder.h"
 #include "IBISDriverFilter.h"
 #include "InvertFilter.h"

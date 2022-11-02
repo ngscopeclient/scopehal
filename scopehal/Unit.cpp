@@ -87,6 +87,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_MILLIVOLTS;
 	else if(rhs == "Vs")
 		m_type = UNIT_VOLT_SEC;
+	else if(rhs == "hex")
+		m_type = UNIT_HEXNUM;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -163,6 +165,9 @@ string Unit::ToString() const
 
 		case UNIT_VOLT_SEC:
 			return "Vs";
+
+		case UNIT_HEXNUM:
+			return "hex";
 
 		default:
 			return "unknown";
@@ -333,6 +338,13 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			scaleFactor = 1;
 			break;
 
+		//No rescaling for pointers
+		case UNIT_HEXNUM:
+			suffix = "";
+			prefix = "0x";
+			scaleFactor = 1;
+			break;
+
 		//dBm are always reported as is, with no SI prefixes
 		case UNIT_DBM:
 			suffix = "dBm";
@@ -401,6 +413,12 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	{
 		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
 			snprintf(tmp, sizeof(tmp), "1e%.0f", value);
+			break;
+
+		//TODO: separate pretty printing functions? We don't have enough sig figs to properly show large integers
+		//with an intermediate conversion to double.
+		case UNIT_HEXNUM:
+			snprintf(tmp, sizeof(tmp), "0x%x", static_cast<uint32_t>(value));
 			break;
 
 		default:
@@ -574,56 +592,6 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	out += prefix;
 	out += suffix;
 
-	/*
-	switch(m_type)
-	{
-		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
-			snprintf(tmp, sizeof(tmp), "1e%.0f", value);
-			break;
-
-		default:
-			{
-				const char* space = " ";
-				if(!space_after_number)
-					space = "";
-
-				if(sigfigs > 0)
-				{
-					int leftdigits = 0;
-					if(fabs(value_rescaled) > 1000)			//shouldn't have more than 4 digits w/ SI scaling
-						leftdigits = 4;
-					else if(fabs(value_rescaled) > 100)
-						leftdigits = 3;
-					else if(fabs(value_rescaled) > 10)
-						leftdigits = 2;
-					else if(fabs(value_rescaled) > 1)
-						leftdigits = 1;
-					int rightdigits = sigfigs - leftdigits;
-
-					char format[32];
-					snprintf(format, sizeof(format), "%%%d.%df%%s%%s%%s", leftdigits, rightdigits);
-					snprintf(tmp, sizeof(tmp), format, value_rescaled, space, prefix.c_str(), suffix.c_str());
-				}
-
-				//If not a round number, add more digits (up to 4)
-				else
-				{
-					if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
-						snprintf(tmp, sizeof(tmp), "%.0f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-					else if(fabs(round(value_rescaled*10) - value_rescaled*10) < 0.001)
-						snprintf(tmp, sizeof(tmp), "%.1f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-					else if(fabs(round(value_rescaled*100) - value_rescaled*100) < 0.001 )
-						snprintf(tmp, sizeof(tmp), "%.2f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-					else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
-						snprintf(tmp, sizeof(tmp), "%.3f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-					else
-						snprintf(tmp, sizeof(tmp), "%.4f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-				}
-			}
-			break;
-	}
-	*/
-
 	SetDefaultLocale();
 	return out;
 }
@@ -640,54 +608,65 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 	if(useDisplayLocale)
 		SetPrintingLocale();
 
-	//Find the first non-numeric character in the strnig
-	double scale = 1;
-	for(size_t i=0; i<str.size(); i++)
+	double ret;
+
+	if(m_type == UNIT_HEXNUM)
 	{
-		char c = str[i];
-		if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
-			continue;
-
-		if(c == 'T')
-			scale = 1e12;
-		else if(c == 'G')
-			scale = 1e9;
-		else if(c == 'M')
-			scale = 1e6;
-		else if(c == 'K' || c == 'k')
-			scale = 1e3;
-		else if(c == 'm')
-			scale = 1e-3;
-		else if( (c == 'u') || (str.find("μ", i) == i) )
-			scale = 1e-6;
-		else if(c == 'n')
-			scale = 1e-9;
-		else if(c == 'p')
-			scale = 1e-12;
-		else if(c == 'f')
-			scale = 1e-15;
-
-		break;
+		unsigned int temp = 0;
+		sscanf(str.c_str(), "0x%x", &temp);
+		ret = temp;
 	}
 
-	//Parse the base value
-	double ret;
-	sscanf(str.c_str(), "%20lf", &ret);
-	ret *= scale;
-
-	//Apply a unit-specific scaling factor
-	switch(m_type)
+	else
 	{
-		case Unit::UNIT_FS:
-			ret *= 1e15;
-			break;
+		//Find the first non-numeric character in the strnig
+		double scale = 1;
+		for(size_t i=0; i<str.size(); i++)
+		{
+			char c = str[i];
+			if(isspace(c) || isdigit(c) || (c == '.') || (c == ',') || (c == '-') )
+				continue;
 
-		case Unit::UNIT_PERCENT:
-			ret *= 0.01;
-			break;
+			if(c == 'T')
+				scale = 1e12;
+			else if(c == 'G')
+				scale = 1e9;
+			else if(c == 'M')
+				scale = 1e6;
+			else if(c == 'K' || c == 'k')
+				scale = 1e3;
+			else if(c == 'm')
+				scale = 1e-3;
+			else if( (c == 'u') || (str.find("μ", i) == i) )
+				scale = 1e-6;
+			else if(c == 'n')
+				scale = 1e-9;
+			else if(c == 'p')
+				scale = 1e-12;
+			else if(c == 'f')
+				scale = 1e-15;
 
-		default:
 			break;
+		}
+
+		//Parse the base value
+		sscanf(str.c_str(), "%20lf", &ret);
+		ret *= scale;
+
+		//Apply a unit-specific scaling factor
+		switch(m_type)
+		{
+			case Unit::UNIT_FS:
+				ret *= 1e15;
+				break;
+
+			case Unit::UNIT_PERCENT:
+				ret *= 0.01;
+				break;
+
+			default:
+				break;
+		}
 	}
 
 	SetDefaultLocale();

@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
 * Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,108 +30,71 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Unit
+	@brief Declaration of I2CRegisterDecoder
  */
+#ifndef I2CRegisterDecoder_h
+#define I2CRegisterDecoder_h
 
-#ifndef Unit_h
-#define Unit_h
+#include "../scopehal/PacketDecoder.h"
 
-/**
-	@brief A unit of measurement, plus conversion to pretty-printed output
-
-	TODO: add scale factors too?
- */
-class Unit
+class I2CRegisterSymbol
 {
 public:
 
-	enum UnitType
+	enum EepromType
 	{
-		UNIT_FS,			//Time. Note that this is not a SI base unit.
-							//Using femtoseconds allows integer math for all known scope timebases,
-							//which keeps things nice and simple.
-		UNIT_HZ,			//Frequency
-		UNIT_VOLTS,			//Voltage
-		UNIT_AMPS,			//Current
-		UNIT_OHMS,			//Resistance
-		UNIT_BITRATE,		//Bits per second
-		UNIT_PERCENT,		//Dimensionless ratio
-		UNIT_DB,			//Dimensionless ratio
-		UNIT_DBM,			//dB mW (more common than dBW)
-		UNIT_COUNTS,		//Dimensionless ratio (histogram)
-		UNIT_COUNTS_SCI,	//Dimensionless ratio (histogram, but scientific notation)
-		UNIT_LOG_BER,		//Dimensionless ratio (log scale)
-		UNIT_SAMPLERATE,	//Sample rate (Hz but displayed as S/s)
-		UNIT_SAMPLEDEPTH,	//Memory depth (number of samples)
-		UNIT_WATTS,			//Power
-		UNIT_UI,			//Unit interval (relative to signal bit rate)
-		UNIT_DEGREES,		//Angular degrees
-		UNIT_RPM,			//Revolutions per minute
-		UNIT_CELSIUS,		//Degrees Celsius
-		UNIT_RHO,			//Reflection coefficient (dimensionless ratio)
-		UNIT_HEXNUM,		//Hexadecimal address or similar
-
-		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
-		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds
-
-		//TODO: more here
+		TYPE_SELECT_READ,		//select with read bit, ack'd
+		TYPE_SELECT_WRITE,		//select with write bit, ack'd
+		TYPE_ADDRESS,
+		TYPE_DATA
 	};
 
-	Unit(Unit::UnitType t)
-	: m_type(t)
+	I2CRegisterSymbol()
 	{}
 
-	Unit(const std::string& rhs);
-	std::string ToString() const;
+	I2CRegisterSymbol(EepromType type, uint32_t data)
+	 : m_type(type)
+	 , m_data(data)
+	{}
 
-	std::string PrettyPrint(double value, int sigfigs = -1, bool useDisplayLocale = true) const;
+	EepromType m_type;
+	uint32_t m_data;
 
-	std::string PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin, double rangeMax) const;
+	bool operator== (const I2CRegisterSymbol& s) const
+	{
+		return (m_type == s.m_type) && (m_data == s.m_data);
+	}
+};
 
-	double ParseString(const std::string& str, bool useDisplayLocale = true);
+class I2CRegisterWaveform : public SparseWaveform<I2CRegisterSymbol>
+{
+public:
+	I2CRegisterWaveform (FilterParameter& rawBytes) : SparseWaveform<I2CRegisterSymbol>(), m_rawBytes(rawBytes) {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
 
-	UnitType GetType()
-	{ return m_type; }
+private:
+	FilterParameter& m_rawBytes;
+};
 
-	bool operator==(const Unit& rhs)
-	{ return m_type == rhs.m_type; }
+class I2CRegisterDecoder : public PacketDecoder
+{
+public:
+	I2CRegisterDecoder(const std::string& color);
 
-	bool operator!=(const Unit& rhs)
-	{ return m_type != rhs.m_type; }
+	virtual void Refresh();
 
-	bool operator!=(UnitType rhs)
-	{ return m_type != rhs; }
+	static std::string GetProtocolName();
 
-	Unit operator*(const Unit& rhs);
+	std::vector<std::string> GetHeaders();
 
-	static void SetLocale(const char* locale);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	PROTOCOL_DECODER_INITPROC(I2CRegisterDecoder)
 
 protected:
-	UnitType m_type;
-
-	void GetSIScalingFactor(double num, double& scaleFactor, std::string& prefix) const;
-	void GetUnitSuffix(UnitType type, double num, double& scaleFactor, std::string& prefix, std::string& suffix) const;
-
-#ifdef _WIN32
-	/**
-		@brief String form of m_locale for use on Windows
-	 */
-	static std::string m_slocale;
-
-#else
-	/**
-		@brief The user's requested locale for display
-	 */
-	static locale_t m_locale;
-
-	/**
-		@brief Handle to the "C" locale, used for interchange
-	 */
-	static locale_t m_defaultLocale;
-#endif
-
-	static void SetPrintingLocale();
-	static void SetDefaultLocale();
+	std::string m_addrbytesname;
+	std::string m_baseaddrname;
 };
 
 #endif
