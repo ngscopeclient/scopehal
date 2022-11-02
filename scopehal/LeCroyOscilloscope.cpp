@@ -2946,6 +2946,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 			(m_modelid == MODEL_SDA_8ZI_A) ||
 			(m_modelid == MODEL_SDA_8ZI_B);
 		bool hdo9 = (m_modelid == MODEL_HDO_9K);
+		bool wr8 = (m_modelid == MODEL_WAVERUNNER_8K);
 
 		//WaveMaster 8Zi can't go below 200 ksps in realtime mode?
 		if(!wm8)
@@ -2963,7 +2964,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleRatesNonInterleaved()
 		ret.push_back(500 * k);
 
 		ret.push_back(1 * m);
-		if(hdo9 || wm8)
+		if(hdo9 || wm8 || wr8)
 			ret.push_back(2500 * k);
 		else
 			ret.push_back(2 * m);
@@ -3260,6 +3261,7 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsNonInterleaved()
 			//deep memory option gives us 4x the capacity
 			case MODEL_WAVERUNNER_8K:
 			case MODEL_WAVERUNNER_9K:
+				ret.push_back(12500 * k);
 				ret.push_back(16 * m);
 				if(m_memoryDepthOption == 128)
 				{
