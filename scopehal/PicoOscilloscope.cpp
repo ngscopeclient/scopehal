@@ -433,16 +433,23 @@ Oscilloscope::TriggerMode PicoOscilloscope::PollTrigger()
 
 bool PicoOscilloscope::AcquireData()
 {
-	//Read the number of channels in the current waveform
-	uint16_t numChannels;
-	if(!m_transport->ReadRawData(sizeof(numChannels), (uint8_t*)&numChannels))
-		return false;
+	#pragma pack(push, 1)
+	struct
+	{
+		//Number of channels in the current waveform
+		uint16_t numChannels;
 
-	//Get the sample interval.
-	//May be different from m_srate if we changed the rate after the trigger was armed
-	int64_t fs_per_sample;
-	if(!m_transport->ReadRawData(sizeof(fs_per_sample), (uint8_t*)&fs_per_sample))
+		//Sample interval.
+		//May be different from m_srate if we changed the rate after the trigger was armed
+		int64_t fs_per_sample;
+	} wfmhdrs;
+	#pragma pack(pop)
+
+	//Read global waveform settings (independent of each channel)
+	if(!m_transport->ReadRawData(sizeof(wfmhdrs), (uint8_t*)&wfmhdrs))
 		return false;
+	uint16_t numChannels = wfmhdrs.numChannels;
+	int64_t fs_per_sample = wfmhdrs.fs_per_sample;
 
 	//Acquire data for each channel
 	size_t chnum;
@@ -460,11 +467,13 @@ bool PicoOscilloscope::AcquireData()
 
 	for(size_t i=0; i<numChannels; i++)
 	{
+		size_t tmp[2];
+
 		//Get channel ID and memory depth (samples, not bytes)
-		if(!m_transport->ReadRawData(sizeof(chnum), (uint8_t*)&chnum))
+		if(!m_transport->ReadRawData(sizeof(tmp), (uint8_t*)&tmp))
 			return false;
-		if(!m_transport->ReadRawData(sizeof(memdepth), (uint8_t*)&memdepth))
-			return false;
+		chnum = tmp[0];
+		memdepth = tmp[1];
 
 		//Analog channels
 		if(chnum < m_analogChannelCount)
