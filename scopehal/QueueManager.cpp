@@ -144,12 +144,38 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 	for(size_t family=0; family<families.size(); family++)
 		for(size_t idx=0; idx<families[family].queueCount; idx++)
 			m_queues.push_back(QueueInfo{family, idx, families[family].queueFlags, nullptr});
+	//Sort the queues in ascending order of feature flag count
+	//FIXME-CXX20 Use std::popcount() for sorting when we move to C++20
+	static_assert(sizeof(vk::QueueFlags::MaskType) == sizeof(uint32_t));
+	sort(m_queues.begin(), m_queues.end(),
+		[](QueueInfo const& a, QueueInfo const& b) -> bool
+		{
+			size_t flag_count_a = 0;
+			size_t flag_count_b = 0;
+			for(size_t i=0; i<sizeof(vk::QueueFlags::MaskType)*8; i++)
+			{
+				if(static_cast<uint32_t>(a.Flags) & (1<<i))
+					flag_count_a++;
+				if(static_cast<uint32_t>(b.Flags) & (1<<i))
+					flag_count_b++;
+			}
+			return flag_count_a > flag_count_b;
+		});
+	LogDebug("Sorted queues:\n");
+	LogIndenter li;
+	for(QueueInfo const& qi : m_queues)
+		LogDebug("Family=%zu Index=%zu Flags=%08x\n", qi.Family, qi.Index, (uint32_t)qi.Flags);
 }
 
 shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, std::string name)
 {
 	const lock_guard<mutex> lock(m_mutex);
 
+	//This will choose the first queue with matching flags that is not yet used.
+	//If all queues with matching flags are used, the queue with the fewest
+	//existing handles is chosen.
+	//Because we sort m_queues by flag count in the constructor, the first match
+	//should be the one with the least feature flags that satisfies the request.
 	ssize_t chosenIdx = -1;
 	for(size_t i=0; i<m_queues.size(); i++)
 	{
