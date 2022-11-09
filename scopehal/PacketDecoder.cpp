@@ -73,6 +73,9 @@ PacketDecoder::~PacketDecoder()
 	ClearPackets();
 }
 
+/**
+	@brief Destroys all currently attached packets
+ */
 void PacketDecoder::ClearPackets()
 {
 	for(auto p : m_packets)

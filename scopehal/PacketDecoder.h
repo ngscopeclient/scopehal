@@ -102,6 +102,14 @@ public:
 
 	static std::string m_backgroundColors[PROTO_STANDARD_COLOR_COUNT];
 
+	/**
+		@brief Clears the list of packets attached to this filter *without* freeing memory.
+
+		Typically used after copying the packets somewhere else and assuming ownership of them.
+	 */
+	void DetachPackets()
+	{ m_packets.clear(); }
+
 protected:
 	void ClearPackets();
 
