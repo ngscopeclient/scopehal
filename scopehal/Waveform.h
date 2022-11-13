@@ -592,7 +592,7 @@ size_t BinarySearchForGequal(T* buf, size_t len, T value);
 
    It is NOT GUARANTEED TO if the waveform is not continuous. Results are clamped to
    0 and wfm->size(), setting out_of_bounds if that happened. To be sure that the returned index
-   refers to a sample that includes time_fs, check that `GetOffsetScaled(swaveform, index) + 
+   refers to a sample that includes time_fs, check that `GetOffsetScaled(swaveform, index) +
    GetDurationScaled(swaveform, index) < time_fs`
  */
 size_t GetIndexNearestAtOrBeforeTimestamp(WaveformBase* wfm, int64_t time_fs, bool& out_of_bounds);
@@ -602,6 +602,16 @@ size_t GetIndexNearestAtOrBeforeTimestamp(WaveformBase* wfm, int64_t time_fs, bo
 	and interpolates if possible.
  */
 std::optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zero_hold_behavior);
+
+/**
+	@brief Gets the value of our channel at the specified timestamp (absolute, not waveform ticks).
+ */
+std::optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_fs);
+
+/**
+	@brief Gets the value of our channel at the specified timestamp (absolute, not waveform ticks).
+ */
+std::optional<std::string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs);
 
 #pragma GCC diagnostic pop
 

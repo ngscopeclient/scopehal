@@ -187,3 +187,55 @@ optional<float> GetValueAtTime(WaveformBase* waveform, int64_t time_fs, bool zer
 	else
 		return Filter::InterpolateValue(uwaveform, index, ticks - index );
 }
+
+optional<bool> GetDigitalValueAtTime(WaveformBase* waveform, int64_t time_fs)
+{
+	auto swaveform = dynamic_cast<SparseDigitalWaveform*>(waveform);
+	auto uwaveform = dynamic_cast<UniformDigitalWaveform*>(waveform);
+
+	if(!swaveform && !uwaveform)
+		return {};
+
+	//Find the approximate index of the sample of interest and interpolate the cursor position
+	bool out_of_range;
+	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
+
+	if(out_of_range)
+		return {};
+
+	//No interpolation for digital waveforms
+	if (swaveform)
+	{
+		if (GetOffsetScaled(swaveform, index) + GetDurationScaled(swaveform, index) < time_fs)
+		{
+			// Sample found with GE search does not extend to selected point
+			return {};
+		}
+	}
+
+	return GetValue(swaveform, uwaveform, index);
+}
+
+optional<string> GetProtocolValueAtTime(WaveformBase* waveform, int64_t time_fs)
+{
+	//All protocol waveforms are sparse
+	auto swaveform = dynamic_cast<SparseWaveformBase*>(waveform);
+	if(!swaveform)
+		return {};
+
+	//Find the approximate index of the sample of interest and interpolate the cursor position
+	bool out_of_range;
+	size_t index = GetIndexNearestAtOrBeforeTimestamp(waveform, time_fs, out_of_range);
+
+	if(out_of_range)
+		return {};
+
+	//No interpolation for digital waveforms
+	if (GetOffsetScaled(swaveform, index) + GetDurationScaled(swaveform, index) < time_fs)
+	{
+		// Sample found with GE search does not extend to selected point
+		return {};
+	}
+
+	return waveform->GetText(index);
+}
