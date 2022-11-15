@@ -278,6 +278,8 @@ void Filter::FillDurationsGeneric(SparseWaveformBase& wfm)
 {
 	size_t len = wfm.size();
 	wfm.m_durations.resize(len);
+	if(!len)
+		return;
 	for(size_t i=1; i<len; i++)
 		wfm.m_durations[i-1] = wfm.m_offsets[i] - wfm.m_offsets[i-1];
 
@@ -294,6 +296,8 @@ void Filter::FillDurationsAVX2(SparseWaveformBase& wfm)
 {
 	size_t len = wfm.size();
 	wfm.m_durations.resize(len);
+	if(!len)
+		return;
 
 	size_t end = len - (len % 4);
 	int64_t* po = reinterpret_cast<int64_t*>(&wfm.m_offsets[0]);
