@@ -252,6 +252,11 @@ PUBLIC SYSTEM
 	${CMAKE_CURRENT_SOURCE_DIR}/../VkFFT/vkFFT
 	)
 
+target_include_directories(scopehal
+PUBLIC SYSTEM
+	${OpenMP_CXX_INCLUDE_DIR}
+	)
+
 # Don't include yaml-cpp in Windows PCH because this seems to give errors about path resolution
 # TODO: fix this for faster builds
 if(${WIN32})
