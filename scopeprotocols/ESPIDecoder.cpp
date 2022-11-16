@@ -38,6 +38,7 @@ using namespace std;
 
 ESPIDecoder::ESPIDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
+	, m_busWidthName("Bus Width")
 {
 	CreateInput("clk");
 	CreateInput("cs#");
@@ -45,6 +46,12 @@ ESPIDecoder::ESPIDecoder(const string& color)
 	CreateInput("dq2");
 	CreateInput("dq1");
 	CreateInput("dq0");
+
+	m_parameters[m_busWidthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_busWidthName].AddEnumValue("x1", BUS_WIDTH_X1);
+	m_parameters[m_busWidthName].AddEnumValue("x4", BUS_WIDTH_X4);
+	m_parameters[m_busWidthName].AddEnumValue("Auto", BUS_WIDTH_AUTO);
+	m_parameters[m_busWidthName].SetIntVal(BUS_WIDTH_AUTO);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,6 +139,9 @@ void ESPIDecoder::Refresh()
 		data2->size(),
 		data3->size()
 	};
+
+	//Figure out the bus width to use for protocol decoding
+	auto busWidthMode = static_cast<BusWidth>(m_parameters[m_busWidthName].GetIntVal());
 
 	size_t ics			= 0;
 	size_t iclk			= 0;
@@ -224,16 +234,16 @@ void ESPIDecoder::Refresh()
 	bool byte_valid_next	= false;
 	ESPISymbol::ESpiCompletion completion_type	= ESPISymbol::COMPLETION_NONE;
 	ESPISymbol::ESpiCycleType cycle_type = ESPISymbol::CYCLE_READ;
-
 	while(true)
 	{
 		bool cur_cs = GetValue(scsn, ucsn, ics);
 		bool cur_clk = GetValue(sclk, uclk, iclk);
+
 		uint8_t cur_data =
 			(GetValue(sdata3, udata3, idata[3]) ? 0x8 : 0) |
-			(GetValue(sdata3, udata3, idata[2]) ? 0x4 : 0) |
-			(GetValue(sdata3, udata3, idata[1]) ? 0x2 : 0) |
-			(GetValue(sdata3, udata3, idata[0]) ? 0x1 : 0);
+			(GetValue(sdata2, udata2, idata[2]) ? 0x4 : 0) |
+			(GetValue(sdata1, udata1, idata[1]) ? 0x2 : 0) |
+			(GetValue(sdata0, udata0, idata[0]) ? 0x1 : 0);
 
 		bool byte_valid = false;
 
@@ -270,20 +280,25 @@ void ESPIDecoder::Refresh()
 					{
 						skip_next_falling = false;
 
-						//If this is the beginning of a byte, see if either DQ2 or DQ3 is low.
-						//This means they're actively driven (since they have pullups) and means
-						//that we're definitely in quad mode.
+						//Figure out read mode for this byte
 						if(bitcount == 0)
 						{
-							switch(read_mode)
+							switch(busWidthMode)
 							{
-								case READ_SI:
-								case READ_SO:
-									if( (cur_data & 0xc) != 0xc)
+								case BUS_WIDTH_X1:
+									break;
+								case BUS_WIDTH_X4:
+									if( (read_mode == READ_SI) || (read_mode == READ_SO) )
 										read_mode = READ_QUAD_RISING;
 									break;
 
+								//If this is the beginning of a byte, see if either DQ2 or DQ3 is low.
+								//This means they're actively driven (since they have pullups) and means
+								//that we're definitely in quad mode.
+								case BUS_WIDTH_AUTO:
 								default:
+									if( (cur_data & 0xc) != 0xc)
+										read_mode = READ_QUAD_RISING;
 									break;
 							}
 						}

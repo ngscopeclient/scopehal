@@ -217,6 +217,15 @@ public:
 
 protected:
 	uint8_t UpdateCRC8(uint8_t crc, uint8_t data);
+
+	enum BusWidth
+	{
+		BUS_WIDTH_AUTO,
+		BUS_WIDTH_X1,
+		BUS_WIDTH_X4
+	};
+
+	std::string m_busWidthName;
 };
 
 #endif
