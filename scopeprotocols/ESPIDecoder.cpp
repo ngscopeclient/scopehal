@@ -142,6 +142,8 @@ void ESPIDecoder::Refresh()
 
 	//Figure out the bus width to use for protocol decoding
 	auto busWidthMode = static_cast<BusWidth>(m_parameters[m_busWidthName].GetIntVal());
+	BusWidth busWidthModeNext = busWidthMode;
+	bool busWidthModeChanged = false;
 
 	size_t ics			= 0;
 	size_t iclk			= 0;
@@ -602,6 +604,31 @@ void ESPIDecoder::Refresh()
 									case 0x8:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS_WR, data));
 										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
+
+										//General Capabilities register includes the I/O bus width flag
+										//Decode writes and update our bus width for correct decode of the next packet
+										//Note that the change is deferred: we still use the current bus width mode
+										//to decode the CRC and remaining fields of THIS packet.
+										switch( (data >> 26) & 0x3)
+										{
+											case 0:
+												busWidthModeNext = BUS_WIDTH_X1;
+												busWidthModeChanged = true;
+												break;
+
+											case 1:
+												LogWarning("x2 mode not implemented\n");
+												break;
+
+											case 2:
+												busWidthModeNext = BUS_WIDTH_X4;
+												busWidthModeChanged = true;
+												break;
+
+											default:
+												LogWarning("Invalid IO mode\n");
+												break;
+										}
 										break;
 
 									case 0x10:
@@ -820,9 +847,13 @@ void ESPIDecoder::Refresh()
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_ERROR];
 					}
 
+					//Commit bus width changes before the next packet
+					if(busWidthModeChanged)
+						busWidthMode = busWidthModeNext;
+
 					//Done with the packet
 					txn_state = TXN_STATE_IDLE;
-					break;	//end TXN_STATE_COMMAND_CRC8
+					break;	//end TXN_STATE_RESPONSE_CRC8
 
 				////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Virtual wire channel
