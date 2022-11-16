@@ -599,6 +599,11 @@ void ESPIDecoder::Refresh()
 							case ESPISymbol::COMMAND_SET_CONFIGURATION:
 								switch(addr)
 								{
+									case 0x8:
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS_WR, data));
+										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
+										break;
+
 									case 0x10:
 										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_CH0_CAPS_WR, data));
 										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
@@ -723,7 +728,7 @@ void ESPIDecoder::Refresh()
 								switch(addr)
 								{
 									case 0x8:
-										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS, data));
+										cap->m_samples.push_back(ESPISymbol(ESPISymbol::TYPE_GENERAL_CAPS_RD, data));
 										pack->m_headers["Info"] = Trim(cap->GetText(cap->m_samples.size()-1));
 										break;
 
@@ -1457,7 +1462,8 @@ std::string ESPIWaveform::GetColor(size_t i)
 		case ESPISymbol::TYPE_RESPONSE_CRC_BAD:
 			return StandardColors::colors[StandardColors::COLOR_CHECKSUM_BAD];
 
-		case ESPISymbol::TYPE_GENERAL_CAPS:
+		case ESPISymbol::TYPE_GENERAL_CAPS_RD:
+		case ESPISymbol::TYPE_GENERAL_CAPS_WR:
 		case ESPISymbol::TYPE_CH0_CAPS_RD:
 		case ESPISymbol::TYPE_CH0_CAPS_WR:
 		case ESPISymbol::TYPE_CH1_CAPS_RD:
@@ -1612,7 +1618,8 @@ string ESPIWaveform::GetText(size_t i)
 			}
 			break;
 
-		case ESPISymbol::TYPE_GENERAL_CAPS:
+		case ESPISymbol::TYPE_GENERAL_CAPS_RD:
+		case ESPISymbol::TYPE_GENERAL_CAPS_WR:
 			if(s.m_data & 0x80000000)
 				stmp += "CRC checking enabled\n";
 			if(s.m_data & 0x40000000)
@@ -1638,20 +1645,24 @@ string ESPIWaveform::GetText(size_t i)
 					break;
 			}
 
-			switch( (s.m_data >> 24) & 0x3)
+			//read only, bits dontcare for write
+			if(s.m_type == ESPISymbol::TYPE_GENERAL_CAPS_RD)
 			{
-				case 0:
-					stmp += "Supports x1 mode only\n";
-					break;
-				case 1:
-					stmp += "Supports x1 and x2 modes\n";
-					break;
-				case 2:
-					stmp += "Supports x1 and x4 modes\n";
-					break;
-				default:
-					stmp += "Supports x1, x2, and x4 modes\n";
-					break;
+				switch( (s.m_data >> 24) & 0x3)
+				{
+					case 0:
+						stmp += "Supports x1 mode only\n";
+						break;
+					case 1:
+						stmp += "Supports x1 and x2 modes\n";
+						break;
+					case 2:
+						stmp += "Supports x1 and x4 modes\n";
+						break;
+					default:
+						stmp += "Supports x1, x2, and x4 modes\n";
+						break;
+				}
 			}
 
 			if(s.m_data & 0x00800000)
@@ -1681,29 +1692,33 @@ string ESPIWaveform::GetText(size_t i)
 					break;
 			}
 
-			if(s.m_data & 0x00080000)
-				stmp += "ALERT# supports open drain mode\n";
-
-			switch( (s.m_data >> 16) & 0x7)
+			//read only, bits dontcare for write
+			if(s.m_type == ESPISymbol::TYPE_GENERAL_CAPS_RD)
 			{
-				case 0:
-					stmp += "Max SCK: 20 MHz\n";
-					break;
-				case 1:
-					stmp += "Max SCK: 25 MHz\n";
-					break;
-				case 2:
-					stmp += "Max SCK: 33 MHz\n";
-					break;
-				case 3:
-					stmp += "Max SCK: 50 MHz\n";
-					break;
-				case 4:
-					stmp += "Max SCK: 66 MHz\n";
-					break;
-				default:
-					stmp += "Invalid max SCK speed\n";
-					break;
+				if(s.m_data & 0x00080000)
+					stmp += "ALERT# supports open drain mode\n";
+
+				switch( (s.m_data >> 16) & 0x7)
+				{
+					case 0:
+						stmp += "Max SCK: 20 MHz\n";
+						break;
+					case 1:
+						stmp += "Max SCK: 25 MHz\n";
+						break;
+					case 2:
+						stmp += "Max SCK: 33 MHz\n";
+						break;
+					case 3:
+						stmp += "Max SCK: 50 MHz\n";
+						break;
+					case 4:
+						stmp += "Max SCK: 66 MHz\n";
+						break;
+					default:
+						stmp += "Invalid max SCK speed\n";
+						break;
+				}
 			}
 
 			//15:12 = max wait states
@@ -1712,22 +1727,26 @@ string ESPIWaveform::GetText(size_t i)
 			else
 				stmp += string("Max wait states: ") + to_string((s.m_data >> 12) & 0xf) + "\n";
 
-			if(s.m_data & 0x80)
-				stmp += "Platform channel 7 present\n";
-			if(s.m_data & 0x40)
-				stmp += "Platform channel 6 present\n";
-			if(s.m_data & 0x20)
-				stmp += "Platform channel 5 present\n";
-			if(s.m_data & 0x10)
-				stmp += "Platform channel 4 present\n";
-			if(s.m_data & 0x08)
-				stmp += "Flash channel present\n";
-			if(s.m_data & 0x04)
-				stmp += "OOB channel present\n";
-			if(s.m_data & 0x02)
-				stmp += "Virtual wire channel present\n";
-			if(s.m_data & 0x01)
-				stmp += "Peripheral channel present\n";
+			//read only, bits dontcare for write
+			if(s.m_type == ESPISymbol::TYPE_GENERAL_CAPS_RD)
+			{
+				if(s.m_data & 0x80)
+					stmp += "Platform channel 7 present\n";
+				if(s.m_data & 0x40)
+					stmp += "Platform channel 6 present\n";
+				if(s.m_data & 0x20)
+					stmp += "Platform channel 5 present\n";
+				if(s.m_data & 0x10)
+					stmp += "Platform channel 4 present\n";
+				if(s.m_data & 0x08)
+					stmp += "Flash channel present\n";
+				if(s.m_data & 0x04)
+					stmp += "OOB channel present\n";
+				if(s.m_data & 0x02)
+					stmp += "Virtual wire channel present\n";
+				if(s.m_data & 0x01)
+					stmp += "Peripheral channel present\n";
+			}
 			return stmp;	//end TYPE_GENERAL_CAPS
 
 		case ESPISymbol::TYPE_CH0_CAPS_RD:
