@@ -58,7 +58,7 @@ QueueHandle::QueueHandle(std::shared_ptr<vk::raii::Device> device, size_t family
 
 QueueHandle::~QueueHandle()
 {
-	const lock_guard<mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_mutex);
 	m_fence = nullptr;
 	m_queue = nullptr;
 	m_device = nullptr;
@@ -66,7 +66,7 @@ QueueHandle::~QueueHandle()
 
 void QueueHandle::AddName(string name)
 {
-	const lock_guard<mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_mutex);
 
 	if(m_name.size() != 0)
 		m_name += ";";
@@ -84,7 +84,7 @@ void QueueHandle::AddName(string name)
 
 void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_mutex);
 
 	_waitFence();
 
@@ -103,7 +103,7 @@ void QueueHandle::Submit(vk::raii::CommandBuffer const& cmdBuf)
 
 void QueueHandle::SubmitAndBlock(vk::raii::CommandBuffer const& cmdBuf)
 {
-	const lock_guard<mutex> lock(m_mutex);
+	const lock_guard<recursive_mutex> lock(m_mutex);
 
 	_waitFence();
 

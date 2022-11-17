@@ -82,7 +82,7 @@ public:
 
 protected:
 	friend QueueLock;
-	std::mutex m_mutex;
+	std::recursive_mutex m_mutex;
 	std::string m_name;
 	std::shared_ptr<vk::raii::Device> m_device;
 	std::unique_ptr<vk::raii::Queue> m_queue;
@@ -113,7 +113,7 @@ public:
 	QueueLock& operator=(QueueLock const&) = delete;
 
 protected:
-	const std::lock_guard<std::mutex> m_lock;
+	const std::lock_guard<std::recursive_mutex> m_lock;
 	std::shared_ptr<QueueHandle> m_handle;
 };
 
