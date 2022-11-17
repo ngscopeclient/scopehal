@@ -325,8 +325,11 @@ void CSVImportFilter::OnFileNameChanged()
 			if(TryNormalizeTimebase(wfm))
 			{
 				auto dense = new UniformDigitalWaveform(*wfm);
+				dense->MarkModifiedFromCpu();
 				SetData(dense, i);
 			}
+			else
+				wfm->MarkModifiedFromCpu();
 		}
 
 		//Analog data
@@ -360,8 +363,11 @@ void CSVImportFilter::OnFileNameChanged()
 			if(TryNormalizeTimebase(wfm))
 			{
 				auto dense = new UniformAnalogWaveform(*wfm);
+				dense->MarkModifiedFromCpu();
 				SetData(dense, i);
 			}
+			else
+				wfm->MarkModifiedFromCpu();
 		}
 	}
 }
