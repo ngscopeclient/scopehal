@@ -165,7 +165,7 @@ size_t JitterSpectrumFilter::EstimateUIWidth(SparseAnalogWaveform* din)
 	return ui_width;
 }
 
-void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void JitterSpectrumFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndSparseAnalog())

@@ -42,7 +42,7 @@ class CTLEFilter : public DeEmbedFilter
 public:
 	CTLEFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 
 	static std::string GetProtocolName();
 

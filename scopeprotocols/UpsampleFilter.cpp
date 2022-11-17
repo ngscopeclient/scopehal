@@ -104,7 +104,7 @@ string UpsampleFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Get the input data
 	//Current resampling implementation assumes input is uniform, fail if it's not
@@ -164,7 +164,7 @@ void UpsampleFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 
 		//Done, submit to the queue and wait
 		cmdBuf.end();
-		SubmitAndBlock(cmdBuf, queue);
+		queue->SubmitAndBlock(cmdBuf);
 		cap->MarkModifiedFromGpu();
 	}
 

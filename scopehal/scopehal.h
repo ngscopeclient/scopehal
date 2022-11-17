@@ -191,8 +191,6 @@ extern uint32_t g_vkComputeDeviceDriverVer;
 extern vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
 extern std::unique_ptr<QueueManager> g_vkQueueManager;
 
-void SubmitAndBlock(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
-
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
 extern bool g_gpuScopeDriverEnabled;

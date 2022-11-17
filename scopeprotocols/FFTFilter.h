@@ -45,6 +45,8 @@
 
 #include "VulkanFFTPlan.h"
 
+class QueueHandle;
+
 struct WindowFunctionArgs
 {
 	uint32_t numActualSamples;
@@ -66,7 +68,7 @@ public:
 	FFTFilter(const std::string& color);
 	virtual ~FFTFilter();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
@@ -125,7 +127,7 @@ protected:
 		size_t nouts,
 		bool log_output,
 		vk::raii::CommandBuffer& cmdBuf,
-		vk::raii::Queue& queue
+		std::shared_ptr<QueueHandle> queue
 		);
 
 	size_t m_cachedNumPoints;

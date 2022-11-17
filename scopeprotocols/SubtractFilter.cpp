@@ -86,7 +86,7 @@ string SubtractFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -176,7 +176,7 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& q
 		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, GetComputeBlockCount(len, 64));
 
 		cmdBuf.end();
-		SubmitAndBlock(cmdBuf, queue);
+		queue->SubmitAndBlock(cmdBuf);
 
 		if(scap)
 			scap->m_samples.MarkModifiedFromGpu();

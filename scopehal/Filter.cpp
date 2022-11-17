@@ -1458,7 +1458,7 @@ void Filter::Refresh()
 
 	The default implementation calls the legacy non-accelerated Refresh() method.
  */
-void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, vk::raii::Queue& /*queue*/)
+void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
 	Refresh();
 

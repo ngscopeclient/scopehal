@@ -244,10 +244,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 			}
 
 			//Actually execute the filter
-			{
-				QueueLock lock(queue);
-				f->Refresh(cmdbuf, *lock);
-			}
+			f->Refresh(cmdbuf, queue);
 
 			//Filter execution has completed, remove it from the running list and mark as completed
 			lock_guard<mutex> lock2(m_mutex);

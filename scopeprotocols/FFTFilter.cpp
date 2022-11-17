@@ -195,7 +195,7 @@ void FFTFilter::ReallocateBuffers(size_t npoints_raw, size_t npoints, size_t nou
 	m_cachedGpuFilterEnabled = g_gpuFilterEnabled;
 }
 
-void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void FFTFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -231,7 +231,7 @@ void FFTFilter::DoRefresh(
 	size_t nouts,
 	bool log_output,
 	vk::raii::CommandBuffer& cmdBuf,
-	vk::raii::Queue& queue)
+	shared_ptr<QueueHandle> queue)
 {
 	//Look up some parameters
 	double sample_ghz = 1e6 / fs_per_sample;
@@ -343,7 +343,7 @@ void FFTFilter::DoRefresh(
 
 		//Done, block until the compute operations finish
 		cmdBuf.end();
-		SubmitAndBlock(cmdBuf, queue);
+		queue->SubmitAndBlock(cmdBuf);
 
 		cap->MarkModifiedFromGpu();
 	}

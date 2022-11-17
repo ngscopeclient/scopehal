@@ -35,13 +35,15 @@
 #ifndef SubtractFilter_h
 #define SubtractFilter_h
 
+class QueueHandle;
+
 class SubtractFilter : public Filter
 {
 public:
 	SubtractFilter(const std::string& color);
 	~SubtractFilter();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();

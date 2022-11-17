@@ -35,6 +35,8 @@
 #ifndef UpsampleFilter_h
 #define UpsampleFilter_h
 
+class QueueHandle;
+
 struct UpsampleFilterArgs
 {
 	uint32_t imax;
@@ -47,7 +49,7 @@ class UpsampleFilter : public Filter
 public:
 	UpsampleFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();

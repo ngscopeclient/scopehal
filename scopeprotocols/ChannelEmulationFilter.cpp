@@ -52,7 +52,7 @@ string ChannelEmulationFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ChannelEmulationFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void ChannelEmulationFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	DoRefresh(false, cmdBuf, queue);
 }

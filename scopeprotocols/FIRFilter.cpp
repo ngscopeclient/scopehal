@@ -141,7 +141,7 @@ Filter::DataLocation FIRFilter::GetInputLocation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Sanity check
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -220,7 +220,7 @@ void FIRFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
 
 void FIRFilter::DoFilterKernel(
 	vk::raii::CommandBuffer& cmdBuf,
-	vk::raii::Queue& queue,
+	shared_ptr<QueueHandle> queue,
 	UniformAnalogWaveform* din,
 	UniformAnalogWaveform* cap)
 {
@@ -238,7 +238,7 @@ void FIRFilter::DoFilterKernel(
 		m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(args.end, 64));
 
 		cmdBuf.end();
-		SubmitAndBlock(cmdBuf, queue);
+		queue->SubmitAndBlock(cmdBuf);
 
 		cap->m_samples.MarkModifiedFromGpu();
 	}

@@ -39,6 +39,8 @@
 #include "OscilloscopeChannel.h"
 #include "FlowGraphNode.h"
 
+class QueueHandle;
+
 /**
 	@brief Describes a particular revision of a waveform
 
@@ -187,7 +189,7 @@ public:
 
 public:
 	//GPU accelerated refresh method
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).

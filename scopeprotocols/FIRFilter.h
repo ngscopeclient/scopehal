@@ -49,7 +49,7 @@ class FIRFilter : public Filter
 public:
 	FIRFilter(const std::string& color);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
@@ -61,7 +61,7 @@ public:
 
 	void DoFilterKernel(
 		vk::raii::CommandBuffer& cmdBuf,
-		vk::raii::Queue& queue,
+		std::shared_ptr<QueueHandle> queue,
 		UniformAnalogWaveform* din,
 		UniformAnalogWaveform* cap);
 

@@ -51,7 +51,7 @@ public:
 	DeEmbedFilter(const std::string& color);
 	virtual ~DeEmbedFilter();
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
@@ -62,7 +62,7 @@ public:
 
 protected:
 	virtual int64_t GetGroupDelay();
-	void DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue);
+	void DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	virtual void InterpolateSparameters(float bin_hz, bool invert, size_t nouts);
 
 	std::string m_maxGainName;

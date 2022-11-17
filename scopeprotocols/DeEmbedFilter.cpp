@@ -145,7 +145,7 @@ Filter::DataLocation DeEmbedFilter::GetInputLocation()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void DeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void DeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	DoRefresh(true, cmdBuf, queue);
 }
@@ -153,7 +153,7 @@ void DeEmbedFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& qu
 /**
 	@brief Applies the S-parameters in the forward or reverse direction
  */
-void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::raii::Queue& queue)
+void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -359,7 +359,7 @@ void DeEmbedFilter::DoRefresh(bool invert, vk::raii::CommandBuffer& cmdBuf, vk::
 
 		//Done, block until the compute operations finish
 		cmdBuf.end();
-		SubmitAndBlock(cmdBuf, queue);
+		queue->SubmitAndBlock(cmdBuf);
 		cap->MarkModifiedFromGpu();
 	}
 	else
