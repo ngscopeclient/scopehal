@@ -311,9 +311,10 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 void TektronixOscilloscope::DetectProbes()
 {
 	std::vector<bool> currentlyEnabled;
-	for (size_t i = 0; i < m_analogChannelCount; i++)
+	for (size_t i = 0; i < m_channels.size(); i++)
 	{
-		currentlyEnabled.push_back(IsChannelEnabled(i));
+		bool isEnabled = IsChannelEnabled(i);
+		currentlyEnabled.push_back(isEnabled);
 	}
 
 	switch(m_family)
@@ -348,7 +349,7 @@ void TektronixOscilloscope::DetectProbes()
 			break;
 	}
 
-	for (size_t i = 0; i < m_analogChannelCount; i++)
+	for (size_t i = 0; i < m_channels.size(); i++)
 	{
 		if (currentlyEnabled[i]) EnableChannel(i);
 		else                     DisableChannel(i);
@@ -435,6 +436,19 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			{
 				reply = m_transport->SendCommandQueuedWithReply(
 					string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
+
+				if (IsDigital(i))
+				{
+					// Digital channels may report enabled, but not actually be displayed because the associated _DALL
+					//  view is not enabled. Especially relevant after doing File -> Default Setup
+					string dall_reply = m_transport->SendCommandQueuedWithReply(
+						string("DISP:WAVEV:") + m_channels[m_flexChannelParents[m_channels[i]]]->GetHwname() + "_DALL:STATE?");
+
+					if (dall_reply == "0")
+					{
+						reply = "0";
+					}
+				}
 			}
 			break;
 
@@ -502,13 +516,16 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 				m_transport->SendCommandQueued(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE ON");
 			else
 			{
-				//Make sure the digital group is on
-				if(IsDigital(i))
-				{
-					size_t parent = m_flexChannelParents[m_channels[i]];
-					m_transport->SendCommandQueued(
-						string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
-				}
+				// <Commented out 2022-11-18> Was this needed on earlier scope firmware? Not needed
+				//                            now and confuses the enable state of individual digital channels.
+				// //Make sure the digital group is on
+				// if(IsDigital(i))
+				// {
+				// 	size_t parent = m_flexChannelParents[m_channels[i]];
+				// 	m_transport->SendCommandQueued(
+				// 		string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
+				// }
+				// </Commented out 2022-11-18>
 
 				//Difference between SELECT:CHx 1 vs this??
 				m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
