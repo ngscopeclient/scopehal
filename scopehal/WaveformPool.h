@@ -43,7 +43,6 @@ class WaveformPool
 public:
 	WaveformPool()
 	: m_maxSize(16)
-	, m_destroyed(false)
 	{}
 
 	~WaveformPool()
@@ -51,8 +50,6 @@ public:
 		for(auto w : m_waveforms)
 			delete w;
 		m_waveforms.clear();
-
-		m_destroyed = true;
 	}
 
 	/**
@@ -93,8 +90,6 @@ protected:
 	std::mutex m_mutex;
 
 	std::list<WaveformBase*> m_waveforms;
-
-	bool m_destroyed;
 };
 
 #endif
