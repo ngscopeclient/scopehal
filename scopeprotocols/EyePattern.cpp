@@ -50,20 +50,20 @@ EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
 {
 	size_t npix = width*height;
 	m_accumdata = new int64_t[npix];
-	m_outdata = new float[npix];
+	m_outdata.resize(npix);
+	m_outdata.PrepareForCpuAccess();
 	for(size_t i=0; i<npix; i++)
 	{
 		m_outdata[i] = 0;
 		m_accumdata[i] = 0;
 	}
+	m_outdata.MarkModifiedFromCpu();
 }
 
 EyeWaveform::~EyeWaveform()
 {
 	delete[] m_accumdata;
 	m_accumdata = NULL;
-	delete[] m_outdata;
-	m_outdata = NULL;
 }
 
 void EyeWaveform::Normalize()
@@ -91,11 +91,15 @@ void EyeWaveform::Normalize()
 		Normalize with saturation
 		Saturation level of 1.0 means mapping all values to [0, 1].
 		2.0 means mapping values to [0, 2] and saturating anything above 1.
+
+		TODO: do this in a shader?
 	 */
 	norm *= m_saturationLevel;
 	size_t len = m_width * m_height;
+	m_outdata.PrepareForCpuAccess();
 	for(size_t i=0; i<len; i++)
 		m_outdata[i] = min(1.0f, m_accumdata[i] * norm);
+	m_outdata.MarkModifiedFromCpu();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

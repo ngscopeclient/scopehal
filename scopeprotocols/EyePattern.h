@@ -53,6 +53,12 @@ public:
 	{}
 
 	float* GetData()
+	{
+		m_outdata.PrepareForCpuAccess();
+		return m_outdata.GetCpuPointer();
+	}
+
+	AcceleratorBuffer<float>& GetOutData()
 	{ return m_outdata; }
 
 	int64_t* GetAccumData()
@@ -120,7 +126,7 @@ protected:
 	size_t m_width;
 	size_t m_height;
 
-	float* m_outdata;
+	AcceleratorBuffer<float> m_outdata;
 	int64_t* m_accumdata;
 
 	size_t m_totalUIs;
