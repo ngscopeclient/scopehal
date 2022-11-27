@@ -318,7 +318,7 @@ void CSVExportWizard::on_apply()
 
 		//Write timestamp
 		if(timebaseUnit == Unit(Unit::UNIT_FS))
-			fprintf(fp, "%e", timestamp / FS_PER_SECOND);
+			fprintf(fp, "%.10e", timestamp / FS_PER_SECOND);
 		else if(timebaseUnit == Unit(Unit::UNIT_HZ))
 			fprintf(fp, "%ld", timestamp);
 		else
