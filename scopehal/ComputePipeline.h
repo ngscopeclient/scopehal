@@ -42,7 +42,12 @@
 class ComputePipeline
 {
 public:
-	ComputePipeline(const std::string& shaderPath, size_t numSSBOs, size_t pushConstantSize, size_t numImages = 0);
+	ComputePipeline(
+		const std::string& shaderPath,
+		size_t numSSBOs,
+		size_t pushConstantSize,
+		size_t numStorageImages = 0,
+		size_t numSampledImages = 0);
 	virtual ~ComputePipeline();
 
 	/**
@@ -70,9 +75,23 @@ public:
 			DeferredInit();
 
 		size_t numImage = i - m_numSSBOs;
-		m_imageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
-		m_writeDescriptors[i] =
-			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_imageInfo[numImage]);
+		m_storageImageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
+		m_writeDescriptors[i] = vk::WriteDescriptorSet(
+			**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_storageImageInfo[numImage]);
+	}
+
+	/**
+		@brief Binds a sampled image to a descriptor slot
+	 */
+	void BindSampledImage(size_t i, vk::Sampler sampler, vk::ImageView view, vk::ImageLayout layout)
+	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+
+		size_t numImage = i - (m_numSSBOs + m_numStorageImages);
+		m_sampledImageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
+		m_writeDescriptors[i] = vk::WriteDescriptorSet(
+			**m_descriptorSet, i, 0, vk::DescriptorType::eCombinedImageSampler, m_sampledImageInfo[numImage]);
 	}
 
 	/**
@@ -135,7 +154,8 @@ protected:
 
 	std::string m_shaderPath;
 	size_t m_numSSBOs;
-	size_t m_numImages;
+	size_t m_numStorageImages;
+	size_t m_numSampledImages;
 	size_t m_pushConstantSize;
 
 	std::unique_ptr<vk::raii::ShaderModule> m_shaderModule;
@@ -147,7 +167,8 @@ protected:
 
 	std::vector<vk::WriteDescriptorSet> m_writeDescriptors;
 	std::vector<vk::DescriptorBufferInfo> m_bufferInfo;
-	std::vector<vk::DescriptorImageInfo> m_imageInfo;
+	std::vector<vk::DescriptorImageInfo> m_storageImageInfo;
+	std::vector<vk::DescriptorImageInfo> m_sampledImageInfo;
 };
 
 #endif

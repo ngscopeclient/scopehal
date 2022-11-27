@@ -35,15 +35,22 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ComputePipeline::ComputePipeline(const string& shaderPath, size_t numSSBOs, size_t pushConstantSize, size_t numImages)
+ComputePipeline::ComputePipeline(
+	const string& shaderPath,
+	size_t numSSBOs,
+	size_t pushConstantSize,
+	size_t numStorageImages,
+	size_t numSampledImages)
 	: m_shaderPath(shaderPath)
 	, m_numSSBOs(numSSBOs)
-	, m_numImages(numImages)
+	, m_numStorageImages(numStorageImages)
+	, m_numSampledImages(numSampledImages)
 	, m_pushConstantSize(pushConstantSize)
 {
-	m_writeDescriptors.resize(numSSBOs + numImages);
+	m_writeDescriptors.resize(numSSBOs + numStorageImages + numSampledImages);
 	m_bufferInfo.resize(numSSBOs);
-	m_imageInfo.resize(numImages);
+	m_storageImageInfo.resize(numStorageImages);
+	m_sampledImageInfo.resize(numSampledImages);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -72,15 +79,23 @@ void ComputePipeline::DeferredInit()
 
 	//Configure shader input bindings
 	vector<vk::DescriptorSetLayoutBinding> bindings;
+	size_t ibase = 0;
 	for(size_t i=0; i<m_numSSBOs; i++)
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
-			i, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
+			i + ibase, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute));
 	}
-	for(size_t i=0; i<m_numImages; i++)
+	ibase += m_numSSBOs;
+	for(size_t i=0; i<m_numStorageImages; i++)
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
-			i + m_numSSBOs, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute));
+			i + ibase, vk::DescriptorType::eStorageImage, 1, vk::ShaderStageFlagBits::eCompute));
+	}
+	ibase += m_numStorageImages;
+	for(size_t i=0; i<m_numSampledImages; i++)
+	{
+		bindings.push_back(vk::DescriptorSetLayoutBinding(
+			i + ibase, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eCompute));
 	}
 	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
 	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
@@ -105,8 +120,10 @@ void ComputePipeline::DeferredInit()
 	vector<vk::DescriptorPoolSize> poolSizes;
 	if(m_numSSBOs)
 		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs));
-	if(m_numImages)
-		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, m_numImages));
+	if(m_numStorageImages)
+		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, m_numStorageImages));
+	if(m_numSampledImages)
+		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, m_numSampledImages));
 	vk::DescriptorPoolCreateInfo poolInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
 			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
