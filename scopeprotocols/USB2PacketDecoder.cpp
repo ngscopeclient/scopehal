@@ -67,7 +67,7 @@ string USB2PacketDecoder::GetProtocolName()
 
 bool USB2PacketDecoder::GetShowDataColumn()
 {
-	return false;
+	return true;
 }
 
 vector<string> USB2PacketDecoder::GetHeaders()
@@ -793,21 +793,14 @@ void USB2PacketDecoder::DecodeData(USB2PacketWaveform* cap, size_t istart, size_
 	else
 	{
 		LogDebug("DecodeData got type %x instead of ACK/NAK\n", sack.m_type);
-		ack = "Not a PID";
+		ack = "Invalid PID, expected ACK/NAK";
 	}
 
 	pack->m_len = ((cap->m_offsets[i] + cap->m_durations[i]) * cap->m_timescale) - pack->m_offset;
 	i++;
 
 	//Format the data
-	string details = "";
-	for(auto b : pack->m_data)
-	{
-		snprintf(tmp, sizeof(tmp), "%02x ", b);
-		details += tmp;
-	}
-	details += ack;
-	pack->m_headers["Details"] = details;
+	pack->m_headers["Details"] = ack;
 
 	snprintf(tmp, sizeof(tmp), "%zu", pack->m_data.size());
 	pack->m_headers["Length"] = tmp;
