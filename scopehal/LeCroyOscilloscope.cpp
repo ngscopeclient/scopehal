@@ -4562,6 +4562,12 @@ Trigger::Condition LeCroyOscilloscope::GetCondition(string reply)
 
 void LeCroyOscilloscope::PushTrigger()
 {
+	if(!m_trigger->GetInput(0))
+	{
+		LogWarning("LeCroyOscilloscope::PushTrigger: no input specified\n");
+		return;
+	}
+
 	//Source is the same for every channel
 	char tmp[128];
 	snprintf(
