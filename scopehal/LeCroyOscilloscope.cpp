@@ -4422,7 +4422,6 @@ void LeCroyOscilloscope::PullUartTrigger()
 		* InterFrameMinBits
 		* NeedDualLevels
 		* NeededSources
-		* PatternLength
 		* PatternPosition
 		* RS232Mode (how is this different from polarity inversion?)
 		* SupportsDigital
@@ -4487,12 +4486,21 @@ void LeCroyOscilloscope::PullUartTrigger()
 	else
 		ut->SetMatchType(UartTrigger::TYPE_DATA);
 
-	//PatternValue1 / 2
-	auto p1 = Trim(m_transport->SendCommandQueuedWithReply(
-		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue'"));
-	auto p2 = Trim(m_transport->SendCommandQueuedWithReply(
-		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue2'"));
-	ut->SetPatterns(p1, p2, ignore_p2);
+	//Pattern length
+	auto len = stoi(m_transport->SendCommandQueuedWithReply(
+		"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternLength'"));
+
+	//Do not attempt to pull trigger config if it's zero length
+	//The scope won't reply
+	if(len > 0)
+	{
+		//PatternValue1 / 2
+		auto p1 = Trim(m_transport->SendCommandQueuedWithReply(
+			"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue'"));
+		auto p2 = Trim(m_transport->SendCommandQueuedWithReply(
+			"VBS? 'return = app.Acquisition.Trigger.Serial.UART.PatternValue2'"));
+		ut->SetPatterns(p1, p2, ignore_p2);
+	}
 }
 
 /**
