@@ -820,13 +820,13 @@ public:
 		auto sclock = dynamic_cast<SparseDigitalWaveform*>(clock);
 
 		if(udata && uclock)
-			SampleOnAnyEdges(udata, uclock, samples);
+			SampleOnRisingEdges(udata, uclock, samples);
 		else if(udata && sclock)
-			SampleOnAnyEdges(udata, sclock, samples);
+			SampleOnRisingEdges(udata, sclock, samples);
 		else if(sdata && sclock)
-			SampleOnAnyEdges(sdata, sclock, samples);
+			SampleOnRisingEdges(sdata, sclock, samples);
 		else if(sdata && uclock)
-			SampleOnAnyEdges(sdata, uclock, samples);
+			SampleOnRisingEdges(sdata, uclock, samples);
 	}
 
 	/**
