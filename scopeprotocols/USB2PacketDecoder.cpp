@@ -546,13 +546,19 @@ void USB2PacketDecoder::DecodeSetup(USB2PacketWaveform* cap, size_t istart, size
 		LogDebug("Truncated ACK\n");
 		return;
 	}
-	auto sack = cap->m_samples[i++];
+	auto sack = cap->m_samples[i];
 	if(sack.m_type == USB2PacketSymbol::TYPE_PID)
 	{
 		if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_ACK)
+		{
 			ack = "ACK";
+			i++;
+		}
 		else if( (sack.m_data & 0xf) == USB2PacketSymbol::PID_NAK)
+		{
 			ack = "NAK";
+			i++;
+		}
 		else
 			ack = "Unknown end PID";
 	}
