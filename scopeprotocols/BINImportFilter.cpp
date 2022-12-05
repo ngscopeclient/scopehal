@@ -151,8 +151,8 @@ void BINImportFilter::OnFileNameChanged()
 		DataHeader dh;
 		f.copy((char*)&dh, sizeof(DataHeader), fpos);
 
-		//Digital waveform
-		if(dh.type == 6)
+		//Digital logic waveform
+		if(wh.type == 6)
 		{
 			//Create 8 streams of digital data
 			vector<UniformDigitalWaveform*> wfms;
@@ -184,10 +184,25 @@ void BINImportFilter::OnFileNameChanged()
 				LogDebug("Sample depth:   %i bits\n", dh.depth*8);
 				LogDebug("Buffer length:  %i KB\n\n\n", dh.length/1024);
 
-				//Integer samples (digital waveforms)
 				for(size_t k=0; k<wh.samples; k++)
 				{
-					uint8_t s = *(uint8_t*)(f.c_str() + fpos);
+					uint8_t s = -1;
+
+					//Logic samples (counts 32-bit float data waveforms)
+					if (dh.type == 5)
+					{
+						s = (uint8_t)*(float*)(f.c_str() + fpos);
+					}
+					//Logic samples (digital unsigned 8-bit character data)
+					else if (dh.type == 6)
+					{
+						s = *(uint8_t*)(f.c_str() + fpos);
+					}
+					else
+					{
+						LogDebug("Invalid buffer type for logic waveform\n");
+						return;
+					}
 
 					for(size_t m=0; m<8; m++)
 					{
