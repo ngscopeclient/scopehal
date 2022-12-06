@@ -81,6 +81,7 @@
 #include "EmphasisFilter.h"
 #include "EmphasisRemovalFilter.h"
 #include "EnhancedResolutionFilter.h"
+#include "EnvelopeFilter.h"
 #include "ESPIDecoder.h"
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
