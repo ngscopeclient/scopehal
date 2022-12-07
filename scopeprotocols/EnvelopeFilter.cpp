@@ -104,12 +104,15 @@ void EnvelopeFilter::Refresh()
 		size_t len = udata->size();
 		udata->PrepareForCpuAccess();
 
+		//Find large (multiple sample) phase offset of the input
+		int64_t largeSampleShift = udata->m_triggerPhase - (udata->m_triggerPhase % udata->m_timescale);
+
 		//Make output waveforms
 		auto umin = dynamic_cast<UniformAnalogWaveform*>(GetData(0));
 		if(!umin)
 		{
 			umin = new UniformAnalogWaveform;
-			umin->m_triggerPhase = data->m_triggerPhase;
+			umin->m_triggerPhase = largeSampleShift;
 			SetData(umin, 0);
 		}
 
@@ -117,7 +120,7 @@ void EnvelopeFilter::Refresh()
 		if(!umax)
 		{
 			umax = new UniformAnalogWaveform;
-			umax->m_triggerPhase = data->m_triggerPhase;
+			umax->m_triggerPhase = largeSampleShift;
 			SetData(umax, 1);
 		}
 		size_t oldlen = min(umin->size(), umax->size());
@@ -139,17 +142,20 @@ void EnvelopeFilter::Refresh()
 
 		//Process overlap of old and new waveforms
 		size_t i = 0;
+		double delta = 1.0f * (umin->m_triggerPhase - udata->m_triggerPhase) / udata->m_timescale;
 		for(; i<oldlen; i++)
 		{
-			umax->m_samples[i] = max(umax->m_samples[i], udata->m_samples[i]);
-			umin->m_samples[i] = min(umin->m_samples[i], udata->m_samples[i]);
+			float uin = InterpolateValue(udata, i, delta);
+			umax->m_samples[i] = max(umax->m_samples[i], uin);
+			umin->m_samples[i] = min(umin->m_samples[i], uin);
 		}
 
 		//Copy input verbatim to new offsets
 		for(; i<len; i++)
 		{
-			umax->m_samples[i] = udata->m_samples[i];
-			umin->m_samples[i] = udata->m_samples[i];
+			float uin = InterpolateValue(udata, i, delta);
+			umax->m_samples[i] = uin;
+			umin->m_samples[i] = uin;
 		}
 
 		umax->MarkModifiedFromCpu();
