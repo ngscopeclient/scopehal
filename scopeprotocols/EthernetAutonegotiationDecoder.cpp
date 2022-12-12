@@ -87,6 +87,8 @@ void EthernetAutonegotiationDecoder::Refresh()
 	//Create the outbound data
 	auto* cap = new EthernetAutonegotiationWaveform;
 	cap->m_timescale = din->m_timescale;
+	cap->m_startTimestamp = din->m_startTimestamp;
+	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->PrepareForCpuAccess();
 
 	//Crunch it
@@ -170,58 +172,9 @@ std::string EthernetAutonegotiationWaveform::GetColor(size_t /*i*/)
 string EthernetAutonegotiationWaveform::GetText(size_t i)
 {
 	auto s = m_samples[i];
-	unsigned int sel = s & 0x1f;
-	unsigned int ability = (s >> 5) & 0x7f;
-	bool xnp = (s >> 12) & 1;
-	bool rf = (s >> 13) & 1;
-	bool ack = (s >> 14) & 1;
-	bool np = (s >> 15) & 1;
-
-	//Not 802.3? Just display as hex
 	char tmp[128];
-	if(sel != 1)
 	{
 		snprintf(tmp, sizeof(tmp), "%04x", (int)s);
 		return tmp;
 	}
-
-	//Yes, it's 802.3
-	string ret = "Base: ";
-	if(ability & 0x40)
-		ret += "apause ";
-	if(ability & 0x20)
-		ret += "pause ";
-	if(ability & 0x10)
-		ret += "T4 ";
-	if(ability & 0xc)
-	{
-		ret += "100/";
-		if( (ability & 0xc) == 0xc)
-			ret += "full+half ";
-		else if(ability & 0x8)
-			ret += "full ";
-		else if(ability & 0x4)
-			ret += "half ";
-	}
-	if(ability & 0x3)
-	{
-		ret += "10/";
-		if( (ability & 0x3) == 0x3)
-			ret += "full+half ";
-		else if(ability & 0x2)
-			ret += "full ";
-		else if(ability & 0x1)
-			ret += "half ";
-	}
-
-	if(xnp)
-		ret += "XNP ";
-	if(rf)
-		ret += "FAULT ";
-	if(ack)
-		ret += "ACK ";
-	if(np)
-		ret += "Next-page";
-
-	return ret;
 }

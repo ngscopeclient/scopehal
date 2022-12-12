@@ -85,6 +85,7 @@
 #include "ESPIDecoder.h"
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
+#include "EthernetAutonegotiationPageDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "EthernetRGMIIDecoder.h"
 #include "EthernetRMIIDecoder.h"
