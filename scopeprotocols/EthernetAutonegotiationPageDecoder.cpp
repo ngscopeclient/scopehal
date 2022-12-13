@@ -665,7 +665,7 @@ Packet* EthernetAutonegotiationPageDecoder::CreateMergedHeader(Packet* pack, siz
 	ret->m_offset = pack->m_offset;
 	ret->m_len = pack->m_len;
 	ret->m_headers = pack->m_headers;
-	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+	ret->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 
 	if(pack->m_headers["Type"] == "Base")
 	{
