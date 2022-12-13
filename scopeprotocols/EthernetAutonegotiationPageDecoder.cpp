@@ -43,9 +43,8 @@ using namespace std;
 // Construction / destruction
 
 EthernetAutonegotiationPageDecoder::EthernetAutonegotiationPageDecoder(const string& color)
-	: Filter(color, CAT_SERIAL)
+	: PacketDecoder(color, CAT_SERIAL)
 {
-	AddProtocolStream("data");
 	CreateInput("din");
 }
 
@@ -73,6 +72,8 @@ string EthernetAutonegotiationPageDecoder::GetProtocolName()
 
 void EthernetAutonegotiationPageDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -102,9 +103,11 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 	} state = STATE_IDLE;
 
 	const uint16_t ACK = 0x4000;
-	const uint16_t ACK2 = 0x0800;
+	const uint16_t ACK2 = 0x1000;
 	const uint16_t ACKS = ACK | ACK2;
 	const uint16_t MP = 0x2000;
+	const uint16_t NP = 0x8000;
+	const uint16_t TOGGLE = 0x800;
 
 	int messageCount = 0;
 	int lastMessage = 0;
@@ -113,6 +116,7 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 	auto len = din->size();
 	int64_t tstart = 0;
 	uint16_t codeOrig = 0;
+	string lastType;
 	for(size_t i = 0; i < len; i ++)
 	{
 		uint16_t code = din->m_samples[i];
@@ -132,6 +136,19 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 							EthernetAutonegotiationPageSample::TYPE_BASE_PAGE, code));
 						cap->m_offsets.push_back(tnow);
 						cap->m_durations.push_back(din->m_durations[i]);
+
+						auto pack = new Packet;
+						pack->m_headers["Type"] = "Base";
+						pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+						pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+						pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+						pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+						pack->m_data.push_back(code >> 8);
+						pack->m_data.push_back(code & 0xff);
+						pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+						pack->m_len = din->m_durations[i] * din->m_timescale;
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+						m_packets.push_back(pack);
 					}
 
 					//Something else. Ignore it.
@@ -159,11 +176,41 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 						EthernetAutonegotiationPageSample::TYPE_ACK, code));
 					cap->m_offsets.push_back(tnow);
 					cap->m_durations.push_back(din->m_durations[i]);
+
+					auto pack = new Packet;
+					pack->m_headers["Type"] = "Base";
+					pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+					pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+					pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+					pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+					pack->m_data.push_back(code >> 8);
+					pack->m_data.push_back(code & 0xff);
+					pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+					pack->m_len = din->m_durations[i] * din->m_timescale;
+					lastType = "Base";
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+					m_packets.push_back(pack);
 				}
 
 				//Same codeword? Extend it
 				else if(code == codeOrig)
+				{
 					cap->m_durations[cap->m_durations.size() - 1] = (tnow + len) - tstart;
+
+					//Add new packets for the original events
+					auto pack = new Packet;
+					pack->m_headers["Type"] = "Base";
+					pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+					pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+					pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+					pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+					pack->m_data.push_back(code >> 8);
+					pack->m_data.push_back(code & 0xff);
+					pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+					pack->m_len = din->m_durations[i] * din->m_timescale;
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					m_packets.push_back(pack);
+				}
 
 				//else it's an error, ignore it?
 
@@ -174,7 +221,23 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 
 				//Extend the ACK
 				if( (code & ACK) && ( (code & ~ACKS) == (codeOrig & ~ACKS) ) )
+				{
 					cap->m_durations[cap->m_durations.size() - 1] = (tnow + len) - tstart;
+
+					auto pack = new Packet;
+					pack->m_headers["Type"] = lastType;
+					pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+					pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+					pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+					pack->m_headers["Ack2"] = (code & ACK2) ? "1" : "0";
+					pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+					pack->m_data.push_back(code >> 8);
+					pack->m_data.push_back(code & 0xff);
+					pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+					pack->m_len = din->m_durations[i] * din->m_timescale;
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+					m_packets.push_back(pack);
+				}
 
 				//else start a new codeword
 				//TODO: we should probably check the toggle bit
@@ -193,6 +256,22 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 						state = STATE_NEXT_PAGE;
 						cap->m_samples.push_back(EthernetAutonegotiationPageSample(
 							EthernetAutonegotiationPageSample::TYPE_MESSAGE_PAGE, code));
+
+						auto pack = new Packet;
+						pack->m_headers["Type"] = "Message";
+						lastType = pack->m_headers["Type"];
+						pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+						pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+						pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+						pack->m_headers["Ack2"] = (code & ACK2) ? "1" : "0";
+						pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+						pack->m_data.push_back(code >> 8);
+						pack->m_data.push_back(code & 0xff);
+						pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+						pack->m_len = din->m_durations[i] * din->m_timescale;
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+						lastType = pack->m_headers["Type"];
+						m_packets.push_back(pack);
 
 						messageCount = 0;
 						lastMessage = (code & 0x7ff);
@@ -244,6 +323,21 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 								break;
 						}
 
+						auto pack = new Packet;
+						pack->m_headers["Type"] = "Unformatted";
+						lastType = pack->m_headers["Type"];
+						pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+						pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+						pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+						pack->m_headers["Ack2"] = (code & ACK2) ? "1" : "0";
+						pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+						pack->m_data.push_back(code >> 8);
+						pack->m_data.push_back(code & 0xff);
+						pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+						pack->m_len = din->m_durations[i] * din->m_timescale;
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+						m_packets.push_back(pack);
+
 						messageCount ++;
 					}
 
@@ -271,11 +365,42 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 						EthernetAutonegotiationPageSample::TYPE_ACK, code));
 					cap->m_offsets.push_back(tnow);
 					cap->m_durations.push_back(din->m_durations[i]);
+
+					auto pack = new Packet;
+					pack->m_headers["Type"] = lastType;
+					pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+					pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+					pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+					pack->m_headers["Ack2"] = (code & ACK2) ? "1" : "0";
+					pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+					pack->m_data.push_back(code >> 8);
+					pack->m_data.push_back(code & 0xff);
+					pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+					pack->m_len = din->m_durations[i] * din->m_timescale;
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+					m_packets.push_back(pack);
 				}
 
 				//Same codeword? Extend it
 				else if(code == codeOrig)
+				{
 					cap->m_durations[cap->m_durations.size() - 1] = (tnow + len) - tstart;
+
+					auto pack = new Packet;
+					pack->m_headers["Type"] = lastType;
+					pack->m_headers["Ack"] = (code & ACK) ? "1" : "0";
+					pack->m_headers["Info"] = cap->GetText(cap->m_samples.size()-1);
+					pack->m_headers["T"] = (code & TOGGLE) ? "1" : "0";
+					pack->m_headers["Ack2"] = (code & ACK2) ? "1" : "0";
+					pack->m_headers["NP"] = (code & NP) ? "1" : "0";
+					pack->m_data.push_back(code >> 8);
+					pack->m_data.push_back(code & 0xff);
+					pack->m_offset = tnow * din->m_timescale + din->m_triggerPhase;
+					pack->m_len = din->m_durations[i] * din->m_timescale;
+					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+					lastType = pack->m_headers["Type"];
+					m_packets.push_back(pack);
+				}
 
 				//else it's an error, ignore it?
 
@@ -290,7 +415,7 @@ void EthernetAutonegotiationPageDecoder::Refresh()
 	cap->MarkModifiedFromCpu();
 }
 
-std::string EthernetAutonegotiationPageWaveform::GetColor(size_t i)
+string EthernetAutonegotiationPageWaveform::GetColor(size_t i)
 {
 	auto s = m_samples[i];
 	switch(s.m_type)
@@ -437,7 +562,7 @@ string EthernetAutonegotiationPageWaveform::GetText(size_t i)
 
 		//802.3-2018 table 40-4
 		case EthernetAutonegotiationPageSample::TYPE_1000BASET_TECH_1:
-			snprintf(tmp, sizeof(tmp), "Seed: %03x", s.m_value & 0x7ff);
+			snprintf(tmp, sizeof(tmp), "Seed %03x", s.m_value & 0x7ff);
 			return tmp;
 
 		//802.3-2018 table 40-4 and 45.2.7.13
@@ -479,7 +604,7 @@ string EthernetAutonegotiationPageWaveform::GetText(size_t i)
 				if(ret.empty())
 					return "No EEE support";
 				else
-					return string("EEE for: ") + ret;
+					return ret;
 			}
 			break;
 
@@ -494,4 +619,94 @@ string EthernetAutonegotiationPageWaveform::GetText(size_t i)
 			snprintf(tmp, sizeof(tmp), "Invalid (%04x)", (int)s.m_value);
 			return tmp;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Packet decoding
+
+vector<string> EthernetAutonegotiationPageDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Ack");
+	ret.push_back("T");
+	ret.push_back("Ack2");
+	ret.push_back("NP");
+	ret.push_back("Info");
+	return ret;
+}
+
+bool EthernetAutonegotiationPageDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+{
+	//Merge base page with subsequent base pages (and their acks)
+	if( (first->m_headers["Type"] == "Base") && (next->m_headers["Type"] == "Base") )
+		return true;
+
+	//Merge message page with subsequent ACKs and unformatted pages
+	if(first->m_headers["Type"] == "Message")
+	{
+		if( (next->m_headers["Type"] == "Message") &&
+			( (next->m_headers["Info"] == "ACK") || (next->m_headers["Info"] == first->m_headers["Info"]) ) )
+		{
+			return true;
+		}
+
+		if(next->m_headers["Type"] == "Unformatted")
+			return true;
+	}
+
+	return false;
+}
+
+Packet* EthernetAutonegotiationPageDecoder::CreateMergedHeader(Packet* pack, size_t i)
+{
+	//Default to copying everything
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;
+	ret->m_headers = pack->m_headers;
+	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+
+	if(pack->m_headers["Type"] == "Base")
+	{
+		//Extend lengths
+		for(; i<m_packets.size(); i++)
+		{
+			if(CanMerge(pack, nullptr, m_packets[i]))
+				ret->m_len = (m_packets[i]->m_offset + m_packets[i]->m_len) - pack->m_offset;
+			else
+				break;
+		}
+	}
+
+	if(pack->m_headers["Type"] == "Message")
+	{
+		ret->m_headers["Type"] = pack->m_headers["Info"];
+		ret->m_headers["Info"] = "";
+
+		string lastT = pack->m_headers["T"];
+
+		//Check subsequent packets for unformatted pages that might be interesting
+		for(; i<m_packets.size(); i++)
+		{
+			auto p = m_packets[i];
+
+			if(CanMerge(pack, nullptr, p))
+			{
+				//Only care if it's a new toggle
+				auto curT = p->m_headers["T"];
+				if( (curT != lastT) && (p->m_headers["Type"] == "Unformatted") )
+				{
+					ret->m_headers["Info"] += p->m_headers["Info"] + " ";
+					lastT = curT;
+				}
+
+				ret->m_len = (p->m_offset + p->m_len) - pack->m_offset;
+			}
+			else
+				break;
+		}
+	}
+
+	return ret;
 }

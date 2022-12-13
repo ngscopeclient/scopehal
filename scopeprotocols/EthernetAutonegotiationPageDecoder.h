@@ -36,6 +36,8 @@
 #ifndef EthernetAutonegotiationPageDecoder_h
 #define EthernetAutonegotiationPageDecoder_h
 
+#include "PacketDecoder.h"
+
 class EthernetAutonegotiationPageSample
 {
 public:
@@ -78,7 +80,7 @@ public:
 	virtual std::string GetColor(size_t) override;
 };
 
-class EthernetAutonegotiationPageDecoder : public Filter
+class EthernetAutonegotiationPageDecoder : public PacketDecoder
 {
 public:
 	EthernetAutonegotiationPageDecoder(const std::string& color);
@@ -88,6 +90,10 @@ public:
 	static std::string GetProtocolName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	virtual std::vector<std::string> GetHeaders();
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next);
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i);
 
 	PROTOCOL_DECODER_INITPROC(EthernetAutonegotiationPageDecoder)
 
