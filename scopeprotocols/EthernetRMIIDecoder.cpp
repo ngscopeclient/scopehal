@@ -123,6 +123,10 @@ void EthernetRMIIDecoder::Refresh()
 		if(!dctl.m_samples[i])
 			continue;
 
+		//No preamble (ctl high, d0 high, d1 low) yet
+		if(!dd0.m_samples[i])
+			continue;
+
 		//Set of recovered bytes and timestamps
 		vector<uint8_t> bytes;
 		vector<uint64_t> starts;
