@@ -84,7 +84,9 @@ void VCDImportFilter::OnFileNameChanged()
 		STATE_TIMESCALE,
 		STATE_VARS,
 		STATE_INITIAL,
-		STATE_DUMP
+		STATE_DUMP,
+		STATE_DUMPALL,
+		STATE_COMMENT
 	} state = STATE_IDLE;
 
 	int64_t timescale = 1;
@@ -135,6 +137,14 @@ void VCDImportFilter::OnFileNameChanged()
 					state = STATE_TIMESCALE;
 				else if(s == "$dumpvars")
 					state = STATE_INITIAL;
+				else if(s == "$dumpall")
+					state = STATE_DUMPALL;
+				else if(s.find("$comment") == 0)
+				{
+					if(s.find("$end") == string::npos)
+						state = STATE_COMMENT;
+					//else one-line comment, ignore but stay in idle state
+				}
 				else
 					LogWarning("Don't know what to do with line %s\n", s.c_str());
 				break;	//end STATE_IDLE
@@ -332,6 +342,11 @@ void VCDImportFilter::OnFileNameChanged()
 				}
 
 				break;	//end STATE_INITIAL / STATE_DUMP
+
+			case STATE_COMMENT:
+			case STATE_DUMPALL:
+				//nothing to do, ignore them
+				break;
 		}
 
 		//Reset at the end of a block
