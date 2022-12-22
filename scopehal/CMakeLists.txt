@@ -119,6 +119,7 @@ set(SCOPEHAL_SOURCES
 
 	StandardColors.cpp
 	Filter.cpp
+	ActionProvider.cpp
 	FilterParameter.cpp
 	ImportFilter.cpp
 	PacketDecoder.cpp

@@ -123,6 +123,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MagnitudeFilter);
 	AddDecoderClass(MDIODecoder);
+	AddDecoderClass(MemoryFilter);
 	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultimeterTrendFilter);

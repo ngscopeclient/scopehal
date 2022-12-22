@@ -123,6 +123,7 @@
 #include "JtagDecoder.h"
 #include "MagnitudeFilter.h"
 #include "MDIODecoder.h"
+#include "MemoryFilter.h"
 #include "MilStd1553Decoder.h"
 #include "MovingAverageFilter.h"
 #include "MultimeterTrendFilter.h"

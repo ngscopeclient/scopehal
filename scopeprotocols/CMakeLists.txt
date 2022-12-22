@@ -87,6 +87,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	JtagDecoder.cpp
 	MagnitudeFilter.cpp
 	MDIODecoder.cpp
+	MemoryFilter.cpp
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
 	MultimeterTrendFilter.cpp
