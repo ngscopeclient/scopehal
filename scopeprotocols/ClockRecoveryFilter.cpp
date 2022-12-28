@@ -107,7 +107,11 @@ void ClockRecoveryFilter::Refresh()
 	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
-	auto gate = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(1));
+	auto gate = GetInputWaveform(1);
+	auto sgate = dynamic_cast<SparseDigitalWaveform*>(gate);
+	auto ugate = dynamic_cast<UniformDigitalWaveform*>(gate);
+	if(gate)
+		gate->PrepareForCpuAccess();
 
 	//Timestamps of the edges
 	vector<int64_t> edges;
@@ -160,8 +164,12 @@ void ClockRecoveryFilter::Refresh()
 
 	//If gated at T=0, start with output stopped
 	bool gating = false;
-	if(gate && gate->m_samples.size())
-		gating = !gate->m_samples[0];
+	if(gate && gate->size())
+		gating = !GetValue(sgate, ugate, 0);
+	LogDebug("CDR PLL refresh\n");
+	LogIndenter li;
+	if(gating)
+		LogDebug("Gating at time 0\n");
 
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
@@ -169,15 +177,13 @@ void ClockRecoveryFilter::Refresh()
 
 		//See if the current edge position is within a gating region
 		bool was_gating = gating;
-		if(gate != NULL)
+		if(gate != nullptr)
 		{
 			while(igate < edges.size()-1)
 			{
 				//See if this edge is within the region
-				int64_t a = gate->m_offsets[igate];
-				int64_t b = a + gate->m_durations[igate];
-				a *= gate->m_timescale;
-				b *= gate->m_timescale;
+				int64_t a = GetOffsetScaled(sgate, ugate, igate);
+				int64_t b = a + GetDurationScaled(sgate, ugate, igate);
 
 				//We went too far, stop
 				if(edgepos < a)
@@ -190,11 +196,15 @@ void ClockRecoveryFilter::Refresh()
 				//Good alignment
 				else
 				{
-					gating = !gate->m_samples[igate];
+					gating = !GetValue(sgate, ugate, igate);
 					break;
 				}
 			}
 		}
+		if(gating && !was_gating)
+			LogDebug("Start gating at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
+		if(!gating && was_gating)
+			LogDebug("Stop gating at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
 
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
@@ -202,27 +212,30 @@ void ClockRecoveryFilter::Refresh()
 		int64_t tnext = edges[nedge];
 		while( (tnext + center < edgepos) && (nedge+1 < edges.size()) )
 		{
-			//Find phase error
-			int64_t delta = (edgepos - tnext) - period;
-			total_error += fabs(delta);
-
-			//If the clock is currently gated, re-sync to the edge
-			if(was_gating && !gating)
-				edgepos = tnext + period;
-
-			//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
-			else
+			if(!gating)
 			{
-				int64_t cperiod = period;
-				if(delta > 0)
-				{
-					period  -= cperiod / 40000;
-					edgepos -= cperiod / 400;
-				}
+				//Find phase error
+				int64_t delta = (edgepos - tnext) - period;
+				total_error += fabs(delta);
+
+				//If the clock just got ungated, align exactly to the next edge
+				if(was_gating)
+					edgepos = tnext + period;
+
+				//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 				else
 				{
-					period  += cperiod / 40000;
-					edgepos += cperiod / 400;
+					int64_t cperiod = period;
+					if(delta > 0)
+					{
+						period  -= cperiod / 40000;
+						edgepos -= cperiod / 400;
+					}
+					else
+					{
+						period  += cperiod / 40000;
+						edgepos += cperiod / 400;
+					}
 				}
 			}
 
