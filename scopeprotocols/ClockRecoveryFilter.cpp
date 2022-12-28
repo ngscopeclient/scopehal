@@ -130,7 +130,8 @@ void ClockRecoveryFilter::Refresh()
 	}
 
 	//Get nominal period used for the first cycle of the NCO
-	int64_t period = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
+	int64_t initialPeriod = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
+	int64_t period = initialPeriod;
 
 	//Disallow frequencies higher than Nyquist of the input
 	auto fnyquist = 2*din->m_timescale;
@@ -167,6 +168,9 @@ void ClockRecoveryFilter::Refresh()
 	if(gate && gate->size())
 		gating = !GetValue(sgate, ugate, 0);
 
+	int64_t tlast = 0;
+	/*LogDebug("--START--\n");
+	LogDebug("t,period,dphase,dperiod,uiLen\n");*/
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -207,41 +211,54 @@ void ClockRecoveryFilter::Refresh()
 			if(!gating)
 			{
 				//Find phase error
-				int64_t delta = (edgepos - tnext) - period;
-				total_error += fabs(delta);
+				int64_t dphase = (edgepos - tnext) - period;
+				total_error += fabs(dphase);
+
+				//Find frequency error
+				int64_t uiLen = (tnext - tlast);
+				float numUIs = round(uiLen * 1.0 / initialPeriod);
+				if(numUIs < 0.1)		//Sanity check: no correction if we have a glitch
+					uiLen = period;
+				else
+					uiLen /= numUIs;
+				int64_t dperiod = period - uiLen;
+
+				/*LogDebug("%e, %.2f, %.2f, %.2f, %.2f\n",
+					edgepos * SECONDS_PER_FS, period*1e-3f, dphase*1e-3f, dperiod*1e-3f, uiLen*1e-3f);*/
 
 				//If the clock just got ungated, align exactly to the next edge
 				if(was_gating)
 					edgepos = tnext + period;
 
-				//Check sign of phase and do bang-bang feedback (constant shift regardless of error magnitude)
 				else
 				{
-					int64_t cperiod = period;
-					if(delta > 0)
-					{
-						period  -= cperiod / 40000;
-						edgepos -= cperiod / 400;
-					}
-					else
-					{
-						period  += cperiod / 40000;
-						edgepos += cperiod / 400;
-					}
+					//Proportional correction for frequency error
+					period -= dperiod * 0.008;
+
+					//Proportional correction for phase error
+					period -= dphase * 0.002;
+				}
+
+				if(period < fnyquist)
+				{
+					LogWarning("PLL attempted to lock to frequency near or above Nyquist - invalid config or undersampled data?\n");
+					nedge = edges.size();
+					break;
+				}
+				if(period > 2*initialPeriod)
+				{
+					LogWarning("PLL attempted to go really slow, what's up? %s\n",
+						Unit(Unit::UNIT_FS).PrettyPrint(period).c_str());
+					nedge = edges.size();
+					break;
 				}
 			}
 
+			tlast = tnext;
 			tnext = edges[++nedge];
-
-			if(period < fnyquist)
-			{
-				LogWarning("PLL attempted to lock to frequency near or above Nyquist - invalid config or undersampled data?\n");
-				nedge = edges.size();
-				break;
-			}
 		}
 
-		//Add the sample
+		//Add the sample (90 deg phase offset from the internal NCO)
 		if(!gating)
 		{
 			value = !value;
@@ -253,7 +270,7 @@ void ClockRecoveryFilter::Refresh()
 	}
 
 	total_error /= edges.size();
-	LogTrace("average phase error %zu\n", total_error);
+	//LogTrace("average phase error %zu\n", total_error);
 
 	SetData(cap, 0);
 
