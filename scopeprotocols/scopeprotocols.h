@@ -117,6 +117,7 @@
 #include "IBISDriverFilter.h"
 #include "InvertFilter.h"
 #include "IPv4Decoder.h"
+#include "IQSquelchFilter.h"
 #include "ISIMeasurement.h"
 #include "JitterFilter.h"
 #include "JitterSpectrumFilter.h"

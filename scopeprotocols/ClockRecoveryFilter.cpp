@@ -157,7 +157,11 @@ void ClockRecoveryFilter::Refresh()
 	int64_t total_error = 0;
 	cap->m_samples.reserve(edges.size());
 	size_t igate = 0;
+
+	//If gated at T=0, start with output stopped
 	bool gating = false;
+	if(gate && gate->m_samples.size())
+		gating = !gate->m_samples[0];
 
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{

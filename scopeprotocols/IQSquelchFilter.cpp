@@ -28,20 +28,22 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "SquelchFilter.h"
+#include "IQSquelchFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SquelchFilter::SquelchFilter(const string& color)
-	: Filter(color, CAT_MATH)
+IQSquelchFilter::IQSquelchFilter(const string& color)
+	: Filter(color, CAT_RF)
 {
 	//Set up channels
-	CreateInput("in");
+	CreateInput("I");
+	CreateInput("Q");
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "out", Stream::STREAM_TYPE_DIGITAL);
+	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
 	m_thresholdname = "Threshold";
 	m_parameters[m_thresholdname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
@@ -55,12 +57,12 @@ SquelchFilter::SquelchFilter(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool IQSquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
 		return true;
 
 	return false;
@@ -69,15 +71,15 @@ bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string SquelchFilter::GetProtocolName()
+string IQSquelchFilter::GetProtocolName()
 {
-	return "Squelch";
+	return "IQ Squelch";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SquelchFilter::Refresh()
+void IQSquelchFilter::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -86,26 +88,37 @@ void SquelchFilter::Refresh()
 		return;
 	}
 
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
+	auto din_i = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto din_q = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
+	din_i->PrepareForCpuAccess();
+	din_q->PrepareForCpuAccess();
 
-	size_t len = din->size();
+	size_t len = min(din_i->size(), din_q->size());
 
 	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
 	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
-	size_t holdtime_samples = holdtime_fs / din->m_timescale;
+	size_t holdtime_samples = holdtime_fs / din_i->m_timescale;
 
-	auto dout = SetupEmptyUniformDigitalOutputWaveform(din, 0);
-	dout->Resize(len);
-	dout->PrepareForCpuAccess();
+	auto dout_i = SetupEmptyUniformAnalogOutputWaveform(din_i, 0);
+	auto dout_q = SetupEmptyUniformAnalogOutputWaveform(din_q, 1);
+	dout_i->Resize(len);
+	dout_q->Resize(len);
+	dout_i->PrepareForCpuAccess();
+	dout_q->PrepareForCpuAccess();
 
 	bool open = false;
+	float tsq = threshold * threshold;
 	size_t topen = 0;
 	for(size_t i=0; i<len; i++)
 	{
+		//Find I/Q magnitude (do comparison on squared mag to avoid a ton of sqrts)
+		float vi = din_i->m_samples[i];
+		float vq = din_q->m_samples[i];
+		float msq = vi*vi + vq*vq;
+
 		//Signal amplitude is above threshold - open squelch immediately
 		//TODO: attack time?
-		if(din->m_samples[i] > threshold)
+		if(msq > tsq)
 		{
 			open = true;
 			topen = i;
@@ -115,8 +128,18 @@ void SquelchFilter::Refresh()
 		else if(open && ( (i - topen) > holdtime_samples) )
 			open = false;
 
-		dout->m_samples[i] = open;
+		if(open)
+		{
+			dout_i->m_samples[i] = din_i->m_samples[i];
+			dout_q->m_samples[i] = din_q->m_samples[i];
+		}
+		else
+		{
+			dout_i->m_samples[i] = 0.0f;
+			dout_q->m_samples[i] = 0.0f;
+		}
 	}
 
-	dout->MarkModifiedFromCpu();
+	dout_i->MarkModifiedFromCpu();
+	dout_q->MarkModifiedFromCpu();
 }

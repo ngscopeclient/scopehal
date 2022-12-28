@@ -81,6 +81,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	IBM8b10bDecoder.cpp
 	InvertFilter.cpp
 	IPv4Decoder.cpp
+	IQSquelchFilter.cpp
 	ISIMeasurement.cpp
 	JitterFilter.cpp
 	JitterSpectrumFilter.cpp

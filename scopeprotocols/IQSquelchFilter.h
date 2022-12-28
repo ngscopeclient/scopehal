@@ -27,96 +27,30 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "SquelchFilter.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of IQSquelchFilter
+ */
+#ifndef IQSquelchFilter_h
+#define IQSquelchFilter_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SquelchFilter::SquelchFilter(const string& color)
-	: Filter(color, CAT_MATH)
+class IQSquelchFilter : public Filter
 {
-	//Set up channels
-	CreateInput("in");
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "out", Stream::STREAM_TYPE_DIGITAL);
+public:
+	IQSquelchFilter(const std::string& color);
 
-	m_thresholdname = "Threshold";
-	m_parameters[m_thresholdname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_thresholdname].SetFloatVal(0.01);
+	virtual void Refresh();
 
-	m_holdtimename = "Hold time";
-	m_parameters[m_holdtimename] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_holdtimename].SetIntVal(1e6);
-}
+	static std::string GetProtocolName();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-bool SquelchFilter::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	if(stream.m_channel == NULL)
-		return false;
+	PROTOCOL_DECODER_INITPROC(IQSquelchFilter)
 
-	if( (i < 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
+protected:
+	std::string m_thresholdname;
+	std::string m_holdtimename;
+};
 
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string SquelchFilter::GetProtocolName()
-{
-	return "Squelch";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void SquelchFilter::Refresh()
-{
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-
-	size_t len = din->size();
-
-	auto threshold = m_parameters[m_thresholdname].GetFloatVal();
-	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
-	size_t holdtime_samples = holdtime_fs / din->m_timescale;
-
-	auto dout = SetupEmptyUniformDigitalOutputWaveform(din, 0);
-	dout->Resize(len);
-	dout->PrepareForCpuAccess();
-
-	bool open = false;
-	size_t topen = 0;
-	for(size_t i=0; i<len; i++)
-	{
-		//Signal amplitude is above threshold - open squelch immediately
-		//TODO: attack time?
-		if(din->m_samples[i] > threshold)
-		{
-			open = true;
-			topen = i;
-		}
-
-		//Signal amplitude below threshold - close squelch after hold time elapses
-		else if(open && ( (i - topen) > holdtime_samples) )
-			open = false;
-
-		dout->m_samples[i] = open;
-	}
-
-	dout->MarkModifiedFromCpu();
-}
+#endif
