@@ -166,10 +166,6 @@ void ClockRecoveryFilter::Refresh()
 	bool gating = false;
 	if(gate && gate->size())
 		gating = !GetValue(sgate, ugate, 0);
-	LogDebug("CDR PLL refresh\n");
-	LogIndenter li;
-	if(gating)
-		LogDebug("Gating at time 0\n");
 
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
@@ -201,10 +197,6 @@ void ClockRecoveryFilter::Refresh()
 				}
 			}
 		}
-		if(gating && !was_gating)
-			LogDebug("Start gating at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
-		if(!gating && was_gating)
-			LogDebug("Stop gating at %s\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
 
 		//See if the next edge occurred in this UI.
 		//If not, just run the NCO open loop.
