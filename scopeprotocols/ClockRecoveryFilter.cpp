@@ -32,7 +32,7 @@
 
 using namespace std;
 
-#define PLL_DEBUG_OUTPUTS
+//#define PLL_DEBUG_OUTPUTS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
@@ -252,15 +252,19 @@ void ClockRecoveryFilter::Refresh()
 				else if(tlast != 0)
 				{
 					//Frequency error term
-					//period -= dperiod * 0.006;
-					//period -= dperiod * 0.0001;
+					period -= dperiod * 0.006;
 
 					//Frequency drift term (delta from refclk)
 					//period -= (period - initialPeriod) * 0.0001;
 
 					//Phase error term
-					//period -= dphase * 0.002;
-					period -= dphase * 0.00005;
+					period -= dphase * 0.002;
+
+					//HACK: immediate bang-bang phase shift
+					if(dphase > 0)
+						edgepos -= period / 400;
+					else
+						edgepos += period / 400;
 
 					#ifdef PLL_DEBUG_OUTPUTS
 						debugPeriod->m_offsets.push_back(edgepos + period/2);
