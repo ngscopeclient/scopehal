@@ -32,6 +32,8 @@
 
 using namespace std;
 
+#define PLL_DEBUG_OUTPUTS
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
@@ -49,6 +51,13 @@ ClockRecoveryFilter::ClockRecoveryFilter(const string& color)
 	m_threshname = "Threshold";
 	m_parameters[m_threshname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
 	m_parameters[m_threshname].SetFloatVal(0);
+
+	#ifdef PLL_DEBUG_OUTPUTS
+	AddStream(Unit::UNIT_FS, "period", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit::UNIT_FS, "dphase", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit::UNIT_FS, "dfreq", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit::UNIT_FS, "drift", Stream::STREAM_TYPE_ANALOG);
+	#endif
 }
 
 ClockRecoveryFilter::~ClockRecoveryFilter()
@@ -154,6 +163,13 @@ void ClockRecoveryFilter::Refresh()
 	else
 		tend = GetOffsetScaled(sddin, uddin, din->size()-1);
 
+	#ifdef PLL_DEBUG_OUTPUTS
+	auto debugPeriod = SetupEmptySparseAnalogOutputWaveform(cap, 1);
+	auto debugPhase = SetupEmptySparseAnalogOutputWaveform(cap, 2);
+	auto debugFreq = SetupEmptySparseAnalogOutputWaveform(cap, 3);
+	auto debugDrift = SetupEmptySparseAnalogOutputWaveform(cap, 4);
+	#endif
+
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
 	size_t nedge = 1;
@@ -170,8 +186,6 @@ void ClockRecoveryFilter::Refresh()
 		gating = !GetValue(sgate, ugate, 0);
 
 	int64_t tlast = 0;
-	//LogDebug("--START--\n");
-	//LogDebug("t,period,dphase,dperiod,uiLen\n");
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -231,37 +245,47 @@ void ClockRecoveryFilter::Refresh()
 					uiLen /= numUIs;
 				int64_t dperiod = period - uiLen;
 
-				/*LogDebug("%.10e, %.2f, %.2f, %.2f, %.2f\n",
-					edgepos * SECONDS_PER_FS, period*1e-3f, dphase*1e-3f, dperiod*1e-3f, uiLen*1e-3f);*/
-
 				//If the clock just got ungated, align exactly to the next edge
 				if(was_gating)
 					edgepos = tnext + period;
 
-				else
+				else if(tlast != 0)
 				{
 					//Frequency error term
-					period -= dperiod * 0.006;
+					//period -= dperiod * 0.006;
+					//period -= dperiod * 0.0001;
 
 					//Frequency drift term (delta from refclk)
-					period -= (period - initialPeriod) * 0.0001;
+					//period -= (period - initialPeriod) * 0.0001;
 
 					//Phase error term
-					period -= dphase * 0.002;
-				}
+					//period -= dphase * 0.002;
+					period -= dphase * 0.00005;
 
-				if(period < fnyquist)
-				{
-					LogWarning("PLL attempted to lock to frequency near or above Nyquist - invalid config or undersampled data?\n");
-					nedge = edges.size();
-					break;
-				}
-				if(period > 2*initialPeriod)
-				{
-					LogWarning("PLL attempted to go really slow, what's up? %s\n",
-						Unit(Unit::UNIT_FS).PrettyPrint(period).c_str());
-					nedge = edges.size();
-					break;
+					#ifdef PLL_DEBUG_OUTPUTS
+						debugPeriod->m_offsets.push_back(edgepos + period/2);
+						debugPeriod->m_durations.push_back(period);
+						debugPeriod->m_samples.push_back(period);
+
+						debugPhase->m_offsets.push_back(edgepos + period/2);
+						debugPhase->m_durations.push_back(period);
+						debugPhase->m_samples.push_back(dphase);
+
+						debugFreq->m_offsets.push_back(edgepos + period/2);
+						debugFreq->m_durations.push_back(period);
+						debugFreq->m_samples.push_back(dperiod);
+
+						debugDrift->m_offsets.push_back(edgepos + period/2);
+						debugDrift->m_durations.push_back(period);
+						debugDrift->m_samples.push_back(period - initialPeriod);
+					#endif
+
+					if(period < fnyquist)
+					{
+						LogWarning("PLL attempted to lock to frequency near or above Nyquist\n");
+						nedge = edges.size();
+						break;
+					}
 				}
 			}
 
