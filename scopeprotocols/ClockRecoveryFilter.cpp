@@ -131,6 +131,7 @@ void ClockRecoveryFilter::Refresh()
 
 	//Get nominal period used for the first cycle of the NCO
 	int64_t initialPeriod = round(FS_PER_SECOND / m_parameters[m_baudname].GetFloatVal());
+	int64_t halfPeriod = initialPeriod / 2;
 	int64_t period = initialPeriod;
 
 	//Disallow frequencies higher than Nyquist of the input
@@ -169,8 +170,8 @@ void ClockRecoveryFilter::Refresh()
 		gating = !GetValue(sgate, ugate, 0);
 
 	int64_t tlast = 0;
-	/*LogDebug("--START--\n");
-	LogDebug("t,period,dphase,dperiod,uiLen\n");*/
+	//LogDebug("--START--\n");
+	//LogDebug("t,period,dphase,dperiod,uiLen\n");
 	for(; (edgepos < tend) && (nedge < edges.size()-1); edgepos += period)
 	{
 		float center = period/2;
@@ -212,6 +213,13 @@ void ClockRecoveryFilter::Refresh()
 			{
 				//Find phase error
 				int64_t dphase = (edgepos - tnext) - period;
+
+				//If we're more than half a UI off, assume this is actually part of the next UI
+				if(dphase > halfPeriod)
+					dphase -= period;
+				if(dphase < -halfPeriod)
+					dphase += period;
+
 				total_error += fabs(dphase);
 
 				//Find frequency error
@@ -223,7 +231,7 @@ void ClockRecoveryFilter::Refresh()
 					uiLen /= numUIs;
 				int64_t dperiod = period - uiLen;
 
-				/*LogDebug("%e, %.2f, %.2f, %.2f, %.2f\n",
+				/*LogDebug("%.10e, %.2f, %.2f, %.2f, %.2f\n",
 					edgepos * SECONDS_PER_FS, period*1e-3f, dphase*1e-3f, dperiod*1e-3f, uiLen*1e-3f);*/
 
 				//If the clock just got ungated, align exactly to the next edge
@@ -232,10 +240,13 @@ void ClockRecoveryFilter::Refresh()
 
 				else
 				{
-					//Proportional correction for frequency error
-					period -= dperiod * 0.008;
+					//Frequency error term
+					period -= dperiod * 0.006;
 
-					//Proportional correction for phase error
+					//Frequency drift term (delta from refclk)
+					period -= (period - initialPeriod) * 0.0001;
+
+					//Phase error term
 					period -= dphase * 0.002;
 				}
 
