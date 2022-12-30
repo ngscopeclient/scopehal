@@ -277,7 +277,13 @@ void PCIeGen2LogicalDecoder::Refresh()
 
 								//Skip the rest of the ordered set
 								if(hitTS1 || hitTS2)
+								{
 									indexes[j] += 15;
+
+									//Cycle the LFSR for another 15 bytes
+									for(size_t k=0; k<15; k++)
+										RunScrambler(scramblers[j]);
+								}
 							}
 						}
 						break;
