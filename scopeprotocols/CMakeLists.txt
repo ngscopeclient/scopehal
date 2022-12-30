@@ -103,6 +103,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	PCIeDataLinkDecoder.cpp
 	PCIeGen2LogicalDecoder.cpp
 	PCIeGen3LogicalDecoder.cpp
+	PCIeLinkTrainingDecoder.cpp
 	PCIeTransportDecoder.cpp
 	PeakHoldFilter.cpp
 	PeriodMeasurement.cpp
