@@ -133,10 +133,10 @@ void PCIeGen2LogicalDecoder::Refresh()
 	cap->m_triggerPhase = 0;
 	cap->PrepareForCpuAccess();
 
-	//Find the first comma symbol in each lane so we can synchronize them to each other
-	//TODO: this might fail if we have a partial set of commas right at the start of the capture and there's a few symbols
+	//Find the first skip ordered set (K28.5 K28.0 K28.0 K28.0) in each lane so we can synchronize them to each other
+	//TODO: this might fail if we have a partial set of them right at the start of the capture and there's a few symbols
 	//worth of skew between the probes.
-	//We can improve reliability by searching for the second comma in this case.
+	//We can improve reliability by searching for the second set in this case.
 	vector<size_t> indexes;
 	vector<uint16_t> scramblers;
 	for(ssize_t i=0; i<nports; i++)
@@ -145,18 +145,22 @@ void PCIeGen2LogicalDecoder::Refresh()
 
 		size_t len = in->m_samples.size();
 		size_t j=0;
-		for(; j<len; j++)
+		for(; j<len-3; j++)
 		{
-			auto sym = in->m_samples[j];
-			if(sym.m_control && (sym.m_data == 0xbc) )
+			if( (in->m_samples[j].m_control && (in->m_samples[j].m_data == 0xbc) ) &&
+				(in->m_samples[j+1].m_control && (in->m_samples[j+1].m_data == 0x1c) ) &&
+				(in->m_samples[j+2].m_control && (in->m_samples[j+2].m_data == 0x1c) ) &&
+				(in->m_samples[j+3].m_control && (in->m_samples[j+3].m_data == 0x1c) ) )
+			{
 				break;
+			}
 		}
 
 		indexes.push_back(j);
 		scramblers.push_back(0xffff);
 	}
 
-	//Add "scrambler desynced" symbol from start of waveform until the first comma in lane 0
+	//Add "scrambler desynced" symbol from start of waveform until the first skip in lane 0
 	cap->m_offsets.push_back(0);
 	cap->m_durations.push_back(
 		(in0->m_offsets[indexes[0]] + in0->m_durations[indexes[0]]) * in0->m_timescale +
@@ -195,9 +199,11 @@ void PCIeGen2LogicalDecoder::Refresh()
 			size_t ilast = outlen - 1;
 			bool last_was_skip = false;
 			bool last_was_idle = false;
+			bool last_was_pad = false;
 			if(outlen)
 			{
 				last_was_skip = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_SKIP);
+				last_was_pad = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_PAD);
 				last_was_idle = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_LOGICAL_IDLE);
 			}
 
@@ -216,6 +222,64 @@ void PCIeGen2LogicalDecoder::Refresh()
 					//K28.5 COM
 					case 0xbc:
 						scramblers[j] = 0xffff;
+
+						//Check for TSxx ordered sets
+						//Don't decode them, we have a separate filter for that.
+						//Focus is on identifying and not trying to descramble them.
+						//X+10 to X+15 should be D10.2 (0x4a) for TS1 or D5.2 (0x45) for TS2
+						if(i+15 < inputs[j]->m_samples.size() )
+						{
+							if(
+								//Link ID must be K23.7 PAD or a D character
+								( (data->m_samples[i+1].m_control && data->m_samples[i+1].m_data == 0xf7) ||
+								(!data->m_samples[i+1].m_control) ) &&
+
+								//Lane ID must be K23.7 or data character with value <= 31
+								( (data->m_samples[i+2].m_control && data->m_samples[i+2].m_data == 0xf7) ||
+								(!data->m_samples[i+2].m_control && (data->m_samples[i+2].m_data <= 31) ) ) &&
+
+								//Rate ID must have bit 1 set
+								(!data->m_samples[i+4].m_control && (data->m_samples[i+4].m_data & 2) ) )
+							{
+								bool hitTS1 = true;
+								bool hitTS2 = true;
+
+								for(size_t k=0; k<6; k++)
+								{
+									if(data->m_samples[i+10+k].m_control)
+									{
+										hitTS1 = false;
+										hitTS2 = false;
+										break;
+									}
+
+									if(data->m_samples[i+10+k].m_data != 0x4a)
+										hitTS1 = false;
+									if(data->m_samples[i+10+k].m_data != 0x45)
+										hitTS2 = false;
+								}
+
+								auto setEnd = data->m_offsets[i+15] + data->m_durations[i+15];
+
+								if(hitTS1)
+								{
+									cap->m_offsets.push_back(off);
+									cap->m_durations.push_back(setEnd * data->m_timescale - off);
+									cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_TS1));
+								}
+
+								if(hitTS2)
+								{
+									cap->m_offsets.push_back(off);
+									cap->m_durations.push_back(setEnd * data->m_timescale - off);
+									cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_TS2));
+								}
+
+								//Skip the rest of the ordered set
+								if(hitTS1 || hitTS2)
+									indexes[j] += 15;
+							}
+						}
 						break;
 
 					//K28.0 SKP
@@ -256,6 +320,30 @@ void PCIeGen2LogicalDecoder::Refresh()
 						cap->m_durations.push_back(dur);
 						cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_START_TLP));
 						in_packet = true;
+						break;
+
+					//K23.7 PAD
+					case 0xf7:
+						{
+							//Prefer to extend an existing symbol
+							if(last_was_pad)
+								cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
+
+							//Nope, need to make a new symbol
+							else
+							{
+								//If we had a gap from a COM character, stretch rearwards into it
+								int64_t start = off;
+								if(outlen)
+									start = cap->m_offsets[ilast] + cap->m_durations[ilast];
+
+								cap->m_offsets.push_back(start);
+								cap->m_durations.push_back(end - start);
+								cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_PAD));
+							}
+
+							in_packet = false;
+						}
 						break;
 
 					//K29.7 END
@@ -353,12 +441,15 @@ std::string PCIeLogicalWaveform::GetColor(size_t i)
 		case PCIeLogicalSymbol::TYPE_NO_SCRAMBLER:
 		case PCIeLogicalSymbol::TYPE_LOGICAL_IDLE:
 		case PCIeLogicalSymbol::TYPE_SKIP:
+		case PCIeLogicalSymbol::TYPE_PAD:
 			return StandardColors::colors[StandardColors::COLOR_IDLE];
 
 		case PCIeLogicalSymbol::TYPE_START_TLP:
 		case PCIeLogicalSymbol::TYPE_START_DLLP:
 		case PCIeLogicalSymbol::TYPE_END:
 		case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
+		case PCIeLogicalSymbol::TYPE_TS1:
+		case PCIeLogicalSymbol::TYPE_TS2:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
@@ -387,6 +478,14 @@ string PCIeLogicalWaveform::GetText(size_t i)
 
 		case PCIeLogicalSymbol::TYPE_SKIP:
 			return "Skip";
+
+		case PCIeLogicalSymbol::TYPE_PAD:
+			return "Pad";
+
+		case PCIeLogicalSymbol::TYPE_TS1:
+			return "TS1";
+		case PCIeLogicalSymbol::TYPE_TS2:
+			return "TS2";
 
 		case PCIeLogicalSymbol::TYPE_START_TLP:
 			return "TLP";

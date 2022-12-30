@@ -51,7 +51,10 @@ public:
 		TYPE_END_BAD,			//End a packet, but mark it as to be ignored
 		TYPE_PAYLOAD_DATA,		//A byte of TLP or DLLP data
 		TYPE_END_DATA_STREAM,	//End of a data stream
-		TYPE_ERROR
+		TYPE_ERROR,
+		TYPE_TS1,				//Training set
+		TYPE_TS2,
+		TYPE_PAD
 	} m_type;
 
 	uint8_t m_data;
