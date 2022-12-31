@@ -46,6 +46,7 @@ using namespace std;
 PCIeLinkTrainingDecoder::PCIeLinkTrainingDecoder(const string& color)
 	: PacketDecoder(color, CAT_BUS)
 {
+	ClearStreams();
 	AddProtocolStream("packets");
 	AddProtocolStream("states");
 	CreateInput("lane");
@@ -83,10 +84,14 @@ vector<string> PCIeLinkTrainingDecoder::GetHeaders()
 	ret.push_back("Lane");
 	ret.push_back("Num FTS");
 	ret.push_back("Rates");
-	//TODO: Train CTL
+	ret.push_back("Flags");
 	return ret;
 }
 
+bool PCIeLinkTrainingDecoder::GetShowDataColumn()
+{
+	return false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
@@ -223,8 +228,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 		cap->m_offsets.push_back(din->m_offsets[i+1]);
 		cap->m_durations.push_back(din->m_durations[i+1]);
 		auto linkid = din->m_samples[i+1].m_data;
-		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LINK_NUMBER,
-			linkid));
+		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LINK_NUMBER, linkid));
 		if(linkid == 0xf7)
 			pack->m_headers["Link"] = "Unassigned";
 		else
@@ -234,8 +238,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 		cap->m_offsets.push_back(din->m_offsets[i+2]);
 		cap->m_durations.push_back(din->m_durations[i+2]);
 		auto laneid = din->m_samples[i+2].m_data;
-		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LANE_NUMBER,
-			laneid));
+		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LANE_NUMBER, laneid));
 		if(laneid == 0xf7)
 			pack->m_headers["Lane"] = "Unassigned";
 		else
@@ -245,16 +248,14 @@ void PCIeLinkTrainingDecoder::Refresh()
 		auto numFTS = din->m_samples[i+3].m_data;
 		cap->m_offsets.push_back(din->m_offsets[i+3]);
 		cap->m_durations.push_back(din->m_durations[i+3]);
-		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_NUM_FTS,
-			numFTS));
+		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_NUM_FTS, numFTS));
 		pack->m_headers["Num FTS"] = to_string(numFTS);
 
 		//Rate ID
 		cap->m_offsets.push_back(din->m_offsets[i+4]);
 		cap->m_durations.push_back(din->m_durations[i+4]);
 		auto rates = din->m_samples[i+4].m_data;
-		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_RATE_ID,
-			rates));
+		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_RATE_ID, rates));
 		string srates;
 		if(rates & 2)
 			srates += "2.5G ";
@@ -267,6 +268,24 @@ void PCIeLinkTrainingDecoder::Refresh()
 		pack->m_headers["Rates"] = srates;
 
 		//Training control
+		cap->m_offsets.push_back(din->m_offsets[i+5]);
+		cap->m_durations.push_back(din->m_durations[i+5]);
+		auto flags = din->m_samples[i+5].m_data;
+		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_TRAIN_CTL, flags));
+		string sflags;
+		if(flags & 1)
+			sflags += "Hot reset ";
+		if(flags & 2)
+			sflags += "Disable link ";
+		if(flags & 4)
+			sflags += "Loopback ";
+		if(flags & 8)
+			sflags += "Disable scrambling ";
+		if(flags & 0x10)
+			sflags += "Compliance Receive ";
+		if(sflags == "")
+			sflags = "None";
+		pack->m_headers["Flags"] = sflags;
 
 		//TS ID
 		cap->m_offsets.push_back(din->m_offsets[i+6]);
@@ -360,6 +379,35 @@ void PCIeLinkTrainingDecoder::Refresh()
 	scap->MarkModifiedFromCpu();
 }
 
+bool PCIeLinkTrainingDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+{
+	//If all headers are the same, it's mergeable
+	if(first->m_headers == next->m_headers)
+		return true;
+
+	return false;
+}
+
+Packet* PCIeLinkTrainingDecoder::CreateMergedHeader(Packet* pack, size_t i)
+{
+	//Copy everything
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;
+	ret->m_headers = pack->m_headers;
+	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+
+	//Extend length
+	for(; i<m_packets.size(); i++)
+	{
+		if(CanMerge(pack, nullptr, m_packets[i]))
+			ret->m_len = (m_packets[i]->m_offset + m_packets[i]->m_len) - pack->m_offset;
+		else
+			break;
+	}
+
+	return ret;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PCIeLinkTrainingWaveform
@@ -373,6 +421,7 @@ string PCIeLinkTrainingWaveform::GetColor(size_t i)
 		case PCIeLinkTrainingSymbol::TYPE_HEADER:
 		case PCIeLinkTrainingSymbol::TYPE_NUM_FTS:
 		case PCIeLinkTrainingSymbol::TYPE_RATE_ID:
+		case PCIeLinkTrainingSymbol::TYPE_TRAIN_CTL:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case PCIeLinkTrainingSymbol::TYPE_TS_ID:
@@ -429,6 +478,27 @@ string PCIeLinkTrainingWaveform::GetText(size_t i)
 		case PCIeLinkTrainingSymbol::TYPE_NUM_FTS:
 			snprintf(tmp, sizeof(tmp), "Need %d FTS", s.m_data);
 			return tmp;
+
+		case PCIeLinkTrainingSymbol::TYPE_TRAIN_CTL:
+			{
+				string ret;
+				if(s.m_data & 1)
+					ret += "Hot reset ";
+				if(s.m_data & 2)
+					ret += "Disable link ";
+				if(s.m_data & 4)
+					ret += "Loopback ";
+				if(s.m_data & 8)
+					ret += "Disable scrambling ";
+				if(s.m_data & 0x10)
+					ret += "Compliance Receive ";
+
+				if(ret == "")
+					ret = "No flags";
+
+				return ret;
+			}
+			break;
 
 		case PCIeLinkTrainingSymbol::TYPE_RATE_ID:
 			{
