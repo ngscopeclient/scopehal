@@ -44,7 +44,7 @@ using namespace std;
 // Construction / destruction
 
 PCIeLinkTrainingDecoder::PCIeLinkTrainingDecoder(const string& color)
-	: Filter(color, CAT_BUS)
+	: PacketDecoder(color, CAT_BUS)
 {
 	AddProtocolStream("packets");
 	AddProtocolStream("states");
@@ -75,11 +75,26 @@ string PCIeLinkTrainingDecoder::GetProtocolName()
 	return "PCIe Link Training";
 }
 
+vector<string> PCIeLinkTrainingDecoder::GetHeaders()
+{
+	vector<string> ret;
+	ret.push_back("Type");
+	ret.push_back("Link");
+	ret.push_back("Lane");
+	ret.push_back("Num FTS");
+	ret.push_back("Rates");
+	//TODO: Train CTL
+	return ret;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
 void PCIeLinkTrainingDecoder::Refresh()
 {
+	ClearPackets();
+
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
@@ -179,43 +194,77 @@ void PCIeLinkTrainingDecoder::Refresh()
 		if(!hitTS1 && !hitTS2)
 			continue;
 
+		Packet* pack = new Packet;
+		m_packets.push_back(pack);
+		pack->m_offset = din->m_offsets[i] * din->m_timescale + din->m_triggerPhase;
+		pack->m_len = (din->m_offsets[i+15] + din->m_durations[i+15] - din->m_offsets[i]) * din->m_timescale;
+
+		pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
+
 		//Add header symbol
 		if(hitTS1)
 		{
 			cap->m_offsets.push_back(din->m_offsets[i]);
 			cap->m_durations.push_back(din->m_durations[i]);
 			cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_HEADER, 1));
+
+			pack->m_headers["Type"] = "TS1";
 		}
 		else
 		{
 			cap->m_offsets.push_back(din->m_offsets[i]);
 			cap->m_durations.push_back(din->m_durations[i]);
 			cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_HEADER, 2));
+
+			pack->m_headers["Type"] = "TS2";
 		}
 
 		//Link number
 		cap->m_offsets.push_back(din->m_offsets[i+1]);
 		cap->m_durations.push_back(din->m_durations[i+1]);
+		auto linkid = din->m_samples[i+1].m_data;
 		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LINK_NUMBER,
-			din->m_samples[i+1].m_data));
+			linkid));
+		if(linkid == 0xf7)
+			pack->m_headers["Link"] = "Unassigned";
+		else
+			pack->m_headers["Link"] = to_string(linkid);
 
 		//Lane number
 		cap->m_offsets.push_back(din->m_offsets[i+2]);
 		cap->m_durations.push_back(din->m_durations[i+2]);
+		auto laneid = din->m_samples[i+2].m_data;
 		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_LANE_NUMBER,
-			din->m_samples[i+2].m_data));
+			laneid));
+		if(laneid == 0xf7)
+			pack->m_headers["Lane"] = "Unassigned";
+		else
+			pack->m_headers["Lane"] = to_string(laneid);
 
 		//Num FTS
+		auto numFTS = din->m_samples[i+3].m_data;
 		cap->m_offsets.push_back(din->m_offsets[i+3]);
 		cap->m_durations.push_back(din->m_durations[i+3]);
 		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_NUM_FTS,
-			din->m_samples[i+3].m_data));
+			numFTS));
+		pack->m_headers["Num FTS"] = to_string(numFTS);
 
 		//Rate ID
 		cap->m_offsets.push_back(din->m_offsets[i+4]);
 		cap->m_durations.push_back(din->m_durations[i+4]);
+		auto rates = din->m_samples[i+4].m_data;
 		cap->m_samples.push_back(PCIeLinkTrainingSymbol(PCIeLinkTrainingSymbol::TYPE_RATE_ID,
-			din->m_samples[i+4].m_data));
+			rates));
+		string srates;
+		if(rates & 2)
+			srates += "2.5G ";
+		if(rates & 4)
+			srates += "5G ";
+		if(rates & 8)
+			srates += "8G ";
+		if(rates & 0x80)
+			srates += "SpeedChange";
+		pack->m_headers["Rates"] = srates;
 
 		//Training control
 
@@ -428,8 +477,6 @@ string PCIeLTSSMWaveform::GetColor(size_t i)
 
 string PCIeLTSSMWaveform::GetText(size_t i)
 {
-	char tmp[32];
-
 	const PCIeLTSSMSymbol& s = m_samples[i];
 
 	switch(s.m_type)

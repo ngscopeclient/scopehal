@@ -36,6 +36,8 @@
 #ifndef PCIe2LinkTrainingDecoder_h
 #define PCIe2LinkTrainingDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+
 class PCIeLinkTrainingSymbol
 {
 public:
@@ -115,15 +117,17 @@ public:
 };
 
 /**
-	@brief Decoder for PCIe gen 1/2 logical sub-block
+	@brief Decoder for PCIe gen 1/2 link training
  */
-class PCIeLinkTrainingDecoder : public Filter
+class PCIeLinkTrainingDecoder : public PacketDecoder
 {
 public:
 	PCIeLinkTrainingDecoder(const std::string& color);
 	virtual ~PCIeLinkTrainingDecoder();
 
 	virtual void Refresh();
+
+	virtual std::vector<std::string> GetHeaders();
 
 	static std::string GetProtocolName();
 
