@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -141,6 +141,8 @@ void PCIeLinkTrainingDecoder::Refresh()
 	//Main decode loop
 	for(; i<end; i++)
 	{
+		//TODO: If we had a huge gap since the last symbol, jump to DETECT state
+
 		//All training sets start with a comma. If we see anything else, ignore it.
 		if(!din->m_samples[i].m_control || (din->m_samples[i].m_data != 0xbc) )
 		{
@@ -163,6 +165,19 @@ void PCIeLinkTrainingDecoder::Refresh()
 			}
 
 			continue;
+		}
+
+		//Discard SKIP ordered sets (K28.5 K28.0 K28.0 K28.0)
+		if(i+3 < end)
+		{
+			if(
+				(din->m_samples[i+1].m_control && (din->m_samples[i+1].m_data == 0x1c) ) &&
+				(din->m_samples[i+2].m_control && (din->m_samples[i+2].m_data == 0x1c) ) &&
+				(din->m_samples[i+3].m_control && (din->m_samples[i+3].m_data == 0x1c) ) )
+			{
+				i += 3;
+				continue;
+			}
 		}
 
 		//Link ID must be K23.7 PAD or a D character
@@ -198,6 +213,16 @@ void PCIeLinkTrainingDecoder::Refresh()
 		//If not a training set, skip it
 		if(!hitTS1 && !hitTS2)
 			continue;
+
+		//If we're in L0 and see a training set, we're now in recovery
+		if(lstate == PCIeLTSSMSymbol::TYPE_L0)
+		{
+			lstate = PCIeLTSSMSymbol::TYPE_RECOVERY;
+
+			scap->m_offsets.push_back(din->m_offsets[i]);
+			scap->m_durations.push_back(din->m_durations[i]);
+			scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY));
+		}
 
 		Packet* pack = new Packet;
 		m_packets.push_back(pack);
@@ -264,7 +289,10 @@ void PCIeLinkTrainingDecoder::Refresh()
 		if(rates & 8)
 			srates += "8G ";
 		if(rates & 0x80)
+		{
 			srates += "SpeedChange";
+			pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_COMMAND];
+		}
 		pack->m_headers["Rates"] = srates;
 
 		//Training control
@@ -312,6 +340,14 @@ void PCIeLinkTrainingDecoder::Refresh()
 				}
 				break;
 
+			case PCIeLTSSMSymbol::TYPE_RECOVERY:
+				{
+					//Extend the current state
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
+				}
+				break;
+
 			case PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE:
 
 				//If we're sending TS2s we're in Polling.Configuration now
@@ -324,7 +360,7 @@ void PCIeLinkTrainingDecoder::Refresh()
 					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION));
 				}
 
-				//Extend the Polling.Active symbol to the current state
+				//Extend the current state
 				else
 				{
 					size_t nout = scap->m_offsets.size() - 1;
@@ -535,6 +571,7 @@ string PCIeLTSSMWaveform::GetColor(size_t i)
 		case PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE:
 		case PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION:
 		case PCIeLTSSMSymbol::TYPE_CONFIGURATION:
+		case PCIeLTSSMSymbol::TYPE_RECOVERY:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case PCIeLTSSMSymbol::TYPE_L0:
@@ -565,6 +602,9 @@ string PCIeLTSSMWaveform::GetText(size_t i)
 
 		case PCIeLTSSMSymbol::TYPE_L0:
 			return "L0";
+
+		case PCIeLTSSMSymbol::TYPE_RECOVERY:
+			return "Recovery";
 
 		default:
 			return "ERROR";
