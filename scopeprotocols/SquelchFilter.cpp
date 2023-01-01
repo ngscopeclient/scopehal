@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -95,16 +95,25 @@ void SquelchFilter::Refresh()
 	auto holdtime_fs = m_parameters[m_holdtimename].GetIntVal();
 	size_t holdtime_samples = holdtime_fs / din->m_timescale;
 
-	auto dout = SetupEmptyUniformDigitalOutputWaveform(din, 0);
-	dout->Resize(len);
+	auto dout = SetupEmptySparseDigitalOutputWaveform(din, 0);
 	dout->PrepareForCpuAccess();
 
-	bool open = false;
+	//Add initial sample
+	bool open = din->m_samples[0] > threshold;
+	dout->m_offsets.push_back(0);
+	dout->m_durations.push_back(1);
+	dout->m_samples.push_back(open);
+
 	size_t topen = 0;
-	for(size_t i=0; i<len; i++)
+	for(size_t i=1; i<len; i++)
 	{
+		//Extend previous sample to start of this one
+		size_t iout = dout->m_offsets.size() - 1;
+		dout->m_durations[iout] = i - dout->m_offsets[iout];
+
 		//Signal amplitude is above threshold - open squelch immediately
 		//TODO: attack time?
+		bool was_open = open;
 		if(din->m_samples[i] > threshold)
 		{
 			open = true;
@@ -115,8 +124,20 @@ void SquelchFilter::Refresh()
 		else if(open && ( (i - topen) > holdtime_samples) )
 			open = false;
 
-		dout->m_samples[i] = open;
+		if(open == was_open)
+			continue;
+
+		//If we get here we're adding a new sample
+		dout->m_offsets.push_back(i);
+		dout->m_durations.push_back(1);
+		dout->m_samples.push_back(open);
 	}
+
+	//Add a duplicate sample at the very end
+	//TODO: this shouldn't be needed but glscopeclient and some filters are picky?
+	dout->m_offsets.push_back(len);
+	dout->m_durations.push_back(1);
+	dout->m_samples.push_back(open);
 
 	dout->MarkModifiedFromCpu();
 }
