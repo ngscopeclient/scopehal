@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -173,7 +173,6 @@ void ClockRecoveryFilter::Refresh()
 	//The actual PLL NCO
 	//TODO: use the real fibre channel PLL.
 	size_t nedge = 1;
-	//LogDebug("n, delta, period, freq_ghz, cycles_open_loop\n");
 	int64_t edgepos = edges[0];
 	bool value = false;
 	int64_t total_error = 0;
@@ -194,7 +193,7 @@ void ClockRecoveryFilter::Refresh()
 		bool was_gating = gating;
 		if(gate != nullptr)
 		{
-			while(igate < edges.size()-1)
+			while(igate < gate->size()-1)
 			{
 				//See if this edge is within the region
 				int64_t a = GetOffsetScaled(sgate, ugate, igate);
