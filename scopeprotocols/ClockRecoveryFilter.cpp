@@ -211,6 +211,40 @@ void ClockRecoveryFilter::Refresh()
 				else
 				{
 					gating = !GetValue(sgate, ugate, igate);
+
+					//If the clock just got ungated, reset the PLL
+					if(!gating && was_gating)
+					{
+						LogDebug("Clock ungated (at %s)!\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
+						LogIndenter li;
+
+						//Find the median pulse width in the next few edges
+						//(this is likely either our UI width or an integer multiple thereof)
+						vector<int64_t> lengths;
+						for(size_t i=1; i<=128; i++)
+						{
+							if(i + nedge >= edges.size())
+								break;
+							lengths.push_back(edges[nedge+i] - edges[nedge+i-1]);
+						}
+						std::sort(lengths.begin(), lengths.end());
+						auto median = lengths[lengths.size() / 2];
+						LogDebug("Median of next %zu edges: %s\n",
+							lengths.size(),
+							Unit(Unit::UNIT_FS).PrettyPrint(median).c_str());
+
+						//TODO: consider if this might be a multi bit period, rather than the fundamental,
+						//depending on the line coding in use? (e.g. TMDS)
+
+						//For now, assume that this length is our actual pulse width and use it as our period
+						period = median;
+						initialPeriod = median;
+
+						//Align exactly to the next edge
+						int64_t tnext = edges[nedge];
+						edgepos = tnext + period;
+					}
+
 					break;
 				}
 			}
@@ -244,11 +278,7 @@ void ClockRecoveryFilter::Refresh()
 					uiLen /= numUIs;
 				int64_t dperiod = period - uiLen;
 
-				//If the clock just got ungated, align exactly to the next edge
-				if(was_gating)
-					edgepos = tnext + period;
-
-				else if(tlast != 0)
+				if(tlast != 0)
 				{
 					//Frequency error term
 					period -= dperiod * 0.006;
