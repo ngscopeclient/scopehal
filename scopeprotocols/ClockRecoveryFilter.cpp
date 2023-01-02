@@ -215,7 +215,7 @@ void ClockRecoveryFilter::Refresh()
 					//If the clock just got ungated, reset the PLL
 					if(!gating && was_gating)
 					{
-						LogDebug("Clock ungated (at %s)!\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
+						LogTrace("CDR ungated (at %s)\n", Unit(Unit::UNIT_FS).PrettyPrint(edgepos).c_str());
 						LogIndenter li;
 
 						//Find the median pulse width in the next few edges
@@ -229,16 +229,30 @@ void ClockRecoveryFilter::Refresh()
 						}
 						std::sort(lengths.begin(), lengths.end());
 						auto median = lengths[lengths.size() / 2];
-						LogDebug("Median of next %zu edges: %s\n",
+						LogTrace("Median of next %zu edges: %s\n",
 							lengths.size(),
 							Unit(Unit::UNIT_FS).PrettyPrint(median).c_str());
 
 						//TODO: consider if this might be a multi bit period, rather than the fundamental,
 						//depending on the line coding in use? (e.g. TMDS)
 
+						//Look up/down and average everything kinda close to the median (within 25%)
+						int64_t sum = 0;
+						int64_t navg = 0;
+						for(auto w : lengths)
+						{
+							if( (w >= 0.75*median) && (w <= 1.25*median) )
+							{
+								sum += w;
+								navg ++;
+							}
+						}
+						int64_t avg = sum / navg;
+						LogTrace("Average of edges near median: %s\n",	Unit(Unit::UNIT_FS).PrettyPrint(avg).c_str());
+
 						//For now, assume that this length is our actual pulse width and use it as our period
-						period = median;
-						initialPeriod = median;
+						period = avg;
+						initialPeriod = period;
 
 						//Align exactly to the next edge
 						int64_t tnext = edges[nedge];
