@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -111,73 +111,31 @@ void IBM8b10bDecoder::Refresh()
 	//Record the value of the data stream at each clock edge
 	//TODO: allow single rate clocks too?
 	SparseDigitalWaveform data;
+	SparseDigitalWaveform wsquelch;
 	SampleOnAnyEdgesBase(din, clkin, data);
 	data.PrepareForCpuAccess();
 
-	//Look for commas in the data stream
-	//TODO: make this more efficient?
-	size_t max_commas = 0;
-	size_t max_offset = 0;
-	for(size_t offset=0; offset < 10; offset ++)
-	{
-		size_t num_commas = 0;
-		size_t dlen = data.m_samples.size() - 20;
-		size_t num_errors = 0;
-
-		//Only check the first 100K UIs (10K symbols) for alignment
-		//to avoid wasting a ton of time repeatedly decoding a huge capture
-		dlen = min(dlen, (size_t)100000);
-
-		for(size_t i=0; i<dlen; i += 10)
-		{
-			//Check if we have a comma (five identical bits) anywhere in the data stream
-			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
-			bool comma = true;
-			for(int j=3; j<=6; j++)
-			{
-				if(data.m_samples[i+offset+j] != data.m_samples[i+offset+2])
-				{
-					comma = false;
-					break;
-				}
-			}
-
-			//Comma is always exactly five identical bits (so 1 and 7 must be different)
-			if(data.m_samples[i+offset+1] == data.m_samples[i+offset+2])
-				comma = false;
-			if(data.m_samples[i+offset+7] == data.m_samples[i+offset+2])
-				comma = false;
-
-			//Count number of 0s and 1s in the symbol
-			//Should always be equal (5/5) or two greater (4/6 or 6/4)
-			int nones = 0;
-			for(int j=0; j<10; j++)
-				nones += data.m_samples[i+offset+j];
-			if( (nones != 4) && (nones != 5) && (nones != 6) )
-				num_errors ++;
-
-			if(comma)
-				num_commas ++;
-		}
-
-		//Allow a *few* errors, but discard any potential alignment with more errors than commas
-		if(num_errors > num_commas)
-		{}
-
-		else if(num_commas > max_commas)
-		{
-			max_commas = num_commas;
-			max_offset = offset;
-		}
-		LogTrace("Found %zu commas and %zu errors at offset %zu\n", num_commas, num_errors, offset);
-	}
-
 	//Decode the actual data
-	bool first = true;
 	int last_disp = -1;
+	bool first = true;
 	size_t dlen = data.m_samples.size() - 11;
-	for(size_t i=max_offset; i<dlen; i+= 10)
+	int64_t lastSymbolLength = 0;
+	int64_t lastSymbolEnd = 0;
+	int64_t lastSymbolStart = 0;
+	for(size_t i=0; i<dlen;i+=10)
 	{
+		//Re-synchronize at start of waveform or if squelch is reopening
+		//If we have a gap
+		if(i == 0)
+			first = true;
+		if( (data.m_offsets[i] - lastSymbolEnd) > 3*lastSymbolLength)
+			first = true;
+		if(first)
+		{
+			LogTrace("Realigning at t=%s\n", Unit(Unit::UNIT_FS).PrettyPrint(data.m_offsets[i]).c_str());
+			Align(data, i);
+		}
+
 		//5b/6b decode
 
 		uint8_t code6 =
@@ -321,7 +279,6 @@ void IBM8b10bDecoder::Refresh()
 		}
 
 		bool disperr = false;
-		//int old_disp = last_disp;
 		if(total_disp > 0 && last_disp > 0)
 		{
 			disperr = true;
@@ -346,37 +303,98 @@ void IBM8b10bDecoder::Refresh()
 		//Horizontally shift the decoded symbol back by half a UI
 		//since the recovered clock edge is in the middle of the UI.
 		//We want the decoded signal boundaries to line up with the data edge, not the middle of the UI.
-		cap->m_offsets.push_back(data.m_offsets[i] - data.m_durations[i]/2);
-
-		cap->m_durations.push_back(data.m_offsets[i+10] - data.m_offsets[i]);
-		cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5, last_disp));
-
-		if(err5 || err3 || disperr)
+		auto symbolStart = data.m_offsets[i] - data.m_durations[i]/2;
+		auto symbolLength = data.m_offsets[i+10] - data.m_offsets[i];
+		if( (symbolStart - lastSymbolStart) > 5*symbolLength)
 		{
-			/*LogDebug(
-				"Symbol %zu (ctl5 = %d, err5 = %d, err3=%d, disperr=%d, code3=%d, code5=%d, "
-					"old_disp = %d, total_disp = %d, disp3 = %d, disp5 = %d)\n",
-				i,
-				ctl5, err5, err3, disperr, code3, code5, old_disp, total_disp, disp3, disp5);*/
+			LogTrace("Sync lost (big gap)\n");
+			first = true;
 		}
-		/*
 		else
 		{
-			if(ctl5)
-				LogDebug("K%d.%d, disp=%d (old_disp = %d, disp3=%d, disp5=%d)\n",
-					code5, code3, last_disp, old_disp, disp3, disp5);
-			else
-				LogDebug("D%d.%d, disp=%d (old_disp = %d, disp3=%d, disp5=%d)\n",
-					code5, code3, last_disp, old_disp,disp3, disp5);
+			cap->m_offsets.push_back(symbolStart);
+			cap->m_durations.push_back(lastSymbolLength);
+			cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5, last_disp));
 		}
-		*/
+
+		lastSymbolLength = symbolLength;
+		lastSymbolEnd = symbolStart + lastSymbolEnd;
+		lastSymbolStart = symbolStart;
 	}
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
 }
 
-std::string IBM8b10bWaveform::GetColor(size_t i)
+void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
+{
+	//Look for commas in the data stream
+	//TODO: make this more efficient?
+	size_t max_commas = 0;
+	size_t max_offset = 0;
+	size_t dend = data.m_samples.size() - 20;
+	for(size_t offset=0; offset < 10; offset ++)
+	{
+		size_t num_commas = 0;
+		size_t num_errors = 0;
+
+		//Only check the first 20K UIs (2K symbols) for alignment
+		//to avoid wasting a ton of time repeatedly decoding a huge capture
+		for(size_t delta=0; delta<20000; delta += 10)
+		{
+			size_t base = i + offset + delta;
+			if(base > dend)
+				break;
+
+			//Check if we have a comma (five identical bits) anywhere in the data stream
+			//Commas are always at positions 2...6 within the symbol (left-right bit ordering)
+			bool comma = true;
+			for(int j=3; j<=6; j++)
+			{
+				if(data.m_samples[base+j] != data.m_samples[base+2])
+				{
+					comma = false;
+					break;
+				}
+			}
+
+			//Comma is always exactly five identical bits (so 1 and 7 must be different)
+			if(data.m_samples[base+1] == data.m_samples[base+2])
+				comma = false;
+			if(data.m_samples[base+7] == data.m_samples[base+2])
+				comma = false;
+
+			//Count number of 0s and 1s in the symbol
+			//Should always be equal (5/5) or two greater (4/6 or 6/4)
+			int nones = 0;
+			for(int j=0; j<10; j++)
+				nones += data.m_samples[base+j];
+			if( (nones != 4) && (nones != 5) && (nones != 6) )
+				num_errors ++;
+
+			if(comma)
+				num_commas ++;
+		}
+
+		//Allow a *few* errors, but discard any potential alignment with more errors than commas
+		if(num_errors > num_commas)
+		{}
+
+		else if(num_commas > max_commas)
+		{
+			max_commas = num_commas;
+			max_offset = offset;
+		}
+		LogTrace("Found %zu commas and %zu errors at offset %zu\n", num_commas, num_errors, offset);
+	}
+
+	i += max_offset;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// IBM8b10bWaveform
+
+string IBM8b10bWaveform::GetColor(size_t i)
 {
 	const IBM8b10bSymbol& s = m_samples[i];
 
