@@ -146,45 +146,48 @@ void PCIeLinkTrainingDecoder::Refresh()
 	//Main decode loop
 	for(; i<end; i++)
 	{
-		//If we see a K28.3 we're entering DETECT state (electrical idle)
+		//If we see a K28.3 we're entering electrical idle
 		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x7c) )
 		{
-			if(lstate != PCIeLTSSMSymbol::TYPE_DETECT)
+			//If in Recovery.Speed transition to Recovery.RcvrLock
+			if(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED)
 			{
 				//Extend previous state to start of this symbol
 				size_t nout = scap->m_offsets.size() - 1;
 				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
-				//Enter DETECT state
-				lstate = PCIeLTSSMSymbol::TYPE_DETECT;
+				//Enter Recovery.RcvrLock state
+				lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK;
 				scap->m_offsets.push_back(din->m_offsets[i]);
 				scap->m_durations.push_back(din->m_durations[i]);
-				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK));
 			}
 			continue;
 		}
 
-		//If we see a K28.7 we're exiting electrical idle and entering Polling.Active
+		//If we see a K28.7 we're exiting electrical idle
 		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xfc) )
 		{
-			if(lstate == PCIeLTSSMSymbol::TYPE_DETECT)
+			//Skip all subsequent K28.7 symbols
+			while(i < end)
 			{
-				size_t nout = scap->m_offsets.size() - 1;
-				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
-
-				lstate = PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE;
-
-				scap->m_offsets.push_back(din->m_offsets[i]);
-				scap->m_durations.push_back(din->m_durations[i]);
-				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE));
+				if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xfc) )
+					i++;
+				else
+					break;
 			}
+
+			//Next symbol is expected to be a D10.2. If so, skip it.
+			if(!din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x4a) )
+				continue;
 		}
 
 		//All training sets start with a comma. If we see anything else, ignore it.
 		if(!din->m_samples[i].m_control || (din->m_samples[i].m_data != 0xbc) )
 		{
-			//If in Configuration state, this means we're now in L0
-			if(lstate == PCIeLTSSMSymbol::TYPE_CONFIGURATION)
+			//If in Configuration or RcvrConfig state, this means we're now in L0
+			if( (lstate == PCIeLTSSMSymbol::TYPE_CONFIGURATION) ||
+				(lstate == PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG) )
 			{
 				lstate = PCIeLTSSMSymbol::TYPE_L0;
 
@@ -194,7 +197,6 @@ void PCIeLinkTrainingDecoder::Refresh()
 			}
 
 			//if in L0 state, extend
-			//TODO: handle recovery
 			if(lstate == PCIeLTSSMSymbol::TYPE_L0)
 			{
 				size_t nout = scap->m_offsets.size() - 1;
@@ -250,16 +252,6 @@ void PCIeLinkTrainingDecoder::Refresh()
 		//If not a training set, skip it
 		if(!hitTS1 && !hitTS2)
 			continue;
-
-		//If we're in L0 and see a training set, we're now in recovery
-		if(lstate == PCIeLTSSMSymbol::TYPE_L0)
-		{
-			lstate = PCIeLTSSMSymbol::TYPE_RECOVERY;
-
-			scap->m_offsets.push_back(din->m_offsets[i]);
-			scap->m_durations.push_back(din->m_durations[i]);
-			scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY));
-		}
 
 		Packet* pack = new Packet;
 		m_packets.push_back(pack);
@@ -360,6 +352,15 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 		switch(lstate)
 		{
+			//If we're in L0 and see a training set, we're now in recovery
+			case PCIeLTSSMSymbol::TYPE_L0:
+				lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK;
+
+				scap->m_offsets.push_back(din->m_offsets[i]);
+				scap->m_durations.push_back(din->m_durations[i]);
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK));
+				break;
+
 			case PCIeLTSSMSymbol::TYPE_DETECT:
 
 				//Add a Detect symbol from time zero to the first TS1
@@ -376,12 +377,37 @@ void PCIeLinkTrainingDecoder::Refresh()
 				}
 				break;
 
-			case PCIeLTSSMSymbol::TYPE_RECOVERY:
+			case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK:
+				//If we have the speed change bit, we're now in Recovery.Speed
+				if(rates & 0x80)
 				{
-					//Extend the current state
+					lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED;
+
+					scap->m_offsets.push_back(din->m_offsets[i]);
+					scap->m_durations.push_back(din->m_durations[i]);
+					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED));
+				}
+
+				//Otherwise, got to Recovery.RcvrCfg
+				else
+				{
+					lstate = PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG;
+
+					scap->m_offsets.push_back(din->m_offsets[i]);
+					scap->m_durations.push_back(din->m_durations[i]);
+					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG));
+				}
+				break;
+
+			case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG:
+				{
+					//Extend
 					size_t nout = scap->m_offsets.size() - 1;
 					scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
 				}
+				break;
+
+			case PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED:
 				break;
 
 			case PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE:
@@ -432,9 +458,6 @@ void PCIeLinkTrainingDecoder::Refresh()
 					size_t nout = scap->m_offsets.size() - 1;
 					scap->m_durations[nout] = din->m_offsets[i] + din->m_durations[i] - scap->m_offsets[nout];
 				}
-
-			case PCIeLTSSMSymbol::TYPE_L0:
-				break;
 
 			default:
 				break;
@@ -607,7 +630,9 @@ string PCIeLTSSMWaveform::GetColor(size_t i)
 		case PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE:
 		case PCIeLTSSMSymbol::TYPE_POLLING_CONFIGURATION:
 		case PCIeLTSSMSymbol::TYPE_CONFIGURATION:
-		case PCIeLTSSMSymbol::TYPE_RECOVERY:
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK:
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED:
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case PCIeLTSSMSymbol::TYPE_L0:
@@ -639,8 +664,12 @@ string PCIeLTSSMWaveform::GetText(size_t i)
 		case PCIeLTSSMSymbol::TYPE_L0:
 			return "L0";
 
-		case PCIeLTSSMSymbol::TYPE_RECOVERY:
-			return "Recovery";
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRLOCK:
+			return "Recovery.RcvrLock";
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_SPEED:
+			return "Recovery.Speed";
+		case PCIeLTSSMSymbol::TYPE_RECOVERY_RCVRCFG:
+			return "Recovery.RcvrCfg";
 
 		default:
 			return "ERROR";

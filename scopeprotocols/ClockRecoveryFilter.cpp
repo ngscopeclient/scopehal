@@ -221,7 +221,7 @@ void ClockRecoveryFilter::Refresh()
 						//Find the median pulse width in the next few edges
 						//(this is likely either our UI width or an integer multiple thereof)
 						vector<int64_t> lengths;
-						for(size_t i=1; i<=128; i++)
+						for(size_t i=1; i<=512; i++)
 						{
 							if(i + nedge >= edges.size())
 								break;
@@ -248,11 +248,14 @@ void ClockRecoveryFilter::Refresh()
 							}
 						}
 						int64_t avg = sum / navg;
-						LogTrace("Average of edges near median: %s\n",	Unit(Unit::UNIT_FS).PrettyPrint(avg).c_str());
+						LogTrace("Average of %lld edges near median: %s\n",
+							(long long)navg,
+							Unit(Unit::UNIT_FS).PrettyPrint(avg).c_str());
 
 						//For now, assume that this length is our actual pulse width and use it as our period
 						period = avg;
 						initialPeriod = period;
+						halfPeriod = initialPeriod / 2;
 
 						//Align exactly to the next edge
 						int64_t tnext = edges[nedge];
