@@ -138,10 +138,47 @@ void PCIeLinkTrainingDecoder::Refresh()
 
 	PCIeLTSSMSymbol::SymbolType lstate = PCIeLTSSMSymbol::TYPE_DETECT;
 
+	//Add a Detect symbol from time zero to the first 8b10b symbol
+	scap->m_offsets.push_back(0);
+	scap->m_durations.push_back(0);
+	scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
+
 	//Main decode loop
 	for(; i<end; i++)
 	{
-		//TODO: If we had a huge gap since the last symbol, jump to DETECT state
+		//If we see a K28.3 we're entering DETECT state (electrical idle)
+		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0x7c) )
+		{
+			if(lstate != PCIeLTSSMSymbol::TYPE_DETECT)
+			{
+				//Extend previous state to start of this symbol
+				size_t nout = scap->m_offsets.size() - 1;
+				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
+				//Enter DETECT state
+				lstate = PCIeLTSSMSymbol::TYPE_DETECT;
+				scap->m_offsets.push_back(din->m_offsets[i]);
+				scap->m_durations.push_back(din->m_durations[i]);
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
+			}
+			continue;
+		}
+
+		//If we see a K28.7 we're exiting electrical idle and entering Polling.Active
+		if(din->m_samples[i].m_control && (din->m_samples[i].m_data == 0xfc) )
+		{
+			if(lstate == PCIeLTSSMSymbol::TYPE_DETECT)
+			{
+				size_t nout = scap->m_offsets.size() - 1;
+				scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
+
+				lstate = PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE;
+
+				scap->m_offsets.push_back(din->m_offsets[i]);
+				scap->m_durations.push_back(din->m_durations[i]);
+				scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE));
+			}
+		}
 
 		//All training sets start with a comma. If we see anything else, ignore it.
 		if(!din->m_samples[i].m_control || (din->m_samples[i].m_data != 0xbc) )
@@ -328,9 +365,8 @@ void PCIeLinkTrainingDecoder::Refresh()
 				//Add a Detect symbol from time zero to the first TS1
 				if(hitTS1 && (din->m_samples[i+1].m_data == 0xf7) )
 				{
-					scap->m_offsets.push_back(0);
-					scap->m_durations.push_back(din->m_offsets[i]);
-					scap->m_samples.push_back(PCIeLTSSMSymbol(PCIeLTSSMSymbol::TYPE_DETECT));
+					size_t nout = scap->m_offsets.size() - 1;
+					scap->m_durations[nout] = din->m_offsets[i] - scap->m_offsets[nout];
 
 					lstate = PCIeLTSSMSymbol::TYPE_POLLING_ACTIVE;
 

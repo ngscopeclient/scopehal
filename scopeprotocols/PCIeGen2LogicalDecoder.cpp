@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -200,11 +200,15 @@ void PCIeGen2LogicalDecoder::Refresh()
 			bool last_was_skip = false;
 			bool last_was_idle = false;
 			bool last_was_pad = false;
+			bool last_was_eidl = false;
+			bool last_was_eie = false;
 			if(outlen)
 			{
 				last_was_skip = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_SKIP);
 				last_was_pad = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_PAD);
 				last_was_idle = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_LOGICAL_IDLE);
+				last_was_eidl = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_IDLE);
+				last_was_eie = (cap->m_samples[ilast].m_type == PCIeLogicalSymbol::TYPE_EXIT_IDLE);
 			}
 
 			//Update the scrambler UNLESS we have a SKP character K28.0 (k.1c)
@@ -312,6 +316,40 @@ void PCIeGen2LogicalDecoder::Refresh()
 						}
 						break;
 
+					//K28.3 IDL
+					case 0x7c:
+						{
+							//Extend the last symbol if it was one
+							if(last_was_eidl)
+								cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
+
+							//Nope, need to make a new symbol
+							else
+							{
+								cap->m_offsets.push_back(off);
+								cap->m_durations.push_back(dur);
+								cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_IDLE));
+							}
+						}
+						break;
+
+					//K28.7 EIE
+					case 0xfc:
+						{
+							//Extend the last symbol if it was one
+							if(last_was_eie)
+								cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
+
+							//Nope, need to make a new symbol
+							else
+							{
+								cap->m_offsets.push_back(off);
+								cap->m_durations.push_back(dur);
+								cap->m_samples.push_back(PCIeLogicalSymbol(PCIeLogicalSymbol::TYPE_EXIT_IDLE));
+							}
+						}
+						break;
+
 					//K28.2 SDP
 					case 0x5c:
 						cap->m_offsets.push_back(off);
@@ -366,8 +404,12 @@ void PCIeGen2LogicalDecoder::Refresh()
 			//Upper layer payload
 			else
 			{
+				//D10.2 is end of EIEOS
+				if( last_was_eie && (sym.m_data == 0x4a) )
+					cap->m_durations[ilast] = end - cap->m_offsets[outlen-1];
+
 				//Payload data
-				if(in_packet)
+				else if(in_packet)
 				{
 					cap->m_offsets.push_back(off);
 					cap->m_durations.push_back(dur);
@@ -456,6 +498,8 @@ std::string PCIeLogicalWaveform::GetColor(size_t i)
 		case PCIeLogicalSymbol::TYPE_END_DATA_STREAM:
 		case PCIeLogicalSymbol::TYPE_TS1:
 		case PCIeLogicalSymbol::TYPE_TS2:
+		case PCIeLogicalSymbol::TYPE_IDLE:
+		case PCIeLogicalSymbol::TYPE_EXIT_IDLE:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case PCIeLogicalSymbol::TYPE_PAYLOAD_DATA:
@@ -492,6 +536,12 @@ string PCIeLogicalWaveform::GetText(size_t i)
 			return "TS1";
 		case PCIeLogicalSymbol::TYPE_TS2:
 			return "TS2";
+
+		case PCIeLogicalSymbol::TYPE_IDLE:
+			return "Electrical Idle";
+
+		case PCIeLogicalSymbol::TYPE_EXIT_IDLE:
+			return "Exit Electrical Idle";
 
 		case PCIeLogicalSymbol::TYPE_START_TLP:
 			return "TLP";
