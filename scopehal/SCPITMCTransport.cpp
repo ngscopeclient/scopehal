@@ -53,6 +53,8 @@ SCPITMCTransport::SCPITMCTransport(const string& args)
 	, m_data_in_staging_buf(0)
 	, m_data_offset(0)
 	, m_data_depleted(false)
+	, m_fix_buggy_driver(false)
+	, m_transfer_size(48)
 {
 	// TODO: add configuration options:
 	// - set the maximum request size of usbtmc read requests (currently 2032)
@@ -64,10 +66,27 @@ SCPITMCTransport::SCPITMCTransport(const string& args)
 
 	LogDebug("Connecting to SCPI oscilloscope over USBTMC through %s\n", m_devicePath.c_str());
 
-	m_handle = open(m_devicePath.c_str(), O_RDWR);
+	char devicePath[128] = "";
+	char transferBufferSize[128] = "";
+	char *ptr;
+	if(2 == sscanf(m_devicePath.c_str(), "%127[^:]:%127s", devicePath, transferBufferSize))
+	{
+		// set size for a buggy tmc firmware	
+		// FIXME: Workaround for Siglent SDS1x04X-E. Max request size is 48 byte. Bug in firmware 8.2.6.1.37R9 ?
+		m_fix_buggy_driver = true;
+		m_transfer_size = strtol(transferBufferSize, &ptr, 10);
+		if(m_transfer_size == 0)
+		{
+			LogNotice("USBTMC wrong size value %s\n", transferBufferSize);
+			return;
+		}
+		LogNotice("Set USBTMC transfer size %d bytes. Workaround for buggy firmware.\n", m_transfer_size);		
+	}
+
+	m_handle = open(devicePath, O_RDWR);
 	if (m_handle <= 0)
 	{
-		LogError("Couldn't open %s\n", m_devicePath.c_str());
+		LogError("Couldn't open %s\n", devicePath);
 		return;
 	}
 
@@ -176,8 +195,16 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf)
 
 			do
 			{
-				bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
-				bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size);
+				if(m_fix_buggy_driver == false)
+				{
+				    bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
+				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size);
+				}
+				{
+					// limit each request to m_transfer_size
+					bytes_requested = m_transfer_size;
+				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_transfer_size);
+				}
 				i += bytes_fetched;
 			} while(bytes_fetched == bytes_requested);
 
@@ -216,4 +243,10 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf)
 bool SCPITMCTransport::IsCommandBatchingSupported()
 {
 	return false;
+}
+
+void SCPITMCTransport::FlushRXBuffer(void)
+{
+	// FIXME: Can we flush USBTMC
+	LogDebug("SCPITMCTransport::FlushRXBuffer is unimplemented\n");
 }

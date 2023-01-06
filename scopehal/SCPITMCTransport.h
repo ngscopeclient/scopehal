@@ -59,6 +59,8 @@ public:
 	virtual bool IsCommandBatchingSupported();
 	virtual bool IsConnected();
 
+	virtual void FlushRXBuffer(void);
+
 	TRANSPORT_INITPROC(SCPITMCTransport)
 
 	const std::string& GetDevicePath()
@@ -75,6 +77,8 @@ protected:
 	int m_data_in_staging_buf;
 	int m_data_offset;
 	bool m_data_depleted;
+	bool m_fix_buggy_driver;
+	int m_transfer_size;
 };
 
 #endif
