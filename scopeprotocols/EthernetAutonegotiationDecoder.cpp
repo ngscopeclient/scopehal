@@ -101,7 +101,7 @@ void EthernetAutonegotiationDecoder::Refresh()
 	auto len = din->size();
 	for(size_t i = 0; i < len; i ++)
 	{
-		bool sample_value = GetValue(sdin, udin, i) > 1.25;
+		bool sample_value = GetValue(sdin, udin, i) > 0.5;
 		int64_t tm = GetOffsetScaled(sdin, udin, i);
 		float dt = (tm - last_pulse) * 1e-9f;
 
