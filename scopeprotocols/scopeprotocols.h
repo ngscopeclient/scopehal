@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -86,6 +86,7 @@
 #include "EthernetProtocolDecoder.h"		//must be before all other ethernet decodes
 #include "EthernetAutonegotiationDecoder.h"
 #include "EthernetAutonegotiationPageDecoder.h"
+#include "EthernetBaseXAutonegotiationDecoder.h"
 #include "EthernetGMIIDecoder.h"
 #include "EthernetRGMIIDecoder.h"
 #include "EthernetRMIIDecoder.h"
