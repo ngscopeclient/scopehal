@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -51,6 +51,7 @@ MDIODecoder::MDIODecoder(const string& color)
 	m_typename = "PHY Type";
 	m_parameters[m_typename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_typename].AddEnumValue("Generic", PHY_TYPE_GENERIC);
+	m_parameters[m_typename].AddEnumValue("DP83867", PHY_TYPE_DP83867);
 	m_parameters[m_typename].AddEnumValue("KSZ9031", PHY_TYPE_KSZ9031);
 	m_parameters[m_typename].SetIntVal(PHY_TYPE_GENERIC);
 }
@@ -118,7 +119,7 @@ void MDIODecoder::Refresh()
 		//Abort if we don't have space for a whole frame
 		if(i + 63 >= dlen)
 		{
-			LogDebug("aborting at i=%zu, %s\n", i, Unit(Unit::UNIT_FS).PrettyPrint(dmdio.m_offsets[i]).c_str());
+			LogTrace("aborting at i=%zu, %s\n", i, Unit(Unit::UNIT_FS).PrettyPrint(dmdio.m_offsets[i]).c_str());
 			break;
 		}
 
@@ -133,7 +134,7 @@ void MDIODecoder::Refresh()
 			//Expect 32 "1" bits in a row. If we see any non-1 bits, declare an error
 			if(dmdio.m_samples[i+j] != true)
 			{
-				LogDebug("Err: some 0 bits\n");
+				LogTrace("Err: some 0 bits\n");
 				err = true;
 				break;
 			}
