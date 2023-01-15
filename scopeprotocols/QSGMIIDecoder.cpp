@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -144,7 +144,7 @@ void QSGMIIDecoder::Refresh()
 		//Copy sample unless it's a K28.1. if so, convert to K28.5
 		auto s = din->m_samples[i];
 		if(s.m_control && (s.m_data == 0x3c) )
-			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, 0xbc, s.m_disparity));
+			caps[nlane]->m_samples.push_back(IBM8b10bSymbol(true, false, false, false, 0xbc, s.m_disparity));
 		else
 			caps[nlane]->m_samples.push_back(din->m_samples[i]);
 

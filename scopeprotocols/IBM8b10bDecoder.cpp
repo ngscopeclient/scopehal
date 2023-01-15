@@ -314,7 +314,7 @@ void IBM8b10bDecoder::Refresh()
 		{
 			cap->m_offsets.push_back(symbolStart);
 			cap->m_durations.push_back(lastSymbolLength);
-			cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5 || err3 || disperr, (code3 << 5) | code5, last_disp));
+			cap->m_samples.push_back(IBM8b10bSymbol(ctl5, err5, err3, disperr, (code3 << 5) | code5, last_disp));
 		}
 
 		lastSymbolLength = symbolLength;
@@ -398,7 +398,7 @@ string IBM8b10bWaveform::GetColor(size_t i)
 {
 	const IBM8b10bSymbol& s = m_samples[i];
 
-	if(s.m_error)
+	if(s.m_error5 || s.m_error3 || s.m_errorDisp)
 		return StandardColors::colors[StandardColors::COLOR_ERROR];
 	else if(s.m_control)
 		return StandardColors::colors[StandardColors::COLOR_CONTROL];
@@ -416,8 +416,12 @@ string IBM8b10bWaveform::GetText(size_t i)
 	unsigned int left = s.m_data & 0x1F;
 
 	char tmp[32];
-	if(s.m_error)
-		return "ERROR";
+	if(s.m_error5)
+		return "ERROR (5b/6b)";
+	else if(s.m_error3)
+		return "ERROR (3b/4b)";
+	else if(s.m_errorDisp)
+		return "ERROR (disparity)";
 	else
 	{
 		//Dotted format
