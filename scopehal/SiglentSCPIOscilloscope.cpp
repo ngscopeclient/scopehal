@@ -294,7 +294,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 			m_maxBandwidth = 100;
 			if(m_model.compare(4, 1, "2") == 0)
 				m_maxBandwidth = 200;
-			if(m_fwVersion != "8.2.6.1.37R8")
+			if(m_fwVersion != "8.2.6.1.37R9")
 				LogWarning("Siglent firmware \"%s\" is not tested\n", m_fwVersion.c_str());
 			return;
 		}
