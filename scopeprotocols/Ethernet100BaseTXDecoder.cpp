@@ -345,9 +345,9 @@ bool Ethernet100BaseTXDecoder::TrySync(
 
 int Ethernet100BaseTXDecoder::GetState(float voltage)
 {
-	if(voltage > 0.3)
+	if(voltage > 0.5)
 		return 1;
-	else if(voltage < -0.3)
+	else if(voltage < -0.5)
 		return -1;
 	else
 		return 0;
