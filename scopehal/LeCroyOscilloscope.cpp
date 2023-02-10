@@ -62,6 +62,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasUartTrigger(false)
 	, m_has8b10bTrigger(false)
 	, m_hasNrzTrigger(false)
+	, m_hasXdev(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(false)
@@ -761,6 +762,8 @@ void LeCroyOscilloscope::DetectOptions()
 			{
 				type = "SDK";
 				desc = "Software development kit";
+				action = "FastWavePort waveform download available";
+				m_hasXdev = true;
 			}
 
 			//Ignore meta-options

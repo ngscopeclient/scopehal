@@ -106,6 +106,7 @@ set(SCOPEHAL_SOURCES
 	GWInstekGPDX303SPowerSupply.cpp
 	KeysightDCA.cpp
 	LeCroyOscilloscope.cpp
+	LeCroyFWPOscilloscope.cpp
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
 	RigolOscilloscope.cpp

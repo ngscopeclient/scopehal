@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,68 +27,40 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of VICPSocketTransport
- */
+#ifndef LeCroyFWPOscilloscope_h
+#define LeCroyFWPOscilloscope_h
 
-#ifndef VICPSocketTransport_h
-#define VICPSocketTransport_h
-
-#include "../xptools/Socket.h"
+#include "LeCroyOscilloscope.h"
 
 /**
-	@brief A SCPI transport tunneled over LeCroy's Virtual Instrument Control Protocol
+	@brief A Teledyne LeCroy oscilloscope using the FastWavePort interface for download instead of SCPI
 
-	Protocol layer is based on LeCroy's released VICPClient.h, but rewritten and modernized heavily
+	Requires the instrument to have the XDEV option installed, and scopehal-fwp-bridge running
  */
-class VICPSocketTransport : public SCPITransport
+class LeCroyFWPOscilloscope : public LeCroyOscilloscope
 {
 public:
-	VICPSocketTransport(const std::string& args);
-	virtual ~VICPSocketTransport();
+	LeCroyFWPOscilloscope(SCPITransport* transport);
+	virtual ~LeCroyFWPOscilloscope();
 
-	virtual std::string GetConnectionString();
-	static std::string GetTransportName();
-
-	std::string GetHostname()
-	{ return m_hostname; }
-
-	virtual bool SendCommand(const std::string& cmd);
-	virtual std::string ReadReply(bool endOnSemicolon = true);
-	virtual size_t ReadRawData(size_t len, unsigned char* buf);
-	virtual void SendRawData(size_t len, const unsigned char* buf);
-
-	virtual bool IsCommandBatchingSupported();
-	virtual bool IsConnected();
-
-	virtual void FlushRXBuffer();
-
-	//VICP constant helpers
-	enum HEADER_OPS
-	{
-		OP_DATA		= 0x80,
-		OP_REMOTE	= 0x40,
-		OP_LOCKOUT	= 0x20,
-		OP_CLEAR	= 0x10,
-		OP_SRQ		= 0x8,
-		OP_REQ		= 0x4,
-		OP_EOI		= 0x1
-	};
-
-	TRANSPORT_INITPROC(VICPSocketTransport)
+	//not copyable or assignable
+	LeCroyFWPOscilloscope(const LeCroyFWPOscilloscope& rhs) =delete;
+	LeCroyFWPOscilloscope& operator=(const LeCroyFWPOscilloscope& rhs) =delete;
 
 protected:
-	uint8_t GetNextSequenceNumber();
 
-	uint8_t m_nextSequence;
-	uint8_t m_lastSequence;
+	///@brief Indicates we're operating in fallback mode (FWP wasn't available for some reason)
+	bool m_fallback;
+
+	virtual Oscilloscope::TriggerMode PollTrigger();
+	virtual bool AcquireData();
+	virtual void Start();
 
 	Socket m_socket;
 
-	std::string m_hostname;
-	unsigned short m_port;
+public:
+	static std::string GetDriverNameInternal();
+	OSCILLOSCOPE_INITPROC(LeCroyFWPOscilloscope)
 };
 
 #endif

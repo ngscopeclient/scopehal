@@ -327,6 +327,7 @@ protected:
 	bool m_hasUartTrigger;
 	bool m_has8b10bTrigger;
 	bool m_hasNrzTrigger;
+	bool m_hasXdev;
 
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
