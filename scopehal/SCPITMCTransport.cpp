@@ -200,6 +200,7 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf)
 				    bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
 				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size);
 				}
+				else
 				{
 					// limit each request to m_transfer_size
 					bytes_requested = m_transfer_size;
