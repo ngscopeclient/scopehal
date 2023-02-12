@@ -98,13 +98,32 @@ LeCroyFWPOscilloscope::LeCroyFWPOscilloscope(SCPITransport* transport)
 		m_fallback = true;
 	}
 
-	//TODO: configure math functions... do we want to use F1-F4? should we use F9-F12 to minimize chance of conflict?
+	//Configure math functions F9-F12 as FastWavePort
+	for(int i=0; i<4; i++)
+	{
+		string prefix = string("app.Math.F") + to_string(9+i);
 
-	LogDebug("all good, connected\n");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".MathMode = OneOperator'");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".Operator1 = \"FastWavePort\"'");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".Source1 = \"" + m_channels[i]->GetHwname() + "\"'");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".Operator1Setup.PortName = \"FastWavePort" + to_string(i+1) + "\"'");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".Operator1Setup.Timeout = 1'");
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".View = true'");
+	}
+	m_transport->FlushCommandQueue();
+
+	SendEnableMask();
 }
 
 LeCroyFWPOscilloscope::~LeCroyFWPOscilloscope()
 {
+	//Disable FWP functions
+	for(int i=0; i<4; i++)
+	{
+		string prefix = string("app.Math.F") + to_string(9+i);
+		m_transport->SendCommandQueued(string("VBS '") + prefix + ".View = false'");
+		m_transport->FlushCommandQueue();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +159,40 @@ void LeCroyFWPOscilloscope::Start()
 	m_triggerOneShot = false;
 }
 
+void LeCroyFWPOscilloscope::EnableChannel(size_t i)
+{
+	LeCroyOscilloscope::EnableChannel(i);
+	SendEnableMask();
+}
+
+void LeCroyFWPOscilloscope::DisableChannel(size_t i)
+{
+	LeCroyOscilloscope::DisableChannel(i);
+	SendEnableMask();
+}
+
+void LeCroyFWPOscilloscope::SendEnableMask()
+{
+	//Send the set of enabled channels to the bridge server
+	uint8_t mask = 0;
+	for(int i=0; i<4; i++)
+	{
+		if(m_channelsEnabled[i])
+			mask |= (1 << i);
+	}
+	m_socket.SendLooped(&mask, 1);
+
+	//Turn FWP blocks on/off as needed
+	for(int i=0; i<4; i++)
+	{
+		string prefix = string("app.Math.F") + to_string(9+i);
+		if(m_channelsEnabled[i])
+			m_transport->SendCommandQueued(string("VBS '") + prefix + ".View = true'");
+		else
+			m_transport->SendCommandQueued(string("VBS '") + prefix + ".View = false'");
+	}
+}
+
 bool LeCroyFWPOscilloscope::AcquireData()
 {
 	if(m_fallback)
@@ -164,35 +217,60 @@ bool LeCroyFWPOscilloscope::AcquireData()
 
 	for(int i=0; i<4; i++)
 	{
-		//Grab the data
-		data[i].resize(headers[i].numSamples);
-		if(!m_socket.RecvLooped((uint8_t*)&data[i][0], headers[i].numSamples * sizeof(int16_t)))
-			return false;
+		if(headers[i].numSamples > 0)
+		{
+			//Grab the data
+			data[i].resize(headers[i].numSamples);
+			if(!m_socket.RecvLooped((uint8_t*)&data[i][0], headers[i].numSamples * sizeof(int16_t)))
+				return false;
+		}
 	}
 
+	time_t basetime = 0;
+	struct tm tstruc;
+#ifdef _WIN32
+	localtime_s(&tstruc, &basetime);
+#else
+	localtime_r(&basetime, &tstruc);
+#endif
+	int64_t utcOffset = 0;
+	if(tstruc.tm_year == 1969)
+		utcOffset = -3600 * tstruc.tm_hour;
+	else
+		utcOffset = 3600 * tstruc.tm_hour;
+
 	//Convert the waveforms
+	int64_t nsPerSec = 1e9;
 	for(int i=0; i<4; i++)
 	{
-		auto wfm = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
-		wfm->m_timescale = round(headers[i].horizontalInterval * FS_PER_SECOND);
-		wfm->m_triggerPhase = fmodf(headers[i].horizontalOffset, wfm->m_timescale);
+		if(headers[i].numSamples > 0)
+		{
+			auto wfm = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
+			wfm->m_timescale = round(headers[i].horizontalInterval * FS_PER_SECOND);
+			double h_off = headers[i].horizontalOffset * FS_PER_SECOND;
+			auto h_off_frac = fmodf(h_off, wfm->m_timescale);
+			if(h_off_frac < 0)
+				h_off_frac = wfm->m_timescale + h_off_frac;
+			wfm->m_triggerPhase = h_off_frac;
 
-		//FIXME
-		//Timestamp is seconds since jan 1 2000 at midnight *local time*
-		wfm->m_startTimestamp = 0;
-		wfm->m_startFemtoseconds = 0;
+			//FIXME: add UTC offset
+			//Timestamp is seconds since jan 1 2000 at midnight *local time*
+			headers[i].trigTime += utcOffset;
+			wfm->m_startTimestamp = 946713600 + (headers[i].trigTime / nsPerSec);
+			wfm->m_startFemtoseconds = (headers[i].trigTime % nsPerSec) * 1e6;
 
-		//Crunch the data
-		wfm->Resize(headers[i].numSamples);
-		Convert16BitSamples(
-			wfm->m_samples.GetCpuPointer(),
-			&data[i][0],
-			headers[i].verticalGain,
-			headers[i].verticalOffset,
-			headers[i].numSamples);
-		wfm->MarkSamplesModifiedFromCpu();
+			//Crunch the data
+			wfm->Resize(headers[i].numSamples);
+			Convert16BitSamples(
+				wfm->m_samples.GetCpuPointer(),
+				&data[i][0],
+				headers[i].verticalGain,
+				headers[i].verticalOffset,
+				headers[i].numSamples);
+			wfm->MarkSamplesModifiedFromCpu();
 
-		pending_waveforms[i] = wfm;
+			pending_waveforms[i] = wfm;
+		}
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
@@ -207,4 +285,32 @@ bool LeCroyFWPOscilloscope::AcquireData()
 	m_pendingWaveformsMutex.unlock();
 
 	return true;
+}
+
+vector<uint64_t> LeCroyFWPOscilloscope::GetSampleDepthsNonInterleaved()
+{
+	//Copy all depths under 40M. FastWavePort can't go higher due to fixed sized shared memory region
+	//TODO: clean fallback to SCPI in this case
+	vector<uint64_t> base = LeCroyOscilloscope::GetSampleDepthsNonInterleaved();
+	vector<uint64_t> ret;
+	for(auto depth : base)
+	{
+		if(depth <= 40000000)
+			ret.push_back(depth);
+	}
+	return ret;
+}
+
+vector<uint64_t> LeCroyFWPOscilloscope::GetSampleDepthsInterleaved()
+{
+	//Copy all depths under 40M. FastWavePort can't go higher due to fixed sized shared memory region
+	//TODO: clean fallback to SCPI in this case
+	vector<uint64_t> base = LeCroyOscilloscope::GetSampleDepthsInterleaved();
+	vector<uint64_t> ret;
+	for(auto depth : base)
+	{
+		if(depth <= 40000000)
+			ret.push_back(depth);
+	}
+	return ret;
 }

@@ -47,14 +47,21 @@ public:
 	LeCroyFWPOscilloscope(const LeCroyFWPOscilloscope& rhs) =delete;
 	LeCroyFWPOscilloscope& operator=(const LeCroyFWPOscilloscope& rhs) =delete;
 
-protected:
-
-	///@brief Indicates we're operating in fallback mode (FWP wasn't available for some reason)
-	bool m_fallback;
-
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool AcquireData();
 	virtual void Start();
+
+	virtual void EnableChannel(size_t i);
+	virtual void DisableChannel(size_t i);
+
+	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved();
+	virtual std::vector<uint64_t> GetSampleDepthsInterleaved();
+
+protected:
+	void SendEnableMask();
+
+	///@brief Indicates we're operating in fallback mode (FWP wasn't available for some reason)
+	bool m_fallback;
 
 	Socket m_socket;
 
