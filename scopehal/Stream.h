@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -94,18 +94,21 @@ public:
 	///@brief General datatype stored in the stream
 	StreamType m_stype;
 
-	
+
 	/**
 		@brief Flags that apply to this waveform. Bitfield.
 		STREAM_DO_NOT_INTERPOLATE: *hint* that this stream should not be rendered with interpolation
 		                           even though/if it is analog. E.g. measurement values related to
 		                           discrete parts of a waveform.
+
+		STREAM_FILL_UNDER:			requests that waveform be drawn with area under curve filled (e.g. histogram)
 	 */
 	uint8_t m_flags;
 
 	enum
 	{
-		STREAM_DO_NOT_INTERPOLATE = 1
+		STREAM_DO_NOT_INTERPOLATE	= 1,
+		STREAM_FILL_UNDER			= 2
 	};
 };
 

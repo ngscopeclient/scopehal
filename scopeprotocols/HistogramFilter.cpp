@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -43,6 +43,8 @@ HistogramFilter::HistogramFilter(const string& color)
 	  m_binSizeName("Bin Size")
 {
 	AddStream(Unit(Unit::UNIT_COUNTS_SCI), "data", Stream::STREAM_TYPE_ANALOG);
+
+	m_streams[0].m_flags = Stream::STREAM_DO_NOT_INTERPOLATE | Stream::STREAM_FILL_UNDER;
 
 	m_parameters[m_autorangeName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_autorangeName].AddEnumValue("Autorange", 1);
