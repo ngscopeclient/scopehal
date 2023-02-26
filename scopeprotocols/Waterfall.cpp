@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,19 +37,12 @@ using namespace std;
 // Construction / destruction
 
 WaterfallWaveform::WaterfallWaveform(size_t width, size_t height)
-	: m_width(width)
-	, m_height(height)
+	: DensityFunctionWaveform(width, height)
 {
-	size_t npix = width*height;
-	m_outdata = new float[npix];
-	for(size_t i=0; i<npix; i++)
-		m_outdata[i] = 0;
 }
 
 WaterfallWaveform::~WaterfallWaveform()
 {
-	delete[] m_outdata;
-	m_outdata = NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,6 +102,11 @@ string Waterfall::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+void Waterfall::ClearPersistence()
+{
+	SetData(nullptr, 0);
+}
+
 void Waterfall::Refresh()
 {
 	//Make sure we've got valid inputs
@@ -133,16 +131,14 @@ void Waterfall::Refresh()
 	float* data = cap->GetData();
 
 	//Move the whole waterfall down by one row
+	//TODO: can we just rotate indexes or something to make this more efficient?
 	for(size_t y=0; y < m_height-1 ; y++)
-	{
-		for(size_t x=0; x<m_width; x++)
-			data[y*m_width + x] = data[(y+1)*m_width + x];
-	}
+		memcpy(data + y*m_width, data + (y+1)*m_width, m_width * sizeof(float));
 
 	//Zero the new row
 	float* prow = data + (m_height-1)*m_width;
 	for(size_t x=0; x<m_width; x++)
-		prow[x] = 0;
+		memset(prow, 0, m_width*sizeof(float));
 
 	//Add the new data
 	double hz_per_bin = din->m_timescale;
@@ -151,6 +147,8 @@ void Waterfall::Refresh()
 	float vmin = 1.0 / 255.0;
 	float vrange = m_inputs[0].GetVoltageRange();	//db from min to max scale
 	float vfs = vrange/2 - m_inputs[0].GetOffset();
+	LogDebug("vrange = %f, vfs = %f\n", vrange, vfs);
+	LogDebug("m_width = %zu, m_height = %zu\n", m_width, m_height);
 	for(size_t x=0; x<m_width; x++)
 	{
 		//Look up the frequency bin(s) for this position

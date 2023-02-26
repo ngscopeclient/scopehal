@@ -40,24 +40,17 @@ using namespace std;
 // Construction / destruction
 
 EyeWaveform::EyeWaveform(size_t width, size_t height, float center)
-	: m_uiWidth(0)
+	: DensityFunctionWaveform(width, height)
+	, m_uiWidth(0)
 	, m_saturationLevel(1)
-	, m_width(width)
-	, m_height(height)
 	, m_totalUIs(0)
 	, m_centerVoltage(center)
 	, m_maskHitRate(0)
 {
 	size_t npix = width*height;
 	m_accumdata = new int64_t[npix];
-	m_outdata.resize(npix);
-	m_outdata.PrepareForCpuAccess();
 	for(size_t i=0; i<npix; i++)
-	{
-		m_outdata[i] = 0;
 		m_accumdata[i] = 0;
-	}
-	m_outdata.MarkModifiedFromCpu();
 }
 
 EyeWaveform::~EyeWaveform()

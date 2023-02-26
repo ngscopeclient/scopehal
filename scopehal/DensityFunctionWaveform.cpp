@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,77 +27,21 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Waterfall
- */
-#ifndef Waterfall_h
-#define Waterfall_h
+#include "scopehal.h"
+#include "DensityFunctionWaveform.h"
 
-#include "../scopehal/DensityFunctionWaveform.h"
-
-class WaterfallWaveform : public DensityFunctionWaveform
+DensityFunctionWaveform::DensityFunctionWaveform(size_t width, size_t height)
+	: m_width(width)
+	, m_height(height)
 {
-public:
-	WaterfallWaveform(size_t width, size_t height);
-	virtual ~WaterfallWaveform();
+	size_t npix = width*height;
+	m_outdata.resize(npix);
+	m_outdata.PrepareForCpuAccess();
+	for(size_t i=0; i<npix; i++)
+		m_outdata[i] = 0;
+	m_outdata.MarkModifiedFromCpu();
+}
 
-	//not copyable or assignable
-	WaterfallWaveform(const WaterfallWaveform&) =delete;
-	WaterfallWaveform& operator=(const WaterfallWaveform&) =delete;
-};
-
-class Waterfall : public Filter
+DensityFunctionWaveform::~DensityFunctionWaveform()
 {
-public:
-	Waterfall(const std::string& color);
-
-	//not copyable or assignable
-	Waterfall(const Waterfall&) =delete;
-	Waterfall& operator=(const Waterfall&) =delete;
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-	virtual void ClearPersistence();
-
-	void SetWidth(size_t width)
-	{
-		m_width = width;
-		SetData(NULL, 0);
-	}
-
-	void SetHeight(size_t height)
-	{
-		m_height = height;
-		SetData(NULL, 0);
-	}
-
-	void SetTimeScale(double pixelsPerHz)
-	{ m_pixelsPerHz = pixelsPerHz; }
-
-	void SetTimeOffset(double offsetHz)
-	{ m_offsetHz = offsetHz; }
-
-	size_t GetWidth()
-	{ return m_width; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	PROTOCOL_DECODER_INITPROC(Waterfall)
-
-protected:
-	double m_pixelsPerHz;
-	double m_offsetHz;
-
-	size_t m_width;
-	size_t m_height;
-};
-
-#endif
+}

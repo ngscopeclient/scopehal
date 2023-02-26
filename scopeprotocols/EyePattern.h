@@ -37,8 +37,9 @@
 #define EyePattern_h
 
 #include "EyeMask.h"
+#include "../scopehal/DensityFunctionWaveform.h"
 
-class EyeWaveform : public WaveformBase
+class EyeWaveform : public DensityFunctionWaveform
 {
 public:
 	EyeWaveform(size_t width, size_t height, float center);
@@ -47,19 +48,6 @@ public:
 	//not copyable or assignable
 	EyeWaveform(const EyeWaveform&) =delete;
 	EyeWaveform& operator=(const EyeWaveform&) =delete;
-
-	//nothing to do if not gpu accelerated
-	virtual void Rename(const std::string& /*name*/ = "")
-	{}
-
-	float* GetData()
-	{
-		m_outdata.PrepareForCpuAccess();
-		return m_outdata.GetCpuPointer();
-	}
-
-	AcceleratorBuffer<float>& GetOutData()
-	{ return m_outdata; }
 
 	int64_t* GetAccumData()
 	{ return m_accumdata; }
@@ -71,12 +59,6 @@ public:
 
 	float GetCenterVoltage()
 	{ return m_centerVoltage; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
 
 	void IntegrateUIs(size_t uis)
 	{ m_totalUIs += uis; }
@@ -94,39 +76,7 @@ public:
 	void SetMaskHitRate(float rate)
 	{ m_maskHitRate = rate; }
 
-	//Unused virtual methods from WaveformBase that we have to override
-	virtual void clear()
-	{}
-
-	virtual void Resize(size_t /*unused*/)
-	{}
-
-	virtual void PrepareForCpuAccess()
-	{}
-
-	virtual void PrepareForGpuAccess()
-	{}
-
-	virtual void MarkSamplesModifiedFromCpu()
-	{}
-
-	virtual void MarkSamplesModifiedFromGpu()
-	{}
-
-	virtual void MarkModifiedFromCpu()
-	{}
-
-	virtual void MarkModifiedFromGpu()
-	{}
-
-	virtual size_t size() const
-	{ return 0; }
-
 protected:
-	size_t m_width;
-	size_t m_height;
-
-	AcceleratorBuffer<float> m_outdata;
 	int64_t* m_accumdata;
 
 	size_t m_totalUIs;

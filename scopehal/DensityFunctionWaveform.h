@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,74 +30,82 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of Waterfall
+	@brief Declaration of DensityFunction
  */
-#ifndef Waterfall_h
-#define Waterfall_h
 
-#include "../scopehal/DensityFunctionWaveform.h"
+#ifndef DensityFunctionWaveform_h
+#define DensityFunctionWaveform_h
 
-class WaterfallWaveform : public DensityFunctionWaveform
+#include "Waveform.h"
+
+/**
+	@brief Base class for waveforms such as eye patterns, spectrograms, and waterfalls which are conceptually a 2D bitmap
+
+	Internally, the image data is represented as an AcceleratorBuffer<float> storing 2D sample values.
+ */
+class DensityFunctionWaveform : public WaveformBase
 {
 public:
-	WaterfallWaveform(size_t width, size_t height);
-	virtual ~WaterfallWaveform();
+
+	DensityFunctionWaveform(size_t width, size_t height);
+	virtual ~DensityFunctionWaveform();
 
 	//not copyable or assignable
-	WaterfallWaveform(const WaterfallWaveform&) =delete;
-	WaterfallWaveform& operator=(const WaterfallWaveform&) =delete;
-};
+	DensityFunctionWaveform(const DensityFunctionWaveform&) =delete;
+	DensityFunctionWaveform& operator=(const DensityFunctionWaveform&) =delete;
 
-class Waterfall : public Filter
-{
-public:
-	Waterfall(const std::string& color);
+	//nothing to do if not gpu accelerated
+	virtual void Rename(const std::string& /*name*/ = "")
+	{}
 
-	//not copyable or assignable
-	Waterfall(const Waterfall&) =delete;
-	Waterfall& operator=(const Waterfall&) =delete;
-
-	virtual void Refresh();
-
-	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-	virtual void ClearPersistence();
-
-	void SetWidth(size_t width)
+	float* GetData()
 	{
-		m_width = width;
-		SetData(NULL, 0);
+		m_outdata.PrepareForCpuAccess();
+		return m_outdata.GetCpuPointer();
 	}
 
-	void SetHeight(size_t height)
-	{
-		m_height = height;
-		SetData(NULL, 0);
-	}
-
-	void SetTimeScale(double pixelsPerHz)
-	{ m_pixelsPerHz = pixelsPerHz; }
-
-	void SetTimeOffset(double offsetHz)
-	{ m_offsetHz = offsetHz; }
-
-	size_t GetWidth()
-	{ return m_width; }
+	AcceleratorBuffer<float>& GetOutData()
+	{ return m_outdata; }
 
 	size_t GetHeight()
 	{ return m_height; }
 
-	PROTOCOL_DECODER_INITPROC(Waterfall)
+	size_t GetWidth()
+	{ return m_width; }
+
+	//Unused virtual methods from WaveformBase that we have to override
+	virtual void clear()
+	{}
+
+	virtual void Resize(size_t /*unused*/)
+	{}
+
+	virtual void PrepareForCpuAccess()
+	{ m_outdata.PrepareForCpuAccess(); }
+
+	virtual void PrepareForGpuAccess()
+	{}
+
+	virtual void MarkSamplesModifiedFromCpu()
+	{ m_outdata.MarkModifiedFromCpu(); }
+
+	virtual void MarkSamplesModifiedFromGpu()
+	{}
+
+	virtual void MarkModifiedFromCpu()
+	{ m_outdata.MarkModifiedFromCpu(); }
+
+	virtual void MarkModifiedFromGpu()
+	{}
+
+	virtual size_t size() const
+	{ return 0; }
 
 protected:
-	double m_pixelsPerHz;
-	double m_offsetHz;
-
 	size_t m_width;
 	size_t m_height;
+
+	AcceleratorBuffer<float> m_outdata;
 };
 
 #endif

@@ -49,6 +49,7 @@ set(SCOPEHAL_SOURCES
 	FileSystem.cpp
 	Unit.cpp
 	Waveform.cpp
+	DensityFunctionWaveform.cpp
 
 	SCPITransport.cpp
 	SCPISocketTransport.cpp
