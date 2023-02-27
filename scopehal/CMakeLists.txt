@@ -84,6 +84,7 @@ set(SCOPEHAL_SOURCES
 	WindowTrigger.cpp
 
 	Instrument.cpp
+	InstrumentChannel.cpp
 	FunctionGenerator.cpp
 	Multimeter.cpp
 	Oscilloscope.cpp

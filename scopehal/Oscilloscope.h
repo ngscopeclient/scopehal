@@ -98,7 +98,7 @@ public:
 		included in the channel count. Call OscilloscopeChannel::GetType() on a given channel to see what kind
 		of channel it is.
 	 */
-	size_t GetChannelCount();
+	virtual size_t GetChannelCount();
 
 	/**
 		@brief Gets a channel by index

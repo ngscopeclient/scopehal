@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -54,9 +54,9 @@ string SiglentVectorSignalGenerator::GetDriverNameInternal()
 	return "siglent_ssg";
 }
 
-int SiglentVectorSignalGenerator::GetChannelCount()
+size_t SiglentVectorSignalGenerator::GetChannelCount()
 {
-	return 1;
+	return 2;
 }
 
 string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)
@@ -82,6 +82,16 @@ string SiglentVectorSignalGenerator::GetVendor()
 string SiglentVectorSignalGenerator::GetSerial()
 {
 	return m_serial;
+}
+
+uint32_t SiglentVectorSignalGenerator::GetInstrumentTypesForChannel(size_t i)
+{
+	if(i == CHANNEL_RFOUT)
+		return Instrument::INST_RF_GEN;
+	else if(i == CHANNEL_LFO)
+		return Instrument::INST_FUNCTION;
+	else
+		return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

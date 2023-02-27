@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -198,6 +198,11 @@ string RohdeSchwarzOscilloscope::GetDriverNameInternal()
 }
 
 unsigned int RohdeSchwarzOscilloscope::GetInstrumentTypes()
+{
+	return Instrument::INST_OSCILLOSCOPE;
+}
+
+uint32_t RohdeSchwarzOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

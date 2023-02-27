@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -537,6 +537,14 @@ unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes()
 	if(m_hasFunctionGen)
 		type |= INST_FUNCTION;
 	return type;
+}
+
+uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+{
+	//TODO: AWG outputs
+
+	//If we get here, it's an oscilloscope channel
+	return Instrument::INST_OSCILLOSCOPE;
 }
 
 string SiglentSCPIOscilloscope::GetName()

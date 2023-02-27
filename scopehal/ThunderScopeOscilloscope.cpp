@@ -141,13 +141,18 @@ string ThunderScopeOscilloscope::GetChannelColor(size_t i)
 
 ThunderScopeOscilloscope::~ThunderScopeOscilloscope()
 {
-	
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
 unsigned int ThunderScopeOscilloscope::GetInstrumentTypes()
+{
+	return Instrument::INST_OSCILLOSCOPE;
+}
+
+uint32_t ThunderScopeOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

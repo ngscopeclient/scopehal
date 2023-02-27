@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -79,6 +79,16 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetSecondaryMeasurementTypes()
 		default:
 			return 0;
 	}
+}
+
+size_t RohdeSchwarzHMC8012Multimeter::GetChannelCount()
+{
+	return 1;
+}
+
+uint32_t RohdeSchwarzHMC8012Multimeter::GetInstrumentTypesForChannel(size_t /*i*/)
+{
+	return INST_DMM;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,11 +183,6 @@ double RohdeSchwarzHMC8012Multimeter::GetSecondaryMeterValue()
 	//If we have a secondary value, this gets it
 	//If no secondary mode configured, returns primary value
 	return stod(m_transport->SendCommandQueuedWithReply("READ?"));
-}
-
-int RohdeSchwarzHMC8012Multimeter::GetMeterChannelCount()
-{
-	return 1;
 }
 
 string RohdeSchwarzHMC8012Multimeter::GetMeterChannelName(int /*chan*/)

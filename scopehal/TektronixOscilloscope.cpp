@@ -305,6 +305,18 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 	return mask;
 }
 
+uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i)
+{
+	//TODO: AWG outputs
+
+	//If we get here, it's an oscilloscope channel
+	//Report DMM functionality if available
+	if(m_hasDVM && (i < m_analogChannelCount))
+		return Instrument::INST_OSCILLOSCOPE | Instrument::INST_DMM;
+	else
+		return Instrument::INST_OSCILLOSCOPE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device interface functions
 

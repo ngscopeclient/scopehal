@@ -75,6 +75,7 @@ public:
 	virtual std::string GetSerial();
 	virtual unsigned int GetInstrumentTypes();
 	virtual unsigned int GetMeasurementTypes();
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	virtual void FlushConfigCache();
 

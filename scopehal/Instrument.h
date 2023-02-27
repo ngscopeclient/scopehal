@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,6 +38,13 @@
 
 /**
 	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
+
+	An instrument has one or more channels (theoretically zero is allowed, but this would make little sense),
+	each of which may have different capabilities. For example, an oscilloscope might have four oscilloscope
+	channels which can also be used as multimeter inputs, and one function/arbitrary waveform generator output,
+	for a total of five channels.
+
+	All channels regardless of type occupy a single zero-based namespace.
  */
 class Instrument
 {
@@ -72,7 +79,24 @@ public:
 		INST_RF_GEN				= 0x10
 	};
 
+	/**
+		@brief Returns a bitfield describing the set of instrument types that this instrument supports.
+
+		Not all types may be available on a given channel.
+	 */
 	virtual unsigned int GetInstrumentTypes() =0;
+
+	/**
+		@brief Returns a bitfield describing the set of instrument types that a given channel supports.
+	 */
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) =0;
+
+	/**
+		@brief Gets the number of channels this instrument has.
+
+		Only hardware I/O channels are included, not math/memory.
+	 */
+	virtual size_t GetChannelCount() =0;
 
 	//Device information
 	virtual std::string GetName() =0;

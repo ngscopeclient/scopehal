@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,6 +90,11 @@ string MockOscilloscope::GetTransportConnectionString()
 unsigned int MockOscilloscope::GetInstrumentTypes()
 {
 	return INST_OSCILLOSCOPE;
+}
+
+uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+{
+	return Instrument::INST_OSCILLOSCOPE;
 }
 
 string MockOscilloscope::GetName()

@@ -1043,6 +1043,18 @@ unsigned int LeCroyOscilloscope::GetInstrumentTypes()
 	return type;
 }
 
+uint32_t LeCroyOscilloscope::GetInstrumentTypesForChannel(size_t i)
+{
+	//TODO: AWG outputs
+
+	//If we get here, it's an oscilloscope channel
+	//Report DMM functionality if available
+	if(m_hasDVM && (i < m_analogChannelCount))
+		return Instrument::INST_OSCILLOSCOPE | Instrument::INST_DMM;
+	else
+		return Instrument::INST_OSCILLOSCOPE;
+}
+
 string LeCroyOscilloscope::GetName()
 {
 	return m_model;
