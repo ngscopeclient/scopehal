@@ -36,6 +36,8 @@
 #ifndef Instrument_h
 #define Instrument_h
 
+#include "InstrumentChannel.h"
+
 /**
 	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
 
@@ -44,12 +46,18 @@
 	channels which can also be used as multimeter inputs, and one function/arbitrary waveform generator output,
 	for a total of five channels.
 
+	Math, memory, and other non-acquisition channels are generally not exposed in the API unless they provide features
+	which are not possible to implement clientside.
+
 	All channels regardless of type occupy a single zero-based namespace.
  */
 class Instrument
 {
 public:
 	virtual ~Instrument();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Instrument identification
 
 	/*
 		@brief Types of instrument.
@@ -86,18 +94,6 @@ public:
 	 */
 	virtual unsigned int GetInstrumentTypes() =0;
 
-	/**
-		@brief Returns a bitfield describing the set of instrument types that a given channel supports.
-	 */
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) =0;
-
-	/**
-		@brief Gets the number of channels this instrument has.
-
-		Only hardware I/O channels are included, not math/memory.
-	 */
-	virtual size_t GetChannelCount() =0;
-
 	//Device information
 	virtual std::string GetName() =0;
 	virtual std::string GetVendor() =0;
@@ -119,6 +115,81 @@ public:
 		@brief Gets the name of our transport
 	 */
 	virtual std::string GetTransportName() =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Channel enumeration and identification
+
+	/**
+		@brief Returns a bitfield describing the set of instrument types that a given channel supports.
+
+		@param i	Channel index
+	 */
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) =0;
+
+	/**
+		@brief Gets the number of channels (of any type) this instrument has.
+	 */
+	size_t GetChannelCount()
+	{ return m_channels.size(); }
+
+	/**
+		@brief Gets a given channel on the instrument
+
+		Derived classes typically implement a GetXChannel() helper function which casts the channel to the requested
+		type.
+
+		@param i		Channel index
+	 */
+	InstrumentChannel* GetChannel(size_t i)
+	{
+		if(i >= m_channels.size())
+			return nullptr;
+
+		return m_channels[i];
+	}
+
+	/**
+		@brief Gets the hardware display name for a channel. This is an arbitrary user-selected string.
+
+		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
+		driver should override this function.
+
+		This function does not implement any caching, so calling it directly in performance critical code is
+		not advisable. Instead, call InstrumentChannel::GetDisplayName(), which caches clientside and calls this
+		function only on a cache miss.
+
+		The default implementation is a no-op.
+
+		@param i Zero-based index of channel
+	 */
+	virtual std::string GetChannelDisplayName(size_t i);
+
+	/**
+		@brief Sets the hardware display name for a channel. This is an arbitrary user-selected string.
+
+		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
+		driver should override this function.
+
+		This function directly updates hardware without caching. In most cases, you should call
+		InstrumentChannel::SetDisplayName(), which updates the clientside cache and then calls this function.
+
+		The default function returns the hardware name.
+
+		@param i	Zero-based index of channel
+		@param name	Name of the channel
+	 */
+	virtual void SetChannelDisplayName(size_t i, std::string name);
+
+	InstrumentChannel* GetChannelByDisplayName(const std::string& name);
+	InstrumentChannel* GetChannelByHwName(const std::string& name);
+
+protected:
+
+	/**
+		@brief Set of all channels on this instrument
+	 */
+	std::vector<InstrumentChannel*> m_channels;
+
 };
 
 #endif

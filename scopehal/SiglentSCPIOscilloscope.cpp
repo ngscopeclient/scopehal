@@ -503,7 +503,6 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
-	m_channelDisplayNames.clear();
 	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
@@ -517,6 +516,13 @@ void SiglentSCPIOscilloscope::FlushConfigCache()
 	m_awgShape.clear();
 	m_awgImpedance.clear();
 	m_adcModeValid = false;
+
+	//Clear cached display name of all channels
+	for(auto c : m_channels)
+	{
+		if(GetInstrumentTypesForChannel(c->GetIndex()) & Instrument::INST_OSCILLOSCOPE)
+			c->ClearCachedDisplayName();
+	}
 }
 
 /**
@@ -1218,18 +1224,14 @@ bool SiglentSCPIOscilloscope::IsInverted(size_t i)
 
 void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
+	if(!chan)
+		return;
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return;
-
-	//Update cache
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelDisplayNames[m_channels[i]] = name;
-	}
 
 	//Update in hardware
 	switch(m_modelid)
@@ -1263,19 +1265,14 @@ void SiglentSCPIOscilloscope::SetChannelDisplayName(size_t i, string name)
 
 string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
+	if(!chan)
+		return "";
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return m_extTrigChannel->GetHwname();
-
-	//Check cache first
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_channelDisplayNames.find(chan) != m_channelDisplayNames.end())
-			return m_channelDisplayNames[chan];
-	}
 
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
@@ -1319,9 +1316,6 @@ string SiglentSCPIOscilloscope::GetChannelDisplayName(size_t i)
 	//Default to using hwname if no alias defined
 	if(name == "")
 		name = chan->GetHwname();
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelDisplayNames[chan] = name;
 
 	return name;
 }
@@ -2131,7 +2125,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 		for(size_t j = 0; j < m_channels.size(); j++)
 		{
 			if(pending_waveforms.find(j) != pending_waveforms.end())
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -2614,9 +2608,9 @@ set<SiglentSCPIOscilloscope::InterleaveConflict> SiglentSCPIOscilloscope::GetInt
 
 	//All scopes normally interleave channels 1/2 and 3/4.
 	//If both channels in either pair is in use, that's a problem.
-	ret.emplace(InterleaveConflict(m_channels[0], m_channels[1]));
+	ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(1)));
 	if(m_analogChannelCount > 2)
-		ret.emplace(InterleaveConflict(m_channels[2], m_channels[3]));
+		ret.emplace(InterleaveConflict(GetOscilloscopeChannel(2), GetOscilloscopeChannel(3)));
 
 	return ret;
 }
@@ -3428,7 +3422,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 					m_trigger = NULL;
 					return;
 				}
-				auto chan = GetChannelByHwName(result[2]);
+				auto chan = GetOscilloscopeChannelByHwName(result[2]);
 				m_trigger->SetInput(0, StreamDescriptor(chan, 0), true);
 			}
 			break;
@@ -3482,7 +3476,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 void SiglentSCPIOscilloscope::PullTriggerSource(Trigger* trig, string triggerModeName)
 {
 	string reply = Trim(converse(":TRIGGER:%s:SOURCE?", triggerModeName.c_str()));
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());

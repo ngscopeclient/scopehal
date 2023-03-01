@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -32,6 +32,50 @@
 
 using namespace std;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
 Instrument::~Instrument()
 {
+	for(auto c : m_channels)
+		delete c;
+	m_channels.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Channel enumeration and identification
+
+/**
+	@brief Gets a channel given the display name
+ */
+InstrumentChannel* Instrument::GetChannelByDisplayName(const string& name)
+{
+	for(auto c : m_channels)
+	{
+		if(c->GetDisplayName() == name)
+			return c;
+	}
+	return NULL;
+}
+
+/**
+	@brief Gets a channel given the hardware name
+ */
+InstrumentChannel* Instrument::GetChannelByHwName(const string& name)
+{
+	for(auto c : m_channels)
+	{
+		if(c->GetHwname() == name)
+			return c;
+	}
+	return NULL;
+}
+
+void Instrument::SetChannelDisplayName(size_t /*i*/, string /*name*/)
+{
+}
+
+string Instrument::GetChannelDisplayName(size_t i)
+{
+	return m_channels[i]->GetHwname();
 }

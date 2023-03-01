@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,11 +47,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& color,
 	Unit xunit,
 	size_t index)
-	: m_displaycolor(color)
-	, m_displayname(hwname)
+	: InstrumentChannel(hwname, index)
+	, m_displaycolor(color)
 	, m_scope(scope)
-	, m_hwname(hwname)
-	, m_index(index)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
 {
@@ -65,11 +63,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit yunit,
 	Stream::StreamType stype,
 	size_t index)
-	: m_displaycolor(color)
-	, m_displayname(hwname)
+	: InstrumentChannel(hwname, index)
+	, m_displaycolor(color)
 	, m_scope(scope)
-	, m_hwname(hwname)
-	, m_index(index)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
 {
@@ -273,16 +269,20 @@ void OscilloscopeChannel::SetDisplayName(string name)
 {
 	if(m_scope)
 		m_scope->SetChannelDisplayName(m_index, name);
-	else
-		m_displayname = name;
+	InstrumentChannel::SetDisplayName(name);
 }
 
 string OscilloscopeChannel::GetDisplayName()
 {
-	if(m_scope)
-		return m_scope->GetChannelDisplayName(m_index);
-	else
-		return m_displayname;
+	//Use cached name if we have it
+	auto cached = InstrumentChannel::GetDisplayName();
+	if(!cached.empty())
+		return cached;
+
+	//If not, pull from hardware
+	auto tmp = m_scope->GetChannelDisplayName(m_index);
+	InstrumentChannel::SetDisplayName(tmp);
+	return tmp;
 }
 
 bool OscilloscopeChannel::CanInvert()

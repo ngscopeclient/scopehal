@@ -1005,13 +1005,19 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelOffsets.clear();
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
-	m_channelDisplayNames.clear();
 	m_probeIsActive.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
 	m_interleavingValid = false;
 	m_meterModeValid = false;
+
+	//Clear cached display name of all channels
+	for(auto c : m_channels)
+	{
+		if(GetInstrumentTypesForChannel(c->GetIndex()) & Instrument::INST_OSCILLOSCOPE)
+			c->ClearCachedDisplayName();
+	}
 }
 
 /**
@@ -1097,7 +1103,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	if(i < m_analogChannelCount)
 	{
 		//See if the channel is enabled, hide it if not
-		string cmd = m_channels[i]->GetHwname() + ":TRACE?";
+		string cmd = GetOscilloscopeChannel(i)->GetHwname() + ":TRACE?";
 		auto reply = m_transport->SendCommandQueuedWithReply(cmd);
 
 		lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -1141,7 +1147,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 	if(i < m_analogChannelCount)
 	{
 		//Disable interleaving if we created a conflict
-		auto chan = m_channels[i];
+		auto chan = GetOscilloscopeChannel(i);
 		if(IsInterleaving())
 		{
 			auto conflicts = GetInterleaveConflicts();
@@ -1248,7 +1254,7 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 
 	//If this is an analog channel, just toggle it
 	if(i < m_analogChannelCount)
-		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TRACE OFF");
+		m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TRACE OFF");
 
 	//Trigger can't be enabled
 	else if(i == m_extTrigChannel->GetIndex())
@@ -1308,7 +1314,7 @@ OscilloscopeChannel::CouplingType LeCroyOscilloscope::GetChannelCoupling(size_t 
 
 	string reply;
 	{
-		reply = Trim(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":COUPLING?"));
+		reply = Trim(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING?"));
 		reply = reply.substr(0,3);
 	}
 
@@ -1351,21 +1357,21 @@ void LeCroyOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coupl
 	switch(type)
 	{
 		case OscilloscopeChannel::COUPLE_AC_1M:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING A1M");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING A1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_1M:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING D1M");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D1M");
 			break;
 
 		case OscilloscopeChannel::COUPLE_DC_50:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING D50");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING D50");
 			break;
 
 		//treat unrecognized as ground
 		case OscilloscopeChannel::COUPLE_GND:
 		default:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUPLING GND");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUPLING GND");
 			break;
 	}
 }
@@ -1379,7 +1385,7 @@ double LeCroyOscilloscope::GetChannelAttenuation(size_t i)
 	if(i == m_extTrigChannel->GetIndex())
 		return 1;
 
-	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":ATTENUATION?");
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":ATTENUATION?");
 
 	double d;
 	sscanf(reply.c_str(), "%lf", &d);
@@ -1403,7 +1409,7 @@ void LeCroyOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	}
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "%s:ATTENUATION %f", m_channels[i]->GetHwname().c_str(), atten);
+	snprintf(cmd, sizeof(cmd), "%s:ATTENUATION %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), atten);
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -1530,7 +1536,7 @@ unsigned int LeCroyOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 	auto reply = m_transport->SendCommandQueuedWithReply("BANDWIDTH_LIMIT?");
 
-	size_t index = reply.find(m_channels[i]->GetHwname());
+	size_t index = reply.find(GetOscilloscopeChannel(i)->GetHwname());
 	if(index == string::npos)
 		return 0;
 
@@ -1571,11 +1577,11 @@ void LeCroyOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limit_m
 {
 	char cmd[128];
 	if(limit_mhz == 0)
-		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", m_channels[i]->GetHwname().c_str());
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,OFF", GetOscilloscopeChannel(i)->GetHwname().c_str());
 	else if(limit_mhz >= 1000)
-		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uGHZ", m_channels[i]->GetHwname().c_str(), limit_mhz/1000);
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uGHZ", GetOscilloscopeChannel(i)->GetHwname().c_str(), limit_mhz/1000);
 	else
-		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", m_channels[i]->GetHwname().c_str(), limit_mhz);
+		snprintf(cmd, sizeof(cmd), "BANDWIDTH_LIMIT %s,%uMHZ", GetOscilloscopeChannel(i)->GetHwname().c_str(), limit_mhz);
 
 	m_transport->SendCommandQueued(cmd);
 }
@@ -1592,9 +1598,9 @@ void LeCroyOscilloscope::Invert(size_t i, bool invert)
 		return;
 
 	if(invert)
-		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = true'");
+		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".Invert = true'");
 	else
-		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert = false'");
+		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".Invert = false'");
 }
 
 bool LeCroyOscilloscope::IsInverted(size_t i)
@@ -1603,7 +1609,7 @@ bool LeCroyOscilloscope::IsInverted(size_t i)
 		return false;
 
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
-		string("VBS? 'return = app.Acquisition.") + m_channels[i]->GetHwname() + ".Invert'"));
+		string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".Invert'"));
 	return (reply == "-1");
 }
 
@@ -1614,7 +1620,7 @@ string LeCroyOscilloscope::GetProbeName(size_t i)
 
 	//Step 1: Determine which input is active.
 	//There's always a mux selector in software, even if only one is present on the physical acquisition board
-	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
 	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 
 	//Step 2: Identify the probe connected to this mux channel
@@ -1676,7 +1682,7 @@ void LeCroyOscilloscope::AutoZero(size_t i)
 		return;
 
 	//Get the active input and probe name
-	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
 	auto mux = Trim(m_transport->SendCommandQueuedWithReply(
 		string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 	auto name = Trim(m_transport->SendCommandQueuedWithReply(
@@ -1710,7 +1716,7 @@ size_t LeCroyOscilloscope::GetInputMuxSetting(size_t i)
 		return 0;
 
 	//Get the active input and probe name
-	string prefix = string("app.Acquisition.") + m_channels[i]->GetHwname();
+	string prefix = string("app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname();
 	auto mux = Trim(m_transport->SendCommandQueuedWithReply(string("VBS? 'return = ") + prefix + ".ActiveInput'"));
 	if(mux == "InputA")
 		return 0;
@@ -1746,29 +1752,25 @@ void LeCroyOscilloscope::SetInputMux(size_t i, size_t select)
 	if(select == 0)
 	{
 		m_transport->SendCommandQueued(
-			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputA\"'");
+			string("VBS 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".ActiveInput = \"InputA\"'");
 	}
 	else
 	{
 		m_transport->SendCommandQueued(
-			string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() + ".ActiveInput = \"InputB\"'");
+			string("VBS 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".ActiveInput = \"InputB\"'");
 	}
 }
 
 void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
+	if(!chan)
+		return;
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return;
-
-	//Update cache
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelDisplayNames[m_channels[i]] = name;
-	}
 
 	//Update in hardware
 	if(i < m_analogChannelCount)
@@ -1783,19 +1785,14 @@ void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)
 
 string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
+	if(!chan)
+		return "";
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return m_extTrigChannel->GetHwname();
-
-	//Check cache first
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_channelDisplayNames.find(chan) != m_channelDisplayNames.end())
-			return m_channelDisplayNames[chan];
-	}
 
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
@@ -1818,9 +1815,6 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 	//Default to using hwname if no alias defined
 	if(name == "")
 		name = chan->GetHwname();
-
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelDisplayNames[chan] = name;
 
 	return name;
 }
@@ -2222,7 +2216,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 		lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 		for(auto i : uncached)
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TRACE?");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TRACE?");
 		m_transport->FlushCommandQueue();
 		for(auto i : uncached)
 		{
@@ -2241,7 +2235,7 @@ void LeCroyOscilloscope::BulkCheckChannelEnableState()
 	{
 		for(auto i : uncached)
 		{
-			auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":TRACE?");
+			auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":TRACE?");
 
 			lock_guard<recursive_mutex> lock(m_cacheMutex);
 			if(reply == "OFF")
@@ -2295,7 +2289,7 @@ bool LeCroyOscilloscope::ReadWavedescs(
 		{
 			if(firstEnabledChannel == UINT_MAX)
 				firstEnabledChannel = i;
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? DESC");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":WF? DESC");
 		}
 	}
 
@@ -2336,12 +2330,12 @@ void LeCroyOscilloscope::RequestWaveforms(bool* enabled, uint32_t num_sequences,
 			//If a multi-segment capture, ask for the trigger time data
 			if( (num_sequences > 1) && !sent_wavetime)
 			{
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? TIME");
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":WF? TIME");
 				sent_wavetime = true;
 			}
 
 			//Ask for the data
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":WF? DAT1");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":WF? DAT1");
 		}
 	}
 
@@ -2816,7 +2810,7 @@ bool LeCroyOscilloscope::AcquireData()
 		for(size_t j=0; j<m_channels.size(); j++)
 		{
 			if(pending_waveforms.find(j) != pending_waveforms.end())
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -2877,7 +2871,7 @@ float LeCroyOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 			return m_channelOffsets[i];
 	}
 
-	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFSET?");
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":OFFSET?");
 
 	float offset;
 	sscanf(reply.c_str(), "%f", &offset);
@@ -2894,7 +2888,7 @@ void LeCroyOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float off
 		return;
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", m_channels[i]->GetHwname().c_str(), offset);
+	snprintf(tmp, sizeof(tmp), "%s:OFFSET %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), offset);
 	m_transport->SendCommandQueued(tmp);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -2913,7 +2907,7 @@ float LeCroyOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 			return m_channelVoltageRanges[i];
 	}
 
-	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":VOLT_DIV?");
+	auto reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":VOLT_DIV?");
 
 	double volts_per_div;
 	sscanf(reply.c_str(), "%lf", &volts_per_div);
@@ -2930,7 +2924,7 @@ void LeCroyOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, flo
 	m_channelVoltageRanges[i] = range;
 
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", m_channels[i]->GetHwname().c_str(), vdiv);
+	snprintf(cmd, sizeof(cmd), "%s:VOLT_DIV %.4f", GetOscilloscopeChannel(i)->GetHwname().c_str(), vdiv);
 	m_transport->SendCommandQueued(cmd);
 }
 
@@ -3319,8 +3313,11 @@ vector<uint64_t> LeCroyOscilloscope::GetSampleDepthsInterleaved()
 		case MODEL_HDO_6KA:
 		case MODEL_LABMASTER_ZI_A:
 		case MODEL_MDA_800:
-		case MODEL_WAVEMASTER_8ZI_B:
-			return base;
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_WAVEMASTER_8ZI:
+		case MODEL_WAVEMASTER_8ZI_A:
+		//SDA/wavemaster 8Zi-B can interleave
 
 		//TODO: add more models here
 		default:
@@ -3336,17 +3333,18 @@ set<LeCroyOscilloscope::InterleaveConflict> LeCroyOscilloscope::GetInterleaveCon
 
 	//All scopes normally interleave channels 1/2 and 3/4.
 	//If both channels in either pair is in use, that's a problem.
-	ret.emplace(InterleaveConflict(m_channels[0], m_channels[1]));
+	ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(1)));
 	if(m_analogChannelCount > 2)
-		ret.emplace(InterleaveConflict(m_channels[2], m_channels[3]));
+		ret.emplace(InterleaveConflict(GetOscilloscopeChannel(2), GetOscilloscopeChannel(3)));
 
 	switch(m_modelid)
 	{
 		//Any use of 1 or 4 disqualifies interleaving in these models
+		//TODO: is this true of everything but the wavesurfer 3K? so far that seems to be the only exception
 		case MODEL_HDO_9K:
 		case MODEL_WAVERUNNER_8K:
-			ret.emplace(InterleaveConflict(m_channels[0], m_channels[0]));
-			ret.emplace(InterleaveConflict(m_channels[3], m_channels[3]));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(0)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(3), GetOscilloscopeChannel(3)));
 			break;
 
 		default:
@@ -3762,7 +3760,7 @@ void LeCroyOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 		//Disable all interpolation
 		for(size_t i=0; i<m_analogChannelCount; i++)
 		{
-			m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + m_channels[i]->GetHwname() +
+			m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() +
 				".Interpolation = \"NONE\"'");
 		}
 	}
@@ -3912,7 +3910,7 @@ void LeCroyOscilloscope::PullTriggerSource(Trigger* trig)
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
 		"VBS? 'return = app.Acquisition.Trigger.Source'"));		//not visible in XStream Browser?
 
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	trig->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source \"%s\"\n", reply.c_str());

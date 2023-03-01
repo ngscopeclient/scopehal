@@ -41,7 +41,9 @@ RohdeSchwarzHMC804xPowerSupply::RohdeSchwarzHMC804xPowerSupply(SCPITransport* tr
 	, m_activeChannel(-1)
 {
 	//Figure out how many channels we have
-	m_channelCount = atoi(m_model.c_str() + strlen("HMC804"));
+	int nchans = atoi(m_model.c_str() + strlen("HMC804"));
+	for(int i=0; i<nchans; i++)
+		m_channels.push_back(new InstrumentChannel(string("CH") + to_string(i+1), i));
 }
 
 RohdeSchwarzHMC804xPowerSupply::~RohdeSchwarzHMC804xPowerSupply()
@@ -70,11 +72,6 @@ string RohdeSchwarzHMC804xPowerSupply::GetVendor()
 string RohdeSchwarzHMC804xPowerSupply::GetSerial()
 {
 	return m_serial;
-}
-
-size_t RohdeSchwarzHMC804xPowerSupply::GetChannelCount()
-{
-	return m_channelCount;
 }
 
 uint32_t RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)

@@ -884,7 +884,7 @@ bool RigolOscilloscope::AcquireData()
 		for(size_t j = 0; j < m_analogChannelCount; j++)
 		{
 			if(pending_waveforms.count(j) > 0)
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -1226,7 +1226,7 @@ void RigolOscilloscope::PullEdgeTrigger()
 	//Source
 	m_transport->SendCommand(":TRIG:EDGE:SOUR?");
 	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	et->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());

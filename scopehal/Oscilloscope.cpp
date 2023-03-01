@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -66,10 +66,6 @@ Oscilloscope::~Oscilloscope()
 		m_trigger = NULL;
 	}
 
-	for(size_t i=0; i<m_channels.size(); i++)
-		delete m_channels[i];
-	m_channels.clear();
-
 	for(auto set : m_pendingWaveforms)
 	{
 		for(auto it : set)
@@ -112,39 +108,6 @@ void Oscilloscope::FlushConfigCache()
 bool Oscilloscope::IsOffline()
 {
 	return false;
-}
-
-size_t Oscilloscope::GetChannelCount()
-{
-	return m_channels.size();
-}
-
-OscilloscopeChannel* Oscilloscope::GetChannel(size_t i)
-{
-	if(i < m_channels.size())
-		return m_channels[i];
-	else
-		return NULL;
-}
-
-OscilloscopeChannel* Oscilloscope::GetChannelByDisplayName(const string& name)
-{
-	for(auto c : m_channels)
-	{
-		if(c->GetDisplayName() == name)
-			return c;
-	}
-	return NULL;
-}
-
-OscilloscopeChannel* Oscilloscope::GetChannelByHwName(const string& name)
-{
-	for(auto c : m_channels)
-	{
-		if(c->GetHwname() == name)
-			return c;
-	}
-	return NULL;
 }
 
 bool Oscilloscope::CanEnableChannel(size_t /*i*/)
@@ -256,9 +219,17 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
-		auto chan = GetChannel(i);
+		auto chan = GetOscilloscopeChannel(i);
+
+		//Skip any channel that's not an oscilloscope input
+		//TODO: new unified object model might require some retooling here since we can have multiple types of channel
+		//and not all are oscilloscope channels
+		if(!chan)
+			continue;
+
+		//skip any kind of math functions etc
 		if(!chan->IsPhysicalChannel())
-			continue;	//skip any kind of math functions etc
+			continue;
 
 		//Basic channel info
 		snprintf(tmp, sizeof(tmp), "            ch%zu:\n", i);
@@ -407,7 +378,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	for(auto it : chans)
 	{
 		auto& cnode = it.second;
-		auto chan = m_channels[cnode["index"].as<int>()];
+		auto chan = GetOscilloscopeChannel(cnode["index"].as<int>());
 		table.emplace(cnode["id"].as<int>(), chan);
 
 		//Ignore name/type.
@@ -586,16 +557,6 @@ bool Oscilloscope::CanInterleave()
 	return true;
 }
 
-void Oscilloscope::SetChannelDisplayName(size_t i, string name)
-{
-	m_channelDisplayNames[m_channels[i]] = name;
-}
-
-string Oscilloscope::GetChannelDisplayName(size_t i)
-{
-	return m_channelDisplayNames[m_channels[i]];
-}
-
 vector<unsigned int> Oscilloscope::GetChannelBandwidthLimiters(size_t /*i*/)
 {
 	vector<unsigned int> ret;
@@ -694,7 +655,9 @@ Oscilloscope::AnalogBank Oscilloscope::GetAnalogBank(size_t /*channel*/)
 	AnalogBank ret;
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
-		auto chan = m_channels[i];
+		auto chan = GetOscilloscopeChannel(i);
+		if(chan == nullptr)
+			continue;
 		if(chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 			ret.push_back(chan);
 	}

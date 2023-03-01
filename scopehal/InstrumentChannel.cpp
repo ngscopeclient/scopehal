@@ -35,13 +35,37 @@
 
 #include "scopehal.h"
 
+using namespace std;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-InstrumentChannel::InstrumentChannel()
+InstrumentChannel::InstrumentChannel(const string& hwname, size_t i)
+	: m_hwname(hwname)
+	, m_displayname(hwname)
+	, m_index(i)
 {
 }
 
 InstrumentChannel::~InstrumentChannel()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+/**
+	@brief Sets the human-readable nickname for this channel, as displayed in the GUI
+ */
+void InstrumentChannel::SetDisplayName(string name)
+{
+	m_displayname = name;
+}
+
+/**
+	@brief Gets the human-readable nickname for this channel, as displayed in the GUI
+ */
+string InstrumentChannel::GetDisplayName()
+{
+	return m_displayname;
 }

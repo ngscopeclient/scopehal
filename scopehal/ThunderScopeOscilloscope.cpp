@@ -93,7 +93,7 @@ ThunderScopeOscilloscope::ThunderScopeOscilloscope(SCPITransport* transport)
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
-	trig->SetInput(0, StreamDescriptor(m_channels[0]));
+	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(1000000000000); //1ms to allow trigphase interpolation
@@ -322,7 +322,7 @@ bool ThunderScopeOscilloscope::AcquireData()
 			scales.push_back(scale);
 			offsets.push_back(offset);
 
-			s[m_channels[chnum]] = cap;
+			s[GetOscilloscopeChannel(chnum)] = cap;
 		} else {
 			LogFatal("???\n");
 		}

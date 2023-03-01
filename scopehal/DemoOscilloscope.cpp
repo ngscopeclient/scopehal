@@ -445,7 +445,7 @@ vector<Oscilloscope::AnalogBank> DemoOscilloscope::GetAnalogBanks()
 Oscilloscope::AnalogBank DemoOscilloscope::GetAnalogBank(size_t channel)
 {
 	AnalogBank bank;
-	bank.push_back(m_channels[channel]);
+	bank.push_back(GetOscilloscopeChannel(channel));
 	return bank;
 }
 
@@ -521,7 +521,7 @@ bool DemoOscilloscope::AcquireData()
 
 	SequenceSet s;
 	for(int i=0; i<4; i++)
-		s[m_channels[i]] = waveforms[i];
+		s[GetOscilloscopeChannel(i)] = waveforms[i];
 
 	//Timestamp the waveform(s)
 	double now = GetTime();

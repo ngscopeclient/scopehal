@@ -43,6 +43,9 @@ RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* tran
 {
 	//prefetch operating mode
 	GetMeterMode();
+
+	//Create our single channel
+	m_channels.push_back(new InstrumentChannel("VIN", 0));
 }
 
 RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()
@@ -79,11 +82,6 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetSecondaryMeasurementTypes()
 		default:
 			return 0;
 	}
-}
-
-size_t RohdeSchwarzHMC8012Multimeter::GetChannelCount()
-{
-	return 1;
 }
 
 uint32_t RohdeSchwarzHMC8012Multimeter::GetInstrumentTypesForChannel(size_t /*i*/)

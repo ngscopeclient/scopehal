@@ -40,6 +40,9 @@ SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transp
 	, SCPIInstrument(transport)
 {
 	//TODO: query options to figure out what we actually have
+
+	m_channels.push_back(new InstrumentChannel("RFOUT", 0));
+	m_channels.push_back(new InstrumentChannel("LFO", 1));
 }
 
 SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()
@@ -52,11 +55,6 @@ SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()
 string SiglentVectorSignalGenerator::GetDriverNameInternal()
 {
 	return "siglent_ssg";
-}
-
-size_t SiglentVectorSignalGenerator::GetChannelCount()
-{
-	return 2;
 }
 
 string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)

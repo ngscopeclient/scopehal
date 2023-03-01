@@ -636,7 +636,7 @@ void AntikernelLogicAnalyzer::PullTrigger()
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	//Default setup
-	et->SetInput(0, StreamDescriptor(m_channels[0], 0), true);
+	et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0), 0), true);
 	et->SetLevel(0.5);
 	et->SetType(EdgeTrigger::EDGE_RISING);
 }

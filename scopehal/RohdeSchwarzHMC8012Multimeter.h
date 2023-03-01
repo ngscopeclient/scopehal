@@ -40,35 +40,34 @@ public:
 	RohdeSchwarzHMC8012Multimeter(SCPITransport* transport);
 	virtual ~RohdeSchwarzHMC8012Multimeter();
 
-	virtual unsigned int GetInstrumentTypes();
-	virtual size_t GetChannelCount() override;
+	virtual unsigned int GetInstrumentTypes() override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
-	virtual unsigned int GetMeasurementTypes();
-	virtual unsigned int GetSecondaryMeasurementTypes();
+	virtual unsigned int GetMeasurementTypes() override;
+	virtual unsigned int GetSecondaryMeasurementTypes() override;
 
 	//Channel info
-	virtual std::string GetMeterChannelName(int chan);
-	virtual int GetCurrentMeterChannel();
-	virtual void SetCurrentMeterChannel(int chan);
+	virtual std::string GetMeterChannelName(int chan) override;
+	virtual int GetCurrentMeterChannel() override;
+	virtual void SetCurrentMeterChannel(int chan) override;
 
 	//Meter operating mode
-	virtual MeasurementTypes GetMeterMode();
-	virtual MeasurementTypes GetSecondaryMeterMode();
-	virtual void SetMeterMode(MeasurementTypes type);
-	virtual void SetSecondaryMeterMode(MeasurementTypes type);
+	virtual MeasurementTypes GetMeterMode() override;
+	virtual MeasurementTypes GetSecondaryMeterMode() override;
+	virtual void SetMeterMode(MeasurementTypes type) override;
+	virtual void SetSecondaryMeterMode(MeasurementTypes type) override;
 
 	//Control
-	virtual void SetMeterAutoRange(bool enable);
-	virtual bool GetMeterAutoRange();
-	virtual void StartMeter();
-	virtual void StopMeter();
+	virtual void SetMeterAutoRange(bool enable) override;
+	virtual bool GetMeterAutoRange() override;
+	virtual void StartMeter() override;
+	virtual void StopMeter() override;
 
-	virtual int GetMeterDigits();
+	virtual int GetMeterDigits() override;
 
 	//Get readings
-	virtual double GetMeterValue();
-	virtual double GetSecondaryMeterValue();
+	virtual double GetMeterValue() override;
+	virtual double GetSecondaryMeterValue() override;
 
 protected:
 	bool m_modeValid;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,32 +90,12 @@ public:
 	// Channel information
 
 	/**
-		@brief Gets the number of channels this instrument has.
-
-		Only hardware acquisition channels (analog or digital) are included, not math/memory.
-
-		Note that since external trigger inputs have some of the same settings as acquisition channels, they are
-		included in the channel count. Call OscilloscopeChannel::GetType() on a given channel to see what kind
-		of channel it is.
-	 */
-	virtual size_t GetChannelCount();
-
-	/**
 		@brief Gets a channel by index
 
 		@param i Zero-based index of channel
 	 */
-	OscilloscopeChannel* GetChannel(size_t i);
-
-	/**
-		@brief Gets a channel given the display name
-	 */
-	OscilloscopeChannel* GetChannelByDisplayName(const std::string& name);
-
-	/**
-		@brief Gets a channel given the hardware name
-	 */
-	OscilloscopeChannel* GetChannelByHwName(const std::string& name);
+	OscilloscopeChannel* GetOscilloscopeChannel(size_t i)
+	{ return dynamic_cast<OscilloscopeChannel*>(GetChannel(i)); }
 
 	/**
 		@brief Checks if a channel is enabled in hardware.
@@ -153,6 +133,12 @@ public:
 	virtual void DisableChannel(size_t i) =0;
 
 	/**
+		@brief Gets a channel given the hardware name
+	 */
+	OscilloscopeChannel* GetOscilloscopeChannelByHwName(const std::string& name)
+	{ return dynamic_cast<OscilloscopeChannel*>(GetChannelByHwName(name)); }
+
+	/**
 		@brief Gets the coupling used for an input channel
 
 		@param i Zero-based index of channel
@@ -172,33 +158,6 @@ public:
 		@param i	Zero-based index of channel
 	 */
 	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) =0;
-
-	/**
-		@brief Gets the display name for a channel. This is an arbitrary user-selected string.
-
-		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
-		driver should override this function.
-
-		The default function simply stores the display name in the Oscilloscope object, and is appropriate for
-		instruments which have no concept of a nickname or display name.
-
-		@param i Zero-based index of channel
-	 */
-	virtual std::string GetChannelDisplayName(size_t i);
-
-	/**
-		@brief Sets the display name for a channel. This is an arbitrary user-selected string.
-
-		Some instruments allow displaying channel names in the GUI or on probes. If this is supported, the
-		driver should override this function.
-
-		The default function simply stores the display name in the Oscilloscope object, and is appropriate for
-		instruments which have no concept of a nickname or display name.
-
-		@param i	Zero-based index of channel
-		@param name	Name of the channel
-	 */
-	virtual void SetChannelDisplayName(size_t i, std::string name);
 
 	/**
 		@brief Gets the probe attenuation for an input channel.
@@ -893,12 +852,6 @@ public:
 	}
 
 protected:
-
-	///The channels
-	std::vector<OscilloscopeChannel*> m_channels;
-
-	///Display names for channels
-	std::map<OscilloscopeChannel*, std::string> m_channelDisplayNames;
 
 	//The trigger
 	Trigger* m_trigger;

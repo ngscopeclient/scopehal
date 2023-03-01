@@ -279,7 +279,7 @@ bool LeCroyFWPOscilloscope::AcquireData()
 		for(size_t j=0; j<m_channels.size(); j++)
 		{
 			if(pending_waveforms.find(j) != pending_waveforms.end())
-				s[m_channels[j]] = pending_waveforms[j];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j];
 		}
 		m_pendingWaveforms.push_back(s);
 	m_pendingWaveformsMutex.unlock();

@@ -162,7 +162,7 @@ void KeysightDCA::FlushConfigCache()
 
 bool KeysightDCA::IsAnalogChannel(size_t i)
 {
-	return m_channels[i]->GetType(0) == Stream::STREAM_TYPE_ANALOG;
+	return GetOscilloscopeChannel(i)->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
 bool KeysightDCA::IsChannelPresent(string name)
@@ -200,7 +200,7 @@ bool KeysightDCA::IsChannelEnabled(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -221,7 +221,7 @@ void KeysightDCA::EnableChannel(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP ON");
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -232,7 +232,7 @@ void KeysightDCA::DisableChannel(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP OFF");
 	}
 
 
@@ -274,7 +274,7 @@ double KeysightDCA::GetChannelAttenuation(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -291,7 +291,7 @@ void KeysightDCA::SetChannelAttenuation(size_t i, double atten)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		PushFloat(m_channels[i]->GetHwname() + ":PROB", atten);
+		PushFloat(GetOscilloscopeChannel(i)->GetHwname() + ":PROB", atten);
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -310,7 +310,7 @@ unsigned int KeysightDCA::GetChannelBandwidthLimit(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":BAND?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BAND?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -349,7 +349,7 @@ float KeysightDCA::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":RANGE?");
 
 		reply = m_transport->ReadReply();
 	}
@@ -363,7 +363,7 @@ float KeysightDCA::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 void KeysightDCA::SetChannelVoltageRange(size_t i, size_t /*stream*/, float range)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	PushFloat(m_channels[i]->GetHwname() + ":RANGE", range);
+	PushFloat(GetOscilloscopeChannel(i)->GetHwname() + ":RANGE", range);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelVoltageRanges.erase(i);
@@ -390,7 +390,7 @@ float KeysightDCA::GetChannelOffset(size_t i, size_t /*stream*/)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -405,7 +405,7 @@ float KeysightDCA::GetChannelOffset(size_t i, size_t /*stream*/)
 void KeysightDCA::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	PushFloat(m_channels[i]->GetHwname() + ":OFFS", -offset);
+	PushFloat(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS", -offset);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelOffsets.erase(i);
@@ -483,7 +483,7 @@ bool KeysightDCA::AcquireData()
 		if(!IsChannelEnabled(i))
 			continue;
 
-		auto chname = m_channels[i]->GetHwname();
+		auto chname = GetOscilloscopeChannel(i)->GetHwname();
 		auto preamble = GetWaveformPreamble(chname);
 
 		int64_t fs_per_sample = round(preamble.xincrement * FS_PER_SECOND);
@@ -525,7 +525,7 @@ bool KeysightDCA::AcquireData()
 		SequenceSet s;
 		for (size_t j = 0; j < m_channels.size(); j++)
 			if(IsChannelEnabled(j) && pending_waveforms.find(j) != pending_waveforms.end())
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		m_pendingWaveforms.push_back(s);
 	}
 	m_pendingWaveformsMutex.unlock();
@@ -742,7 +742,7 @@ void KeysightDCA::PullEdgeTrigger()
 	//Source
 	m_transport->SendCommand("TRIG:SOUR?");
 	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	et->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());

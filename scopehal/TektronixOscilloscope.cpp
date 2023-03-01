@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -173,7 +173,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					new SpectrumChannel(
 					this,
 					string("CH") + to_string(i+1) + "_SPECTRUM",
-					m_channels[i]->m_displaycolor,
+					GetOscilloscopeChannel(i)->m_displaycolor,
 					m_channels.size()));
 			}
 			break;
@@ -196,8 +196,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 					//TODO: pick colors properly
 					auto chan = new OscilloscopeChannel(
 						this,
-						m_channels[i]->GetHwname() + "_D" + to_string(j),
-						m_channels[i]->m_displaycolor,
+						GetOscilloscopeChannel(i)->GetHwname() + "_D" + to_string(j),
+						GetOscilloscopeChannel(i)->m_displaycolor,
 						Unit(Unit::UNIT_FS),
 						Unit(Unit::UNIT_COUNTS),
 						Stream::STREAM_TYPE_DIGITAL,
@@ -338,7 +338,7 @@ void TektronixOscilloscope::DetectProbes()
 			//If a digital probe (TLP058), disable this channel and mark as not usable
 			for(size_t i=0; i<m_analogChannelCount; i++)
 			{
-				string reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PROBETYPE?");
+				string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROBETYPE?");
 
 				if(reply == "DIG")
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
@@ -347,7 +347,7 @@ void TektronixOscilloscope::DetectProbes()
 				else
 				{
 					string id = TrimQuotes(m_transport->SendCommandQueuedWithReply(
-						m_channels[i]->GetHwname() + ":PROBE:ID:TYP?"));
+						GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:ID:TYP?"));
 
 					if(id == "TPP1000")
 						m_probeTypes[i] = PROBE_TYPE_ANALOG_250K;
@@ -378,7 +378,13 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
 	m_channelDeskew.clear();
-	m_channelDisplayNames.clear();
+
+	//Clear cached display name of all channels
+	for(auto c : m_channels)
+	{
+		if(GetInstrumentTypesForChannel(c->GetIndex()) & Instrument::INST_OSCILLOSCOPE)
+			c->ClearCachedDisplayName();
+	}
 
 	m_sampleRateValid = false;
 	m_sampleDepthValid = false;
@@ -410,7 +416,7 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			if(IsDigital(i))
 			{
 				//If the parent analog channel doesn't have a digital probe, we're disabled
-				size_t parent = m_flexChannelParents[m_channels[i]];
+				size_t parent = m_flexChannelParents[GetOscilloscopeChannel(i)];
 				if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
 					return false;
 			}
@@ -447,14 +453,14 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			else
 			{
 				reply = m_transport->SendCommandQueuedWithReply(
-					string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE?");
+					string("DISP:WAVEV:") + GetOscilloscopeChannel(i)->GetHwname() + ":STATE?");
 
 				if (IsDigital(i))
 				{
 					// Digital channels may report enabled, but not actually be displayed because the associated _DALL
 					//  view is not enabled. Especially relevant after doing File -> Default Setup
 					string dall_reply = m_transport->SendCommandQueuedWithReply(
-						string("DISP:WAVEV:") + m_channels[m_flexChannelParents[m_channels[i]]]->GetHwname() + "_DALL:STATE?");
+						string("DISP:WAVEV:") + m_channels[m_flexChannelParents[GetOscilloscopeChannel(i)]]->GetHwname() + "_DALL:STATE?");
 
 					if (dall_reply == "0")
 					{
@@ -503,7 +509,7 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 				if(IsDigital(i))
 				{
 					//If the parent analog channel doesn't have a digital probe, we're disabled
-					size_t parent = m_flexChannelParents[m_channels[i]];
+					size_t parent = m_flexChannelParents[GetOscilloscopeChannel(i)];
 					if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
 						return;
 				}
@@ -533,14 +539,14 @@ void TektronixOscilloscope::EnableChannel(size_t i)
 				// //Make sure the digital group is on
 				// if(IsDigital(i))
 				// {
-				// 	size_t parent = m_flexChannelParents[m_channels[i]];
+				// 	size_t parent = m_flexChannelParents[GetOscilloscopeChannel(i)];
 				// 	m_transport->SendCommandQueued(
 				// 		string("DISP:WAVEV:") + m_channels[parent]->GetHwname() + "_DALL:STATE ON");
 				// }
 				// </Commented out 2022-11-18>
 
 				//Difference between SELECT:CHx 1 vs this??
-				m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE ON");
+				m_transport->SendCommandQueued(string("DISP:WAVEV:") + GetOscilloscopeChannel(i)->GetHwname() + ":STATE ON");
 			}
 			break;
 
@@ -567,7 +573,7 @@ bool TektronixOscilloscope::CanEnableChannel(size_t i)
 	//If the parent analog channel doesn't have a digital probe, we're unusable
 	if(IsDigital(i))
 	{
-		size_t parent = m_flexChannelParents[m_channels[i]];
+		size_t parent = m_flexChannelParents[GetOscilloscopeChannel(i)];
 		if(m_probeTypes[parent] != PROBE_TYPE_DIGITAL_8BIT)
 			return false;
 	}
@@ -598,7 +604,7 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 			if(IsSpectrum(i))
 				m_transport->SendCommandQueued(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE OFF");
 			else
-				m_transport->SendCommandQueued(string("DISP:WAVEV:") + m_channels[i]->GetHwname() + ":STATE OFF");
+				m_transport->SendCommandQueued(string("DISP:WAVEV:") + GetOscilloscopeChannel(i)->GetHwname() + ":STATE OFF");
 			break;
 
 		default:
@@ -627,9 +633,9 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 		case FAMILY_MSO6:
 			{
 				string coup = m_transport->SendCommandQueuedWithReply(
-					m_channels[i]->GetHwname() + ":COUP?");
+					GetOscilloscopeChannel(i)->GetHwname() + ":COUP?");
 				float nterm = stof(m_transport->SendCommandQueuedWithReply(
-					m_channels[i]->GetHwname() + ":TER?"));
+					GetOscilloscopeChannel(i)->GetHwname() + ":TER?"));
 
 				//TODO: Tek's 1 GHz passive probes are 250K ohm impedance at the scope side.
 				//We report anything other than 50 ohm as 1M because scopehal doesn't have API support for that.
@@ -649,9 +655,9 @@ OscilloscopeChannel::CouplingType TektronixOscilloscope::GetChannelCoupling(size
 		/*
 		#if 0
 
-			m_transport->SendCommandImmediate(m_channels[i]->GetHwname() + ":COUP?");
+			m_transport->SendCommandImmediate(GetOscilloscopeChannel(i)->GetHwname() + ":COUP?");
 			string coup_reply = m_transport->ReadReply();
-			m_transport->SendCommandImmediate(m_channels[i]->GetHwname() + ":IMP?");
+			m_transport->SendCommandImmediate(GetOscilloscopeChannel(i)->GetHwname() + ":IMP?");
 			string imp_reply = m_transport->ReadReply();
 
 			OscilloscopeChannel::CouplingType coupling;
@@ -702,23 +708,23 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_DC_50:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 50");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TERM 50");
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
 					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 250E3");
+						m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TERM 250E3");
 					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 1E+6");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP AC");
+						m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TERM 1E+6");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP AC");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
 					if(m_probeTypes[i] == PROBE_TYPE_ANALOG_250K)
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":TERM 250E3");
+						m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TERM 250E3");
 					else
-						m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
+						m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
 					break;
 
 				default:
@@ -730,18 +736,18 @@ void TektronixOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Co
 			switch(type)
 			{
 				case OscilloscopeChannel::COUPLE_DC_50:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP FIFT");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP FIFT");
 					break;
 
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP ONEM");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP AC");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP AC");
 					break;
 
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":IMP ONEM");
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":COUP DC");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
 					break;
 
 				default:
@@ -772,9 +778,9 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 		case FAMILY_MSO6:
 			{
 				float probegain = stof(
-					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
+					m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PRO:GAIN?"));
 				float extatten = stof(
-					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PROBEF:EXTA?"));
+					m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROBEF:EXTA?"));
 
 				//Calculate the overall system attenuation.
 				//Note that probes report *gain* while the external is *attenuation*.
@@ -790,7 +796,7 @@ double TektronixOscilloscope::GetChannelAttenuation(size_t i)
 			/*
 			lock_guard<recursive_mutex> lock(m_mutex);
 
-			m_transport->SendCommandImmediate(m_channels[i]->GetHwname() + ":PROB?");
+			m_transport->SendCommandImmediate(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
 
 			string reply = m_transport->ReadReply();
 			double atten;
@@ -824,10 +830,10 @@ void TektronixOscilloscope::SetChannelAttenuation(size_t i, double atten)
 				//We need to scale this by the probe gain to figure out the necessary external attenuation.
 				//At the moment, this isn't cached, but we probably should do this in the future.
 				float probegain = stof(
-					m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":PRO:GAIN?"));
+					m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PRO:GAIN?"));
 
 				m_transport->SendCommandQueued(
-					m_channels[i]->GetHwname() + ":PROBEF:EXTA " + to_string(atten * probegain));
+					GetOscilloscopeChannel(i)->GetHwname() + ":PROBEF:EXTA " + to_string(atten * probegain));
 			}
 			break;
 
@@ -856,7 +862,7 @@ unsigned int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
 				{
-					string reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":BAN?");
+					string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":BAN?");
 					if(reply == "FUL")		//no limit
 						bwl = 0;
 					else
@@ -870,7 +876,7 @@ unsigned int TektronixOscilloscope::GetChannelBandwidthLimit(size_t i)
 
 			default:
 				/*
-				m_transport->SendCommandImmediate(m_channels[i]->GetHwname() + ":BWL?");
+				m_transport->SendCommandImmediate(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 				string reply = m_transport->ReadReply();
 				int bwl;
 				if(reply == "1")
@@ -973,9 +979,9 @@ void TektronixOscilloscope::SetChannelBandwidthLimit(size_t i, unsigned int limi
 				limit_hz *= 1000 * 1000;
 
 				if(limit_mhz == 0)
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BAN FUL");
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":BAN FUL");
 				else
-					m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":BAN " + to_string(limit_hz));
+					m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":BAN " + to_string(limit_hz));
 			}
 			break;
 
@@ -1016,7 +1022,7 @@ float TektronixOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 				else
 				{
 					range = 10 * stof(m_transport->SendCommandQueuedWithReply(
-						m_channels[i]->GetHwname() + ":SCA?"));
+						GetOscilloscopeChannel(i)->GetHwname() + ":SCA?"));
 				}
 				break;
 
@@ -1063,7 +1069,7 @@ void TektronixOscilloscope::SetChannelVoltageRange(size_t i, size_t stream, floa
 					":VERT:POS " + to_string(offset_div));
 			}
 			else
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":SCA " + to_string(range/10));
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":SCA " + to_string(range/10));
 			break;
 
 		default:
@@ -1078,19 +1084,12 @@ OscilloscopeChannel* TektronixOscilloscope::GetExternalTrigger()
 
 string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return m_extTrigChannel->GetHwname();
-
-	//Check cache first
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		if(m_channelDisplayNames.find(chan) != m_channelDisplayNames.end())
-			return m_channelDisplayNames[chan];
-	}
 
 	//Spectrum channels don't have separate names from the time domain ones.
 	//Store our own nicknames clientside for them.
@@ -1120,26 +1119,17 @@ string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 	if(name == "")
 		name = chan->GetHwname();
 
-	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	m_channelDisplayNames[chan] = name;
-
 	return name;
 }
 
 void TektronixOscilloscope::SetChannelDisplayName(size_t i, string name)
 {
-	auto chan = m_channels[i];
+	auto chan = GetOscilloscopeChannel(i);
 
 	//External trigger cannot be renamed in hardware.
 	//TODO: allow clientside renaming?
 	if(chan == m_extTrigChannel)
 		return;
-
-	//Update cache
-	{
-		lock_guard<recursive_mutex> lock(m_cacheMutex);
-		m_channelDisplayNames[m_channels[i]] = name;
-	}
 
 	//Update in hardware if possible (spectrum channels only have clientside naming)
 	if(!IsSpectrum(i))
@@ -1201,7 +1191,7 @@ float TektronixOscilloscope::GetChannelOffset(size_t i, size_t stream)
 					offset = (pos+5) * (GetChannelVoltageRange(i, stream)/10);
 				}
 				else
-					offset = -stof(m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":OFFS?"));
+					offset = -stof(m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?"));
 				break;
 
 			default:
@@ -1244,7 +1234,7 @@ void TektronixOscilloscope::SetChannelOffset(size_t i, size_t stream, float offs
 					":VERT:POS " + to_string(offset_div));
 			}
 			else
-				m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":OFFS " + to_string(-offset));
+				m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS " + to_string(-offset));
 			break;
 
 		default:
@@ -1330,7 +1320,7 @@ bool TektronixOscilloscope::AcquireData()
 			break;
 
 		default:
-			//m_transport->SendCommandImmediate("WFMPRE:" + m_channels[i]->GetHwname() + "?");
+			//m_transport->SendCommandImmediate("WFMPRE:" + GetOscilloscopeChannel(i)->GetHwname() + "?");
 				/*
 			//		string reply = m_transport->ReadReply();
 			//		sscanf(reply.c_str(), "%u,%u,%lu,%u,%lf,%lf,%lf,%lf,%lf,%lf",
@@ -1416,7 +1406,7 @@ bool TektronixOscilloscope::AcquireData()
 		for(size_t j=0; j<m_channels.size(); j++)
 		{
 			if(IsChannelEnabled(j))
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -1521,7 +1511,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		for (int retry = 0; retry < 3; retry++)
 		{
 			// Set source (before setting format)
-			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname());
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + GetOscilloscopeChannel(i)->GetHwname());
 
 			if (firstAnalog || retry) // set again on retry
 			{
@@ -1541,7 +1531,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			timebase = preamble.xincrement * FS_PER_SECOND;	//scope gives sec, not fs
 			m_channelOffsets[i] = -preamble.yoff;
 
-			//LogDebug("Channel %zu (%s)\n", i, m_channels[i]->GetHwname().c_str());
+			//LogDebug("Channel %zu (%s)\n", i, GetOscilloscopeChannel(i)->GetHwname().c_str());
 			LogIndenter li2;
 
 			//Read the data block
@@ -1627,7 +1617,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 		for (int retry = 0; retry < 3; retry++)
 		{
 			// Set source (before setting format)
-			m_transport->SendCommandImmediate(string("DAT:SOU ") + m_channels[i]->GetHwname() + "_SV_NORMAL");
+			m_transport->SendCommandImmediate(string("DAT:SOU ") + GetOscilloscopeChannel(i)->GetHwname() + "_SV_NORMAL");
 
 			//Select mode
 			if(firstSpectrum || retry) // set again on retry
@@ -2022,7 +2012,7 @@ set<Oscilloscope::InterleaveConflict> TektronixOscilloscope::GetInterleaveConfli
 		case FAMILY_MSO6:
 			{
 				for(size_t i=0; i<m_analogChannelCount; i++)
-					ret.emplace(InterleaveConflict(m_channels[i], m_channels[i]));
+					ret.emplace(InterleaveConflict(GetOscilloscopeChannel(i), GetOscilloscopeChannel(i)));
 			}
 			break;
 
@@ -2264,7 +2254,7 @@ void TektronixOscilloscope::SetDeskewForChannel(size_t channel, int64_t skew)
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
 			//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
-			m_transport->SendCommandQueued(m_channels[channel]->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
+			m_transport->SendCommandQueued(GetOscilloscopeChannel(channel)->GetHwname() + ":DESK " + to_string(-skew) + "E-15");
 			break;
 
 		default:
@@ -2325,7 +2315,7 @@ int64_t TektronixOscilloscope::GetDeskewForChannel(size_t channel)
 			case FAMILY_MSO6:
 				//Tek's skew convention has positive values move the channel EARLIER, so we need to flip sign
 				deskew = -round(FS_PER_SECOND * stof(
-					m_transport->SendCommandQueuedWithReply(m_channels[channel]->GetHwname() + ":DESK?")));
+					m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(channel)->GetHwname() + ":DESK?")));
 				break;
 
 			default:
@@ -2441,10 +2431,10 @@ void TektronixOscilloscope::PullEdgeTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:EDGE:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
+				et->SetLevel(ReadTriggerLevelMSO56(GetOscilloscopeChannelByHwName(reply)));
 
 				//Edge slope
 				reply = m_transport->SendCommandQueuedWithReply("TRIG:A:EDGE:SLO?");
@@ -2533,12 +2523,12 @@ void TektronixOscilloscope::PullPulseWidthTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//TODO: TRIG:A:PULSEW:LOGICQUAL?
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
+				et->SetLevel(ReadTriggerLevelMSO56(GetOscilloscopeChannelByHwName(reply)));
 
 				Unit fs(Unit::UNIT_FS);
 				et->SetUpperBound(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:PULSEW:HIGHL?")));
@@ -2600,10 +2590,10 @@ void TektronixOscilloscope::PullDropoutTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:TIMEO:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//Trigger level
-				et->SetLevel(ReadTriggerLevelMSO56(GetChannelByHwName(reply)));
+				et->SetLevel(ReadTriggerLevelMSO56(GetOscilloscopeChannelByHwName(reply)));
 
 				Unit fs(Unit::UNIT_FS);
 				et->SetDropoutTime(fs.ParseString(m_transport->SendCommandQueuedWithReply("TRIG:A:TIMEO:TIM?")));
@@ -2650,7 +2640,7 @@ void TektronixOscilloscope::PullRuntTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:RUNT:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
@@ -2718,7 +2708,7 @@ void TektronixOscilloscope::PullSlewRateTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:TRAN:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
@@ -2784,7 +2774,7 @@ void TektronixOscilloscope::PullWindowTrigger()
 			{
 				//Source channel
 				auto reply = m_transport->SendCommandQueuedWithReply("TRIG:A:WIN:SOU?");
-				et->SetInput(0, StreamDescriptor(GetChannelByHwName(reply), 0), true);
+				et->SetInput(0, StreamDescriptor(GetOscilloscopeChannelByHwName(reply), 0), true);
 
 				//Trigger level
 				auto chname = reply;
@@ -3259,7 +3249,7 @@ Oscilloscope::DigitalBank TektronixOscilloscope::GetDigitalBank(size_t channel)
 	{
 		case FAMILY_MSO5:
 		case FAMILY_MSO6:
-			ret.push_back(m_channels[channel]);
+			ret.push_back(GetOscilloscopeChannel(channel));
 			break;
 
 		default:
@@ -3288,7 +3278,7 @@ float TektronixOscilloscope::GetDigitalThreshold(size_t channel)
 {
 	//TODO: caching?
 
-	auto chan = m_channels[channel];
+	auto chan = GetOscilloscopeChannel(channel);
 
 	switch(m_family)
 	{
@@ -3312,7 +3302,7 @@ void TektronixOscilloscope::SetDigitalHysteresis(size_t /*channel*/, float /*lev
 
 void TektronixOscilloscope::SetDigitalThreshold(size_t channel, float level)
 {
-	auto chan = m_channels[channel];
+	auto chan = GetOscilloscopeChannel(channel);
 
 	switch(m_family)
 	{
@@ -3472,7 +3462,7 @@ int TektronixOscilloscope::GetCurrentMeterChannel()
 		{
 			case FAMILY_MSO5:
 			case FAMILY_MSO6:
-				m_dmmChannel = (int)GetChannelByHwName(Trim(m_transport->SendCommandQueuedWithReply(
+				m_dmmChannel = (int)GetOscilloscopeChannelByHwName(Trim(m_transport->SendCommandQueuedWithReply(
 					"DVM:SOU?")))->GetIndex();
 				break;
 

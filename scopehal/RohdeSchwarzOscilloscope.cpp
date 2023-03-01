@@ -580,7 +580,7 @@ bool RohdeSchwarzOscilloscope::AcquireData()
 		for(size_t j=0; j<m_analogChannelCount; j++)
 		{
 			if(IsChannelEnabled(j))
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -763,7 +763,7 @@ void RohdeSchwarzOscilloscope::PullEdgeTrigger()
 	m_transport->SendCommand("TRIG:A:SOUR?");
 	string reply = m_transport->ReadReply();
 	if(reply.find("CH") == 0)
-		et->SetInput(0, StreamDescriptor(m_channels[atoi(reply.c_str()+2) - 1], 0), true);
+		et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(atoi(reply.c_str()+2) - 1), 0), true);
 	else if(reply == "EXT")
 		et->SetInput(0, StreamDescriptor(m_extTrigChannel, 0), true);
 	else

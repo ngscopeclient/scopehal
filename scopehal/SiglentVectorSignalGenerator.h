@@ -44,65 +44,64 @@ public:
 	virtual ~SiglentVectorSignalGenerator();
 
 	//Instrument
-	virtual unsigned int GetInstrumentTypes();
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-	virtual size_t GetChannelCount();
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i);
+	virtual unsigned int GetInstrumentTypes() override;
+	virtual std::string GetName() override;
+	virtual std::string GetVendor() override;
+	virtual std::string GetSerial() override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//RF signal generator base stuff
-	virtual std::string GetChannelName(int chan);
-	virtual bool GetChannelOutputEnable(int chan);
-	virtual void SetChannelOutputEnable(int chan, bool on);
-	virtual float GetChannelOutputPower(int chan);
-	virtual void SetChannelOutputPower(int chan, float power);
-	virtual float GetChannelCenterFrequency(int chan);
-	virtual void SetChannelCenterFrequency(int chan, float freq);
+	virtual std::string GetChannelName(int chan) override;
+	virtual bool GetChannelOutputEnable(int chan) override;
+	virtual void SetChannelOutputEnable(int chan, bool on) override;
+	virtual float GetChannelOutputPower(int chan) override;
+	virtual void SetChannelOutputPower(int chan, float power) override;
+	virtual float GetChannelCenterFrequency(int chan) override;
+	virtual void SetChannelCenterFrequency(int chan, float freq) override;
 
 	//Vector modulation
-	virtual bool IsVectorModulationAvailable(int chan);
+	virtual bool IsVectorModulationAvailable(int chan) override;
 
 	//Sweep
-	virtual bool IsSweepAvailable(int chan);
-	virtual float GetSweepStartFrequency(int chan);
-	virtual float GetSweepStopFrequency(int chan);
-	virtual void SetSweepStartFrequency(int chan, float freq);
-	virtual void SetSweepStopFrequency(int chan, float freq);
-	virtual float GetSweepStartLevel(int chan);
-	virtual float GetSweepStopLevel(int chan);
-	virtual void SetSweepStartLevel(int chan, float level);
-	virtual void SetSweepStopLevel(int chan, float level);
-	virtual void SetSweepDwellTime(int chan, float fs);
-	virtual float GetSweepDwellTime(int chan);
-	virtual void SetSweepPoints(int chan, int npoints);
-	virtual int GetSweepPoints(int chan);
-	virtual SweepShape GetSweepShape(int chan);
-	virtual void SetSweepShape(int chan, SweepShape shape);
-	virtual SweepSpacing GetSweepSpacing(int chan);
-	virtual void SetSweepSpacing(int chan, SweepSpacing shape);
-	virtual SweepDirection GetSweepDirection(int chan);
-	virtual void SetSweepDirection(int chan, SweepDirection dir);
-	virtual SweepType GetSweepType(int chan);
-	virtual void SetSweepType(int chan, SweepType type);
+	virtual bool IsSweepAvailable(int chan) override;
+	virtual float GetSweepStartFrequency(int chan) override;
+	virtual float GetSweepStopFrequency(int chan) override;
+	virtual void SetSweepStartFrequency(int chan, float freq) override;
+	virtual void SetSweepStopFrequency(int chan, float freq) override;
+	virtual float GetSweepStartLevel(int chan) override;
+	virtual float GetSweepStopLevel(int chan) override;
+	virtual void SetSweepStartLevel(int chan, float level) override;
+	virtual void SetSweepStopLevel(int chan, float level) override;
+	virtual void SetSweepDwellTime(int chan, float fs) override;
+	virtual float GetSweepDwellTime(int chan) override;
+	virtual void SetSweepPoints(int chan, int npoints) override;
+	virtual int GetSweepPoints(int chan) override;
+	virtual SweepShape GetSweepShape(int chan) override;
+	virtual void SetSweepShape(int chan, SweepShape shape) override;
+	virtual SweepSpacing GetSweepSpacing(int chan) override;
+	virtual void SetSweepSpacing(int chan, SweepSpacing shape) override;
+	virtual SweepDirection GetSweepDirection(int chan) override;
+	virtual void SetSweepDirection(int chan, SweepDirection dir) override;
+	virtual SweepType GetSweepType(int chan) override;
+	virtual void SetSweepType(int chan, SweepType type) override;
 
 	//Function generator
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
-	virtual bool GetFunctionChannelActive(int chan);
-	virtual void SetFunctionChannelActive(int chan, bool on);
-	virtual bool HasFunctionDutyCycleControls(int chan);
-	virtual float GetFunctionChannelAmplitude(int chan);
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
-	virtual float GetFunctionChannelOffset(int chan);
-	virtual void SetFunctionChannelOffset(int chan, float offset);
-	virtual float GetFunctionChannelFrequency(int chan);
-	virtual void SetFunctionChannelFrequency(int chan, float hz);
-	virtual WaveShape GetFunctionChannelShape(int chan);
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
-	virtual bool HasFunctionRiseFallTimeControls(int chan);
-	virtual bool HasFunctionImpedanceControls(int chan);
+	virtual int GetFunctionChannelCount() override;
+	virtual std::string GetFunctionChannelName(int chan) override;
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
+	virtual bool GetFunctionChannelActive(int chan) override;
+	virtual void SetFunctionChannelActive(int chan, bool on) override;
+	virtual bool HasFunctionDutyCycleControls(int chan) override;
+	virtual float GetFunctionChannelAmplitude(int chan) override;
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
+	virtual float GetFunctionChannelOffset(int chan) override;
+	virtual void SetFunctionChannelOffset(int chan, float offset) override;
+	virtual float GetFunctionChannelFrequency(int chan) override;
+	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
+	virtual WaveShape GetFunctionChannelShape(int chan) override;
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
+	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
+	virtual bool HasFunctionImpedanceControls(int chan) override;
 
 public:
 	static std::string GetDriverNameInternal();

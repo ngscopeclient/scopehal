@@ -124,7 +124,7 @@ DigilentOscilloscope::DigilentOscilloscope(SCPITransport* transport)
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
-	trig->SetInput(0, StreamDescriptor(m_channels[0]));
+	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(0);
@@ -232,7 +232,7 @@ void DigilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 	//send attenuation info to hardware
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char buf[128];
-	snprintf(buf, sizeof(buf), ":%s:ATTEN %f", m_channels[i]->GetHwname().c_str(), atten);
+	snprintf(buf, sizeof(buf), ":%s:ATTEN %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), atten);
 	m_transport->SendCommand(buf);
 }
 
@@ -316,7 +316,7 @@ bool DigilentOscilloscope::AcquireData()
 			cap->Resize(memdepth);
 			awfms.push_back(cap);
 
-			s[m_channels[chnum]] = cap;
+			s[GetOscilloscopeChannel(chnum)] = cap;
 		}
 
 		/*

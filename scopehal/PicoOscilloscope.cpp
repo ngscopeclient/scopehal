@@ -165,7 +165,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	auto trig = new EdgeTrigger(this);
 	trig->SetType(EdgeTrigger::EDGE_RISING);
 	trig->SetLevel(0);
-	trig->SetInput(0, StreamDescriptor(m_channels[0]));
+	trig->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0)));
 	SetTrigger(trig);
 	PushTrigger();
 	SetTriggerOffset(10 * 1000L * 1000L);
@@ -396,7 +396,7 @@ vector<OscilloscopeChannel::CouplingType> PicoOscilloscope::GetAvailableCoupling
 
 double PicoOscilloscope::GetChannelAttenuation(size_t i)
 {
-	if(GetChannel(i) == m_extTrigChannel)
+	if(GetOscilloscopeChannel(i) == m_extTrigChannel)
 		return 1;
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -505,7 +505,7 @@ bool PicoOscilloscope::AcquireData()
 			abuf->MarkModifiedFromCpu();
 
 			//Create our waveform
-			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
+			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetOscilloscopeChannel(i)->GetHwname());
 			cap->m_timescale = fs_per_sample;
 			cap->m_triggerPhase = trigphase;
 			cap->m_startTimestamp = time(NULL);
@@ -515,7 +515,7 @@ bool PicoOscilloscope::AcquireData()
 			scales.push_back(scale);
 			offsets.push_back(offset);
 
-			s[m_channels[chnum]] = cap;
+			s[GetOscilloscopeChannel(chnum)] = cap;
 		}
 
 		//Digital pod
@@ -543,8 +543,8 @@ bool PicoOscilloscope::AcquireData()
 			for(size_t j=0; j<8; j++)
 			{
 				auto nchan = m_digitalChannelBase + 8*podnum + j;
-				caps[j] = AllocateDigitalWaveform(m_nickname + "." + GetChannel(nchan)->GetHwname());
-				s[m_channels[nchan] ] = caps[j];
+				caps[j] = AllocateDigitalWaveform(m_nickname + "." + GetOscilloscopeChannel(nchan)->GetHwname());
+				s[GetOscilloscopeChannel(nchan) ] = caps[j];
 			}
 
 			//Now that we have the waveform data, unpack it into individual channels
@@ -881,7 +881,7 @@ vector<Oscilloscope::DigitalBank> PicoOscilloscope::GetDigitalBanks()
 	for(size_t i=0; i<m_digitalChannelCount; i++)
 	{
 		DigitalBank bank;
-		bank.push_back(GetChannel(m_digitalChannelBase + i));
+		bank.push_back(GetOscilloscopeChannel(m_digitalChannelBase + i));
 		banks.push_back(bank);
 	}
 	return banks;
@@ -890,7 +890,7 @@ vector<Oscilloscope::DigitalBank> PicoOscilloscope::GetDigitalBanks()
 Oscilloscope::DigitalBank PicoOscilloscope::GetDigitalBank(size_t channel)
 {
 	DigitalBank ret;
-	ret.push_back(GetChannel(channel));
+	ret.push_back(GetOscilloscopeChannel(channel));
 	return ret;
 }
 
@@ -924,7 +924,7 @@ void PicoOscilloscope::SetDigitalHysteresis(size_t channel, float level)
 	}
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(GetChannel(channel)->GetHwname() + ":HYS " + to_string(level * 1000));
+	m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":HYS " + to_string(level * 1000));
 }
 
 void PicoOscilloscope::SetDigitalThreshold(size_t channel, float level)
@@ -935,7 +935,7 @@ void PicoOscilloscope::SetDigitalThreshold(size_t channel, float level)
 	}
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(GetChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
+	m_transport->SendCommand(GetOscilloscopeChannel(channel)->GetHwname() + ":THRESH " + to_string(level));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

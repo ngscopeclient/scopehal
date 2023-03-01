@@ -170,7 +170,7 @@ bool AntikernelLabsOscilloscope::IsChannelEnabled(size_t /*i*/)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":STAT?");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":STAT?");
 	string reply = m_transport->ReadReply();
 	if(reply == "OFF")
 	{
@@ -189,13 +189,13 @@ bool AntikernelLabsOscilloscope::IsChannelEnabled(size_t /*i*/)
 void AntikernelLabsOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":EN");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":EN");
 }
 
 void AntikernelLabsOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":DIS");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DIS");
 }
 
 vector<OscilloscopeChannel::CouplingType> AntikernelLabsOscilloscope::GetAvailableCouplings(size_t /*i*/)
@@ -221,7 +221,7 @@ double AntikernelLabsOscilloscope::GetChannelAttenuation(size_t /*i*/)
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
 
 	string reply = m_transport->ReadReply();
 	double atten;
@@ -245,7 +245,7 @@ unsigned int AntikernelLabsOscilloscope::GetChannelBandwidthLimit(size_t /*i*/)
 	/*
 	lock_guard<recursive_mutex> lock(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 	string reply = m_transport->ReadReply();
 	if(reply == "20M")
 		return 20;
@@ -272,7 +272,7 @@ float AntikernelLabsOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stre
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":GAIN?");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":GAIN?");
 	string reply = m_transport->ReadReply();
 
 	/*
@@ -313,7 +313,7 @@ void AntikernelLabsOscilloscope::SetChannelVoltageRange(size_t i, size_t /*strea
 	}
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:GAIN %d", m_channels[i]->GetHwname().c_str(), (int)round(db));
+	snprintf(tmp, sizeof(tmp), "%s:GAIN %d", GetOscilloscopeChannel(i)->GetHwname().c_str(), (int)round(db));
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 	m_transport->SendCommand(tmp);
@@ -340,7 +340,7 @@ float AntikernelLabsOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 
 	lock_guard<recursive_mutex> lock2(m_mutex);
 
-	m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+	m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?");
 
 	string reply = m_transport->ReadReply();
 	float offset;
@@ -355,7 +355,7 @@ void AntikernelLabsOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, f
 	lock_guard<recursive_mutex> lock(m_mutex);
 
 	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "%s:OFFS %f", m_channels[i]->GetHwname().c_str(), offset);
+	snprintf(tmp, sizeof(tmp), "%s:OFFS %f", GetOscilloscopeChannel(i)->GetHwname().c_str(), offset);
 	m_transport->SendCommand(tmp);
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -415,7 +415,7 @@ bool AntikernelLabsOscilloscope::AcquireData()
 		for(size_t j=0; j<m_analogChannelCount; j++)
 		{
 			if(IsChannelEnabled(j))
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		}
 		m_pendingWaveforms.push_back(s);
 	}
@@ -574,7 +574,7 @@ void AntikernelLabsOscilloscope::PullTrigger()
 	EdgeTrigger* et = dynamic_cast<EdgeTrigger*>(m_trigger);
 
 	//Default setup
-	et->SetInput(0, StreamDescriptor(m_channels[0], 0), true);
+	et->SetInput(0, StreamDescriptor(GetOscilloscopeChannel(0), 0), true);
 	et->SetLevel(0.5);
 	et->SetType(EdgeTrigger::EDGE_RISING);
 }

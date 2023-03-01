@@ -51,7 +51,6 @@ class GWInstekGPDX303SPowerSupply
 	std::string GetName() override;
 	std::string GetVendor() override;
 	std::string GetSerial() override;
-	virtual size_t GetChannelCount() override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//Device capabilities
@@ -76,8 +75,6 @@ class GWInstekGPDX303SPowerSupply
 
 protected:
 	std::bitset<8> GetStatusRegister();
-
-	int m_channelCount;
 
 public:
 	static std::string GetDriverNameInternal();

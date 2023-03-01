@@ -220,7 +220,7 @@ void AgilentOscilloscope::FlushConfigCache()
 
 bool AgilentOscilloscope::IsAnalogChannel(size_t i)
 {
-	return m_channels[i]->GetType(0) == Stream::STREAM_TYPE_ANALOG;
+	return GetOscilloscopeChannel(i)->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
 bool AgilentOscilloscope::IsChannelEnabled(size_t i)
@@ -238,7 +238,7 @@ bool AgilentOscilloscope::IsChannelEnabled(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -259,7 +259,7 @@ void AgilentOscilloscope::EnableChannel(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP ON");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP ON");
 	}
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
@@ -270,7 +270,7 @@ void AgilentOscilloscope::DisableChannel(size_t i)
 {
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":DISP OFF");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP OFF");
 	}
 
 
@@ -302,9 +302,9 @@ OscilloscopeChannel::CouplingType AgilentOscilloscope::GetChannelCoupling(size_t
 	string coup_reply, imp_reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP?");
 		coup_reply = m_transport->ReadReply();
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP?");
 		imp_reply = m_transport->ReadReply();
 	}
 
@@ -336,18 +336,18 @@ void AgilentOscilloscope::SetChannelCoupling(size_t i, OscilloscopeChannel::Coup
 		switch(type)
 		{
 			case OscilloscopeChannel::COUPLE_DC_50:
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP FIFT");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP FIFT");
 				break;
 
 			case OscilloscopeChannel::COUPLE_AC_1M:
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP ONEM");
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP AC");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP AC");
 				break;
 
 			case OscilloscopeChannel::COUPLE_DC_1M:
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":IMP ONEM");
-				m_transport->SendCommand(m_channels[i]->GetHwname() + ":COUP DC");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":IMP ONEM");
+				m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":COUP DC");
 				break;
 
 			default:
@@ -370,7 +370,7 @@ double AgilentOscilloscope::GetChannelAttenuation(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROB?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROB?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -389,7 +389,7 @@ void AgilentOscilloscope::SetChannelAttenuation(size_t i, double atten)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		PushFloat(m_channels[i]->GetHwname() + ":PROB", atten);
+		PushFloat(GetOscilloscopeChannel(i)->GetHwname() + ":PROB", atten);
 	}
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
@@ -408,7 +408,7 @@ unsigned int AgilentOscilloscope::GetChannelBandwidthLimit(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":BWL?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":BWL?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -430,7 +430,7 @@ void AgilentOscilloscope::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*
 
 float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 {
-	if(m_channels[i]->GetType(0) != Stream::STREAM_TYPE_ANALOG)
+	if(GetOscilloscopeChannel(i)->GetType(0) != Stream::STREAM_TYPE_ANALOG)
 		return 1;
 
 	{
@@ -443,7 +443,7 @@ float AgilentOscilloscope::GetChannelVoltageRange(size_t i, size_t /*stream*/)
 
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":RANGE?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":RANGE?");
 
 		reply = m_transport->ReadReply();
 	}
@@ -463,7 +463,7 @@ void AgilentOscilloscope::SetChannelVoltageRange(size_t i, size_t /*stream*/, fl
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "%s:RANGE %.4f", m_channels[i]->GetHwname().c_str(), range);
+	snprintf(cmd, sizeof(cmd), "%s:RANGE %.4f", GetOscilloscopeChannel(i)->GetHwname().c_str(), range);
 	m_transport->SendCommand(cmd);
 }
 
@@ -488,7 +488,7 @@ float AgilentOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":OFFS?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":OFFS?");
 		reply = m_transport->ReadReply();
 	}
 
@@ -509,7 +509,7 @@ void AgilentOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float of
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	char cmd[128];
-	snprintf(cmd, sizeof(cmd), "%s:OFFS %.4f", m_channels[i]->GetHwname().c_str(), -offset);
+	snprintf(cmd, sizeof(cmd), "%s:OFFS %.4f", GetOscilloscopeChannel(i)->GetHwname().c_str(), -offset);
 	m_transport->SendCommand(cmd);
 }
 
@@ -651,7 +651,7 @@ bool AgilentOscilloscope::AcquireData()
 		if(!IsChannelEnabled(i))
 			continue;
 
-		auto chname = m_channels[i]->GetHwname();
+		auto chname = GetOscilloscopeChannel(i)->GetHwname();
 		auto preamble = GetWaveformPreamble(chname);
 
 		//Figure out the sample rate
@@ -717,7 +717,7 @@ bool AgilentOscilloscope::AcquireData()
 		SequenceSet s;
 		for (size_t j = 0; j < m_channels.size(); j++)
 			if(IsChannelEnabled(j) && pending_waveforms.find(j) != pending_waveforms.end())
-				s[m_channels[j]] = pending_waveforms[j][i];
+				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];
 		m_pendingWaveforms.push_back(s);
 	}
 	m_pendingWaveformsMutex.unlock();
@@ -881,9 +881,12 @@ void AgilentOscilloscope::SetSampleRateAndDepth(uint64_t rate, uint64_t depth)
 
 	lock_guard<recursive_mutex> lock(m_mutex);
 	PushFloat("TIMEBASE:RANGE", duration);
-	for (auto chan: m_channels)
+	for (auto chan : m_channels)
 	{
-		if (chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
+		auto ochan = dynamic_cast<OscilloscopeChannel*>(chan);
+		if(!ochan)
+			continue;
+		if (ochan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 		{
 			m_transport->SendCommand(":WAV:SOUR " + chan->GetHwname());
 
@@ -975,7 +978,7 @@ void AgilentOscilloscope::PullEdgeTrigger()
 	//Source
 	m_transport->SendCommand("TRIG:SOUR?");
 	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	et->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
@@ -1009,7 +1012,7 @@ void AgilentOscilloscope::PullNthEdgeBurstTrigger()
 	//Source
 	m_transport->SendCommand("TRIG:EDGE:SOUR?");
 	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	bt->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
@@ -1050,7 +1053,7 @@ void AgilentOscilloscope::PullPulseWidthTrigger()
 	//Source
 	m_transport->SendCommand("TRIG:GLIT:SOUR?");
 	string reply = m_transport->ReadReply();
-	auto chan = GetChannelByHwName(reply);
+	auto chan = GetOscilloscopeChannelByHwName(reply);
 	pt->SetInput(0, StreamDescriptor(chan, 0), true);
 	if(!chan)
 		LogWarning("Unknown trigger source %s\n", reply.c_str());
@@ -1158,7 +1161,7 @@ void AgilentOscilloscope::GetProbeType(size_t i)
 	string reply;
 	{
 		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand(m_channels[i]->GetHwname() + ":PROBE:ID?");
+		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:ID?");
 		reply = m_transport->ReadReply();
 	}
 

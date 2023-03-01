@@ -43,10 +43,11 @@ GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transpor
 	auto modelNumber = atoi(m_model.c_str() + strlen("GPD-"));
 
 	// The GPD-3303S/D models have three channels, but only two are programmable and visible via SCPI
+	int channelCount = modelNumber / 1000;
 	if (modelNumber == 3303)
-		m_channelCount = 2;
-	else
-		m_channelCount = modelNumber/1000;
+		channelCount = 2;
+	for(int i=0; i<channelCount; i++)
+		m_channels.push_back(new InstrumentChannel(string("CH") + to_string(i+1), i));
 }
 
 GWInstekGPDX303SPowerSupply::~GWInstekGPDX303SPowerSupply()
@@ -62,7 +63,6 @@ string GWInstekGPDX303SPowerSupply::GetDriverNameInternal()
 	return "gwinstek_gpdx303s";
 }
 
-
 string GWInstekGPDX303SPowerSupply::GetName()
 {
 	return m_model;
@@ -76,11 +76,6 @@ string GWInstekGPDX303SPowerSupply::GetVendor()
 string GWInstekGPDX303SPowerSupply::GetSerial()
 {
 	return m_serial;
-}
-
-size_t GWInstekGPDX303SPowerSupply::GetChannelCount()
-{
-	return m_channelCount;
 }
 
 uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)

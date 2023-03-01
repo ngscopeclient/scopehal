@@ -82,9 +82,6 @@ public:
 			return Stream::STREAM_TYPE_UNDEFINED;
 	}
 
-	std::string GetHwname()
-	{ return m_hwname; }
-
 	///Get the number of data streams
 	size_t GetStreamCount()
 	{ return m_streams.size(); }
@@ -128,14 +125,11 @@ public:
 	Oscilloscope* GetScope()
 	{ return m_scope; }
 
-	size_t GetIndex()
-	{ return m_index; }
-
 	size_t GetRefCount()
 	{ return m_refcount; }
 
-	void SetDisplayName(std::string name);
-	std::string GetDisplayName();
+	virtual void SetDisplayName(std::string name) override;
+	virtual std::string GetDisplayName() override;
 
 	//Hardware configuration
 public:
@@ -227,24 +221,11 @@ protected:
 	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
 	/**
-		@brief Display name (user defined, defaults to m_hwname)
-
-		This is ONLY used if m_scope is NULL.
-	 */
-	std::string m_displayname;
-
-	/**
 		@brief The oscilloscope (if any) we are part of.
 
 		Note that filters and other special channels are not attached to a scope.
 	 */
 	Oscilloscope* m_scope;
-
-	///Hardware name as labeled on the scope
-	std::string m_hwname;
-
-	///Channel index
-	size_t m_index;
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;
