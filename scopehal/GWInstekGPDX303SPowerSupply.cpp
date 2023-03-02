@@ -126,13 +126,6 @@ bitset<8> GWInstekGPDX303SPowerSupply::GetStatusRegister()
 	return bitset<8>(ret.substr(0, 8));
 }
 
-string GWInstekGPDX303SPowerSupply::GetPowerChannelName(int chan)
-{
-	char tmp[] = "CH1";
-	tmp[2] += chan;
-	return string(tmp);
-}
-
 double GWInstekGPDX303SPowerSupply::GetPowerVoltageActual(int chan)
 {
 	char tmpCmd[] = "VOUT1?";

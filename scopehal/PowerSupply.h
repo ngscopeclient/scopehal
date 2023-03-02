@@ -41,9 +41,6 @@ public:
 
 	virtual unsigned int GetInstrumentTypes();
 
-	//Channel info
-	virtual std::string GetPowerChannelName(int chan) =0;
-
 	//Device capabilities
 	/**
 		@brief Determines if the power supply supports soft start

@@ -53,9 +53,6 @@ public:
 	bool SupportsMasterOutputSwitching() override;
 	bool SupportsOvercurrentShutdown() override;
 
-	//Channel info
-	std::string GetPowerChannelName(int chan) override;
-
 	//Read sensors
 	double GetPowerVoltageActual(int chan) override;	//actual voltage after current limiting
 	double GetPowerVoltageNominal(int chan) override;	//set point

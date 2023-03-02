@@ -125,13 +125,6 @@ int RohdeSchwarzHMC804xPowerSupply::GetStatusRegister(int chan)
 	return atoi(ret.c_str());
 }
 
-string RohdeSchwarzHMC804xPowerSupply::GetPowerChannelName(int chan)
-{
-	char tmp[] = "CH1";
-	tmp[2] += chan;
-	return string(tmp);
-}
-
 double RohdeSchwarzHMC804xPowerSupply::GetPowerVoltageActual(int chan)
 {
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
