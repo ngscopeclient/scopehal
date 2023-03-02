@@ -70,6 +70,9 @@ public:
 		//Class datatype from a protocol decoder
 		STREAM_TYPE_PROTOCOL,
 
+		//Single analog value
+		STREAM_TYPE_ANALOG_SCALAR,
+
 		//Other / unspecified
 		STREAM_TYPE_UNDEFINED
 	};
