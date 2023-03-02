@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,8 +57,9 @@ FlowGraphNode::~FlowGraphNode()
 	//Release any inputs we currently have refs to
 	for(auto c : m_inputs)
 	{
-		if(c.m_channel != NULL)
-			c.m_channel->Release();
+		auto schan = dynamic_cast<OscilloscopeChannel*>(c.m_channel);
+		if(schan)
+			schan->Release();
 	}
 }
 
@@ -143,11 +144,14 @@ void FlowGraphNode::SetInput(size_t i, StreamDescriptor stream, bool force)
 
 			This causes A to get GC'd right before we hook up C's input to it, and Bad Things(tm) happen.
 		 */
-		stream.m_channel->AddRef();
+		auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
+		if(schan)
+			schan->AddRef();
 
 		//Deref whatever was there (if anything)
-		if(m_inputs[i].m_channel != NULL)
-			m_inputs[i].m_channel->Release();
+		auto oldchan = dynamic_cast<OscilloscopeChannel*>(m_inputs[i].m_channel);
+		if(oldchan)
+			oldchan->Release();
 
 		//All good, we can save the new input
 		m_inputs[i] = stream;

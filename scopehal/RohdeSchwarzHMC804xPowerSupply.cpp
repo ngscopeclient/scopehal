@@ -43,7 +43,10 @@ RohdeSchwarzHMC804xPowerSupply::RohdeSchwarzHMC804xPowerSupply(SCPITransport* tr
 	//Figure out how many channels we have
 	int nchans = atoi(m_model.c_str() + strlen("HMC804"));
 	for(int i=0; i<nchans; i++)
-		m_channels.push_back(new InstrumentChannel(string("CH") + to_string(i+1), i));
+	{
+		m_channels.push_back(
+			new PowerSupplyChannel(string("CH") + to_string(i+1), "#808080", i));
+	}
 }
 
 RohdeSchwarzHMC804xPowerSupply::~RohdeSchwarzHMC804xPowerSupply()

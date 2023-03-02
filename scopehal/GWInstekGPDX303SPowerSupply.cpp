@@ -47,7 +47,10 @@ GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transpor
 	if (modelNumber == 3303)
 		channelCount = 2;
 	for(int i=0; i<channelCount; i++)
-		m_channels.push_back(new InstrumentChannel(string("CH") + to_string(i+1), i));
+	{
+		m_channels.push_back(
+			new PowerSupplyChannel(string("CH") + to_string(i+1), "#808080", i));
+	}
 }
 
 GWInstekGPDX303SPowerSupply::~GWInstekGPDX303SPowerSupply()

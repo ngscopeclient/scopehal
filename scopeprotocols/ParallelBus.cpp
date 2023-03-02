@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -130,11 +130,12 @@ void ParallelBus::Refresh()
 	for(size_t i=width; i < 16; i++)
 	{
 		auto chan = m_inputs[i].m_channel;
-		if(chan != NULL)
+		if(chan)
 		{
-			if(chan != NULL)
-				chan->Release();
-			m_inputs[i].m_channel = NULL;
+			auto schan = dynamic_cast<OscilloscopeChannel*>(chan);
+			if(schan)
+				schan->Release();
+			m_inputs[i].m_channel = nullptr;
 		}
 	}
 

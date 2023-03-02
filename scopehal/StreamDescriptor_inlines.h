@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -83,28 +83,34 @@ inline uint8_t StreamDescriptor::GetFlags()
 
 inline float StreamDescriptor::GetVoltageRange()
 {
-	if(m_channel == NULL)
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan == NULL)
 		return 1;
 	else
-		return m_channel->GetVoltageRange(m_stream);
+		return schan->GetVoltageRange(m_stream);
 }
 
 inline float StreamDescriptor::GetOffset()
 {
-	if(m_channel == NULL)
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan == NULL)
 		return 0;
 	else
-		return m_channel->GetOffset(m_stream);
+		return schan->GetOffset(m_stream);
 }
 
 inline void StreamDescriptor::SetVoltageRange(float v)
 {
-	m_channel->SetVoltageRange(v, m_stream);
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan)
+		schan->SetVoltageRange(v, m_stream);
 }
 
 inline void StreamDescriptor::SetOffset(float v)
 {
-	m_channel->SetOffset(v, m_stream);
+	auto schan = dynamic_cast<OscilloscopeChannel*>(m_channel);
+	if(schan)
+		schan->SetOffset(v, m_stream);
 }
 
 #endif

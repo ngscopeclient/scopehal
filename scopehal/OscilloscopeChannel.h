@@ -70,55 +70,6 @@ public:
 		size_t index = 0);
 	virtual ~OscilloscopeChannel();
 
-	//Stuff here is set once at init and can't be changed
-	Stream::StreamType GetType(size_t stream)
-	{
-		if(stream < m_streams.size())
-			return m_streams[stream].m_stype;
-		else
-			return Stream::STREAM_TYPE_UNDEFINED;
-	}
-
-	///Get the number of data streams
-	size_t GetStreamCount()
-	{ return m_streams.size(); }
-
-	///Gets the name of a stream (for display in the UI)
-	std::string GetStreamName(size_t stream)
-	{
-		if(stream < m_streams.size())
-			return m_streams[stream].m_name;
-		else
-			return "";
-	}
-
-	///Get the contents of a data stream
-	WaveformBase* GetData(size_t stream)
-	{
-		if(stream >= m_streams.size())
-			return nullptr;
-		return m_streams[stream].m_waveform;
-	}
-
-	///Get the flags of a data stream
-	uint8_t GetStreamFlags(size_t stream)
-	{
-		if(stream >= m_streams.size())
-			return 0;
-		return m_streams[stream].m_flags;
-	}
-
-	///Detach the capture data from this channel
-	WaveformBase* Detach(size_t stream)
-	{
-		WaveformBase* tmp = m_streams[stream].m_waveform;
-		m_streams[stream].m_waveform = NULL;
-		return tmp;
-	}
-
-	///Set new data, overwriting the old data as appropriate
-	void SetData(WaveformBase* pNew, size_t stream);
-
 	Oscilloscope* GetScope()
 	{ return m_scope; }
 
@@ -174,18 +125,6 @@ public:
 	virtual float GetOffset(size_t stream);
 	virtual void SetOffset(float offset, size_t stream);
 
-	virtual Unit GetXAxisUnits()
-	{ return m_xAxisUnit; }
-
-	virtual Unit GetYAxisUnits(size_t stream)
-	{ return m_streams[stream].m_yAxisUnit; }
-
-	virtual void SetXAxisUnits(const Unit& rhs)
-	{ m_xAxisUnit = rhs; }
-
-	virtual void SetYAxisUnits(const Unit& rhs, size_t stream)
-	{ m_streams[stream].m_yAxisUnit = rhs; }
-
 	void SetDigitalHysteresis(float level);
 	void SetDigitalThreshold(float level);
 
@@ -208,16 +147,6 @@ protected:
 	void SharedCtorInit(Unit unit);
 
 	/**
-		@brief Clears out any existing streams
-	 */
-	virtual void ClearStreams();
-
-	/**
-		@brief Adds a new data stream to the channel
-	 */
-	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
-
-	/**
 		@brief The oscilloscope (if any) we are part of.
 
 		Note that filters and other special channels are not attached to a scope.
@@ -226,12 +155,6 @@ protected:
 
 	///Number of references (channel is disabled when last ref is released)
 	size_t m_refcount;
-
-	///Unit of measurement for our horizontal axis
-	Unit m_xAxisUnit;
-
-	///Stream configuration
-	std::vector<Stream> m_streams;
 };
 
 #endif

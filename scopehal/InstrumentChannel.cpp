@@ -40,16 +40,38 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-InstrumentChannel::InstrumentChannel(const string& hwname, size_t i, const string& color)
+InstrumentChannel::InstrumentChannel(
+	const string& hwname,
+	const string& color,
+	Unit xunit,
+	size_t index)
 	: m_displaycolor(color)
 	, m_hwname(hwname)
 	, m_displayname(hwname)
-	, m_index(i)
+	, m_index(index)
+	, m_xAxisUnit(xunit)
 {
+}
+
+InstrumentChannel::InstrumentChannel(
+	const string& hwname,
+	const string& color,
+	Unit xunit,
+	Unit yunit,
+	Stream::StreamType stype,
+	size_t index)
+	: m_displaycolor(color)
+	, m_hwname(hwname)
+	, m_displayname(hwname)
+	, m_index(index)
+	, m_xAxisUnit(xunit)
+{
+	AddStream(yunit, "data", stype);
 }
 
 InstrumentChannel::~InstrumentChannel()
 {
+	ClearStreams();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,4 +91,42 @@ void InstrumentChannel::SetDisplayName(string name)
 string InstrumentChannel::GetDisplayName()
 {
 	return m_displayname;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Stream management
+
+/**
+	@brief Clears out any existing streams
+ */
+void InstrumentChannel::ClearStreams()
+{
+	for(auto s : m_streams)
+		delete s.m_waveform;
+	m_streams.clear();
+}
+
+/**
+	@brief Adds a new data stream to the channel
+ */
+void InstrumentChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
+{
+	m_streams.push_back(Stream(yunit, name, stype, flags));
+}
+
+/**
+	@brief Sets the waveform data for a given stream, replacing any previous waveform.
+
+	Calling this function with pNew == GetData() is a legal no-op.
+
+	Any existing waveform is deleted, unless it is the same as pNew.
+ */
+void InstrumentChannel::SetData(WaveformBase* pNew, size_t stream)
+{
+	if(m_streams[stream].m_waveform == pNew)
+		return;
+
+	if(m_streams[stream].m_waveform != NULL)
+		delete m_streams[stream].m_waveform;
+	m_streams[stream].m_waveform = pNew;
 }

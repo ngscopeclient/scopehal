@@ -90,6 +90,7 @@ set(SCOPEHAL_SOURCES
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
 	PowerSupply.cpp
+	PowerSupplyChannel.cpp
 	RFSignalGenerator.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp

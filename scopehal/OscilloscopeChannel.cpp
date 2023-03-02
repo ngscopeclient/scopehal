@@ -47,10 +47,9 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& color,
 	Unit xunit,
 	size_t index)
-	: InstrumentChannel(hwname, index, color)
+	: InstrumentChannel(hwname, color, xunit, index)
 	, m_scope(scope)
 	, m_refcount(0)
-	, m_xAxisUnit(xunit)
 {
 }
 
@@ -62,12 +61,10 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit yunit,
 	Stream::StreamType stype,
 	size_t index)
-	: InstrumentChannel(hwname, index, color)
+	: InstrumentChannel(hwname, color, xunit, yunit, stype, index)
 	, m_scope(scope)
 	, m_refcount(0)
-	, m_xAxisUnit(xunit)
 {
-	AddStream(yunit, "data", stype);
 }
 
 /**
@@ -90,27 +87,6 @@ void OscilloscopeChannel::SetDefaultDisplayName()
 
 OscilloscopeChannel::~OscilloscopeChannel()
 {
-	for(auto p : m_streams)
-		delete p.m_waveform;
-	m_streams.clear();
-}
-
-/**
-	@brief Clears out any existing streams
- */
-void OscilloscopeChannel::ClearStreams()
-{
-	for(auto s : m_streams)
-		delete s.m_waveform;
-	m_streams.clear();
-}
-
-/**
-	@brief Adds a new data stream to the channel
- */
-void OscilloscopeChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
-{
-	m_streams.push_back(Stream(yunit, name, stype, flags));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -345,17 +321,4 @@ void OscilloscopeChannel::SetInputMux(size_t select)
 {
 	if(m_scope)
 		m_scope->SetInputMux(m_index, select);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-void OscilloscopeChannel::SetData(WaveformBase* pNew, size_t stream)
-{
-	if(m_streams[stream].m_waveform == pNew)
-		return;
-
-	if(m_streams[stream].m_waveform != NULL)
-		delete m_streams[stream].m_waveform;
-	m_streams[stream].m_waveform = pNew;
 }

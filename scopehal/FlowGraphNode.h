@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,7 +42,7 @@ class WaveformBase;
 #include "Waveform.h"
 #include "Stream.h"
 
-class OscilloscopeChannel;
+class InstrumentChannel;
 
 /**
 	@brief Descriptor for a single stream coming off a channel
@@ -55,7 +55,7 @@ public:
 	, m_stream(0)
 	{}
 
-	StreamDescriptor(OscilloscopeChannel* channel, size_t stream = 0)
+	StreamDescriptor(InstrumentChannel* channel, size_t stream = 0)
 		: m_channel(channel)
 		, m_stream(stream)
 	{}
@@ -65,7 +65,7 @@ public:
 
 	std::string GetName();
 
-	OscilloscopeChannel* m_channel;
+	InstrumentChannel* m_channel;
 	size_t m_stream;
 
 	//None of these functions can be inlined here, because OscilloscopeChannel isn't fully declared yet.

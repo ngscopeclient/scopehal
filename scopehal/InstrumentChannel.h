@@ -55,13 +55,25 @@
 	This instrument implements three device classes (oscilloscope, multimeter, and function generator) across a total
 	of 22 channels, however no one channel supports all three APIs.
 
-
 	This base class implements functionality which is common to channels from any kind of instrument
  */
 class InstrumentChannel : public FlowGraphNode
 {
 public:
-	InstrumentChannel(const std::string& hwname, size_t i, const std::string& color = "#808080");
+	InstrumentChannel(
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		Unit xunit = Unit(Unit::UNIT_FS),
+		size_t index = 0);
+
+	InstrumentChannel(
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		Unit xunit = Unit(Unit::UNIT_FS),
+		Unit yunit = Unit(Unit::UNIT_VOLTS),
+		Stream::StreamType stype = Stream::STREAM_TYPE_ANALOG,
+		size_t index = 0);
+
 	virtual ~InstrumentChannel();
 
 	///Display color (HTML hex notation with optional alpha channel: #RRGGBB or ##RRGGBBAA)
@@ -90,7 +102,96 @@ public:
 	void ClearCachedDisplayName()
 	{ m_displayname = ""; }
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Stream management
+public:
+
+	void SetData(WaveformBase* pNew, size_t stream);
+
+	/**
+		@brief Returns the X axis unit for this channel
+	 */
+	virtual Unit GetXAxisUnits()
+	{ return m_xAxisUnit; }
+
+	/**
+		@brief Returns the Y axis unit for a specified stream
+	 */
+	virtual Unit GetYAxisUnits(size_t stream)
+	{ return m_streams[stream].m_yAxisUnit; }
+
+	/**
+		@brief Changes the X axis unit for this channel
+
+		This function is intended for filter/driver implementations.
+		No actual conversion of data is performed, so calling this with an incorrect unit may lead to confusing results.
+	 */
+	virtual void SetXAxisUnits(const Unit& rhs)
+	{ m_xAxisUnit = rhs; }
+
+	/**
+		@brief Changes the X axis unit for a specified stream.
+
+		This function is intended for filter/driver implementations.
+		No actual conversion of data is performed, so calling this with an incorrect unit may lead to confusing results.
+	 */
+	virtual void SetYAxisUnits(const Unit& rhs, size_t stream)
+	{ m_streams[stream].m_yAxisUnit = rhs; }
+
+	///@brief Returns the type of a specified stream
+	Stream::StreamType GetType(size_t stream)
+	{
+		if(stream < m_streams.size())
+			return m_streams[stream].m_stype;
+		else
+			return Stream::STREAM_TYPE_UNDEFINED;
+	}
+
+	///@brief Get the number of data streams
+	size_t GetStreamCount()
+	{ return m_streams.size(); }
+
+	///@brief Gets the name of a stream (for display in the UI)
+	std::string GetStreamName(size_t stream)
+	{
+		if(stream < m_streams.size())
+			return m_streams[stream].m_name;
+		else
+			return "";
+	}
+
+	///@brief Get the contents of a data stream
+	WaveformBase* GetData(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return nullptr;
+		return m_streams[stream].m_waveform;
+	}
+
+	///@brief Get the flags of a data stream
+	uint8_t GetStreamFlags(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return 0;
+		return m_streams[stream].m_flags;
+	}
+
+	/**
+		@brief Detach the capture data from this channel
+
+		Once this function is called, the waveform is now owned by the caller and not the channel object.
+	 */
+	WaveformBase* Detach(size_t stream)
+	{
+		WaveformBase* tmp = m_streams[stream].m_waveform;
+		m_streams[stream].m_waveform = NULL;
+		return tmp;
+	}
+
 protected:
+
+	virtual void ClearStreams();
+	virtual void AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0);
 
 	/**
 		@brief Hardware name of the channel
@@ -112,6 +213,16 @@ protected:
 		@brief Zero based index of the channel within the instrument
 	 */
 	size_t m_index;
+
+	/**
+		@brief Unit of measurement for our horizontal axis (common to all streams)
+	 */
+	Unit m_xAxisUnit;
+
+	/**
+		@brief Configuration data for each of our output streams
+	 */
+	std::vector<Stream> m_streams;
 };
 
 #endif

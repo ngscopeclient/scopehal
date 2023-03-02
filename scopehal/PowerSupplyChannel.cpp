@@ -28,90 +28,23 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "SlewRateTrigger.h"
-#include "LeCroyOscilloscope.h"
-#include "TektronixOscilloscope.h"
-#include "SiglentSCPIOscilloscope.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SlewRateTrigger::SlewRateTrigger(Oscilloscope* scope)
-	: TwoLevelTrigger(scope)
-	, m_conditionname("Condition")
-	, m_lowerintname("Lower Interval")
-	, m_upperintname("Upper Interval")
-	, m_slopename("Edge Slope")
+PowerSupplyChannel::PowerSupplyChannel(
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
-	CreateInput("in");
-
-	m_parameters[m_conditionname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_conditionname].AddEnumValue("Less than", CONDITION_LESS);
-	m_parameters[m_conditionname].AddEnumValue("Greater than", CONDITION_GREATER);
-
-	m_parameters[m_slopename] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_slopename].AddEnumValue("Rising", EDGE_RISING);
-	m_parameters[m_slopename].AddEnumValue("Falling", EDGE_FALLING);
-
-	//Make/model specific options
-	if((dynamic_cast<LeCroyOscilloscope*>(scope) != NULL) || (dynamic_cast<SiglentSCPIOscilloscope*>(scope) != NULL))
-	{
-		m_parameters[m_conditionname].AddEnumValue("Between", CONDITION_BETWEEN);
-		m_parameters[m_conditionname].AddEnumValue("Not between", CONDITION_NOT_BETWEEN);
-
-		//Upper interval only present on LeCroy
-		m_parameters[m_upperintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	}
-
-	if(dynamic_cast<TektronixOscilloscope*>(scope) != NULL)
-	{
-		m_lowerintname = "Time Limit";
-
-		m_parameters[m_slopename].AddEnumValue("Any", EDGE_ANY);
-
-		m_parameters[m_conditionname].AddEnumValue("Equal", CONDITION_EQUAL);
-		m_parameters[m_conditionname].AddEnumValue("Not equal", CONDITION_NOT_EQUAL);
-	}
-
-	//must come after model specific config since we change parameter names
-	m_parameters[m_lowerintname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
+	ClearStreams();
+	AddStream(Unit(Unit::UNIT_VOLTS), "voltage", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "current", Stream::STREAM_TYPE_ANALOG_SCALAR);
 }
 
-SlewRateTrigger::~SlewRateTrigger()
+PowerSupplyChannel::~PowerSupplyChannel()
 {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string SlewRateTrigger::GetTriggerName()
-{
-	return "Slew Rate";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Input validation
-
-bool SlewRateTrigger::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	//We only can take one input
-	if(i > 0)
-		return false;
-
-	//There has to be a signal to trigger on
-	auto schan = dynamic_cast<OscilloscopeChannel*>(stream.m_channel);
-	if(!schan)
-		return false;
-
-	//It has to be from the same instrument we're trying to trigger on
-	if(schan->GetScope() != m_scope)
-		return false;
-
-	//It has to be analog or external trigger, digital inputs make no sense
-	if( (stream.GetType() != Stream::STREAM_TYPE_ANALOG) && (stream.GetType() != Stream::STREAM_TYPE_TRIGGER) )
-		return false;
-
-	return true;
 }
