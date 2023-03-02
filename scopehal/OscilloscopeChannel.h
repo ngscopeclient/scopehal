@@ -70,9 +70,6 @@ public:
 		size_t index = 0);
 	virtual ~OscilloscopeChannel();
 
-	///Display color (any valid GDK format)
-	std::string m_displaycolor;
-
 	//Stuff here is set once at init and can't be changed
 	Stream::StreamType GetType(size_t stream)
 	{

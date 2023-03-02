@@ -61,8 +61,11 @@
 class InstrumentChannel : public FlowGraphNode
 {
 public:
-	InstrumentChannel(const std::string& hwname, size_t i);
+	InstrumentChannel(const std::string& hwname, size_t i, const std::string& color = "#808080");
 	virtual ~InstrumentChannel();
+
+	///Display color (HTML hex notation with optional alpha channel: #RRGGBB or ##RRGGBBAA)
+	std::string m_displaycolor;
 
 	virtual void SetDisplayName(std::string name);
 	virtual std::string GetDisplayName();

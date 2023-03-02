@@ -40,8 +40,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-InstrumentChannel::InstrumentChannel(const string& hwname, size_t i)
-	: m_hwname(hwname)
+InstrumentChannel::InstrumentChannel(const string& hwname, size_t i, const string& color)
+	: m_displaycolor(color)
+	, m_hwname(hwname)
 	, m_displayname(hwname)
 	, m_index(i)
 {

@@ -47,8 +47,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	const string& color,
 	Unit xunit,
 	size_t index)
-	: InstrumentChannel(hwname, index)
-	, m_displaycolor(color)
+	: InstrumentChannel(hwname, index, color)
 	, m_scope(scope)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
@@ -63,8 +62,7 @@ OscilloscopeChannel::OscilloscopeChannel(
 	Unit yunit,
 	Stream::StreamType stype,
 	size_t index)
-	: InstrumentChannel(hwname, index)
-	, m_displaycolor(color)
+	: InstrumentChannel(hwname, index, color)
 	, m_scope(scope)
 	, m_refcount(0)
 	, m_xAxisUnit(xunit)
