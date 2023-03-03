@@ -47,6 +47,10 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
 	PROTOCOL_DECODER_INITPROC(MultiplyFilter)
+
+protected:
+	void RefreshVectorVector();
+	void RefreshScalarScalar();
 };
 
 #endif

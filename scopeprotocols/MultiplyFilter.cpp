@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -51,7 +51,10 @@ bool MultiplyFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+	if(i >= 2)
+		return false;
+
+	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) || (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
 		return true;
 
 	return false;
@@ -70,10 +73,35 @@ string MultiplyFilter::GetProtocolName()
 
 void MultiplyFilter::Refresh()
 {
+	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
+	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
+
+	if(veca && vecb)
+		RefreshVectorVector();
+	else if(!veca && !vecb)
+		RefreshScalarScalar();
+
+	//TODO: vector * scalar
+}
+
+void MultiplyFilter::RefreshScalarScalar()
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
+	SetData(nullptr, 0);
+
+	//Multiply units and value
+	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits() * GetInput(1).GetYAxisUnits();
+	m_streams[0].m_value = GetInput(0).GetScalarValue() * GetInput(1).GetScalarValue();
+}
+
+void MultiplyFilter::RefreshVectorVector()
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
 		return;
 	}
 
