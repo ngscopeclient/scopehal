@@ -82,8 +82,6 @@ protected:
 	//Helpers for controlling stuff
 	void SelectChannel(int chan);
 
-	int m_channelCount;
-
 	int m_activeChannel;
 
 public:

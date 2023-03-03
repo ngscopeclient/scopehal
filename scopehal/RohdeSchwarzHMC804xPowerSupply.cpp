@@ -97,7 +97,7 @@ bool RohdeSchwarzHMC804xPowerSupply::SupportsIndividualOutputSwitching()
 
 bool RohdeSchwarzHMC804xPowerSupply::SupportsMasterOutputSwitching()
 {
-	return m_channelCount > 1;
+	return m_channels.size() > 1;
 }
 
 bool RohdeSchwarzHMC804xPowerSupply::SupportsOvercurrentShutdown()
@@ -258,7 +258,7 @@ bool RohdeSchwarzHMC804xPowerSupply::GetMasterPowerEnable()
 	lock_guard<recursive_mutex> lock(m_transport->GetMutex());
 
 	//not supported in single channel device, return "always on"
-	if(m_channelCount == 1)
+	if(m_channels.size() == 1)
 		return true;
 
 	auto ret = m_transport->SendCommandQueuedWithReply("outp:mast?");
@@ -268,7 +268,7 @@ bool RohdeSchwarzHMC804xPowerSupply::GetMasterPowerEnable()
 void RohdeSchwarzHMC804xPowerSupply::SetMasterPowerEnable(bool enable)
 {
 	//not supported in single channel device
-	if(m_channelCount == 1)
+	if(m_channels.size() == 1)
 		return;
 
 	if(enable)
@@ -281,7 +281,7 @@ void RohdeSchwarzHMC804xPowerSupply::SelectChannel(int chan)
 {
 	//per HMC804x SCPI manual page 26, this command is neither supported nor required
 	//for the single channel device
-	if(m_channelCount == 1)
+	if(m_channels.size() == 1)
 		return;
 
 	//Early-out if we're already on the requested channel
