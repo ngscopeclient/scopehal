@@ -189,11 +189,6 @@ double RohdeSchwarzHMC8012Multimeter::GetSecondaryMeterValue()
 	return stod(m_transport->SendCommandQueuedWithReply("READ?"));
 }
 
-string RohdeSchwarzHMC8012Multimeter::GetMeterChannelName(int /*chan*/)
-{
-	return "VIN";
-}
-
 int RohdeSchwarzHMC8012Multimeter::GetCurrentMeterChannel()
 {
 	return 0;

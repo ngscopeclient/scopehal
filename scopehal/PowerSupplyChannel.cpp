@@ -41,8 +41,10 @@ PowerSupplyChannel::PowerSupplyChannel(
 	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "voltage", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_AMPS), "current", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "CurrentSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
 }
 
 PowerSupplyChannel::~PowerSupplyChannel()

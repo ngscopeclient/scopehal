@@ -3449,11 +3449,6 @@ int TektronixOscilloscope::GetMeterChannelCount()
 	return m_analogChannelCount;
 }
 
-string TektronixOscilloscope::GetMeterChannelName(int chan)
-{
-	return GetChannel(chan)->GetDisplayName();
-}
-
 int TektronixOscilloscope::GetCurrentMeterChannel()
 {
 	if(!m_dmmChannelValid)

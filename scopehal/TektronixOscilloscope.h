@@ -149,7 +149,6 @@ public:
 
 	virtual unsigned int GetMeasurementTypes();
 	virtual int GetMeterChannelCount();
-	virtual std::string GetMeterChannelName(int chan);
 	virtual int GetCurrentMeterChannel();
 	virtual void SetCurrentMeterChannel(int chan);
 	virtual MeasurementTypes GetMeterMode();

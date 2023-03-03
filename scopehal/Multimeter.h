@@ -62,7 +62,6 @@ public:
 	virtual unsigned int GetSecondaryMeasurementTypes();
 
 	//Channel info
-	virtual std::string GetMeterChannelName(int chan) =0;
 	virtual int GetCurrentMeterChannel() =0;
 	virtual void SetCurrentMeterChannel(int chan) =0;
 

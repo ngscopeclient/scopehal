@@ -47,7 +47,6 @@ public:
 	virtual unsigned int GetSecondaryMeasurementTypes() override;
 
 	//Channel info
-	virtual std::string GetMeterChannelName(int chan) override;
 	virtual int GetCurrentMeterChannel() override;
 	virtual void SetCurrentMeterChannel(int chan) override;
 
