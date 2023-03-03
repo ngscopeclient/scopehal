@@ -44,6 +44,27 @@ public:
 
 	virtual ~PowerSupplyChannel();
 
+	//Well defined stream IDs used by PowerSupplyChannel
+	enum StreamIndexes
+	{
+		STREAM_VOLTAGE_MEASURED,
+		STREAM_VOLTAGE_SET_POINT,
+		STREAM_CURRENT_MEASURED,
+		STREAM_CURRENT_SET_POINT
+	};
+
+	float GetVoltageMeasured()
+	{ return GetScalarValue(STREAM_VOLTAGE_MEASURED); }
+
+	float GetVoltageSetPoint()
+	{ return GetScalarValue(STREAM_VOLTAGE_SET_POINT); }
+
+	float GetCurrentMeasured()
+	{ return GetScalarValue(STREAM_CURRENT_MEASURED); }
+
+	float GetCurrentSetPoint()
+	{ return GetScalarValue(STREAM_CURRENT_SET_POINT); }
+
 };
 
 #endif

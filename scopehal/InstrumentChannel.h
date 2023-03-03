@@ -176,6 +176,22 @@ public:
 		return m_streams[stream].m_flags;
 	}
 
+	///@brief Gets the value of a scalar data stream
+	float GetScalarValue(size_t stream)
+	{
+		if(stream >= m_streams.size())
+			return 0;
+		return m_streams[stream].m_value;
+	}
+
+	///@brief Sets the value of a scalar data stream
+	void SetScalarValue(size_t stream, float value)
+	{
+		if(stream >= m_streams.size())
+			return;
+		m_streams[stream].m_value = value;
+	}
+
 	/**
 		@brief Detach the capture data from this channel
 

@@ -82,6 +82,7 @@ public:
 	void SetVoltageRange(float v);
 	void SetOffset(float v);
 	Stream::StreamType GetType();
+	float GetScalarValue();
 };
 
 /**

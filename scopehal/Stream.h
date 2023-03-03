@@ -81,6 +81,7 @@ public:
 	: m_yAxisUnit(yunit)
 	, m_name(name)
 	, m_waveform(nullptr)
+	, m_value(0)
 	, m_stype(type)
 	, m_flags(flags)
 	{}
@@ -93,6 +94,9 @@ public:
 
 	///@brief The current waveform (or null if nothing here)
 	WaveformBase* m_waveform;
+
+	///@brief The current value (only meaningful for analog scalar type)
+	float m_value;
 
 	///@brief General datatype stored in the stream
 	StreamType m_stype;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -105,4 +105,22 @@ bool PowerSupply::IsSoftStartEnabled(int /*chan*/)
 
 void PowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
 {
+}
+
+/**
+	@brief Pulls data from hardware and updates our measurements
+ */
+void PowerSupply::AcquireData()
+{
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto pchan = dynamic_cast<PowerSupplyChannel*>(m_channels[i]);
+		if(!pchan)
+			continue;
+
+		pchan->SetScalarValue(PowerSupplyChannel::STREAM_VOLTAGE_MEASURED, GetPowerVoltageActual(i));
+		pchan->SetScalarValue(PowerSupplyChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
+		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_MEASURED, GetPowerCurrentActual(i));
+		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
+	}
 }

@@ -74,6 +74,9 @@ public:
 	 */
 	virtual bool SupportsOvercurrentShutdown();
 
+	//TODO: This should become a virtual that's used by Oscilloscope etc too?
+	void AcquireData();
+
 	//Read sensors
 	virtual double GetPowerVoltageActual(int chan) =0;				//actual voltage after current limiting
 	virtual double GetPowerVoltageNominal(int chan) =0;				//set point

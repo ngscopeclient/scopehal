@@ -113,4 +113,9 @@ inline void StreamDescriptor::SetOffset(float v)
 		schan->SetOffset(v, m_stream);
 }
 
+inline float StreamDescriptor::GetScalarValue()
+{
+	return m_channel->GetScalarValue(m_stream);
+}
+
 #endif
