@@ -92,7 +92,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	MemoryFilter.cpp
 	MilStd1553Decoder.cpp
 	MovingAverageFilter.cpp
-	MultimeterTrendFilter.cpp
 	MultiplyFilter.cpp
 	NoiseFilter.cpp
 	OFDMDemodulator.cpp
@@ -147,6 +146,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TopMeasurement.cpp
 	TouchstoneImportFilter.cpp
 	TRCImportFilter.cpp
+	TrendFilter.cpp
 	UartClockRecoveryFilter.cpp
 	UARTDecoder.cpp
 	UndershootMeasurement.cpp

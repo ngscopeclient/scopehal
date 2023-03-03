@@ -28,118 +28,87 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "MultimeterTrendFilter.h"
+#include "TrendFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-MultimeterTrendFilter::MultimeterTrendFilter(const string& color)
-	: Filter(color, CAT_MEASUREMENT)
-	, m_meter(NULL)
+TrendFilter::TrendFilter(const string& color)
+	: Filter(color, CAT_MATH)
+	, m_tlast(0)
+	, m_depthname("Buffer length")
 {
-	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "Primary", Stream::STREAM_TYPE_ANALOG);
-	AddStream(Unit(Unit::UNIT_VOLTS), "Secondary", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	CreateInput("din");
 
-	//initial default config until we have data
-	SetVoltageRange(1, 0);
-	SetOffset(0, 0);
-	SetVoltageRange(1, 1);
-	SetOffset(0, 1);
-
-	SetXAxisUnits(Unit(Unit::UNIT_FS));
-	m_tlast = GetTime();
+	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
+	m_parameters[m_depthname].SetIntVal(10000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool MultimeterTrendFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool TrendFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
+	if(stream.m_channel == NULL)
+		return false;
+
+	if(i > 0)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;
+
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string MultimeterTrendFilter::GetProtocolName()
+string TrendFilter::GetProtocolName()
 {
-	return "Multimeter Trend";
+	return "Trend";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void MultimeterTrendFilter::ClearSweeps()
+void TrendFilter::ClearSweeps()
 {
-	SetData(NULL, 0);
-	SetData(NULL, 1);
+	SetData(nullptr, 0);
 }
 
-SparseAnalogWaveform* MultimeterTrendFilter::GetWaveform(size_t stream)
+void TrendFilter::Refresh()
 {
-	auto wfm = dynamic_cast<SparseAnalogWaveform*>(GetData(stream));
-	if(wfm == NULL)
+	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
+
+	//See if we have output already
+	double now = GetTime();
+	auto wfm = dynamic_cast<SparseAnalogWaveform*>(GetData(0));
+	if(wfm)
+	{
+		//Remove old samples
+		size_t nmax = m_parameters[m_depthname].GetIntVal();
+		while(wfm->m_samples.size() > nmax)
+		{
+			wfm->m_samples.pop_front();
+			wfm->m_durations.pop_front();
+			wfm->m_offsets.pop_front();
+		}
+	}
+	else
 	{
 		wfm = new SparseAnalogWaveform;
-		SetData(wfm, stream);
+		SetData(wfm, 0);
 
-		//Base time unit is milliseconds
-		wfm->m_timescale = FS_PER_SECOND / 1000;
-		wfm->m_triggerPhase = false;
-		wfm->m_flags = 0;
+		wfm->m_triggerPhase = 0;
+		wfm->m_timescale = 1;
+		m_tlast = now;
 	}
-
-	return wfm;
-}
-
-void MultimeterTrendFilter::Refresh()
-{
-	//nothing to do
-}
-
-void MultimeterTrendFilter::OnDataReady(double prival, double secval)
-{
-	//Get output waveforms, creating if needed
-	double now = GetTime();
-	auto pri = GetWaveform(0);
-	auto sec = GetWaveform(1);
-
-	//Update units and clear if needed
-	auto punit = m_meter->GetMeterUnit();
-	if(punit != GetYAxisUnits(0))
-	{
-		pri->clear();
-		SetYAxisUnits(punit, 0);
-	}
-
-	auto sunit = m_meter->GetSecondaryMeterUnit();
-	if(sunit != GetYAxisUnits(1))
-	{
-		sec->clear();
-		SetYAxisUnits(sunit, 1);
-	}
-
-	AddSample(pri, prival, now);
-	AddSample(sec, secval, now);
-
-	m_tlast = now;
-}
-
-void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, double now)
-{
 	wfm->PrepareForCpuAccess();
-
-	//Remove old samples
-	size_t nmax = 4096;
-	while(wfm->m_samples.size() > nmax)
-	{
-		wfm->m_samples.pop_front();
-		wfm->m_durations.pop_front();
-		wfm->m_offsets.pop_front();
-	}
+	wfm->m_revision ++;
 
 	//Update timestamp
 	wfm->m_startTimestamp = floor(now);
@@ -147,12 +116,12 @@ void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, d
 
 	//Update duration of previous sample
 	size_t len = wfm->m_samples.size();
-	double dt = (now - m_tlast) * (FS_PER_SECOND / wfm->m_timescale);
+	double dt = (now - m_tlast) * FS_PER_SECOND;
 	if(len > 0)
 		wfm->m_durations[len-1] = dt;
 
 	//Add the new sample
-	wfm->m_samples.push_back(value);
+	wfm->m_samples.push_back(GetInput(0).GetScalarValue());
 	wfm->m_durations.push_back(dt);
 	if(wfm->m_offsets.empty())
 		wfm->m_offsets.push_back(0);
@@ -165,4 +134,6 @@ void MultimeterTrendFilter::AddSample(SparseAnalogWaveform* wfm, double value, d
 		wfm->m_offsets[i] -= dt;
 
 	wfm->MarkModifiedFromCpu();
+
+	m_tlast = now;
 }

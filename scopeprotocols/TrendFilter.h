@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,22 +30,17 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of MultimeterTrendFilter
+	@brief Declaration of TrendFilter
  */
-#ifndef MultimeterTrendFilter_h
-#define MultimeterTrendFilter_h
+#ifndef TrendFilter_h
+#define TrendFilter_h
 
-class MultimeterTrendFilter : public Filter
+class TrendFilter : public Filter
 {
 public:
-	MultimeterTrendFilter(const std::string& color);
-
-	void SetMeter(Multimeter* meter)
-	{ m_meter = meter; }
+	TrendFilter(const std::string& color);
 
 	virtual void Refresh();
-
-	void OnDataReady(double prival, double secval);
 
 	virtual void ClearSweeps();
 
@@ -53,14 +48,12 @@ public:
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(MultimeterTrendFilter)
+	PROTOCOL_DECODER_INITPROC(TrendFilter)
 
 protected:
-	Multimeter* m_meter;
 	double m_tlast;
 
-	void AddSample(SparseAnalogWaveform* wfm, double value, double now);
-	SparseAnalogWaveform* GetWaveform(size_t stream);
+	std::string m_depthname;
 };
 
 #endif

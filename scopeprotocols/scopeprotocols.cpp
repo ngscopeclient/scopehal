@@ -128,7 +128,6 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(MemoryFilter);
 	AddDecoderClass(MilStd1553Decoder);
 	AddDecoderClass(MovingAverageFilter);
-	AddDecoderClass(MultimeterTrendFilter);
 	AddDecoderClass(MultiplyFilter);
 	AddDecoderClass(NoiseFilter);
 	//AddDecoderClass(OFDMDemodulator);
@@ -184,6 +183,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TopMeasurement);
 	AddDecoderClass(TouchstoneImportFilter);
 	AddDecoderClass(TRCImportFilter);
+	AddDecoderClass(TrendFilter);
 	AddDecoderClass(UARTDecoder);
 	AddDecoderClass(UartClockRecoveryFilter);
 	AddDecoderClass(UndershootMeasurement);
