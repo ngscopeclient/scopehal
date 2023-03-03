@@ -139,6 +139,8 @@ public:
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 	virtual void LoadInputs(const YAML::Node& node, IDTable& table);
 
+	bool IsDownstreamOf(std::set<FlowGraphNode*> nodes);
+
 	//Input handling helpers
 protected:
 

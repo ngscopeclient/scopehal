@@ -222,6 +222,30 @@ bool FlowGraphNode::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Cone tracing
+
+/**
+	@brief Determines if this node is downstream of any of the specified other nodes.
+
+	Returns true if any of this node's inputs, or their inputs, etc. eventually chain back to an element in the set.
+ */
+bool FlowGraphNode::IsDownstreamOf(set<FlowGraphNode*> nodes)
+{
+	for(size_t i=0; i<m_inputs.size(); i++)
+	{
+		auto chan = m_inputs[i].m_channel;
+		if(!chan)
+			continue;
+		if(nodes.find(chan) != nodes.end())
+			return true;
+		if(chan->IsDownstreamOf(nodes))
+			return true;
+	}
+
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
 string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)

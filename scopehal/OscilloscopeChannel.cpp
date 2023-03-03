@@ -254,9 +254,16 @@ string OscilloscopeChannel::GetDisplayName()
 		return cached;
 
 	//If not, pull from hardware
-	auto tmp = m_scope->GetChannelDisplayName(m_index);
-	InstrumentChannel::SetDisplayName(tmp);
-	return tmp;
+	if(m_scope)
+	{
+		auto tmp = m_scope->GetChannelDisplayName(m_index);
+		InstrumentChannel::SetDisplayName(tmp);
+		return tmp;
+	}
+
+	//No hardware? just use hwname
+	else
+		return m_hwname;
 }
 
 bool OscilloscopeChannel::CanInvert()
