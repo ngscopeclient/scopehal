@@ -84,7 +84,10 @@ public:
 		INST_FUNCTION			= 0x08,
 
 		//An RF signal generator
-		INST_RF_GEN				= 0x10
+		INST_RF_GEN				= 0x10,
+
+		//An electronic load
+		INST_LOAD				= 0x20
 	};
 
 	/**

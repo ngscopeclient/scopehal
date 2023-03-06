@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,38 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#include "scopehal.h"
+#include "Load.h"
+
+Load::Load()
+{
+}
+
+Load::~Load()
+{
+}
+
+unsigned int Load::GetInstrumentTypes()
+{
+	return INST_LOAD;
+}
 
 /**
-	@brief An SCPI-based RF signal generator
+	@brief Pulls data from hardware and updates our measurements
  */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+void Load::AcquireData()
 {
-public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
+	/*
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto pchan = dynamic_cast<LoadChannel*>(m_channels[i]);
+		if(!pchan)
+			continue;
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
-
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
-
-	virtual std::string GetDriverName() =0;
-
-protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
-};
-
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
-
-#endif
+		pchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetPowerVoltageActual(i));
+		pchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
+		pchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetPowerCurrentActual(i));
+		pchan->SetScalarValue(LoadChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
+	}
+	*/
+}

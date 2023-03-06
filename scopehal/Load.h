@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,74 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#ifndef Load_h
+#define Load_h
 
 /**
-	@brief An SCPI-based RF signal generator
+	@brief A generic electronic load
  */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+class Load : public virtual Instrument
 {
 public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
+	Load();
+	virtual ~Load();
+
+	virtual unsigned int GetInstrumentTypes();
+
+	//TODO: This should become a virtual that's used by Oscilloscope etc too?
+	void AcquireData();
+
+	//New object model does not have explicit query methods for channel properties.
+	//Instead, call AcquireData() then read scalar channel state
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+	// Operating modes
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+	enum LoadMode
+	{
+		MODE_CONSTANT_CURRENT,
+		MODE_CONSTANT_VOLTAGE,
+		MODE_CONSTANT_RESISTANCE,
+		MODE_CONSTANT_POWER
+	};
 
-	virtual std::string GetDriverName() =0;
+	/**
+		@brief Returns the operating mode of the load
+	 */
+	virtual LoadMode GetLoadMode(size_t channel) =0;
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
+	/**
+		@brief Sets the operating mode of the load
+	 */
+	virtual void SetLoadMode(size_t channel, LoadMode mode) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Range selection
+
+	/**
+		@brief Returns a sorted list of operating ranges for the load's current scale, in amps
+
+		For example, returning [1, 10] means the load supports one mode with 1A full scale range and one with 10A range.
+	 */
+	virtual std::vector<float> GetLoadCurrentRanges(size_t channel) =0;
+
+	/**
+		@brief Returns the index of the load's selected current range, as returned by GetLoadCurrentRanges()
+	 */
+	virtual size_t GetLoadCurrentRange(size_t channel) =0;
+
+	/**
+		@brief Returns a sorted list of operating ranges for the load's voltage scale, in volts
+
+		For example, returning [10, 250] means the load supports one mode with 10V full scale range and one with
+		250V range.
+	 */
+	virtual std::vector<float> GetLoadVoltageRanges(size_t channel) =0;
+
+	/**
+		@brief Returns the index of the load's selected voltage range, as returned by GetLoadVoltageRanges()
+	 */
+	virtual size_t GetLoadVoltageRange(size_t channel) =0;
 };
-
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
 
 #endif

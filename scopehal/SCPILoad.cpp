@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#include "scopehal.h"
 
-/**
-	@brief An SCPI-based RF signal generator
- */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+using namespace std;
+
+SCPILoad::LoadCreateMapType SCPILoad::m_loadcreateprocs;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SCPILoad::SCPILoad()
 {
-public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
+}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+SCPILoad::~SCPILoad()
+{
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+}
 
-	virtual std::string GetDriverName() =0;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Enumeration
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
-};
+void SCPILoad::DoAddDriverClass(string name, LoadCreateProcType proc)
+{
+	m_loadcreateprocs[name] = proc;
+}
 
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
+void SCPILoad::EnumDrivers(vector<string>& names)
+{
+	for(auto it=m_loadcreateprocs.begin(); it != m_loadcreateprocs.end(); ++it)
+		names.push_back(it->first);
+}
 
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+SCPILoad* SCPILoad::CreateLoad(string driver, SCPITransport* transport)
+{
+	if(m_loadcreateprocs.find(driver) != m_loadcreateprocs.end())
+		return m_loadcreateprocs[driver](transport);
 
-
-#endif
+	LogError("Invalid driver name");
+	return NULL;
+}

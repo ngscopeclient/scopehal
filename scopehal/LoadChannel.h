@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,57 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#ifndef LoadChannel_h
+#define LoadChannel_h
 
 /**
-	@brief An SCPI-based RF signal generator
+	@brief A single channel of a power supply
  */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+class LoadChannel : public LoadChannel
 {
 public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+	LoadChannel(
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+	virtual ~LoadChannel();
 
-	virtual std::string GetDriverName() =0;
+	/*
+		Measured voltage/current
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
+		Available but not using (can be rederived, no sense wasting bandwidth pulling from hardware):
+			power
+			resistance
+
+		waveform?? need to learn more about this
+	 */
+
+	//Well defined stream IDs used by LoadChannel
+	enum StreamIndexes
+	{
+		/*STREAM_VOLTAGE_MEASURED,
+		STREAM_VOLTAGE_SET_POINT,
+		STREAM_CURRENT_MEASURED,
+		STREAM_CURRENT_SET_POINT
+		*/
+	};
+	/*
+
+	float GetVoltageMeasured()
+	{ return GetScalarValue(STREAM_VOLTAGE_MEASURED); }
+
+	float GetVoltageSetPoint()
+	{ return GetScalarValue(STREAM_VOLTAGE_SET_POINT); }
+
+	float GetCurrentMeasured()
+	{ return GetScalarValue(STREAM_CURRENT_MEASURED); }
+
+	float GetCurrentSetPoint()
+	{ return GetScalarValue(STREAM_CURRENT_SET_POINT); }
+	*/
+
 };
-
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
 
 #endif

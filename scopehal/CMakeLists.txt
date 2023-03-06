@@ -86,6 +86,7 @@ set(SCOPEHAL_SOURCES
 	Instrument.cpp
 	InstrumentChannel.cpp
 	FunctionGenerator.cpp
+	Load.cpp
 	Multimeter.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
@@ -94,6 +95,7 @@ set(SCOPEHAL_SOURCES
 	RFSignalGenerator.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
+	SCPILoad.cpp
 	SCPIMultimeter.cpp
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp
@@ -113,6 +115,7 @@ set(SCOPEHAL_SOURCES
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
 	RigolOscilloscope.cpp
+	SiglentLoad.cpp
 	SiglentSCPIOscilloscope.cpp
 	SiglentVectorSignalGenerator.cpp
 	TektronixOscilloscope.cpp

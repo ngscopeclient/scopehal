@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,84 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#include "scopehal.h"
+#include "SiglentLoad.h"
 
-/**
-	@brief An SCPI-based RF signal generator
- */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+SiglentLoad::SiglentLoad(SCPITransport* transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 {
-public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
+	m_channels.push_back(new InstrumentChannel("LOAD", "#808080", Unit(Unit::UNIT_FS), 0));
+}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
+SiglentLoad::~SiglentLoad()
+{
+}
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// System info / configuration
 
-	virtual std::string GetDriverName() =0;
+string SiglentLoad::GetDriverNameInternal()
+{
+	return "siglent_load";
+}
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
-};
+unsigned int SiglentLoad::GetInstrumentTypes()
+{
+	return INST_LOAD;
+}
 
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
+string SiglentLoad::GetName()
+{
+	return m_model;
+}
 
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+string SiglentLoad::GetVendor()
+{
+	return m_vendor;
+}
 
+string SiglentLoad::GetSerial()
+{
+	return m_serial;
+}
 
-#endif
+uint32_t SiglentLoad::GetInstrumentTypesForChannel(size_t i)
+{
+	if(i == 0)
+		return Instrument::INST_LOAD;
+	else
+		return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Load
+
+Load::LoadMode SiglentLoad::GetLoadMode(size_t channel)
+{
+}
+
+void SiglentLoad::SetLoadMode(size_t channel, LoadMode mode)
+{
+}
+
+vector<float> SiglentLoad::GetLoadCurrentRanges(size_t channel)
+{
+}
+
+size_t SiglentLoad::GetLoadCurrentRange(size_t channel)
+{
+}
+
+vector<float> SiglentLoad::GetLoadVoltageRanges(size_t channel)
+{
+}
+
+size_t SiglentLoad::GetLoadVoltageRange(size_t channel)
+{
+}

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,43 +27,42 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIRFSignalGenerator_h
-#define SCPIRFSignalGenerator_h
+#ifndef SiglentLoad_h
+#define SiglentLoad_h
 
 /**
-	@brief An SCPI-based RF signal generator
+	@brief Siglent electronic load
+
+	So far only series available is SDL1000X-E, base X should be the same (just higher resolution).
  */
-class SCPIRFSignalGenerator 	: public virtual RFSignalGenerator
-								, public virtual SCPIInstrument
+class SiglentLoad
+	: public virtual SCPILoad
 {
 public:
-	SCPIRFSignalGenerator();
-	virtual ~SCPIRFSignalGenerator();
+	SiglentLoad(SCPITransport* transport);
+	virtual ~SiglentLoad();
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
+	//Instrument
+	virtual unsigned int GetInstrumentTypes() override;
+	virtual std::string GetName() override;
+	virtual std::string GetVendor() override;
+	virtual std::string GetSerial() override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+
+	//Load
+	virtual LoadMode GetLoadMode(size_t channel);
+	virtual void SetLoadMode(size_t channel, LoadMode mode);
+	virtual std::vector<float> GetLoadCurrentRanges(size_t channel);
+	virtual size_t GetLoadCurrentRange(size_t channel);
+	virtual std::vector<float> GetLoadVoltageRanges(size_t channel);
+	virtual size_t GetLoadVoltageRange(size_t channel);
+
 public:
-	typedef SCPIRFSignalGenerator* (*VSGCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VSGCreateProcType proc);
-
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
-
-	virtual std::string GetDriverName() =0;
+	static std::string GetDriverNameInternal();
+	LOAD_INITPROC(SiglentLoad)
 
 protected:
-	//Class enumeration
-	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
-	static VSGCreateMapType m_vsgcreateprocs;
+	//Cache config
 };
-
-#define VSG_INITPROC(T) \
-	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
 
 #endif

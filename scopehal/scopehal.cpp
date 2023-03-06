@@ -57,6 +57,8 @@
 #include "GWInstekGPDX303SPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
 
+#include "SiglentLoad.h"
+
 #include "SiglentVectorSignalGenerator.h"
 
 #include "CDR8B10BTrigger.h"
@@ -196,6 +198,8 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
+
+	AddLoadDriverClass(SiglentLoad);
 
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
