@@ -56,13 +56,21 @@ public:
 	virtual size_t GetLoadCurrentRange(size_t channel);
 	virtual std::vector<float> GetLoadVoltageRanges(size_t channel);
 	virtual size_t GetLoadVoltageRange(size_t channel);
+	virtual bool GetLoadActive(size_t channel);
+	virtual void SetLoadActive(size_t channel, bool active);
 
 public:
 	static std::string GetDriverNameInternal();
 	LOAD_INITPROC(SiglentLoad)
 
 protected:
+	LoadMode GetLoadModeUncached(size_t channel);
+
+	virtual float GetLoadVoltageActual(size_t channel);
+	virtual float GetLoadCurrentActual(size_t channel);
+
 	//Cache config
+	LoadMode m_modeCached;
 };
 
 #endif

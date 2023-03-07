@@ -59,7 +59,10 @@ bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i < 2) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+	if(i >= 2)
+		return false;
+
+	if( (stream.GetType() == Stream::STREAM_TYPE_ANALOG) || (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
 		return true;
 
 	return false;
@@ -87,6 +90,33 @@ string SubtractFilter::GetProtocolName()
 // Actual decoder logic
 
 void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+{
+	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
+	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
+
+	if(veca && vecb)
+		DoRefreshVectorVector(cmdBuf, queue);
+	else if(!veca && !vecb)
+		DoRefreshScalarScalar();
+	else
+	{
+		LogWarning("[SubtractFilter::Refresh] Scalar - vector case not yet implemented\n");
+		SetData(nullptr, 0);
+	}
+}
+
+void SubtractFilter::DoRefreshScalarScalar()
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
+	SetData(nullptr, 0);
+
+	//Subtract value
+	//TODO: how to handle unequal units?
+	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
+	m_streams[0].m_value = GetInput(0).GetScalarValue() - GetInput(1).GetScalarValue();
+}
+
+void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())

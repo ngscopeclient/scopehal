@@ -95,6 +95,37 @@ public:
 		@brief Returns the index of the load's selected voltage range, as returned by GetLoadVoltageRanges()
 	 */
 	virtual size_t GetLoadVoltageRange(size_t channel) =0;
+
+	//TODO: setters for range
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Channel control
+
+	/**
+		@brief Returns true if the load is enabled (sinking power) and false if disabled (no load)
+	 */
+	virtual bool GetLoadActive(size_t channel) =0;
+
+	/**
+		@brief Turns the load on or off
+	 */
+	virtual void SetLoadActive(size_t channel, bool active) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Readback
+	// Typically called by AcquireData() and cached in the channel object, not used directly by applications
+
+protected:
+
+	/**
+		@brief Get the measured voltage of the load
+	 */
+	virtual float GetLoadVoltageActual(size_t channel) =0;
+
+	/**
+		@brief Get the measured current of the load
+	 */
+	virtual float GetLoadCurrentActual(size_t channel) =0;
 };
 
 #endif

@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,42 +27,26 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#include "scopehal.h"
+#include "LoadChannel.h"
 
-class QueueHandle;
+using namespace std;
 
-class SubtractFilter : public Filter
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+LoadChannel::LoadChannel(
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
 {
-public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
+	ClearStreams();
+	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "SetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);	//TODO: unit can change w/ mode
+}
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual DataLocation GetInputLocation();
-
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
-
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
-
-protected:
-	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	void DoRefreshScalarScalar();
-
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-#ifdef __x86_64__
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
-#endif
-
-	ComputePipeline m_computePipeline;
-};
-
-#endif
+LoadChannel::~LoadChannel()
+{
+}

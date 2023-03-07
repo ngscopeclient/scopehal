@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "SiglentLoad.h"
+#include "LoadChannel.h"
 
 using namespace std;
 
@@ -39,7 +40,10 @@ SiglentLoad::SiglentLoad(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
-	m_channels.push_back(new InstrumentChannel("LOAD", "#808080", Unit(Unit::UNIT_FS), 0));
+	m_channels.push_back(new LoadChannel("Load", "#808080", 0));
+
+	//Populate the cache for a few commonly used variables
+	GetLoadModeUncached(0);
 }
 
 SiglentLoad::~SiglentLoad()
@@ -85,26 +89,154 @@ uint32_t SiglentLoad::GetInstrumentTypesForChannel(size_t i)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Load
 
-Load::LoadMode SiglentLoad::GetLoadMode(size_t channel)
+/*
+	Get waveform (200 points, at what rate?)
+	MEAS:WAVE:VOLT
+	MEAS:WAVE:CURR
+
+	Short circuit mode TODO
+	Transient mode TODO
+	List/sequence mode TODO
+ */
+
+Load::LoadMode SiglentLoad::GetLoadMode(size_t /*channel*/)
 {
+	return m_modeCached;
 }
 
-void SiglentLoad::SetLoadMode(size_t channel, LoadMode mode)
+Load::LoadMode SiglentLoad::GetLoadModeUncached(size_t /*channel*/)
 {
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply("SOUR:FUNC?"));
+	if(reply == "CURRENT")
+		return MODE_CONSTANT_CURRENT;
+	else if(reply == "VOLTAGE")
+		return MODE_CONSTANT_VOLTAGE;
+	else if(reply == "POWER")
+		return MODE_CONSTANT_POWER;
+	else if(reply == "RESISTANCE")
+		return MODE_CONSTANT_RESISTANCE;
+	//TODO: LED mode
+
+	LogWarning("[SiglentLoad::GetLoadMode] Unknown mode %s\n", reply.c_str());
+	return MODE_CONSTANT_CURRENT;
 }
 
-vector<float> SiglentLoad::GetLoadCurrentRanges(size_t channel)
+void SiglentLoad::SetLoadMode(size_t /*channel*/, LoadMode mode)
 {
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			m_transport->SendCommandQueued("SOUR:FUNC CURR");
+			break;
+
+		case MODE_CONSTANT_POWER:
+			m_transport->SendCommandQueued("SOUR:FUNC POW");
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			m_transport->SendCommandQueued("SOUR:FUNC RES");
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			m_transport->SendCommandQueued("SOUR:FUNC VOLT");
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::SetLoadMode] Unknown mode %d\n", mode);
+			break;
+	}
+
+	m_modeCached = mode;
+}
+
+vector<float> SiglentLoad::GetLoadCurrentRanges(size_t /*channel*/)
+{
+	vector<float> ranges;
+	ranges.push_back(5);
+	ranges.push_back(30);
+	return ranges;
 }
 
 size_t SiglentLoad::GetLoadCurrentRange(size_t channel)
 {
+	int maxcur = 0;
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			maxcur = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:CURR:IRANG?")));
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			maxcur = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:VOLT:IRANG?")));
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::GetLoadCurrentRange] Unknown mode %d\n", mode);
+			break;
+	}
+
+	//Given the current value, find which range we're in
+	if(maxcur > 5)
+		return 1;
+	else
+		return 0;
 }
 
-vector<float> SiglentLoad::GetLoadVoltageRanges(size_t channel)
+vector<float> SiglentLoad::GetLoadVoltageRanges(size_t /*channel*/)
 {
+	vector<float> ranges;
+	ranges.push_back(36);
+	ranges.push_back(150);
+	return ranges;
 }
 
 size_t SiglentLoad::GetLoadVoltageRange(size_t channel)
 {
+	int maxvolt = 0;
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			maxvolt = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:CURR:VRANG?")));
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			maxvolt = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:VOLT:VRANG?")));
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::GetLoadVoltageRange] Unknown mode %d\n", mode);
+			break;
+	}
+
+	//Given the voltage value, find which range we're in
+	if(maxvolt > 36)
+		return 1;
+	else
+		return 0;
+}
+
+bool SiglentLoad::GetLoadActive(size_t /*channel*/)
+{
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply("SOUR:INP:STAT?"));
+	return stoi(reply) == 1;
+}
+
+void SiglentLoad::SetLoadActive(size_t /*channel*/, bool active)
+{
+	if(active)
+		m_transport->SendCommandQueued("SOUR:INP:STAT 1");
+	else
+		m_transport->SendCommandQueued("SOUR:INP:STAT 0");
+}
+
+float SiglentLoad::GetLoadVoltageActual(size_t /*channel*/)
+{
+	return stof(Trim(m_transport->SendCommandQueuedWithReply("MEAS:VOLT?")));
+}
+
+float SiglentLoad::GetLoadCurrentActual(size_t /*channel*/)
+{
+	return stof(Trim(m_transport->SendCommandQueuedWithReply("MEAS:CURR?")));
 }

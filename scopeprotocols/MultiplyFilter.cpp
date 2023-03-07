@@ -80,8 +80,11 @@ void MultiplyFilter::Refresh()
 		RefreshVectorVector();
 	else if(!veca && !vecb)
 		RefreshScalarScalar();
-
-	//TODO: vector * scalar
+	else
+	{
+		LogWarning("[MultiplyFilter::Refresh] Scalar * vector case not yet implemented\n");
+		SetData(nullptr, 0);
+	}
 }
 
 void MultiplyFilter::RefreshScalarScalar()

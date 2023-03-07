@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "Load.h"
+#include "LoadChannel.h"
 
 Load::Load()
 {
@@ -48,17 +49,15 @@ unsigned int Load::GetInstrumentTypes()
  */
 void Load::AcquireData()
 {
-	/*
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
-		auto pchan = dynamic_cast<LoadChannel*>(m_channels[i]);
-		if(!pchan)
+		auto lchan = dynamic_cast<LoadChannel*>(m_channels[i]);
+		if(!lchan)
 			continue;
 
-		pchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetPowerVoltageActual(i));
-		pchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
-		pchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetPowerCurrentActual(i));
-		pchan->SetScalarValue(LoadChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
+		lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetLoadVoltageActual(i));
+	//	lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
+		lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetLoadCurrentActual(i));
+	//	lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
 	}
-	*/
 }

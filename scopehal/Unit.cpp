@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -684,6 +684,34 @@ Unit Unit::operator*(const Unit& rhs)
 	{
 		return Unit(UNIT_WATTS);
 	}
+
+	//Unknown / invalid pairing?
+	//For now, just return the first unit.
+	//TODO: how should we handle this
+	return Unit(m_type);
+}
+
+/**
+	@brief Divides two units and calculates the resulting unit
+ */
+Unit Unit::operator/(const Unit& rhs)
+{
+	//Same unit? Dimensionless ratio
+	//TODO: should we output percent or counts here? or what
+	if(m_type == rhs.m_type)
+		return Unit(Unit::UNIT_COUNTS);
+
+	//Ohm's law
+	if( (m_type == UNIT_VOLTS) && (rhs.m_type == UNIT_OHMS) )
+		return Unit(UNIT_AMPS);
+	if( (m_type == UNIT_VOLTS) && (rhs.m_type == UNIT_AMPS) )
+		return Unit(UNIT_OHMS);
+
+	//Power
+	if( (m_type == UNIT_WATTS) && (rhs.m_type == UNIT_AMPS) )
+		return Unit(UNIT_VOLTS);
+	if( (m_type == UNIT_WATTS) && (rhs.m_type == UNIT_VOLTS) )
+		return Unit(UNIT_AMPS);
 
 	//Unknown / invalid pairing?
 	//For now, just return the first unit.

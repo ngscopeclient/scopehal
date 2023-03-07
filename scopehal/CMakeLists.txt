@@ -87,6 +87,7 @@ set(SCOPEHAL_SOURCES
 	InstrumentChannel.cpp
 	FunctionGenerator.cpp
 	Load.cpp
+	LoadChannel.cpp
 	Multimeter.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
