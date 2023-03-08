@@ -217,6 +217,66 @@ size_t SiglentLoad::GetLoadVoltageRange(size_t channel)
 		return 0;
 }
 
+void SiglentLoad::SetLoadVoltageRange(size_t channel, size_t rangeIndex)
+{
+	auto ranges = GetLoadVoltageRanges(channel);
+	int fullScaleRange = ranges[rangeIndex];
+
+	//Cannot change range while load is enabled
+	bool wasOn = GetLoadActive(channel);
+	if(wasOn)
+		SetLoadActive(channel, false);
+
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			m_transport->SendCommandQueued(string("SOUR:CURR:VRANG ") + to_string(fullScaleRange));
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			m_transport->SendCommandQueued(string("SOUR:VOLT:VRANG ") + to_string(fullScaleRange));
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::SetLoadVoltageRange] Unknown mode %d\n", mode);
+			break;
+	}
+
+	if(wasOn)
+		SetLoadActive(channel, true);
+}
+
+void SiglentLoad::SetLoadCurrentRange(size_t channel, size_t rangeIndex)
+{
+	auto ranges = GetLoadCurrentRanges(channel);
+	int fullScaleRange = ranges[rangeIndex];
+
+	//Cannot change range while load is enabled
+	bool wasOn = GetLoadActive(channel);
+	if(wasOn)
+		SetLoadActive(channel, false);
+
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			m_transport->SendCommandQueued(string("SOUR:CURR:IRANG ") + to_string(fullScaleRange));
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			m_transport->SendCommandQueued(string("SOUR:VOLT:IRANG ") + to_string(fullScaleRange));
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::SetLoadCurrentRange] Unknown mode %d\n", mode);
+			break;
+	}
+
+	if(wasOn)
+		SetLoadActive(channel, true);
+}
+
 bool SiglentLoad::GetLoadActive(size_t /*channel*/)
 {
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply("SOUR:INP:STAT?"));

@@ -96,7 +96,21 @@ public:
 	 */
 	virtual size_t GetLoadVoltageRange(size_t channel) =0;
 
-	//TODO: setters for range
+	/**
+		@brief Select the voltage range to use
+
+		@param channel		Channel index
+		@param rangeIndex	Index of the range, as returned by GetLoadVoltageRanges()
+	 */
+	virtual void SetLoadVoltageRange(size_t channel, size_t rangeIndex) =0;
+
+	/**
+		@brief Select the current range to use
+
+		@param channel		Channel index
+		@param rangeIndex	Index of the range, as returned by GetLoadCurrentRanges()
+	 */
+	virtual void SetLoadCurrentRange(size_t channel, size_t rangeIndex) =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Channel control

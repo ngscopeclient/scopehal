@@ -58,6 +58,8 @@ public:
 	virtual size_t GetLoadVoltageRange(size_t channel);
 	virtual bool GetLoadActive(size_t channel);
 	virtual void SetLoadActive(size_t channel, bool active);
+	virtual void SetLoadVoltageRange(size_t channel, size_t rangeIndex);
+	virtual void SetLoadCurrentRange(size_t channel, size_t rangeIndex);
 
 public:
 	static std::string GetDriverNameInternal();
