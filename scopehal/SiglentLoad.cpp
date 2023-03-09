@@ -300,3 +300,52 @@ float SiglentLoad::GetLoadCurrentActual(size_t /*channel*/)
 {
 	return stof(Trim(m_transport->SendCommandQueuedWithReply("MEAS:CURR?")));
 }
+
+float SiglentLoad::GetLoadSetPoint(size_t channel)
+{
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			return stof(Trim(m_transport->SendCommandQueuedWithReply("SOUR:CURR:LEV?")));
+
+		case MODE_CONSTANT_VOLTAGE:
+			return stof(Trim(m_transport->SendCommandQueuedWithReply("SOUR:VOLT:LEV?")));
+
+		case MODE_CONSTANT_POWER:
+			return stof(Trim(m_transport->SendCommandQueuedWithReply("SOUR:POW:LEV?")));
+
+		case MODE_CONSTANT_RESISTANCE:
+			return stof(Trim(m_transport->SendCommandQueuedWithReply("SOUR:RES:LEV?")));
+
+		default:
+			LogWarning("[SiglentLoad::GetLoadSetPoint] Unknown mode %d\n", mode);
+			return 0;
+	}
+}
+
+void SiglentLoad::SetLoadSetPoint(size_t channel, float target)
+{
+	auto mode = GetLoadMode(channel);
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			m_transport->SendCommandQueued(string("SOUR:CURR:LEV ") + to_string(target));
+			break;
+
+		case MODE_CONSTANT_VOLTAGE:
+			m_transport->SendCommandQueued(string("SOUR:VOLT:LEV ") + to_string(target));
+			break;
+
+		case MODE_CONSTANT_POWER:
+			m_transport->SendCommandQueued(string("SOUR:POW:LEV ") + to_string(target));
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			m_transport->SendCommandQueued(string("SOUR:RES:LEV ") + to_string(target));
+			break;
+
+		default:
+			LogWarning("[SiglentLoad::SetLoadSetPoint] Unknown mode %d\n", mode);
+	}
+}

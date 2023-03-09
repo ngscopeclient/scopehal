@@ -56,8 +56,7 @@ void Load::AcquireData()
 			continue;
 
 		lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetLoadVoltageActual(i));
-	//	lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_SET_POINT, GetPowerVoltageNominal(i));
+		lchan->SetScalarValue(LoadChannel::STREAM_SET_POINT, GetLoadSetPoint(i));
 		lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetLoadCurrentActual(i));
-	//	lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
 	}
 }

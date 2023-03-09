@@ -125,6 +125,20 @@ public:
 	 */
 	virtual void SetLoadActive(size_t channel, bool active) =0;
 
+	/**
+		@brief Gets the set point for the channel
+
+		Units vary depending on operating mode: amps (CC), volts (CV), ohms (CR), watts (CP).
+	 */
+	virtual float GetLoadSetPoint(size_t channel) =0;
+
+	/**
+		@brief Sets the set point for the channel
+
+		Units vary depending on operating mode: amps (CC), volts (CV), ohms (CR), watts (CP).
+	 */
+	virtual void SetLoadSetPoint(size_t channel, float target) =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Readback
 	// Typically called by AcquireData() and cached in the channel object, not used directly by applications

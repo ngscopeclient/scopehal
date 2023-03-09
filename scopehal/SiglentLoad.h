@@ -61,6 +61,9 @@ public:
 	virtual void SetLoadVoltageRange(size_t channel, size_t rangeIndex);
 	virtual void SetLoadCurrentRange(size_t channel, size_t rangeIndex);
 
+	virtual float GetLoadSetPoint(size_t channel);
+	virtual void SetLoadSetPoint(size_t channel, float target);
+
 public:
 	static std::string GetDriverNameInternal();
 	LOAD_INITPROC(SiglentLoad)
