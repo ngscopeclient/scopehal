@@ -15,6 +15,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClipFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
+	CSVExportFilter.cpp
 	CSVImportFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
@@ -59,6 +60,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	EthernetRMIIDecoder.cpp
 	EthernetSGMIIDecoder.cpp
 	EthernetProtocolDecoder.cpp
+	ExportFilter.cpp
 	EyeBitRateMeasurement.cpp
 	EyePattern.cpp
 	EyeMask.cpp

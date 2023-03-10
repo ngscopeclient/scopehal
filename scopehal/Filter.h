@@ -98,7 +98,8 @@ public:
 		CAT_MISC,			//anything not otherwise categorized
 		CAT_POWER,			//Power analysis
 		CAT_RF,				//Frequency domain analysis (FFT etc) and other RF stuff
-		CAT_GENERATION		//Waveform generation and synthesis
+		CAT_GENERATION,		//Waveform generation and synthesis
+		CAT_EXPORT,			//Waveform export
 	};
 
 	Filter(

@@ -52,6 +52,7 @@
 #include "ClipFilter.h"
 #include "ClockRecoveryFilter.h"
 #include "ComplexImportFilter.h"
+#include "CSVExportFilter.h"
 #include "CSVImportFilter.h"
 #include "CTLEFilter.h"
 #include "CurrentShuntFilter.h"
