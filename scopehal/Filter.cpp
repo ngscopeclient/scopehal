@@ -1222,6 +1222,7 @@ void Filter::AdvanceToTimestampScaled(UniformWaveformBase* wfm, size_t& i, size_
  */
 void Filter::SetDefaultName()
 {
+	/*
 	//Start with our immediate inputs
 	set<StreamDescriptor> inputs;
 	for(auto i : m_inputs)
@@ -1315,6 +1316,7 @@ void Filter::SetDefaultName()
 			inames += ",";
 		inames += s;
 	}
+	*/
 
 	//Format final output: remove spaces from display name, add instance number
 	auto pname = GetProtocolDisplayName();
@@ -1325,8 +1327,8 @@ void Filter::SetDefaultName()
 			pname2 += c;
 	}
 	string name = pname2 + +"_" + to_string(m_instanceNum + 1);
-	if(!inames.empty())
-		name += "(" + inames + ")";
+	/*if(!inames.empty())
+		name += "(" + inames + ")";*/
 
 	m_hwname = name;
 	m_displayname = name;
