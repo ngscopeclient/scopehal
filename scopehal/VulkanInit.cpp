@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,7 +92,7 @@ shared_ptr<QueueHandle> g_vkTransferQueue;
 
 /**
  * @brief Allocates QueueHandle objects
- * 
+ *
  * This is a single global resource, all QueueHandles must be obtained through this object.
  */
 std::unique_ptr<QueueManager> g_vkQueueManager;
@@ -134,6 +134,9 @@ bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
 bool g_hasDebugUtils = false;
+
+//Feature flags indicating specific drivers, for bug workarounds
+bool g_vulkanDeviceIsIntelMesa = false;
 
 void VulkanCleanup();
 
@@ -185,12 +188,14 @@ bool VulkanInit(bool skipGLFW)
 		auto availableVersion = g_vkContext.enumerateInstanceVersion();
 		uint32_t loader_major = VK_VERSION_MAJOR(availableVersion);
 		uint32_t loader_minor = VK_VERSION_MINOR(availableVersion);
+		bool vulkan11Available = false;
 		bool vulkan12Available = false;
 		LogDebug("Loader/API support available for Vulkan %d.%d\n", loader_major, loader_minor);
 		if( (loader_major >= 1) || ( (loader_major == 1) && (loader_minor >= 2) ) )
 		{
 			apiVersion = VK_API_VERSION_1_2;
 			vulkan12Available = true;
+			vulkan11Available = true;
 			LogDebug("Vulkan 1.2 support available, requesting it\n");
 		}
 		else
@@ -507,6 +512,33 @@ bool VulkanInit(bool skipGLFW)
 				auto properties = device.getProperties();
 				g_vkComputeDeviceDriverVer = properties.driverVersion;
 				memcpy(g_vkComputeDeviceUuid, properties.pipelineCacheUUID, 16);
+
+				//Detect driver (used by some workarounds for bugs etc)
+				if(vulkan11Available)
+				{
+					auto features2 = device.getProperties2<
+						vk::PhysicalDeviceProperties2,
+						vk::PhysicalDeviceDriverProperties
+						>();
+					auto driverProperties = std::get<1>(features2);
+
+					//Identify driver
+					g_vulkanDeviceIsIntelMesa = false;
+					switch(driverProperties.driverID)
+					{
+						case vk::DriverId::eIntelOpenSourceMESA:
+							g_vulkanDeviceIsIntelMesa = true;
+							LogDebug("Driver: vk::DriverId::eIntelOpenSourceMESA\n");
+							break;
+
+						case vk::DriverId::eNvidiaProprietary:
+							LogDebug("Driver: vk::DriverId::eNvidiaProprietary\n");
+							break;
+
+						default:
+							LogDebug("Driver: %d\n", (int)driverProperties.driverID);
+					}
+				}
 
 				//See if the device has good integer data type support. If so, enable it
 				vk::PhysicalDeviceFeatures enabledFeatures;

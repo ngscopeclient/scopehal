@@ -193,6 +193,7 @@ extern uint8_t g_vkComputeDeviceUuid[16];
 extern uint32_t g_vkComputeDeviceDriverVer;
 extern vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
 extern std::unique_ptr<QueueManager> g_vkQueueManager;
+extern bool g_vulkanDeviceIsIntelMesa;
 
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
