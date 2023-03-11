@@ -137,6 +137,8 @@ bool g_hasDebugUtils = false;
 
 //Feature flags indicating specific drivers, for bug workarounds
 bool g_vulkanDeviceIsIntelMesa = false;
+bool g_vulkanDeviceIsAnyMesa = false;
+bool g_vulkanDeviceIsMoltenVK = false;
 
 void VulkanCleanup();
 
@@ -524,11 +526,54 @@ bool VulkanInit(bool skipGLFW)
 
 					//Identify driver
 					g_vulkanDeviceIsIntelMesa = false;
+					g_vulkanDeviceIsAnyMesa = false;
+					g_vulkanDeviceIsMoltenVK = false;
 					switch(driverProperties.driverID)
 					{
 						case vk::DriverId::eIntelOpenSourceMESA:
 							g_vulkanDeviceIsIntelMesa = true;
+							g_vulkanDeviceIsAnyMesa = true;
 							LogDebug("Driver: vk::DriverId::eIntelOpenSourceMESA\n");
+							break;
+
+						case vk::DriverId::eMesaRadv:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaRadv\n");
+							break;
+
+						case vk::DriverId::eMesaLlvmpipe:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaLlvmpipe\n");
+							break;
+
+						case vk::DriverId::eMesaTurnip:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaTurnip\n");
+							break;
+
+						case vk::DriverId::eMesaV3Dv:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaV3Dv\n");
+							break;
+
+						case vk::DriverId::eMesaPanvk:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaPanvk\n");
+							break;
+
+						case vk::DriverId::eMesaVenus:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaVenus\n");
+							break;
+
+						case vk::DriverId::eMesaDozen:
+							g_vulkanDeviceIsAnyMesa = true;
+							LogDebug("Driver: vk::DriverId::eMesaDozen\n");
+							break;
+
+						case vk::DriverId::eMoltenvk:
+							g_vulkanDeviceIsMoltenVK = true;
+							LogDebug("Driver: vk::DriverId::eMoltenvk\n");
 							break;
 
 						case vk::DriverId::eNvidiaProprietary:
