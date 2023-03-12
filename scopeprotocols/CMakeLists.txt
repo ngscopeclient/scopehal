@@ -140,6 +140,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TCPDecoder.cpp
 	TDRFilter.cpp
 	TDRStepDeEmbedFilter.cpp
+	ThermalDiodeFilter.cpp
 	ThresholdFilter.cpp
 	TIEMeasurement.cpp
 	TimeOutsideLevelMeasurement.cpp

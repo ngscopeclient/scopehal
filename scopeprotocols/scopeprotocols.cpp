@@ -176,6 +176,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TCPDecoder);
 	AddDecoderClass(TDRFilter);
 	//AddDecoderClass(TDRStepDeEmbedFilter);
+	AddDecoderClass(ThermalDiodeFilter);
 	AddDecoderClass(ThresholdFilter);
 	AddDecoderClass(TIEMeasurement);
 	AddDecoderClass(TimeOutsideLevelMeasurement);

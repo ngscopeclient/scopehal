@@ -174,6 +174,7 @@
 #include "TCPDecoder.h"
 #include "TDRFilter.h"
 #include "TDRStepDeEmbedFilter.h"
+#include "ThermalDiodeFilter.h"
 #include "ThresholdFilter.h"
 #include "TIEMeasurement.h"
 #include "TimeOutsideLevelMeasurement.h"
