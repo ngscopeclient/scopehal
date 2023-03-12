@@ -71,7 +71,7 @@ SCPITMCTransport::SCPITMCTransport(const string& args)
 	char *ptr;
 	if(2 == sscanf(m_devicePath.c_str(), "%127[^:]:%127s", devicePath, transferBufferSize))
 	{
-		// set size for a buggy tmc firmware	
+		// set size for a buggy tmc firmware
 		// FIXME: Workaround for Siglent SDS1x04X-E. Max request size is 48 byte. Bug in firmware 8.2.6.1.37R9 ?
 		m_fix_buggy_driver = true;
 		m_transfer_size = strtol(transferBufferSize, &ptr, 10);
@@ -80,7 +80,7 @@ SCPITMCTransport::SCPITMCTransport(const string& args)
 			LogNotice("USBTMC wrong size value %s\n", transferBufferSize);
 			return;
 		}
-		LogNotice("Set USBTMC transfer size %d bytes. Workaround for buggy firmware.\n", m_transfer_size);		
+		LogNotice("Set USBTMC transfer size %d bytes. Workaround for buggy firmware.\n", m_transfer_size);
 	}
 
 	m_handle = open(devicePath, O_RDWR);
@@ -200,6 +200,7 @@ size_t SCPITMCTransport::ReadRawData(size_t len, unsigned char* buf)
 				    bytes_requested = (max_bytes_per_req < len) ? max_bytes_per_req : len;
 				    bytes_fetched = read(m_handle, (char *)m_staging_buf + i, m_staging_buf_size);
 				}
+				else
 				{
 					// limit each request to m_transfer_size
 					bytes_requested = m_transfer_size;
