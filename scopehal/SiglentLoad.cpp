@@ -43,7 +43,7 @@ SiglentLoad::SiglentLoad(SCPITransport* transport)
 	m_channels.push_back(new LoadChannel("Load", "#808080", 0));
 
 	//Populate the cache for a few commonly used variables
-	GetLoadModeUncached(0);
+	m_modeCached = GetLoadModeUncached(0);
 }
 
 SiglentLoad::~SiglentLoad()
