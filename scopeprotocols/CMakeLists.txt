@@ -146,6 +146,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	TMDSDecoder.cpp
 	ToneGeneratorFilter.cpp
 	TopMeasurement.cpp
+	TouchstoneExportFilter.cpp
 	TouchstoneImportFilter.cpp
 	TRCImportFilter.cpp
 	TrendFilter.cpp

@@ -110,7 +110,7 @@ void PowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
 /**
 	@brief Pulls data from hardware and updates our measurements
  */
-void PowerSupply::AcquireData()
+bool PowerSupply::AcquireData()
 {
 	for(size_t i=0; i<m_channels.size(); i++)
 	{
@@ -123,4 +123,6 @@ void PowerSupply::AcquireData()
 		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_MEASURED, GetPowerCurrentActual(i));
 		pchan->SetScalarValue(PowerSupplyChannel::STREAM_CURRENT_SET_POINT, GetPowerCurrentNominal(i));
 	}
+
+	return true;
 }

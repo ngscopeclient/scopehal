@@ -186,6 +186,16 @@ public:
 	InstrumentChannel* GetChannelByDisplayName(const std::string& name);
 	InstrumentChannel* GetChannelByHwName(const std::string& name);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Data capture
+
+	/**
+		@brief Pull data from the instrument
+
+		@return True if waveform was acquired, false if connection lost or other serious error
+	 */
+	virtual bool AcquireData() =0;
+
 protected:
 
 	/**

@@ -104,6 +104,8 @@ public:
 		Values are rounded up for display, for example a 5 3/4 digit meter should return 6 here.
 	 */
 	virtual int GetMeterDigits() =0;
+
+	virtual bool AcquireData() override;
 };
 
 #endif

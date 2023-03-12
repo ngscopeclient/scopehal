@@ -27,38 +27,39 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "Load.h"
-#include "LoadChannel.h"
-
-Load::Load()
-{
-}
-
-Load::~Load()
-{
-}
-
-unsigned int Load::GetInstrumentTypes()
-{
-	return INST_LOAD;
-}
+#ifndef MultimeterChannel_h
+#define MultimeterChannel_h
 
 /**
-	@brief Pulls data from hardware and updates our measurements
+	@brief A single channel of a multimeter
+
+	Meter channels can overlap with scope channels, which (by convention) use stream index zero for waveform data.
+
+	So our meter channel reading can get a bit tricky to update.
  */
-bool Load::AcquireData()
+class MultimeterChannel : public InstrumentChannel
 {
-	for(size_t i=0; i<m_channels.size(); i++)
-	{
-		auto lchan = dynamic_cast<LoadChannel*>(m_channels[i]);
-		if(!lchan)
-			continue;
+public:
 
-		lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetLoadVoltageActual(i));
-		lchan->SetScalarValue(LoadChannel::STREAM_SET_POINT, GetLoadSetPoint(i));
-		lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetLoadCurrentActual(i));
-	}
+	MultimeterChannel(
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-	return true;
-}
+	virtual ~MultimeterChannel();
+
+	void Update(Multimeter* meter);
+
+	float GetPrimaryValue()
+	{ return GetScalarValue(m_primaryStream); }
+
+	float GetSecondaryValue()
+	{ return GetScalarValue(m_secondaryStream); }
+
+protected:
+	size_t m_primaryStream;
+	size_t m_secondaryStream;
+
+};
+
+#endif

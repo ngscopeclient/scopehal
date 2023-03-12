@@ -89,6 +89,7 @@ set(SCOPEHAL_SOURCES
 	Load.cpp
 	LoadChannel.cpp
 	Multimeter.cpp
+	MultimeterChannel.cpp
 	Oscilloscope.cpp
 	OscilloscopeChannel.cpp
 	PowerSupply.cpp

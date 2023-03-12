@@ -28,37 +28,31 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "Load.h"
-#include "LoadChannel.h"
 
-Load::Load()
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+MultimeterChannel::MultimeterChannel(
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+{
+	m_primaryStream = AddStream(Unit(Unit::UNIT_VOLTS), "Primary", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	m_secondaryStream = AddStream(Unit(Unit::UNIT_VOLTS), "Secondary", Stream::STREAM_TYPE_ANALOG_SCALAR);
+}
+
+MultimeterChannel::~MultimeterChannel()
 {
 }
 
-Load::~Load()
+void MultimeterChannel::Update(Multimeter* meter)
 {
-}
+	m_streams[m_primaryStream].m_yAxisUnit = meter->GetMeterUnit();
+	m_streams[m_primaryStream].m_value = meter->GetMeterValue();
 
-unsigned int Load::GetInstrumentTypes()
-{
-	return INST_LOAD;
-}
-
-/**
-	@brief Pulls data from hardware and updates our measurements
- */
-bool Load::AcquireData()
-{
-	for(size_t i=0; i<m_channels.size(); i++)
-	{
-		auto lchan = dynamic_cast<LoadChannel*>(m_channels[i]);
-		if(!lchan)
-			continue;
-
-		lchan->SetScalarValue(LoadChannel::STREAM_VOLTAGE_MEASURED, GetLoadVoltageActual(i));
-		lchan->SetScalarValue(LoadChannel::STREAM_SET_POINT, GetLoadSetPoint(i));
-		lchan->SetScalarValue(LoadChannel::STREAM_CURRENT_MEASURED, GetLoadCurrentActual(i));
-	}
-
-	return true;
+	m_streams[m_secondaryStream].m_yAxisUnit = meter->GetSecondaryMeterUnit();
+	m_streams[m_secondaryStream].m_value = meter->GetSecondaryMeterValue();
 }

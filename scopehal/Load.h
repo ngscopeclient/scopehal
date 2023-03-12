@@ -41,8 +41,7 @@ public:
 
 	virtual unsigned int GetInstrumentTypes();
 
-	//TODO: This should become a virtual that's used by Oscilloscope etc too?
-	void AcquireData();
+	virtual bool AcquireData() override;
 
 	//New object model does not have explicit query methods for channel properties.
 	//Instead, call AcquireData() then read scalar channel state

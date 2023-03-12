@@ -180,6 +180,7 @@
 #include "TMDSDecoder.h"
 #include "ToneGeneratorFilter.h"
 #include "TopMeasurement.h"
+#include "TouchstoneExportFilter.h"
 #include "TouchstoneImportFilter.h"
 #include "TRCImportFilter.h"
 #include "TrendFilter.h"

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -1359,11 +1359,11 @@ void Filter::ClearStreams()
 	m_offsets.clear();
 }
 
-void Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
+size_t Filter::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
 {
-	OscilloscopeChannel::AddStream(yunit, name, stype, flags);
 	m_ranges.push_back(0);
 	m_offsets.push_back(0);
+	return OscilloscopeChannel::AddStream(yunit, name, stype, flags);
 }
 
 /**

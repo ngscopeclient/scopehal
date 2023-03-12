@@ -133,5 +133,6 @@ void ExportFilter::Clear()
 
 	//Open and truncate it, but do not keep open (so the next Export() treats the file as not open and writes headers)
 	FILE* ftmp = fopen(m_parameters[m_fname].GetFileName().c_str(), "wb");
-	fclose(ftmp);
+	if(ftmp)
+		fclose(ftmp);
 }

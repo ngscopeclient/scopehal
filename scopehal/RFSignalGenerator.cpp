@@ -143,3 +143,8 @@ void RFSignalGenerator::SetSweepType(int /*chan*/, SweepType /*type*/)
 {
 	//no-op in base class
 }
+
+bool RFSignalGenerator::AcquireData()
+{
+	return true;
+}

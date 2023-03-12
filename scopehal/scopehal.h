@@ -108,6 +108,7 @@ extern bool g_hasAvx2;
 #include "FunctionGenerator.h"
 #include "Load.h"
 #include "Multimeter.h"
+#include "MultimeterChannel.h"
 #include "Oscilloscope.h"
 #include "SParameterChannel.h"
 #include "PowerSupply.h"

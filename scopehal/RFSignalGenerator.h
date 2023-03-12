@@ -296,6 +296,8 @@ public:
 		@param dir	Direction of the sweep curve to use
 	 */
 	virtual void SetSweepDirection(int chan, SweepDirection dir);
+
+	bool AcquireData() override;
 };
 
 #endif

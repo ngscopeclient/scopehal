@@ -435,11 +435,6 @@ public:
 	virtual void PullTrigger() =0;
 
 	/**
-		@brief Reads a waveform into the queue of pending waveforms
-	 */
-	virtual bool AcquireData() =0;
-
-	/**
 		@brief Starts the instrument in continuous trigger mode.
 
 		Most drivers will implement this as repeated calls to the "single trigger" function to avoid race conditions

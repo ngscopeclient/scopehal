@@ -182,6 +182,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(TMDSDecoder);
 	AddDecoderClass(ToneGeneratorFilter);
 	AddDecoderClass(TopMeasurement);
+	AddDecoderClass(TouchstoneExportFilter);
 	AddDecoderClass(TouchstoneImportFilter);
 	AddDecoderClass(TRCImportFilter);
 	AddDecoderClass(TrendFilter);

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -142,4 +142,16 @@ void Multimeter::SetSecondaryMeterMode(MeasurementTypes /*type*/)
 double Multimeter::GetSecondaryMeterValue()
 {
 	return 0;
+}
+
+/**
+	@brief Pull meter readings from hardware
+ */
+bool Multimeter::AcquireData()
+{
+	auto chan = dynamic_cast<MultimeterChannel*>(GetChannel(GetCurrentMeterChannel()));
+	if(chan)
+		chan->Update(this);
+
+	return true;
 }

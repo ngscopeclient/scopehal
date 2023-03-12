@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "RohdeSchwarzHMC8012Multimeter.h"
+#include "MultimeterChannel.h"
 
 using namespace std;
 
@@ -45,13 +46,7 @@ RohdeSchwarzHMC8012Multimeter::RohdeSchwarzHMC8012Multimeter(SCPITransport* tran
 	GetMeterMode();
 
 	//Create our single channel
-	m_channels.push_back(new InstrumentChannel(
-		"VIN",
-		"#808080",
-		Unit(Unit::UNIT_COUNTS),
-		Unit(Unit::UNIT_VOLTS),
-		Stream::STREAM_TYPE_ANALOG_SCALAR,
-		0));
+	m_channels.push_back(new MultimeterChannel("VIN", "#808080", 0));
 }
 
 RohdeSchwarzHMC8012Multimeter::~RohdeSchwarzHMC8012Multimeter()

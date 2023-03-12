@@ -108,10 +108,14 @@ void InstrumentChannel::ClearStreams()
 
 /**
 	@brief Adds a new data stream to the channel
+
+	@return Index of the new stream
  */
-void InstrumentChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
+size_t InstrumentChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
 {
+	size_t index = m_streams.size();
 	m_streams.push_back(Stream(yunit, name, stype, flags));
+	return index;
 }
 
 /**
