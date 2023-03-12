@@ -68,7 +68,7 @@ bool ThermalDiodeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.GetType() != Stream::STREAM_TYPE_ANALOG_SCALAR)
 		return false;
 
-	return false;
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,7 @@ bool ThermalDiodeFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 
 string ThermalDiodeFilter::GetProtocolName()
 {
-	return "ThermalDiode";
+	return "Thermal Diode";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,5 +105,5 @@ void ThermalDiodeFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr
 			break;
 	}
 
-	m_streams[0].m_value = (GetInput(0).GetScalarValue() + offset) / gain;
+	m_streams[0].m_value = (GetInput(0).GetScalarValue() + offset) * gain;
 }
