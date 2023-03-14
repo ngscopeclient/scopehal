@@ -167,7 +167,7 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Accessors
 
-	virtual bool IsScalarOutput();
+	virtual bool __attribute__((deprecated)) IsScalarOutput();
 
 	Category GetCategory()
 	{ return m_category; }
