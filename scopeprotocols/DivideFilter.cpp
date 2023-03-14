@@ -46,6 +46,7 @@ DivideFilter::DivideFilter(const string& color)
 	m_parameters[m_formatName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_formatName].AddEnumValue("Ratio", FORMAT_RATIO);
 	m_parameters[m_formatName].AddEnumValue("dB", FORMAT_DB);
+	m_parameters[m_formatName].AddEnumValue("Percent", FORMAT_PERCENT);
 	m_parameters[m_formatName].SetIntVal(FORMAT_RATIO);
 }
 
@@ -86,11 +87,10 @@ void DivideFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queue
 		DoRefreshVectorVector();
 	else if(!veca && !vecb)
 		DoRefreshScalarScalar();
+	else if(veca)
+		RefreshScalarVector(1, 0);
 	else
-	{
-		LogWarning("[DivideFilter::Refresh] Scalar / vector case not yet implemented\n");
-		SetData(nullptr, 0);
-	}
+		RefreshScalarVector(0, 1);
 }
 
 void DivideFilter::DoRefreshScalarScalar()
@@ -98,9 +98,92 @@ void DivideFilter::DoRefreshScalarScalar()
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
-	//Multiply units and value
-	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits();
-	m_streams[0].m_value = GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue();
+	//Different output formats possible besides just a direct division
+	switch(m_parameters[m_formatName].GetIntVal())
+	{
+		case FORMAT_RATIO:
+			SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
+			m_streams[0].m_value = GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue();
+			break;
+
+		case FORMAT_PERCENT:
+			SetYAxisUnits(Unit(Unit::UNIT_PERCENT), 0);
+			m_streams[0].m_value = GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue();
+			break;
+
+		case FORMAT_DB:
+			SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
+			m_streams[0].m_value = 20 * log10(GetInput(0).GetScalarValue() / GetInput(1).GetScalarValue());
+			break;
+
+		default:
+			break;
+	}
+}
+
+void DivideFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+	float scale = GetInput(iScalar).GetScalarValue();
+	auto din = GetInputWaveform(iVector);
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	din->PrepareForCpuAccess();
+	auto len = din->size();
+
+	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	//TODO: support different output formats
+
+	if(sparse)
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sparse, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(sparse->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		if(iVector == 0)
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = fin[i] / scale;
+		}
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = scale / fin[i];
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(uniform, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		if(iVector == 0)
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = fin[i] / scale;
+		}
+		else
+		{
+			for(size_t i=0; i<len; i++)
+				fdst[i] = scale / fin[i];
+		}
+
+		cap->MarkModifiedFromCpu();
+	}
 }
 
 void DivideFilter::DoRefreshVectorVector()
@@ -134,21 +217,31 @@ void DivideFilter::DoRefreshVectorVector()
 	float* fb = (float*)__builtin_assume_aligned(&b->m_samples[0], 16);
 	float* fdst = (float*)__builtin_assume_aligned(&cap->m_samples[0], 16);
 
-	auto format = m_parameters[m_formatName].GetIntVal();
-
-	if(format == FORMAT_RATIO)
+	size_t i=0;
+	switch(m_parameters[m_formatName].GetIntVal())
 	{
-		SetYAxisUnits(Unit(Unit::UNIT_COUNTS), 0);
+		case FORMAT_RATIO:
+			SetYAxisUnits(GetInput(0).GetYAxisUnits() / GetInput(1).GetYAxisUnits(), 0);
+			for(; i<len; i++)
+				fdst[i] = fa[i] / fb[i];
+			break;
 
-		for(size_t i=0; i<len; i++)
-			fdst[i] = fa[i] / fb[i];
-	}
-	else /*if(format == FORMAT_DB) */
-	{
-		SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
+		case FORMAT_PERCENT:
+			SetYAxisUnits(Unit(Unit::UNIT_PERCENT), 0);
+			for(; i<len; i++)
+				fdst[i] = fa[i] / fb[i];
+			break;
 
-		for(size_t i=0; i<len; i++)
-			fdst[i] = 20 * log10(fa[i] / fb[i]);
+		case FORMAT_DB:
+			SetYAxisUnits(Unit(Unit::UNIT_DB), 0);
+
+			for(i=0; i<len; i++)
+				fdst[i] = 20 * log10(fa[i] / fb[i]);
+			break;
+
+		default:
+			break;
+
 	}
 
 	cap->MarkModifiedFromCpu();

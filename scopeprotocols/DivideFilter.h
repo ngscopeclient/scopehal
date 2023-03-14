@@ -51,13 +51,15 @@ public:
 	enum OutputFormat
 	{
 		FORMAT_RATIO,
-		FORMAT_DB
+		FORMAT_DB,
+		FORMAT_PERCENT
 	};
 
 protected:
 
 	void DoRefreshVectorVector();
 	void DoRefreshScalarScalar();
+	void RefreshScalarVector(size_t iScalar, size_t iVector);
 
 	std::string m_formatName;
 };
