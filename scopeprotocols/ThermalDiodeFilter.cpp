@@ -48,7 +48,7 @@ ThermalDiodeFilter::ThermalDiodeFilter(const string& color)
 	m_parameters[m_diodeType] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_diodeType].AddEnumValue("LTC3374", DIODE_LTC3374);
 	m_parameters[m_diodeType].AddEnumValue("LTC3374A", DIODE_LTC3374A);
-	m_parameters[m_diodeType].SetIntVal(DIODE_LTC3374);
+	m_parameters[m_diodeType].SetIntVal(DIODE_LTC3374A);
 }
 
 ThermalDiodeFilter::~ThermalDiodeFilter()
@@ -98,7 +98,7 @@ void ThermalDiodeFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr
 
 		case DIODE_LTC3374A:
 			offset = -45e-3;
-			gain = 1 / -7e-3;
+			gain = 1 / 7e-3;
 			break;
 
 		default:
