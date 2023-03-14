@@ -1385,7 +1385,7 @@ void Filter::AutoscaleVertical(size_t stream)
 	float vmax = GetMaxVoltage(swfm, uwfm);
 
 	float range = vmax - vmin;
-	if(IsScalarOutput())
+	if(IsScalarOutput() || (range < 1e-6) )
 		range = vmax * 0.05;
 
 	SetVoltageRange(range * 1.05, stream);
