@@ -51,6 +51,7 @@ public:
 protected:
 	void RefreshVectorVector();
 	void RefreshScalarScalar();
+	void RefreshScalarVector(size_t iScalar, size_t iVector);
 };
 
 #endif

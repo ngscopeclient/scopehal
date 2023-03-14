@@ -76,15 +76,18 @@ void MultiplyFilter::Refresh()
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
 
+	//Update units
+	if(m_inputs[0] && m_inputs[1])
+		SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
+
 	if(veca && vecb)
 		RefreshVectorVector();
 	else if(!veca && !vecb)
 		RefreshScalarScalar();
+	else if(veca)
+		RefreshScalarVector(1, 0);
 	else
-	{
-		LogWarning("[MultiplyFilter::Refresh] Scalar * vector case not yet implemented\n");
-		SetData(nullptr, 0);
-	}
+		RefreshScalarVector(0, 1);
 }
 
 void MultiplyFilter::RefreshScalarScalar()
@@ -92,9 +95,55 @@ void MultiplyFilter::RefreshScalarScalar()
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
-	//Multiply units and value
-	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits() * GetInput(1).GetYAxisUnits();
+	//Multiply value
 	m_streams[0].m_value = GetInput(0).GetScalarValue() * GetInput(1).GetScalarValue();
+}
+
+void MultiplyFilter::RefreshScalarVector(size_t iScalar, size_t iVector)
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+	float scale = GetInput(iScalar).GetScalarValue();
+	auto din = GetInputWaveform(iVector);
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	din->PrepareForCpuAccess();
+	auto len = din->size();
+
+	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	if(sparse)
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sparse, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(sparse->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fin[i] * scale;
+
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(uniform, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fin[i] * scale;
+
+		cap->MarkModifiedFromCpu();
+	}
 }
 
 void MultiplyFilter::RefreshVectorVector()
@@ -114,9 +163,6 @@ void MultiplyFilter::RefreshVectorVector()
 	auto len = min(a->size(), b->size());
 	a->PrepareForCpuAccess();
 	b->PrepareForCpuAccess();
-
-	//Multiply the units
-	SetYAxisUnits(m_inputs[0].GetYAxisUnits() * m_inputs[1].GetYAxisUnits(), 0);
 
 	//Type conversion
 	auto sa = dynamic_cast<SparseAnalogWaveform*>(a);
