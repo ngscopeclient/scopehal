@@ -156,6 +156,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(QSPIDecoder);
 	AddDecoderClass(QuadratureDecoder);
 	AddDecoderClass(RiseMeasurement);
+	AddDecoderClass(ScalarStairstepFilter);
 	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
