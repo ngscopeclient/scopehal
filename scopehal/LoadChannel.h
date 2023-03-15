@@ -39,6 +39,7 @@ public:
 
 	LoadChannel(
 		const std::string& hwname,
+		Load* load,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
@@ -70,6 +71,12 @@ public:
 
 	float GetSetPoint()
 	{ return GetScalarValue(STREAM_SET_POINT); }
+
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+protected:
+	Load* m_load;
 };
 
 #endif

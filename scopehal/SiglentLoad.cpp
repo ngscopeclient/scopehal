@@ -40,10 +40,11 @@ SiglentLoad::SiglentLoad(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
-	m_channels.push_back(new LoadChannel("Load", "#808080", 0));
+	m_channels.push_back(new LoadChannel("Load", this, "#808080", 0));
 
 	//Populate the cache for a few commonly used variables
 	m_modeCached = GetLoadModeUncached(0);
+	m_setPointCached = GetLoadSetPointActual(0);
 }
 
 SiglentLoad::~SiglentLoad()
@@ -147,6 +148,9 @@ void SiglentLoad::SetLoadMode(size_t /*channel*/, LoadMode mode)
 	}
 
 	m_modeCached = mode;
+
+	//Pull new set point from hardware
+	m_setPointCached = GetLoadSetPointActual(0);
 }
 
 vector<float> SiglentLoad::GetLoadCurrentRanges(size_t /*channel*/)
@@ -301,7 +305,12 @@ float SiglentLoad::GetLoadCurrentActual(size_t /*channel*/)
 	return stof(Trim(m_transport->SendCommandQueuedWithReply("MEAS:CURR?")));
 }
 
-float SiglentLoad::GetLoadSetPoint(size_t channel)
+float SiglentLoad::GetLoadSetPoint(size_t /*channel*/)
+{
+	return m_setPointCached;
+}
+
+float SiglentLoad::GetLoadSetPointActual(size_t channel)
 {
 	auto mode = GetLoadMode(channel);
 	switch(mode)
@@ -326,6 +335,10 @@ float SiglentLoad::GetLoadSetPoint(size_t channel)
 
 void SiglentLoad::SetLoadSetPoint(size_t channel, float target)
 {
+	//Optimization: Skip redundant sets of exactly identical targets
+	if(m_setPointCached == target)
+		return;
+
 	auto mode = GetLoadMode(channel);
 	switch(mode)
 	{
@@ -348,4 +361,6 @@ void SiglentLoad::SetLoadSetPoint(size_t channel, float target)
 		default:
 			LogWarning("[SiglentLoad::SetLoadSetPoint] Unknown mode %d\n", mode);
 	}
+
+	m_setPointCached = target;
 }

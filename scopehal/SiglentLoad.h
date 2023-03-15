@@ -64,6 +64,8 @@ public:
 	virtual float GetLoadSetPoint(size_t channel);
 	virtual void SetLoadSetPoint(size_t channel, float target);
 
+	//TODO: FlushConfigCache should get pulled up from Oscilloscope into Load
+
 public:
 	static std::string GetDriverNameInternal();
 	LOAD_INITPROC(SiglentLoad)
@@ -73,9 +75,11 @@ protected:
 
 	virtual float GetLoadVoltageActual(size_t channel);
 	virtual float GetLoadCurrentActual(size_t channel);
+	virtual float GetLoadSetPointActual(size_t channel);
 
 	//Cache config
 	LoadMode m_modeCached;
+	float m_setPointCached;
 };
 
 #endif

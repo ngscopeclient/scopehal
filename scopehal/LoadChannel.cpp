@@ -37,16 +37,69 @@ using namespace std;
 
 LoadChannel::LoadChannel(
 	const string& hwname,
+	Load* load,
 	const string& color,
 	size_t index)
 	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_FS), index)
+	, m_load(load)
 {
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_AMPS), "SetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);	//TODO: unit can change w/ mode
+
+	CreateInput("SetPoint");
 }
 
 LoadChannel::~LoadChannel()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Flow graph updates
+
+bool LoadChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if(i >= 1)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;
+
+	return false;
+}
+
+
+void LoadChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	auto setPointIn = GetInput(0);
+	if(setPointIn)
+	{
+		//Validate that set point has the correct units
+		Unit expectedUnit(Unit::UNIT_COUNTS);
+		switch(m_load->GetLoadMode(m_index))
+		{
+			case Load::MODE_CONSTANT_CURRENT:
+				expectedUnit = Unit(Unit::UNIT_AMPS);
+				break;
+
+			case Load::MODE_CONSTANT_VOLTAGE:
+				expectedUnit = Unit(Unit::UNIT_VOLTS);
+				break;
+
+			case Load::MODE_CONSTANT_POWER:
+				expectedUnit = Unit(Unit::UNIT_WATTS);
+				break;
+
+			case Load::MODE_CONSTANT_RESISTANCE:
+				expectedUnit = Unit(Unit::UNIT_OHMS);
+				break;
+		}
+
+		if(expectedUnit == setPointIn.GetYAxisUnits())
+			m_load->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
+	}
 }
