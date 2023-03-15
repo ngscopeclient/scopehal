@@ -179,25 +179,18 @@ public:
 	 */
 	virtual std::string GetProtocolDisplayName() =0;
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Evaluation
-
-	virtual void
-	#ifndef _MSC_VER
-	__attribute__((deprecated))
-	#endif
-	 Refresh();
-
 public:
-	//GPU accelerated refresh method
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-
 	/**
 		@brief Clears any integrated data from past triggers (e.g. eye patterns).
 
 		Most decoders shouldn't have to do anything for this.
 	 */
 	virtual void ClearSweeps();
+
+	virtual void Refresh() override;
+
+	//GPU accelerated refresh method
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling
@@ -213,20 +206,6 @@ public:
 protected:
 	std::vector<float> m_ranges;
 	std::vector<float> m_offsets;
-
-public:
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Accelerated waveform accessors
-
-	enum DataLocation
-	{
-		LOC_CPU,
-		LOC_GPU,
-		LOC_DONTCARE
-	};
-
-	virtual DataLocation GetInputLocation();
 
 public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

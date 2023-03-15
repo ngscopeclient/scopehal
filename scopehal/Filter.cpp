@@ -701,6 +701,27 @@ void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edg
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Evaluation
+
+void Filter::Refresh()
+{
+	FlowGraphNode::Refresh();
+}
+
+void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	FlowGraphNode::Refresh();
+
+	//Mark our outputs as modified CPU side
+	for(size_t i=0; i<m_streams.size(); i++)
+	{
+		auto data = m_streams[i].m_waveform;
+		if(data)
+			data->MarkSamplesModifiedFromCpu();
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
 string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
@@ -1426,49 +1447,4 @@ float Filter::GetOffset(size_t stream)
 void Filter::SetOffset(float offset, size_t stream)
 {
 	m_offsets[stream] = offset;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accelerated waveform processing
-
-/**
-	@brief Gets the desired location of the filter's output data
-
-	The default implementation returns CPU.
-
-	@return		LOC_CPU: if the filter assumes input waveforms are readable from the CPU
-				LOC_GPU: if the filter assumes input waveforms are readable from the GPU
-				LOC_DONTCARE: if the filter manages its own input memory, or can work with either CPU or GPU input
- */
-Filter::DataLocation Filter::GetInputLocation()
-{
-	return LOC_CPU;
-}
-
-/**
-	@brief Evaluates the filter.
-
-	This version does not support using Vulkan acceleration and should be considered deprecated. It will be
-	removed in the indefinite future once all filters have been converted to the new API.
- */
-void Filter::Refresh()
-{
-}
-
-/**
-	@brief Evaluates the filter, using GPU acceleration if possible
-
-	The default implementation calls the legacy non-accelerated Refresh() method.
- */
-void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
-{
-	Refresh();
-
-	//Mark our outputs as modified CPU side
-	for(size_t i=0; i<m_streams.size(); i++)
-	{
-		auto data = m_streams[i].m_waveform;
-		if(data)
-			data->MarkSamplesModifiedFromCpu();
-	}
 }

@@ -76,6 +76,43 @@ void FlowGraphNode::DetachInputs()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accelerated waveform processing
+
+/**
+	@brief Evaluates a filter graph node.
+
+	This version does not support using Vulkan acceleration and should be considered deprecated. It will be
+	removed in the indefinite future once all filters have been converted to the new API.
+ */
+void FlowGraphNode::Refresh()
+{
+}
+
+/**
+	@brief Evaluates a filter graph node, using GPU acceleration if possible
+
+	The default implementation calls the legacy non-accelerated Refresh() method.
+ */
+void FlowGraphNode::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	Refresh();
+}
+
+/**
+	@brief Gets the desired location of the nodes's input data
+
+	The default implementation returns CPU.
+
+	@return		LOC_CPU: if the filter assumes input waveforms are readable from the CPU
+				LOC_GPU: if the filter assumes input waveforms are readable from the GPU
+				LOC_DONTCARE: if the filter manages its own input memory, or can work with either CPU or GPU input
+ */
+FlowGraphNode::DataLocation FlowGraphNode::GetInputLocation()
+{
+	return LOC_CPU;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
 FilterParameter& FlowGraphNode::GetParameter(string s)

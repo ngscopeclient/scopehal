@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -57,14 +57,14 @@ FilterGraphExecutor::~FilterGraphExecutor()
 /**
 	@brief Evaluates the filter graph, blocking until execution has completed
  */
-void FilterGraphExecutor::RunBlocking(const set<Filter*>& filters)
+void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 {
-	//Nothing to do if we have no filters to run
-	if(filters.empty())
+	//Nothing to do if we have no nodes to run
+	if(nodes.empty())
 		return;
 
-	m_incompleteFilters = filters;
-	m_runnableFilters.clear();
+	m_incompleteNodes = nodes;
+	m_runnableNodes.clear();
 
 	Filter::ClearAnalysisCache();
 
@@ -78,7 +78,7 @@ void FilterGraphExecutor::RunBlocking(const set<Filter*>& filters)
 		m_completionCvar.wait(lock);
 
 		lock_guard<mutex> lock2(m_mutex);
-		if(m_runnableFilters.empty())
+		if(m_runnableNodes.empty())
 			break;
 	}
 }
@@ -91,7 +91,7 @@ void FilterGraphExecutor::RunBlocking(const set<Filter*>& filters)
 
 	Returns null if there are no remaining filters to evaluate.
  */
-Filter* FilterGraphExecutor::GetNextRunnableFilter()
+FlowGraphNode* FilterGraphExecutor::GetNextRunnableNode()
 {
 	while(true)
 	{
@@ -100,19 +100,19 @@ Filter* FilterGraphExecutor::GetNextRunnableFilter()
 			lock_guard<mutex> lock(m_mutex);
 
 			//Nothing left to run? Stop
-			if(m_incompleteFilters.empty())
+			if(m_incompleteNodes.empty())
 				return nullptr;
 
 			//Nothing ready to run? Update the run queue
-			if(m_runnableFilters.empty())
+			if(m_runnableNodes.empty())
 				UpdateRunnable();
 
 			//If there is something ready to run, grab it
-			if(!m_runnableFilters.empty())
+			if(!m_runnableNodes.empty())
 			{
-				auto f = *m_runnableFilters.begin();
-				m_runnableFilters.erase(f);
-				m_runningFilters.emplace(f);
+				auto f = *m_runnableNodes.begin();
+				m_runnableNodes.erase(f);
+				m_runningNodes.emplace(f);
 				return f;
 			}
 		}
@@ -124,21 +124,21 @@ Filter* FilterGraphExecutor::GetNextRunnableFilter()
 }
 
 /**
-	@brief Searches m_incompleteFilters for any that are unblocked, and adds them to m_runnableFilters
+	@brief Searches m_incompleteNodes for any that are unblocked, and adds them to m_runnableNodes
 
 	Assumes m_mutex is locked
  */
 void FilterGraphExecutor::UpdateRunnable()
 {
 	//Do nothing if we already have other filters marked runnable
-	if(!m_runnableFilters.empty())
+	if(!m_runnableNodes.empty())
 		return;
 
 	//Look for new filters that are eligible to run
-	for(auto f : m_incompleteFilters)
+	for(auto f : m_incompleteNodes)
 	{
 		//If the filter is already running, nothing we can do
-		if(m_runningFilters.find(f) != m_runningFilters.end())
+		if(m_runningNodes.find(f) != m_runningNodes.end())
 			continue;
 
 		//Not actively running.
@@ -147,7 +147,7 @@ void FilterGraphExecutor::UpdateRunnable()
 		for(size_t i=0; i<f->GetInputCount(); i++)
 		{
 			auto in = f->GetInput(i).m_channel;
-			if(m_incompleteFilters.find((Filter*)in) != m_incompleteFilters.end())
+			if(m_incompleteNodes.find(in) != m_incompleteNodes.end())
 			{
 				ok = false;
 				break;
@@ -156,7 +156,7 @@ void FilterGraphExecutor::UpdateRunnable()
 
 		//Not blocked. It's runnable.
 		if(ok)
-			m_runnableFilters.emplace(f);
+			m_runnableNodes.emplace(f);
 	}
 }
 
@@ -220,9 +220,9 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		if(m_terminating)
 			break;
 
-		//Evaluate filter objects as they become available, then stop when there's nothing left to do
-		Filter* f;
-		while( (f = GetNextRunnableFilter()) != nullptr)
+		//Evaluate nodesas they become available, then stop when there's nothing left to do
+		FlowGraphNode* f;
+		while( (f = GetNextRunnableNode()) != nullptr)
 		{
 			//Make sure the filter's inputs are where we need them
 			auto loc = f->GetInputLocation();
@@ -248,8 +248,8 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 
 			//Filter execution has completed, remove it from the running list and mark as completed
 			lock_guard<mutex> lock2(m_mutex);
-			m_runningFilters.erase(f);
-			m_incompleteFilters.erase(f);
+			m_runningNodes.erase(f);
+			m_incompleteNodes.erase(f);
 
 			//Wake up all threads that might have been waiting on this filter to complete
 			m_workerCvar.notify_all();
@@ -258,7 +258,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		//We have no more filters to run.
 		//If this was the last filter (nothing left incomplete), we're done - wake up the main thread
 		lock_guard<mutex> lock2(m_mutex);
-		if(m_incompleteFilters.empty())
+		if(m_incompleteNodes.empty())
 			m_completionCvar.notify_one();
 	}
 }

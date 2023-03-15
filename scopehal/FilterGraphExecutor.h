@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -42,9 +42,9 @@ public:
 	FilterGraphExecutor(size_t numThreads = 8);
 	~FilterGraphExecutor();
 
-	void RunBlocking(const std::set<Filter*>& filters);
+	void RunBlocking(const std::set<FlowGraphNode*>& nodes);
 
-	Filter* GetNextRunnableFilter();
+	FlowGraphNode* GetNextRunnableNode();
 
 protected:
 	static void ExecutorThread(FilterGraphExecutor* pThis, size_t i);
@@ -55,14 +55,14 @@ protected:
 	//Mutex for access to shared state
 	std::mutex m_mutex;
 
-	//Filters that have not yet been updated
-	std::set<Filter*> m_incompleteFilters;
+	//Nodes that have not yet been updated
+	std::set<FlowGraphNode*> m_incompleteNodes;
 
-	//Filters that have no dependencies and are eligible to run now
-	std::set<Filter*> m_runnableFilters;
+	//Nodes that have no dependencies and are eligible to run now
+	std::set<FlowGraphNode*> m_runnableNodes;
 
-	//Filters that are actively being run
-	std::set<Filter*> m_runningFilters;
+	//Nodes that are actively being run
+	std::set<FlowGraphNode*> m_runningNodes;
 
 	//Set of thread contexts
 	std::vector<std::unique_ptr<std::thread>> m_threads;

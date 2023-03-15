@@ -141,6 +141,30 @@ public:
 
 	bool IsDownstreamOf(std::set<FlowGraphNode*> nodes);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Accelerated waveform accessors
+
+	enum DataLocation
+	{
+		LOC_CPU,
+		LOC_GPU,
+		LOC_DONTCARE
+	};
+
+	virtual DataLocation GetInputLocation();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Filter evaluation
+
+	virtual void
+	#ifndef _MSC_VER
+	__attribute__((deprecated))
+	#endif
+	 Refresh();
+
+	//GPU accelerated refresh method
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+
 	//Input handling helpers
 protected:
 
