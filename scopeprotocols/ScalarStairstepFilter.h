@@ -56,6 +56,8 @@ protected:
 	std::string m_unit;
 
 	double m_lastUpdate;
+
+	void OnUnitChanged();
 };
 
 #endif

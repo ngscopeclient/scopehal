@@ -60,9 +60,11 @@ ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 
 	m_parameters[m_unit] = FilterParameter::UnitSelector();
 	m_parameters[m_unit].SetIntVal(Unit::UNIT_VOLTS);
+	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &ScalarStairstepFilter::OnUnitChanged));
 
 	SetData(nullptr, 0);
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
@@ -83,6 +85,13 @@ string ScalarStairstepFilter::GetProtocolName()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
+
+void ScalarStairstepFilter::OnUnitChanged()
+{
+	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
+	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+}
 
 void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
