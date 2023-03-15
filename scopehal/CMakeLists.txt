@@ -116,6 +116,7 @@ set(SCOPEHAL_SOURCES
 	LeCroyFWPOscilloscope.cpp
 	MockOscilloscope.cpp
 	PicoOscilloscope.cpp
+	RigolFunctionGenerator.cpp
 	RigolOscilloscope.cpp
 	SiglentLoad.cpp
 	SiglentSCPIOscilloscope.cpp

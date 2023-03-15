@@ -54,6 +54,8 @@
 
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
+#include "RigolFunctionGenerator.h"
+
 #include "GWInstekGPDX303SPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
 
@@ -198,6 +200,8 @@ void DriverStaticInit()
 	AddDriverClass(SiglentSCPIOscilloscope);
 	AddDriverClass(TektronixOscilloscope);
 	AddDriverClass(ThunderScopeOscilloscope);
+
+	AddFunctionGeneratorDriverClass(RigolFunctionGenerator);
 
 	AddLoadDriverClass(SiglentLoad);
 
