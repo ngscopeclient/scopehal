@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -58,6 +58,38 @@ FilterParameter::FilterParameter(ParameterTypes type, Unit unit)
 	, m_readOnly(false)
 {
 
+}
+
+/**
+	@brief Constructs a FilterParameter object for choosing from available units
+ */
+FilterParameter FilterParameter::UnitSelector()
+{
+	FilterParameter ret(TYPE_ENUM, Unit::UNIT_COUNTS);
+	ret.AddEnumValue("S", Unit::UNIT_FS);	//pretty-printed as seconds even though internally scaled to fs
+	ret.AddEnumValue("Hz", Unit::UNIT_HZ);
+	ret.AddEnumValue("V", Unit::UNIT_VOLTS);
+	ret.AddEnumValue("A", Unit::UNIT_AMPS);
+	ret.AddEnumValue("Ω", Unit::UNIT_OHMS);
+	ret.AddEnumValue("Bps", Unit::UNIT_BITRATE);
+	ret.AddEnumValue("%", Unit::UNIT_PERCENT);
+	ret.AddEnumValue("dB", Unit::UNIT_DB);
+	ret.AddEnumValue("dBm", Unit::UNIT_DBM);
+	ret.AddEnumValue("Dimensionless", Unit::UNIT_COUNTS);
+	ret.AddEnumValue("Dimensionless (log)", Unit::UNIT_COUNTS_SCI);
+	ret.AddEnumValue("Log BER", Unit::UNIT_LOG_BER);
+	ret.AddEnumValue("Sa/s", Unit::UNIT_SAMPLERATE);
+	ret.AddEnumValue("Samples", Unit::UNIT_SAMPLEDEPTH);
+	ret.AddEnumValue("W", Unit::UNIT_WATTS);
+	ret.AddEnumValue("UI", Unit::UNIT_UI);
+	ret.AddEnumValue("° (angular)", Unit::UNIT_DEGREES);
+	ret.AddEnumValue("RPM", Unit::UNIT_RPM);
+	ret.AddEnumValue("°C", Unit::UNIT_CELSIUS);
+	ret.AddEnumValue("ρ", Unit::UNIT_RHO);
+	ret.AddEnumValue("Hexadecimal", Unit::UNIT_HEXNUM);
+	ret.AddEnumValue("mV", Unit::UNIT_MILLIVOLTS);
+	ret.AddEnumValue("V/s", Unit::UNIT_VOLT_SEC);
+	return ret;
 }
 
 /**
