@@ -705,12 +705,12 @@ void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edg
 
 void Filter::Refresh()
 {
-	FlowGraphNode::Refresh();
+	Refresh();
 }
 
-void Filter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+void Filter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	FlowGraphNode::Refresh();
+	FlowGraphNode::Refresh(cmdBuf, queue);
 
 	//Mark our outputs as modified CPU side
 	for(size_t i=0; i<m_streams.size(); i++)
