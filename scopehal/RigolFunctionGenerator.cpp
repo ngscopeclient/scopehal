@@ -82,58 +82,68 @@ int RigolFunctionGenerator::GetFunctionChannelCount()
 
 string RigolFunctionGenerator::GetFunctionChannelName(int chan)
 {
-	return string("SOURCE") + to_string(chan+1);
+	return string("CH") + to_string(chan+1);
 }
 
-vector<FunctionGenerator::WaveShape> RigolFunctionGenerator::GetAvailableWaveformShapes(int chan)
+vector<FunctionGenerator::WaveShape> RigolFunctionGenerator::GetAvailableWaveformShapes(int /*chan*/)
 {
 	vector<WaveShape> ret;
+	ret.push_back(SHAPE_SINE);
 	return ret;
 }
 
 bool RigolFunctionGenerator::GetFunctionChannelActive(int chan)
 {
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("OUTP") + to_string(chan+1) + ":STAT?"));
+	if(reply == "ON")
+		return true;
 	return false;
 }
 
 void RigolFunctionGenerator::SetFunctionChannelActive(int chan, bool on)
 {
+	if(on)
+		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT ON");
+	else
+		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT OFF");
 }
 
-float RigolFunctionGenerator::GetFunctionChannelDutyCycle(int chan)
+bool RigolFunctionGenerator::HasFunctionDutyCycleControls(int /*chan*/)
 {
-	return 0.5;
-}
-
-void RigolFunctionGenerator::SetFunctionChannelDutyCycle(int chan, float duty)
-{
+	return false;
 }
 
 float RigolFunctionGenerator::GetFunctionChannelAmplitude(int chan)
 {
-	return 1;
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":VOLT?"));
+	return stof(reply);
 }
 
 void RigolFunctionGenerator::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":VOLT " + to_string(amplitude));
 }
 
 float RigolFunctionGenerator::GetFunctionChannelOffset(int chan)
 {
-	return 0;
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":VOLT:OFFS?"));
+	return stof(reply);
 }
 
 void RigolFunctionGenerator::SetFunctionChannelOffset(int chan, float offset)
 {
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":VOLT:OFFS " + to_string(offset));
 }
 
 float RigolFunctionGenerator::GetFunctionChannelFrequency(int chan)
 {
-	return 1e6;
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FREQ?"));
+	return stof(reply);
 }
 
 void RigolFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 {
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FREQ " + to_string(hz));
 }
 
 FunctionGenerator::WaveShape RigolFunctionGenerator::GetFunctionChannelShape(int chan)
