@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -73,7 +73,7 @@ SCPILxiTransport::SCPILxiTransport(const string& args)
 
 	m_timeout = 1000;
 
-	LogDebug("Connecting to SCPI oscilloscope over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
+	LogDebug("Connecting to SCPI device over VXI-11 at %s:%d\n", m_hostname.c_str(), m_port);
 
 	string instname = "inst0";
 	m_device = lxi_connect(&m_hostname[0], m_port, &instname[0], m_timeout, VXI11);
@@ -220,6 +220,11 @@ size_t SCPILxiTransport::ReadRawData(size_t len, unsigned char* buf)
 bool SCPILxiTransport::IsCommandBatchingSupported()
 {
 	return false;
+}
+
+void SCPILxiTransport::FlushRXBuffer()
+{
+	//no-op
 }
 
 #endif
