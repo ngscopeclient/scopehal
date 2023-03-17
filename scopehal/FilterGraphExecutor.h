@@ -76,8 +76,11 @@ protected:
 	//Condition variable for waking up main thread when work is complete
 	std::condition_variable m_completionCvar;
 
-	//Mutex for access to m_workerCvar
+	//Mutex for access to m_completionCvar
 	std::mutex m_completionCvarMutex;
+
+	///@brief Indicates that all worker threads have finished executing this pass
+	bool m_allWorkersComplete;
 
 	//Shutdown flag
 	bool m_terminating;

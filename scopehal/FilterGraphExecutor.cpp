@@ -35,7 +35,8 @@ using namespace std;
 // Construction / destruction
 
 FilterGraphExecutor::FilterGraphExecutor(size_t numThreads)
-	: m_terminating(false)
+	: m_allWorkersComplete(false)
+	, m_terminating(false)
 {
 	//Create our thread pool
 	for(size_t i=0; i<numThreads; i++)
@@ -65,6 +66,7 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 
 	m_incompleteNodes = nodes;
 	m_runnableNodes.clear();
+	m_allWorkersComplete = false;
 
 	Filter::ClearAnalysisCache();
 
@@ -75,7 +77,7 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 	while(true)
 	{
 		unique_lock<mutex> lock(m_completionCvarMutex);
-		m_completionCvar.wait(lock);
+		m_completionCvar.wait(lock, [this]{return m_allWorkersComplete;});
 
 		lock_guard<mutex> lock2(m_mutex);
 		if(m_runnableNodes.empty())
@@ -220,7 +222,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 		if(m_terminating)
 			break;
 
-		//Evaluate nodesas they become available, then stop when there's nothing left to do
+		//Evaluate nodes as they become available, then stop when there's nothing left to do
 		FlowGraphNode* f;
 		while( (f = GetNextRunnableNode()) != nullptr)
 		{
@@ -257,8 +259,19 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 
 		//We have no more filters to run.
 		//If this was the last filter (nothing left incomplete), we're done - wake up the main thread
-		lock_guard<mutex> lock2(m_mutex);
-		if(m_incompleteNodes.empty())
+		bool empty = false;
+		{
+			lock_guard<mutex> lock2(m_mutex);
+			empty = m_incompleteNodes.empty();
+		}
+		if(empty)
+		{
+			{
+				lock_guard<mutex> lock3(m_completionCvarMutex);
+				m_allWorkersComplete = true;
+			}
+
 			m_completionCvar.notify_one();
+		}
 	}
 }
