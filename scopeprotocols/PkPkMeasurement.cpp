@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -38,7 +38,9 @@ using namespace std;
 PkPkMeasurement::PkPkMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "minmax", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput("din");
 }
 
@@ -101,13 +103,19 @@ void PkPkMeasurement::Refresh()
 	float		vmax		= -FLT_MAX;
 	float		last_max	= -FLT_MAX;
 
+	float global_min = FLT_MAX;
+	float global_max = -FLT_MAX;
+
 	//For each cycle, find the min and max
 	bool		last_was_low	= true;
 	bool		first			= true;
 	for(size_t i=0; i < len; i++)
 	{
-		//If we're above the midpoint, reset everything and add a new sample
 		float v = GetValue(sdin, udin, i);
+		global_min = min(v, global_min);
+		global_max = max(v, global_max);
+
+		//If we're above the midpoint, reset everything and add a new sample
 		if(v > midpoint)
 		{
 			last_was_low = false;
@@ -163,4 +171,6 @@ void PkPkMeasurement::Refresh()
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = global_max - global_min;
 }
