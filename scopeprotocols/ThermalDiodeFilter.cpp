@@ -42,7 +42,7 @@ ThermalDiodeFilter::ThermalDiodeFilter(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 	, m_diodeType("Diode type")
 {
-	AddStream(Unit(Unit::UNIT_CELSIUS), "temp", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_CELSIUS), "temp", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("VTEMP");
 
 	m_parameters[m_diodeType] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -84,7 +84,6 @@ string ThermalDiodeFilter::GetProtocolName()
 
 void ThermalDiodeFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
-	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
 	float offset = 0;
