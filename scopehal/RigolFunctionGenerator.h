@@ -50,7 +50,8 @@ public:
 	virtual bool GetFunctionChannelActive(int chan) override;
 	virtual void SetFunctionChannelActive(int chan, bool on) override;
 
-	virtual bool HasFunctionDutyCycleControls(int chan) override;
+	virtual float GetFunctionChannelDutyCycle(int chan) override;
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
 
 	virtual float GetFunctionChannelAmplitude(int chan) override;
 	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;

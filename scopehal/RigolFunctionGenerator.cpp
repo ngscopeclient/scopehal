@@ -89,6 +89,36 @@ vector<FunctionGenerator::WaveShape> RigolFunctionGenerator::GetAvailableWavefor
 {
 	vector<WaveShape> ret;
 	ret.push_back(SHAPE_SINE);
+	ret.push_back(SHAPE_SQUARE);
+	ret.push_back(SHAPE_SAWTOOTH_UP);
+	ret.push_back(SHAPE_PULSE);
+	ret.push_back(SHAPE_NOISE);
+	ret.push_back(SHAPE_DC);
+	ret.push_back(SHAPE_HALF_SINE);
+	ret.push_back(SHAPE_GAUSSIAN_PULSE);
+	ret.push_back(SHAPE_SAWTOOTH_DOWN);
+	ret.push_back(SHAPE_NEGATIVE_PULSE);
+	ret.push_back(SHAPE_STAIRCASE_DOWN);
+	ret.push_back(SHAPE_STAIRCASE_UP_DOWN);
+	ret.push_back(SHAPE_STAIRCASE_UP);
+	ret.push_back(SHAPE_CARDIAC);
+	ret.push_back(SHAPE_CUBIC);
+	ret.push_back(SHAPE_EXPONENTIAL_DECAY);
+	ret.push_back(SHAPE_EXPONENTIAL_RISE);
+	ret.push_back(SHAPE_GAUSSIAN);
+	ret.push_back(SHAPE_HAVERSINE);
+	ret.push_back(SHAPE_LOG_RISE);
+	ret.push_back(SHAPE_COT);
+	ret.push_back(SHAPE_SINC);
+	ret.push_back(SHAPE_SQUARE_ROOT);
+	ret.push_back(SHAPE_TAN);
+	ret.push_back(SHAPE_ACOS);
+	ret.push_back(SHAPE_ASIN);
+	ret.push_back(SHAPE_ATAN);
+	ret.push_back(SHAPE_BARTLETT);
+	ret.push_back(SHAPE_HAMMING);
+	ret.push_back(SHAPE_HANNING);
+	ret.push_back(SHAPE_TRIANGLE);
 	return ret;
 }
 
@@ -106,11 +136,6 @@ void RigolFunctionGenerator::SetFunctionChannelActive(int chan, bool on)
 		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT ON");
 	else
 		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":STAT OFF");
-}
-
-bool RigolFunctionGenerator::HasFunctionDutyCycleControls(int /*chan*/)
-{
-	return false;
 }
 
 float RigolFunctionGenerator::GetFunctionChannelAmplitude(int chan)
@@ -148,11 +173,289 @@ void RigolFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 
 FunctionGenerator::WaveShape RigolFunctionGenerator::GetFunctionChannelShape(int chan)
 {
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP?"));
+	if(reply == "SIN")
+		return SHAPE_SINE;
+	else if(reply == "SQU")
+		return SHAPE_SQUARE;
+	else if(reply == "RAMP")
+		return SHAPE_SAWTOOTH_UP;
+	else if(reply == "PULS")
+		return SHAPE_PULSE;
+	else if(reply == "NOIS")
+		return SHAPE_NOISE;
+	//USER
+	//HARMonic
+	//CUSTom
+	else if(reply == "DC")
+		return SHAPE_DC;
+	else if(reply == "ABSSINE")
+		return SHAPE_HALF_SINE;
+	//ABSSINEHALF
+	//AMPALT
+	//ATTALT
+	else if(reply == "GAUSSPULSE")
+		return SHAPE_GAUSSIAN_PULSE;
+	else if(reply == "NEGRAMP")
+		return SHAPE_SAWTOOTH_DOWN;
+	else if(reply == "NPULSE")
+		return SHAPE_NEGATIVE_PULSE;
+	//PPULSE
+	//SINETRA
+	//SINEVER
+	else if(reply == "STAIRDN")
+		return SHAPE_STAIRCASE_DOWN;
+	else if(reply == "STAIRUD")
+		return SHAPE_STAIRCASE_UP_DOWN;
+	else if(reply == "STAIRUP")
+		return SHAPE_STAIRCASE_UP;
+	//TRAPEZIA
+	//BANDLIMITED
+	//BUTTERWORTH
+	//CHEBYSHEV1
+	//CHEBYSHEV2
+	//COMBIN
+	//CPULSE
+	//CWPULSE
+	//DAMPEDOSC
+	//DUALTONE
+	//GAMA
+	//GATEVIBR
+	//LFMPULSE
+	//MCNOSIE
+	//NIMHDISCHARGE
+	//PAHCUR
+	//QUAKE
+	//RADAR
+	//RIPPLE
+	//ROUDHALF
+	//ROUNDPM
+	//STEPRESP
+	//SWINGOSC
+	//TV
+	//VOICE
+	//THREEAM
+	//THREEFM
+	//THREEPM
+	//THREEPWM
+	//THREEPFM
+	else if(reply == "CARDIAC")
+		return SHAPE_CARDIAC;
+	//EOG
+	//EEG
+	//EMG
+	//PULSILOGRAM
+	//RESSPEED
+	//LFPULSE
+	//TENS1
+	//TENS2
+	//TENS3
+	//IGNITION
+	//ISO167502SP|ISO167502VR|ISO76372TP1|ISO76372TP2A|ISO76372TP2B|ISO76372TP3A|ISO76372TP3B|ISO76372TP4|ISO76372TP5A|ISO76372TP5B|
+	//SCR
+	//SURGE
+	//AIRY
+	//BESSELJ
+	//BESSELY
+	//CAUCHY
+	else if(reply == "CUBIC")
+		return SHAPE_CUBIC;
+	//DIRICHLET|ERF|ERFC|ERFCINV|ERFINV|
+	else if(reply == "EXPFALL")
+		return SHAPE_EXPONENTIAL_DECAY;
+	else if(reply == "EXPRISE")
+		return SHAPE_EXPONENTIAL_RISE;
+	else if(reply == "GAUSS")
+		return SHAPE_GAUSSIAN;
+	else if(reply == "HAVERSINE")
+		return SHAPE_HAVERSINE;
+	//LAGUERRE|LAPLACE|LEGEND|
+	else if(reply == "LOG")
+		return SHAPE_LOG_RISE;
+	//LOGNORMAL
+	//LORENTZ|MAXWELL|RAYLEIGH|VERSIERA|WEIBULL|X2DATA|COSH|COSINT
+	else if(reply == "COT")
+		return SHAPE_COT;
+	//COTHCON|COTHPRO|CSCCON|CSCPRO|CSCHCON|CSCHPRO|RECIPCON|RECIPPRO|SECCON|SECPRO|SECH|
+	else if(reply == "SINC")
+		return SHAPE_SINC;
+	//SINH|SININT
+	else if(reply == "SQRT")
+		return SHAPE_SQUARE_ROOT;
+	else if(reply == "TAN")
+		return SHAPE_TAN;
+	//TANH
+	else if(reply == "ACOS")
+		return SHAPE_ACOS;
+	//COSH|ACOTCON|ACOTPRO|ACOTHCON|ACOTHPRO|ACSCCON|ACSCPRO|ACSCHCON|ACSCHPRO|ASECCON|ASECPRO|ASECH|
+	else if(reply == "ASIN")
+		return SHAPE_ASIN;
+	//ASINH
+	else if(reply == "ATAN")
+		return SHAPE_ATAN;
+	//ATANH
+	else if(reply == "BARTLETT")
+		return SHAPE_BARTLETT;
+	//BARTHANN|BLACKMAN|BLACKMANH|BOHMANWIN|BOXCAR|CHEBWIN|FLATTOPWIN|
+	else if(reply == "HAMMING")
+		return SHAPE_HAMMING;
+	else if(reply == "HANNING")
+		return SHAPE_HANNING;
+	//KAISER|NUTTALLWIN|PARZENWIN|TAYLORWIN|TUKEYWIN
+	else if(reply == "TRIANG")
+		return SHAPE_TRIANGLE;
+
 	return SHAPE_SINE;
 }
 
 void RigolFunctionGenerator::SetFunctionChannelShape(int chan, WaveShape shape)
 {
+	switch(shape)
+	{
+		case SHAPE_SINE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SIN");
+			break;
+
+		case SHAPE_SQUARE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SQU");
+			break;
+
+		case SHAPE_SAWTOOTH_UP:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP RAMP");
+			break;
+
+		case SHAPE_PULSE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP PULS");
+			break;
+
+		case SHAPE_NOISE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP NOIS");
+			break;
+
+		case SHAPE_DC:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP DC");
+			break;
+
+		case SHAPE_HALF_SINE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP ABSSINE");
+			break;
+
+		case SHAPE_GAUSSIAN_PULSE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP GAUSSPULSE");
+			break;
+
+		case SHAPE_SAWTOOTH_DOWN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP NEGRAMP");
+			break;
+
+		case SHAPE_NEGATIVE_PULSE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP NPULSE");
+			break;
+
+		case SHAPE_STAIRCASE_DOWN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP STAIRDN");
+			break;
+
+		case SHAPE_STAIRCASE_UP_DOWN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP STAIRUD");
+			break;
+
+		case SHAPE_STAIRCASE_UP:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP STAIRUP");
+			break;
+
+		case SHAPE_CARDIAC:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP CARDIAC");
+			break;
+
+		case SHAPE_CUBIC:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP CUBIC");
+			break;
+
+		case SHAPE_EXPONENTIAL_DECAY:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP EXPFALL");
+			break;
+
+		case SHAPE_EXPONENTIAL_RISE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP EXPRISE");
+			break;
+
+		case SHAPE_GAUSSIAN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP GAUSS");
+			break;
+
+		case SHAPE_HAVERSINE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP HAVERSINE");
+			break;
+
+		case SHAPE_LOG_RISE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP LOG");
+			break;
+
+		case SHAPE_COT:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP COT");
+			break;
+
+		case SHAPE_SINC:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SINC");
+			break;
+
+		case SHAPE_SQUARE_ROOT:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP SQRT");
+			break;
+
+		case SHAPE_TAN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP TAN");
+			break;
+
+		case SHAPE_ACOS:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP ACOS");
+			break;
+
+		case SHAPE_ASIN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP ASIN");
+			break;
+
+		case SHAPE_ATAN:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP ATAN");
+			break;
+
+		case SHAPE_BARTLETT:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP BARTLETT");
+			break;
+
+		case SHAPE_HAMMING:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP HAMMING");
+			break;
+
+		case SHAPE_HANNING:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP HANNING");
+			break;
+
+		case SHAPE_TRIANGLE:
+			m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SHAP TRIANG");
+			break;
+
+		default:
+			LogWarning("[RigolFunctionGenerator::SetFunctionChannelShape] unrecognized shape %d", shape);
+			break;
+	}
+}
+
+float RigolFunctionGenerator::GetFunctionChannelDutyCycle(int chan)
+{
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FUNC:SQU:DCYC?"));
+	return stof(reply) * 1e-2;
+}
+
+void RigolFunctionGenerator::SetFunctionChannelDutyCycle(int chan, float duty)
+{
+	//TODO: implement caps on duty cycle per manual
+	//20-80% from DC to 10 MHz
+	//40-60% from 10-40 MHz
+	//fixed 50% past 40 MHz
+	int percent = round(100 * duty);
+	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FUNC:SQU:DCYC " + to_string(percent));
 }
 
 bool RigolFunctionGenerator::HasFunctionRiseFallTimeControls(int /*chan*/)
@@ -162,9 +465,16 @@ bool RigolFunctionGenerator::HasFunctionRiseFallTimeControls(int /*chan*/)
 
 FunctionGenerator::OutputImpedance RigolFunctionGenerator::GetFunctionChannelOutputImpedance(int chan)
 {
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("OUTP") + to_string(chan+1) + ":IMP?"));
+	if(reply == "50")
+		return IMPEDANCE_50_OHM;
 	return IMPEDANCE_HIGH_Z;
 }
 
 void RigolFunctionGenerator::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
 {
+	if(z == IMPEDANCE_HIGH_Z)
+		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":IMP INF");
+	else
+		m_transport->SendCommandQueued(string("OUTP") + to_string(chan+1) + ":IMP 50");
 }
