@@ -108,11 +108,18 @@ void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_
 	//so graph execution times don't cause skew of future updates
 	m_lastUpdate = timeOfNextUpdate;
 
-	//Are we at the last step? If so, wrap back to the start
 	float start = m_parameters[m_start].GetFloatVal();
 	float end = m_parameters[m_end].GetFloatVal();
 	float delta = end - start;
 	float stepsize = delta / m_parameters[m_nsteps].GetIntVal();
+
+	//Clip out of range values
+	if((end > start) && (m_streams[0].m_value > end) )
+		m_streams[0].m_value = start;
+	else if((end < start) && (m_streams[0].m_value < end) )
+		m_streams[0].m_value = start;
+
+	//Are we at the last step? If so, wrap back to the start
 	if( fabs(m_streams[0].m_value - end) < (0.5*stepsize) )
 		m_streams[0].m_value = start;
 
