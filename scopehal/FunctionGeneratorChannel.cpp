@@ -27,49 +27,24 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef RigolFunctionGenerator_h
-#define RigolFunctionGenerator_h
+#include "scopehal.h"
 
-class RigolFunctionGenerator : public virtual SCPIFunctionGenerator
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+FunctionGeneratorChannel::FunctionGeneratorChannel(
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
-public:
-	RigolFunctionGenerator(SCPITransport* transport);
-	virtual ~RigolFunctionGenerator();
+	ClearStreams();
 
-	//Device information
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	CreateInput("Frequency");
+}
 
-	virtual bool AcquireData() override;
-
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
-
-	virtual bool GetFunctionChannelActive(int chan) override;
-	virtual void SetFunctionChannelActive(int chan, bool on) override;
-
-	virtual float GetFunctionChannelDutyCycle(int chan) override;
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
-
-	virtual float GetFunctionChannelAmplitude(int chan) override;
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
-
-	virtual float GetFunctionChannelOffset(int chan) override;
-	virtual void SetFunctionChannelOffset(int chan, float offset) override;
-
-	virtual float GetFunctionChannelFrequency(int chan) override;
-	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
-
-	virtual WaveShape GetFunctionChannelShape(int chan) override;
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
-
-	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
-
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
-
-public:
-	static std::string GetDriverNameInternal();
-	GENERATOR_INITPROC(RigolFunctionGenerator)
-};
-
-#endif
+FunctionGeneratorChannel::~FunctionGeneratorChannel()
+{
+}

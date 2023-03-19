@@ -140,13 +140,32 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	}
 
 	//Set initial AWG configuration
-	SetFunctionChannelAmplitude(0, 0.1);
-	SetFunctionChannelShape(0, SHAPE_SQUARE);
-	SetFunctionChannelDutyCycle(0, 0.5);
-	SetFunctionChannelFrequency(0, 1e6);
-	SetFunctionChannelOffset(0, 0);
-	SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
-	SetFunctionChannelActive(0, false);
+	switch(m_series)
+	{
+		//has function generator
+		case SERIES_3x0xD:
+		case SERIES_3x0xDMSO:
+		case SERIES_6403E:
+		case SERIES_6x0xE:
+		case SERIES_6x2xE:
+			SetFunctionChannelAmplitude(0, 0.1);
+			SetFunctionChannelShape(0, SHAPE_SQUARE);
+			SetFunctionChannelDutyCycle(0, 0.5);
+			SetFunctionChannelFrequency(0, 1e6);
+			SetFunctionChannelOffset(0, 0);
+			SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
+			SetFunctionChannelActive(0, false);
+			m_awgChannel = new FunctionGeneratorChannel(
+				"AWG",
+				"#808080",
+				m_channels.size());
+			m_channels.push_back(m_awgChannel);
+			break;
+
+		//no AWG
+		default:
+			m_awgChannel = nullptr;
+	}
 
 	//Add the external trigger input
 	m_extTrigChannel =
@@ -299,9 +318,10 @@ unsigned int PicoOscilloscope::GetInstrumentTypes()
 	}
 }
 
-uint32_t PicoOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t PicoOscilloscope::GetInstrumentTypesForChannel(size_t i)
 {
-	//TODO: function generator
+	if(m_awgChannel && (m_awgChannel->GetIndex() == i))
+		return Instrument::INST_FUNCTION;
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
@@ -1354,29 +1374,6 @@ bool PicoOscilloscope::Is12BitModeAvailable()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator
-
-int PicoOscilloscope::GetFunctionChannelCount()
-{
-	switch(m_series)
-	{
-		//has function generator
-		case SERIES_3x0xD:
-		case SERIES_3x0xDMSO:
-		case SERIES_6403E:
-		case SERIES_6x0xE:
-		case SERIES_6x2xE:
-			return 1;
-
-		//no special features
-		default:
-			return 0;
-	}
-}
-
-string PicoOscilloscope::GetFunctionChannelName(int /*chan*/)
-{
-	return "AWG";
-}
 
 vector<FunctionGenerator::WaveShape> PicoOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
 {

@@ -27,49 +27,28 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef RigolFunctionGenerator_h
-#define RigolFunctionGenerator_h
+#ifndef FunctionGeneratorChannel_h
+#define FunctionGeneratorChannel_h
 
-class RigolFunctionGenerator : public virtual SCPIFunctionGenerator
+/**
+	@brief A single channel of a function generator
+ */
+class FunctionGeneratorChannel : public InstrumentChannel
 {
 public:
-	RigolFunctionGenerator(SCPITransport* transport);
-	virtual ~RigolFunctionGenerator();
 
-	//Device information
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	FunctionGeneratorChannel(
+		const std::string& hwname,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-	virtual bool AcquireData() override;
+	virtual ~FunctionGeneratorChannel();
 
-	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
-
-	virtual bool GetFunctionChannelActive(int chan) override;
-	virtual void SetFunctionChannelActive(int chan, bool on) override;
-
-	virtual float GetFunctionChannelDutyCycle(int chan) override;
-	virtual void SetFunctionChannelDutyCycle(int chan, float duty) override;
-
-	virtual float GetFunctionChannelAmplitude(int chan) override;
-	virtual void SetFunctionChannelAmplitude(int chan, float amplitude) override;
-
-	virtual float GetFunctionChannelOffset(int chan) override;
-	virtual void SetFunctionChannelOffset(int chan, float offset) override;
-
-	virtual float GetFunctionChannelFrequency(int chan) override;
-	virtual void SetFunctionChannelFrequency(int chan, float hz) override;
-
-	virtual WaveShape GetFunctionChannelShape(int chan) override;
-	virtual void SetFunctionChannelShape(int chan, WaveShape shape) override;
-
-	virtual bool HasFunctionRiseFallTimeControls(int chan) override;
-
-	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan) override;
-	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z) override;
-
-public:
-	static std::string GetDriverNameInternal();
-	GENERATOR_INITPROC(RigolFunctionGenerator)
+	//Well defined stream IDs used by FunctionGeneratorChannel
+	enum StreamIndexes
+	{
+		STREAM_FREQUENCY
+	};
 };
 
 #endif

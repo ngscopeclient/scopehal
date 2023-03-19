@@ -279,6 +279,15 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		// Bandwidth expanding options reflected in earlier query for max B/W
 	}
 
+	//Add AWG channel
+	if(m_hasAFG)
+	{
+		m_awgChannel = new FunctionGeneratorChannel("AWG", "#808080", m_channels.size());
+		m_channels.push_back(m_awgChannel);
+	}
+	else
+		m_awgChannel = nullptr;
+
 	//Figure out what probes we have connected
 	DetectProbes();
 }
@@ -307,7 +316,8 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 
 uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i)
 {
-	//TODO: AWG outputs
+	if(m_hasAFG && (i == m_awgChannel->GetIndex()))
+		return Instrument::INST_FUNCTION;
 
 	//If we get here, it's an oscilloscope channel
 	//Report DMM functionality if available
@@ -3622,16 +3632,6 @@ int TektronixOscilloscope::GetMeterDigits()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator
-
-int TektronixOscilloscope::GetFunctionChannelCount()
-{
-	return m_hasAFG ? 1 : 0;
-}
-
-string TektronixOscilloscope::GetFunctionChannelName(int /*chan*/)
-{
-	return "AWG";
-}
 
 vector<FunctionGenerator::WaveShape> TektronixOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
 {

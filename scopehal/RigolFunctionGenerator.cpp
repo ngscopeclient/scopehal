@@ -39,6 +39,9 @@ RigolFunctionGenerator::RigolFunctionGenerator(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
+	//All DG4000 series have two channels
+	m_channels.push_back(new FunctionGeneratorChannel("CH1", "#ffff00", 0));
+	m_channels.push_back(new FunctionGeneratorChannel("CH2", "#00ffff", 1));
 }
 
 RigolFunctionGenerator::~RigolFunctionGenerator()
@@ -73,17 +76,6 @@ string RigolFunctionGenerator::GetDriverNameInternal()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FunctionGenerator
-
-int RigolFunctionGenerator::GetFunctionChannelCount()
-{
-	//All DG4000 series have two channels
-	return 2;
-}
-
-string RigolFunctionGenerator::GetFunctionChannelName(int chan)
-{
-	return string("CH") + to_string(chan+1);
-}
 
 vector<FunctionGenerator::WaveShape> RigolFunctionGenerator::GetAvailableWaveformShapes(int /*chan*/)
 {

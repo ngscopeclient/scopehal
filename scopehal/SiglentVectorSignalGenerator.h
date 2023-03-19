@@ -86,8 +86,6 @@ public:
 	virtual void SetSweepType(int chan, SweepType type) override;
 
 	//Function generator
-	virtual int GetFunctionChannelCount() override;
-	virtual std::string GetFunctionChannelName(int chan) override;
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan) override;
 	virtual bool GetFunctionChannelActive(int chan) override;
 	virtual void SetFunctionChannelActive(int chan, bool on) override;

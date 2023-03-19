@@ -791,6 +791,14 @@ void LeCroyOscilloscope::DetectOptions()
 	if(!m_hasLA && (m_model.find("-MS") != string::npos))
 		AddDigitalChannels(16);
 
+	if(m_hasFunctionGen)
+	{
+		m_awgChannel = new FunctionGeneratorChannel("AWG", "#808080", m_channels.size());
+		m_channels.push_back(m_awgChannel);
+	}
+	else
+		m_awgChannel = nullptr;
+
 	LogDebug("\n");
 }
 
@@ -1051,7 +1059,9 @@ unsigned int LeCroyOscilloscope::GetInstrumentTypes()
 
 uint32_t LeCroyOscilloscope::GetInstrumentTypesForChannel(size_t i)
 {
-	//TODO: AWG outputs
+	//AWG outputs
+	if(m_hasFunctionGen && (i == m_awgChannel->GetIndex()))
+		return Instrument::INST_FUNCTION;
 
 	//If we get here, it's an oscilloscope channel
 	//Report DMM functionality if available
@@ -1981,19 +1991,6 @@ void LeCroyOscilloscope::SetMeterMode(Multimeter::MeasurementTypes type)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator mode
-
-int LeCroyOscilloscope::GetFunctionChannelCount()
-{
-	if(m_hasFunctionGen)
-		return 1;
-	else
-		return 0;
-}
-
-string LeCroyOscilloscope::GetFunctionChannelName(int /*chan*/)
-{
-	return "FUNC";
-}
 
 vector<FunctionGenerator::WaveShape> LeCroyOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
 {

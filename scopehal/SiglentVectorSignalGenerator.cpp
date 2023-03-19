@@ -337,16 +337,6 @@ void SiglentVectorSignalGenerator::SetSweepType(int /*chan*/, SweepType type)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator
 
-int SiglentVectorSignalGenerator::GetFunctionChannelCount()
-{
-	return 1;
-}
-
-string SiglentVectorSignalGenerator::GetFunctionChannelName(int /*chan*/)
-{
-	return "LFO";
-}
-
 vector<FunctionGenerator::WaveShape> SiglentVectorSignalGenerator::GetAvailableWaveformShapes(int /*chan*/)
 {
 	vector<WaveShape> shapes;

@@ -92,10 +92,6 @@ public:
 
 	std::string GetNameOfShape(WaveShape shape);
 
-	//Channel info
-	virtual int GetFunctionChannelCount() =0;
-	virtual std::string GetFunctionChannelName(int chan) =0;
-
 	//Configuration
 	virtual bool GetFunctionChannelActive(int chan) =0;
 	virtual void SetFunctionChannelActive(int chan, bool on) =0;

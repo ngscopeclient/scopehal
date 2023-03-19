@@ -164,10 +164,6 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
-	//Channel info
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
-
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 
 	//Configuration
@@ -337,8 +333,9 @@ protected:
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
 
-	//External trigger input
+	//Other channels
 	OscilloscopeChannel* m_extTrigChannel;
+	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 
 	//Mutexing for thread safety

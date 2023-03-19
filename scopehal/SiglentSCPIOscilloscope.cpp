@@ -182,6 +182,18 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 			m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 
+	//Add the function generator output
+	if(m_hasFunctionGen)
+	{
+		//TODO: this is stupid, it shares the same name as our scope input!
+		//Is this going to break anything??
+		m_awgChannel = new FunctionGeneratorChannel("C1", "#808080", m_channels.size());
+		m_channels.push_back(m_awgChannel);
+		m_awgChannel->SetDisplayName("AWG");
+	}
+	else
+		m_awgChannel = nullptr;
+
 	switch(m_modelid)
 	{
 		// --------------------------------------------------
@@ -545,9 +557,10 @@ unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes()
 	return type;
 }
 
-uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t i)
 {
-	//TODO: AWG outputs
+	if(m_awgChannel && (m_awgChannel->GetIndex() == i) )
+		return Instrument::INST_FUNCTION;
 
 	//If we get here, it's an oscilloscope channel
 	return Instrument::INST_OSCILLOSCOPE;
@@ -4260,16 +4273,6 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 //But the SAG102I and integrated generator have only a single output.
 //This code can likely be ported to work with SDG* fairly easily, though.
 
-int SiglentSCPIOscilloscope::GetFunctionChannelCount()
-{
-	return 1;
-}
-
-string SiglentSCPIOscilloscope::GetFunctionChannelName(int chan)
-{
-	return string("C") + to_string(chan+1);
-}
-
 vector<FunctionGenerator::WaveShape> SiglentSCPIOscilloscope::GetAvailableWaveformShapes(int /*chan*/)
 {
 	vector<WaveShape> ret;
@@ -4343,7 +4346,7 @@ bool SiglentSCPIOscilloscope::GetFunctionChannelActive(int chan)
 			return m_awgEnabled[chan];
 	}
 
-	auto reply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":OUTP?", false);
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":OUTP?", false);
 
 	//Crack result
 	//Note that both enable/disable and impedance are in the same command, so we get the other for free
@@ -4380,7 +4383,7 @@ void SiglentSCPIOscilloscope::SetFunctionChannelActive(int chan, bool on)
 	else
 		imp = "HZ";
 
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":OUTP " + state + ",LOAD," + imp);
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgEnabled[chan] = on;
@@ -4403,7 +4406,7 @@ float SiglentSCPIOscilloscope::GetFunctionChannelDutyCycle(int chan)
 
 void SiglentSCPIOscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
 {
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV DUTY," + to_string(round(duty * 100)));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV DUTY," + to_string(round(duty * 100)));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgDutyCycle[chan] = duty;
@@ -4426,7 +4429,7 @@ float SiglentSCPIOscilloscope::GetFunctionChannelAmplitude(int chan)
 
 void SiglentSCPIOscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV AMP," + to_string(amplitude));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV AMP," + to_string(amplitude));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgRange[chan] = amplitude;
@@ -4449,7 +4452,7 @@ float SiglentSCPIOscilloscope::GetFunctionChannelOffset(int chan)
 
 void SiglentSCPIOscilloscope::SetFunctionChannelOffset(int chan, float offset)
 {
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV OFST," + to_string(offset));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV OFST," + to_string(offset));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgOffset[chan] = offset;
@@ -4472,7 +4475,7 @@ float SiglentSCPIOscilloscope::GetFunctionChannelFrequency(int chan)
 
 void SiglentSCPIOscilloscope::SetFunctionChannelFrequency(int chan, float hz)
 {
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV FRQ," + to_string(hz));
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV FRQ," + to_string(hz));
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgFrequency[chan] = hz;
@@ -4537,8 +4540,8 @@ FunctionGenerator::WaveShape SiglentSCPIOscilloscope::GetFunctionChannelShape(in
 	}
 
 	//Query the basic wave parameters
-	auto reply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":BSWV?", false);
-	auto areply = m_transport->SendCommandQueuedWithReply(GetFunctionChannelName(chan) + ":ARWV?", false);
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":BSWV?", false);
+	auto areply = m_transport->SendCommandQueuedWithReply(m_channels[chan]->GetHwname() + ":ARWV?", false);
 
 	//Crack the replies
 	{
@@ -4902,7 +4905,7 @@ void SiglentSCPIOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerato
 	}
 
 	//Select type
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":BSWV WVTP," + basicType);
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":BSWV WVTP," + basicType);
 	if(basicType == "ARB")
 	{
 		//Returns map of memory slots ("M10") to waveform names
@@ -4911,7 +4914,7 @@ void SiglentSCPIOscilloscope::SetFunctionChannelShape(int chan, FunctionGenerato
 		auto stl = m_transport->SendCommandQueuedWithReply("STL?");
 		auto arbmap = ParseCommaSeparatedNameValueList(stl, false);
 
-		m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":ARWV INDEX," + arbmap[arbType].substr(1));
+		m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":ARWV INDEX," + arbmap[arbType].substr(1));
 	}
 
 	//Update cache
@@ -4954,7 +4957,7 @@ void SiglentSCPIOscilloscope::SetFunctionChannelOutputImpedance(int chan, Functi
 	else
 		imp = "HZ";
 
-	m_transport->SendCommandQueued(GetFunctionChannelName(chan) + ":OUTP " + state + ",LOAD," + imp);
+	m_transport->SendCommandQueued(m_channels[chan]->GetHwname() + ":OUTP " + state + ",LOAD," + imp);
 
 	lock_guard<recursive_mutex> lock(m_cacheMutex);
 	m_awgImpedance[chan] = z;

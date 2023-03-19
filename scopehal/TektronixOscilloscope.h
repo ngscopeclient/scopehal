@@ -163,10 +163,6 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
-	//Channel info
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
-
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 
 	//Configuration
@@ -206,6 +202,7 @@ public:
 
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
+	FunctionGeneratorChannel* m_awgChannel;
 
 	struct mso56_preamble
 	{

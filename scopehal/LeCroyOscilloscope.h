@@ -141,8 +141,6 @@ public:
 	virtual int GetMeterDigits();
 
 	//Function generator
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 	virtual bool GetFunctionChannelActive(int chan);
 	virtual void SetFunctionChannelActive(int chan, bool on);
@@ -357,6 +355,7 @@ protected:
 
 	//External trigger input
 	OscilloscopeChannel* m_extTrigChannel;
+	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 
 	//Mutexing for thread safety

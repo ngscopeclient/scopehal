@@ -101,10 +101,6 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Function generator
 
-	//Channel info
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
-
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 
 	//Configuration
@@ -205,6 +201,7 @@ protected:
 	size_t m_digitalChannelCount;
 
 	OscilloscopeChannel* m_extTrigChannel;
+	FunctionGeneratorChannel* m_awgChannel;
 
 	//Most Pico API calls are write only, so we have to maintain all state clientside.
 	//This isn't strictly a cache anymore since it's never flushed!
