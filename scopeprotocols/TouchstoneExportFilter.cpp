@@ -48,7 +48,18 @@ TouchstoneExportFilter::TouchstoneExportFilter(const string& color)
 	m_parameters[m_portCount].signal_changed().connect(sigc::mem_fun(*this, &TouchstoneExportFilter::OnPortCountChanged));
 	m_parameters[m_portCount].SetIntVal(2);
 
-	//TODO
+	m_parameters[m_freqUnit] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_freqUnit].AddEnumValue("Hz", SParameters::FREQ_HZ);
+	m_parameters[m_freqUnit].AddEnumValue("kHz", SParameters::FREQ_KHZ);
+	m_parameters[m_freqUnit].AddEnumValue("MHz", SParameters::FREQ_MHZ);
+	m_parameters[m_freqUnit].AddEnumValue("GHz", SParameters::FREQ_GHZ);
+	m_parameters[m_freqUnit].SetIntVal(SParameters::FREQ_MHZ);
+
+	m_parameters[m_format] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
+	m_parameters[m_format].AddEnumValue("Mag / angle", SParameters::FORMAT_MAG_ANGLE);
+	m_parameters[m_format].AddEnumValue("dB / angle", SParameters::FORMAT_DBMAG_ANGLE);
+	m_parameters[m_format].AddEnumValue("Real / imaginary", SParameters::FORMAT_REAL_IMAGINARY);
+	m_parameters[m_format].SetIntVal(SParameters::FORMAT_MAG_ANGLE);
 
 	OnPortCountChanged();
 }
@@ -109,41 +120,49 @@ void TouchstoneExportFilter::Export()
 	//Touchstone files don't support appending, that makes no sense. So always close and rewrite the file
 	Clear();
 
-	/*
-	//If file is not open, open it and write a header row
-	Unit xunit = GetInput(0).GetXAxisUnits();
-	if(!m_fp)
+	//Create the output parameters
+	auto nports = m_parameters[m_portCount].GetIntVal();
+	SParameters params;
+	params.Allocate(nports);
+
+	//Convert from display oriented dB/degrees to linear magnitude / radians (internal SParameters class format).
+	//This then gets converted to whatever we need in the actual Touchstone file.
+	//For now, assume all inputs have the same frequency spacing etc.
+	//TODO: detect this and print error or (ideally) resample
+	for(int to=0; to < nports; to++)
 	{
-		auto mode = static_cast<ExportMode_t>(m_parameters[m_mode].GetIntVal());
-
-		bool append = (mode == MODE_CONTINUOUS_APPEND) || (mode == MODE_MANUAL_APPEND);
-		if(append)
-			m_fp = fopen(m_parameters[m_fname].GetFileName().c_str(), "ab");
-		else
-			m_fp = fopen(m_parameters[m_fname].GetFileName().c_str(), "wb");
-
-		//See if file is empty. If so, write header
-		fseek(m_fp, 0, SEEK_END);
-		if(ftell(m_fp) == 0)
+		for(int from=0; from < nports; from++)
 		{
-			if(xunit == Unit(Unit::UNIT_FS))
-				fprintf(m_fp, "Time (s)");
-			else if(xunit == Unit(Unit::UNIT_HZ))
-				fprintf(m_fp, "Frequency (Hz)");
-			else
-				fprintf(m_fp, "X Unit");
+			auto base = to*nports + from;
+			auto mdata = GetInput(base*2).GetData();
+	 		auto adata = GetInput(base*2 + 1).GetData();
 
-			//Write other fields
-			for(size_t i=0; i<GetInputCount(); i++)
+			auto umagData = dynamic_cast<const UniformAnalogWaveform*>(mdata);
+			auto uangData = dynamic_cast<const UniformAnalogWaveform*>(adata);
+
+			auto smagData = dynamic_cast<const SparseAnalogWaveform*>(mdata);
+			auto sangData = dynamic_cast<const SparseAnalogWaveform*>(adata);
+
+			if(umagData && uangData)
+				params[SPair(to+1, from+1)].ConvertFromWaveforms(umagData, uangData);
+			else if(smagData && sangData)
+				params[SPair(to+1, from+1)].ConvertFromWaveforms(smagData, sangData);
+			else
 			{
-				string colname = GetInput(i).GetName();
-				colname = str_replace(",", "_", colname);
-				fprintf(m_fp, ",%s", colname.c_str());
+				LogError("Missing mag or angle data\n");
+				continue;
 			}
-			fprintf(m_fp, "\n");
 		}
 	}
-	*/
+
+	auto format = static_cast<SParameters::ParameterFormat>(m_parameters[m_format].GetIntVal());
+	auto freqUnit = static_cast<SParameters::FreqUnit>(m_parameters[m_freqUnit].GetIntVal());
+
+	//Done, save it
+	params.SaveToFile(
+		m_parameters[m_fname].GetFileName(),
+		format,
+		freqUnit);
 }
 
 void TouchstoneExportFilter::OnPortCountChanged()
