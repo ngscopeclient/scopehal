@@ -3530,6 +3530,10 @@ int64_t LeCroyOscilloscope::GetDeskewForChannel(size_t channel)
 
 bool LeCroyOscilloscope::IsInterleaving()
 {
+	//interleaving is automatic / not possible
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		return false;
+
 	//Check cache
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
