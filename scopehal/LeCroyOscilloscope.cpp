@@ -3560,6 +3560,10 @@ bool LeCroyOscilloscope::IsInterleaving()
 
 bool LeCroyOscilloscope::SetInterleaving(bool combine)
 {
+	//interleaving is automatic / not possible
+	if(m_modelid == MODEL_WAVESURFER_3K)
+		return false;
+
 	//Setting to "off" always is possible
 	if(!combine)
 	{
