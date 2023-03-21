@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,7 @@ using namespace std;
 EyePeriodMeasurement::EyePeriodMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -67,12 +67,6 @@ string EyePeriodMeasurement::GetProtocolName()
 	return "Eye Period";
 }
 
-bool EyePeriodMeasurement::IsScalarOutput()
-{
-	//single point
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -80,24 +74,14 @@ void EyePeriodMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK(true))
 	{
-		SetData(NULL, 0);
+		m_streams[0].m_value = 0;
 		return;
 	}
 
 	//Get the input data
 	auto din = dynamic_cast<EyeWaveform*>(GetInputWaveform(0));
-
-	//Create the output
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
 	din->PrepareForCpuAccess();
-	cap->PrepareForCpuAccess();
-	cap->m_timescale = 1;
 
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(2 * din->m_uiWidth);
-	cap->m_samples.push_back(din->m_uiWidth);
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	//Do the actual bit rate calculation
+	m_streams[0].m_value = din->m_uiWidth;
 }
