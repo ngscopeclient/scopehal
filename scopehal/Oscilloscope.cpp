@@ -449,7 +449,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	if(CanInterleave())
 	{
 		if(node["interleave"])
-			SetInterleaving(node["interleave"].as<int>());
+			SetInterleaving(node["interleave"].as<bool>());
 	}
 	if(node["rate"])
 		SetSampleRate(node["rate"].as<unsigned long>());

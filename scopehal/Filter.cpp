@@ -738,7 +738,6 @@ YAML::Node Filter::SerializeConfiguration(IDTable& table)
 	filter["nick"] = m_displayname;
 	filter["name"] = GetHwname();
 
-	YAML::Node streams;
 	//Save gain and offset (not applicable to all filters, but save it just in case)
 	for(size_t i=0; i<GetStreamCount(); i++)
 	{
@@ -755,11 +754,10 @@ YAML::Node Filter::SerializeConfiguration(IDTable& table)
 				streamNode["index"] = i;
 				streamNode["vrange"] = GetVoltageRange(i);
 				streamNode["offset"] = GetOffset(i);
-				streams["stream" + to_string(i)] = streamNode;
+				filter["streams"]["stream" + to_string(i)] = streamNode;
 				break;
 		}
 	}
-	filter["streams"] = streams;
 
 	return filter;
 }

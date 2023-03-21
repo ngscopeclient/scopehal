@@ -290,6 +290,7 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 	YAML::Node node;
 
 	//Inputs
+	YAML::Node inputs;
 	for(size_t i=0; i<m_inputs.size(); i++)
 	{
 		auto desc = m_inputs[i];
@@ -298,12 +299,15 @@ YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 			value = "0";
 		else
 			value = to_string(table.emplace(desc.m_channel)) + "/" + to_string(desc.m_stream);
-		node["inputs"][m_signalNames[i]] = value;
+		inputs[m_signalNames[i]] = value;
 	}
+	node["inputs"] = inputs;
 
 	//Parameters
+	YAML::Node parameters;
 	for(auto it : m_parameters)
-		node["parameters"][it.first] = it.second.ToString(false);
+		parameters[it.first] = it.second.ToString(false);
+	node["parameters"] = parameters;
 
 	return node;
 }
