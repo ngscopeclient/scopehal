@@ -77,8 +77,6 @@ void ISIMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = GetInputWaveform(0);
-	din->PrepareForCpuAccess();
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
 	float* table = ddj->GetDDJTable();
 

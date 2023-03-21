@@ -77,9 +77,6 @@ void DCDMeasurement::Refresh()
 	}
 
 	//Get the input data
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
-
 	auto ddj = dynamic_cast<DDJMeasurement*>(GetInput(0).m_channel);
 	float* table = ddj->GetDDJTable();
 

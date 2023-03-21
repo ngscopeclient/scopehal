@@ -130,6 +130,9 @@ bool Filter::VerifyInputOK(size_t i, bool allowEmpty)
 {
 	auto p = m_inputs[i];
 
+	if(p.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;
+
 	if(p.m_channel == NULL)
 		return false;
 	auto data = p.GetData();

@@ -161,7 +161,7 @@ void EyeWidthMeasurement::Refresh()
 		cap->m_samples.push_back(value);
 	}
 
-	m_streams[1].m_value = far_right - far_left;
+	m_streams[1].m_value = fs_per_pixel * (far_right - far_left);
 
 	SetData(cap, 0);
 
