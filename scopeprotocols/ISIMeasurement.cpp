@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,7 @@ using namespace std;
 ISIMeasurement::ISIMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("DDJ");
@@ -65,11 +65,6 @@ string ISIMeasurement::GetProtocolName()
 	return "ISI";
 }
 
-bool ISIMeasurement::IsScalarOutput()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -77,7 +72,7 @@ void ISIMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		m_streams[0].m_value = 0;
 		return;
 	}
 
@@ -114,12 +109,5 @@ void ISIMeasurement::Refresh()
 	float rising_pp = rising_max - falling_min;
 	float falling_pp = falling_max - falling_min;
 
-	float isi = max(rising_pp, falling_pp);
-
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-	cap->m_samples.push_back(isi);
-	cap->m_timescale = 1;
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	m_streams[0].m_value = max(rising_pp, falling_pp);
 }
