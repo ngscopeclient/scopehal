@@ -109,7 +109,8 @@ void LeCroyOscilloscope::SharedCtorInit()
 		m_transport->SendCommandQueued("COMM_FORMAT DEF9,BYTE,BIN");
 
 	//Always use "fixed sample rate" config for setting timebase
-	m_transport->SendCommandQueued("VBS 'app.Acquisition.Horizontal.Maximize=\"FixedSampleRate\"'");
+	if(m_modelid != MODEL_WAVESURFER_3K)
+		m_transport->SendCommandQueued("VBS 'app.Acquisition.Horizontal.Maximize=\"FixedSampleRate\"'");
 
 	//If interleaving, disable the extra channels
 	if(IsInterleaving())
