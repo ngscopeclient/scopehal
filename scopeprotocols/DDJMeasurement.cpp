@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,7 @@ using namespace std;
 DDJMeasurement::DDJMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("TIE");
@@ -77,11 +77,6 @@ string DDJMeasurement::GetProtocolName()
 	return "DDJ";
 }
 
-bool DDJMeasurement::IsScalarOutput()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -89,7 +84,7 @@ void DDJMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		m_streams[0].m_value = 0;
 		return;
 	}
 
@@ -180,12 +175,5 @@ void DDJMeasurement::Refresh()
 			m_table[i] = 0;
 	}
 
-	auto cap = SetupEmptyUniformAnalogOutputWaveform(tie, 0, true);
-	cap->PrepareForCpuAccess();
-	cap->m_samples.push_back(ddjmax - ddjmin);
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = tie->m_startTimestamp;
-	cap->m_startFemtoseconds = tie->m_startFemtoseconds;
-	SetData(cap, 0);
-	cap->MarkModifiedFromCpu();
+	m_streams[0].m_value = ddjmax - ddjmin;
 }

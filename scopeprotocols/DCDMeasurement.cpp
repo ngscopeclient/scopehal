@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,7 +37,7 @@ using namespace std;
 DCDMeasurement::DCDMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("DDJ");
@@ -65,11 +65,6 @@ string DCDMeasurement::GetProtocolName()
 	return "DCD";
 }
 
-bool DCDMeasurement::IsScalarOutput()
-{
-	return true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -77,7 +72,7 @@ void DCDMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		SetData(NULL, 0);
+		m_streams[0].m_value = 0;
 		return;
 	}
 
@@ -114,17 +109,5 @@ void DCDMeasurement::Refresh()
 
 	float rising_avg = rising_sum / rising_count;
 	float falling_avg = falling_sum / falling_count;
-	float dcd = fabs(rising_avg - falling_avg);
-
-	auto cap = new SparseAnalogWaveform;
-	cap->PrepareForCpuAccess();
-	cap->m_offsets.push_back(0);
-	cap->m_durations.push_back(1);
-	cap->m_samples.push_back(dcd);
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = din->m_startTimestamp;
-	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
+	m_streams[0].m_value = fabs(rising_avg - falling_avg);
 }
