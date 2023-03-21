@@ -770,7 +770,7 @@ public:
 
 		@return YAML block with this oscilloscope's configuration
 	 */
-	virtual std::string SerializeConfiguration(IDTable& table);
+	virtual YAML::Node SerializeConfiguration(IDTable& table);
 
 	/**
 		@brief Load instrument and channel configuration from a save file

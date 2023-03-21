@@ -74,16 +74,11 @@ Trigger* Trigger::CreateTrigger(string name, Oscilloscope* scope)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Trigger::SerializeConfiguration(IDTable& table, size_t /*indent*/)
+YAML::Node Trigger::SerializeConfiguration(IDTable& table)
 {
-	string config = "        trigger:\n";
-
 	int id = table.emplace(this);
-	char tmp[128];
-	snprintf(tmp, sizeof(tmp), "            id:              %d\n", id);
-	config += tmp;
-
-	config += FlowGraphNode::SerializeConfiguration(table, 12);
-	config += string("            type:            ") + GetTriggerDisplayName() + "\n";
-	return config;
+	YAML::Node node = FlowGraphNode::SerializeConfiguration(table);
+	node["id"] = id;
+	node["type"] = GetTriggerDisplayName();
+	return node;
 }

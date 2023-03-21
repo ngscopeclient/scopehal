@@ -131,7 +131,7 @@ public:
 
 		@return YAML block with this trigger's configuration
 	 */
-	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
+	virtual YAML::Node SerializeConfiguration(IDTable& table);
 
 	/**
 		@brief Load configuration from a save file

@@ -714,32 +714,21 @@ void Filter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> qu
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
+YAML::Node Filter::SerializeConfiguration(IDTable& table)
 {
-	string base = FlowGraphNode::SerializeConfiguration(table, 8);
+	//Start with flow graph config
+	YAML::Node filter = FlowGraphNode::SerializeConfiguration(table);
 
 	int id = table.emplace(this);
-	string config;
-	char tmp[1024];
-	snprintf(tmp, sizeof(tmp), "    filter%d:\n", id);
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        id:              %d\n", id);
-	config += tmp;
-	config += base;
+	filter["id"] = id;
 
 	//Channel info
-	snprintf(tmp, sizeof(tmp), "        protocol:        \"%s\"\n", GetProtocolDisplayName().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        color:           \"%s\"\n", m_displaycolor.c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        nick:            \"%s\"\n", m_displayname.c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        name:            \"%s\"\n", GetHwname().c_str());
-	config += tmp;
+	filter["protocol"] = GetProtocolDisplayName();
+	filter["color"] = m_displaycolor;
+	filter["nick"] = m_displayname;
+	filter["name"] = GetHwname();
 
 	//Save gain and offset (not applicable to all filters, but save it just in case)
-	snprintf(tmp, sizeof(tmp), "        streams:\n");
-	config += tmp;
 	for(size_t i=0; i<GetStreamCount(); i++)
 	{
 		switch(m_streams[i].m_stype)
@@ -751,21 +740,16 @@ string Filter::SerializeConfiguration(IDTable& table, size_t /*indent*/)
 				break;
 
 			default:
-				snprintf(tmp, sizeof(tmp), "            stream%zu:\n", i);
-				config += tmp;
-
-				snprintf(tmp, sizeof(tmp), "                index:           %zu\n", i);
-				config += tmp;
-
-				snprintf(tmp, sizeof(tmp), "                vrange:          %f\n", GetVoltageRange(i));
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                offset:          %f\n", GetOffset(i));
-				config += tmp;
+				YAML::Node streamNode;
+				streamNode["index"] = i;
+				streamNode["vrange"] = GetVoltageRange(i);
+				streamNode["offset"] = GetOffset(i);
+				filter["streams"]["stream" + to_string(i)] = streamNode;
 				break;
 		}
 	}
 
-	return config;
+	return filter;
 }
 
 void Filter::LoadParameters(const YAML::Node& node, IDTable& table)

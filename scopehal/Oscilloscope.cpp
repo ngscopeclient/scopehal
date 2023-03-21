@@ -181,45 +181,33 @@ bool Oscilloscope::PopPendingWaveform()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Oscilloscope::SerializeConfiguration(IDTable& table)
+YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 {
 	//Save basic scope info
-	char tmp[1024];
+	YAML::Node scope;
+	YAML::Node channels;
 	int iscope = table.emplace(this);
-	snprintf(tmp, sizeof(tmp), "    scope%d:\n", iscope);
-	string config = tmp;
-	snprintf(tmp, sizeof(tmp), "        id:             %d\n", iscope);
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        nick:           \"%s\"\n", m_nickname.c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        name:           \"%s\"\n", GetName().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        vendor:         \"%s\"\n", GetVendor().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        serial:         \"%s\"\n", GetSerial().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        transport:      \"%s\"\n", GetTransportName().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        args:           \"%s\"\n", GetTransportConnectionString().c_str());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        driver:         \"%s\"\n", GetDriverName().c_str());
-	config += tmp;
+
+	scope["id"] = iscope;
+	scope["nick"] = m_nickname;
+	scope["name"] = GetName();
+	scope["vendor"] = GetVendor();
+	scope["serial"] = GetSerial();
+	scope["transport"] = GetTransportName();
+	scope["args"] = GetTransportConnectionString();
+	scope["driver"] = GetDriverName();
 
 	//Save timebase info
-	snprintf(tmp, sizeof(tmp), "        rate:           %ld\n", GetSampleRate());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        depth:          %ld\n", GetSampleDepth());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        interleave:     %d\n", IsInterleaving());
-	config += tmp;
-	snprintf(tmp, sizeof(tmp), "        triggerpos:     %ld\n", GetTriggerOffset());
-	config += tmp;
+	scope["rate"] = GetSampleRate();
+	scope["depth"] = GetSampleDepth();
+	scope["interleave"] = IsInterleaving();
+	scope["triggerpos"] = GetTriggerOffset();
 
 	//Save channels
-	config += "        channels:\n";
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		auto chan = GetOscilloscopeChannel(i);
+		YAML::Node channelNode;
 
 		//Skip any channel that's not an oscilloscope input
 		//TODO: new unified object model might require some retooling here since we can have multiple types of channel
@@ -232,50 +220,33 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 			continue;
 
 		//Basic channel info
-		snprintf(tmp, sizeof(tmp), "            ch%zu:\n", i);
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                id:          %d\n", table.emplace(chan));
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                index:       %zu\n", i);
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                color:       \"%s\"\n", chan->m_displaycolor.c_str());
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                nick:        \"%s\"\n", chan->GetDisplayName().c_str());
-		config += tmp;
-		snprintf(tmp, sizeof(tmp), "                name:        \"%s\"\n", chan->GetHwname().c_str());
-		config += tmp;
+		channelNode["id"] = table.emplace(chan);
+		channelNode["index"] = i;
+		channelNode["color"] = chan->m_displaycolor;
+		channelNode["nick"] = chan->GetDisplayName();
+		channelNode["name"] = chan->GetHwname();
+
 
 		if(chan->HasInputMux())
-		{
-			snprintf(tmp, sizeof(tmp), "                inmux:       %zu\n", chan->GetInputMuxSetting());
-			config += tmp;
-		}
+			channelNode["inmux"] = chan->GetInputMuxSetting();
 
 		//All *hardware* channels have the same type for all streams for now
 		switch(chan->GetType(0))
 		{
 			case Stream::STREAM_TYPE_ANALOG:
-				config += "                type:        analog\n";
+				channelNode["type"] = "analog";
 				if(IsADCModeConfigurable())
-				{
-					snprintf(tmp, sizeof(tmp), "                adcmode:     %ld\n", GetADCMode(i));
-					config += tmp;
-				}
+					channelNode["adcmode"] = GetADCMode(i);
 				if(chan->CanInvert())
-				{
-					snprintf(tmp, sizeof(tmp), "                invert:      %d\n", IsInverted(i));
-					config += tmp;
-				}
+					channelNode["invert"] = IsInverted(i);
 				break;
 			case Stream::STREAM_TYPE_DIGITAL:
-				config += "                type:        digital\n";
-				snprintf(tmp, sizeof(tmp), "                thresh:      %f\n", GetDigitalThreshold(i));
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                hys:         %f\n", GetDigitalHysteresis(i));
-				config += tmp;
+				channelNode["type"] = "digital";
+				channelNode["thresh"] = GetDigitalThreshold(i);
+				channelNode["hys"] = GetDigitalHysteresis(i);
 				break;
 			case Stream::STREAM_TYPE_TRIGGER:
-				config += "                type:        trigger\n";
+				channelNode["type"] = "trigger";
 				break;
 
 			//should never get complex channels on a scope
@@ -286,47 +257,37 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		}
 
 		//Current channel configuration
-		if(chan->IsEnabled())
-			config += "                enabled:     1\n";
-		else
-			config += "                enabled:     0\n";
-
-		snprintf(tmp, sizeof(tmp), "                xunit:       \"%s\"\n", chan->GetXAxisUnits().ToString().c_str());
-		config += tmp;
+		channelNode["enabled"] = chan->IsEnabled() ? 1 : 0;
+		channelNode["xunit"] = chan->GetXAxisUnits().ToString();
 
 		size_t nstreams = chan->GetStreamCount();
 		if(chan->GetType(0) == Stream::STREAM_TYPE_ANALOG)
 		{
-			snprintf(tmp, sizeof(tmp), "                attenuation: %f\n", chan->GetAttenuation());
-			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                bwlimit:     %d\n", chan->GetBandwidthLimit());
-			config += tmp;
+			channelNode["attenuation"] = chan->GetAttenuation();
+			channelNode["bwlimit"] = chan->GetBandwidthLimit();
 
 			//single stream unit goes here
 			//multi stream unit goes under streams heading
 			if(nstreams == 1)
 			{
-				snprintf(tmp, sizeof(tmp), "                yunit:       \"%s\"\n", chan->GetYAxisUnits(0).ToString().c_str());
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                vrange:      %f\n", chan->GetVoltageRange(0));
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                offset:      %f\n", chan->GetOffset(0));
-				config += tmp;
+				channelNode["yunit"] = chan->GetYAxisUnits(0).ToString();
+				channelNode["vrange"] = chan->GetVoltageRange(0);
+				channelNode["offset"] = chan->GetOffset(0);
 			}
 
 			switch(chan->GetCoupling())
 			{
 				case OscilloscopeChannel::COUPLE_DC_1M:
-					config += "                coupling:    dc_1M\n";
+					channelNode["coupling"] = "dc_1M";
 					break;
 				case OscilloscopeChannel::COUPLE_AC_1M:
-					config += "                coupling:    ac_1M\n";
+					channelNode["coupling"] = "ac_1M";
 					break;
 				case OscilloscopeChannel::COUPLE_DC_50:
-					config += "                coupling:    dc_50\n";
+					channelNode["coupling"] = "dc_50";
 					break;
 				case OscilloscopeChannel::COUPLE_GND:
-					config += "                coupling:    gnd\n";
+					channelNode["coupling"] = "gnd";
 					break;
 
 				//should never get synthetic coupling on a scope channel
@@ -339,34 +300,35 @@ string Oscilloscope::SerializeConfiguration(IDTable& table)
 		//Save streams if there's more than one
 		if(nstreams > 1)
 		{
-			snprintf(tmp, sizeof(tmp), "                nstreams:     %zu\n", nstreams);
-			config += tmp;
-			snprintf(tmp, sizeof(tmp), "                streams:\n");
-			config += tmp;
+			YAML::Node streams;
+			channelNode["nstreams"] = nstreams;
+
 			for(size_t j=0; j<nstreams; j++)
 			{
-				snprintf(tmp, sizeof(tmp), "                    stream%zu:\n", j);
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                        index: %zu\n", j);
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                        name: \"%s\"\n", chan->GetStreamName(j).c_str());
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                        yunit:       \"%s\"\n", chan->GetYAxisUnits(j).ToString().c_str());
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                        vrange:      %f\n", chan->GetVoltageRange(j));
-				config += tmp;
-				snprintf(tmp, sizeof(tmp), "                        offset:      %f\n", chan->GetOffset(j));
-				config += tmp;
+				YAML::Node stream;
+				stream["index"] = j;
+				stream["name"] = chan->GetStreamName(j);
+				stream["yunit"] = chan->GetYAxisUnits(j).ToString();
+				stream["vrange"] = chan->GetVoltageRange(j);
+				stream["offset"] = chan->GetOffset(j);
+
+				streams["stream" + to_string(j)] = stream;
 			}
+
+			channelNode["streams"] = streams;
 		}
+
+		channels["ch" + to_string(i)] = channelNode;
 	}
+
+	scope["channels"] = channels;
 
 	//Save trigger
 	auto trig = GetTrigger();
 	if(trig)
-		config += trig->SerializeConfiguration(table);
+		scope["trigger"] = trig->SerializeConfiguration(table);
 
-	return config;
+	return scope;
 }
 
 void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
@@ -487,7 +449,7 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	if(CanInterleave())
 	{
 		if(node["interleave"])
-			SetInterleaving(node["interleave"].as<int>());
+			SetInterleaving(node["interleave"].as<bool>());
 	}
 	if(node["rate"])
 		SetSampleRate(node["rate"].as<unsigned long>());
