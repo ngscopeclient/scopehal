@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,8 @@ EyeHeightMeasurement::EyeHeightMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_FS);
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "heightslice", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_VOLTS), "minheight", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -88,7 +89,8 @@ void EyeHeightMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK(true))
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
+		m_streams[1].m_value = NAN;
 		return;
 	}
 
@@ -134,6 +136,7 @@ void EyeHeightMeasurement::Refresh()
 	float* data = din->GetData();
 	int64_t w = din->GetWidth();
 	float ber_max = FLT_EPSILON;
+	float minheight = FLT_MAX;
 	for(size_t x = start_bin; x <= end_bin; x ++)
 	{
 		//Search up and down from the midpoint to find the edges of the eye opening
@@ -154,6 +157,7 @@ void EyeHeightMeasurement::Refresh()
 		//Convert from eye bins to volts
 		size_t height_bins = top_bin - bot_bin;
 		float height_volts = volts_per_row * height_bins;
+		minheight = min(minheight, height_volts);
 
 		//Output waveform generation
 		cap->m_offsets.push_back(round( (x*fs_per_bin) - din->m_uiWidth ));
@@ -164,4 +168,6 @@ void EyeHeightMeasurement::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = minheight;
 }

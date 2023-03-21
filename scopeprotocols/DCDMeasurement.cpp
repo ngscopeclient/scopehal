@@ -72,7 +72,7 @@ void DCDMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK())
 	{
-		m_streams[0].m_value = 0;
+		m_streams[0].m_value = NAN;
 		return;
 	}
 

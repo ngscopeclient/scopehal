@@ -74,7 +74,7 @@ void EyeBitRateMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK(true))
 	{
-		m_streams[0].m_value = 0;
+		m_streams[0].m_value = NAN;
 		return;
 	}
 

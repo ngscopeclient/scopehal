@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,8 @@ EyeJitterMeasurement::EyeJitterMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "ppjslice", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "ppj", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -85,6 +86,7 @@ void EyeJitterMeasurement::Refresh()
 	if(!VerifyAllInputsOK(true))
 	{
 		SetData(NULL, 0);
+		m_streams[1].m_value = NAN;
 		return;
 	}
 
@@ -125,6 +127,7 @@ void EyeJitterMeasurement::Refresh()
 	float ber_max = FLT_EPSILON;
 	double width_fs = 2 * din->m_uiWidth;
 	double fs_per_pixel = width_fs / w;
+	int64_t jitter_pp = 0;
 	for(size_t i=start_bin; i <= end_bin; i++)
 	{
 		float* row = data + i*w;
@@ -156,14 +159,18 @@ void EyeJitterMeasurement::Refresh()
 
 		int64_t jitter_left = cleft - left;
 		int64_t jitter_right = cright - right;
+		int64_t jitter_max = max(jitter_left, jitter_right);
+		jitter_pp = max(jitter_pp, jitter_max);
 
-		float value = fs_per_pixel * max(jitter_left, jitter_right);
+		float value = fs_per_pixel * jitter_max;
 
 		//Output waveform generation
 		cap->m_offsets.push_back(round(i*duration_mv + base_mv));
 		cap->m_durations.push_back(round(duration_mv));
 		cap->m_samples.push_back(value);
 	}
+
+	m_streams[1].m_value = fs_per_pixel * jitter_pp;
 
 	SetData(cap, 0);
 

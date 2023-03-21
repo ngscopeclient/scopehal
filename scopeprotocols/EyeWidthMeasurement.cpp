@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -41,7 +41,8 @@ EyeWidthMeasurement::EyeWidthMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
 	m_xAxisUnit = Unit(Unit::UNIT_MILLIVOLTS);
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "widthslice", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "minwidth", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("Eye");
@@ -84,7 +85,8 @@ void EyeWidthMeasurement::Refresh()
 {
 	if(!VerifyAllInputsOK(true))
 	{
-		SetData(NULL, 0);
+		SetData(nullptr, 0);
+		m_streams[1].m_value = NAN;
 		return;
 	}
 
@@ -125,6 +127,8 @@ void EyeWidthMeasurement::Refresh()
 	float ber_max = FLT_EPSILON;
 	double width_fs = 2 * din->m_uiWidth;
 	double fs_per_pixel = width_fs / w;
+	int64_t far_left = INT64_MAX;
+	int64_t far_right = INT64_MIN;
 	for(size_t i=start_bin; i <= end_bin; i++)
 	{
 		float* row = data + i*w;
@@ -146,6 +150,9 @@ void EyeWidthMeasurement::Refresh()
 				cright = min(cright, x);
 		}
 
+		far_left = min(far_left, cleft);
+		far_right = max(far_right, cright);
+
 		float value = fs_per_pixel * (cright - cleft);
 
 		//Output waveform generation
@@ -153,6 +160,8 @@ void EyeWidthMeasurement::Refresh()
 		cap->m_durations.push_back(round(duration_mv));
 		cap->m_samples.push_back(value);
 	}
+
+	m_streams[1].m_value = far_right - far_left;
 
 	SetData(cap, 0);
 
