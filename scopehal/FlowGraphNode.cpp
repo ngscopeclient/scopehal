@@ -285,69 +285,27 @@ bool FlowGraphNode::IsDownstreamOf(set<FlowGraphNode*> nodes)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string FlowGraphNode::SerializeConfiguration(IDTable& table, size_t indent)
+YAML::Node FlowGraphNode::SerializeConfiguration(IDTable& table)
 {
-	string sindent = "";
-	for(size_t i=0; i<indent; i++)
-		sindent += ' ';
+	YAML::Node node;
 
 	//Inputs
-	char tmp[1024];
-	string config = sindent + "inputs:\n";
 	for(size_t i=0; i<m_inputs.size(); i++)
 	{
 		auto desc = m_inputs[i];
+		string value;
 		if(desc.m_channel == NULL)
-			snprintf(tmp, sizeof(tmp), "    %-20s 0\n", (m_signalNames[i] + ":").c_str());
+			value = "0";
 		else
-		{
-			snprintf(tmp, sizeof(tmp), "    %-20s %d/%zu\n",
-				(m_signalNames[i] + ":").c_str(),
-				table.emplace(desc.m_channel),
-				desc.m_stream
-			);
-		}
-		config += sindent + tmp;
+			value = to_string(table.emplace(desc.m_channel)) + "/" + to_string(desc.m_stream);
+		node["inputs"][m_signalNames[i]] = value;
 	}
 
 	//Parameters
-	config += sindent + "parameters:\n";
 	for(auto it : m_parameters)
-	{
-		switch(it.second.GetType())
-		{
-			case FilterParameter::TYPE_FLOAT:
-			case FilterParameter::TYPE_INT:
-			case FilterParameter::TYPE_BOOL:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"    %-20s %s\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
-				break;
+		node["parameters"][it.first] = it.second.ToString(false);
 
-			case FilterParameter::TYPE_FILENAME:
-				{
-					string escaped = str_replace("\\", "\\\\", it.second.ToString(false));
-					snprintf(
-						tmp,
-						sizeof(tmp),
-						"    %-20s \"%s\"\n", (it.first+":").c_str(), escaped.c_str());
-				}
-				break;
-
-			case FilterParameter::TYPE_8B10B_PATTERN:
-			default:
-				snprintf(
-					tmp,
-					sizeof(tmp),
-					"    %-20s \"%s\"\n", (it.first+":").c_str(), it.second.ToString(false).c_str());
-				break;
-		}
-
-		config += sindent + tmp;
-	}
-
-	return config;
+	return node;
 }
 
 void FlowGraphNode::LoadParameters(const YAML::Node& node, IDTable& /*table*/)

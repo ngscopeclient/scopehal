@@ -214,7 +214,7 @@ public:
 	/**
 		@brief Serialize this decoder's configuration to a string
 	 */
-	virtual std::string SerializeConfiguration(IDTable& table, size_t indent = 8);
+	virtual YAML::Node SerializeConfiguration(IDTable& table);
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
 
