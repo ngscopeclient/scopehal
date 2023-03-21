@@ -93,16 +93,6 @@ void Filter::Release()
 		delete this;
 }
 
-/**
-	@brief Returns true if this filter outputs a waveform consisting of a single sample.
-
-	If scalar, the output is displayed with statistics rather than a waveform view.
- */
-bool Filter::IsScalarOutput()
-{
-	return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
@@ -1406,7 +1396,9 @@ void Filter::AutoscaleVertical(size_t stream)
 	float vmax = GetMaxVoltage(swfm, uwfm);
 
 	float range = vmax - vmin;
-	if(IsScalarOutput() || (range < 1e-6) )
+
+	//give some range to really small or constant waveforms
+	if(range < 1e-6)
 		range = vmax * 0.05;
 
 	SetVoltageRange(range * 1.05, stream);
