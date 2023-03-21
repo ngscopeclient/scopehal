@@ -184,7 +184,6 @@ bool Oscilloscope::PopPendingWaveform()
 YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 {
 	//Save basic scope info
-	YAML::Node node;
 	YAML::Node scope;
 	YAML::Node channels;
 	int iscope = table.emplace(this);
@@ -329,9 +328,7 @@ YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 	if(trig)
 		scope["trigger"] = trig->SerializeConfiguration(table);
 
-	node["scope" + to_string(iscope)] = scope;
-
-	return node;
+	return scope;
 }
 
 void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)

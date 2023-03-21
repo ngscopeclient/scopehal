@@ -726,8 +726,6 @@ void Filter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> qu
 
 YAML::Node Filter::SerializeConfiguration(IDTable& table)
 {
-	YAML::Node node;
-
 	//Start with flow graph config
 	YAML::Node filter = FlowGraphNode::SerializeConfiguration(table);
 
@@ -763,8 +761,7 @@ YAML::Node Filter::SerializeConfiguration(IDTable& table)
 	}
 	filter["streams"] = streams;
 
-	node["filter" + to_string(id)] = filter;
-	return node;
+	return filter;
 }
 
 void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
