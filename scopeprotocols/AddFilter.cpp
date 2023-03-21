@@ -28,7 +28,7 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "SubtractFilter.h"
+#include "AddFilter.h"
 #ifdef __x86_64__
 #include <immintrin.h>
 #endif
@@ -38,23 +38,23 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SubtractFilter::SubtractFilter(const string& color)
+AddFilter::AddFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_computePipeline("shaders/SubtractFilter.spv", 3, sizeof(uint32_t))
+	, m_computePipeline("shaders/AddFilter.spv", 3, sizeof(uint32_t))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("IN+");
-	CreateInput("IN-");
+	CreateInput("a");
+	CreateInput("b");
 }
 
-SubtractFilter::~SubtractFilter()
+AddFilter::~AddFilter()
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+bool AddFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -71,25 +71,25 @@ bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void SubtractFilter::SetDefaultName()
+void AddFilter::SetDefaultName()
 {
 	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s - %s",
+	snprintf(hwname, sizeof(hwname), "%s + %s",
 		GetInputDisplayName(0).c_str(),
 		GetInputDisplayName(1).c_str());
 	m_hwname = hwname;
 	m_displayname = m_hwname;
 }
 
-string SubtractFilter::GetProtocolName()
+string AddFilter::GetProtocolName()
 {
-	return "Subtract";
+	return "Add";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
+void AddFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	bool veca = GetInput(0).GetType() == Stream::STREAM_TYPE_ANALOG;
 	bool vecb = GetInput(1).GetType() == Stream::STREAM_TYPE_ANALOG;
@@ -98,25 +98,71 @@ void SubtractFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHa
 		DoRefreshVectorVector(cmdBuf, queue);
 	else if(!veca && !vecb)
 		DoRefreshScalarScalar();
+	else if(veca)
+		DoRefreshScalarVector(1, 0);
 	else
-	{
-		LogWarning("[SubtractFilter::Refresh] Scalar - vector case not yet implemented\n");
-		SetData(nullptr, 0);
-	}
+		DoRefreshScalarVector(0, 1);
 }
 
-void SubtractFilter::DoRefreshScalarScalar()
+void AddFilter::DoRefreshScalarScalar()
 {
 	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG_SCALAR;
 	SetData(nullptr, 0);
 
-	//Subtract value
+	//Add value
 	//TODO: how to handle unequal units?
 	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
-	m_streams[0].m_value = GetInput(0).GetScalarValue() - GetInput(1).GetScalarValue();
+	m_streams[0].m_value = GetInput(0).GetScalarValue() + GetInput(1).GetScalarValue();
 }
 
-void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
+void AddFilter::DoRefreshScalarVector(size_t iScalar, size_t iVector)
+{
+	m_streams[0].m_stype = Stream::STREAM_TYPE_ANALOG;
+
+	float scale = GetInput(iScalar).GetScalarValue();
+	auto din = GetInputWaveform(iVector);
+	if(!din)
+	{
+		SetData(nullptr, 0);
+		return;
+	}
+	din->PrepareForCpuAccess();
+	auto len = din->size();
+
+	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
+
+	if(sparse)
+	{
+		//Set up the output waveform
+		auto cap = SetupSparseOutputWaveform(sparse, 0, 0, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(sparse->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fin[i] + scale;
+
+		cap->MarkModifiedFromCpu();
+	}
+	else
+	{
+		//Set up the output waveform
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(uniform, 0);
+		cap->Resize(len);
+		cap->PrepareForCpuAccess();
+
+		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
+		float* fdst = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
+		for(size_t i=0; i<len; i++)
+			fdst[i] = fin[i] + scale;
+
+		cap->MarkModifiedFromCpu();
+	}
+}
+
+void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -182,7 +228,7 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 
 		for(size_t i=0; i<len; i++)
 		{
-			out[i] 		= a[i] - b[i];
+			out[i] 		= a[i] + b[i];
 			if(out[i] < -180)
 				out[i] += 360;
 			if(out[i] > 180)
@@ -244,19 +290,19 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 }
 
 //We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
-void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
+void AddFilter::InnerLoop(float* out, float* a, float* b, size_t len)
 {
 	out = (float*)__builtin_assume_aligned(out, 64);
 	a = (float*)__builtin_assume_aligned(a, 64);
 	b = (float*)__builtin_assume_aligned(b, 64);
 
 	for(size_t i=0; i<len; i++)
-		out[i] 		= a[i] - b[i];
+		out[i] 		= a[i] + b[i];
 }
 
 #ifdef __x86_64__
 __attribute__((target("avx2")))
-void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
+void AddFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 {
 	size_t end = len - (len % 8);
 
@@ -265,17 +311,17 @@ void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 	{
 		__m256 pa = _mm256_load_ps(a + i);
 		__m256 pb = _mm256_load_ps(b + i);
-		__m256 o = _mm256_sub_ps(pa, pb);
+		__m256 o = _mm256_add_ps(pa, pb);
 		_mm256_store_ps(out+i, o);
 	}
 
 	//Get any extras
 	for(size_t i=end; i<len; i++)
-		out[i] 		= a[i] - b[i];
+		out[i] 		= a[i] + b[i];
 }
 #endif /* __x86_64__ */
 
-Filter::DataLocation SubtractFilter::GetInputLocation()
+Filter::DataLocation AddFilter::GetInputLocation()
 {
 	//We explicitly manage our input memory and don't care where it is when Refresh() is called
 	return LOC_DONTCARE;

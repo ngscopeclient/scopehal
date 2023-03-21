@@ -41,10 +41,11 @@
 void ScopeProtocolStaticInit()
 {
 	AddDecoderClass(ACCoupleFilter);
-	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(ACRMSMeasurement);
+	AddDecoderClass(AddFilter);
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(AreaMeasurement);
+	AddDecoderClass(AutocorrelationFilter);
 	AddDecoderClass(BaseMeasurement);
 	AddDecoderClass(BINImportFilter);
 	AddDecoderClass(BurstWidthMeasurement);
@@ -53,12 +54,12 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ClipFilter);
 	AddDecoderClass(ClockRecoveryFilter);
 	AddDecoderClass(ComplexImportFilter);
+	AddDecoderClass(ConstantFilter);
 	AddDecoderClass(CSVExportFilter);
 	AddDecoderClass(CSVImportFilter);
 	AddDecoderClass(CTLEFilter);
 	AddDecoderClass(CurrentShuntFilter);
 	AddDecoderClass(DCDMeasurement);
-	AddDecoderClass(DCOffsetFilter);
 	AddDecoderClass(DDJMeasurement);
 	AddDecoderClass(DDR1Decoder);
 	AddDecoderClass(DDR3Decoder);

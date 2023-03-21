@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,27 +30,40 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of DCOffsetFilter
+	@brief Declaration of AddFilter
  */
-#ifndef DCOffsetFilter_h
-#define DCOffsetFilter_h
+#ifndef AddFilter_h
+#define AddFilter_h
 
-class DCOffsetFilter : public Filter
+class QueueHandle;
+
+class AddFilter : public Filter
 {
 public:
-	DCOffsetFilter(const std::string& color);
+	AddFilter(const std::string& color);
+	~AddFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
 	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(DCOffsetFilter)
+	PROTOCOL_DECODER_INITPROC(AddFilter)
 
 protected:
-	std::string m_offsetname;
+	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	void DoRefreshScalarScalar();
+	void DoRefreshScalarVector(size_t iScalar, size_t iVector);
+
+	void InnerLoop(float* out, float* a, float* b, size_t len);
+#ifdef __x86_64__
+	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
+#endif
+
+	ComputePipeline m_computePipeline;
 };
 
 #endif

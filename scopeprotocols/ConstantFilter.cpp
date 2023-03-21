@@ -27,42 +27,60 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
- */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#include "../scopehal/scopehal.h"
+#include "ConstantFilter.h"
 
-class QueueHandle;
+using namespace std;
 
-class SubtractFilter : public Filter
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+ConstantFilter::ConstantFilter(const string& color)
+	: Filter(color, CAT_GENERATION)
+	, m_value("Value")
+	, m_unit("Unit")
 {
-public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
+	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual DataLocation GetInputLocation();
+	m_parameters[m_value] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_value].SetFloatVal(0);
 
-	static std::string GetProtocolName();
-	virtual void SetDefaultName();
+	m_parameters[m_unit] = FilterParameter::UnitSelector();
+	m_parameters[m_unit].SetIntVal(Unit::UNIT_VOLTS);
+	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &ConstantFilter::OnUnitChanged));
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	SetData(nullptr, 0);
+}
 
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
 
-protected:
-	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	void DoRefreshScalarScalar();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Factory methods
 
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-#ifdef __x86_64__
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
-#endif
+bool ConstantFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+{
+	//no inputs
+	return false;
+}
 
-	ComputePipeline m_computePipeline;
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
 
-#endif
+string ConstantFilter::GetProtocolName()
+{
+	return "Constant";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Actual decoder logic
+
+void ConstantFilter::OnUnitChanged()
+{
+	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
+	m_parameters[m_value] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+}
+
+void ConstantFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	SetYAxisUnits(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()), 0);
+	m_streams[0].m_value = m_parameters[m_value].GetFloatVal();
+}

@@ -29,6 +29,7 @@ endfunction()
 add_compute_shaders(
 	protocolshaders
 	SOURCES
+		AddFilter.glsl
 		BlackmanHarrisWindow.glsl
 		ComplexToLogMagnitude.glsl
 		ComplexToMagnitude.glsl

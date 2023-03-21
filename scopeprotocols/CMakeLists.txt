@@ -4,6 +4,7 @@ link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 set(SCOPEPROTOCOLS_SOURCES
 	ACCoupleFilter.cpp
 	ACRMSMeasurement.cpp
+	AddFilter.cpp
 	ADL5205Decoder.cpp
 	AreaMeasurement.cpp
 	AutocorrelationFilter.cpp
@@ -15,12 +16,12 @@ set(SCOPEPROTOCOLS_SOURCES
 	ClipFilter.cpp
 	ClockRecoveryFilter.cpp
 	ComplexImportFilter.cpp
+	ConstantFilter.cpp
 	CSVExportFilter.cpp
 	CSVImportFilter.cpp
 	CTLEFilter.cpp
 	CurrentShuntFilter.cpp
 	DCDMeasurement.cpp
-	DCOffsetFilter.cpp
 	DDJMeasurement.cpp
 	DDR1Decoder.cpp
 	DDR3Decoder.cpp

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,103 +27,35 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "DCOffsetFilter.h"
+#version 430
+#pragma shader_stage(compute)
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-DCOffsetFilter::DCOffsetFilter(const string& color)
-	: Filter(color, CAT_MATH, Unit(Unit::UNIT_FS))
+layout(std430, binding=0) restrict readonly buffer buf_inP
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
-	CreateInput("din");
+	float inP[];
+};
 
-	m_offsetname = "Offset";
-	m_parameters[m_offsetname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_offsetname].SetFloatVal(0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Factory methods
-
-bool DCOffsetFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+layout(std430, binding=1) restrict readonly buffer buf_inN
 {
-	if(stream.m_channel == NULL)
-		return false;
+	float inN[];
+};
 
-	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
-		return true;
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string DCOffsetFilter::GetProtocolName()
+layout(std430, binding=2) restrict writeonly buffer buf_dout
 {
-	return "DC offset";
-}
+	float dout[];
+};
 
-void DCOffsetFilter::SetDefaultName()
+layout(std430, push_constant) uniform constants
 {
-	char hwname[256];
-	float offset = m_parameters[m_offsetname].GetFloatVal();
-	if(offset >= 0)
-		snprintf(hwname, sizeof(hwname), "%s + %.3f", GetInputDisplayName(0).c_str(), offset);
-	else
-		snprintf(hwname, sizeof(hwname), "%s %.3f", GetInputDisplayName(0).c_str(), offset);
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
+	uint size;
+};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
 
-void DCOffsetFilter::Refresh()
+void main()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
+	if(gl_GlobalInvocationID.x >= size)
 		return;
-	}
 
-	auto din = GetInputWaveform(0);
-	size_t len = din->size();
-	float offset = m_parameters[m_offsetname].GetFloatVal();
-
-	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
-	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
-
-	if(udin)
-	{
-		//Subtract all of our samples
-		auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
-		cap->Resize(len);
-		cap->PrepareForCpuAccess();
-
-		float* out = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		float* a = (float*)__builtin_assume_aligned(udin->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			out[i] 		= a[i] + offset;
-
-		cap->MarkModifiedFromCpu();
-	}
-	else
-	{
-		//Subtract all of our samples
-		auto cap = SetupSparseOutputWaveform(sdin, 0, 0, 0);
-		cap->PrepareForCpuAccess();
-
-		float* out = (float*)__builtin_assume_aligned(cap->m_samples.GetCpuPointer(), 16);
-		float* a = (float*)__builtin_assume_aligned(sdin->m_samples.GetCpuPointer(), 16);
-		for(size_t i=0; i<len; i++)
-			out[i] 		= a[i] + offset;
-
-		cap->MarkModifiedFromCpu();
-	}
+	dout[gl_GlobalInvocationID.x] = inP[gl_GlobalInvocationID.x] + inN[gl_GlobalInvocationID.x];
 }

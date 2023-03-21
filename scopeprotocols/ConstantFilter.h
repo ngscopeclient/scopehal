@@ -30,39 +30,29 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of SubtractFilter
+	@brief Declaration of ConstantFilter
  */
-#ifndef SubtractFilter_h
-#define SubtractFilter_h
+#ifndef ConstantFilter_h
+#define ConstantFilter_h
 
-class QueueHandle;
-
-class SubtractFilter : public Filter
+class ConstantFilter : public Filter
 {
 public:
-	SubtractFilter(const std::string& color);
-	~SubtractFilter();
+	ConstantFilter(const std::string& color);
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-	PROTOCOL_DECODER_INITPROC(SubtractFilter)
+	PROTOCOL_DECODER_INITPROC(ConstantFilter)
 
 protected:
-	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
-	void DoRefreshScalarScalar();
+	std::string m_value;
+	std::string m_unit;
 
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-#ifdef __x86_64__
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
-#endif
-
-	ComputePipeline m_computePipeline;
+	void OnUnitChanged();
 };
 
 #endif
