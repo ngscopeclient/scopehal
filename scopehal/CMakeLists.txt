@@ -125,6 +125,7 @@ set(SCOPEHAL_SOURCES
 	TektronixOscilloscope.cpp
 	ThunderScopeOscilloscope.cpp
 	RohdeSchwarzOscilloscope.cpp
+	RSRTO6Oscilloscope.cpp
 	RohdeSchwarzHMC8012Multimeter.cpp
 	RohdeSchwarzHMC804xPowerSupply.cpp
 
