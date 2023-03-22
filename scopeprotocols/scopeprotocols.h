@@ -106,6 +106,7 @@
 #include "EyeWidthMeasurement.h"
 #include "FallMeasurement.h"
 #include "FSKDecoder.h"
+#include "FullWidthHalfMax.h"
 #include "FFTFilter.h"
 #include "FIRFilter.h"
 #include "FrequencyMeasurement.h"
