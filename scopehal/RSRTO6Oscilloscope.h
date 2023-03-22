@@ -52,6 +52,7 @@ public:
 	virtual OscilloscopeChannel* GetExternalTrigger();
 
 	//Channel configuration
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);
@@ -109,9 +110,6 @@ public:
 	// Function generator
 
 	//Channel info
-	virtual int GetFunctionChannelCount();
-	virtual std::string GetFunctionChannelName(int chan);
-
 	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
 
 	//Configuration
@@ -150,6 +148,7 @@ protected:
 	unsigned int m_digitalChannelBase;
 	unsigned int m_digitalChannelCount;
 	bool m_hasAFG;
+	unsigned int m_firstAFGIndex;
 
 	const static std::map<const std::string, const WaveShape> m_waveShapeNames;
 

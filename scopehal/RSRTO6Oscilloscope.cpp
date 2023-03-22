@@ -179,6 +179,13 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 	{
 		m_transport->SendCommandQueued("WGEN1:SOURCE FUNCGEN"); //Don't currently support modulation or other modes
 		m_transport->SendCommandQueued("WGEN2:SOURCE FUNCGEN");
+
+		for (int i = 0; i < 2; i++)
+		{
+			m_firstAFGIndex = m_channels.size();
+			auto ch = new FunctionGeneratorChannel("WGEN" + to_string(i + 1), "#808080", m_channels.size());
+			m_channels.push_back(ch);
+		}
 	}
 
 	m_transport->SendCommandQueued("FORMat:DATA REAL,32"); //Report in f32
@@ -214,6 +221,14 @@ unsigned int RSRTO6Oscilloscope::GetInstrumentTypes()
 		resp |= Instrument::INST_FUNCTION;
 
 	return resp;
+}
+
+uint32_t RSRTO6Oscilloscope::GetInstrumentTypesForChannel(size_t i)
+{
+	if(m_hasAFG && (i >= m_firstAFGIndex))
+		return Instrument::INST_FUNCTION;
+
+	return Instrument::INST_OSCILLOSCOPE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -613,7 +628,7 @@ vector<Oscilloscope::DigitalBank> RSRTO6Oscilloscope::GetDigitalBanks()
 	{
 		DigitalBank bank;
 		for (int n = 0; n < 4; n++)
-			bank.push_back(m_channels[m_digitalChannelBase + i + n]);
+			bank.push_back(static_cast<OscilloscopeChannel*>(m_channels[m_digitalChannelBase + i + n]));
 		banks.push_back(bank);
 	}
 
@@ -1341,20 +1356,6 @@ void RSRTO6Oscilloscope::PushEdgeTrigger(EdgeTrigger* trig)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function generator
 
-//Channel info
-int RSRTO6Oscilloscope::GetFunctionChannelCount()
-{
-	if (!m_hasAFG)
-		LogFatal("Should not GetFunctionChannelCount() on a RTO6 w/o AFG\n");
-
-	return 2;
-}
-
-std::string RSRTO6Oscilloscope::GetFunctionChannelName(int chan)
-{
-	return "Gen" + to_string(chan + 1);
-}
-
 vector<FunctionGenerator::WaveShape> RSRTO6Oscilloscope::GetAvailableWaveformShapes(int /*chan*/)
 {
 	vector<WaveShape> res;
@@ -1364,15 +1365,17 @@ vector<FunctionGenerator::WaveShape> RSRTO6Oscilloscope::GetAvailableWaveformSha
 	return res;
 }
 
+#define TO_HW_STR(chan) to_string(chan - m_firstAFGIndex + 1)
+
 //Configuration
 bool RSRTO6Oscilloscope::GetFunctionChannelActive(int chan)
 {
-	return m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":ENABLE?") == "ON";
+	return m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":ENABLE?") == "ON";
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelActive(int chan, bool on)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":ENABLE " + (on ? "ON" : "OFF"));
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":ENABLE " + (on ? "ON" : "OFF"));
 }
 
 bool RSRTO6Oscilloscope::HasFunctionDutyCycleControls(int chan)
@@ -1382,47 +1385,47 @@ bool RSRTO6Oscilloscope::HasFunctionDutyCycleControls(int chan)
 
 float RSRTO6Oscilloscope::GetFunctionChannelDutyCycle(int chan)
 {
-	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":FUNC:SQUARE:DCYCLE?")) / 100.;
+	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":FUNC:SQUARE:DCYCLE?")) / 100.;
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelDutyCycle(int chan, float duty)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":FUNC:SQUARE:DCYCLE " + to_string(duty*100.));
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":FUNC:SQUARE:DCYCLE " + to_string(duty*100.));
 }
 
 float RSRTO6Oscilloscope::GetFunctionChannelAmplitude(int chan)
 {
-	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":VOLTAGE?"));
+	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":VOLTAGE?"));
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelAmplitude(int chan, float amplitude)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":VOLTAGE " + to_string(amplitude));
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":VOLTAGE " + to_string(amplitude));
 }
 
 float RSRTO6Oscilloscope::GetFunctionChannelOffset(int chan)
 {
-	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":VOLTAGE:OFFSET?"));
+	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":VOLTAGE:OFFSET?"));
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelOffset(int chan, float offset)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":VOLTAGE:OFFSET " + to_string(offset));
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":VOLTAGE:OFFSET " + to_string(offset));
 }
 
 float RSRTO6Oscilloscope::GetFunctionChannelFrequency(int chan)
 {
-	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":FREQUENCY?"));
+	return stof(m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":FREQUENCY?"));
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelFrequency(int chan, float hz)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":FREQUENCY " + to_string(hz));
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":FREQUENCY " + to_string(hz));
 }
 
 FunctionGenerator::WaveShape RSRTO6Oscilloscope::GetFunctionChannelShape(int chan)
 {
-	string reply = m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":FUNCTION?");
+	string reply = m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":FUNCTION?");
 
 	if (m_waveShapeNames.count(reply) == 0)
 	{
@@ -1439,7 +1442,7 @@ void RSRTO6Oscilloscope::SetFunctionChannelShape(int chan, FunctionGenerator::Wa
 	{
 		if (i.second == shape)
 		{
-			m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":FUNCTION " + i.first);
+			m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":FUNCTION " + i.first);
 			return;
 		}
 	}
@@ -1454,13 +1457,13 @@ bool RSRTO6Oscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 
 FunctionGenerator::OutputImpedance RSRTO6Oscilloscope::GetFunctionChannelOutputImpedance(int chan)
 {
-	return (m_transport->SendCommandQueuedWithReply("WGEN" + to_string(chan + 1) +":OUTPUT?") == "FIFT") ? 
+	return (m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":OUTPUT?") == "FIFT") ? 
 			FunctionGenerator::IMPEDANCE_50_OHM : FunctionGenerator::IMPEDANCE_HIGH_Z;
 }
 
 void RSRTO6Oscilloscope::SetFunctionChannelOutputImpedance(int chan, FunctionGenerator::OutputImpedance z)
 {
-	m_transport->SendCommandQueued("WGEN" + to_string(chan + 1) +":OUTPUT " +
+	m_transport->SendCommandQueued("WGEN" + TO_HW_STR(chan) +":OUTPUT " +
 		((z == FunctionGenerator::IMPEDANCE_50_OHM) ? "FIFTY" : "HIZ"));
 }
 
