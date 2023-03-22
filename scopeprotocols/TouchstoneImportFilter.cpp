@@ -43,6 +43,11 @@ TouchstoneImportFilter::TouchstoneImportFilter(const string& color)
 	m_parameters[m_fpname].m_fileFilterMask = "*.s*p";
 	m_parameters[m_fpname].m_fileFilterName = "Touchstone S-parameter files (*.s*p)";
 	m_parameters[m_fpname].signal_changed().connect(sigc::mem_fun(*this, &TouchstoneImportFilter::OnFileNameChanged));
+
+	//Make a default set of ports assuming we're a .s2p
+	//(this allows us to make initial connections in the filter graph prior to the file being selected)
+	m_params.Allocate(2);
+	SetupStreams();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
