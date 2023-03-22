@@ -212,6 +212,9 @@ void HistogramFilter::Refresh()
 	//Reallocate the histogram if we changed it
 	if(reallocate)
 	{
+		if (cap)
+			delete cap;
+		
 		//Reallocate our waveform
 		cap = new UniformAnalogWaveform;
 		cap->m_timescale = binsize;
