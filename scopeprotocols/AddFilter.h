@@ -47,7 +47,6 @@ public:
 	virtual DataLocation GetInputLocation();
 
 	static std::string GetProtocolName();
-	virtual void SetDefaultName();
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 

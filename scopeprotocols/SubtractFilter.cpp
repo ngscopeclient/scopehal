@@ -71,16 +71,6 @@ bool SubtractFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-void SubtractFilter::SetDefaultName()
-{
-	char hwname[256];
-	snprintf(hwname, sizeof(hwname), "%s - %s",
-		GetInputDisplayName(0).c_str(),
-		GetInputDisplayName(1).c_str());
-	m_hwname = hwname;
-	m_displayname = m_hwname;
-}
-
 string SubtractFilter::GetProtocolName()
 {
 	return "Subtract";
