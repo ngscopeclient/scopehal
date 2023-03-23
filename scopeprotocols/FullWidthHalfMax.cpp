@@ -106,13 +106,13 @@ void FullWidthHalfMax::Refresh()
 	vector<float> first_diff;
 	first_diff.resize(len-1);
 
-	//Threshold of first difference signal in digital format to extract falling edges from later on
+	//Threshold first difference signal in digital format, to extract falling edges later on
 	//These falling edges will correspond to peaks in the input signal
 	auto thresh_diff = new UniformDigitalWaveform;
-	thresh_diff->m_startTimestamp		= din->m_startTimestamp;
-	thresh_diff->m_startFemtoseconds	= din->m_startFemtoseconds;
-	thresh_diff->m_triggerPhase			= din->m_triggerPhase;
-	thresh_diff->m_timescale			= din->m_timescale;
+	thresh_diff->m_startTimestamp = din->m_startTimestamp;
+	thresh_diff->m_startFemtoseconds = din->m_startFemtoseconds;
+	thresh_diff->m_triggerPhase = din->m_triggerPhase;
+	thresh_diff->m_timescale = din->m_timescale;
 	thresh_diff->Resize(len - 1);
 
 	float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
