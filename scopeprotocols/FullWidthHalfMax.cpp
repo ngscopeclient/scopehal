@@ -125,10 +125,12 @@ void FullWidthHalfMax::Refresh()
 		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
 
 		// Normalize the input signal to have all positive values
+		#pragma omp parallel for
 		for(size_t i = 0; i < len; i++)
 			din_norm[i] = fin[i] - min_voltage;
 
 		// Calculate the first difference of normalized input signal
+		#pragma omp parallel for
 		for(size_t i = 1; i < (len - 1); i++)
 			first_diff[i - 1] = fin[i] - fin[i - 1];
 
