@@ -40,6 +40,7 @@ FullWidthHalfMax::FullWidthHalfMax(const string& color)
 {
 	AddStream(Unit(Unit::UNIT_FS), "FWHM", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Amplitude", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
+	AddStream(Unit(Unit::UNIT_FS), "Average FWHM", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
 }
@@ -158,22 +159,24 @@ void FullWidthHalfMax::Refresh()
 	// Get the number of falling edges
 	size_t num_of_edges = falling_edges.size();
 
+	int64_t sum_half_widths = 0;
+
 	// Calculate and store the full width at half maximum and amplitude for all peaks
 	for(size_t i = 0; i < num_of_edges; i++)
 	{
 		size_t j;
 		int64_t width = 0;
 		int64_t index = falling_edges[i] / din->m_timescale;
-		float peak_value = din_norm[index];
+		float half_max = din_norm[index] / 2;
 
 		// Calculate the distance from the peak to its half maximum on x-axis in forward direction
-		for(j = index; din_norm[j] > (peak_value / 2); j++)
+		for(j = index; din_norm[j] > half_max; j++)
 		{
 			width++;
 		}
 
 		// Calculate the distance from the peak to its half maximum on x-axis in backward direction
-		for(j = index; din_norm[j] > (peak_value / 2); j--)
+		for(j = index; din_norm[j] > half_max; j--)
 		{
 			width++;
 		}
@@ -190,6 +193,8 @@ void FullWidthHalfMax::Refresh()
 		cap1->m_offsets.push_back(offset);
 		cap1->m_durations.push_back(fwhm);
 		cap1->m_samples.push_back(fin[index]);
+
+		sum_half_widths += fwhm;
 	}
 
 	SetData(cap, 0);
@@ -197,4 +202,6 @@ void FullWidthHalfMax::Refresh()
 
 	cap->MarkModifiedFromCpu();
 	cap1->MarkModifiedFromCpu();
+
+	m_streams[2].m_value = sum_half_widths / num_of_edges;
 }
