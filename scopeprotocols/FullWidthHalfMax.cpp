@@ -100,7 +100,7 @@ void FullWidthHalfMax::Refresh()
 		cap->m_timescale = 1;
 		cap->PrepareForCpuAccess();
 
-        //Set up the output waveform for Amplitude of peaks
+		//Set up the output waveform for Amplitude of peaks
 		auto cap1 = SetupEmptySparseAnalogOutputWaveform(din, 1, true);
 		cap1->m_timescale = 1;
 		cap1->PrepareForCpuAccess();
@@ -130,7 +130,7 @@ void FullWidthHalfMax::Refresh()
 
 		// Calculate the first difference of normalized input signal
 		for(size_t i = 1; i < (len - 1); i++)
-			first_diff[i - 1] = din_norm[i] - din_norm[i - 1];
+			first_diff[i - 1] = fin[i] - fin[i - 1];
 
 		// Threshold the first difference vector to get a digital signal
 		bool cur = first_diff[0] > 0.0f;
