@@ -104,7 +104,7 @@ void FullWidthHalfMax::Refresh()
 
 	//Vector to store first difference of input signal
 	vector<float> first_diff;
-	first_diff.resize(len-1);
+	first_diff.resize(len);
 
 	//Threshold first difference signal in digital format, to extract falling edges later on
 	//These falling edges will correspond to peaks in the input signal
@@ -113,7 +113,7 @@ void FullWidthHalfMax::Refresh()
 	thresh_diff->m_startFemtoseconds = din->m_startFemtoseconds;
 	thresh_diff->m_triggerPhase = din->m_triggerPhase;
 	thresh_diff->m_timescale = din->m_timescale;
-	thresh_diff->Resize(len - 1);
+	thresh_diff->Resize(len);
 
 	float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
 
@@ -130,7 +130,7 @@ void FullWidthHalfMax::Refresh()
 		#pragma omp task
 		{
 			// Calculate the first difference of normalized input signal
-			for(size_t i = 1; i < (len - 1); i++)
+			for(size_t i = 1; i < len; i++)
 				first_diff[i - 1] = fin[i] - fin[i - 1];
 		}
 	}
@@ -138,7 +138,7 @@ void FullWidthHalfMax::Refresh()
 	// Threshold the first difference vector to get a digital signal
 	bool cur = first_diff[0] > 0.0f;
 
-	for(size_t i = 0; i < (len - 1); i++)
+	for(size_t i = 0; i < len; i++)
 	{
 		float f = first_diff[i];
 
@@ -187,7 +187,7 @@ void FullWidthHalfMax::Refresh()
 		// Push FWHM information
 		cap->m_offsets.push_back(offset);
 		cap->m_durations.push_back(fwhm);
-		cap->m_samples.push_back(fwhm);
+		cap->m_samples.push_back((float)fwhm);
 
 		// Push amplitude information
 		cap1->m_offsets.push_back(offset);
@@ -203,5 +203,5 @@ void FullWidthHalfMax::Refresh()
 	cap->MarkModifiedFromCpu();
 	cap1->MarkModifiedFromCpu();
 
-	m_streams[2].m_value = sum_half_widths / num_of_edges;
+	m_streams[2].m_value = (float) sum_half_widths / num_of_edges;
 }
