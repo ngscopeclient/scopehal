@@ -73,9 +73,9 @@ void FullWidthHalfMax::Refresh()
 {
 	auto din = GetInputWaveform(0);
 
-	if(!din)
+	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
-		SetData(nullptr, 0);
+		SetData(NULL, 0);
 		return;
 	}
 
@@ -83,127 +83,118 @@ void FullWidthHalfMax::Refresh()
 
 	auto len = din->size();
 
-	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
 	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
 
-	float min_voltage = GetMinVoltage(sparse, uniform);
+	float min_voltage = GetMinVoltage(NULL, uniform);
 
-	if(sparse)
-	{
-		SetData(nullptr, 0);
-		return;
-	}
-	else
-	{
-		//Set up the output waveform for Full Width at Half Maximum
-		auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-		cap->m_timescale = 1;
-		cap->PrepareForCpuAccess();
+	//Set up the output waveform for Full Width at Half Maximum
+	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
+	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
-		//Set up the output waveform for Amplitude of peaks
-		auto cap1 = SetupEmptySparseAnalogOutputWaveform(din, 1, true);
-		cap1->m_timescale = 1;
-		cap1->PrepareForCpuAccess();
+	//Set up the output waveform for Amplitude of peaks
+	auto cap1 = SetupEmptySparseAnalogOutputWaveform(din, 1, true);
+	cap1->m_timescale = 1;
+	cap1->PrepareForCpuAccess();
 
-		//Vector to store normalized version of input waveform
-		vector<float> din_norm;
-		din_norm.resize(len);
+	//Vector to store normalized version of input waveform
+	vector<float> din_norm;
+	din_norm.resize(len);
 
-		//Vector to store first difference of input signal
-		vector<float> first_diff;
-		first_diff.resize(len-1);
+	//Vector to store first difference of input signal
+	vector<float> first_diff;
+	first_diff.resize(len-1);
 
-		//Threshold of first difference signal in digital format to extract falling edges from later on
-		//These falling edges will correspond to peaks in the input signal
-		auto thresh_diff = new UniformDigitalWaveform;
-		thresh_diff->m_startTimestamp		= din->m_startTimestamp;
-		thresh_diff->m_startFemtoseconds	= din->m_startFemtoseconds;
-		thresh_diff->m_triggerPhase			= din->m_triggerPhase;
-		thresh_diff->m_timescale			= din->m_timescale;
-		thresh_diff->Resize(len - 1);
+	//Threshold of first difference signal in digital format to extract falling edges from later on
+	//These falling edges will correspond to peaks in the input signal
+	auto thresh_diff = new UniformDigitalWaveform;
+	thresh_diff->m_startTimestamp		= din->m_startTimestamp;
+	thresh_diff->m_startFemtoseconds	= din->m_startFemtoseconds;
+	thresh_diff->m_triggerPhase			= din->m_triggerPhase;
+	thresh_diff->m_timescale			= din->m_timescale;
+	thresh_diff->Resize(len - 1);
 
-		float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
+	float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
 
-		#pragma omp parallel
-		#pragma omp single nowait
-		{			
-			#pragma omp task
-			{
-				// Normalize the input signal to have all positive values
-				for(size_t i = 0; i < len; i++)
-					din_norm[i] = fin[i] - min_voltage;
-			}
-
-			#pragma omp task
-			{
-				// Calculate the first difference of normalized input signal
-				for(size_t i = 1; i < (len - 1); i++)
-					first_diff[i - 1] = fin[i] - fin[i - 1];
-			}
-		}
-
-		// Threshold the first difference vector to get a digital signal
-		bool cur = first_diff[0] > 0.0f;
-
-		for(size_t i = 0; i < (len - 1); i++)
+	#pragma omp parallel
+	#pragma omp single nowait
+	{			
+		#pragma omp task
 		{
-			float f = first_diff[i];
-
-			if(cur && (f < 0.0f))
-				cur = false;
-			else if(!cur && (f > 0.0f))
-				cur = true;
-
-			thresh_diff->m_samples[i] = cur;
+			// Normalize the input signal to have all positive values
+			for(size_t i = 0; i < len; i++)
+				din_norm[i] = fin[i] - min_voltage;
 		}
 
-		//Vector to store falling edges
-		vector<int64_t> falling_edges;
-
-		// Get falling edges. These falling edges will correspond to peaks in the input signal
-		FindFallingEdges(NULL, thresh_diff, falling_edges);
-
-		// Get the number of falling edges
-		size_t num_of_edges = falling_edges.size();
-
-		// Calculate and store the full width at half maximum and amplitude for all peaks
-		for(size_t i = 0; i < num_of_edges; i++)
+		#pragma omp task
 		{
-			size_t j;
-			int64_t width = 0;
-			int64_t index = falling_edges[i] / din->m_timescale;
-			float peak_value = din_norm[index];
+			// Calculate the first difference of normalized input signal
+			for(size_t i = 1; i < (len - 1); i++)
+				first_diff[i - 1] = fin[i] - fin[i - 1];
+		}
+	}
 
-			// Calculate the distance from the peak to its half maximum on x-axis in forward direction
-			for(j = index; din_norm[j] > (peak_value / 2); j++)
-			{
-				width++;
-			}
+	// Threshold the first difference vector to get a digital signal
+	bool cur = first_diff[0] > 0.0f;
 
-			// Calculate the distance from the peak to its half maximum on x-axis in backward direction
-			for(j = index; din_norm[j] > (peak_value / 2); j--)
-			{
-				width++;
-			}
+	for(size_t i = 0; i < (len - 1); i++)
+	{
+		float f = first_diff[i];
 
-			int64_t fwhm = width * din->m_timescale;
-			int64_t offset = j * din->m_timescale;
+		if(cur && (f < 0.0f))
+			cur = false;
+		else if(!cur && (f > 0.0f))
+			cur = true;
 
-			// Push FWHM information
-			cap->m_offsets.push_back(offset);
-			cap->m_durations.push_back(fwhm);
-			cap->m_samples.push_back(fwhm);
+		thresh_diff->m_samples[i] = cur;
+	}
 
-			// Push amplitude information
-			cap1->m_offsets.push_back(offset);
-			cap1->m_durations.push_back(fwhm);
-			cap1->m_samples.push_back(fin[index]);
+	//Vector to store falling edges
+	vector<int64_t> falling_edges;
+
+	// Get falling edges. These falling edges will correspond to peaks in the input signal
+	FindFallingEdges(NULL, thresh_diff, falling_edges);
+
+	// Get the number of falling edges
+	size_t num_of_edges = falling_edges.size();
+
+	// Calculate and store the full width at half maximum and amplitude for all peaks
+	for(size_t i = 0; i < num_of_edges; i++)
+	{
+		size_t j;
+		int64_t width = 0;
+		int64_t index = falling_edges[i] / din->m_timescale;
+		float peak_value = din_norm[index];
+
+		// Calculate the distance from the peak to its half maximum on x-axis in forward direction
+		for(j = index; din_norm[j] > (peak_value / 2); j++)
+		{
+			width++;
 		}
 
-		SetData(cap, 0);
-		SetData(cap1, 1);
+		// Calculate the distance from the peak to its half maximum on x-axis in backward direction
+		for(j = index; din_norm[j] > (peak_value / 2); j--)
+		{
+			width++;
+		}
 
-		cap->MarkModifiedFromCpu();
-		cap1->MarkModifiedFromCpu();
+		int64_t fwhm = width * din->m_timescale;
+		int64_t offset = j * din->m_timescale;
+
+		// Push FWHM information
+		cap->m_offsets.push_back(offset);
+		cap->m_durations.push_back(fwhm);
+		cap->m_samples.push_back(fwhm);
+
+		// Push amplitude information
+		cap1->m_offsets.push_back(offset);
+		cap1->m_durations.push_back(fwhm);
+		cap1->m_samples.push_back(fin[index]);
 	}
+
+	SetData(cap, 0);
+	SetData(cap1, 1);
+
+	cap->MarkModifiedFromCpu();
+	cap1->MarkModifiedFromCpu();
 }
