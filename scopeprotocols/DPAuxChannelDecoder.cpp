@@ -116,6 +116,8 @@ void DPAuxChannelDecoder::Refresh()
 
 	size_t i = 0;
 	bool done = false;
+	uint32_t request_addr = 0;
+	bool last_was_i2c = false;
 	while(i < len)
 	{
 		if(done)
@@ -150,18 +152,17 @@ void DPAuxChannelDecoder::Refresh()
 
 		//Recover the Manchester bitstream
 		bool current_state = false;
-		bool last_was_i2c = false;
 		int64_t ui_start = GetOffsetScaled(din, i);
 		int64_t symbol_start = i;
 		int64_t last_edge = i;
 		int64_t last_edge2 = i;
 		uint32_t addr_hi = 0;
-		uint32_t request_addr = 0;
 		LogTrace("[T = %s] Found initial falling edge\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_start).c_str());
 		pack = new Packet;
 		m_packets.push_back(pack);
 		pack->m_offset = ui_start;
 		pack->m_len = 0;
+		char tmp[32];
 		while(i < len)
 		{
 			//When we get here, i points to the start of our UI
@@ -281,6 +282,13 @@ void DPAuxChannelDecoder::Refresh()
 
 					packetIsRequest = !packetIsRequest;
 
+					//Calculate final packet duration
+					pack->m_len = ui_start - pack->m_offset;
+
+					//Decode packet content
+					if(!pack->m_data.empty())
+						pack->m_headers["Info"] = DecodeRegisterContent(request_addr, pack->m_data);
+
 					break;
 				}
 				else
@@ -346,6 +354,10 @@ void DPAuxChannelDecoder::Refresh()
 						cap->m_durations.push_back(i - symbol_start);
 						symbol_start = i;
 
+						//Push the address from the previous request
+						snprintf(tmp, sizeof(tmp), "%06x", request_addr);
+						pack->m_headers["Address"] = tmp;
+
 						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 
@@ -377,7 +389,6 @@ void DPAuxChannelDecoder::Refresh()
 			//Rest of stuff is all full length bytes
 			else if(bitcount == 8)
 			{
-				char tmp[32];
 				switch(frame_state)
 				{
 					case FRAME_ADDR_MID:
@@ -562,6 +573,8 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x006f: return "DSC_MAX_BPP_DELTA_AND_BPP_INCREMENT";
 		case 0x0080: return "DPFX_CAP";
 
+		case 0x00b0: return "Panel replay capability supported";
+
 		case 0x0100: return "LINK_BW_SET";
 		case 0x0101: return "LANE_COUNT_SET";
 		case 0x0102: return "TRAINING_PATTERN_SET";
@@ -648,6 +661,214 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 	}
 }
 
+string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vector<uint8_t>& data)
+{
+	size_t i = 0;
+	string ret = "";
+	while(i < data.size())
+	{
+		//Decode known register bitfields
+		string out = "";
+		size_t fieldsize = 1;
+		switch(start_addr)
+		{
+			//DCPD_REV
+			case 0x00000:
+				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				break;
+
+			//MAX_LANE_COUNT
+			case 0x00002:
+				out = string("Max lanes: ") + to_string(data[i] & 0x1f) + "\n";
+				if(data[i] & 0x20)
+					out += "POST_LT_ADJ_REQ supported\n";
+				else
+					out += "POST_LT_ADJ_REQ not supported\n";
+				if(data[i] & 0x40)
+					out += "TPS3 supported\n";
+				else
+					out += "TPS3 not supported\n";
+				if(data[i] & 0x80)
+					out += "Enhanced framing sequence supported";
+				else
+					out += "Enhanced framing sequence not supported";
+				break;
+
+			//MAX_DOWNSPREAD
+			case 0x00003:
+				if(data[i] & 0x1)
+					out += "Spread spectrum clocking supported\n";
+				else
+					out += "Spread spectrum clocking not supported\n";
+				if(data[i] & 0x2)
+					out += "Stream regeneration supported\n";
+				else
+					out += "Stream regeneration not supported\n";
+				if(data[i] & 0x40)
+					out += "AUX transactions not needed for link training\n";
+				else
+					out += "AUX transactions required for link training\n";
+				if(data[i] & 0x80)
+					out += "TPS4 supported";
+				else
+					out += "TPS4 not supported";
+				break;
+
+			//8B10B_TRAINING_AUX_RD_INTERVAL
+			case 0x0000e:
+				if(data[i] & 0x80)
+					out = "Extended RX capability field present\n";
+				else
+					out = "Extended RX capability field not present\n";
+				out += "LANEx_CR_DONE polling interval: 100 μs\n";
+				switch(data[i] & 0x7f)
+				{
+					case 0:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: 400 μs";
+						break;
+
+					case 1:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: 4 ms";
+						break;
+
+					case 2:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: 8 ms";
+						break;
+
+					case 3:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: 12 ms";
+						break;
+
+					case 4:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: 16 ms";
+						break;
+
+					default:
+						out += "LANEx_CHANNEL_EQ_DONE polling interval: reserved";
+						break;
+				}
+
+				break;
+
+			//DCPD_REV (extended)
+			case 0x02200:
+				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				break;
+
+			//8B10B_MAX_LINK_RATE (extended)
+			case 0x2201:
+				switch(data[i])
+				{
+					case 0x06:
+						out = "1.62 Gbps/lane (RBR)";
+						break;
+
+					case 0x0a:
+						out = "2.7 Gbps/lane (HBR)";
+						break;
+
+					case 0x14:
+						out = "5.4 Gbps/lane (HBR2)";
+						break;
+
+					case 0x1e:
+						out = "8.1 Gbps/lane (HBR3)";
+						break;
+
+					default:
+						out = "Unknown rate (reserved)";
+						break;
+				}
+				break;
+
+			//Unknown? Don't print any decode, skip it
+			default:
+				break;
+		}
+
+		//Default to advancing by one byte, but some are larger
+		i += fieldsize;
+		start_addr += fieldsize;
+
+		//Concatenate lines
+		if(!out.empty())
+		{
+			if(ret.empty())
+				ret = out;
+			else
+				ret += "\n" + out;
+		}
+	}
+
+	return ret;
+}
+
+bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+{
+	//Merge reads and writes with their completions
+	if( (first->m_headers["Type"] == "DP Read") && (next->m_headers["Type"] == "AUX_ACK") )
+		return true;
+	if( (first->m_headers["Type"] == "DP Write") && (next->m_headers["Type"] == "AUX_ACK") )
+		return true;
+
+	return false;
+}
+
+Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
+{
+	//Combine DP read with completion
+	if(pack->m_headers["Type"] == "DP Read")
+	{
+		Packet* ret = new Packet;
+		ret->m_offset = pack->m_offset;
+		ret->m_len = pack->m_len;
+		ret->m_headers["Type"] = pack->m_headers["Type"];
+		ret->m_headers["Address"] = pack->m_headers["Address"];
+		ret->m_headers["Length"] = pack->m_headers["Length"];
+		ret->m_headers["Info"] = pack->m_headers["Info"];
+		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+
+		//Add data from reply, if available
+		if(i+1 < m_packets.size())
+		{
+			auto next = m_packets[i+1];
+			ret->m_data = next->m_data;
+			ret->m_len = next->m_offset + next->m_len - pack->m_offset;
+
+			auto info = next->m_headers["Info"];
+			if(!info.empty())
+				ret->m_headers["Info"] += "\n" + info;
+		}
+
+		return ret;
+	}
+
+	//Combine DP write with completion
+	if(pack->m_headers["Type"] == "DP Write")
+	{
+		Packet* ret = new Packet;
+		ret->m_offset = pack->m_offset;
+		ret->m_len = pack->m_len;
+		ret->m_headers["Type"] = pack->m_headers["Type"];
+		ret->m_headers["Address"] = pack->m_headers["Address"];
+		ret->m_headers["Length"] = pack->m_headers["Length"];
+		ret->m_headers["Info"] = pack->m_headers["Info"];
+		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+		ret->m_data = pack->m_data;
+
+		//Extend to reply
+		if(i+1 < m_packets.size())
+		{
+			auto next = m_packets[i+1];
+			ret->m_len = next->m_offset + next->m_len - pack->m_offset;
+		}
+
+		return ret;
+	}
+
+	return NULL;
+}
+
 bool DPAuxChannelDecoder::FindFallingEdge(size_t& i, UniformAnalogWaveform* cap)
 {
 	size_t j = i;
@@ -683,6 +904,7 @@ bool DPAuxChannelDecoder::FindRisingEdge(size_t& i, UniformAnalogWaveform* cap)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DPAuxWaveform
 
 string DPAuxWaveform::GetColor(size_t i)
 {

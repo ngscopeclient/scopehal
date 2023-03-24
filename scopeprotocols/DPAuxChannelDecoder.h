@@ -86,11 +86,14 @@ public:
 	DPAuxChannelDecoder(const std::string& color);
 	virtual ~DPAuxChannelDecoder();
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-	virtual std::vector<std::string> GetHeaders();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	virtual std::vector<std::string> GetHeaders() override;
+
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
 
 	PROTOCOL_DECODER_INITPROC(DPAuxChannelDecoder)
 
@@ -99,6 +102,7 @@ protected:
 	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* cap);
 
 	std::string DecodeRegisterName(uint32_t nreg);
+	std::string DecodeRegisterContent(uint32_t start_addr, const std::vector<uint8_t>& data);
 
 	bool FindEdge(size_t& i, UniformAnalogWaveform* cap, bool polarity)
 	{
