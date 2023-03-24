@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -156,6 +156,7 @@ void DPAuxChannelDecoder::Refresh()
 		int64_t last_edge = i;
 		int64_t last_edge2 = i;
 		uint32_t addr_hi = 0;
+		uint32_t request_addr = 0;
 		LogTrace("[T = %s] Found initial falling edge\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_start).c_str());
 		pack = new Packet;
 		m_packets.push_back(pack);
@@ -376,6 +377,7 @@ void DPAuxChannelDecoder::Refresh()
 			//Rest of stuff is all full length bytes
 			else if(bitcount == 8)
 			{
+				char tmp[32];
 				switch(frame_state)
 				{
 					case FRAME_ADDR_MID:
@@ -385,9 +387,14 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_ADDR_LO:
-						pack->m_headers["Address"] = to_string_hex((addr_hi << 8) | current_byte);
+						addr_hi = (addr_hi << 8) | current_byte;
+						request_addr = addr_hi;
 
-						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_ADDRESS, (addr_hi << 8) | current_byte));
+						snprintf(tmp, sizeof(tmp), "%06x", addr_hi);
+						pack->m_headers["Address"] = tmp;
+						pack->m_headers["Info"] = DecodeRegisterName(addr_hi);
+
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_ADDRESS, addr_hi));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
 						symbol_start = i;
@@ -408,6 +415,7 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_PAYLOAD:
+						pack->m_data.push_back(current_byte);
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_DATA, current_byte));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
@@ -478,6 +486,166 @@ void DPAuxChannelDecoder::Refresh()
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
+}
+
+string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
+{
+	//we dont have HDCP info at the moment, but we know what registers are used
+	if( (nreg >= 0x68000) && (nreg <= 0x68fff) )
+		return "(unknown, HDCP v1.3)";
+	if( (nreg >= 0x69000) && (nreg <= 0x69fff) )
+		return "(unknown, HDCP v2.2)";
+
+	//eDP panel self refresh
+	if( (nreg >= 0x70) && (nreg <= 0x7f) )
+		return "(unknown, eDP self refresh)";
+
+	switch(nreg)
+	{
+		//see table 2-183, DP 2.0 spec
+		case 0x0000: return "DCPD_REV";
+		case 0x0001: return "8B10B_MAX_LINK_RATE";
+		case 0x0002: return "MAX_LANE_COUNT";
+		case 0x0003: return "MAX_DOWNSPREAD";
+		case 0x0004: return "NORP/DP_PWR_VOLTAGE_CAP";
+		case 0x0005: return "DOWN_STREAM_PORT_PRESENT";
+		case 0x0006: return "MAIN_LINK_CHANNEL_CODING_CAP";
+		case 0x0007: return "DOWN_STREAM_PORT_COUNT";
+		case 0x0008: return "RECEIVE_PORT0_CAP_0";
+		case 0x0009: return "RECEIVE_PORT0_CAP_1";
+		case 0x000a: return "RECEIVE_PORT1_CAP_0";
+		case 0x000b: return "RECEIVE_PORT1_CAP_1";
+		case 0x000c: return "I2C capabilities";
+		case 0x000d: return "eDP_CONFIGURATION_CAP";
+		case 0x000e: return "8B10B_TRAINING_AUX_RD_INTERVAL";
+		case 0x000f: return "ADAPTER_CAP";
+		case 0x0020: return "SINK_VIDEO_FALLBACK_FORMATS";
+		case 0x0021: return "MSTM_CAP";
+		case 0x0022: return "NUMBER_OF_AUDIO_ENDPOINTS";
+		case 0x0023: return "AV_SYNC_DATA_BLOCK_AV_GRANULARITY";
+		case 0x0024: return "AV_SYNC_DATA_BLOCK / AUD_DEC_LAT[7:0]";
+		case 0x0025: return "AUD_DEC_LAT[15:8]";
+		case 0x0026: return "AUD_PP_LAT[7:0]";
+		case 0x0027: return "AUD_PP_LAT[15:8]";
+		case 0x0028: return "VID_INTER_LAT[7:0]";
+		case 0x0029: return "VID_PROG_LAT[7:0]";
+		case 0x002a: return "REP_LAT[7:0]";
+		case 0x002b: return "AUD_DEL_INS[7:0]";
+		case 0x002c: return "AUD_DEL_INS[15:8]";
+		case 0x002d: return "AUD_DEL_INS[23:16]";
+		case 0x002e: return "RECEIVER_ADVANCED_LINK_POWER_MANAGEMENT_CAPABILITIES";
+		case 0x002f: return "AUX_FRAME_SYNC";
+		case 0x0030: return "GUID";	//thru 0x3f
+		case 0x0040: return "GUID_2";	//thru 0x4f
+		case 0x0054: return "RX_GTC_VALUE[7:0]";
+		case 0x0055: return "RX_GTC_VALUE[15:8]";
+		case 0x0056: return "RX_GTC_VALUE[23:16]";
+		case 0x0057: return "RX_GTC_VALUE[31:24]";
+		case 0x0058: return "RX_GC_MSTR_REQ";
+		case 0x005a: return "RX_GTC_PHASE_SKEW_OFFSET[7:0]";
+		case 0x005b: return "RX_GTC_PHASE_SKEW_OFFSET[15:8]";
+		case 0x0060: return "DSC Support";
+		case 0x0061: return "DSC Algorithm Revision";
+		case 0x0062: return "DSC RX Buffer Block Size";
+		case 0x0063: return "DSC RC Buffer Size";
+		case 0x0064: return "DSC Slice Capabilities 1";
+		case 0x0065: return "DSC Line Buffer Bit Depth";
+		case 0x0066: return "DSC Feature Support";
+		case 0x0067: return "Max supported bits/pixel";
+		case 0x0068: return "Max supported bits/pixel";
+		case 0x0069: return "DSC Decoder Pixel Encoding Format Capability";
+		case 0x006a: return "DSC Decoder Color Depth Capability";
+		case 0x006b: return "DSC Peak Throughput";
+		case 0x006c: return "DSC Maximum Slice Width";
+		case 0x006d: return "DSC Slice Capabilities 2";
+		case 0x006e: return "DSC_MAX_BPP_DELTA_AND_BPP_INCREMENT";
+		case 0x006f: return "DSC_MAX_BPP_DELTA_AND_BPP_INCREMENT";
+		case 0x0080: return "DPFX_CAP";
+
+		case 0x0100: return "LINK_BW_SET";
+		case 0x0101: return "LANE_COUNT_SET";
+		case 0x0102: return "TRAINING_PATTERN_SET";
+		case 0x0103: return "TRAINING_LANE0_SET";
+		case 0x0104: return "TRAINING_LANE1_SET";
+		case 0x0105: return "TRAINING_LANE2_SET";
+		case 0x0106: return "TRAINING_LANE3_SET";
+		case 0x0107: return "DOWNSPREAD_CTRL";
+		case 0x0108: return "MAIN_LINK_CHANNEL_CODING_SET";
+		case 0x0109: return "I2C Speed Control/Status Bit Map";
+		case 0x010a: return "eDP_CONFIGURATION_SET";
+		case 0x010b: return "LINK_QUAL_LANE0_SET";
+		case 0x010c: return "LINK_QUAL_LANE1_SET";
+		case 0x010d: return "LINK_QUAL_LANE2_SET";
+		case 0x010e: return "LINK_QUAL_LANE3_SET";
+
+		case 0x0300: return "Source IEEE_OUI[0]";
+		case 0x0301: return "Source IEEE_OUI[1]";
+		case 0x0302: return "Source IEEE_OUI[2]";
+		case 0x0303: return "Source DEVICE_ID[0]";
+		case 0x0304: return "Source DEVICE_ID[1]";
+		case 0x0305: return "Source DEVICE_ID[2]";
+		case 0x0306: return "Source DEVICE_ID[3]";
+		case 0x0307: return "Source DEVICE_ID[4]";
+		case 0x0308: return "Source DEVICE_ID[5]";
+		case 0x0309: return "Source Hardware Revision";
+		case 0x030a: return "Source Firmware/Software Major Revision";
+		case 0x030b: return "Source Firmware/Software Minor Revision";
+
+		case 0x0500: return "Branch IEEE_OUI[0]";
+		case 0x0501: return "Branch IEEE_OUI[1]";
+		case 0x0502: return "Branch IEEE_OUI[2]";
+		case 0x0503: return "Branch DEVICE_ID[0]";
+		case 0x0504: return "Branch DEVICE_ID[1]";
+		case 0x0505: return "Branch DEVICE_ID[2]";
+		case 0x0506: return "Branch DEVICE_ID[3]";
+		case 0x0507: return "Branch DEVICE_ID[4]";
+		case 0x0508: return "Branch DEVICE_ID[5]";
+		case 0x0509: return "Branch Hardware Revision";
+		case 0x050a: return "Branch Firmware/Software Major Revision";
+		case 0x050b: return "Branch Firmware/Software Minor Revision";
+
+		case 0x2000: return "RESERVED";
+		case 0x2001: return "RESERVED";
+		case 0x2002: return "SINK_COUNT_ESI";
+		case 0x2003: return "DEVICE_SERVICE_IRQ_VECTOR_ESI0";
+		case 0x2004: return "DEVICE_SERVICE_IRQ_VECTOR_ESI1";
+		case 0x2005: return "LINK_SERVICE_IRQ_VECTOR_ESI0";
+		case 0x200c: return "LANE0_1_STATUS_ESI";
+		case 0x200d: return "LANE2_3_STATUS_ESI";
+
+		case 0x2200: return "DCPD_REV";
+		case 0x2201: return "8B10B_MAX_LINK_RATE";
+		case 0x2202: return "MAX_LANE_COUNT";
+		case 0x2203: return "MAX_DOWNSPREAD";
+		case 0x2204: return "NORP/DP_PWR_VOLTAGE_CAP";
+		case 0x2205: return "DOWN_STREAM_PORT_PRESENT";
+		case 0x2206: return "MAIN_LINK_CHANNEL_CODING_CAP";
+		case 0x2207: return "DOWN_STREAM_PORT_COUNT";
+		case 0x2208: return "RECEIVE_PORT0_CAP_0";
+		case 0x2209: return "RECEIVE_PORT0_CAP_1";
+		case 0x220a: return "RECEIVE_PORT1_CAP_0";
+		case 0x220b: return "RECEIVE_PORT1_CAP_1";
+		case 0x220c: return "I2C capabilities";
+		case 0x220d: return "eDP_CONFIGURATION_CAP";
+		case 0x220e: return "8B10B_TRAINING_AUX_RD_INTERVAL";
+		case 0x220f: return "ADAPTER_CAP";
+		case 0x2210: return "DPRX_FEATURE_ENUMERATION_LIST";
+		case 0x2211: return "EXTENDED_DPRX_SLEEP_WAKE_TIMEOUT_REQUEST";
+		case 0x2212: return "VSC_EXT_VESA_SDP_MAX_CHAINING";
+		case 0x2213: return "VSC_EXT_CTA_SDP_MAX_CHAINING";
+
+		case 0xf0000: return "LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV";
+		case 0xf0001: return "8B10B_MAX_LINK_RATE_PHY_REPEATER";
+		case 0xf0002: return "PHY_REPEATER_CNT";
+		case 0xf0003: return "PHY_REPEATER_MODE";
+		case 0xf0004: return "MAX_LANE_COUNT_PHY_REPEATER";
+		case 0xf0005: return "PHY_REPEATER_EXTENDED_WAKE_TIMEOUT";
+		case 0xf0006: return "MAIN_CHANNEL_CODING_PHY_REPEATER";
+		case 0xf0007: return "PHY_REPEATER_128B/132B_RATES";
+
+		default:
+			return "";
+	}
 }
 
 bool DPAuxChannelDecoder::FindFallingEdge(size_t& i, UniformAnalogWaveform* cap)

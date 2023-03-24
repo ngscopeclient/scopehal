@@ -98,6 +98,8 @@ protected:
 	bool FindFallingEdge(size_t& i, UniformAnalogWaveform* cap);
 	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* cap);
 
+	std::string DecodeRegisterName(uint32_t nreg);
+
 	bool FindEdge(size_t& i, UniformAnalogWaveform* cap, bool polarity)
 	{
 		if(polarity)
