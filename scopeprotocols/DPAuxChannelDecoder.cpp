@@ -28,7 +28,6 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "EthernetProtocolDecoder.h"
 #include "DPAuxChannelDecoder.h"
 
 using namespace std;
@@ -71,7 +70,10 @@ bool DPAuxChannelDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 vector<string> DPAuxChannelDecoder::GetHeaders()
 {
 	vector<string> ret;
-	ret.push_back("Direction");
+	ret.push_back("Type");
+	ret.push_back("Address");
+	ret.push_back("Length");
+	ret.push_back("Info");
 	return ret;
 }
 
@@ -108,6 +110,10 @@ void DPAuxChannelDecoder::Refresh()
 	const int64_t sync_width_max = 3e9;
 	const int64_t sync_width_min = 1.75e9;
 
+	bool packetIsRequest = true;
+
+	Packet* pack = nullptr;
+
 	size_t i = 0;
 	bool done = false;
 	while(i < len)
@@ -136,18 +142,25 @@ void DPAuxChannelDecoder::Refresh()
 			FRAME_ADDR_LO,
 			FRAME_PAYLOAD,
 			FRAME_LEN,
+			FRAME_REPLY,
+			FRAME_REPLY_PAD,
 			FRAME_END_1,
 			FRAME_END_2
 		} frame_state = FRAME_PREAMBLE_0;
 
 		//Recover the Manchester bitstream
 		bool current_state = false;
+		bool last_was_i2c = false;
 		int64_t ui_start = GetOffsetScaled(din, i);
 		int64_t symbol_start = i;
 		int64_t last_edge = i;
 		int64_t last_edge2 = i;
 		uint32_t addr_hi = 0;
 		LogTrace("[T = %s] Found initial falling edge\n", Unit(Unit::UNIT_FS).PrettyPrint(ui_start).c_str());
+		pack = new Packet;
+		m_packets.push_back(pack);
+		pack->m_offset = ui_start;
+		pack->m_len = 0;
 		while(i < len)
 		{
 			//When we get here, i points to the start of our UI
@@ -201,7 +214,18 @@ void DPAuxChannelDecoder::Refresh()
 							if(!current_state)
 							{
 								good = true;
-								frame_state = FRAME_COMMAND;
+
+								if(packetIsRequest)
+									frame_state = FRAME_COMMAND;
+								else
+									frame_state = FRAME_REPLY;
+
+								//See how long the sync pulse was
+								//We nominally want it to be 2us.
+								//If it's closer to 2.5us, then the first half-bit of the payload must be included
+								//in this pulse
+								if(delta > 2.25e9)
+									i -= ui_halfwidth / din->m_timescale;
 
 								//Add the symbol
 								cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_SYNC));
@@ -254,6 +278,8 @@ void DPAuxChannelDecoder::Refresh()
 					//TODO: add a "return to differential zero" detector to do this more robustly?
 					i += 3 * ui_width / din->m_timescale;
 
+					packetIsRequest = !packetIsRequest;
+
 					break;
 				}
 				else
@@ -271,7 +297,7 @@ void DPAuxChannelDecoder::Refresh()
 			current_byte = (current_byte << 1) | current_state;
 			bitcount ++;
 
-			//Command and addr hi are only 4 bits long
+			//Command, reply, and addr hi are only 4 bits long
 			bool symbolDone = false;
 			if(bitcount == 4)
 			{
@@ -283,11 +309,19 @@ void DPAuxChannelDecoder::Refresh()
 						cap->m_durations.push_back(i - symbol_start);
 						symbol_start = i;
 
+						if( (current_byte & 3) == 0)
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
+						else
+							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+
 						current_byte = 0;
 						bitcount = 0;
 
+						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
+
 						//Assume it's a native DP command for now, do I2C later?
 						frame_state = FRAME_ADDR_HI;
+						last_was_i2c = false;
 						symbolDone = true;
 						break;
 
@@ -299,6 +333,38 @@ void DPAuxChannelDecoder::Refresh()
 						bitcount = 0;
 
 						frame_state = FRAME_ADDR_MID;
+						symbolDone = true;
+						break;
+
+					case FRAME_REPLY:
+						if(last_was_i2c)
+							cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_REPLY, current_byte));
+						else
+							cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_AUX_REPLY, current_byte));
+						cap->m_offsets.push_back(symbol_start);
+						cap->m_durations.push_back(i - symbol_start);
+						symbol_start = i;
+
+						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
+
+						current_byte = 0;
+						bitcount = 0;
+
+						frame_state = FRAME_REPLY_PAD;
+						symbolDone = true;
+						break;
+
+					case FRAME_REPLY_PAD:
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_PAD));
+						cap->m_offsets.push_back(symbol_start);
+						cap->m_durations.push_back(i - symbol_start);
+						symbol_start = i;
+
+						current_byte = 0;
+						bitcount = 0;
+
+						frame_state = FRAME_PAYLOAD;
 						symbolDone = true;
 						break;
 
@@ -319,6 +385,8 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_ADDR_LO:
+						pack->m_headers["Address"] = to_string_hex((addr_hi << 8) | current_byte);
+
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_ADDRESS, (addr_hi << 8) | current_byte));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
@@ -329,12 +397,22 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_LEN:
+						pack->m_headers["Length"] = to_string(current_byte + 1);
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_LEN, current_byte));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
 						symbol_start = i;
 
 						frame_state = FRAME_PAYLOAD;
+						symbolDone = true;
+						break;
+
+					case FRAME_PAYLOAD:
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_DATA, current_byte));
+						cap->m_offsets.push_back(symbol_start);
+						cap->m_durations.push_back(i - symbol_start);
+						symbol_start = i;
+
 						symbolDone = true;
 						break;
 
@@ -450,19 +528,20 @@ string DPAuxWaveform::GetColor(size_t i)
 		case DPAuxSymbol::TYPE_PREAMBLE:
 		case DPAuxSymbol::TYPE_SYNC:
 		case DPAuxSymbol::TYPE_STOP:
+		case DPAuxSymbol::TYPE_PAD:
 			return StandardColors::colors[StandardColors::COLOR_PREAMBLE];
 
 		case DPAuxSymbol::TYPE_COMMAND:
+		case DPAuxSymbol::TYPE_AUX_REPLY:
+		case DPAuxSymbol::TYPE_I2C_REPLY:
 		case DPAuxSymbol::TYPE_LEN:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case DPAuxSymbol::TYPE_ADDRESS:
 			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
-		/*
 		case DPAuxSymbol::TYPE_DATA:
 			return StandardColors::colors[StandardColors::COLOR_DATA];
-		*/
 
 		default:
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
@@ -482,11 +561,48 @@ string DPAuxWaveform::GetText(size_t i)
 		case DPAuxSymbol::TYPE_PREAMBLE:
 			return "PREAMBLE";
 
+		case DPAuxSymbol::TYPE_PAD:
+			return "PAD";
+
 		case DPAuxSymbol::TYPE_SYNC:
 			return "SYNC";
 
 		case DPAuxSymbol::TYPE_STOP:
 			return "STOP";
+
+		case DPAuxSymbol::TYPE_AUX_REPLY:
+			switch(s.m_data & 3)
+			{
+				case 0:
+					return "AUX_ACK";
+
+				case 1:
+					return "AUX_NACK";
+
+				case 2:
+					return "AUX_DEFER";
+
+				case 3:
+				default:
+					return "RESERVED";
+			}
+		case DPAuxSymbol::TYPE_I2C_REPLY:
+			switch((s.m_data >> 2) & 3)
+			{
+				case 0:
+					return "I2C_ACK";
+
+				case 1:
+					return "I2C_NACK";
+
+				case 2:
+					return "I2C_DEFER";
+
+				case 3:
+				default:
+					return "RESERVED";
+			}
+			break;
 
 		case DPAuxSymbol::TYPE_COMMAND:
 
@@ -536,17 +652,16 @@ string DPAuxWaveform::GetText(size_t i)
 			break;
 
 		case DPAuxSymbol::TYPE_LEN:
-			snprintf(tmp, sizeof(tmp), "Len: %d", s.m_data);
+			snprintf(tmp, sizeof(tmp), "Len: %d", s.m_data + 1);	//length is offset by one since len=0 makes no sense
 			break;
 
 		case DPAuxSymbol::TYPE_ADDRESS:
 			snprintf(tmp, sizeof(tmp), "Addr: %06x", s.m_data);
 			break;
-			/*
+
 		case DPAuxSymbol::TYPE_DATA:
 			snprintf(tmp, sizeof(tmp), "%02x", s.m_data);
 			break;
-			*/
 	}
 	return string(tmp);
 }

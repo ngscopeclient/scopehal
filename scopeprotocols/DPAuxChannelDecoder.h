@@ -35,6 +35,8 @@
 #ifndef DPAuxChannelDecoder_h
 #define DPAuxChannelDecoder_h
 
+#include "../scopehal/PacketDecoder.h"
+
 class DPAuxSymbol
 {
 public:
@@ -46,6 +48,10 @@ public:
 		TYPE_COMMAND,
 		TYPE_ADDRESS,
 		TYPE_LEN,
+		TYPE_PAD,
+		TYPE_AUX_REPLY,
+		TYPE_I2C_REPLY,
+		TYPE_DATA,
 		TYPE_STOP
 	};
 
