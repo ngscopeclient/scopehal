@@ -48,3 +48,54 @@ FunctionGeneratorChannel::FunctionGeneratorChannel(
 FunctionGeneratorChannel::~FunctionGeneratorChannel()
 {
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input processing
+
+bool FunctionGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+/*
+	if(i >= 1)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;*/
+
+	return false;
+}
+
+
+void FunctionGeneratorChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	/*
+	auto setPointIn = GetInput(0);
+	if(setPointIn)
+	{
+		//Validate that set point has the correct units
+		Unit expectedUnit(Unit::UNIT_COUNTS);
+		switch(m_load->GetLoadMode(m_index))
+		{
+			case Load::MODE_CONSTANT_CURRENT:
+				expectedUnit = Unit(Unit::UNIT_AMPS);
+				break;
+
+			case Load::MODE_CONSTANT_VOLTAGE:
+				expectedUnit = Unit(Unit::UNIT_VOLTS);
+				break;
+
+			case Load::MODE_CONSTANT_POWER:
+				expectedUnit = Unit(Unit::UNIT_WATTS);
+				break;
+
+			case Load::MODE_CONSTANT_RESISTANCE:
+				expectedUnit = Unit(Unit::UNIT_OHMS);
+				break;
+		}
+
+		if(expectedUnit == setPointIn.GetYAxisUnits())
+			m_load->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
+	}
+	*/
+}
