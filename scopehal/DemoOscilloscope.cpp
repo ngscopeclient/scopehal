@@ -182,7 +182,7 @@ bool DemoOscilloscope::IsTriggerArmed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void DemoOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
+void DemoOscilloscope::LoadConfiguration(int version, const YAML::Node& node, IDTable& table)
 {
 	//Load the channels
 	auto& chans = node["channels"];
@@ -219,7 +219,7 @@ void DemoOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	}
 
 	//Call the base class to configure everything
-	Oscilloscope::LoadConfiguration(node, table);
+	Oscilloscope::LoadConfiguration(version, node, table);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
