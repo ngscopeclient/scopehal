@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,7 +27,7 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
 #include "AreaMeasurement.h"
 
 using namespace std;
@@ -135,7 +135,7 @@ void AreaMeasurement::Refresh()
 			//Perform summation using Kahan Summation Algorithm. Use volatile to prevent optimizations
 			for (size_t i = 0; i < length; i++)
 			{
-				float y = (((area_type == TRUE_AREA) ? sadin->m_samples[i] : fabs(sadin->m_samples[i])) * sadin->m_durations[i] 
+				float y = (((area_type == TRUE_AREA) ? sadin->m_samples[i] : fabs(sadin->m_samples[i])) * sadin->m_durations[i]
 																										* din->m_timescale) - c;
 				volatile float t = area + y;
 				volatile float z = t - area;

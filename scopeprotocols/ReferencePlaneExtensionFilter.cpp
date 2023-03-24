@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -32,7 +32,9 @@
 	@author Andrew D. Zonenberg
 	@brief Implementation of ReferencePlaneExtensionFilter
  */
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "SParameterFilter.h"
+#include "ReferencePlaneExtensionFilter.h"
 
 using namespace std;
 
