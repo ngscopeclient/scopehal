@@ -105,7 +105,7 @@ public:
 	virtual AnalogBank GetAnalogBank(size_t channel);
 
 	virtual unsigned int GetInstrumentTypes();
-	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
+	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
 protected:
 

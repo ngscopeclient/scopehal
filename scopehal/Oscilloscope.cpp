@@ -331,7 +331,7 @@ YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 	return scope;
 }
 
-void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
+void Oscilloscope::LoadConfiguration(int version, const YAML::Node& node, IDTable& table)
 {
 	m_nickname = node["nick"].as<string>();
 
@@ -449,7 +449,12 @@ void Oscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	if(CanInterleave())
 	{
 		if(node["interleave"])
-			SetInterleaving(node["interleave"].as<bool>());
+		{
+			if (version == 0)
+				SetInterleaving(node["interleave"].as<int>() == 1);
+			else
+				SetInterleaving(node["interleave"].as<bool>());
+		}
 	}
 	if(node["rate"])
 		SetSampleRate(node["rate"].as<unsigned long>());

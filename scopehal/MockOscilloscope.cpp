@@ -160,7 +160,7 @@ bool MockOscilloscope::IsTriggerArmed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void MockOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
+void MockOscilloscope::LoadConfiguration(int version, const YAML::Node& node, IDTable& table)
 {
 	//Load the channels
 	auto& chans = node["channels"];
@@ -198,7 +198,7 @@ void MockOscilloscope::LoadConfiguration(const YAML::Node& node, IDTable& table)
 	}
 
 	//Call the base class to configure everything
-	Oscilloscope::LoadConfiguration(node, table);
+	Oscilloscope::LoadConfiguration(version, node, table);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
