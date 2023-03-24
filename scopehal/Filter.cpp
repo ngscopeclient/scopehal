@@ -693,6 +693,43 @@ void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edg
 	}
 }
 
+/**
+	@brief Find peaks in a waveform
+ */
+void Filter::FindPeaks(UniformAnalogWaveform* data, vector<int64_t>& peaks)
+{
+	auto len = data->size();
+
+	//Threshold first difference signal in digital format, to extract falling edges later on
+	//These falling edges will correspond to peaks in the input signal
+	auto thresh_diff = new UniformDigitalWaveform;
+	thresh_diff->m_startTimestamp = data->m_startTimestamp;
+	thresh_diff->m_startFemtoseconds = data->m_startFemtoseconds;
+	thresh_diff->m_triggerPhase = data->m_triggerPhase;
+	thresh_diff->m_timescale = data->m_timescale;
+	thresh_diff->Resize(len);
+
+	float* fin = (float*)__builtin_assume_aligned(data->m_samples.GetCpuPointer(), 16);
+
+	bool cur = false;
+
+	// Threshold the first difference of signal to get a digital signal
+	for(size_t i = 1; i < len; i++)
+	{
+		float f = fin[i] - fin[i - 1];
+
+		if(f < 0.0f)
+			cur = false;
+		else if(f > 0.0f)
+			cur = true;
+
+		thresh_diff->m_samples[i-1] = cur;
+	}
+
+	// Get falling edges. These falling edges will correspond to peaks in the input signal
+	FindFallingEdges(NULL, thresh_diff, peaks);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Evaluation
 

@@ -102,71 +102,29 @@ void FullWidthHalfMax::Refresh()
 	vector<float> din_norm;
 	din_norm.resize(len);
 
-	//Vector to store first difference of input signal
-	vector<float> first_diff;
-	first_diff.resize(len);
-
-	//Threshold first difference signal in digital format, to extract falling edges later on
-	//These falling edges will correspond to peaks in the input signal
-	auto thresh_diff = new UniformDigitalWaveform;
-	thresh_diff->m_startTimestamp = din->m_startTimestamp;
-	thresh_diff->m_startFemtoseconds = din->m_startFemtoseconds;
-	thresh_diff->m_triggerPhase = din->m_triggerPhase;
-	thresh_diff->m_timescale = din->m_timescale;
-	thresh_diff->Resize(len);
-
 	float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
 
-	#pragma omp parallel
-	#pragma omp single nowait
-	{			
-		#pragma omp task
-		{
-			// Normalize the input signal to have all positive values
-			for(size_t i = 0; i < len; i++)
-				din_norm[i] = fin[i] - min_voltage;
-		}
-
-		#pragma omp task
-		{
-			// Calculate the first difference of normalized input signal
-			for(size_t i = 1; i < len; i++)
-				first_diff[i - 1] = fin[i] - fin[i - 1];
-		}
-	}
-
-	// Threshold the first difference vector to get a digital signal
-	bool cur = first_diff[0] > 0.0f;
-
+	// Normalize the input signal to have all positive values
 	for(size_t i = 0; i < len; i++)
-	{
-		float f = first_diff[i];
-
-		if(cur && (f < 0.0f))
-			cur = false;
-		else if(!cur && (f > 0.0f))
-			cur = true;
-
-		thresh_diff->m_samples[i] = cur;
-	}
+		din_norm[i] = fin[i] - min_voltage;
 
 	//Vector to store falling edges
-	vector<int64_t> falling_edges;
+	vector<int64_t> peaks;
 
-	// Get falling edges. These falling edges will correspond to peaks in the input signal
-	FindFallingEdges(NULL, thresh_diff, falling_edges);
+	// Get peaks
+	FindPeaks(uniform, peaks);
 
-	// Get the number of falling edges
-	size_t num_of_edges = falling_edges.size();
+	// Get the number of peaks
+	size_t num_of_peaks = peaks.size();
 
 	int64_t sum_half_widths = 0;
 
 	// Calculate and store the full width at half maximum and amplitude for all peaks
-	for(size_t i = 0; i < num_of_edges; i++)
+	for(size_t i = 0; i < num_of_peaks; i++)
 	{
 		size_t j;
 		int64_t width = 0;
-		int64_t index = falling_edges[i] / din->m_timescale;
+		int64_t index = peaks[i] / din->m_timescale;
 		float half_max = din_norm[index] / 2;
 
 		// Calculate the distance from the peak to its half maximum on x-axis in forward direction
@@ -203,5 +161,5 @@ void FullWidthHalfMax::Refresh()
 	cap->MarkModifiedFromCpu();
 	cap1->MarkModifiedFromCpu();
 
-	m_streams[2].m_value = (float) sum_half_widths / num_of_edges;
+	m_streams[2].m_value = (float) sum_half_widths / num_of_peaks;
 }

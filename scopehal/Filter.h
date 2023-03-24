@@ -1000,6 +1000,7 @@ public:
 	static void FindRisingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindPeaks(UniformAnalogWaveform* data, std::vector<int64_t>& edges);
 
 	static void FindZeroCrossingsBase(WaveformBase* data, float threshold, std::vector<int64_t>& edges)
 	{
