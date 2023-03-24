@@ -32,6 +32,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DivideFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
+	DPAuxChannelDecoder.cpp
 	DPhyDataDecoder.cpp
 	DPhyEscapeModeDecoder.cpp
 	DPhyHSClockRecoveryFilter.cpp

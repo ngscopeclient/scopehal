@@ -69,6 +69,7 @@
 #include "DivideFilter.h"
 #include "DownconvertFilter.h"
 #include "DownsampleFilter.h"
+#include "DPAuxChannelDecoder.h"
 #include "DPhyDataDecoder.h"
 #include "DPhyEscapeModeDecoder.h"
 #include "DPhyHSClockRecoveryFilter.h"
