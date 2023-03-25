@@ -120,6 +120,7 @@ void DPAuxChannelDecoder::Refresh()
 	bool done = false;
 	uint32_t request_addr = 0;
 	bool last_was_i2c = false;
+	bool last_i2c_was_write = false;
 	while(i < len)
 	{
 		if(done)
@@ -148,6 +149,9 @@ void DPAuxChannelDecoder::Refresh()
 			FRAME_LEN,
 			FRAME_REPLY,
 			FRAME_REPLY_PAD,
+			FRAME_I2C_PAD1,
+			FRAME_I2C_PAD2,
+			FRAME_I2C_ADDR,
 			FRAME_END_1,
 			FRAME_END_2
 		} frame_state = FRAME_PREAMBLE_0;
@@ -325,15 +329,30 @@ void DPAuxChannelDecoder::Refresh()
 						else
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_READ];
 
-						current_byte = 0;
-						bitcount = 0;
-
 						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
 
-						//Assume it's a native DP command for now, do I2C later?
-						frame_state = FRAME_ADDR_HI;
-						last_was_i2c = false;
+						//native DP command
+						if(current_byte & 0x8)
+						{
+							frame_state = FRAME_ADDR_HI;
+							last_was_i2c = false;
+						}
+						else
+						{
+							frame_state = FRAME_I2C_PAD1;
+							last_i2c_was_write = ((current_byte & 0x3) == 0);
+							last_was_i2c = true;
+						}
+
 						symbolDone = true;
+						current_byte = 0;
+						bitcount = 0;
+						break;
+
+					case FRAME_I2C_PAD1:
+						current_byte = 0;
+						bitcount = 0;
+						frame_state = FRAME_I2C_PAD2;
 						break;
 
 					case FRAME_ADDR_HI:
@@ -397,6 +416,16 @@ void DPAuxChannelDecoder::Refresh()
 						frame_state = FRAME_ADDR_LO;
 						break;
 
+					case FRAME_I2C_PAD2:
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_PAD));
+						cap->m_offsets.push_back(symbol_start);
+						cap->m_durations.push_back(i - symbol_start);
+						symbol_start = i;
+
+						frame_state = FRAME_I2C_ADDR;
+						symbolDone = true;
+						break;
+
 					case FRAME_ADDR_LO:
 						addr_hi = (addr_hi << 8) | current_byte;
 						request_addr = addr_hi;
@@ -411,6 +440,24 @@ void DPAuxChannelDecoder::Refresh()
 						symbol_start = i;
 
 						frame_state = FRAME_LEN;
+						symbolDone = true;
+						break;
+
+					case FRAME_I2C_ADDR:
+						request_addr = current_byte;
+
+						snprintf(tmp, sizeof(tmp), "%05x", current_byte);
+						pack->m_headers["Address"] = tmp;
+
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_ADDRESS, current_byte));
+						cap->m_offsets.push_back(symbol_start);
+						cap->m_durations.push_back(i - symbol_start);
+						symbol_start = i;
+
+						if(last_i2c_was_write)
+							frame_state = FRAME_PAYLOAD;
+						else
+							frame_state = FRAME_LEN;
 						symbolDone = true;
 						break;
 
@@ -573,6 +620,8 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x006f: return "DSC_MAX_BPP_DELTA_AND_BPP_INCREMENT";
 		case 0x0080: return "DPFX_CAP";
 
+		case 0x0090: return "FEC_CAPABILITY_0";
+
 		case 0x00b0: return "Panel replay capability supported";
 
 		case 0x0100: return "LINK_BW_SET";
@@ -590,6 +639,14 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x010c: return "LINK_QUAL_LANE1_SET";
 		case 0x010d: return "LINK_QUAL_LANE2_SET";
 		case 0x010e: return "LINK_QUAL_LANE3_SET";
+
+		case 0x0111: return "MSTM_CTRL";
+
+		case 0x0202: return "LANE0_1_STATUS";
+		case 0x0203: return "LANE2_3_STATUS";
+		case 0x0204: return "LANE_ALIGN_STATUS_UPDATED";
+		case 0x0206: return "ADJUST_REQUEST_LANE0_1";
+		case 0x0207: return "ADJUST_REQUEST_LANE2_3";
 
 		case 0x0300: return "Source IEEE_OUI[0]";
 		case 0x0301: return "Source IEEE_OUI[1]";
@@ -616,6 +673,8 @@ string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
 		case 0x0509: return "Branch Hardware Revision";
 		case 0x050a: return "Branch Firmware/Software Major Revision";
 		case 0x050b: return "Branch Firmware/Software Minor Revision";
+
+		case 0x600: return "SET_POWER / SET_DP_PWR_VOLTAGE";
 
 		case 0x2000: return "RESERVED";
 		case 0x2001: return "RESERVED";
@@ -719,6 +778,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				break;
 
 			//8B10B_TRAINING_AUX_RD_INTERVAL
+			case 0x0000e:
 			case 0x0220e:
 				if(data[i] & 0x80)
 					out = "Extended RX capability field present\n";
@@ -1016,32 +1076,160 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				{
 					memset(tmp, 0, sizeof(tmp));
 					memcpy(tmp, &data[i], 6);
-					out += string("Device ID ") + tmp;
+					out += string("Source Device ID ") + tmp;
 					fieldsize = 6;
 				}
 				else
 				{
-					snprintf(tmp, sizeof(tmp), "Device ID[0] = %02X\n", data[i]);
+					snprintf(tmp, sizeof(tmp), "Source Device ID[0] = %02X\n", data[i]);
 					out += tmp;
 				}
 
 				break;
 
-
 			//Hardware revision
 			case 0x309:
-				out += string("Hardware rev ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				out += string("Source hardware rev ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
 				break;
 
 			//Firmware revision
 			case 0x30a:
 				if(data.size() >= i+1)
 				{
-					out += string("Firmware rev ") + to_string(data[i]) + "." + to_string(data[i+1]);
+					out += string("Source firmware rev ") + to_string(data[i]) + "." + to_string(data[i+1]);
 					fieldsize = 2;
 				}
 				else
-					out += string("Firmware major rev ") + to_string(data[i]);
+					out += string("Source firmware major rev ") + to_string(data[i]);
+				break;
+
+			//Branch IEEE_OUI
+			case 0x500:
+				if(data.size() >= i+3)
+				{
+					snprintf(tmp, sizeof(tmp), "Branch OUI %02X-%02X-%02X", data[i], data[i+1], data[i+2]);
+					out += tmp;
+					fieldsize = 3;
+				}
+				else
+				{
+					snprintf(tmp, sizeof(tmp), "Branch OUI[0] = %02X", data[i]);
+					out += tmp;
+				}
+				break;
+
+			//Device ID string
+			case 0x503:
+				if(data.size() >= i+6)
+				{
+					memset(tmp, 0, sizeof(tmp));
+					memcpy(tmp, &data[i], 6);
+					out += string("Branch Device ID ") + tmp;
+					fieldsize = 6;
+				}
+				else
+				{
+					snprintf(tmp, sizeof(tmp), "Branch Device ID[0] = %02X\n", data[i]);
+					out += tmp;
+				}
+
+				break;
+
+			//Hardware revision
+			case 0x509:
+				out += string("Branch hardware rev ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				break;
+
+			//Firmware revision
+			case 0x50a:
+				if(data.size() >= i+1)
+				{
+					out += string("Branch firmware rev ") + to_string(data[i]) + "." + to_string(data[i+1]);
+					fieldsize = 2;
+				}
+				else
+					out += string("Branch firmware major rev ") + to_string(data[i]);
+				break;
+
+
+			//SINK_COUNT_ESI
+			case 0x2002:
+				out += string("Sink count: ") + to_string(data[i] & 0x3f);
+				break;
+
+			//LINK_SERVICE_IRQ_VECTOR_ESI0
+			case 0x2005:
+				if(data[i] & 1)
+					out += "RX_CAP_CHANGED\n";
+				if(data[i] & 2)
+					out += "LINK_STATUS_CHANGED\n";
+				if(data[i] & 4)
+					out += "STREAM_STATUS_CHANGED\n";
+				if(data[i] & 8)
+					out += "HDMI_LINK_STATUS_CHANGED\n";
+				if(data[i] & 0x10)
+					out += "CONNECTED_OFF_ENTRY_REQUESTED\n";
+				break;
+
+			//LANE0_1_STATUS_ESI
+			//LANE2_3_STATUS_ESI
+			case 0x200c:
+			case 0x200d:
+				out += string("Lane ") + to_string( (start_addr - 0x200c)*2) + ":\n";
+				if(data[i] & 0x1)
+					out += "    CR done\n";
+				else
+					out += "    CR not done\n";
+
+				if(data[i] & 0x2)
+					out += "    EQ done\n";
+				else
+					out += "    EQ not done\n";
+
+				if(data[i] & 0x4)
+					out += "    Symbol locked\n";
+				else
+					out += "    No symbol lock\n";
+
+				out += string("Lane ") + to_string( (start_addr - 0x200c)*2 + 1) + ":\n";
+				if(data[i] & 0x10)
+					out += "    CR done\n";
+				else
+					out += "    CR not done\n";
+
+				if(data[i] & 0x20)
+					out += "    EQ done\n";
+				else
+					out += "    EQ not done\n";
+
+				if(data[i] & 0x40)
+					out += "    Symbol locked";
+				else
+					out += "    No symbol lock";
+				break;
+
+			//LANE_ALIGN_STATUS_UPDATED_ESI
+			case 0x200e:
+				if(data[i] & 0x1)
+					out += "Inter-lane align done\n";
+				else
+					out += "Inter-lane align not done\n";
+
+				if(data[i] & 0x2)
+					out += "Post-LT adjust in progress\n";
+				else
+					out += "No post-LT adjust in progress\n";
+
+				if(data[i] & 0x40)
+					out += "Downstream port status changed\n";
+				else
+					out += "No downstream port status change\n";
+
+				if(data[i] & 0x80)
+					out += "Link status updated";
+				else
+					out += "Link status not updated";
+
 				break;
 
 			//8B10B_MAX_LINK_RATE (extended)
@@ -1083,9 +1271,9 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 					out += "Not 5V power capable\n";
 
 				if(data[i] & 0x40)
-					out += "12V power capable";
+					out += "12V power capable\n";
 				else
-					out += "Not 12V power capable";
+					out += "Not 12V power capable\n";
 
 				if(data[i] & 0x80)
 					out += "18V power capable";
@@ -1284,31 +1472,53 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 	return ret;
 }
 
-bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* /*cur*/, Packet* next)
+bool DPAuxChannelDecoder::CanMerge(Packet* first, Packet* cur, Packet* next)
 {
 	//Merge reads and writes with their completions
 	if( (first->m_headers["Type"] == "DP Read") && (next->m_headers["Type"] == "AUX_ACK") )
 		return true;
-	if( (first->m_headers["Type"] == "DP Write") && (next->m_headers["Type"] == "AUX_ACK") )
+	if( (first->m_headers["Type"] == "DP Write") &&
+		( (next->m_headers["Type"] == "AUX_ACK") || (next->m_headers["Type"] == "AUX_NACK") ) )
+	{
 		return true;
+	}
+
+	//Merge I2C reads and writes with ACKs
+	if( (first->m_headers["Type"].find("I2C Write") == 0) && (next->m_headers["Type"] == "I2C_ACK") )
+		return true;
+	if( (first->m_headers["Type"].find("I2C Read") == 0) && (next->m_headers["Type"] == "I2C_ACK") )
+		return true;
+
+	//Merge Read MOT with any subsequent Read MOT or ACK using the same address
+	if( (first->m_headers["Type"] == "I2C Read MOT") &&
+		( (next->m_headers["Type"] == "I2C Read MOT") || (next->m_headers["Type"] == "I2C_ACK") ) &&
+		(first->m_headers["Address"] == next->m_headers["Address"]) )
+	{
+		//Do not merge anything new if the current packet has data
+		if( (cur != first) && (!cur->m_data.empty()) )
+			return false;
+
+		return true;
+	}
 
 	return false;
 }
 
 Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 {
+	//Default passthrough of first packet
+	Packet* ret = new Packet;
+	ret->m_offset = pack->m_offset;
+	ret->m_len = pack->m_len;
+	ret->m_headers["Type"] = pack->m_headers["Type"];
+	ret->m_headers["Address"] = pack->m_headers["Address"];
+	ret->m_headers["Length"] = pack->m_headers["Length"];
+	ret->m_headers["Info"] = pack->m_headers["Info"];
+	ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
+
 	//Combine DP read with completion
 	if(pack->m_headers["Type"] == "DP Read")
 	{
-		Packet* ret = new Packet;
-		ret->m_offset = pack->m_offset;
-		ret->m_len = pack->m_len;
-		ret->m_headers["Type"] = pack->m_headers["Type"];
-		ret->m_headers["Address"] = pack->m_headers["Address"];
-		ret->m_headers["Length"] = pack->m_headers["Length"];
-		ret->m_headers["Info"] = pack->m_headers["Info"];
-		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
-
 		//Add data from reply, if available
 		if(i+1 < m_packets.size())
 		{
@@ -1320,21 +1530,11 @@ Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			if(!info.empty())
 				ret->m_headers["Info"] += "\n" + info;
 		}
-
-		return ret;
 	}
 
 	//Combine DP write with completion
 	if(pack->m_headers["Type"] == "DP Write")
 	{
-		Packet* ret = new Packet;
-		ret->m_offset = pack->m_offset;
-		ret->m_len = pack->m_len;
-		ret->m_headers["Type"] = pack->m_headers["Type"];
-		ret->m_headers["Address"] = pack->m_headers["Address"];
-		ret->m_headers["Length"] = pack->m_headers["Length"];
-		ret->m_headers["Info"] = pack->m_headers["Info"];
-		ret->m_displayBackgroundColor = pack->m_displayBackgroundColor;
 		ret->m_data = pack->m_data;
 
 		//Extend to reply
@@ -1343,11 +1543,61 @@ Packet* DPAuxChannelDecoder::CreateMergedHeader(Packet* pack, size_t i)
 			auto next = m_packets[i+1];
 			ret->m_len = next->m_offset + next->m_len - pack->m_offset;
 		}
-
-		return ret;
 	}
 
-	return NULL;
+	//Combine I2C read or write with ACK
+	if( (pack->m_headers["Type"].find("I2C Write") == 0) || (pack->m_headers["Type"].find("I2C Read") == 0) )
+	{
+		ret->m_data = pack->m_data;
+
+		//If not a MOT, stop after one
+		if(pack->m_headers["Type"].find("MOT") == string::npos)
+		{
+			if(i+1 < m_packets.size())
+			{
+				auto next = m_packets[i+1];
+				ret->m_len = next->m_offset + next->m_len - pack->m_offset;
+
+				//append the data, if any
+				for(auto d : next->m_data)
+					ret->m_data.push_back(d);
+			}
+		}
+
+		//If MOT, keep going as long as we find matches
+		else
+		{
+			//Remove the MOT flag from the top level packet
+			if(pack->m_headers["Type"] == "I2C Write MOT")
+				ret->m_headers["Type"] = "I2C Write";
+			else
+				ret->m_headers["Type"] = "I2C Read";
+
+			while(i+1 < m_packets.size())
+			{
+				//Not the same type or ACK? Stop
+				auto next = m_packets[i+1];
+				if( (pack->m_headers["Type"] != next->m_headers["Type"]) && (next->m_headers["Type"] != "I2C_ACK") )
+					break;
+				if(pack->m_headers["Address"] != next->m_headers["Address"])
+					break;
+
+				ret->m_len = next->m_offset + next->m_len - pack->m_offset;
+
+				//append the data, if any
+				for(auto d : next->m_data)
+					ret->m_data.push_back(d);
+
+				//If we had data, stop
+				if(next->m_data.size())
+					break;
+
+				i++;
+			}
+		}
+	}
+
+	return ret;
 }
 
 bool DPAuxChannelDecoder::FindFallingEdge(size_t& i, UniformAnalogWaveform* cap)
@@ -1409,6 +1659,7 @@ string DPAuxWaveform::GetColor(size_t i)
 			return StandardColors::colors[StandardColors::COLOR_CONTROL];
 
 		case DPAuxSymbol::TYPE_ADDRESS:
+		case DPAuxSymbol::TYPE_I2C_ADDRESS:
 			return StandardColors::colors[StandardColors::COLOR_ADDRESS];
 
 		case DPAuxSymbol::TYPE_DATA:
@@ -1497,8 +1748,6 @@ string DPAuxWaveform::GetText(size_t i)
 			else
 			{
 				string ret = "I2C ";
-				if(s.m_data & 0x4)
-					ret += "MOT ";
 
 				switch(s.m_data & 0x3)
 				{
@@ -1507,7 +1756,7 @@ string DPAuxWaveform::GetText(size_t i)
 						break;
 
 					case 1:
-						ret + "Read";
+						ret += "Read";
 						break;
 
 					case 2:
@@ -1518,6 +1767,9 @@ string DPAuxWaveform::GetText(size_t i)
 						ret += "RSVD";
 						break;
 				}
+
+				if(s.m_data & 0x4)
+					ret += " MOT";
 				return ret;
 			}
 			break;
@@ -1528,6 +1780,10 @@ string DPAuxWaveform::GetText(size_t i)
 
 		case DPAuxSymbol::TYPE_ADDRESS:
 			snprintf(tmp, sizeof(tmp), "Addr: %06x", s.m_data);
+			break;
+
+		case DPAuxSymbol::TYPE_I2C_ADDRESS:
+			snprintf(tmp, sizeof(tmp), "Addr: %02x", s.m_data);
 			break;
 
 		case DPAuxSymbol::TYPE_DATA:
