@@ -29,6 +29,7 @@
 
 #include "../scopehal/scopehal.h"
 #include "DPAuxChannelDecoder.h"
+#include "I2CDecoder.h"
 
 using namespace std;
 
@@ -41,6 +42,12 @@ DPAuxChannelDecoder::DPAuxChannelDecoder(const string& color)
 	, m_dfpType(DFP_TYPE_UNKNOWN)
 {
 	CreateInput("aux");
+
+	//Rename default output stream since we have several
+	m_signalNames[0] = "dpaux";
+
+	//Add a second output stream (in addition to the usual DP one) for I2C
+	AddProtocolStream("i2c");
 }
 
 DPAuxChannelDecoder::~DPAuxChannelDecoder()
@@ -102,6 +109,14 @@ void DPAuxChannelDecoder::Refresh()
 	cap->m_triggerPhase = din->m_triggerPhase;
 	cap->PrepareForCpuAccess();
 
+	//Create a second waveform for the tunneled I2C traffic
+	auto i2ccap = new I2CWaveform;
+	i2ccap->m_timescale = din->m_timescale;
+	i2ccap->m_startTimestamp = din->m_startTimestamp;
+	i2ccap->m_startFemtoseconds = din->m_startFemtoseconds;
+	i2ccap->m_triggerPhase = din->m_triggerPhase;
+	i2ccap->PrepareForCpuAccess();
+
 	const int64_t ui_width 		= 1e9;	//4.5e8
 	const int64_t ui_halfwidth 	= 5e8;
 	const int64_t jitter_tol 	= 2e8;
@@ -120,6 +135,10 @@ void DPAuxChannelDecoder::Refresh()
 	bool done = false;
 	uint32_t request_addr = 0;
 	bool last_was_i2c = false;
+	bool last_was_i2c_request = false;
+	bool last_i2c_was_write = false;
+	bool i2c_transaction_open = false;
+	bool i2c_address_sent = false;
 	while(i < len)
 	{
 		if(done)
@@ -277,9 +296,22 @@ void DPAuxChannelDecoder::Refresh()
 					LogTrace("Got valid sync pattern\n");
 				else if(frame_state == FRAME_END_1)
 				{
+					auto dur = i - symbol_start + 2*ui_width / din->m_timescale;
+
 					cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_STOP));
 					cap->m_offsets.push_back(symbol_start);
-					cap->m_durations.push_back(i - symbol_start + 2*ui_width / din->m_timescale);
+					cap->m_durations.push_back(dur);
+
+					if(last_was_i2c &&
+						(
+							(last_was_i2c_request && !i2c_transaction_open && last_i2c_was_write) ||
+							(!last_was_i2c_request && !i2c_transaction_open && !last_i2c_was_write)
+						))
+					{
+						i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_STOP, 0));
+						i2ccap->m_offsets.push_back(symbol_start);
+						i2ccap->m_durations.push_back(dur);
+					}
 
 					//move ahead two UIs to skip end of frame etc
 					//TODO: add a "return to differential zero" detector to do this more robustly?
@@ -321,7 +353,6 @@ void DPAuxChannelDecoder::Refresh()
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_COMMAND, current_byte));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
-						symbol_start = i;
 
 						if( (current_byte & 3) == 0)
 							pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_DATA_WRITE];
@@ -335,13 +366,54 @@ void DPAuxChannelDecoder::Refresh()
 						{
 							frame_state = FRAME_ADDR_HI;
 							last_was_i2c = false;
+							last_was_i2c_request = false;
 						}
 						else
 						{
+							//If we already have an open transaction, see whether we need to end it
+							bool this_is_write = (current_byte & 3) == 0;
+							if(i2c_transaction_open)
+							{
+								//Is this type the same?
+								if(this_is_write == last_i2c_was_write)
+								{
+									//No action needed
+								}
+
+								//Different type? Stop and restart
+								else
+								{
+									auto acklen = (ui_width / cap->m_timescale);
+									i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_STOP, 0));
+									i2ccap->m_offsets.push_back(symbol_start - acklen);
+									i2ccap->m_durations.push_back(acklen);
+
+									i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_START, 0));
+									i2ccap->m_offsets.push_back(symbol_start);
+									i2ccap->m_durations.push_back(i - symbol_start);
+
+									i2c_address_sent = false;
+								}
+							}
+							else
+							{
+								//Create an I2C start event
+								i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_START, 0));
+								i2ccap->m_offsets.push_back(symbol_start);
+								i2ccap->m_durations.push_back(i - symbol_start);
+
+								i2c_address_sent = false;
+							}
+
+							last_i2c_was_write = this_is_write;
+
 							frame_state = FRAME_I2C_PAD1;
 							last_was_i2c = true;
+							last_was_i2c_request = true;
+							i2c_transaction_open = (current_byte & 0x4) == 0x4;
 						}
 
+						symbol_start = i;
 						symbolDone = true;
 						current_byte = 0;
 						bitcount = 0;
@@ -364,6 +436,8 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_REPLY:
+						last_was_i2c_request = false;
+
 						if(last_was_i2c)
 							cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_REPLY, current_byte));
 						else
@@ -442,16 +516,35 @@ void DPAuxChannelDecoder::Refresh()
 						break;
 
 					case FRAME_I2C_ADDR:
-						request_addr = current_byte;
+						request_addr = current_byte << 1;	//shift left 1 bit to match scopehal left-aligned standard
 
-						snprintf(tmp, sizeof(tmp), "%05x", current_byte);
+						snprintf(tmp, sizeof(tmp), "%05x", request_addr);
 						pack->m_headers["Address"] = tmp;
 
-						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_ADDRESS, current_byte));
+						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_I2C_ADDRESS, request_addr));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
-						symbol_start = i;
 
+						if(!i2c_address_sent)
+						{
+							auto acklen = (ui_width / cap->m_timescale);
+
+							i2ccap->m_samples.push_back(I2CSymbol(
+								I2CSymbol::TYPE_ADDRESS,
+								request_addr | !last_i2c_was_write));
+							i2ccap->m_offsets.push_back(symbol_start);
+							i2ccap->m_durations.push_back(i - symbol_start - acklen);
+
+							//TODO: is there a better way to do this?
+							//(given that the other side hasn't ACKed us yet, we have to just guess what to put here)
+							i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ACK, 0));
+							i2ccap->m_offsets.push_back(i - acklen);
+							i2ccap->m_durations.push_back(acklen);
+
+							i2c_address_sent = true;
+						}
+
+						symbol_start = i;
 						frame_state = FRAME_LEN;
 						symbolDone = true;
 						break;
@@ -472,6 +565,22 @@ void DPAuxChannelDecoder::Refresh()
 						cap->m_samples.push_back(DPAuxSymbol(DPAuxSymbol::TYPE_DATA, current_byte));
 						cap->m_offsets.push_back(symbol_start);
 						cap->m_durations.push_back(i - symbol_start);
+
+						if(last_was_i2c)
+						{
+							auto acklen = (ui_width / cap->m_timescale);
+
+							i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_DATA, current_byte));
+							i2ccap->m_offsets.push_back(symbol_start);
+							i2ccap->m_durations.push_back(i - symbol_start - acklen);
+
+							//TODO: is there a better way to do this?
+							//(given that the other side hasn't ACKed us yet, we have to just guess what to put here)
+							i2ccap->m_samples.push_back(I2CSymbol(I2CSymbol::TYPE_ACK, 0));
+							i2ccap->m_offsets.push_back(i - acklen);
+							i2ccap->m_durations.push_back(acklen);
+						}
+
 						symbol_start = i;
 
 						symbolDone = true;
@@ -539,6 +648,9 @@ void DPAuxChannelDecoder::Refresh()
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
+
+	SetData(i2ccap, 1);
+	i2ccap->MarkModifiedFromCpu();
 }
 
 string DPAuxChannelDecoder::DecodeRegisterName(uint32_t nreg)
