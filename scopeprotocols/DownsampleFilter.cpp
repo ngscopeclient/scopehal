@@ -89,6 +89,12 @@ void DownsampleFilter::Refresh()
 
 	//Set up output waveform and get configuration
 	int64_t factor = m_parameters[m_factorname].GetIntVal();
+	if (factor == 0)
+	{
+		// Occurs momentarily while editing the value sometimes in glscopeclient
+		return;
+	}
+
 	size_t outlen = len / factor;
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->Resize(outlen);
