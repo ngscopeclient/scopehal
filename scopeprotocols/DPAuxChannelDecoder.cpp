@@ -120,7 +120,6 @@ void DPAuxChannelDecoder::Refresh()
 	bool done = false;
 	uint32_t request_addr = 0;
 	bool last_was_i2c = false;
-	bool last_i2c_was_write = false;
 	while(i < len)
 	{
 		if(done)
@@ -340,7 +339,6 @@ void DPAuxChannelDecoder::Refresh()
 						else
 						{
 							frame_state = FRAME_I2C_PAD1;
-							last_i2c_was_write = ((current_byte & 0x3) == 0);
 							last_was_i2c = true;
 						}
 
@@ -454,10 +452,7 @@ void DPAuxChannelDecoder::Refresh()
 						cap->m_durations.push_back(i - symbol_start);
 						symbol_start = i;
 
-						if(last_i2c_was_write)
-							frame_state = FRAME_PAYLOAD;
-						else
-							frame_state = FRAME_LEN;
+						frame_state = FRAME_LEN;
 						symbolDone = true;
 						break;
 
