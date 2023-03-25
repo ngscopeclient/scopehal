@@ -74,6 +74,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FIRFilter.cpp
 	FrequencyMeasurement.cpp
 	FSKDecoder.cpp
+	GlitchRemovalFilter.cpp
 	GroupDelayFilter.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp
