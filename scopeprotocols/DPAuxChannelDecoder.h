@@ -111,6 +111,24 @@ protected:
 		else
 			return FindFallingEdge(i, cap);
 	}
+
+	enum
+	{
+		CAP_FORMAT_1BYTE,
+		CAP_FORMAT_4BYTE,
+		CAP_FORMAT_UNKNOWN
+	} m_capFormat;
+
+	enum
+	{
+		DFP_TYPE_VGA,
+		DFP_TYPE_DVI,
+		DFP_TYPE_DP,
+		DFP_TYPE_HDMI,
+		DFP_TYPE_DP_PP,
+		DFP_TYPE_WIRELESS,
+		DFP_TYPE_UNKNOWN
+	} m_dfpType;
 };
 
 #endif

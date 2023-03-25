@@ -37,6 +37,8 @@ using namespace std;
 
 DPAuxChannelDecoder::DPAuxChannelDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
+	, m_capFormat(CAP_FORMAT_UNKNOWN)
+	, m_dfpType(DFP_TYPE_UNKNOWN)
 {
 	CreateInput("aux");
 }
@@ -342,7 +344,6 @@ void DPAuxChannelDecoder::Refresh()
 						bitcount = 0;
 
 						frame_state = FRAME_ADDR_MID;
-						symbolDone = true;
 						break;
 
 					case FRAME_REPLY:
@@ -355,7 +356,7 @@ void DPAuxChannelDecoder::Refresh()
 						symbol_start = i;
 
 						//Push the address from the previous request
-						snprintf(tmp, sizeof(tmp), "%06x", request_addr);
+						snprintf(tmp, sizeof(tmp), "%05x", request_addr);
 						pack->m_headers["Address"] = tmp;
 
 						pack->m_headers["Type"] = cap->GetText(cap->m_samples.size()-1);
@@ -394,14 +395,13 @@ void DPAuxChannelDecoder::Refresh()
 					case FRAME_ADDR_MID:
 						addr_hi = (addr_hi << 8) | current_byte;
 						frame_state = FRAME_ADDR_LO;
-						symbolDone = true;
 						break;
 
 					case FRAME_ADDR_LO:
 						addr_hi = (addr_hi << 8) | current_byte;
 						request_addr = addr_hi;
 
-						snprintf(tmp, sizeof(tmp), "%06x", addr_hi);
+						snprintf(tmp, sizeof(tmp), "%05x", addr_hi);
 						pack->m_headers["Address"] = tmp;
 						pack->m_headers["Info"] = DecodeRegisterName(addr_hi);
 
@@ -665,6 +665,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 {
 	size_t i = 0;
 	string ret = "";
+	char tmp[128];
 	while(i < data.size())
 	{
 		//Decode known register bitfields
@@ -672,13 +673,15 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 		size_t fieldsize = 1;
 		switch(start_addr)
 		{
-			//DCPD_REV
+			//DCPD_REV (and extended)
 			case 0x00000:
+			case 0x02200:
 				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
 				break;
 
-			//MAX_LANE_COUNT
+			//MAX_LANE_COUNT (and extended)
 			case 0x00002:
+			case 0x02202:
 				out = string("Max lanes: ") + to_string(data[i] & 0x1f) + "\n";
 				if(data[i] & 0x20)
 					out += "POST_LT_ADJ_REQ supported\n";
@@ -694,8 +697,9 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 					out += "Enhanced framing sequence not supported";
 				break;
 
-			//MAX_DOWNSPREAD
+			//MAX_DOWNSPREAD (and extended)
 			case 0x00003:
+			case 0x02203:
 				if(data[i] & 0x1)
 					out += "Spread spectrum clocking supported\n";
 				else
@@ -715,7 +719,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				break;
 
 			//8B10B_TRAINING_AUX_RD_INTERVAL
-			case 0x0000e:
+			case 0x0220e:
 				if(data[i] & 0x80)
 					out = "Extended RX capability field present\n";
 				else
@@ -750,9 +754,294 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 
 				break;
 
-			//DCPD_REV (extended)
-			case 0x02200:
-				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+			//SINK_VIDEO_FALLBACK_FORMATS
+			case 0x00020:
+				if(data[i] & 0x1)
+					out += "1024x768x60, 24bpp supported\n";
+				else
+					out += "1024x768x60, 24bpp not supported\n";
+
+				if(data[i] & 0x2)
+					out += "1280x720x60, 24bpp supported\n";
+				else
+					out += "1280x720x60, 24bpp not supported\n";
+
+				if(data[i] & 0x4)
+					out += "1920x1080x60, 24bpp supported";
+				else
+					out += "1920x1080x60, 24bpp not supported (noncompliant w/ DP 2.0)";
+				break;
+
+			//MSTM_CAP
+			case 0x00021:
+				if(data[i] & 0x1)
+					out += "MST / sideband mode supported\n";
+				else
+				{
+					out += "MST / sideband mode not supported\n";
+					if(data[i] & 2)
+						out += "Sideband mode supported, but not multi-stream";
+					else
+						out += "Sideband mode not supported";
+				}
+				break;
+
+			//NUMBER_OF_AUDIO_ENDPOINTS
+			case 0x00022:
+				out += string("Port has ") + to_string(data[i]) + " audio endpoints";
+				break;
+
+			//Detailed Capabilities
+			//DPFX_CAP
+			case 0x0080:
+			case 0x0084:
+			case 0x0088:
+			case 0x008c:
+				out += string("DFP ") + to_string( (start_addr - 0x80) / 4) + ":\n";
+				switch(data[i] & 7)
+				{
+					case 0:
+						out += "    Port is DisplayPort\n";
+						m_dfpType = DFP_TYPE_DP;
+						break;
+
+					case 1:
+						out += "    Port is analog VGA\n";
+						m_dfpType = DFP_TYPE_VGA;
+						break;
+
+					case 2:
+						out += "    Port is DVI\n";
+						m_dfpType = DFP_TYPE_DVI;
+						break;
+
+					case 3:
+						out += "    Port is HDMI\n";
+						m_dfpType = DFP_TYPE_HDMI;
+						break;
+
+					case 4:
+						out += "Port is other (no EDID)\n";
+						switch(data[i] >> 4)
+						{
+							case 1:
+								out += "    Format: 480i60\n";
+								break;
+							case 2:
+								out += "    Format: 480i50\n";
+								break;
+							case 3:
+								out += "    Format: 1080i60\n";
+								break;
+							case 4:
+								out += "    Format: 1080i50\n";
+								break;
+							case 5:
+								out += "    Format: 720p60\n";
+								break;
+							case 7:
+								out += "    Format: 720i50\n";
+								break;
+							default:
+								out += "    Format: reserved\n";
+						}
+						break;
+
+					case 5:
+						out += "    Port is DP++\n";
+						m_dfpType = DFP_TYPE_DP_PP;
+						break;
+
+					case 6:
+						out += "    Port is wireless\n";
+						m_dfpType = DFP_TYPE_WIRELESS;
+						break;
+
+					default:
+						out += "    Reserved port type\n";
+						break;
+				}
+
+				if(data[i] & 0x8)
+					out += "    Port is HPD aware";
+				else
+					out += "    Port is not HPD aware";
+				break;
+
+			//DFP type dependent
+			case 0x81:
+			case 0x85:
+			case 0x89:
+			case 0x8d:
+				switch(m_dfpType)
+				{
+					case DFP_TYPE_VGA:
+						out += string("Max pixel clock: ") + to_string(data[i] * 8) + " MHz";
+						break;
+
+					case DFP_TYPE_DVI:
+					case DFP_TYPE_HDMI:
+					case DFP_TYPE_DP_PP:
+						out += string("Max TMDS character clock: ") + to_string(data[i] * 2.5) + " MHz";
+						break;
+
+					case DFP_TYPE_WIRELESS:
+						if( (data[i] & 0xf) == 0)
+							out += "WiGig DisplayExtension";
+						else
+							out += "Unknown wireless media";
+						break;
+
+					default:
+						break;
+				}
+				break;
+
+			case 0x82:
+			case 0x86:
+			case 0x8a:
+			case 0x8e:
+				switch(m_dfpType)
+				{
+					case DFP_TYPE_VGA:
+					case DFP_TYPE_DVI:
+					case DFP_TYPE_HDMI:
+					case DFP_TYPE_DP_PP:
+						switch(data[i] & 0x3)
+						{
+							case 0:
+								out += "Max bits per component: 8";
+								break;
+
+							case 1:
+								out += "Max bits per component: 10";
+								break;
+
+							case 2:
+								out += "Max bits per component: 12";
+								break;
+
+							case 3:
+								out += "Max bits per component: 16";
+								break;
+						}
+						break;
+
+					case DFP_TYPE_WIRELESS:
+						out += to_string(data[i] & 3) + " WDE TX on device\n";
+						out += to_string((data[i] >> 2) & 3) + " WDE TX can be concurrently active";
+						break;
+
+					default:
+						break;
+				}
+				break;
+
+			case 0x83:
+			case 0x87:
+			case 0x8b:
+			case 0x8f:
+				switch(m_dfpType)
+				{
+					case DFP_TYPE_DVI:
+						if(data[i] & 2)
+							out += "Dual link\n";
+						else
+							out += "Single link\n";
+
+						if(data[i] & 4)
+							out += "High color depth supported";
+						else
+							out += "High color depth not supported";
+						break;
+
+					case DFP_TYPE_HDMI:
+						if(data[i] & 1)
+							out += "Frame Pack conversion supported\n";
+						else
+							out += "Frame Pack conversion not supported\n";
+
+						if(data[i] & 2)
+							out += "YCbCr4:2:2 passthrough supported\n";
+						else
+							out += "YCbCr4:2:2 passthrough not supported\n";
+
+						if(data[i] & 4)
+							out += "YCbCr4:2:0 passthrough supported\n";
+						else
+							out += "YCbCr4:2:0 passthrough not supported\n";
+
+						if(data[i] & 8)
+							out += "YCbCr4:4:4 to 4:2:2 conversion supported\n";
+						else
+							out += "YCbCr4:4:4 to 4:2:2 conversion not supported\n";
+
+						if(data[i] & 0x10)
+							out += "YCbCr4:4:4 to 4:2:0 conversion supported\n";
+						else
+							out += "YCbCr4:4:4 to 4:2:0 conversion not supported\n";
+
+						break;
+
+					case DFP_TYPE_DP_PP:
+						if(data[i] & 1)
+							out += "Frame Pack conversion supported\n";
+						else
+							out += "Frame Pack conversion not supported\n";
+						break;
+
+					default:
+						break;
+				}
+				break;
+
+			//Source IEEE_OUI
+			case 0x300:
+				if(data.size() >= i+3)
+				{
+					snprintf(tmp, sizeof(tmp), "Source OUI %02X-%02X-%02X", data[i], data[i+1], data[i+2]);
+					out += tmp;
+					fieldsize = 3;
+				}
+				else
+				{
+					snprintf(tmp, sizeof(tmp), "Source OUI[0] = %02X", data[i]);
+					out += tmp;
+				}
+				break;
+
+			//Device ID string
+			case 0x303:
+				if(data.size() >= i+6)
+				{
+					memset(tmp, 0, sizeof(tmp));
+					memcpy(tmp, &data[i], 6);
+					out += string("Device ID ") + tmp;
+					fieldsize = 6;
+				}
+				else
+				{
+					snprintf(tmp, sizeof(tmp), "Device ID[0] = %02X\n", data[i]);
+					out += tmp;
+				}
+
+				break;
+
+
+			//Hardware revision
+			case 0x309:
+				out += string("Hardware rev ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				break;
+
+			//Firmware revision
+			case 0x30a:
+				if(data.size() >= i+1)
+				{
+					out += string("Firmware rev ") + to_string(data[i]) + "." + to_string(data[i+1]);
+					fieldsize = 2;
+				}
+				else
+					out += string("Firmware major rev ") + to_string(data[i]);
 				break;
 
 			//8B10B_MAX_LINK_RATE (extended)
@@ -779,6 +1068,198 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 						out = "Unknown rate (reserved)";
 						break;
 				}
+				break;
+
+			//NORP / DP_PWR_VOLTAGE_CAP (extended)
+			case 0x2204:
+				if(data[i] & 1)
+					out += "Two or more RX ports\n";
+				else
+					out += "One RX port\n";
+
+				if(data[i] & 0x20)
+					out += "5V power capable\n";
+				else
+					out += "Not 5V power capable\n";
+
+				if(data[i] & 0x40)
+					out += "12V power capable";
+				else
+					out += "Not 12V power capable";
+
+				if(data[i] & 0x80)
+					out += "18V power capable";
+				else
+					out += "Not 18V power capable";
+
+				break;
+
+			//DOWN_STREAM_PORT_PRESENT
+			case 0x2205:
+				if(data[i] & 1)
+				{
+					out += "Device has downstream ports\n";
+					switch( (data[i] >> 1) & 3)
+					{
+						case 0:
+							out += "Downstream ports are DP\n";
+							break;
+
+						case 1:
+							out += "Downstream ports are VGA\n";
+							break;
+
+						case 2:
+							out += "Downstream ports are DVI, HDMI, or DP++\n";
+							break;
+
+						case 3:
+							out += "Downstream ports are other format\n";
+							break;
+					}
+					if(data[i] & 0x8)
+						out += "Device has format conversion block\n";
+					else
+						out += "Device does not have format conversion block\n";
+					if(data[i] & 0x10)
+					{
+						out += "Device has 4 byte/port capability field";
+						m_capFormat = CAP_FORMAT_4BYTE;
+					}
+					else
+					{
+						out += "Device has 1 byte/port capability field";
+						m_capFormat = CAP_FORMAT_1BYTE;
+					}
+				}
+				break;
+
+			//MAIN_LINK_CHANNEL_CODING_CAP
+			case 0x2206:
+				if(data[i] & 1)
+					out += "Device supports 8b/10b line code\n";
+				else
+					out += "Device does not support 8b/10b line code (noncompliant device or corrupted descriptor?)\n";
+
+				if(data[i] & 2)
+					out += "Device supports 128b/132b line code";
+				else
+					out += "Device does not support 128b/132b";
+
+				break;
+
+			//DOWN_STREAM_PORT_COUNT
+			case 0x2207:
+				if(data[i] & 0xf)
+					out += string("Device has ") + to_string(data[i] & 0xf) + " downstream port(s)\n";
+				if(data[i] & 0x40)
+					out += "Sink does not need MSA timing parameters\n";
+				else
+					out += "Sink requires MSA timing parameters\n";
+				if(data[i] & 0x80)
+					out += "OUI supported";
+				else
+					out += "OUI not supported";
+				break;
+
+			//RECEIVE_PORTx_CAP_0
+			case 0x2208:
+			case 0x220a:
+				out += string("RX Port ") + to_string( (start_addr - 0x2208) / 2) + ":\n";
+				if(data[i] & 0x2)
+					out += "    Receiver has DisplayID or EDID\n";
+				else
+					out += "    Receiver does not have DisplayID or EDID\n";
+				if(data[i] & 0x4)
+					out += "    Port is for secondary stream";
+				else
+					out += "    Port is for main stream";
+				break;
+
+			case 0x2209:
+			case 0x220b:
+				out += string("    Buffer size: ") + to_string(32 * (data[i]+1)) + " bytes";
+				break;
+
+			//I2C Speed Control Capabilities
+			case 0x220c:
+				out += "I2C speeds supported:";
+				if(data[i] & 0x01)
+					out += "\n    1 Kbps";
+				if(data[i] & 0x02)
+					out += "\n    5 Kbps";
+				if(data[i] & 0x04)
+					out += "\n    10 Kbps";
+				if(data[i] & 0x08)
+					out += "\n    100 Kbps";
+				if(data[i] & 0x10)
+					out += "\n    400 Kbps";
+				if(data[i] & 0x20)
+					out += "\n    1 Mbps";
+				break;
+
+			//eDP_CONFIGURATION_CAP
+			case 0x000d:
+			case 0x220d:
+				if(data[i] & 1)
+					out += "eDP alternate scrambler reset value capable";
+				else
+					out += "External (not eDP) receiver";
+				break;
+
+			//ADAPTER_CAP
+			case 0x220f:
+				if(data[i] & 1)
+					out += "VGA force load adapter sense supported\n";
+				else
+					out += "VGA force load adapter sense not supported\n";
+
+				if(data[i] & 2)
+					out += "Alternate I2C pattern supported";
+				else
+					out += "Alternate I2C pattern not supported";
+				break;
+
+			//EXTENDED_DPRX_SLEEP_WAKE_TIMEOUT_REQUEST
+			case 0x2211:
+				switch(data[i])
+				{
+					case 0:
+						out += "Sleep/wake timeout: 1 ms";
+						break;
+
+					case 1:
+						out += "Sleep/wake timeout: 20 ms";
+						break;
+
+					case 2:
+						out += "Sleep/wake timeout: 40 ms";
+						break;
+
+					case 3:
+						out += "Sleep/wake timeout: 60 ms";
+						break;
+
+					case 4:
+						out += "Sleep/wake timeout: 80 ms";
+						break;
+
+					case 5:
+						out += "Sleep/wake timeout: 100 ms";
+						break;
+
+					default:
+						out += "Reserved / unimplemented timeout";
+						break;
+				}
+				break;
+
+			//LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV
+			case 0xf0000:
+				if(data[i] == 0)
+					out = "No LTTPR";
+				else
+					out = string("LTTPR ") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
 				break;
 
 			//Unknown? Don't print any decode, skip it
