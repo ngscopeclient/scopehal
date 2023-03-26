@@ -695,7 +695,6 @@ bool AgilentOscilloscope::AcquireData()
 
 	if(m_digitalChannelCount > 0)
 	{
-		auto preamble = GetWaveformPreamble("POD1");
 
 		// Fetch waveform data for each pod containing enabled channels
 		map<string, vector<uint8_t>> raw_waveforms;
@@ -716,10 +715,13 @@ bool AgilentOscilloscope::AcquireData()
 			}
 		}
 
-		if (raw_waveforms.find("POD1") != raw_waveforms.end())
-			ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD1"), preamble, 0);
-		if (raw_waveforms.find("POD2") != raw_waveforms.end())
-			ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD2"), preamble, 8);
+		if (raw_waveforms.size() > 0) {
+			auto preamble = GetWaveformPreamble("POD1");
+			if (raw_waveforms.find("POD1") != raw_waveforms.end())
+				ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD1"), preamble, 0);
+			if (raw_waveforms.find("POD2") != raw_waveforms.end())
+				ProcessDigitalWaveforms(pending_waveforms, raw_waveforms.at("POD2"), preamble, 8);
+		}
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
