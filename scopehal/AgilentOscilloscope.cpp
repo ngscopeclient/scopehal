@@ -94,7 +94,6 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			i);
 		m_channels.push_back(chan);
 		chan->SetDefaultDisplayName();
-		ConfigureWaveform(chname);
 	}
 	m_analogChannelCount = nchans;
 
@@ -159,8 +158,6 @@ AgilentOscilloscope::AgilentOscilloscope(SCPITransport* transport)
 			m_channels.push_back(chan);
 			chan->SetDefaultDisplayName();
 		}
-		ConfigureWaveform("POD1");
-		ConfigureWaveform("POD2");
 	}
 }
 
@@ -170,8 +167,11 @@ AgilentOscilloscope::~AgilentOscilloscope()
 
 void AgilentOscilloscope::ConfigureWaveform(string channel)
 {
-	//Configure transport format to raw 8-bit int
+	//Select the channel to apply settings to
+	//NOTE: this also enables the channel
 	m_transport->SendCommand(":WAV:SOUR " + channel);
+
+	//Configure transport format to raw 8-bit int
 	m_transport->SendCommand(":WAV:FORM BYTE");
 
 	//Request all points when we download
@@ -223,6 +223,14 @@ bool AgilentOscilloscope::IsAnalogChannel(size_t i)
 	return GetOscilloscopeChannel(i)->GetType(0) == Stream::STREAM_TYPE_ANALOG;
 }
 
+size_t AgilentOscilloscope::GetDigitalPodIndex(size_t i) {
+	return ((i - m_digitalChannelBase) / 8) + 1;
+}
+
+std::string AgilentOscilloscope::GetDigitalPodName(size_t i) {
+	return "POD" + to_string(GetDigitalPodIndex(i));
+}
+
 bool AgilentOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
@@ -261,6 +269,11 @@ void AgilentOscilloscope::EnableChannel(size_t i)
 		lock_guard<recursive_mutex> lock(m_mutex);
 		m_transport->SendCommand(GetOscilloscopeChannel(i)->GetHwname() + ":DISP ON");
 	}
+
+	if (IsAnalogChannel(i))
+		ConfigureWaveform(GetOscilloscopeChannel(i)->GetHwname());
+	else
+		ConfigureWaveform(GetDigitalPodName(i));
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
 	m_channelsEnabled[i] = true;
