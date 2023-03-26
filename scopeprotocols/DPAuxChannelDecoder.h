@@ -130,6 +130,8 @@ protected:
 		DFP_TYPE_WIRELESS,
 		DFP_TYPE_UNKNOWN
 	} m_dfpType;
+
+	int m_dcpdRevision;
 };
 
 #endif

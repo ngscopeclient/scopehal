@@ -40,6 +40,7 @@ DPAuxChannelDecoder::DPAuxChannelDecoder(const string& color)
 	: PacketDecoder(color, CAT_SERIAL)
 	, m_capFormat(CAP_FORMAT_UNKNOWN)
 	, m_dfpType(DFP_TYPE_UNKNOWN)
+	, m_dcpdRevision(0x11)
 {
 	CreateInput("aux");
 
@@ -324,7 +325,11 @@ void DPAuxChannelDecoder::Refresh()
 
 					//Decode packet content
 					if(!pack->m_data.empty())
-						pack->m_headers["Info"] = DecodeRegisterContent(request_addr, pack->m_data);
+					{
+						if(pack->m_headers["Info"] != "")
+							pack->m_headers["Info"] += "\n";
+						pack->m_headers["Info"] += DecodeRegisterContent(request_addr, pack->m_data);
+					}
 
 					break;
 				}
@@ -843,6 +848,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 			case 0x00000:
 			case 0x02200:
 				out = string("DCPD r") + to_string(data[i] >> 4) + "." + to_string(data[i] & 0xf);
+				m_dcpdRevision = data[i];
 				break;
 
 			//MAX_LANE_COUNT (and extended)
@@ -1162,6 +1168,260 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				}
 				break;
 
+			//TRAINING_PATTERN_SET
+			case 0x102:
+
+				//Format is DCPD dependent for the low bits
+				if(m_dcpdRevision == 0x11)
+				{
+					switch(data[i] & 0x3)
+					{
+						case 0:
+							out += "Training not in progress or disabled\n";
+							break;
+
+						case 1:
+							out += "Train with TPS1\n";
+							break;
+
+						case 2:
+							out += "Train with TPS2\n";
+							break;
+
+						default:
+							out += "Reserved training set\n";
+							break;
+					}
+				}
+				else if( (m_dcpdRevision == 0x12) || (m_dcpdRevision == 0x13) )
+				{
+					switch(data[i] & 0x3)
+					{
+						case 0:
+							out += "Training not in progress or disabled\n";
+							break;
+
+						case 1:
+							out += "Train with TPS1\n";
+							break;
+
+						case 2:
+							out += "Train with TPS2\n";
+							break;
+
+						default:
+							out += "Train with TPS3\n";
+							break;
+					}
+				}
+				if(m_dcpdRevision == 0x11)
+				{
+					switch( (data[i] >> 2) & 0x3)
+					{
+						case 0:
+							out += "No link quality test pattern\n";
+							break;
+
+						case 1:
+							out += "D10.2 unscrambled (same as TPS1)\n";
+							break;
+
+						case 2:
+							out += "Symbol Error Rate measurement pattern\n";
+							break;
+
+						case 3:
+							out += "PRBS7\n";
+							break;
+					}
+				}
+
+				if(m_dcpdRevision == 0x14)
+				{
+					//TODO: support 128b/132b here
+					switch(data[i] & 0xf)
+					{
+						case 0:
+							out += "Training not in progress or disabled\n";
+							break;
+
+						case 1:
+							out += "Train with TPS1\n";
+							break;
+
+						case 2:
+							out += "Train with TPS2\n";
+							break;
+
+						case 3:
+							out += "Train with TPS3\n";
+							break;
+
+						case 7:
+							out += "Train with TPS4\n";
+							break;
+
+						default:
+							out += "Reserved training set\n";
+							break;
+					}
+				}
+
+				//TODO: support 128b/132b here, this is all 8b10b specific
+				if(data[i] & 0x10)
+					out += "Recovered clock output on test point\n";
+				else
+					out += "Recovered clock output disabled\n";
+
+				if(data[i] & 0x20)
+					out += "Scrambler disabled\n";
+				else
+					out += "Scrambler enabled\n";
+
+				switch( (data[i] >> 6) & 3)
+				{
+					case 0:
+						out += "Count disparity and illegal symbols";
+						break;
+
+					case 1:
+						out += "Count disparity errors only";
+						break;
+
+					case 2:
+						out += "Count illegal symbol errors only";
+						break;
+
+					default:
+						out += "Reserved count mode";
+				}
+				break;
+
+			//LINK_BW_SET
+			//Codes are context dependent, BUT do not overlap
+			//so for now we ignore MAIN_LINK_CHANNEL_CODING_SET and figure out from the codes
+			case 0x00100:
+				switch(data[i])
+				{
+					//8B10B rates
+					case 0x06:
+						out += "1.62 Gbps/lane (RBR)";
+						break;
+
+					case 0x0a:
+						out += "2.7 Gbps/lane (HBR)";
+						break;
+
+					case 0x14:
+						out += "5.4 Gbps/lane (HBR2)";
+						break;
+
+					case 0x01e:
+						out += "8.1 Gbps/lane (HBR3)";
+						break;
+
+					//128B/132B rates
+					case 0x01:
+						out += "10 Gbps/lane (UHBR10)";
+						break;
+
+					case 0x02:
+						out += "20 Gbps/lane (UHBR20)";
+						break;
+
+					case 0x04:
+						out += "13.5 Gbps/lane (UHBR13.5)";
+						break;
+				}
+				break;
+
+			//LANE_COUNT_SET
+			case 0x00101:
+
+				//Lane count
+				out += to_string(data[i] & 0x1f) + " lane(s)\n";
+
+				//These fields are only valid for 8B/10B
+				if(data[i] & 0x20)
+					out += "Post-LT adjustment request approved\n";
+				else
+					out += "No post-LT adjustment request approved\n";
+
+				if(data[i] & 0x80)
+					out += "Enhanced framing sequence enabled";
+				else
+					out += "Enhanced framing sequence disabled";
+
+				break;
+
+			//TRAINING_LANE0_SET
+			case 0x00103:
+
+				//TODO: 128b/130b
+				//(this is 8b10b format only)
+
+				out += string("Lane ") + to_string(start_addr - 0x103) + ":\n";
+
+				out += string("Voltage swing level ") + to_string(data[i] & 3) + "\n";
+
+				if(data[i] & 4)
+					out += "Max swing reached\n";
+				else
+					out += "Max swing not reached\n";
+
+				out += string("Pre-emphasis level ") + to_string((data[i] >> 3) & 3) + "\n";
+
+				if(data[i] & 0x20)
+					out += "Max pre-emphasis reached";
+				else
+					out += "Max pre-emphasis not reached";
+
+				break;
+
+			//DOWNSPREAD_CTRL
+			case 0x00107:
+				if(data[i] & 0x10)
+					out += "SSC enabled\n";
+				else
+					out += "SSC disabled\n";
+
+				if(data[i] & 0x80)
+					out += "MSA timing parameters should be ignored";
+				else
+					out += "MSA timing parameters are valid";
+
+				break;
+
+			//MSTM_CTRL
+			case 0x111:
+				if(data[i] & 1)
+					out += "Multi-stream transport mode\n";
+				else
+					out += "Single-stream transport mode\n";
+
+				if(data[i] & 2)
+					out += "Downstream DPRX can originate/forward UP_REQ\n";
+				else
+					out += "No UP_REQ origination/forwarding allowed\n";
+
+				if(data[i] & 4)
+					out += "Upstream device is DP source";
+				else
+					out += "Upstream device is branch (or pre DP 1.2 source)";
+				break;
+
+			//ADJUST_REQUEST_LANE_0_1
+			//ADJUST_REQUEST_LANE_2_3
+			case 0x206:
+			case 0x207:
+				out += string("Lane ") + to_string((start_addr - 0x206)*2) + ":\n";
+				out += string("    Voltage swing level ") + to_string(data[i] & 3) + "\n";
+				out += string("    Pre-emphasis level ") + to_string((data[i] >> 2) & 3) + "\n";
+				out += string("Lane ") + to_string((start_addr - 0x206)*2 + 1) + ":\n";
+				out += string("    Voltage swing level ") + to_string((data[i] >> 4) & 3) + "\n";
+				out += string("    Pre-emphasis level ") + to_string((data[i] >> 6) & 3) + "\n";
+				break;
+
 			//Source IEEE_OUI
 			case 0x300:
 				if(data.size() >= i+3)
@@ -1258,6 +1518,30 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 					out += string("Branch firmware major rev ") + to_string(data[i]);
 				break;
 
+			//SET_POWER / SET_DP_PWR_VOLTAGE
+			case 0x600:
+				switch(data[i] & 7)
+				{
+					case 1:
+						out += "Set D0 (normal operation) power state";
+						break;
+					case 2:
+						out += "Set D3 (power down) power state";
+						break;
+					case 5:
+						out += "Set main link and sink to D3 (power down) but AUX powered up";
+						break;
+					default:
+						out += "Reserved power state";
+						break;
+				}
+				if(data[i] & 0x20)
+					out += "\nSet DP_PWR to 5V";
+				if(data[i] & 0x40)
+					out += "\nSet DP_PWR to 12V";
+				if(data[i] & 0x80)
+					out += "\nSet DP_PWR to 18V";
+				break;
 
 			//SINK_COUNT_ESI
 			case 0x2002:
@@ -1276,6 +1560,43 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 					out += "HDMI_LINK_STATUS_CHANGED\n";
 				if(data[i] & 0x10)
 					out += "CONNECTED_OFF_ENTRY_REQUESTED\n";
+				break;
+
+			//LANE0_1_STATUS
+			//LANE2_3_STATUS
+			case 0x0202:
+			case 0x0203:
+				out += string("Lane ") + to_string( (start_addr - 0x0202)*2) + ":\n";
+				if(data[i] & 0x1)
+					out += "    CR done\n";
+				else
+					out += "    CR not done\n";
+
+				if(data[i] & 0x2)
+					out += "    EQ done\n";
+				else
+					out += "    EQ not done\n";
+
+				if(data[i] & 0x4)
+					out += "    Symbol locked\n";
+				else
+					out += "    No symbol lock\n";
+
+				out += string("Lane ") + to_string( (start_addr - 0x0202)*2 + 1) + ":\n";
+				if(data[i] & 0x10)
+					out += "    CR done\n";
+				else
+					out += "    CR not done\n";
+
+				if(data[i] & 0x20)
+					out += "    EQ done\n";
+				else
+					out += "    EQ not done\n";
+
+				if(data[i] & 0x40)
+					out += "    Symbol locked";
+				else
+					out += "    No symbol lock";
 				break;
 
 			//LANE0_1_STATUS_ESI
@@ -1316,6 +1637,7 @@ string DPAuxChannelDecoder::DecodeRegisterContent(uint32_t start_addr, const vec
 				break;
 
 			//LANE_ALIGN_STATUS_UPDATED_ESI
+			case 0x0204:
 			case 0x200e:
 				if(data[i] & 0x1)
 					out += "Inter-lane align done\n";
