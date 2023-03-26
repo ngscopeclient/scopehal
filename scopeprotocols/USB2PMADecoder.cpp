@@ -102,7 +102,7 @@ void USB2PMADecoder::Refresh()
 	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
 
 	//Set appropriate thresholds for different speeds
-	auto threshold = (speed == SPEED_HIGH) ? 0.2 : 0.4;
+	auto threshold = (speed == SPEED_HIGH) ? 0.15 : 0.4;
 	int64_t transition_time;
 	switch(speed)
 	{
