@@ -43,13 +43,17 @@ using namespace std;
 
 IBM8b10bDecoder::IBM8b10bDecoder(const string& color)
 	: Filter(color, CAT_SERIAL)
+	, m_displayformat("Display Format")
+	, m_commaSearchWindow("Comma Search Window")
 {
 	AddProtocolStream("data");
 	CreateInput("data");
 	CreateInput("clk");
 
-	m_displayformat = "Display Format";
 	m_parameters[m_displayformat] = MakeIBM8b10bDisplayFormatParameter();
+
+	m_parameters[m_commaSearchWindow] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_UI));
+	m_parameters[m_commaSearchWindow].SetIntVal(20000);
 }
 
 FilterParameter IBM8b10bDecoder::MakeIBM8b10bDisplayFormatParameter()
@@ -328,6 +332,8 @@ void IBM8b10bDecoder::Refresh()
 
 void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 {
+	size_t range = m_parameters[m_commaSearchWindow].GetIntVal();
+
 	//Look for commas in the data stream
 	//TODO: make this more efficient?
 	size_t max_commas = 0;
@@ -338,9 +344,9 @@ void IBM8b10bDecoder::Align(SparseDigitalWaveform& data, size_t& i)
 		size_t num_commas = 0;
 		size_t num_errors = 0;
 
-		//Only check the first 20K UIs (2K symbols) for alignment
+		//Only check the first few symbols for alignment (default is 20K UIs, 2K symbols)
 		//to avoid wasting a ton of time repeatedly decoding a huge capture
-		for(size_t delta=0; delta<20000; delta += 10)
+		for(size_t delta=0; delta<range; delta += 10)
 		{
 			size_t base = i + offset + delta;
 			if(base > dend)
