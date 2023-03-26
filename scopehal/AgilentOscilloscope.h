@@ -164,6 +164,8 @@ private:
 
 	void ConfigureWaveform(std::string channel);
 	bool IsAnalogChannel(size_t i);
+	size_t GetDigitalPodIndex(size_t i);
+	std::string GetDigitalPodName(size_t i);
 	std::vector<uint8_t> GetWaveformData(std::string channel);
 	WaveformPreamble GetWaveformPreamble(std::string channel);
 	void ProcessDigitalWaveforms(
