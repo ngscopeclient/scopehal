@@ -54,7 +54,7 @@ public:
 	, m_voltage(v)
 	{}
 
-	float m_time;		//either ps or UIs, depending on EyeMask units
+	float m_time;		//either fs or UIs, depending on EyeMask units
 	float m_voltage;	//volts
 };
 
@@ -108,6 +108,12 @@ public:
 
 	bool empty() const
 	{ return m_polygons.empty(); }
+
+	bool IsTimebaseRelative()
+	{ return m_timebaseIsRelative; }
+
+	const std::vector<EyeMaskPolygon>& GetPolygons() const
+	{ return m_polygons; }
 
 protected:
 	void RenderInternal(
