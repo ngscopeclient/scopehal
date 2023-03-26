@@ -810,7 +810,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 			if (len_bytes != (this_length*sizeof(float)))
 			{
 				LogError("Unexpected number of bytes back; aborting acquisition");
-				usleep(100000);
+				std::this_thread::sleep_for(std::chrono::microseconds(100000));
 				m_transport->FlushRXBuffer();
 
 				delete cap;
@@ -857,7 +857,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 			while (m_transport->SendCommandImmediateWithReply("FORM?") != "ASC,0")
 			{
 				m_transport->SendCommandImmediate("FORM ASC; *WAI"); //Only possible to get data out in ASCII format
-				usleep(1000000);
+				std::this_thread::sleep_for(std::chrono::microseconds(1000000));
 			}
 			didAcquireAnyDigitalChannels = true;
 		}
@@ -890,7 +890,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 		if (read_bytes != expected_bytes)
 		{
 			LogWarning("Unexpected number of bytes back; aborting acquisiton\n");
-			usleep(100000);
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 			m_transport->FlushRXBuffer();
 
 			delete cap;
@@ -973,7 +973,7 @@ bool RSRTO6Oscilloscope::AcquireData()
 	if(!any_data || !m_triggerOneShot)
 	{
 		m_transport->SendCommandImmediate("SINGle");
-		usleep(100000);
+		std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
 		m_triggerArmed = true;
 	}
@@ -993,7 +993,7 @@ void RSRTO6Oscilloscope::Start()
 {
 	LogDebug("Start\n");
 	m_transport->SendCommandImmediate("SINGle");
-	usleep(100000);
+	std::this_thread::sleep_for(std::chrono::microseconds(100000));
 	// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
@@ -1003,7 +1003,7 @@ void RSRTO6Oscilloscope::StartSingleTrigger()
 {
 	LogDebug("Start oneshot\n");
 	m_transport->SendCommandImmediate("SINGle");
-	usleep(100000);
+	std::this_thread::sleep_for(std::chrono::microseconds(100000));
 	// If we don't wait here, sending the query for available waveforms will race and return 1 for the exitisting waveform and jam everything up.
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
