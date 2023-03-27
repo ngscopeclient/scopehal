@@ -107,6 +107,7 @@
 #include "EyeWidthMeasurement.h"
 #include "FallMeasurement.h"
 #include "FSKDecoder.h"
+#include "GlitchRemovalFilter.h"
 #include "FFTFilter.h"
 #include "FIRFilter.h"
 #include "FrequencyMeasurement.h"
