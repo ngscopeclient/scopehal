@@ -129,6 +129,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
+	SNRFilter.cpp
 	SParameterCascadeFilter.cpp
 	SParameterDeEmbedFilter.cpp
 	SpectrogramFilter.cpp

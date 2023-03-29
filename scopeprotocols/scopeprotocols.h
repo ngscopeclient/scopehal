@@ -163,6 +163,7 @@
 #include "ScaleFilter.h"
 #include "SDCmdDecoder.h"
 #include "SDDataDecoder.h"
+#include "SNRFilter.h"
 #include "SParameterCascadeFilter.h"
 #include "SParameterDeEmbedFilter.h"
 #include "SpectrogramFilter.h"
