@@ -279,6 +279,8 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 		// Bandwidth expanding options reflected in earlier query for max B/W
 	}
 
+	m_oscilloscopeChannelCount = m_channels.size();
+
 	//Add AWG channel
 	if(m_hasAFG)
 	{
@@ -333,7 +335,7 @@ uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i)
 void TektronixOscilloscope::DetectProbes()
 {
 	std::vector<bool> currentlyEnabled;
-	for (size_t i = 0; i < m_channels.size(); i++)
+	for (size_t i = 0; i < m_oscilloscopeChannelCount; i++)
 	{
 		bool isEnabled = IsChannelEnabled(i);
 		currentlyEnabled.push_back(isEnabled);
@@ -371,7 +373,7 @@ void TektronixOscilloscope::DetectProbes()
 			break;
 	}
 
-	for (size_t i = 0; i < m_channels.size(); i++)
+	for (size_t i = 0; i < m_oscilloscopeChannelCount; i++)
 	{
 		if (currentlyEnabled[i]) EnableChannel(i);
 		else                     DisableChannel(i);
@@ -415,6 +417,9 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
 	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
+		return false;
+
+	if(m_hasAFG && (i == m_awgChannel->GetIndex()))
 		return false;
 
 	{
@@ -1413,7 +1418,7 @@ bool TektronixOscilloscope::AcquireData()
 	for(size_t i=0; i<num_pending; i++)
 	{
 		SequenceSet s;
-		for(size_t j=0; j<m_channels.size(); j++)
+		for(size_t j=0; j<m_oscilloscopeChannelCount; j++)
 		{
 			if(IsChannelEnabled(j))
 				s[GetOscilloscopeChannel(j)] = pending_waveforms[j][i];

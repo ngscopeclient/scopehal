@@ -291,6 +291,7 @@ protected:
 
 	size_t m_digitalChannelBase;
 	size_t m_spectrumChannelBase;
+	size_t m_oscilloscopeChannelCount;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
