@@ -102,7 +102,8 @@ void USB2PMADecoder::Refresh()
 	auto speed = static_cast<Speed>(m_parameters[m_speedname].GetIntVal());
 
 	//Set appropriate thresholds for different speeds
-	auto threshold = (speed == SPEED_HIGH) ? 0.15 : 0.4;
+	auto threshold_diff = (speed == SPEED_HIGH) ? 0.15 : 0.2;
+	auto threshold_se   = 0.8;
 	int64_t transition_time;
 	switch(speed)
 	{
@@ -127,12 +128,12 @@ void USB2PMADecoder::Refresh()
 	{
 		auto vp = GetValue(sdin_p, udin_p, i);
 		auto vn = GetValue(sdin_n, udin_n, i);
-		bool bp = (vp > threshold);
-		bool bn = (vn > threshold);
+		bool bp = (vp > threshold_se);
+		bool bn = (vn > threshold_se);
 		float vdiff = vp - vn;
 
 		USB2PMASymbol::SegmentType type = USB2PMASymbol::TYPE_SE1;
-		if(fabs(vdiff) > threshold)
+		if(fabs(vdiff) > threshold_diff)
 		{
 			if( (speed == SPEED_FULL) || (speed == SPEED_HIGH) )
 			{
