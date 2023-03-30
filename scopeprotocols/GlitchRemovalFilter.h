@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,16 +27,11 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of GlitchRemovalFilter
- */
 #ifndef GlitchRemovalFilter_h
 #define GlitchRemovalFilter_h
 
 /**
-	@brief Downsample - low-pass filter and decimate a signal
+	@brief Removes glitches shorter than a specified length from a sparse digital waveform
  */
 class GlitchRemovalFilter : public Filter
 {

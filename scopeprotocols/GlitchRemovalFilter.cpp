@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -59,7 +59,6 @@ bool GlitchRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
 		return true;
 
-	LogDebug("ValidateChannel false\n");
 	return false;
 }
 
@@ -166,7 +165,7 @@ void GlitchRemovalFilter::Refresh()
 		SetData(NULL, 0);
 		return;
 	}
-	
+
 	//Set up output waveform and get configuration
 	auto cap = SetupEmptySparseDigitalOutputWaveform(GetInputWaveform(0), 0);
 
