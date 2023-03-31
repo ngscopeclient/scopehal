@@ -698,7 +698,7 @@ void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edg
  */
 void Filter::FindPeaks(UniformAnalogWaveform* data, vector<int64_t>& peaks)
 {
-	auto len = data->size();
+	size_t len = data->m_samples.size();
 
 	//Threshold first difference signal in digital format, to extract falling edges later on
 	//These falling edges will correspond to peaks in the input signal
@@ -726,8 +726,83 @@ void Filter::FindPeaks(UniformAnalogWaveform* data, vector<int64_t>& peaks)
 		thresh_diff->m_samples[i-1] = cur;
 	}
 
-	// Get falling edges. These falling edges will correspond to peaks in the input signal
-	FindFallingEdges(NULL, thresh_diff, peaks);
+	//Find indices of falling edges of threshold signal
+	bool first = true;
+	bool last = data->m_samples[0];
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = thresh_diff->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(!value && last)
+			peaks.push_back(i);
+
+		last = value;
+	}
+}
+
+/**
+	@brief Find peaks in a waveform
+ */
+void Filter::FindPeaks(SparseAnalogWaveform* data, vector<int64_t>& peaks)
+{
+	size_t len = data->m_samples.size();
+
+	//Threshold first difference signal in digital format, to extract falling edges later on
+	//These falling edges will correspond to peaks in the input signal
+	auto thresh_diff = new SparseDigitalWaveform;
+	thresh_diff->m_startTimestamp = data->m_startTimestamp;
+	thresh_diff->m_startFemtoseconds = data->m_startFemtoseconds;
+	thresh_diff->m_triggerPhase = data->m_triggerPhase;
+	thresh_diff->m_timescale = data->m_timescale;
+	thresh_diff->Resize(len);
+
+	bool cur = false;
+
+	// Threshold the first difference of signal to get a digital signal
+	for(size_t i = 1; i < len; i++)
+	{
+		float f = data->m_samples[i] - data->m_samples[i - 1];
+
+		if(f < 0.0f)
+			cur = false;
+		else if(f > 0.0f)
+			cur = true;
+
+		thresh_diff->m_samples[i-1] = cur;
+		thresh_diff->m_durations[i-1] = data->m_durations[i-1];
+		thresh_diff->m_offsets[i-1] = data->m_offsets[i-1];
+	}
+
+	//Find times of the zero crossings
+	bool first = true;
+	bool last = data->m_samples[0];
+	for(size_t i=1; i<len; i++)
+	{
+		bool value = data->m_samples[i];
+
+		//Save the last value
+		if(first)
+		{
+			last = value;
+			first = false;
+			continue;
+		}
+
+		//Save samples with an edge
+		if(!value && last)
+			peaks.push_back(i);
+
+		last = value;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
