@@ -86,7 +86,7 @@ void FullWidthHalfMax::Refresh()
 
 	din->PrepareForCpuAccess();
 
-	auto len = din->size();
+	int64_t len = (int64_t) din->size();
 
 	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
 	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
@@ -108,12 +108,10 @@ void FullWidthHalfMax::Refresh()
 
 	//Set up the output waveform for Full Width at Half Maximum
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
 
 	//Set up the output waveform for Amplitude of peaks
 	auto cap1 = SetupEmptySparseAnalogOutputWaveform(din, 1, true);
-	cap1->m_timescale = 1;
 	cap1->PrepareForCpuAccess();
 
 	//Vector to store normalized version of input waveform
@@ -123,31 +121,65 @@ void FullWidthHalfMax::Refresh()
 	if (uniform)
 	{
 		// Normalize the input signal to have all positive values
-		for(size_t i = 0; i < len; i++)
+		for(int64_t i = 0; i < len; i++)
 			din_norm[i] = uniform->m_samples[i] - min_voltage;
 
 		// Calculate and store the full width at half maximum and amplitude for all peaks
 		for(size_t i = 0; i < num_of_peaks; i++)
 		{
-			size_t j;
+			int64_t offset;
 			int64_t width = 0;
 			int64_t index = peak_indices[i];
 			float half_max = din_norm[index] / 2;
 
 			// Calculate the distance from the peak to its half maximum on x-axis in forward direction
-			for(j = index; din_norm[j] > half_max; j++)
+			for(offset = index; (din_norm[offset] > half_max) && (offset < len); offset++)
 			{
 				width++;
 			}
 
 			// Calculate the distance from the peak to its half maximum on x-axis in backward direction
-			for(j = index; din_norm[j] > half_max; j--)
+			for(offset = index; (din_norm[offset] > half_max) && (offset >= 0); offset--)
 			{
 				width++;
 			}
 
 			int64_t fwhm = width * din->m_timescale;
-			int64_t offset = j * din->m_timescale;
+
+			// Push FWHM information
+			cap->m_offsets.push_back(offset);
+			cap->m_durations.push_back(width);
+			cap->m_samples.push_back((float)fwhm);
+
+			// Push amplitude information
+			cap1->m_offsets.push_back(offset);
+			cap1->m_durations.push_back(width);
+			cap1->m_samples.push_back(uniform->m_samples[index]);
+
+			sum_half_widths += fwhm;
+		}
+	}
+	else if (sparse)
+	{
+		// Normalize the input signal to have all positive values
+		for(int64_t i = 0; i < len; i++)
+			din_norm[i] = sparse->m_samples[i] - min_voltage;
+
+		// Calculate and store the full width at half maximum and amplitude for all peaks
+		for(size_t i = 0; i < num_of_peaks; i++)
+		{
+			int64_t offset1, offset2;
+			int64_t index = peak_indices[i];
+			float half_max = din_norm[index] / 2;
+
+			// Calculate the distance from the peak to its half maximum on x-axis in forward direction
+			for(offset2 = index; (din_norm[offset2] > half_max) && (offset2 < len); offset2++);
+
+			// Calculate the distance from the peak to its half maximum on x-axis in backward direction
+			for(offset1 = index; (din_norm[offset1] > half_max) && (offset1 >= 0); offset1--);
+
+			int64_t fwhm = (sparse->m_offsets[offset2] - sparse->m_offsets[offset1]) * din->m_timescale;
+			int64_t offset = sparse->m_offsets[offset1];
 
 			// Push FWHM information
 			cap->m_offsets.push_back(offset);
@@ -161,12 +193,6 @@ void FullWidthHalfMax::Refresh()
 
 			sum_half_widths += fwhm;
 		}
-	}
-	else if (sparse)
-	{
-		// Normalize the input signal to have all positive values
-		for(size_t i = 0; i < len; i++)
-			din_norm[i] = sparse->m_samples[i] - min_voltage;
 	}
 
 	SetData(cap, 0);
