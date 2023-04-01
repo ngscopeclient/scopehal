@@ -43,6 +43,10 @@ FullWidthHalfMax::FullWidthHalfMax(const string& color)
 	AddStream(Unit(Unit::UNIT_FS), "Average FWHM", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	CreateInput("din");
+
+	m_peak_threshold = "Peak Threshold";
+	m_parameters[m_peak_threshold] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
+	m_parameters[m_peak_threshold].SetFloatVal(0.0f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,8 +89,22 @@ void FullWidthHalfMax::Refresh()
 	auto len = din->size();
 
 	auto uniform = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sparse = dynamic_cast<SparseAnalogWaveform*>(din);
 
-	float min_voltage = GetMinVoltage(NULL, uniform);
+	float min_voltage = GetMinVoltage(sparse, uniform);
+
+	//Vector to store indices of peaks
+	vector<int64_t> peak_indices;
+
+	float peak_threshold = m_parameters[m_peak_threshold].GetFloatVal();
+
+	// Get peaks
+	FindPeaks(sparse, uniform, peak_threshold, peak_indices);
+
+	// Get the number of peaks
+	size_t num_of_peaks = peak_indices.size();
+
+	int64_t sum_half_widths = 0;
 
 	//Set up the output waveform for Full Width at Half Maximum
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
@@ -102,57 +120,53 @@ void FullWidthHalfMax::Refresh()
 	vector<float> din_norm;
 	din_norm.resize(len);
 
-	float* fin = (float*)__builtin_assume_aligned(uniform->m_samples.GetCpuPointer(), 16);
-
-	// Normalize the input signal to have all positive values
-	for(size_t i = 0; i < len; i++)
-		din_norm[i] = fin[i] - min_voltage;
-
-	//Vector to store falling edges
-	vector<int64_t> peaks;
-
-	// Get peaks
-	FindPeaks(uniform, peaks);
-
-	// Get the number of peaks
-	size_t num_of_peaks = peaks.size();
-
-	int64_t sum_half_widths = 0;
-
-	// Calculate and store the full width at half maximum and amplitude for all peaks
-	for(size_t i = 0; i < num_of_peaks; i++)
+	if (uniform)
 	{
-		size_t j;
-		int64_t width = 0;
-		int64_t index = peaks[i] / din->m_timescale;
-		float half_max = din_norm[index] / 2;
+		// Normalize the input signal to have all positive values
+		for(size_t i = 0; i < len; i++)
+			din_norm[i] = uniform->m_samples[i] - min_voltage;
 
-		// Calculate the distance from the peak to its half maximum on x-axis in forward direction
-		for(j = index; din_norm[j] > half_max; j++)
+		// Calculate and store the full width at half maximum and amplitude for all peaks
+		for(size_t i = 0; i < num_of_peaks; i++)
 		{
-			width++;
+			size_t j;
+			int64_t width = 0;
+			int64_t index = peak_indices[i];
+			float half_max = din_norm[index] / 2;
+
+			// Calculate the distance from the peak to its half maximum on x-axis in forward direction
+			for(j = index; din_norm[j] > half_max; j++)
+			{
+				width++;
+			}
+
+			// Calculate the distance from the peak to its half maximum on x-axis in backward direction
+			for(j = index; din_norm[j] > half_max; j--)
+			{
+				width++;
+			}
+
+			int64_t fwhm = width * din->m_timescale;
+			int64_t offset = j * din->m_timescale;
+
+			// Push FWHM information
+			cap->m_offsets.push_back(offset);
+			cap->m_durations.push_back(fwhm);
+			cap->m_samples.push_back((float)fwhm);
+
+			// Push amplitude information
+			cap1->m_offsets.push_back(offset);
+			cap1->m_durations.push_back(fwhm);
+			cap1->m_samples.push_back(uniform->m_samples[index]);
+
+			sum_half_widths += fwhm;
 		}
-
-		// Calculate the distance from the peak to its half maximum on x-axis in backward direction
-		for(j = index; din_norm[j] > half_max; j--)
-		{
-			width++;
-		}
-
-		int64_t fwhm = width * din->m_timescale;
-		int64_t offset = j * din->m_timescale;
-
-		// Push FWHM information
-		cap->m_offsets.push_back(offset);
-		cap->m_durations.push_back(fwhm);
-		cap->m_samples.push_back((float)fwhm);
-
-		// Push amplitude information
-		cap1->m_offsets.push_back(offset);
-		cap1->m_durations.push_back(fwhm);
-		cap1->m_samples.push_back(fin[index]);
-
-		sum_half_widths += fwhm;
+	}
+	else if (sparse)
+	{
+		// Normalize the input signal to have all positive values
+		for(size_t i = 0; i < len; i++)
+			din_norm[i] = sparse->m_samples[i] - min_voltage;
 	}
 
 	SetData(cap, 0);
@@ -161,5 +175,6 @@ void FullWidthHalfMax::Refresh()
 	cap->MarkModifiedFromCpu();
 	cap1->MarkModifiedFromCpu();
 
-	m_streams[2].m_value = (float) sum_half_widths / num_of_peaks;
+	if (num_of_peaks > 0)
+		m_streams[2].m_value = (float) sum_half_widths / num_of_peaks;
 }

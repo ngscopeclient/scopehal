@@ -694,9 +694,9 @@ void Filter::FindFallingEdges(UniformDigitalWaveform* data, vector<int64_t>& edg
 }
 
 /**
-	@brief Find peaks in a waveform
+	@brief Find indices of peaks in a waveform
  */
-void Filter::FindPeaks(UniformAnalogWaveform* data, vector<int64_t>& peaks)
+void Filter::FindPeaks(UniformAnalogWaveform* data, float peak_threshold, vector<int64_t>& peak_indices)
 {
 	size_t len = data->m_samples.size();
 
@@ -742,17 +742,17 @@ void Filter::FindPeaks(UniformAnalogWaveform* data, vector<int64_t>& peaks)
 		}
 
 		//Save samples with an edge
-		if(!value && last)
-			peaks.push_back(i);
+		if((!value && last) && (fin[i] > peak_threshold))
+			peak_indices.push_back(i);
 
 		last = value;
 	}
 }
 
 /**
-	@brief Find peaks in a waveform
+	@brief Find indices of peaks in a waveform
  */
-void Filter::FindPeaks(SparseAnalogWaveform* data, vector<int64_t>& peaks)
+void Filter::FindPeaks(SparseAnalogWaveform* data, float peak_threshold, vector<int64_t>& peak_indices)
 {
 	size_t len = data->m_samples.size();
 
@@ -782,7 +782,7 @@ void Filter::FindPeaks(SparseAnalogWaveform* data, vector<int64_t>& peaks)
 		thresh_diff->m_offsets[i-1] = data->m_offsets[i-1];
 	}
 
-	//Find times of the zero crossings
+	//Find indices of falling edges of threshold signal
 	bool first = true;
 	bool last = data->m_samples[0];
 	for(size_t i=1; i<len; i++)
@@ -798,8 +798,8 @@ void Filter::FindPeaks(SparseAnalogWaveform* data, vector<int64_t>& peaks)
 		}
 
 		//Save samples with an edge
-		if(!value && last)
-			peaks.push_back(i);
+		if((!value && last) && (data->m_samples[i] > peak_threshold))
+			peak_indices.push_back(i);
 
 		last = value;
 	}
