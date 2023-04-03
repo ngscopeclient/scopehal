@@ -47,6 +47,8 @@ RigolDP8xxPowerSupply::RigolDP8xxPowerSupply(SCPITransport* transport)
 	{
 		m_channels.push_back(
 			new PowerSupplyChannel(string("CH") + to_string(i+1), "#808080", i));
+
+		GetPowerOvercurrentShutdownEnabled(i); // Initialize map
 	}
 }
 
@@ -103,7 +105,7 @@ bool RigolDP8xxPowerSupply::SupportsMasterOutputSwitching()
 
 bool RigolDP8xxPowerSupply::SupportsOvercurrentShutdown()
 {
-	return false;
+	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,29 +144,35 @@ bool RigolDP8xxPowerSupply::GetPowerChannelActive(int chan)
 	return m_transport->SendCommandQueuedWithReply("OUTPUT? " + CHNAME(chan)) == "ON";
 }
 
-bool RigolDP8xxPowerSupply::IsSoftStartEnabled(int /*chan*/)
+void RigolDP8xxPowerSupply::SetPowerOvercurrentShutdownEnabled(int chan, bool enable)
 {
-	return false;
+	m_overcurrentProtectionEnabled[chan] = enable;
+	m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT:PROTECTION:STATE " + (enable ? "ON" : "OFF"));
+
+	if (enable)
+	{
+		SetPowerCurrent(chan, GetPowerCurrentNominal(chan)); // Make sure OVP level is set
+	}
+	else
+	{
+		m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT:PROTECTION:CLEAR");
+	}
 }
 
-void RigolDP8xxPowerSupply::SetSoftStartEnabled(int /*chan*/, bool /*enable*/)
+bool RigolDP8xxPowerSupply::GetPowerOvercurrentShutdownEnabled(int chan)
 {
-	
-}
+	if (m_overcurrentProtectionEnabled.find(chan) == m_overcurrentProtectionEnabled.end())
+	{
+		m_overcurrentProtectionEnabled[chan] =
+			m_transport->SendCommandQueuedWithReply(SOURCENAME(chan) + ":CURRENT:PROTECTION:STATE?") == "ON";
+	}
 
-void RigolDP8xxPowerSupply::SetPowerOvercurrentShutdownEnabled(int /*chan*/, bool /*enable*/)
-{
-	
-}
-
-bool RigolDP8xxPowerSupply::GetPowerOvercurrentShutdownEnabled(int /*chan*/)
-{
-	return false;
+	return m_overcurrentProtectionEnabled[chan];
 }
 
 bool RigolDP8xxPowerSupply::GetPowerOvercurrentShutdownTripped(int chan)
 {
-	return m_transport->SendCommandQueuedWithReply("OUTPUT:OCP:QUES? " + CHNAME(chan)) == "YES";
+	return m_transport->SendCommandQueuedWithReply(SOURCENAME(chan) + ":CURRENT:PROTECTION:TRIPPED?") == "YES";
 }
 
 void RigolDP8xxPowerSupply::SetPowerVoltage(int chan, double volts)
@@ -174,20 +182,21 @@ void RigolDP8xxPowerSupply::SetPowerVoltage(int chan, double volts)
 
 void RigolDP8xxPowerSupply::SetPowerCurrent(int chan, double amps)
 {
-	m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT " + to_string(amps));
+	if (GetPowerOvercurrentShutdownEnabled(chan))
+	{
+		// Unclear if there is a better way to do this
+		m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT:PROTECTION:LEVEL " + to_string(amps));
+	}
+
+	m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT " + to_string(amps));	
 }
 
 void RigolDP8xxPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
-	m_transport->SendCommandQueued("OUTPUT " + CHNAME(chan) + "," + (on?"ON":"OFF"));
-}
+	m_transport->SendCommandQueued("OUTPUT " + CHNAME(chan) + "," + (on ? "ON" : "OFF"));
 
-bool RigolDP8xxPowerSupply::GetMasterPowerEnable()
-{
-	return true;
-}
-
-void RigolDP8xxPowerSupply::SetMasterPowerEnable(bool /*enable*/)
-{
-	
+	if (on)
+	{
+		m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT:PROTECTION:CLEAR");
+	}
 }

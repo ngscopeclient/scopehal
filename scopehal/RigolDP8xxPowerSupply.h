@@ -71,11 +71,8 @@ public:
 	void SetPowerChannelActive(int chan, bool on) override;
 	bool IsPowerConstantCurrent(int chan) override;
 
-	bool GetMasterPowerEnable() override;
-	void SetMasterPowerEnable(bool enable) override;
-
-	bool IsSoftStartEnabled(int chan) override;
-	void SetSoftStartEnabled(int chan, bool enable) override;
+protected:
+	std::map<int, bool> m_overcurrentProtectionEnabled;
 
 public:
 	static std::string GetDriverNameInternal();
