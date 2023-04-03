@@ -58,6 +58,7 @@
 #include "RigolFunctionGenerator.h"
 
 #include "GWInstekGPDX303SPowerSupply.h"
+#include "RigolDP8xxPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
 
 #include "SiglentLoad.h"
@@ -210,6 +211,7 @@ void DriverStaticInit()
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
 	AddPowerSupplyDriverClass(GWInstekGPDX303SPowerSupply);
+	AddPowerSupplyDriverClass(RigolDP8xxPowerSupply);
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
