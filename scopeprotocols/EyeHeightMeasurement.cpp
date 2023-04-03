@@ -27,7 +27,7 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
 #include "EyeHeightMeasurement.h"
 #include "EyePattern.h"
 #include <algorithm>

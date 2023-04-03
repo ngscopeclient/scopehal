@@ -28,130 +28,153 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "EthernetProtocolDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include <algorithm>
+#include "GlitchRemovalFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-EthernetGMIIDecoder::EthernetGMIIDecoder(const string& color)
-	: EthernetProtocolDecoder(color)
+GlitchRemovalFilter::GlitchRemovalFilter(const string& color)
+	: Filter(color, CAT_MATH)
 {
-	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
-	m_inputs.clear();
+	AddDigitalStream("data");
+	// AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 
-	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	CreateInput("data");
-	CreateInput("clk");
-	CreateInput("en");
-	CreateInput("er");
+	CreateInput("Input");
+
+	m_minwidthname = "Minimum Width";
+	m_parameters[m_minwidthname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_FS));
+	m_parameters[m_minwidthname].SetIntVal(1000000000.0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+// Factory methods
 
-string EthernetGMIIDecoder::GetProtocolName()
+bool GlitchRemovalFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	return "Ethernet - GMII";
-}
-
-bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	auto chan = stream.m_channel;
-	if(chan == NULL)
+	if(stream.m_channel == NULL)
 		return false;
 
-	switch(i)
-	{
-		case 0:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL_BUS)
-		return false;
-			break;
-
-		case 1:
-		case 2:
-		case 3:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
-				return false;
-			break;
-	}
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_DIGITAL) )
+		return true;
 
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Accessors
+
+string GlitchRemovalFilter::GetProtocolName()
+{
+	return "Glitch Removal";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void EthernetGMIIDecoder::Refresh()
+template<class T>
+void DoGlitchRemoval(T* din, SparseDigitalWaveform* cap, size_t minwidth)
 {
-	ClearPackets();
+	size_t len = din->m_samples.size();
+	cap->Resize(len);
 
-	if(!VerifyAllInputsOK())
+	cap->PrepareForCpuAccess();
+	din->PrepareForCpuAccess();
+
+	size_t k = 0;
+	bool last_sample = !din->m_samples[0];
+	size_t running_length = 0;
+
+	for (size_t i = 0; i < len; i++)
+	{
+		bool this_sample = din->m_samples[i];
+		size_t this_offset;
+		size_t this_duration;
+
+		if constexpr (std::is_same<T, UniformDigitalWaveform>::value)
+		{
+			this_offset = i;
+			this_duration = 1;
+		}
+		else
+		{
+			this_offset = din->m_offsets[i];
+			this_duration = din->m_durations[i];
+		}
+
+		if (this_sample != last_sample)
+		{
+			bool coalesce = false;
+			if (k != 0)
+			{
+				if (last_sample == cap->m_samples[k-1])
+				{
+					// Don't create a new sample, just extend the last one
+					coalesce = true;
+				}
+			}
+
+			if (running_length >= minwidth && !coalesce)
+			{
+				// Install pulse
+				cap->m_offsets[k] = this_offset - running_length;
+				cap->m_samples[k] = last_sample;
+				cap->m_durations[k] = running_length;
+				k++;
+			}
+			else
+			{
+				if (k != 0)
+				{
+					// Extend last pulse
+					cap->m_durations[k-1] += running_length;
+				}
+				else
+				{
+					// At the beginning and no long-enough pulses yet
+				}
+			}
+
+			running_length = 0;
+		}
+
+		running_length += this_duration;
+
+		last_sample = this_sample;
+	}
+
+	if (k != 0)
+	{
+		cap->m_durations[k - 1] += running_length; // Extend last to end
+	}
+
+	cap->Resize(k);
+	cap->m_offsets.shrink_to_fit();
+	cap->m_durations.shrink_to_fit();
+	cap->m_samples.shrink_to_fit();
+}
+
+void GlitchRemovalFilter::Refresh()
+{
+	//Get the input data
+	auto udin = dynamic_cast<UniformDigitalWaveform*>(GetInputWaveform(0));
+	auto sdin = dynamic_cast<SparseDigitalWaveform*>(GetInputWaveform(0));
+	if (!udin && !sdin)
 	{
 		SetData(NULL, 0);
 		return;
 	}
 
-	//Get the input data
-	auto data = GetInputWaveform(0);
-	auto clk = GetInputWaveform(1);
-	auto en = GetInputWaveform(2);
-	auto er = GetInputWaveform(3);
+	//Set up output waveform and get configuration
+	auto cap = SetupEmptySparseDigitalOutputWaveform(GetInputWaveform(0), 0);
 
-	//Sample everything on the clock edges
-	SparseDigitalWaveform den;
-	SparseDigitalWaveform der;
-	SparseDigitalBusWaveform ddata;
-	SampleOnRisingEdgesBase(en, clk, den);
-	SampleOnRisingEdgesBase(er, clk, der);
-	SampleOnRisingEdgesBase(data, clk, ddata);
+	size_t minwidth = floor(m_parameters[m_minwidthname].GetFloatVal() / cap->m_timescale);
 
-	//Create the output capture
-	auto cap = new EthernetWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
-	cap->PrepareForCpuAccess();
-
-	size_t len = den.size();
-	len = min(len, der.size());
-	len = min(len, ddata.size());
-	for(size_t i=0; i < len; i++)
-	{
-		if(!den.m_samples[i])
-			continue;
-
-		//Set of recovered bytes and timestamps
-		vector<uint8_t> bytes;
-		vector<uint64_t> starts;
-		vector<uint64_t> ends;
-
-		//TODO: handle error signal (ignored for now)
-		while( (i < len) && (den.m_samples[i]) )
-		{
-			//Convert bits to bytes
-			uint8_t dval = 0;
-			for(size_t j=0; j<8; j++)
-			{
-				if(ddata.m_samples[i][j])
-					dval |= (1 << j);
-			}
-
-			bytes.push_back(dval);
-			starts.push_back(ddata.m_offsets[i]);
-			ends.push_back(ddata.m_offsets[i] + ddata.m_durations[i]);
-			i++;
-		}
-
-		//Crunch the data
-		BytesToFrames(bytes, starts, ends, cap);
-	}
-
-	SetData(cap, 0);
+	if (sdin)
+		DoGlitchRemoval(sdin, cap, minwidth);
+	else
+		DoGlitchRemoval(udin, cap, minwidth);
 
 	cap->MarkModifiedFromCpu();
 }

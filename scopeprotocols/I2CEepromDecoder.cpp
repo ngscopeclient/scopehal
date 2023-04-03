@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -60,7 +60,7 @@ I2CEepromDecoder::I2CEepromDecoder(const string& color)
 	//Maybe they're multiple stacked 24C512s?
 	m_parameters[m_memtypename].AddEnumValue("16+1 (24CM01)", 17);
 	m_parameters[m_memtypename].AddEnumValue("16+2 (24CM02)", 18);
-	m_parameters[m_memtypename].SetIntVal(04);
+	m_parameters[m_memtypename].SetIntVal(8);
 
 	m_baseaddrname = "Base Address";
 	m_parameters[m_baseaddrname] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
@@ -88,7 +88,7 @@ bool I2CEepromDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
 	if(stream.m_channel == NULL)
 		return false;
 
-	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.m_channel->GetData(0)) != NULL) )
+	if( (i == 0) && (dynamic_cast<I2CWaveform*>(stream.GetData()) != NULL) )
 		return true;
 
 	return false;
@@ -217,31 +217,38 @@ void I2CEepromDecoder::Refresh()
 
 					last_device_addr = s.m_data;
 
-					//Process extra memory address bits in the device address, if needed (for 24CM series)
-					switch(device_bits)
-					{
-						case 2:
-							ptr = (s.m_data & 0x6) >> 1;
-							break;
-
-						case 1:
-							ptr = (s.m_data & 0x2) >> 1;
-							break;
-
-						default:
-						case 0:
-							ptr = 0;
-							break;
-					}
-
-					//We should always be an I2C write (setting address pointer) even if reading data
-					//TODO: support reads continuing from the last address without updating the pointer
+					//We should normally be an I2C write (setting address pointer) even if reading data
+					//but it's possible to resume a read without changing the pointer as well
 					if(s.m_data & 1)
-						state = 0;
+					{
+						cap->m_offsets.push_back(tstart);
+						cap->m_durations.push_back(end - tstart);
+						cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_SELECT_READ, 0));
+						tstart = end;
+
+						state = 4;
+					}
 
 					//Expect ACK/NAK then move on
 					else
 					{
+						//Process extra memory address bits in the device address, if needed (for 24CM series)
+						switch(device_bits)
+						{
+							case 2:
+								ptr = (s.m_data & 0x6) >> 1;
+								break;
+
+							case 1:
+								ptr = (s.m_data & 0x2) >> 1;
+								break;
+
+							default:
+							case 0:
+								ptr = 0;
+								break;
+						}
+
 						//Offset left if device_bits is nonzero
 						size_t ui = (din->m_durations[i]) / 8;
 						end -= device_bits * ui;
@@ -284,6 +291,7 @@ void I2CEepromDecoder::Refresh()
 						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 						m_packets.push_back(pack);
 						pack = NULL;
+
 						state = 0;
 					}
 				}
@@ -312,6 +320,7 @@ void I2CEepromDecoder::Refresh()
 					pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_STATUS];
 					m_packets.push_back(pack);
 					pack = NULL;
+
 					state = 0;
 				}
 
@@ -450,6 +459,8 @@ void I2CEepromDecoder::Refresh()
 					cap->m_samples.push_back(I2CEepromSymbol(I2CEepromSymbol::TYPE_DATA, s.m_data));
 
 					pack->m_data.push_back(s.m_data);
+
+					ptr ++;
 					state = 9;
 				}
 				else

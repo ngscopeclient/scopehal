@@ -67,6 +67,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_COUNTS_SCI;
 	else if(rhs == "log BER")
 		m_type = UNIT_LOG_BER;
+	else if(rhs == "ratio (scientific)")
+		m_type = UNIT_RATIO_SCI;
 	else if(rhs == "sa/s")
 		m_type = UNIT_SAMPLERATE;
 	else if(rhs == "sa")
@@ -132,6 +134,9 @@ string Unit::ToString() const
 
 		case UNIT_COUNTS_SCI:
 			return "unitless (log)";
+
+		case UNIT_RATIO_SCI:
+			return "ratio (scientific)";
 
 		case UNIT_LOG_BER:
 			return "log BER";
@@ -363,6 +368,10 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			suffix = "#";
 			break;
 
+		case UNIT_RATIO_SCI:
+			suffix = "";
+			break;
+
 		//Dimensionless unit, no scaling applied
 		case UNIT_DB:
 			suffix = "dB";
@@ -412,7 +421,11 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	switch(m_type)
 	{
 		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
-			snprintf(tmp, sizeof(tmp), "1e%.0f", value);
+			snprintf(tmp, sizeof(tmp), "1e%.2f", value);
+			break;
+
+		case UNIT_RATIO_SCI:
+			snprintf(tmp, sizeof(tmp), "%.2e", value);
 			break;
 
 		//TODO: separate pretty printing functions? We don't have enough sig figs to properly show large integers
@@ -513,6 +526,7 @@ string Unit::PrettyPrintRange(double pixelMin, double pixelMax, double rangeMin,
 	if(m_type == Unit::UNIT_LOG_BER)
 	{
 		snprintf(tmp1, sizeof(tmp1), "1e%.0f", valueMinRescaled);
+
 		SetDefaultLocale();
 		return string(tmp1);
 	}

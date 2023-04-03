@@ -27,131 +27,26 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "EthernetProtocolDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include <algorithm>
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of SNRFilter
+ */
+#ifndef SNRFilter_h
+#define SNRFilter_h
 
-using namespace std;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-EthernetGMIIDecoder::EthernetGMIIDecoder(const string& color)
-	: EthernetProtocolDecoder(color)
+class SNRFilter : public Filter
 {
-	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
-	m_inputs.clear();
+public:
+	SNRFilter(const std::string& color);
 
-	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	CreateInput("data");
-	CreateInput("clk");
-	CreateInput("en");
-	CreateInput("er");
-}
+	virtual void Refresh();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
+	static std::string GetProtocolName();
 
-string EthernetGMIIDecoder::GetProtocolName()
-{
-	return "Ethernet - GMII";
-}
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	auto chan = stream.m_channel;
-	if(chan == NULL)
-		return false;
+	PROTOCOL_DECODER_INITPROC(SNRFilter)
+};
 
-	switch(i)
-	{
-		case 0:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL_BUS)
-		return false;
-			break;
-
-		case 1:
-		case 2:
-		case 3:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
-				return false;
-			break;
-	}
-
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void EthernetGMIIDecoder::Refresh()
-{
-	ClearPackets();
-
-	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
-		return;
-	}
-
-	//Get the input data
-	auto data = GetInputWaveform(0);
-	auto clk = GetInputWaveform(1);
-	auto en = GetInputWaveform(2);
-	auto er = GetInputWaveform(3);
-
-	//Sample everything on the clock edges
-	SparseDigitalWaveform den;
-	SparseDigitalWaveform der;
-	SparseDigitalBusWaveform ddata;
-	SampleOnRisingEdgesBase(en, clk, den);
-	SampleOnRisingEdgesBase(er, clk, der);
-	SampleOnRisingEdgesBase(data, clk, ddata);
-
-	//Create the output capture
-	auto cap = new EthernetWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
-	cap->PrepareForCpuAccess();
-
-	size_t len = den.size();
-	len = min(len, der.size());
-	len = min(len, ddata.size());
-	for(size_t i=0; i < len; i++)
-	{
-		if(!den.m_samples[i])
-			continue;
-
-		//Set of recovered bytes and timestamps
-		vector<uint8_t> bytes;
-		vector<uint64_t> starts;
-		vector<uint64_t> ends;
-
-		//TODO: handle error signal (ignored for now)
-		while( (i < len) && (den.m_samples[i]) )
-		{
-			//Convert bits to bytes
-			uint8_t dval = 0;
-			for(size_t j=0; j<8; j++)
-			{
-				if(ddata.m_samples[i][j])
-					dval |= (1 << j);
-			}
-
-			bytes.push_back(dval);
-			starts.push_back(ddata.m_offsets[i]);
-			ends.push_back(ddata.m_offsets[i] + ddata.m_durations[i]);
-			i++;
-		}
-
-		//Crunch the data
-		BytesToFrames(bytes, starts, ends, cap);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-}
+#endif

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,32 +27,32 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef AgilentOscilloscope_h
-#define AgilentOscilloscope_h
+#ifndef RSRTO6Oscilloscope_h
+#define RSRTO6Oscilloscope_h
 
-#include "EdgeTrigger.h"
-#include "PulseWidthTrigger.h"
-#include "NthEdgeBurstTrigger.h"
+class EdgeTrigger;
 
-class AgilentOscilloscope : public virtual SCPIOscilloscope
+class RSRTO6Oscilloscope 
+	: public virtual SCPIOscilloscope
+	, public virtual SCPIFunctionGenerator
 {
 public:
-	AgilentOscilloscope(SCPITransport* transport);
-	virtual ~AgilentOscilloscope();
+	RSRTO6Oscilloscope(SCPITransport* transport);
+	virtual ~RSRTO6Oscilloscope();
 
 	//not copyable or assignable
-	AgilentOscilloscope(const AgilentOscilloscope& rhs) =delete;
-	AgilentOscilloscope& operator=(const AgilentOscilloscope& rhs) =delete;
+	RSRTO6Oscilloscope(const RSRTO6Oscilloscope& rhs) =delete;
+	RSRTO6Oscilloscope& operator=(const RSRTO6Oscilloscope& rhs) =delete;
 
 public:
-
 	//Device information
 	virtual unsigned int GetInstrumentTypes();
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	virtual void FlushConfigCache();
+	virtual OscilloscopeChannel* GetExternalTrigger();
 
 	//Channel configuration
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);
@@ -63,11 +63,22 @@ public:
 	virtual void SetChannelAttenuation(size_t i, double atten);
 	virtual unsigned int GetChannelBandwidthLimit(size_t i);
 	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
 	virtual float GetChannelVoltageRange(size_t i, size_t stream);
 	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
 	virtual float GetChannelOffset(size_t i, size_t stream);
 	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
+	virtual std::string GetProbeName(size_t i);
+
+	//Digital channel configuration
+	virtual std::vector<DigitalBank> GetDigitalBanks();
+	virtual DigitalBank GetDigitalBank(size_t channel);
+	virtual bool IsDigitalHysteresisConfigurable();
+	virtual bool IsDigitalThresholdConfigurable();
+	// virtual float GetDigitalHysteresis(size_t channel);
+	virtual float GetDigitalThreshold(size_t channel);
+	// virtual void SetDigitalHysteresis(size_t channel, float level);
+	virtual void SetDigitalThreshold(size_t channel, float level);
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -79,8 +90,8 @@ public:
 	virtual bool IsTriggerArmed();
 	virtual void PushTrigger();
 	virtual void PullTrigger();
-	virtual std::vector<std::string> GetTriggerTypes();
 
+	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved();
 	virtual std::vector<uint64_t> GetSampleRatesInterleaved();
 	virtual std::set<InterleaveConflict> GetInterleaveConflicts();
@@ -95,6 +106,37 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Function generator
+
+	//Channel info
+	virtual std::vector<WaveShape> GetAvailableWaveformShapes(int chan);
+
+	//Configuration
+	virtual bool GetFunctionChannelActive(int chan);
+	virtual void SetFunctionChannelActive(int chan, bool on);
+
+	virtual bool HasFunctionDutyCycleControls(int chan);
+	virtual float GetFunctionChannelDutyCycle(int chan);
+	virtual void SetFunctionChannelDutyCycle(int chan, float duty);
+
+	virtual float GetFunctionChannelAmplitude(int chan);
+	virtual void SetFunctionChannelAmplitude(int chan, float amplitude);
+
+	virtual float GetFunctionChannelOffset(int chan);
+	virtual void SetFunctionChannelOffset(int chan, float offset);
+
+	virtual float GetFunctionChannelFrequency(int chan);
+	virtual void SetFunctionChannelFrequency(int chan, float hz);
+
+	virtual WaveShape GetFunctionChannelShape(int chan);
+	virtual void SetFunctionChannelShape(int chan, WaveShape shape);
+
+	virtual bool HasFunctionRiseFallTimeControls(int chan);
+
+	virtual OutputImpedance GetFunctionChannelOutputImpedance(int chan);
+	virtual void SetFunctionChannelOutputImpedance(int chan, OutputImpedance z);
+
 protected:
 	OscilloscopeChannel* m_extTrigChannel;
 
@@ -103,81 +145,45 @@ protected:
 
 	//hardware analog channel count, independent of LA option etc
 	unsigned int m_analogChannelCount;
-	unsigned int m_digitalChannelCount;
 	unsigned int m_digitalChannelBase;
+	unsigned int m_digitalChannelCount;
+	bool m_hasAFG;
+	unsigned int m_firstAFGIndex;
 
-	enum ProbeType {
-		None,
-		AutoProbe,
-		SmartProbe,
-	};
+	const static std::map<const std::string, const WaveShape> m_waveShapeNames;
+
+	bool IsAnalog(size_t index)
+	{ return index < m_analogChannelCount; }
+
+	int HWDigitalNumber(size_t index)
+	{ return index - m_digitalChannelBase; }
+
+	template <typename T> size_t AcquireHeader(T* cap, std::string chname);
 
 	//config cache
 	std::map<size_t, float> m_channelOffsets;
 	std::map<size_t, float> m_channelVoltageRanges;
-	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
-	std::map<size_t, double> m_channelAttenuations;
-	std::map<size_t, int> m_channelBandwidthLimits;
 	std::map<int, bool> m_channelsEnabled;
-	std::map<size_t, ProbeType> m_probeTypes;
-
-	bool m_sampleDepthValid;
-	uint64_t m_sampleDepth;
-	bool m_sampleRateValid;
-	uint64_t m_sampleRate;
+	std::map<size_t, OscilloscopeChannel::CouplingType> m_channelCouplings;
+	std::map<size_t, int> m_channelBandwidthLimits;
+	std::map<size_t, double> m_channelAttenuations;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
+	bool m_sampleRateValid;
+	uint64_t m_sampleRate;
+	bool m_sampleDepthValid;
+	uint64_t m_sampleDepth;
+	bool m_triggerOffsetValid;
+	uint64_t m_triggerOffset;
+
 	void PullEdgeTrigger();
-	void PullNthEdgeBurstTrigger();
-	void PullPulseWidthTrigger();
-
-	void GetTriggerSlope(EdgeTrigger* trig, std::string reply);
-	void GetTriggerSlope(NthEdgeBurstTrigger* trig, std::string reply);
-	Trigger::Condition GetCondition(std::string reply);
-	void GetProbeType(size_t i);
-
 	void PushEdgeTrigger(EdgeTrigger* trig);
-	void PushNthEdgeBurstTrigger(NthEdgeBurstTrigger* trig);
-	void PushPulseWidthTrigger(PulseWidthTrigger* trig);
-	void PushCondition(std::string path, Trigger::Condition cond);
-	void PushFloat(std::string path, float f);
-	void PushSlope(std::string path, EdgeTrigger::EdgeType slope);
-	void PushSlope(std::string path, NthEdgeBurstTrigger::EdgeType slope);
-
-private:
-	static std::map<uint64_t, uint64_t> m_sampleRateToDuration;
-
-	struct WaveformPreamble {
-		unsigned int format;
-		unsigned int type;
-		size_t length;
-		unsigned int average_count;
-		double xincrement;
-		double xorigin;
-		double xreference;
-		double yincrement;
-		double yorigin;
-		double yreference;
-	};
-
-	void ConfigureWaveform(std::string channel);
-	bool IsAnalogChannel(size_t i);
-	size_t GetDigitalPodIndex(size_t i);
-	std::string GetDigitalPodName(size_t i);
-	std::vector<uint8_t> GetWaveformData(std::string channel);
-	WaveformPreamble GetWaveformPreamble(std::string channel);
-	void ProcessDigitalWaveforms(
-		std::map<int, std::vector<WaveformBase*>> &pending_waveforms,
-		std::vector<uint8_t> &data, WaveformPreamble &preamble,
-		size_t chan_start);
-	void SetSampleRateAndDepth(uint64_t rate, uint64_t depth);
-
 
 public:
 	static std::string GetDriverNameInternal();
-	OSCILLOSCOPE_INITPROC(AgilentOscilloscope)
+	OSCILLOSCOPE_INITPROC(RSRTO6Oscilloscope)
 };
 
 #endif

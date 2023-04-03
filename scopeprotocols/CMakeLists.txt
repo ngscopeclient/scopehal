@@ -32,6 +32,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	DivideFilter.cpp
 	DownconvertFilter.cpp
 	DownsampleFilter.cpp
+	DPAuxChannelDecoder.cpp
 	DPhyDataDecoder.cpp
 	DPhyEscapeModeDecoder.cpp
 	DPhyHSClockRecoveryFilter.cpp
@@ -75,6 +76,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FrequencyMeasurement.cpp
 	FSKDecoder.cpp
 	FullWidthHalfMax.cpp
+	GlitchRemovalFilter.cpp
 	GroupDelayFilter.cpp
 	HistogramFilter.cpp
 	HorizontalBathtub.cpp
@@ -128,6 +130,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	SDCmdDecoder.cpp
 	SDDataDecoder.cpp
 	SDRAMDecoderBase.cpp
+	SNRFilter.cpp
 	SParameterCascadeFilter.cpp
 	SParameterDeEmbedFilter.cpp
 	SpectrogramFilter.cpp

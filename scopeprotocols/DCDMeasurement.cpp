@@ -27,7 +27,9 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
+#include "DDJMeasurement.h"
+#include "DCDMeasurement.h"
 
 using namespace std;
 

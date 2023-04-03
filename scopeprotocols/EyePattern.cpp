@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -116,6 +116,8 @@ EyePattern::EyePattern(const string& color)
 	, m_rateName("Bit Rate")
 {
 	AddStream(Unit(Unit::UNIT_COUNTS), "data", Stream::STREAM_TYPE_EYE);
+	AddStream(Unit(Unit::UNIT_RATIO_SCI), "hitrate", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	CreateInput("din");
 	CreateInput("clk");
 
@@ -965,5 +967,7 @@ void EyePattern::DoMaskTest(EyeWaveform* cap)
 		}
 	}
 
-	cap->SetMaskHitRate(hits * 1.0f / total);
+	auto rate = hits * 1.0f / total;
+	cap->SetMaskHitRate(rate);
+	m_streams[1].m_value = rate;
 }

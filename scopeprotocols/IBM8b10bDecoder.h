@@ -103,6 +103,8 @@ public:
 protected:
 	std::string m_displayformat;
 
+	std::string m_commaSearchWindow;
+
 	void Align(SparseDigitalWaveform& data, size_t& i);
 };
 

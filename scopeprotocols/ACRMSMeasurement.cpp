@@ -27,7 +27,7 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopeprotocols.h"
+#include "../scopehal/scopehal.h"
 #include "ACRMSMeasurement.h"
 
 using namespace std;

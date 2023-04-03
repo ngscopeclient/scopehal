@@ -775,7 +775,7 @@ public:
 	/**
 		@brief Load instrument and channel configuration from a save file
 	 */
-	virtual void LoadConfiguration(const YAML::Node& node, IDTable& idmap);
+	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sample format conversion

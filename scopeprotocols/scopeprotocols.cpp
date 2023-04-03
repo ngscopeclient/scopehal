@@ -70,6 +70,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(DivideFilter);
 	AddDecoderClass(DownconvertFilter);
 	AddDecoderClass(DownsampleFilter);
+	AddDecoderClass(DPAuxChannelDecoder);
 	AddDecoderClass(DPhyDataDecoder);
 	AddDecoderClass(DPhyEscapeModeDecoder);
 	AddDecoderClass(DPhyHSClockRecoveryFilter);
@@ -110,6 +111,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(FrequencyMeasurement);
 	AddDecoderClass(FSKDecoder);
 	AddDecoderClass(FullWidthHalfMax);
+	AddDecoderClass(GlitchRemovalFilter);
 	AddDecoderClass(GroupDelayFilter);
 	AddDecoderClass(HistogramFilter);
 	AddDecoderClass(HorizontalBathtub);
@@ -162,6 +164,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
 	AddDecoderClass(SDDataDecoder);
+	AddDecoderClass(SNRFilter);
 	AddDecoderClass(SParameterCascadeFilter);
 	AddDecoderClass(SParameterDeEmbedFilter);
 #ifndef _APPLE_SILICON

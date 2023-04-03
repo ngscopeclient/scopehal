@@ -27,131 +27,111 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "EthernetProtocolDecoder.h"
-#include "EthernetGMIIDecoder.h"
-#include <algorithm>
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of DPAuxChannelDecoder
+ */
+#ifndef DPAuxChannelDecoder_h
+#define DPAuxChannelDecoder_h
 
-using namespace std;
+#include "../scopehal/PacketDecoder.h"
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-EthernetGMIIDecoder::EthernetGMIIDecoder(const string& color)
-	: EthernetProtocolDecoder(color)
+class DPAuxSymbol
 {
-	//Digital inputs, so need to undo some stuff for the PHY layer decodes
-	m_signalNames.clear();
-	m_inputs.clear();
-
-	//Add inputs. Make data be the first, because we normally want the overlay shown there.
-	CreateInput("data");
-	CreateInput("clk");
-	CreateInput("en");
-	CreateInput("er");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Accessors
-
-string EthernetGMIIDecoder::GetProtocolName()
-{
-	return "Ethernet - GMII";
-}
-
-bool EthernetGMIIDecoder::ValidateChannel(size_t i, StreamDescriptor stream)
-{
-	auto chan = stream.m_channel;
-	if(chan == NULL)
-		return false;
-
-	switch(i)
+public:
+	enum stype
 	{
-		case 0:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL_BUS)
-		return false;
-			break;
+		TYPE_ERROR,
+		TYPE_PREAMBLE,
+		TYPE_SYNC,
+		TYPE_COMMAND,
+		TYPE_ADDRESS,
+		TYPE_I2C_ADDRESS,
+		TYPE_LEN,
+		TYPE_PAD,
+		TYPE_AUX_REPLY,
+		TYPE_I2C_REPLY,
+		TYPE_DATA,
+		TYPE_STOP
+	};
 
-		case 1:
-		case 2:
-		case 3:
-			if(stream.GetType() != Stream::STREAM_TYPE_DIGITAL)
-				return false;
-			break;
+	DPAuxSymbol()
+	{}
+
+	DPAuxSymbol(stype t, uint32_t d = 0)
+	 : m_stype(t)
+	 , m_data(d)
+	{}
+
+	stype m_stype;
+	uint32_t m_data;
+
+	bool operator== (const DPAuxSymbol& s) const
+	{
+		return (m_stype == s.m_stype) && (m_data == s.m_data);
+	}
+};
+
+class DPAuxWaveform : public SparseWaveform<DPAuxSymbol>
+{
+public:
+	DPAuxWaveform () : SparseWaveform<DPAuxSymbol>() {};
+	virtual std::string GetText(size_t) override;
+	virtual std::string GetColor(size_t) override;
+};
+
+class DPAuxChannelDecoder : public PacketDecoder
+{
+public:
+	DPAuxChannelDecoder(const std::string& color);
+	virtual ~DPAuxChannelDecoder();
+
+	virtual void Refresh() override;
+	static std::string GetProtocolName();
+
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+	virtual std::vector<std::string> GetHeaders() override;
+
+	virtual bool CanMerge(Packet* first, Packet* cur, Packet* next) override;
+	virtual Packet* CreateMergedHeader(Packet* pack, size_t i) override;
+
+	PROTOCOL_DECODER_INITPROC(DPAuxChannelDecoder)
+
+protected:
+	bool FindFallingEdge(size_t& i, UniformAnalogWaveform* cap);
+	bool FindRisingEdge(size_t& i, UniformAnalogWaveform* cap);
+
+	std::string DecodeRegisterName(uint32_t nreg);
+	std::string DecodeRegisterContent(uint32_t start_addr, const std::vector<uint8_t>& data);
+
+	bool FindEdge(size_t& i, UniformAnalogWaveform* cap, bool polarity)
+	{
+		if(polarity)
+			return FindRisingEdge(i, cap);
+		else
+			return FindFallingEdge(i, cap);
 	}
 
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Actual decoder logic
-
-void EthernetGMIIDecoder::Refresh()
-{
-	ClearPackets();
-
-	if(!VerifyAllInputsOK())
+	enum
 	{
-		SetData(NULL, 0);
-		return;
-	}
+		CAP_FORMAT_1BYTE,
+		CAP_FORMAT_4BYTE,
+		CAP_FORMAT_UNKNOWN
+	} m_capFormat;
 
-	//Get the input data
-	auto data = GetInputWaveform(0);
-	auto clk = GetInputWaveform(1);
-	auto en = GetInputWaveform(2);
-	auto er = GetInputWaveform(3);
-
-	//Sample everything on the clock edges
-	SparseDigitalWaveform den;
-	SparseDigitalWaveform der;
-	SparseDigitalBusWaveform ddata;
-	SampleOnRisingEdgesBase(en, clk, den);
-	SampleOnRisingEdgesBase(er, clk, der);
-	SampleOnRisingEdgesBase(data, clk, ddata);
-
-	//Create the output capture
-	auto cap = new EthernetWaveform;
-	cap->m_timescale = 1;
-	cap->m_startTimestamp = data->m_startTimestamp;
-	cap->m_startFemtoseconds = data->m_startFemtoseconds;
-	cap->PrepareForCpuAccess();
-
-	size_t len = den.size();
-	len = min(len, der.size());
-	len = min(len, ddata.size());
-	for(size_t i=0; i < len; i++)
+	enum
 	{
-		if(!den.m_samples[i])
-			continue;
+		DFP_TYPE_VGA,
+		DFP_TYPE_DVI,
+		DFP_TYPE_DP,
+		DFP_TYPE_HDMI,
+		DFP_TYPE_DP_PP,
+		DFP_TYPE_WIRELESS,
+		DFP_TYPE_UNKNOWN
+	} m_dfpType;
 
-		//Set of recovered bytes and timestamps
-		vector<uint8_t> bytes;
-		vector<uint64_t> starts;
-		vector<uint64_t> ends;
+	int m_dcpdRevision;
+};
 
-		//TODO: handle error signal (ignored for now)
-		while( (i < len) && (den.m_samples[i]) )
-		{
-			//Convert bits to bytes
-			uint8_t dval = 0;
-			for(size_t j=0; j<8; j++)
-			{
-				if(ddata.m_samples[i][j])
-					dval |= (1 << j);
-			}
-
-			bytes.push_back(dval);
-			starts.push_back(ddata.m_offsets[i]);
-			ends.push_back(ddata.m_offsets[i] + ddata.m_durations[i]);
-			i++;
-		}
-
-		//Crunch the data
-		BytesToFrames(bytes, starts, ends, cap);
-	}
-
-	SetData(cap, 0);
-
-	cap->MarkModifiedFromCpu();
-}
+#endif
