@@ -39,6 +39,7 @@ public:
 
 	PowerSupplyChannel(
 		const std::string& hwname,
+		PowerSupply* powerSupply,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
@@ -65,6 +66,11 @@ public:
 	float GetCurrentSetPoint()
 	{ return GetScalarValue(STREAM_CURRENT_SET_POINT); }
 
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+protected:
+	PowerSupply* m_powerSupply;
 };
 
 #endif
