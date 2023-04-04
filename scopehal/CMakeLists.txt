@@ -109,6 +109,7 @@ set(SCOPEHAL_SOURCES
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	DemoOscilloscope.cpp
+	DemoPowerSupply.cpp
 	DigilentOscilloscope.cpp
 	DSLabsOscilloscope.cpp
 	GWInstekGPDX303SPowerSupply.cpp
