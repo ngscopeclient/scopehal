@@ -39,6 +39,7 @@
 #include "AntikernelLabsOscilloscope.h"
 #include "AntikernelLogicAnalyzer.h"
 #include "DemoOscilloscope.h"
+#include "DemoPowerSupply.h"
 #include "DigilentOscilloscope.h"
 #include "DSLabsOscilloscope.h"
 #include "KeysightDCA.h"
@@ -209,6 +210,7 @@ void DriverStaticInit()
 
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 
+	AddPowerSupplyDriverClass(DemoPowerSupply);
 	AddPowerSupplyDriverClass(GWInstekGPDX303SPowerSupply);
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 
