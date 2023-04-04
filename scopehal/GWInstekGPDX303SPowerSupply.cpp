@@ -49,7 +49,7 @@ GWInstekGPDX303SPowerSupply::GWInstekGPDX303SPowerSupply(SCPITransport* transpor
 	for(int i=0; i<channelCount; i++)
 	{
 		m_channels.push_back(
-			new PowerSupplyChannel(string("CH") + to_string(i+1), "#808080", i));
+			new PowerSupplyChannel(string("CH") + to_string(i+1), this, "#808080", i));
 	}
 }
 

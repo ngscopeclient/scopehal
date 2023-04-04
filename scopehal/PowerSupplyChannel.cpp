@@ -36,17 +36,57 @@ using namespace std;
 
 PowerSupplyChannel::PowerSupplyChannel(
 	const string& hwname,
+	PowerSupply* powerSupply,
 	const string& color,
 	size_t index)
 	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	, m_powerSupply(powerSupply)
 {
 	ClearStreams();
 	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_VOLTS), "VoltageSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_AMPS), "CurrentSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
+	CreateInput("VoltageSetPoint");
+	CreateInput("CurrentSetPoint");
 }
 
 PowerSupplyChannel::~PowerSupplyChannel()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Flow graph updates
+
+bool PowerSupplyChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+
+	if(i >= 2)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;
+
+	return false;
+}
+
+
+void PowerSupplyChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	auto voltageSetPointIn = GetInput(0);
+	if(voltageSetPointIn)
+	{
+		if(Unit(Unit::UNIT_VOLTS) == voltageSetPointIn.GetYAxisUnits())
+			m_powerSupply->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
+	}
+
+	auto currentSetPointIn = GetInput(1);
+	if(currentSetPointIn)
+	{
+		if(Unit(Unit::UNIT_AMPS) == currentSetPointIn.GetYAxisUnits())
+			m_powerSupply->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
+	}
 }
