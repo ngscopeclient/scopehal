@@ -1000,6 +1000,8 @@ public:
 	static void FindRisingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(UniformDigitalWaveform* data, std::vector<int64_t>& edges);
 	static void FindFallingEdges(SparseDigitalWaveform* data, std::vector<int64_t>& edges);
+	static void FindPeaks(UniformAnalogWaveform* data, float peak_threshold, std::vector<int64_t>& peak_indices);
+	static void FindPeaks(SparseAnalogWaveform* data, float peak_threshold, std::vector<int64_t>& peak_indices);
 
 	static void FindZeroCrossingsBase(WaveformBase* data, float threshold, std::vector<int64_t>& edges)
 	{
@@ -1028,6 +1030,15 @@ public:
 			FindFallingEdges(sdata, edges);
 		else
 			FindFallingEdges(udata, edges);
+	}
+
+	static void FindPeaks(
+		SparseAnalogWaveform* sdata, UniformAnalogWaveform* udata, float peak_threshold, std::vector<int64_t>& peak_indices)
+	{
+		if(sdata)
+			FindPeaks(sdata, peak_threshold, peak_indices);
+		else
+			FindPeaks(udata, peak_threshold, peak_indices);
 	}
 
 	static void FindZeroCrossings(
