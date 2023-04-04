@@ -46,7 +46,7 @@ RigolDP8xxPowerSupply::RigolDP8xxPowerSupply(SCPITransport* transport)
 	for(int i=0; i<nchans; i++)
 	{
 		m_channels.push_back(
-			new PowerSupplyChannel(string("CH") + to_string(i+1), "#808080", i));
+			new PowerSupplyChannel(string("CH") + to_string(i+1), this, "#808080", i));
 
 		GetPowerOvercurrentShutdownEnabled(i); // Initialize map
 	}
@@ -188,7 +188,7 @@ void RigolDP8xxPowerSupply::SetPowerCurrent(int chan, double amps)
 		m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT:PROTECTION:LEVEL " + to_string(amps));
 	}
 
-	m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT " + to_string(amps));	
+	m_transport->SendCommandQueued(SOURCENAME(chan) + ":CURRENT " + to_string(amps));
 }
 
 void RigolDP8xxPowerSupply::SetPowerChannelActive(int chan, bool on)

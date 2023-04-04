@@ -157,7 +157,7 @@ double DemoPowerSupply::GetPowerCurrentActual(int chan)
 
 	// Add 0.1% noise
 	float rand_0_to_1 = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-	float fudge = 0.999 + (RAND_0_TO_1() / 500.);
+	float fudge = 0.999 + (rand_0_to_1 / 500.);
 
 	return fudge * current;
 }
