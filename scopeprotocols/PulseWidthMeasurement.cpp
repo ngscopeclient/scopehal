@@ -39,6 +39,7 @@ PulseWidthMeasurement::PulseWidthMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
 	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
+	AddStream(Unit(Unit::UNIT_VOLTS), "Amplitude", Stream::STREAM_TYPE_ANALOG, Stream::STREAM_DO_NOT_INTERPOLATE);
 
 	//Set up channels
 	CreateInput("din");
@@ -91,12 +92,20 @@ void PulseWidthMeasurement::Refresh()
 	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
 	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 	vector<int64_t> edges;
+	float average_voltage = 0;
+	float max_value;
+	size_t temp = 0;
+
+	if(uadin)
+		average_voltage = GetAvgVoltage(uadin);
+	else if(sadin)
+		average_voltage = GetAvgVoltage(sadin);
 
 	//Auto-threshold analog signals at 50% of full scale range
 	if(uadin)
-		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+		FindZeroCrossings(uadin, average_voltage, edges);
 	else if(sadin)
-		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+		FindZeroCrossings(sadin, average_voltage, edges);
 
 	//Just find edges in digital signals
 	else if(uddin)
@@ -111,10 +120,18 @@ void PulseWidthMeasurement::Refresh()
 		return;
 	}
 
-	//Create the output
+	//Create the output for pulse width waveform
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
 	cap->m_timescale = 1;
 	cap->PrepareForCpuAccess();
+
+	//Create the output for amplitude waveform for analog inputs only
+	auto cap1 = (uadin || sadin) ? SetupEmptySparseAnalogOutputWaveform(din, 1, true) : NULL;	
+	if(cap1)
+	{
+		cap1->m_timescale = 1;
+		cap1->PrepareForCpuAccess();
+	}
 
 	size_t elen = edges.size();
 	for(size_t i=0; i < (elen - 2); i+= 2)
@@ -125,14 +142,80 @@ void PulseWidthMeasurement::Refresh()
 
 		int64_t delta = end - start;
 
+		//Push pulse width information
 		cap->m_offsets.push_back(start);
 		cap->m_durations.push_back(delta);
 		cap->m_samples.push_back(delta);
+
+		// Find amplitude information for the pulses
+		if(uadin)
+		{
+			int64_t start_index = (start - din->m_triggerPhase) / din->m_timescale;
+			int64_t end_index = (end - din->m_triggerPhase) / din->m_timescale;
+			max_value = average_voltage;
+
+			// Find out the maximum value of the pulse within boundary of the detected pulse
+			for (int64_t j = start_index; j < end_index; j++)
+			{
+				if(uadin->m_samples[j] > max_value)
+					max_value = uadin->m_samples[j];
+			}
+
+			//Push amplitude information
+			cap1->m_offsets.push_back(start);
+			cap1->m_durations.push_back(delta);
+			cap1->m_samples.push_back(max_value);
+		}
+		else if (sadin)
+		{
+			int64_t start_offs = (start - din->m_triggerPhase) / din->m_timescale;
+			int64_t end_offs = (end - din->m_triggerPhase) / din->m_timescale;
+			max_value = average_voltage;
+
+			//Parse the waveform to get to a detected pulse
+			for (size_t j = temp; j < sadin->size(); j++)
+			{
+				// Find out maximum value of the pulse within boundary of the detected pulse
+				if ((sadin->m_offsets[j] >= start_offs) && (sadin->m_offsets[j] <= end_offs))
+				{
+					if(sadin->m_samples[j] > max_value)
+						max_value = sadin->m_samples[j];
+				}
+
+				//End of one pulse reached. Record j, so that next time we start from this index for next pulse if any
+				else if (sadin->m_offsets[j] > end_offs)
+				{
+					temp = j;
+					break;
+				}
+			}
+
+			//Push amplitude information
+			cap1->m_offsets.push_back(start);
+			cap1->m_durations.push_back(delta);
+			cap1->m_samples.push_back(max_value);
+		}
 	}
 
 	SetData(cap, 0);
-
 	cap->MarkModifiedFromCpu();
+
+	if(sadin || uadin)
+	{
+		//Set amplitude output waveform
+		SetData(cap1, 1);
+		cap1->MarkModifiedFromCpu();
+	}
+	else if(uddin || sddin)
+	{
+		//Switch output waveform to digital
+		m_streams[1].m_stype = Stream::STREAM_TYPE_DIGITAL;
+		m_streams[1].m_flags = 0;
+
+		//For digital inputs, amplitude information is same as input
+		SetData(din, 1);
+		din->MarkModifiedFromCpu();
+	}
 
 	if (GetVoltageRange(0) == 0)
 		SetVoltageRange(10000000000000, 0);
