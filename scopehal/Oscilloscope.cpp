@@ -189,6 +189,7 @@ YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 	int iscope = table.emplace(this);
 
 	scope["id"] = iscope;
+	scope["type"] = "oscilloscope";
 	scope["nick"] = m_nickname;
 	scope["name"] = GetName();
 	scope["vendor"] = GetVendor();
