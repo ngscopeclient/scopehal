@@ -57,6 +57,8 @@ MockOscilloscope::MockOscilloscope(
 	, m_driver(driver)
 	, m_args(args)
 {
+	//Need to run this loader prior to the main Oscilloscope loader
+	m_loaders.push_front(sigc::mem_fun(this, &MockOscilloscope::DoLoadConfiguration));
 }
 
 MockOscilloscope::~MockOscilloscope()
@@ -160,7 +162,7 @@ bool MockOscilloscope::IsTriggerArmed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-void MockOscilloscope::LoadConfiguration(int version, const YAML::Node& node, IDTable& table)
+void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table)
 {
 	//Load the channels
 	auto& chans = node["channels"];
@@ -196,9 +198,6 @@ void MockOscilloscope::LoadConfiguration(int version, const YAML::Node& node, ID
 		//Create the channel ID
 		table.emplace(cnode["id"].as<int>(), chan);
 	}
-
-	//Call the base class to configure everything
-	Oscilloscope::LoadConfiguration(version, node, table);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

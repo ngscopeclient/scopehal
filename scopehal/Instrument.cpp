@@ -79,3 +79,20 @@ string Instrument::GetChannelDisplayName(size_t i)
 {
 	return m_channels[i]->GetHwname();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
+{
+	YAML::Node node;
+	for(auto& s : m_serializers)
+		s(node, table);
+	return node;
+}
+
+void Instrument::LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+{
+	for(auto& load : m_loaders)
+		load(version, node, idmap);
+}

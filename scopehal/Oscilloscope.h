@@ -765,17 +765,16 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
 
+protected:
 	/**
-		@brief Serializes this oscilloscope's configuration to a YAML string.
-
-		@return YAML block with this oscilloscope's configuration
+		@brief Serializes this oscilloscope's configuration to a YAML node.
 	 */
-	virtual YAML::Node SerializeConfiguration(IDTable& table);
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
 	/**
 		@brief Load instrument and channel configuration from a save file
 	 */
-	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Sample format conversion

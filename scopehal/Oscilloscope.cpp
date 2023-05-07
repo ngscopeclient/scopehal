@@ -55,6 +55,9 @@ Oscilloscope::CreateMapType Oscilloscope::m_createprocs;
 Oscilloscope::Oscilloscope()
 {
 	m_trigger = NULL;
+
+	m_serializers.push_back(sigc::mem_fun(this, &Oscilloscope::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &Oscilloscope::DoLoadConfiguration));
 }
 
 Oscilloscope::~Oscilloscope()
@@ -181,34 +184,32 @@ bool Oscilloscope::PopPendingWaveform()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
+void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	//Save basic scope info
-	YAML::Node scope;
 	YAML::Node channels;
 	int iscope = table.emplace(this);
 
-	scope["id"] = iscope;
-	scope["type"] = "oscilloscope";
-	scope["nick"] = m_nickname;
-	scope["name"] = GetName();
-	scope["vendor"] = GetVendor();
-	scope["serial"] = GetSerial();
-	scope["transport"] = GetTransportName();
-	scope["args"] = GetTransportConnectionString();
-	scope["driver"] = GetDriverName();
+	node["id"] = iscope;
+	node["nick"] = m_nickname;
+	node["name"] = GetName();
+	node["vendor"] = GetVendor();
+	node["serial"] = GetSerial();
+	node["transport"] = GetTransportName();
+	node["args"] = GetTransportConnectionString();
+	node["driver"] = GetDriverName();
 
 	//Save timebase info
-	scope["rate"] = GetSampleRate();
-	scope["depth"] = GetSampleDepth();
-	scope["interleave"] = IsInterleaving();
-	scope["triggerpos"] = GetTriggerOffset();
+	node["rate"] = GetSampleRate();
+	node["depth"] = GetSampleDepth();
+	node["interleave"] = IsInterleaving();
+	node["triggerpos"] = GetTriggerOffset();
 
 	//Save channels
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		auto chan = GetOscilloscopeChannel(i);
-		YAML::Node channelNode;
+		YAML::Node channelNode = channels["ch" + to_string(i)];
 
 		//Skip any channel that's not an oscilloscope input
 		//TODO: new unified object model might require some retooling here since we can have multiple types of channel
@@ -322,17 +323,15 @@ YAML::Node Oscilloscope::SerializeConfiguration(IDTable& table)
 		channels["ch" + to_string(i)] = channelNode;
 	}
 
-	scope["channels"] = channels;
+	node["channels"] = channels;
 
 	//Save trigger
 	auto trig = GetTrigger();
 	if(trig)
-		scope["trigger"] = trig->SerializeConfiguration(table);
-
-	return scope;
+		node["trigger"] = trig->SerializeConfiguration(table);
 }
 
-void Oscilloscope::LoadConfiguration(int version, const YAML::Node& node, IDTable& table)
+void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& table)
 {
 	m_nickname = node["nick"].as<string>();
 

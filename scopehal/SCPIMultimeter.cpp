@@ -38,6 +38,8 @@ SCPIMultimeter::MeterCreateMapType SCPIMultimeter::m_metercreateprocs;
 
 SCPIMultimeter::SCPIMultimeter()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &SCPIMultimeter::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &SCPIMultimeter::DoLoadConfiguration));
 }
 
 SCPIMultimeter::~SCPIMultimeter()
@@ -66,4 +68,26 @@ SCPIMultimeter* SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* t
 
 	LogError("Invalid driver name");
 	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void SCPIMultimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+	//TODO: how does this handle dual scope+meter instruments?
+	int imeter = table.emplace(this);
+	node["id"] = imeter;
+
+	node["nick"] = m_nickname;
+	node["name"] = GetName();
+	node["vendor"] = GetVendor();
+	node["serial"] = GetSerial();
+	node["transport"] = GetTransportName();
+	node["args"] = GetTransportConnectionString();
+	node["driver"] = GetDriverName();
+}
+
+void SCPIMultimeter::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+{
 }

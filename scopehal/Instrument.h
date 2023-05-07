@@ -38,6 +38,7 @@
 
 #include "InstrumentChannel.h"
 
+
 /**
 	@brief An arbitrary lab instrument. Oscilloscope, LA, PSU, DMM, etc
 
@@ -195,6 +196,35 @@ public:
 		@return True if waveform was acquired, false if connection lost or other serious error
 	 */
 	virtual bool AcquireData() =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Serialization
+
+public:
+
+	/**
+		@brief Serializes this instrument's configuration to a YAML node.
+
+		@return YAML block with this instrument's configuration
+	 */
+	virtual YAML::Node SerializeConfiguration(IDTable& table) const;
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+
+protected:
+
+	/**
+		@brief List of methods which need to be called to serialize this node's configuration
+	 */
+	std::list< sigc::slot<void(YAML::Node&, IDTable&)> > m_serializers;
+
+	/**
+		@brief List of methods which need to be called to deserialize this node's configuration
+	 */
+	std::list< sigc::slot<void(int, const YAML::Node&, IDTable&)> > m_loaders;
 
 protected:
 
