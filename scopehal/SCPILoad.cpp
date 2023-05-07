@@ -64,6 +64,6 @@ SCPILoad* SCPILoad::CreateLoad(string driver, SCPITransport* transport)
 	if(m_loadcreateprocs.find(driver) != m_loadcreateprocs.end())
 		return m_loadcreateprocs[driver](transport);
 
-	LogError("Invalid driver name");
+	LogError("Invalid driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }

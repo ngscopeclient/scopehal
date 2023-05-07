@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -64,6 +64,6 @@ SCPIPowerSupply* SCPIPowerSupply::CreatePowerSupply(string driver, SCPITransport
 	if(m_powercreateprocs.find(driver) != m_powercreateprocs.end())
 		return m_powercreateprocs[driver](transport);
 
-	LogError("Invalid driver name");
+	LogError("Invalid driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }

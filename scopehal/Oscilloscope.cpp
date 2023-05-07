@@ -96,7 +96,7 @@ Oscilloscope* Oscilloscope::CreateOscilloscope(string driver, SCPITransport* tra
 	if(m_createprocs.find(driver) != m_createprocs.end())
 		return m_createprocs[driver](transport);
 
-	LogError("Invalid driver name");
+	LogError("Invalid oscilloscope driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }
 

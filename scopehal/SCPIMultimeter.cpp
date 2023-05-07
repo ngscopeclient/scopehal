@@ -66,7 +66,7 @@ SCPIMultimeter* SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* t
 	if(m_metercreateprocs.find(driver) != m_metercreateprocs.end())
 		return m_metercreateprocs[driver](transport);
 
-	LogError("Invalid driver name");
+	LogError("Invalid multimeter driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }
 
@@ -90,4 +90,5 @@ void SCPIMultimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 void SCPIMultimeter::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
+	m_nickname = node["nick"].as<string>();
 }
