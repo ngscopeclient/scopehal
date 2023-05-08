@@ -69,6 +69,7 @@ public:
 	virtual MeasurementTypes GetMeterMode() =0;
 	virtual MeasurementTypes GetSecondaryMeterMode();
 	virtual std::string ModeToText(MeasurementTypes type);
+	MeasurementTypes TextToMode(const std::string& mode);
 	virtual void SetMeterMode(MeasurementTypes type) =0;
 	virtual void SetSecondaryMeterMode(MeasurementTypes type);
 
@@ -106,6 +107,20 @@ public:
 	virtual int GetMeterDigits() =0;
 
 	virtual bool AcquireData() override;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Configuration storage
+
+protected:
+	/**
+		@brief Serializes this multimeter's configuration to a YAML node.
+	 */
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 };
 
 #endif

@@ -34,6 +34,8 @@ using namespace std;
 
 Multimeter::Multimeter()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &Multimeter::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &Multimeter::DoLoadConfiguration));
 }
 
 Multimeter::~Multimeter()
@@ -112,6 +114,30 @@ string Multimeter::ModeToText(MeasurementTypes type)
 }
 
 /**
+	@brief Converts a textual meter mode to a mode ID
+ */
+Multimeter::MeasurementTypes Multimeter::TextToMode(const string& mode)
+{
+	if(mode == "Frequency")
+		return Multimeter::FREQUENCY;
+	else if(mode == "Temperature")
+		return Multimeter::TEMPERATURE;
+	else if(mode == "DC Current")
+		return Multimeter::DC_CURRENT;
+	else if(mode == "AC Current")
+		return Multimeter::AC_CURRENT;
+	else if(mode == "DC Voltage")
+		return Multimeter::DC_VOLTAGE;
+	else if(mode == "DC RMS Amplitude")
+		return Multimeter::DC_RMS_AMPLITUDE;
+	else if(mode == "AC RMS Amplitude")
+		return Multimeter::AC_RMS_AMPLITUDE;
+
+	//invalid / unknown
+	return Multimeter::DC_VOLTAGE;
+}
+
+/**
 	@brief Gets a bitmask of secondary measurement types currently available.
 
 	The return value may change depending on the current primary measurement type.
@@ -154,4 +180,62 @@ bool Multimeter::AcquireData()
 		chan->Update(this);
 
 	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void Multimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+	node["measurementTypes"] = GetMeasurementTypes();
+	node["secondaryMeasurementTypes"] = GetSecondaryMeasurementTypes();
+	node["currentChannel"] = GetCurrentMeterChannel();
+	node["meterMode"] = ModeToText(GetMeterMode());
+	node["secondaryMode"] = ModeToText(GetSecondaryMeterMode());
+	node["autoRange" ] = GetMeterAutoRange();
+	node["unit"] = GetMeterUnit().ToString();
+	node["secondaryUnit"] = GetSecondaryMeterUnit().ToString();
+	node["value"] = GetMeterUnit().PrettyPrint(GetMeterValue());
+	node["secondaryValue"] = GetSecondaryMeterUnit().PrettyPrint(GetSecondaryMeterValue());
+	node["digits"] = GetMeterDigits();
+
+	//TODO: ranges
+
+	YAML::Node chnode;
+	if(!node["channels"])
+		node["channels"] = chnode;
+
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_DMM))
+			continue;
+
+		auto chan = GetChannel(i);
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Save basic info
+		channelNode["meterid"] = table.emplace(chan);
+		channelNode["index"] = i;
+		channelNode["color"] = chan->m_displaycolor;
+		channelNode["nick"] = chan->GetDisplayName();
+		channelNode["name"] = chan->GetHwname();
+
+		node["channels"][key] = channelNode;
+	}
+}
+
+void Multimeter::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+{
+	if(node["currentChannel"])
+		SetCurrentMeterChannel(node["currentChannel"].as<int>());
+	if(node["meterMode"])
+		SetMeterMode(TextToMode(node["meterMode"].as<string>()));
+
+	//TODO: ranges
+
+	if(node["secondaryMode"])
+		SetSecondaryMeterMode(TextToMode(node["secondaryMode"].as<string>()));
+	if(node["autoRange"])
+		SetMeterAutoRange(node["autoRange"].as<bool>());
 }
