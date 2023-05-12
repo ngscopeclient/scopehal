@@ -38,7 +38,8 @@ using namespace std;
 RiseMeasurement::RiseMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	CreateInput("din");
 
 	m_startname = "Start Fraction";
@@ -124,6 +125,8 @@ void RiseMeasurement::Refresh()
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
+	double sum = 0;
+	int64_t num = 0;
 	for(size_t i=0; i < len; i++)
 	{
 		float cur = GetValue(sdin, udin, i);
@@ -151,6 +154,9 @@ void RiseMeasurement::Refresh()
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
+				sum += dt;
+				num ++;
+
 				state = 0;
 			}
 		}
@@ -160,4 +166,6 @@ void RiseMeasurement::Refresh()
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = sum / num;
 }
