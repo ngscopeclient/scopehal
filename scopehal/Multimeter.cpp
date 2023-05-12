@@ -187,6 +187,11 @@ bool Multimeter::AcquireData()
 
 void Multimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
+	//If we're derived from multimeter class but not a meter, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_DMM) == 0)
+		return;
+
 	node["measurementTypes"] = GetMeasurementTypes();
 	node["secondaryMeasurementTypes"] = GetSecondaryMeasurementTypes();
 	node["currentChannel"] = GetCurrentMeterChannel();
@@ -227,6 +232,11 @@ void Multimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 void Multimeter::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
+	//If we're derived from multimeter class but not a meter, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_DMM) == 0)
+		return;
+
 	if(node["currentChannel"])
 		SetCurrentMeterChannel(node["currentChannel"].as<int>());
 	if(node["meterMode"])
