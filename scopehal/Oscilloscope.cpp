@@ -368,7 +368,12 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		if(cnode["offset"])
 			chan->SetOffset(cnode["offset"].as<float>(), 0);
 		if(cnode["invert"])
-			chan->Invert(cnode["invert"].as<int>());
+		{
+			if(version >= 1)
+				chan->Invert(cnode["invert"].as<bool>());
+			else
+				chan->Invert(cnode["invert"].as<int>());
+		}
 
 		//Add multiple streams if present
 		auto snode = cnode["nstreams"];
