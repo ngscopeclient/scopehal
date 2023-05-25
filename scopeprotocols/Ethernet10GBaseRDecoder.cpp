@@ -28,7 +28,9 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "Ethernet10GbaseRDecoder.h"
+#include "Ethernet64b66bDecoder.h"
+#include "EthernetProtocolDecoder.h"
+#include "Ethernet10GBaseRDecoder.h"
 #include <algorithm>
 
 using namespace std;

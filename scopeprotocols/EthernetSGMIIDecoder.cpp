@@ -28,6 +28,8 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
+#include "IBM8b10bDecoder.h"
+#include "EthernetProtocolDecoder.h"
 #include "EthernetSGMIIDecoder.h"
 #include <algorithm>
 
