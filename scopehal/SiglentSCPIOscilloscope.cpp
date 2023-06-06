@@ -64,7 +64,7 @@
  *   using 4 Channels ( 700 kpts  100 MSa/s)   got 1,62 WFM/s
  *   using 1 Channels ( 1.75 Mpts  250 MSa/s)  got 2,38 WFM/s
  *   using 4 Channels ( 3.5 Mpts  500 MSa/s)   got 0,39 WFM/s
- *
+ * 
  *  TODO Click "Reload configuration from scope"   sometimes we loosing WAVE rendering ( threading issue ?)
  *  TODO sometimes socket timeout (Warning: Socket read failed errno=11 errno=4)
  *
@@ -3425,7 +3425,12 @@ void SiglentSCPIOscilloscope::PullTrigger()
 					result.push_back(substr);
 				}
 
-				if(result[0] == "EDGE")
+				if(result[0] == "GLIT")
+				{
+			     	// Glitch/Pulse GLIT,SR,C1,HT,P2,HV,2.00E-09s,HV2,3.00E-09s
+					PullPulseWidthTrigger();
+				}
+				else if(result[0] == "EDGE")
 				{
 					PullEdgeTrigger();
 				}
@@ -3512,24 +3517,44 @@ void SiglentSCPIOscilloscope::PullDropoutTrigger()
 		m_trigger = new DropoutTrigger(this);
 	DropoutTrigger* dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 
-	//Level
-	dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
-
-	//Dropout time
 	Unit fs(Unit::UNIT_FS);
-	dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
 
-	//Edge type
-	if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
-		dt->SetType(DropoutTrigger::EDGE_RISING);
-	else
-		dt->SetType(DropoutTrigger::EDGE_FALLING);
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+	    // --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			//Level
+			dt->SetLevel(stof(converse(":TRIGGER:DROPOUT:LEVEL?")));
+		
+			//Dropout time
+			dt->SetDropoutTime(fs.ParseString(converse(":TRIGGER:DROPOUT:TIME?")));
 
-	//Reset type
-	if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
-		dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
-	else
-		dt->SetResetType(DropoutTrigger::RESET_NONE);
+			//Edge type
+			if(Trim(converse(":TRIGGER:DROPOUT:SLOPE?")) == "RISING")
+				dt->SetType(DropoutTrigger::EDGE_RISING);
+			else
+				dt->SetType(DropoutTrigger::EDGE_FALLING);
+
+			//Reset type
+			if(Trim(converse(":TRIGGER:DROPOUT:TYPE?")) == "EDGE")
+				dt->SetResetType(DropoutTrigger::RESET_OPPOSITE);
+			else
+				dt->SetResetType(DropoutTrigger::RESET_NONE);
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -3601,22 +3626,48 @@ void SiglentSCPIOscilloscope::PullPulseWidthTrigger()
 	if(m_trigger == NULL)
 		m_trigger = new PulseWidthTrigger(this);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
-
-	//Level
-	pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
-
-	//Condition
-	pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
-
-	//Min range
 	Unit fs(Unit::UNIT_FS);
-	pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TLOWER?")));
 
-	//Max range
-	pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TUPPER?")));
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
 
-	//Slope
-	GetTriggerSlope(pt, Trim(converse(":TRIGGER:INTERVAL:SLOPE?")));
+			// Level
+			pt->SetLevel(stof(converse("C1:TRIG_LEVEL?"))); //,pt->GetInput(0).m_channel->GetHwname().c_str())));
+
+			// Slope
+			GetTriggerSlope(pt, Trim(converse("C1:TRIG_SLOPE?")));
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+
+			//Level
+			pt->SetLevel(stof(converse(":TRIGGER:INTERVAL:LEVEL?")));
+
+			//Condition
+			pt->SetCondition(GetCondition(converse(":TRIGGER:INTERVAL:LIMIT?")));
+
+			//Min range
+			pt->SetLowerBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TLOWER?")));
+
+			//Max range
+			pt->SetUpperBound(fs.ParseString(converse(":TRIGGER:INTERVAL:TUPPER?")));
+
+			//Slope
+			GetTriggerSlope(pt, Trim(converse(":TRIGGER:INTERVAL:SLOPE?")));
+			break;
+
+	    // --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// ----
+	}
 }
 
 /**
@@ -3636,29 +3687,51 @@ void SiglentSCPIOscilloscope::PullRuntTrigger()
 		m_trigger = new RuntTrigger(this);
 	RuntTrigger* rt = dynamic_cast<RuntTrigger*>(m_trigger);
 
-	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LLEVEL?")));
-
-	//Upper bound
-	rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:HLEVEL?")));
-
-	//Lower interval
 	Unit fs(Unit::UNIT_FS);
-	rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:TLOWER?")));
+	string reply;
 
-	//Upper interval
-	rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:TUPPER?")));
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 
-	//Slope
-	auto reply = Trim(converse(":TRIGGER:RUNT:POLARITY?"));
-	if(reply == "POSitive")
-		rt->SetSlope(RuntTrigger::EDGE_RISING);
-	else if(reply == "NEGative")
-		rt->SetSlope(RuntTrigger::EDGE_FALLING);
+			//Lower bound
+			rt->SetLowerBound(v.ParseString(converse(":TRIGGER:RUNT:LLEVEL?")));
 
-	//Condition
-	rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:LIMIT?")));
+			//Upper bound
+			rt->SetUpperBound(v.ParseString(converse(":TRIGGER:RUNT:HLEVEL?")));
+            
+			//Lower bound
+			rt->SetLowerInterval(fs.ParseString(converse(":TRIGGER:RUNT:TLOWER?")));
+
+			//Upper interval
+			rt->SetUpperInterval(fs.ParseString(converse(":TRIGGER:RUNT:TUPPER?")));
+
+			//Slope
+			reply = Trim(converse(":TRIGGER:RUNT:POLARITY?"));
+			if(reply == "POSitive")
+				rt->SetSlope(RuntTrigger::EDGE_RISING);
+			else if(reply == "NEGative")
+				rt->SetSlope(RuntTrigger::EDGE_FALLING);
+
+			//Condition
+			rt->SetCondition(GetCondition(converse(":TRIGGER:RUNT:LIMIT?")));
+			break;
+			// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -3678,31 +3751,53 @@ void SiglentSCPIOscilloscope::PullSlewRateTrigger()
 		m_trigger = new SlewRateTrigger(this);
 	SlewRateTrigger* st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 
-	//Lower bound
 	Unit v(Unit::UNIT_VOLTS);
-	st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
-
-	//Upper bound
-	st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPE:HLEVEL?")));
-
-	//Lower interval
 	Unit fs(Unit::UNIT_FS);
-	st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TLOWER?")));
+	string reply ;
 
-	//Upper interval
-	st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TUPPER?")));
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 
-	//Slope
-	auto reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
-	if(reply == "RISing")
-		st->SetSlope(SlewRateTrigger::EDGE_RISING);
-	else if(reply == "FALLing")
-		st->SetSlope(SlewRateTrigger::EDGE_FALLING);
-	else if(reply == "ALTernate")
-		st->SetSlope(SlewRateTrigger::EDGE_ANY);
+			//Lower bound
+	        st->SetLowerBound(v.ParseString(converse(":TRIGGER:SLOPE:LLEVEL?")));
 
-	//Condition
-	st->SetCondition(GetCondition(converse("TRIGGER:SLOPE:LIMIT?")));
+			//Upper bound
+			st->SetUpperBound(v.ParseString(converse(":TRIGGER:SLOPE:HLEVEL?")));
+
+	        //Lower interval
+			st->SetLowerInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TLOWER?")));
+
+			//Upper interval
+			st->SetUpperInterval(fs.ParseString(converse(":TRIGGER:SLOPE:TUPPER?")));
+
+			//Slope
+			reply = Trim(converse("TRIGGER:SLOPE:SLOPE?"));
+			if(reply == "RISing")
+				st->SetSlope(SlewRateTrigger::EDGE_RISING);
+			else if(reply == "FALLing")
+				st->SetSlope(SlewRateTrigger::EDGE_FALLING);
+			else if(reply == "ALTernate")
+				st->SetSlope(SlewRateTrigger::EDGE_ANY);
+
+			//Condition
+			st->SetCondition(GetCondition(converse("TRIGGER:SLOPE:LIMIT?")));
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -3722,55 +3817,78 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
 		m_trigger = new UartTrigger(this);
 	UartTrigger* ut = dynamic_cast<UartTrigger*>(m_trigger);
 
-	//Bit rate
-	ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
+    string reply;
+	string p1;
 
-	//Level
-	ut->SetLevel(stof(converse(":TRIGGER:UART:LIMIT?")));
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
 
-	//Parity
-	auto reply = Trim(converse(":TRIGGER:UART:PARITY?"));
-	if(reply == "NONE")
-		ut->SetParityType(UartTrigger::PARITY_NONE);
-	else if(reply == "EVEN")
-		ut->SetParityType(UartTrigger::PARITY_EVEN);
-	else if(reply == "ODD")
-		ut->SetParityType(UartTrigger::PARITY_ODD);
-	else if(reply == "MARK")
-		ut->SetParityType(UartTrigger::PARITY_MARK);
-	else if(reply == "SPACe")
-		ut->SetParityType(UartTrigger::PARITY_SPACE);
+			//Bit rate
+			ut->SetBitRate(stoi(converse(":TRIGGER:UART:BAUD?")));
 
-	//Operator
-	//bool ignore_p2 = true;
+			//Level
+			ut->SetLevel(stof(converse(":TRIGGER:UART:LIMIT?")));
 
-	// It seems this scope only copes with equivalence
-	ut->SetCondition(Trigger::CONDITION_EQUAL);
+			//Parity
+			reply = Trim(converse(":TRIGGER:UART:PARITY?"));
+			if(reply == "NONE")
+				ut->SetParityType(UartTrigger::PARITY_NONE);
+			else if(reply == "EVEN")
+				ut->SetParityType(UartTrigger::PARITY_EVEN);
+			else if(reply == "ODD")
+				ut->SetParityType(UartTrigger::PARITY_ODD);
+			else if(reply == "MARK")
+				ut->SetParityType(UartTrigger::PARITY_MARK);
+			else if(reply == "SPACe")
+				ut->SetParityType(UartTrigger::PARITY_SPACE);
 
-	//Idle polarity
-	reply = Trim(converse(":TRIGGER:UART:IDLE?"));
-	if(reply == "HIGH")
-		ut->SetPolarity(UartTrigger::IDLE_HIGH);
-	else if(reply == "LOW")
-		ut->SetPolarity(UartTrigger::IDLE_LOW);
+			//Operator
+			//bool ignore_p2 = true;
 
-	//Stop bits
-	ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
+			// It seems this scope only copes with equivalence
+			ut->SetCondition(Trigger::CONDITION_EQUAL);
 
-	//Trigger type
-	reply = Trim(converse(":TRIGGER:UART:CONDITION?"));
-	if(reply == "STARt")
-		ut->SetMatchType(UartTrigger::TYPE_START);
-	else if(reply == "STOP")
-		ut->SetMatchType(UartTrigger::TYPE_STOP);
-	else if(reply == "ERRor")
-		ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
-	else
-		ut->SetMatchType(UartTrigger::TYPE_DATA);
+			//Idle polarity
+			reply = Trim(converse(":TRIGGER:UART:IDLE?"));
+			if(reply == "HIGH")
+				ut->SetPolarity(UartTrigger::IDLE_HIGH);
+			else if(reply == "LOW")
+				ut->SetPolarity(UartTrigger::IDLE_LOW);
 
-	// Data to match (there is no pattern2 on sds)
-	string p1 = Trim(converse(":TRIGGER:UART:DATA?"));
-	ut->SetPatterns(p1, "", true);
+			//Stop bits
+			ut->SetStopBits(stof(Trim(converse(":TRIGGER:UART:STOP?"))));
+
+			//Trigger type
+			reply = Trim(converse(":TRIGGER:UART:CONDITION?"));
+			if(reply == "STARt")
+				ut->SetMatchType(UartTrigger::TYPE_START);
+			else if(reply == "STOP")
+				ut->SetMatchType(UartTrigger::TYPE_STOP);
+			else if(reply == "ERRor")
+				ut->SetMatchType(UartTrigger::TYPE_PARITY_ERR);
+			else
+				ut->SetMatchType(UartTrigger::TYPE_DATA);
+
+			// Data to match (there is no pattern2 on sds)
+			p1 = Trim(converse(":TRIGGER:UART:DATA?"));
+			ut->SetPatterns(p1, "", true);
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -3789,13 +3907,34 @@ void SiglentSCPIOscilloscope::PullWindowTrigger()
 	if(m_trigger == NULL)
 		m_trigger = new WindowTrigger(this);
 	WindowTrigger* wt = dynamic_cast<WindowTrigger*>(m_trigger);
-
-	//Lower bound
+    
 	Unit v(Unit::UNIT_VOLTS);
-	wt->SetLowerBound(v.ParseString(converse(":TRIGGER:WINDOW:LLEVEL?")));
 
-	//Upper bound
-	wt->SetUpperBound(v.ParseString(converse(":TRIGGER:WINDOW:HLEVEL?")));
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+	    // --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+
+			//Lower bound
+			wt->SetLowerBound(v.ParseString(converse(":TRIGGER:WINDOW:LLEVEL?")));
+
+			//Upper bound
+			wt->SetUpperBound(v.ParseString(converse(":TRIGGER:WINDOW:HLEVEL?")));
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -3904,7 +4043,9 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
-			{
+			{				
+				// set default
+				sendOnly("TRSE EDGE,SR,%s,HT,OFF", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushEdgeTrigger(et, "EDGE");
 			}
 			else
@@ -3979,10 +4120,30 @@ void SiglentSCPIOscilloscope::PushTrigger()
  */
 void SiglentSCPIOscilloscope::PushDropoutTrigger(DropoutTrigger* trig)
 {
-	PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
-	PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
-	sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
-	sendOnly(":TRIGGER:DROPOUT:TYPE %s", (trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE) ? "EDGE" : "STATE");
+	
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+           //TODO
+		   break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			PushFloat(":TRIGGER:DROPOUT:LEVEL", trig->GetLevel());
+			PushFloat(":TRIGGER:DROPOUT:TIME", trig->GetDropoutTime() * SECONDS_PER_FS);
+			sendOnly(":TRIGGER:DROPOUT:SLOPE %s", (trig->GetType() == DropoutTrigger::EDGE_RISING) ? "RISING" : "FALLING");
+			sendOnly(":TRIGGER:DROPOUT:TYPE %s", (trig->GetResetType() == DropoutTrigger::RESET_OPPOSITE) ? "EDGE" : "STATE");
+		    break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -4068,10 +4229,30 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
  */
 void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
 {
-	PushEdgeTrigger(trig, "INTERVAL");
-	PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
-	PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:INTERVAL:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
+	
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			PushEdgeTrigger(trig, "INTERVAL");
+			PushCondition(":TRIGGER:INTERVAL", trig->GetCondition());
+			PushFloat(":TRIGGER:INTERVAL:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
+			PushFloat(":TRIGGER:INTERVAL:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -4079,13 +4260,33 @@ void SiglentSCPIOscilloscope::PushPulseWidthTrigger(PulseWidthTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushRuntTrigger(RuntTrigger* trig)
 {
-	PushCondition(":TRIGGER:RUNT", trig->GetCondition());
-	PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
-	PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetLowerBound());
-	PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetUpperBound());
+	
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			PushCondition(":TRIGGER:RUNT", trig->GetCondition());
+			PushFloat(":TRIGGER:RUNT:TUPPER", trig->GetUpperInterval() * SECONDS_PER_FS);
+			PushFloat(":TRIGGER:RUNT:TLOWER", trig->GetLowerInterval() * SECONDS_PER_FS);
+			PushFloat(":TRIGGER:RUNT:LLEVEL", trig->GetLowerBound());
+			PushFloat(":TRIGGER:RUNT:HLEVEL", trig->GetUpperBound());
 
-	sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
+			sendOnly(":TRIGGER:RUNT:POLARITY %s", (trig->GetSlope() == RuntTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
+		    break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}		
 }
 
 /**
@@ -4110,82 +4311,104 @@ void SiglentSCPIOscilloscope::PushSlewRateTrigger(SlewRateTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
 {
-	//Special parameter for trigger level
-	PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
+    float nstop;
+	string pattern1;
 
-	//AtPosition
-	//Bit9State
-	PushFloat(":TRIGGER:UART:BAUD", trig->GetBitRate());
-	sendOnly(":TRIGGER:UART:BITORDER LSB");
-	//DataBytesLenValue1
-	//DataBytesLenValue2
-	//DataCondition
-	//FrameDelimiter
-	//InterframeMinBits
-	//NeedDualLevels
-	//NeededSources
-	sendOnly(":TRIGGER:UART:DLENGTH 8");
-
-	switch(trig->GetParityType())
+	switch(m_modelid)
 	{
-		case UartTrigger::PARITY_NONE:
-			sendOnly(":TRIGGER:UART:PARITY NONE");
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			//TODO
 			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			//Special parameter for trigger level
+			PushFloat(":TRIGGER:UART:LIMIT", trig->GetLevel());
 
-		case UartTrigger::PARITY_ODD:
-			sendOnly(":TRIGGER:UART:PARITY ODD");
-			break;
+			//AtPosition
+			//Bit9State
+			PushFloat(":TRIGGER:UART:BAUD", trig->GetBitRate());
+			sendOnly(":TRIGGER:UART:BITORDER LSB");
+			//DataBytesLenValue1
+			//DataBytesLenValue2
+			//DataCondition
+			//FrameDelimiter
+			//InterframeMinBits
+			//NeedDualLevels
+			//NeededSources
+			sendOnly(":TRIGGER:UART:DLENGTH 8");
 
-		case UartTrigger::PARITY_EVEN:
-			sendOnly(":TRIGGER:UART:PARITY EVEN");
-			break;
+			switch(trig->GetParityType())
+			{
+				case UartTrigger::PARITY_NONE:
+					sendOnly(":TRIGGER:UART:PARITY NONE");
+					break;
 
-		case UartTrigger::PARITY_MARK:
-			sendOnly(":TRIGGER:UART:PARITY MARK");
-			break;
-		case UartTrigger::PARITY_SPACE:
-			sendOnly(":TRIGGER:UART:PARITY SPACE");
-			break;
-	}
+				case UartTrigger::PARITY_ODD:
+					sendOnly(":TRIGGER:UART:PARITY ODD");
+					break;
 
-	//Pattern length depends on the current format.
-	//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
-	auto pattern1 = trig->GetPattern1();
-	sendOnly(":TRIGGER:UART:DLENGTH \"%d\"", (int)pattern1.length() / 8);
+				case UartTrigger::PARITY_EVEN:
+					sendOnly(":TRIGGER:UART:PARITY EVEN");
+					break;
 
-	PushCondition(":TRIGGER:UART", trig->GetCondition());
+				case UartTrigger::PARITY_MARK:
+					sendOnly(":TRIGGER:UART:PARITY MARK");
+					break;
+				case UartTrigger::PARITY_SPACE:
+					sendOnly(":TRIGGER:UART:PARITY SPACE");
+					break;
+			}
 
-	//Polarity
-	sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
+			//Pattern length depends on the current format.
+			//Note that the pattern length is in bytes, not bits, even though patterns are in binary.
+			pattern1 = trig->GetPattern1();
+			sendOnly(":TRIGGER:UART:DLENGTH \"%d\"", (int)pattern1.length() / 8);
 
-	auto nstop = trig->GetStopBits();
-	if(nstop == 1)
-		sendOnly(":TRIGGER:UART:STOP 1");
-	else if(nstop == 2)
-		sendOnly(":TRIGGER:UART:STOP 2");
-	else
-		sendOnly(":TRIGGER:UART:STOP 1.5");
+			PushCondition(":TRIGGER:UART", trig->GetCondition());
 
-	//Match type
-	switch(trig->GetMatchType())
-	{
-		case UartTrigger::TYPE_START:
-			sendOnly(":TRIGGER:UART:CONDITION START");
-			break;
-		case UartTrigger::TYPE_STOP:
-			sendOnly(":TRIGGER:UART:CONDITION STOP");
-			break;
-		case UartTrigger::TYPE_PARITY_ERR:
-			sendOnly(":TRIGGER:UART:CONDITION ERROR");
+			//Polarity
+			sendOnly(":TRIGGER:UART:IDLE %s", (trig->GetPolarity() == UartTrigger::IDLE_HIGH) ? "HIGH" : "LOW");
+
+		    nstop = trig->GetStopBits();
+			if(nstop == 1)
+				sendOnly(":TRIGGER:UART:STOP 1");
+			else if(nstop == 2)
+				sendOnly(":TRIGGER:UART:STOP 2");
+			else
+				sendOnly(":TRIGGER:UART:STOP 1.5");
+
+			//Match type
+			switch(trig->GetMatchType())
+			{
+				case UartTrigger::TYPE_START:
+					sendOnly(":TRIGGER:UART:CONDITION START");
+					break;
+				case UartTrigger::TYPE_STOP:
+					sendOnly(":TRIGGER:UART:CONDITION STOP");
+					break;
+				case UartTrigger::TYPE_PARITY_ERR:
+					sendOnly(":TRIGGER:UART:CONDITION ERROR");
+					break;
+				default:
+				case UartTrigger::TYPE_DATA:
+					sendOnly(":TRIGGER:UART:CONDITION DATA");
+					break;
+			}
+
+			//UARTCondition
+			//ViewingMode
+			// --------------------------------------------------
 			break;
 		default:
-		case UartTrigger::TYPE_DATA:
-			sendOnly(":TRIGGER:UART:CONDITION DATA");
+			LogError("Unknown scope type\n");
 			break;
+			// --------------------------------------------------
 	}
-
-	//UARTCondition
-	//ViewingMode
 }
 
 /**
@@ -4193,8 +4416,27 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
  */
 void SiglentSCPIOscilloscope::PushWindowTrigger(WindowTrigger* trig)
 {
-	PushFloat(":TRIGGER:WINDOW:LLEVEL", trig->GetLowerBound());
-	PushFloat(":TRIGGER:WINDOW:HLEVEL", trig->GetUpperBound());
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+            //TODO
+		    break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			PushFloat(":TRIGGER:WINDOW:LLEVEL", trig->GetLowerBound());
+			PushFloat(":TRIGGER:WINDOW:HLEVEL", trig->GetUpperBound());
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
 }
 
 /**
@@ -4240,7 +4482,8 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
 			ret.push_back(EdgeTrigger::GetTriggerName());
-			// TODO add more
+			ret.push_back(PulseWidthTrigger::GetTriggerName());
+			//TODO add more
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
