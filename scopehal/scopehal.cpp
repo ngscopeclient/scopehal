@@ -767,6 +767,12 @@ vector<uint32_t> ReadDataFileUint32(const string& relpath)
  */
 string FindDataFile(const string& relpath)
 {
+	FILE* fp = fopen(relpath.c_str(), "rb");
+	if(fp)
+	{
+		fclose(fp);
+		return relpath;
+	}
 	for(auto dir : g_searchPaths)
 	{
 		string path = dir + "/" + relpath;
