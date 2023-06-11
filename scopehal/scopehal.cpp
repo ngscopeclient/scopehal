@@ -690,14 +690,8 @@ void InitializeSearchPaths()
  */
 string ReadDataFile(const string& relpath)
 {
-	FILE* fp = NULL;
-	for(auto dir : g_searchPaths)
-	{
-		string path = dir + "/" + relpath;
-		fp = fopen(path.c_str(), "rb");
-		if(fp)
-			break;
-	}
+	auto abspath = FindDataFile(relpath);
+	FILE* fp = fopen(abspath.c_str(), "rb");
 
 	if(!fp)
 	{
@@ -731,14 +725,8 @@ vector<uint32_t> ReadDataFileUint32(const string& relpath)
 {
 	vector<uint32_t> buf;
 
-	FILE* fp = NULL;
-	for(auto dir : g_searchPaths)
-	{
-		string path = dir + "/" + relpath;
-		fp = fopen(path.c_str(), "rb");
-		if(fp)
-			break;
-	}
+	auto abspath = FindDataFile(relpath);
+	FILE* fp = fopen(abspath.c_str(), "rb");
 
 	if(!fp)
 	{
@@ -767,16 +755,18 @@ vector<uint32_t> ReadDataFileUint32(const string& relpath)
  */
 string FindDataFile(const string& relpath)
 {
+	//Check relative path first
 	FILE* fp = fopen(relpath.c_str(), "rb");
 	if(fp)
 	{
 		fclose(fp);
 		return relpath;
 	}
+
 	for(auto dir : g_searchPaths)
 	{
 		string path = dir + "/" + relpath;
-		FILE* fp = fopen(path.c_str(), "rb");
+		fp = fopen(path.c_str(), "rb");
 		if(fp)
 		{
 			fclose(fp);
