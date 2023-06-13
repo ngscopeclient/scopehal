@@ -198,6 +198,8 @@ extern std::unique_ptr<QueueManager> g_vkQueueManager;
 extern bool g_vulkanDeviceIsIntelMesa;
 extern bool g_vulkanDeviceIsAnyMesa;
 extern bool g_vulkanDeviceIsMoltenVK;
+extern uint32_t g_vkPinnedMemoryHeap;
+extern uint32_t g_vkLocalMemoryHeap;
 
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
@@ -206,6 +208,7 @@ extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
 extern bool g_hasShaderInt8;
 extern bool g_hasDebugUtils;
+extern bool g_hasMemoryBudget;
 
 //Shader args for frequently used kernels
 struct ConvertRawSamplesShaderArgs

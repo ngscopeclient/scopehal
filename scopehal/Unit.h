@@ -75,6 +75,8 @@ public:
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds
 
+		UNIT_BYTES,			//used mostly for displaying memory usage
+
 		//TODO: more here
 	};
 

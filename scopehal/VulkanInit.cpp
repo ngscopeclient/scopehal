@@ -127,6 +127,16 @@ uint32_t g_vkComputeDeviceDriverVer;
  */
 vk::raii::PhysicalDevice* g_vkComputePhysicalDevice;
 
+/**
+	@brief Heap from which g_vkPinnedMemoryType is allocated
+ */
+uint32_t g_vkPinnedMemoryHeap = 0;
+
+/**
+	@brief Heap from which g_vkLocalMemoryType is allocated
+ */
+uint32_t g_vkLocalMemoryHeap = 0;
+
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 //Feature flags indicating that we have support for specific data types / features on the GPU
@@ -134,6 +144,7 @@ bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
 bool g_hasDebugUtils = false;
+bool g_hasMemoryBudget = false;
 
 //Feature flags indicating specific drivers, for bug workarounds
 bool g_vulkanDeviceIsIntelMesa = false;
@@ -690,7 +701,18 @@ bool VulkanInit(bool skipGLFW)
 					if(!strcmp(&ext.extensionName[0], "VK_KHR_shader_non_semantic_info"))
 					{
 						hasNonSemanticInfo = true;
-						LogDebug("Device has KHR_shader_non_semantic_info, requesting it\n");
+						LogDebug("Device has VK_KHR_shader_non_semantic_info, requesting it\n");
+					}
+
+					if(!strcmp(&ext.extensionName[0], "VK_EXT_memory_budget"))
+					{
+						if(!hasPhysicalDeviceProperties2)
+							LogWarning("VK_EXT_memory_budget is supported, but not VK_KHR_get_physical_device_properties2 so it's useless\n");
+						else
+						{
+							LogDebug("Device has VK_EXT_memory_budget, requesting it\n");
+							g_hasMemoryBudget = true;
+						}
 					}
 				}
 
@@ -701,6 +723,8 @@ bool VulkanInit(bool skipGLFW)
 					devextensions.push_back("VK_KHR_portability_subset");
 				if(hasNonSemanticInfo)
 					devextensions.push_back("VK_KHR_shader_non_semantic_info");
+				if(g_hasMemoryBudget)
+					devextensions.push_back("VK_EXT_memory_budget");
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,
@@ -713,6 +737,8 @@ bool VulkanInit(bool skipGLFW)
 				//Figure out what memory types to use for various purposes
 				bool foundPinnedType = false;
 				bool foundLocalType = false;
+				g_vkPinnedMemoryType = 0;
+				g_vkLocalMemoryType = 0;
 				g_vkPinnedMemoryType = 0;
 				g_vkLocalMemoryType = 0;
 				auto memProperties = device.getMemoryProperties();
@@ -743,6 +769,7 @@ bool VulkanInit(bool skipGLFW)
 						{
 							foundPinnedType = true;
 							g_vkPinnedMemoryType = j;
+							g_vkPinnedMemoryHeap = mtype.heapIndex;
 						}
 					}
 
@@ -762,6 +789,7 @@ bool VulkanInit(bool skipGLFW)
 						{
 							foundLocalType = true;
 							g_vkLocalMemoryType = j;
+							g_vkLocalMemoryHeap = mtype.heapIndex;
 						}
 					}
 				}

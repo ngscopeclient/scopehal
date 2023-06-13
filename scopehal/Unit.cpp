@@ -91,6 +91,8 @@ Unit::Unit(const string& rhs)
 		m_type = UNIT_VOLT_SEC;
 	else if(rhs == "hex")
 		m_type = UNIT_HEXNUM;
+	else if(rhs == "B")
+		m_type = UNIT_BYTES;
 	else
 		LogWarning("Unrecognized unit \"%s\"\n", rhs.c_str());
 }
@@ -173,6 +175,9 @@ string Unit::ToString() const
 
 		case UNIT_HEXNUM:
 			return "hex";
+
+		case UNIT_BYTES:
+			return "B";
 
 		default:
 			return "unknown";
@@ -386,6 +391,16 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			break;
 		case UNIT_VOLT_SEC:
 			suffix = "Vs";
+			break;
+
+		//Bytes: use binary rather than decimal scaling factors
+		case UNIT_BYTES:
+			if(scaleFactor <= 1e-9)
+				scaleFactor = 1.0 / (1024 * 1024 * 1024);
+			else if(scaleFactor <= 1e-6)
+				scaleFactor = 1.0 / (1024 * 1024);
+			else if(scaleFactor <= 1e-3)
+				scaleFactor = 1.0 / 1024;
 			break;
 
 		default:
