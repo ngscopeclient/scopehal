@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -380,7 +380,7 @@ bool IBISParser::Load(string fname)
 			{}
 
 			//Ignore pin table
-			else if( (scmd == "Pin") || (scmd == "Diff Pin") | (scmd == "Series Pin Mapping"))
+			else if( (scmd == "Pin") || (scmd == "Diff Pin") || (scmd == "Diff pin") || (scmd == "Series Pin Mapping"))
 			{
 				data_block = BLOCK_NONE;
 				model = NULL;
@@ -412,7 +412,7 @@ bool IBISParser::Load(string fname)
 					&model->m_voltages[CORNER_MIN],
 					&model->m_voltages[CORNER_MAX]);
 			}
-			else if(scmd == "Power Clamp Reference")
+			else if( (scmd == "Power Clamp Reference") || (scmd == "POWER Clamp Reference") )
 			{
 				//ignore for now
 			}
@@ -560,6 +560,10 @@ bool IBISParser::Load(string fname)
 			}
 
 			//Fixture properties in waveforms
+			else if(skeyword == "C_fixture")
+			{}
+			else if(skeyword == "L_fixture")
+			{}
 			else if(skeyword == "R_fixture")
 			{
 				char fres[128];
@@ -688,6 +692,9 @@ float IBISParser::ParseNumber(const char* str)
 
 	switch(scale)
 	{
+		case 'M':
+			return ret * 1e6;
+
 		case 'k':
 			return ret * 1e3;
 
