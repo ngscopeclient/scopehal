@@ -662,6 +662,7 @@ void InitializeSearchPaths()
 	if(binRootDir.size() > 0)
 	{
 		g_searchPaths.push_back(binRootDir + "/share/glscopeclient");
+		g_searchPaths.push_back(binRootDir + "/share/ngscopeclient");
 		g_searchPaths.push_back(binRootDir + "/share/scopehal");
 	}
 
@@ -671,12 +672,15 @@ void InitializeSearchPaths()
 	g_searchPaths.push_back(home + "/.glscopeclient");
 	g_searchPaths.push_back(home + "/.scopehal");
 	g_searchPaths.push_back("/usr/local/share/glscopeclient");
+	g_searchPaths.push_back("/usr/local/share/ngscopeclient");
 	g_searchPaths.push_back("/usr/local/share/scopehal");
 	g_searchPaths.push_back("/usr/share/glscopeclient");
+	g_searchPaths.push_back("/usr/share/ngscopeclient");
 	g_searchPaths.push_back("/usr/share/scopehal");
 
 	//for macports
 	g_searchPaths.push_back("/opt/local/share/glscopeclient");
+	g_searchPaths.push_back("/opt/local/share/ngscopeclient");
 	g_searchPaths.push_back("/opt/local/share/scopehal");
 #endif
 
