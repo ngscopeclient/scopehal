@@ -747,6 +747,8 @@ void Filter::FindPeaks(UniformAnalogWaveform* data, float peak_threshold, vector
 
 		last = value;
 	}
+
+	delete thresh_diff;
 }
 
 /**
@@ -803,6 +805,8 @@ void Filter::FindPeaks(SparseAnalogWaveform* data, float peak_threshold, vector<
 
 		last = value;
 	}
+
+	delete thresh_diff;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
