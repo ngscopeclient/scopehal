@@ -81,6 +81,7 @@ set(SCOPEHAL_SOURCES
 	SlewRateTrigger.cpp
 	TwoLevelTrigger.cpp
 	UartTrigger.cpp
+	VideoTrigger.cpp
 	WindowTrigger.cpp
 
 	Instrument.cpp

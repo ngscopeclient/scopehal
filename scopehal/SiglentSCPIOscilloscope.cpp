@@ -87,6 +87,7 @@
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
+#include "VideoTrigger.h"
 #include "WindowTrigger.h"
 
 using namespace std;
@@ -3456,11 +3457,13 @@ void SiglentSCPIOscilloscope::PullTrigger()
 				PullSlewRateTrigger();
 			else if(reply == "UART")
 				PullUartTrigger();
+			else if(reply == "VIDeo")
+				PullVideoTrigger();
 			else if(reply == "INTerval")
 				PullPulseWidthTrigger();
 			else if(reply == "WINDow")
 				PullWindowTrigger();
-			// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
+			// Note that PULSe, PATTern, QUALified, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
 			//Unrecognized trigger type
 			else
 			{
@@ -3774,6 +3777,104 @@ void SiglentSCPIOscilloscope::PullUartTrigger()
 }
 
 /**
+	@brief Reads settings for a VIDEO trigger from the instrument
+ */
+void SiglentSCPIOscilloscope::PullVideoTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<VideoTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new VideoTrigger(this);
+	VideoTrigger* vt = dynamic_cast<VideoTrigger*>(m_trigger);
+
+	string reply;
+
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			//TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			{
+				//Level
+				vt->SetLevel(stof(converse(":TRIGGER:VIDEO:LEVEL?")));
+
+				//Standard
+				reply = Trim(converse(":TRIGGER:VIDEO:STANDARD?"));
+				if(reply == "NTSC")
+					vt->SetStandard(VideoTrigger::NTSC);
+				else if(reply == "PAL")
+					vt->SetStandard(VideoTrigger::PAL);
+				else if(reply == "P720L50")
+					vt->SetStandard(VideoTrigger::P720L50);
+				else if(reply == "P720L60")
+					vt->SetStandard(VideoTrigger::P720L60);
+				else if(reply == "P1080L50")
+					vt->SetStandard(VideoTrigger::P1080L50);
+				else if(reply == "P1080L60")
+					vt->SetStandard(VideoTrigger::P1080L60);
+				else if(reply == "I1080L50")
+					vt->SetStandard(VideoTrigger::I1080L50);
+				else if(reply == "I1080L60")
+					vt->SetStandard(VideoTrigger::I1080L60);
+				else if(reply == "CUSTom")
+					vt->SetStandard(VideoTrigger::CUSTOM);
+
+				//Line
+				vt->SetLine(stoi(converse(":TRIGGER:VIDEO:LINE?")));
+
+				//Field
+				vt->SetField(stoi(converse(":TRIGGER:VIDEO:FIELD?")));
+
+				//Custom Frame Rate
+				reply = Trim(converse(":TRIGGER:VIDEO:FRATE?"));
+				if(reply == "25Hz")
+					vt->SetFrameRate(VideoTrigger::FRAMERATE_25HZ);
+				if(reply == "30Hz")
+					vt->SetFrameRate(VideoTrigger::FRAMERATE_30HZ);
+				if(reply == "50Hz")
+					vt->SetFrameRate(VideoTrigger::FRAMERATE_50HZ);
+				if(reply == "60Hz")
+					vt->SetFrameRate(VideoTrigger::FRAMERATE_60HZ);
+
+				//Custom Interlace
+				vt->SetInterlace(stoi(converse(":TRIGGER:VIDEO:INTERLACE?")));
+
+				//Custom Number of Lines
+				vt->SetLineCount(stoi(converse(":TRIGGER:VIDEO:LCNT?")));
+
+				//Custom Number of Fields
+				vt->SetFieldCount(stoi(converse(":TRIGGER:VIDEO:FCNT?")));
+
+				//Sync Mode
+				reply = Trim(converse(":TRIGGER:VIDEO:SYNC?"));
+				if (reply == "ANY")
+					vt->SetSyncMode(VideoTrigger::ANY);
+				else if (reply == "SELect")
+					vt->SetSyncMode(VideoTrigger::SELECT);
+			}
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+}
+
+/**
 	@brief Reads settings for a window trigger from the instrument
  */
 void SiglentSCPIOscilloscope::PullWindowTrigger()
@@ -3871,6 +3972,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
 	auto ut = dynamic_cast<UartTrigger*>(m_trigger);
+	auto vt = dynamic_cast<VideoTrigger*>(m_trigger);
 	auto wt = dynamic_cast<WindowTrigger*>(m_trigger);
 	switch(m_modelid)
 	{
@@ -3896,12 +3998,16 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			{
 				PushUartTrigger(ut);
 			}
+			else if(vt)
+			{
+				PushVideoTrigger(vt);
+			}
 			else if(wt)
 			{
 				PushWindowTrigger(wt);
 			}
 
-			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+			// TODO: Add in PULSE, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
 			{
@@ -3947,6 +4053,13 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				sendOnly(":TRIGGER:UART:TXSOURCE %s", m_trigger->GetInput(1).m_channel->GetHwname().c_str());
 				PushUartTrigger(ut);
 			}
+			else if(vt)
+			{
+				sendOnly(":TRIGGER:TYPE VIDEO");
+				// TODO: Validate these trigger allocations
+				sendOnly(":TRIGGER:VIDEO:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+				PushVideoTrigger(vt);
+			}
 			else if(wt)
 			{
 				sendOnly(":TRIGGER:TYPE WINDOW");
@@ -3954,7 +4067,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				PushWindowTrigger(wt);
 			}
 
-			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+			// TODO: Add in PULSE, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
 			{
@@ -4189,6 +4302,105 @@ void SiglentSCPIOscilloscope::PushUartTrigger(UartTrigger* trig)
 }
 
 /**
+	@brief Pushes settings for a Video trigger to the instrument
+ */
+void SiglentSCPIOscilloscope::PushVideoTrigger(VideoTrigger* trig)
+{
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			//TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			{
+				//Level
+				sendOnly(":TRIGGER:VIDEO:LEVEL %1.2E", trig->GetLevel());
+
+				//Standard
+				switch(trig->GetStandard())
+				{
+					case VideoTrigger::PAL:
+						sendOnly(":TRIGGER:VIDEO:STANDARD PAL");
+						break;
+					case VideoTrigger::P720L50:
+						sendOnly(":TRIGGER:VIDEO:STANDARD P720L50");
+						break;
+					case VideoTrigger::P720L60:
+						sendOnly(":TRIGGER:VIDEO:STANDARD P720L60");
+						break;
+					case VideoTrigger::P1080L50:
+						sendOnly(":TRIGGER:VIDEO:STANDARD P1080L50");
+						break;
+					case VideoTrigger::P1080L60:
+						sendOnly(":TRIGGER:VIDEO:STANDARD P1080L60");
+						break;
+					case VideoTrigger::I1080L50:
+						sendOnly(":TRIGGER:VIDEO:STANDARD I1080L50");
+						break;
+					case VideoTrigger::I1080L60:
+						sendOnly(":TRIGGER:VIDEO:STANDARD I1080L60");
+						break;
+					case VideoTrigger::CUSTOM:
+						sendOnly(":TRIGGER:VIDEO:STANDARD CUSTOM");
+						break;
+					default:
+					case VideoTrigger::NTSC:
+						sendOnly(":TRIGGER:VIDEO:STANDARD NTSC");
+						break;
+				}
+
+				//Line
+				sendOnly(":TRIGGER:VIDEO:LINE %d", trig->GetLine());
+
+				//Field
+				sendOnly(":TRIGGER:VIDEO:FIELD %d", trig->GetField());
+
+				//Custom Frame Rate
+				switch(trig->GetFrameRate())
+				{
+					case VideoTrigger::FRAMERATE_30HZ:
+						sendOnly(":TRIGGER:VIDEO:FRATE 30Hz");
+						break;
+					case VideoTrigger::FRAMERATE_50HZ:
+						sendOnly(":TRIGGER:VIDEO:FRATE 50Hz");
+						break;
+					case VideoTrigger::FRAMERATE_60HZ:
+						sendOnly(":TRIGGER:VIDEO:FRATE 60Hz");
+						break;
+					default:
+					case VideoTrigger::FRAMERATE_25HZ:
+						sendOnly(":TRIGGER:VIDEO:FRATE 25Hz");
+						break;
+				}
+
+				//Custom Interlace
+				sendOnly(":TRIGGER:VIDEO:INTERLACE %d", trig->GetInterlace());
+
+				//Custom Number of Lines
+				sendOnly(":TRIGGER:VIDEO:LCNT %d", trig->GetLineCount());
+
+				//Custom Number of Fields
+				sendOnly(":TRIGGER:VIDEO:FCNT %d", trig->GetFieldCount());
+
+				//Sync Mode
+				sendOnly(":TRIGGER:VIDEO:SYNC %s", (trig->GetSyncMode() == VideoTrigger::ANY) ? "ANY" : "SELECT");
+			}
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+}
+
+/**
 	@brief Pushes settings for a window trigger to the instrument
  */
 void SiglentSCPIOscilloscope::PushWindowTrigger(WindowTrigger* trig)
@@ -4254,6 +4466,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 			ret.push_back(SlewRateTrigger::GetTriggerName());
 			if(m_hasUartTrigger)
 				ret.push_back(UartTrigger::GetTriggerName());
+			ret.push_back(VideoTrigger::GetTriggerName());
 			ret.push_back(WindowTrigger::GetTriggerName());
 			break;
 		// --------------------------------------------------
@@ -4262,7 +4475,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 			break;
 			// --------------------------------------------------
 	}
-	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+	// TODO: Add in PULSE, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
 }
 

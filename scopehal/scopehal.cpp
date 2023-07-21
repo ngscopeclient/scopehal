@@ -77,6 +77,7 @@
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
 #include "UartTrigger.h"
+#include "VideoTrigger.h"
 #include "WindowTrigger.h"
 
 #ifndef _WIN32
@@ -229,6 +230,7 @@ void DriverStaticInit()
 	AddTriggerClass(RuntTrigger);
 	AddTriggerClass(SlewRateTrigger);
 	AddTriggerClass(UartTrigger);
+	AddTriggerClass(VideoTrigger);
 	AddTriggerClass(WindowTrigger);
 }
 

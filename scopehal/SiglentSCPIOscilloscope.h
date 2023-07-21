@@ -40,6 +40,7 @@ class PulseWidthTrigger;
 class RuntTrigger;
 class SlewRateTrigger;
 class UartTrigger;
+class VideoTrigger;
 class WindowTrigger;
 
 /**
@@ -226,6 +227,7 @@ protected:
 	void PullRuntTrigger();
 	void PullSlewRateTrigger();
 	void PullUartTrigger();
+	void PullVideoTrigger();
 	void PullWindowTrigger();
 	void PullTriggerSource(Trigger* trig, std::string triggerModeName);
 
@@ -242,6 +244,7 @@ protected:
 	void PushRuntTrigger(RuntTrigger* trig);
 	void PushSlewRateTrigger(SlewRateTrigger* trig);
 	void PushUartTrigger(UartTrigger* trig);
+	void PushVideoTrigger(VideoTrigger* trig);
 	void PushWindowTrigger(WindowTrigger* trig);
 
 	void BulkCheckChannelEnableState();
