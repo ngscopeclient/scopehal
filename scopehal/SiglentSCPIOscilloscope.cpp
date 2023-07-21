@@ -3416,6 +3416,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 			reply = Trim(converse("TRIG_SELECT?"));
 			// <trig_type>,SR,<source>,HT,<hold_type>,HV,<hold_value1>[,HV2,<hold_value2>]
 			//EDGE,SR,C1,HT,OFF
+			//TV,SR,C1,STAN,<standard>,SYNC,<sync_type>[,LINE,<line>,FLD,<field>]
 			{
 				vector<string> result;
 				stringstream s_stream(reply);	 //create string stream from the string
@@ -3429,6 +3430,10 @@ void SiglentSCPIOscilloscope::PullTrigger()
 				if(result[0] == "EDGE")
 				{
 					PullEdgeTrigger();
+				}
+				else if(result[0] == "TV")
+				{
+					PullVideoTrigger();
 				}
 				else
 				{
@@ -3800,7 +3805,69 @@ void SiglentSCPIOscilloscope::PullVideoTrigger()
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			//TODO
+			reply = Trim(converse("TRIG_SELECT?"));
+			// TRSE TV,SR,C1,STAN,<standard>,SYNC,<sync_type>[,LINE,<line>,FLD,<field>]
+			// <standard> := (NTSC|PAL|720P/50|720P/60|1080P/50|1080P/60|1080I/50|1080I/60|CUST)
+			// <sync_type> := (ANY|SELECT)
+			// If <sync_type> is SELECT, then LINE and FLD must be specified
+			{
+				char source[128] = "";
+				char standard[128] = "";
+				char sync_type[128] = "";
+				int line = 1;
+				int field = 1;
+				if (2 >= sscanf(reply.c_str(), "TRSE TV,SR,%127[^,],STAN,%127[^,],SYNC,%127[^,],LINE,%d,FLD,%d", source, standard, sync_type, &line, &field))
+				{
+					LogError("Bad TRSE response %s\n", reply.c_str());
+					break;
+				}
+
+				//Level
+				// <trig_source>:TRLV <trig_level>V
+				Unit v(Unit::UNIT_VOLTS);
+				vt->SetLevel(v.ParseString(converse("C1:TRIG_LEVEL?").substr(8)));
+
+				//Standard
+				string s_standard(standard);
+				if(s_standard == "NTSC")
+					vt->SetStandard(VideoTrigger::NTSC);
+				else if(s_standard == "PAL")
+					vt->SetStandard(VideoTrigger::PAL);
+				else if(s_standard == "720P/50")
+					vt->SetStandard(VideoTrigger::P720L50);
+				else if(s_standard == "720P/60")
+					vt->SetStandard(VideoTrigger::P720L60);
+				else if(s_standard == "1080P/50")
+					vt->SetStandard(VideoTrigger::P1080L50);
+				else if(s_standard == "1080P/60")
+					vt->SetStandard(VideoTrigger::P1080L60);
+				else if(s_standard == "1080I/50")
+					vt->SetStandard(VideoTrigger::I1080L50);
+				else if(s_standard == "1080I/60")
+					vt->SetStandard(VideoTrigger::I1080L60);
+				else if(s_standard == "CUST")
+					vt->SetStandard(VideoTrigger::CUSTOM);
+
+				//Line
+				vt->SetLine(line);
+
+				//Field
+				vt->SetField(field);
+
+				/* No method to set custom settings
+				//Custom Frame Rate
+				//Custom Interlace
+				//Custom Number of Lines
+				//Custom Number of Fields
+				*/
+
+				//Sync Mode
+				string s_sync_type(sync_type);
+				if (s_sync_type == "ANY")
+					vt->SetSyncMode(VideoTrigger::ANY);
+				else if (s_sync_type == "SELECT")
+					vt->SetSyncMode(VideoTrigger::SELECT);
+			}
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
@@ -4311,7 +4378,60 @@ void SiglentSCPIOscilloscope::PushVideoTrigger(VideoTrigger* trig)
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
-			//TODO
+			{
+				auto chan = trig->GetInput(0).m_channel;
+				if(chan == NULL)
+				{
+					LogError("Trigger input 0 has null channel\n");
+					return;
+				}
+				string source = chan->GetHwname();
+				//Level
+				sendOnly("%s:TRIG_LEVEL %1.2E", source.c_str(), trig->GetLevel());
+
+				//Standard
+				// TRSE TV,SR,C1,STAN,<standard>,SYNC,<sync_type>[,LINE,<line>,FLD,<field>]
+				string standard;
+				switch(trig->GetStandard())
+				{
+					case VideoTrigger::PAL:
+						standard = "PAL";
+						break;
+					case VideoTrigger::P720L50:
+						standard = "720P/50";
+						break;
+					case VideoTrigger::P720L60:
+						standard = "720P/60";
+						break;
+					case VideoTrigger::P1080L50:
+						standard = "1080P/50";
+						break;
+					case VideoTrigger::P1080L60:
+						standard = "1080P/60";
+						break;
+					case VideoTrigger::I1080L50:
+						standard = "1080I/50";
+						break;
+					case VideoTrigger::I1080L60:
+						standard = "1080I/60";
+						break;
+					case VideoTrigger::CUSTOM:
+						standard = "CUST";
+						break;
+					default:
+					case VideoTrigger::NTSC:
+						standard = "NTSC";
+						break;
+				}
+
+				//Sync Mode
+				//Line
+				//Field
+				if(trig->GetSyncMode() == VideoTrigger::ANY)
+					sendOnly("TRIG_SELECT TV,SR,%s,STAN,%s,SYNC,ANY", source.c_str(), standard.c_str());
+				else //if(trig->GetSyncMode() == VideoTrigger::SELECT)
+					sendOnly("TRIG_SELECT TV,SR,%s,STAN,%s,SYNC,SELECT,LINE,%d,FLD,%d", source.c_str(), standard.c_str(), trig->GetLine(), trig->GetField());
+			}
 			break;
 		// --------------------------------------------------
 		case MODEL_SIGLENT_SDS2000XP:
@@ -4452,6 +4572,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
 			ret.push_back(EdgeTrigger::GetTriggerName());
+			ret.push_back(VideoTrigger::GetTriggerName());
 			// TODO add more
 			break;
 		// --------------------------------------------------
