@@ -83,6 +83,7 @@
 
 #include "DropoutTrigger.h"
 #include "EdgeTrigger.h"
+#include "GlitchTrigger.h"
 #include "PulseWidthTrigger.h"
 #include "RuntTrigger.h"
 #include "SlewRateTrigger.h"
@@ -3450,6 +3451,8 @@ void SiglentSCPIOscilloscope::PullTrigger()
 				PullDropoutTrigger();
 			else if(reply == "EDGE")
 				PullEdgeTrigger();
+			else if(reply == "PULSe")
+				PullGlitchTrigger();
 			else if(reply == "RUNT")
 				PullRuntTrigger();
 			else if(reply == "SLOPe")
@@ -3460,7 +3463,7 @@ void SiglentSCPIOscilloscope::PullTrigger()
 				PullPulseWidthTrigger();
 			else if(reply == "WINDow")
 				PullWindowTrigger();
-			// Note that PULSe, PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
+			// Note that PATTern, QUALified, VIDeo, IIC, SPI, LIN, CAN, FLEXray, CANFd & IIS are not yet handled
 			//Unrecognized trigger type
 			else
 			{
@@ -3576,6 +3579,63 @@ void SiglentSCPIOscilloscope::PullEdgeTrigger()
 
 			//Slope
 			GetTriggerSlope(et, Trim(converse(":TRIGGER:EDGE:SLOPE?")));
+			break;
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+}
+
+/**
+	@brief Reads settings for a glitch trigger from the instrument
+ */
+void SiglentSCPIOscilloscope::PullGlitchTrigger()
+{
+	//Clear out any triggers of the wrong type
+	if((m_trigger != NULL) && (dynamic_cast<GlitchTrigger*>(m_trigger) != NULL))
+	{
+		delete m_trigger;
+		m_trigger = NULL;
+	}
+
+	//Create a new trigger if necessary
+	if(m_trigger == NULL)
+		m_trigger = new GlitchTrigger(this);
+	GlitchTrigger* gt = dynamic_cast<GlitchTrigger*>(m_trigger);
+
+	string reply;
+	Unit fs(Unit::UNIT_FS);
+
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			//TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			{
+				//Level
+				gt->SetLevel(stof(converse(":TRIGGER:PULSE:LEVEL?")));
+
+				//Condition
+				gt->SetCondition(GetCondition(converse(":TRIGGER:PULSE:LIMIT?")));
+
+				//Min range
+				gt->SetLowerBound(fs.ParseString(converse(":TRIGGER:PULSE:TLOWER?")));
+
+				//Max range
+				gt->SetUpperBound(fs.ParseString(converse(":TRIGGER:PULSE:TUPPER?")));
+
+				//Slope
+				GetTriggerSlope(gt, converse(":TRIGGER:PULSE:POLARITY?"));
+			}
 			break;
 		// --------------------------------------------------
 		default:
@@ -3825,9 +3885,9 @@ void SiglentSCPIOscilloscope::GetTriggerSlope(EdgeTrigger* trig, string reply)
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			if(reply == "RISing")
+			if((reply == "RISing") || (reply == "POSitive"))
 				trig->SetType(EdgeTrigger::EDGE_RISING);
-			else if(reply == "FALLing")
+			else if((reply == "FALLing") || (reply == "NEGative"))
 				trig->SetType(EdgeTrigger::EDGE_FALLING);
 			else if(reply == "ALTernate")
 				trig->SetType(EdgeTrigger::EDGE_ANY);
@@ -3867,6 +3927,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 {
 	auto dt = dynamic_cast<DropoutTrigger*>(m_trigger);
 	auto et = dynamic_cast<EdgeTrigger*>(m_trigger);
+	auto gt = dynamic_cast<GlitchTrigger*>(m_trigger);
 	auto pt = dynamic_cast<PulseWidthTrigger*>(m_trigger);
 	auto rt = dynamic_cast<RuntTrigger*>(m_trigger);
 	auto st = dynamic_cast<SlewRateTrigger*>(m_trigger);
@@ -3879,6 +3940,10 @@ void SiglentSCPIOscilloscope::PushTrigger()
 			if(dt)
 			{
 				PushDropoutTrigger(dt);
+			}
+			if(gt)
+			{
+				PushGlitchTrigger(gt);
 			}
 			else if(pt)
 			{
@@ -3901,7 +3966,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				PushWindowTrigger(wt);
 			}
 
-			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+			// TODO: Add in VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
 			{
@@ -3920,6 +3985,12 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				sendOnly(":TRIGGER:TYPE DROPOUT");
 				sendOnly(":TRIGGER:DROPOUT:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
 				PushDropoutTrigger(dt);
+			}
+			else if(gt)
+			{
+				sendOnly(":TRIGGER:TYPE PULSE");
+				sendOnly(":TRIGGER:PULSE:SOURCE %s", m_trigger->GetInput(0).m_channel->GetHwname().c_str());
+				PushGlitchTrigger(gt);
 			}
 			else if(pt)
 			{
@@ -3954,7 +4025,7 @@ void SiglentSCPIOscilloscope::PushTrigger()
 				PushWindowTrigger(wt);
 			}
 
-			// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+			// TODO: Add in VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 
 			else if(et)	   //must be last
 			{
@@ -4053,6 +4124,40 @@ void SiglentSCPIOscilloscope::PushEdgeTrigger(EdgeTrigger* trig, const std::stri
 			}
 			//Level
 			sendOnly(":TRIGGER:%s:LEVEL %1.2E", trigType.c_str(), trig->GetLevel());
+			break;
+
+		// --------------------------------------------------
+		default:
+			LogError("Unknown scope type\n");
+			break;
+			// --------------------------------------------------
+	}
+}
+
+/**
+	@brief Pushes settings for a glitch trigger to the instrument
+ */
+void SiglentSCPIOscilloscope::PushGlitchTrigger(GlitchTrigger* trig)
+{
+	switch(m_modelid)
+	{
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS1000:
+		case MODEL_SIGLENT_SDS2000XE:
+			//TODO
+			break;
+		// --------------------------------------------------
+		case MODEL_SIGLENT_SDS2000XP:
+		case MODEL_SIGLENT_SDS2000X_HD:
+		case MODEL_SIGLENT_SDS5000X:
+		case MODEL_SIGLENT_SDS6000A:
+			{
+				sendOnly(":TRIGGER:PULSE:LEVEL %1.2E", trig->GetLevel());
+				PushCondition(":TRIGGER:PULSE", trig->GetCondition());
+				PushFloat(":TRIGGER:PULSE:TUPPER", trig->GetUpperBound() * SECONDS_PER_FS);
+				PushFloat(":TRIGGER:PULSE:TLOWER", trig->GetLowerBound() * SECONDS_PER_FS);
+				sendOnly(":TRIGGER:PULSE:POLARITY %s", (trig->GetType() == GlitchTrigger::EDGE_RISING) ? "POSITIVE" : "NEGATIVE");
+			}
 			break;
 
 		// --------------------------------------------------
@@ -4249,6 +4354,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 		case MODEL_SIGLENT_SDS6000A:
 			ret.push_back(DropoutTrigger::GetTriggerName());
 			ret.push_back(EdgeTrigger::GetTriggerName());
+			ret.push_back(GlitchTrigger::GetTriggerName());
 			ret.push_back(PulseWidthTrigger::GetTriggerName());
 			ret.push_back(RuntTrigger::GetTriggerName());
 			ret.push_back(SlewRateTrigger::GetTriggerName());
@@ -4262,7 +4368,7 @@ vector<string> SiglentSCPIOscilloscope::GetTriggerTypes()
 			break;
 			// --------------------------------------------------
 	}
-	// TODO: Add in PULSE, VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
+	// TODO: Add in VIDEO, PATTERN, QUALITFIED, SPI, IIC, CAN, LIN, FLEXRAY and CANFD Triggers
 	return ret;
 }
 

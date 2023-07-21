@@ -222,6 +222,7 @@ public:
 protected:
 	void PullDropoutTrigger();
 	void PullEdgeTrigger();
+	void PullGlitchTrigger();
 	void PullPulseWidthTrigger();
 	void PullRuntTrigger();
 	void PullSlewRateTrigger();
