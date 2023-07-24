@@ -3242,13 +3242,13 @@ size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 	{
 		m_adcMode = ADC_MODE_10BIT;
 		m_highDefinition = true;
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
 	}
 	else //if(reply == "8Bits")
 	{
 		m_adcMode = ADC_MODE_8BIT;
 		m_highDefinition = false;
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
 	}
 
 	return m_adcMode;
@@ -3278,12 +3278,12 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 	if(mode == ADC_MODE_10BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 10Bits");
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
 	}
 	else //if(mode == ADC_MODE_8BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 8Bits");
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
 	}
 
 	if(IsTriggerArmed())
