@@ -3806,7 +3806,7 @@ void SiglentSCPIOscilloscope::PullVideoTrigger()
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
 			reply = Trim(converse("TRIG_SELECT?"));
-			// TRSE TV,SR,C1,STAN,<standard>,SYNC,<sync_type>[,LINE,<line>,FLD,<field>]
+			// TV,SR,C1,STAN,<standard>,SYNC,<sync_type>[,LINE,<line>,FLD,<field>]
 			// <standard> := (NTSC|PAL|720P/50|720P/60|1080P/50|1080P/60|1080I/50|1080I/60|CUST)
 			// <sync_type> := (ANY|SELECT)
 			// If <sync_type> is SELECT, then LINE and FLD must be specified
@@ -3816,16 +3816,14 @@ void SiglentSCPIOscilloscope::PullVideoTrigger()
 				char sync_type[128] = "";
 				int line = 1;
 				int field = 1;
-				if (2 >= sscanf(reply.c_str(), "TRSE TV,SR,%127[^,],STAN,%127[^,],SYNC,%127[^,],LINE,%d,FLD,%d", source, standard, sync_type, &line, &field))
+				if (2 >= sscanf(reply.c_str(), "TV,SR,%127[^,],STAN,%127[^,],SYNC,%127[^,],LINE,%d,FLD,%d", source, standard, sync_type, &line, &field))
 				{
 					LogError("Bad TRSE response %s\n", reply.c_str());
 					break;
 				}
 
 				//Level
-				// <trig_source>:TRLV <trig_level>V
-				Unit v(Unit::UNIT_VOLTS);
-				vt->SetLevel(v.ParseString(converse("C1:TRIG_LEVEL?").substr(8)));
+				vt->SetLevel(stof(converse("C1:TRIG_LEVEL?")));
 
 				//Standard
 				string s_standard(standard);
