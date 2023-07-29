@@ -3618,7 +3618,7 @@ void SiglentSCPIOscilloscope::PullGlitchTrigger()
 		case MODEL_SIGLENT_SDS1000:
 		case MODEL_SIGLENT_SDS2000XE:
 			reply = Trim(converse("TRIG_SELECT?"));
-			// TRSE GLIT,SR,<source>,HT,<hold_type>,HV,<hold_value1>[,HV2,<hold_value2>]
+			// GLIT,SR,<source>,HT,<hold_type>,HV,<hold_value1>[,HV2,<hold_value2>]
 			// <hold_type> := (PS|PL|P2|P1)
 			// PS := Less than
 			// PL := Greater than
@@ -3629,16 +3629,15 @@ void SiglentSCPIOscilloscope::PullGlitchTrigger()
 				char hold_type[128] = "";
 				char hold_value1[128] = "";
 				char hold_value2[128] = "";
-				if(3 > sscanf(reply.c_str(), "TRSE GLIT,SR,%127[^,],HT,%127[^,],HV,%127[^,],HV2,%127s", source, hold_type, hold_value1, hold_value2))
+				if(3 > sscanf(reply.c_str(), "GLIT,SR,%127[^,],HT,%127[^,],HV,%127[^,],HV2,%127s", source, hold_type, hold_value1, hold_value2))
 				{
 					LogError("Bad TRSE response %s\n", reply.c_str());
 					break;
 				}
 
 				//Level
-				// <trig_source>:TRLV <trig_level>V
 				Unit v(Unit::UNIT_VOLTS);
-				gt->SetLevel(v.ParseString(converse("C1:TRIG_LEVEL?").substr(8)));
+				gt->SetLevel(v.ParseString(converse("C1:TRIG_LEVEL?")));
 
 				//Condition
 				Trigger::Condition condition = GetCondition(hold_type);
@@ -3666,8 +3665,7 @@ void SiglentSCPIOscilloscope::PullGlitchTrigger()
 				}
 
 				//Slope
-				// <trig_source>:TRSL <trig_slope>
-				GetTriggerSlope(gt, converse("C1:TRIG_SLOPE?").substr(8));
+				GetTriggerSlope(gt, converse("C1:TRIG_SLOPE?"));
 			}
 			break;
 		// --------------------------------------------------
