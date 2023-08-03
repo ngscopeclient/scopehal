@@ -4081,6 +4081,7 @@ void LeCroyOscilloscope::Pull8b10bTrigger()
 					"VBS? 'return = app.Acquisition.Trigger.Serial.C8B10B.SymbolCount'"));
 				size_t patternlen = stoi(reply);
 				trig->SetSymbolCount(patternlen);
+				pattern.resize(8);
 
 				for(size_t i=0; i<patternlen; i++)
 				{
