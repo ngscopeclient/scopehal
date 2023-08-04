@@ -122,6 +122,7 @@ extern bool g_hasAvx2;
 #include "SCPIOscilloscope.h"
 #include "SCPIRFSignalGenerator.h"
 #include "SCPIPowerSupply.h"
+#include "SCPIVNA.h"
 
 #include "SParameters.h"
 #include "TouchstoneParser.h"

@@ -64,6 +64,8 @@
 
 #include "SiglentLoad.h"
 
+#include "CopperMountainVNA.h"
+
 #include "SiglentVectorSignalGenerator.h"
 
 #include "CDR8B10BTrigger.h"
@@ -217,6 +219,8 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
+
+	AddVNADriverClass(CopperMountainVNA);
 
 	AddTriggerClass(CDR8B10BTrigger);
 	AddTriggerClass(CDRNRZPatternTrigger);

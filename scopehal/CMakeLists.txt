@@ -103,11 +103,13 @@ set(SCOPEHAL_SOURCES
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp
 	SCPIRFSignalGenerator.cpp
+	SCPIVNA.cpp
 	RemoteBridgeOscilloscope.cpp
 
 	AgilentOscilloscope.cpp
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
+	CopperMountainVNA.cpp
 	DemoOscilloscope.cpp
 	DemoPowerSupply.cpp
 	DigilentOscilloscope.cpp
