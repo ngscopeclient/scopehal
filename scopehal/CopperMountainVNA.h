@@ -71,7 +71,6 @@ public:
 	virtual bool IsTriggerArmed() override;
 	virtual void PushTrigger() override;
 	virtual void PullTrigger() override;
-	virtual std::vector<std::string> GetTriggerTypes() override;
 
 	//Timebase
 	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
@@ -87,6 +86,26 @@ public:
 	virtual int64_t GetTriggerOffset() override;
 	virtual bool IsInterleaving() override;
 	virtual bool SetInterleaving(bool combine) override;
+
+	virtual bool HasFrequencyControls() override;
+	virtual bool HasTimebaseControls() override;
+
+	//TODO: Sweep configuration
+	virtual int64_t GetResolutionBandwidth() override;
+
+protected:
+	//Mutexing for thread safety
+	std::recursive_mutex m_cacheMutex;
+
+	std::string GetChannelColor(size_t i);
+
+	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
+	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
+
+	bool m_triggerArmed;
+	bool m_triggerOneShot;
+
+	int64_t m_rbw;
 
 public:
 	static std::string GetDriverNameInternal();

@@ -38,12 +38,79 @@ using namespace std;
 CopperMountainVNA::CopperMountainVNA(SCPITransport* transport)
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
+	, m_rbw(1)
 {
+	//For now, assume we're a 2-port VNA only
+
+	//Add analog channel objects
+	for(size_t dest = 0; dest<2; dest ++)
+	{
+		for(size_t src=0; src<2; src++)
+		{
+			//Hardware name of the channel
+			string chname = "S" + to_string(dest+1) + to_string(src+1);
+
+			//Create the channel
+			auto ichan = m_channels.size();
+			auto chan = new SParameterChannel(
+				this,
+				chname,
+				GetChannelColor(ichan),
+				ichan);
+			m_channels.push_back(chan);
+			chan->SetDefaultDisplayName();
+			chan->SetXAxisUnits(Unit::UNIT_HZ);
+
+			//Set initial configuration so we have a well-defined instrument state
+			SetChannelVoltageRange(ichan, 0, 80);
+			SetChannelOffset(ichan, 0, 40);
+			SetChannelVoltageRange(ichan, 1, 360);
+			SetChannelOffset(ichan, 1, 0);
+		}
+	}
+
+	//TODO: FORMat:DATA binary??
+	//this isn't supported over sockets??
 }
 
 CopperMountainVNA::~CopperMountainVNA()
 {
 }
+
+/**
+	@brief Color the channels (blue-red-green-yellow-purple-gray-cyan-magenta)
+ */
+string CopperMountainVNA::GetChannelColor(size_t i)
+{
+	switch(i % 8)
+	{
+		case 0:
+			return "#4040ff";
+
+		case 1:
+			return "#ff4040";
+
+		case 2:
+			return "#208020";
+
+		case 3:
+			return "#ffff00";
+
+		case 4:
+			return "#600080";
+
+		case 5:
+			return "#808080";
+
+		case 6:
+			return "#40a0a0";
+
+		case 7:
+		default:
+			return "#e040e0";
+	}
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device enumeration
@@ -66,16 +133,19 @@ uint32_t CopperMountainVNA::GetInstrumentTypesForChannel(size_t /*i*/)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Driver logic
 
-bool CopperMountainVNA::IsChannelEnabled(size_t i)
+bool CopperMountainVNA::IsChannelEnabled(size_t /*i*/)
 {
+	return true;
 }
 
-void CopperMountainVNA::EnableChannel(size_t i)
+void CopperMountainVNA::EnableChannel(size_t /*i*/)
 {
+	//no-op
 }
 
-void CopperMountainVNA::DisableChannel(size_t i)
+void CopperMountainVNA::DisableChannel(size_t /*i*/)
 {
+	//no-op
 }
 
 OscilloscopeChannel::CouplingType CopperMountainVNA::GetChannelCoupling(size_t /*i*/)
@@ -89,7 +159,7 @@ void CopperMountainVNA::SetChannelCoupling(size_t /*i*/, OscilloscopeChannel::Co
 	//no-op, coupling cannot be changed
 }
 
-vector<OscilloscopeChannel::CouplingType> CopperMountainVNA::GetAvailableCouplings(size_t i)
+vector<OscilloscopeChannel::CouplingType> CopperMountainVNA::GetAvailableCouplings(size_t /*i*/)
 {
 	vector<OscilloscopeChannel::CouplingType> ret;
 	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
@@ -118,18 +188,30 @@ void CopperMountainVNA::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*li
 
 float CopperMountainVNA::GetChannelVoltageRange(size_t i, size_t stream)
 {
+	//range in cache is always valid
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelVoltageRange[pair<size_t, size_t>(i, stream)];
 }
 
 void CopperMountainVNA::SetChannelVoltageRange(size_t i, size_t stream, float range)
 {
+	//Range is entirely clientside, hardware is always full scale dynamic range
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelVoltageRange[pair<size_t, size_t>(i, stream)]= range;
 }
 
 float CopperMountainVNA::GetChannelOffset(size_t i, size_t stream)
 {
+	//offset in cache is always valid
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelOffset[pair<size_t, size_t>(i, stream)];
 }
 
 void CopperMountainVNA::SetChannelOffset(size_t i, size_t stream, float offset)
 {
+	//Offset is entirely clientside, hardware is always full scale dynamic range
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
 }
 
 //TODO: support ext trig if any
@@ -140,26 +222,47 @@ OscilloscopeChannel* CopperMountainVNA::GetExternalTrigger()
 
 Oscilloscope::TriggerMode CopperMountainVNA::PollTrigger()
 {
+	//Always report "triggered" so we can block on AcquireData() in ScopeThread
+	//TODO: peek function of some sort?
+	return TRIGGER_MODE_TRIGGERED;
 }
 
 void CopperMountainVNA::Start()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+	//m_transport->SendCommand("INIT:ALL");
+	m_triggerArmed = true;
+	m_triggerOneShot = false;
 }
 
 void CopperMountainVNA::StartSingleTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+	//m_transport->SendCommand("INIT:ALL");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 void CopperMountainVNA::Stop()
 {
+	//TODO: send something other than *RST
+	//For now: just wrap up after the current acquisition ends
+	m_triggerArmed = false;
+	m_triggerOneShot = false;
 }
 
 void CopperMountainVNA::ForceTrigger()
 {
+	lock_guard<recursive_mutex> lock(m_mutex);
+	//m_transport->SendCommand("INIT:ALL");
+	m_triggerArmed = true;
+	m_triggerOneShot = true;
 }
 
 bool CopperMountainVNA::IsTriggerArmed()
 {
+	//return m_triggerArmed;
+	return true;
 }
 
 void CopperMountainVNA::PushTrigger()
@@ -170,11 +273,6 @@ void CopperMountainVNA::PullTrigger()
 {
 }
 
-vector<string> CopperMountainVNA::GetTriggerTypes()
-{
-
-}
-
 bool CopperMountainVNA::AcquireData()
 {
 	return true;
@@ -182,52 +280,87 @@ bool CopperMountainVNA::AcquireData()
 
 vector<uint64_t> CopperMountainVNA::GetSampleRatesNonInterleaved()
 {
+	vector<uint64_t> ret;
+	ret.push_back(1);
+	return ret;
 }
 
 vector<uint64_t> CopperMountainVNA::GetSampleRatesInterleaved()
 {
+	//interleaving not supported
+	vector<uint64_t> ret = {};
+	return ret;
 }
 
 set<Oscilloscope::InterleaveConflict> CopperMountainVNA::GetInterleaveConflicts()
 {
+	//interleaving not supported
+	set<Oscilloscope::InterleaveConflict> ret;
+	return ret;
 }
 
 vector<uint64_t> CopperMountainVNA::GetSampleDepthsNonInterleaved()
 {
+	vector<uint64_t> ret;
+	ret.push_back(10001);
+	return ret;
 }
 
 vector<uint64_t> CopperMountainVNA::GetSampleDepthsInterleaved()
 {
+	//interleaving not supported
+	vector<uint64_t> ret;
+	return ret;
 }
 
 uint64_t CopperMountainVNA::GetSampleRate()
 {
+	return 1;
 }
 
 uint64_t CopperMountainVNA::GetSampleDepth()
 {
+	return 10001;
 }
 
-void CopperMountainVNA::SetSampleDepth(uint64_t depth)
+void CopperMountainVNA::SetSampleDepth(uint64_t /*depth*/)
 {
 }
 
-void CopperMountainVNA::SetSampleRate(uint64_t rate)
+void CopperMountainVNA::SetSampleRate(uint64_t /*rate*/)
 {
 }
 
-void CopperMountainVNA::SetTriggerOffset(int64_t offset)
+void CopperMountainVNA::SetTriggerOffset(int64_t /*offset*/)
 {
 }
 
 int64_t CopperMountainVNA::GetTriggerOffset()
 {
+	return 0;
 }
 
 bool CopperMountainVNA::IsInterleaving()
 {
+	return false;
 }
 
-bool CopperMountainVNA::SetInterleaving(bool combine)
+bool CopperMountainVNA::SetInterleaving(bool /*combine*/)
 {
+	return false;
+}
+
+int64_t CopperMountainVNA::GetResolutionBandwidth()
+{
+	return m_rbw;
+}
+
+bool CopperMountainVNA::HasFrequencyControls()
+{
+	return true;
+}
+
+bool CopperMountainVNA::HasTimebaseControls()
+{
+	return false;
 }
