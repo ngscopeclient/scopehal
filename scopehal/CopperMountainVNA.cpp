@@ -41,6 +41,10 @@ CopperMountainVNA::CopperMountainVNA(SCPITransport* transport)
 	, m_rbw(1)
 {
 	//For now, assume we're a 2-port VNA only
+	auto snport = m_transport->SendCommandQueuedWithReply("SERV:PORT:COUN?");
+	int nports = stoi(snport);
+	if(nports != 2)
+		LogWarning("CopperMountainVNA driver only supports 2-port VNAs so far\n");
 
 	//Add analog channel objects
 	for(size_t dest = 0; dest<2; dest ++)
@@ -100,13 +104,19 @@ CopperMountainVNA::CopperMountainVNA(SCPITransport* transport)
 
 	//Get and cache memory depth
 	auto sdepth = m_transport->SendCommandQueuedWithReply("SENS:SWE:POIN?");
-	m_memoryDepth = stoi(srbw);
+	m_memoryDepth = stoi(sdepth);
 
-	//Get and cache start frequency
+	//Get and cache start and stop frequency
 	auto sfreq = m_transport->SendCommandQueuedWithReply("SENS:FREQ:STAR?");
 	m_sweepStart = hz.ParseString(sfreq);
 	sfreq = m_transport->SendCommandQueuedWithReply("SENS:FREQ:STOP?");
 	m_sweepStop = hz.ParseString(sfreq);
+
+	//Get and cache upper/lower freq limits of the instrument
+	sfreq = m_transport->SendCommandQueuedWithReply("SERV:SWE:FREQ:MAX?");
+	m_freqMax = hz.ParseString(sfreq);
+	sfreq = m_transport->SendCommandQueuedWithReply("SERV:SWE:FREQ:MIN?");
+	m_freqMin = hz.ParseString(sfreq);
 }
 
 CopperMountainVNA::~CopperMountainVNA()
@@ -157,99 +167,8 @@ string CopperMountainVNA::GetDriverNameInternal()
 	return "coppermt";
 }
 
-unsigned int CopperMountainVNA::GetInstrumentTypes()
-{
-	return Instrument::INST_OSCILLOSCOPE;
-}
-
-uint32_t CopperMountainVNA::GetInstrumentTypesForChannel(size_t /*i*/)
-{
-	return Instrument::INST_OSCILLOSCOPE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Driver logic
-
-bool CopperMountainVNA::IsChannelEnabled(size_t /*i*/)
-{
-	return true;
-}
-
-void CopperMountainVNA::EnableChannel(size_t /*i*/)
-{
-	//no-op
-}
-
-void CopperMountainVNA::DisableChannel(size_t /*i*/)
-{
-	//no-op
-}
-
-OscilloscopeChannel::CouplingType CopperMountainVNA::GetChannelCoupling(size_t /*i*/)
-{
-	//all inputs are ac coupled 50 ohm impedance
-	return OscilloscopeChannel::COUPLE_AC_50;
-}
-
-void CopperMountainVNA::SetChannelCoupling(size_t /*i*/, OscilloscopeChannel::CouplingType /*type*/)
-{
-	//no-op, coupling cannot be changed
-}
-
-vector<OscilloscopeChannel::CouplingType> CopperMountainVNA::GetAvailableCouplings(size_t /*i*/)
-{
-	vector<OscilloscopeChannel::CouplingType> ret;
-	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
-	return ret;
-}
-
-double CopperMountainVNA::GetChannelAttenuation(size_t /*i*/)
-{
-	return 1;
-}
-
-void CopperMountainVNA::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
-{
-	//no-op
-}
-
-unsigned int CopperMountainVNA::GetChannelBandwidthLimit(size_t /*i*/)
-{
-	return 0;
-}
-
-void CopperMountainVNA::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
-{
-	//no-op
-}
-
-float CopperMountainVNA::GetChannelVoltageRange(size_t i, size_t stream)
-{
-	//range in cache is always valid
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelVoltageRange[pair<size_t, size_t>(i, stream)];
-}
-
-void CopperMountainVNA::SetChannelVoltageRange(size_t i, size_t stream, float range)
-{
-	//Range is entirely clientside, hardware is always full scale dynamic range
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelVoltageRange[pair<size_t, size_t>(i, stream)]= range;
-}
-
-float CopperMountainVNA::GetChannelOffset(size_t i, size_t stream)
-{
-	//offset in cache is always valid
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	return m_channelOffset[pair<size_t, size_t>(i, stream)];
-}
-
-void CopperMountainVNA::SetChannelOffset(size_t i, size_t stream, float offset)
-{
-	//Offset is entirely clientside, hardware is always full scale dynamic range
-	lock_guard<recursive_mutex> lock(m_cacheMutex);
-	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
-}
 
 //TODO: support ext trig if any
 OscilloscopeChannel* CopperMountainVNA::GetExternalTrigger()
@@ -401,44 +320,17 @@ bool CopperMountainVNA::AcquireData()
 	return true;
 }
 
-vector<uint64_t> CopperMountainVNA::GetSampleRatesNonInterleaved()
-{
-	vector<uint64_t> ret;
-	ret.push_back(1);
-	return ret;
-}
-
-vector<uint64_t> CopperMountainVNA::GetSampleRatesInterleaved()
-{
-	//interleaving not supported
-	vector<uint64_t> ret = {};
-	return ret;
-}
-
-set<Oscilloscope::InterleaveConflict> CopperMountainVNA::GetInterleaveConflicts()
-{
-	//interleaving not supported
-	set<Oscilloscope::InterleaveConflict> ret;
-	return ret;
-}
-
 vector<uint64_t> CopperMountainVNA::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
+	ret.push_back(100);
+	ret.push_back(200);
+	ret.push_back(500);
+	ret.push_back(1000);
+	ret.push_back(2000);
+	ret.push_back(5000);
 	ret.push_back(10000);
 	return ret;
-}
-
-vector<uint64_t> CopperMountainVNA::GetSampleDepthsInterleaved()
-{
-	//interleaving not supported
-	vector<uint64_t> ret;
-	return ret;
-}
-
-uint64_t CopperMountainVNA::GetSampleRate()
-{
-	return 1;
 }
 
 uint64_t CopperMountainVNA::GetSampleDepth()
@@ -446,31 +338,10 @@ uint64_t CopperMountainVNA::GetSampleDepth()
 	return m_memoryDepth;
 }
 
-void CopperMountainVNA::SetSampleDepth(uint64_t /*depth*/)
+void CopperMountainVNA::SetSampleDepth(uint64_t depth)
 {
-}
-
-void CopperMountainVNA::SetSampleRate(uint64_t /*rate*/)
-{
-}
-
-void CopperMountainVNA::SetTriggerOffset(int64_t /*offset*/)
-{
-}
-
-int64_t CopperMountainVNA::GetTriggerOffset()
-{
-	return 0;
-}
-
-bool CopperMountainVNA::IsInterleaving()
-{
-	return false;
-}
-
-bool CopperMountainVNA::SetInterleaving(bool /*combine*/)
-{
-	return false;
+	m_memoryDepth = depth;
+	m_transport->SendCommandQueued(string("SENS:SWE:POIN ") + to_string(m_memoryDepth));
 }
 
 int64_t CopperMountainVNA::GetResolutionBandwidth()
@@ -478,12 +349,44 @@ int64_t CopperMountainVNA::GetResolutionBandwidth()
 	return m_rbw;
 }
 
-bool CopperMountainVNA::HasFrequencyControls()
+void CopperMountainVNA::SetSpan(int64_t span)
 {
-	return true;
+	//Calculate requested start/stop
+	auto freq = GetCenterFrequency(0);
+	m_sweepStart = freq - span/2;
+	m_sweepStop = freq + span/2;
+
+	//Clamp to instrument limits
+	m_sweepStart = max(m_freqMin, m_sweepStart);
+	m_sweepStop = min(m_freqMax, m_sweepStop);
+
+	//Send to hardware
+	m_transport->SendCommandQueued(string("SENS:FREQ:STAR ") + to_string(m_sweepStart));
+	m_transport->SendCommandQueued(string("SENS:FREQ:STOP ") + to_string(m_sweepStop));
 }
 
-bool CopperMountainVNA::HasTimebaseControls()
+int64_t CopperMountainVNA::GetSpan()
 {
-	return false;
+	return m_sweepStop - m_sweepStart;
+}
+
+void CopperMountainVNA::SetCenterFrequency(size_t /*channel*/, int64_t freq)
+{
+	//Calculate requested start/stop
+	auto span = GetSpan();
+	m_sweepStart = freq - span/2;
+	m_sweepStop = freq + span/2;
+
+	//Clamp to instrument limits
+	m_sweepStart = max(m_freqMin, m_sweepStart);
+	m_sweepStop = min(m_freqMax, m_sweepStop);
+
+	//Send to hardware
+	m_transport->SendCommandQueued(string("SENS:FREQ:STAR ") + to_string(m_sweepStart));
+	m_transport->SendCommandQueued(string("SENS:FREQ:STOP ") + to_string(m_sweepStop));
+}
+
+int64_t CopperMountainVNA::GetCenterFrequency(size_t /*channel*/)
+{
+	return (m_sweepStop + m_sweepStart) / 2;
 }

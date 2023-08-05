@@ -68,3 +68,164 @@ SCPIVNA* SCPIVNA::CreateVNA(string driver, SCPITransport* transport)
 	LogError("Invalid VNA driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Default stubs for Oscilloscope methods
+
+bool SCPIVNA::IsChannelEnabled(size_t /*i*/)
+{
+	return true;
+}
+
+void SCPIVNA::EnableChannel(size_t /*i*/)
+{
+	//no-op
+}
+
+void SCPIVNA::DisableChannel(size_t /*i*/)
+{
+	//no-op
+}
+
+OscilloscopeChannel::CouplingType SCPIVNA::GetChannelCoupling(size_t /*i*/)
+{
+	//all inputs are ac coupled 50 ohm impedance
+	return OscilloscopeChannel::COUPLE_AC_50;
+}
+
+void SCPIVNA::SetChannelCoupling(size_t /*i*/, OscilloscopeChannel::CouplingType /*type*/)
+{
+	//no-op, coupling cannot be changed
+}
+
+vector<OscilloscopeChannel::CouplingType> SCPIVNA::GetAvailableCouplings(size_t /*i*/)
+{
+	vector<OscilloscopeChannel::CouplingType> ret;
+	ret.push_back(OscilloscopeChannel::COUPLE_AC_50);
+	return ret;
+}
+
+double SCPIVNA::GetChannelAttenuation(size_t /*i*/)
+{
+	return 1;
+}
+
+void SCPIVNA::SetChannelAttenuation(size_t /*i*/, double /*atten*/)
+{
+	//no-op
+}
+
+unsigned int SCPIVNA::GetChannelBandwidthLimit(size_t /*i*/)
+{
+	return 0;
+}
+
+void SCPIVNA::SetChannelBandwidthLimit(size_t /*i*/, unsigned int /*limit_mhz*/)
+{
+	//no-op
+}
+
+bool SCPIVNA::IsInterleaving()
+{
+	return false;
+}
+
+bool SCPIVNA::SetInterleaving(bool /*combine*/)
+{
+	return false;
+}
+
+
+bool SCPIVNA::HasFrequencyControls()
+{
+	return true;
+}
+
+bool SCPIVNA::HasTimebaseControls()
+{
+	return false;
+}
+
+void SCPIVNA::SetTriggerOffset(int64_t /*offset*/)
+{
+}
+
+int64_t SCPIVNA::GetTriggerOffset()
+{
+	return 0;
+}
+
+vector<uint64_t> SCPIVNA::GetSampleDepthsInterleaved()
+{
+	//interleaving not supported
+	vector<uint64_t> ret;
+	return ret;
+}
+
+vector<uint64_t> SCPIVNA::GetSampleRatesInterleaved()
+{
+	//interleaving not supported
+	vector<uint64_t> ret = {};
+	return ret;
+}
+
+set<Oscilloscope::InterleaveConflict> SCPIVNA::GetInterleaveConflicts()
+{
+	//interleaving not supported
+	set<Oscilloscope::InterleaveConflict> ret;
+	return ret;
+}
+
+vector<uint64_t> SCPIVNA::GetSampleRatesNonInterleaved()
+{
+	vector<uint64_t> ret;
+	ret.push_back(1);
+	return ret;
+}
+
+void SCPIVNA::SetSampleRate(uint64_t /*rate*/)
+{
+}
+
+uint64_t SCPIVNA::GetSampleRate()
+{
+	return 1;
+}
+
+unsigned int SCPIVNA::GetInstrumentTypes()
+{
+	return Instrument::INST_OSCILLOSCOPE;
+}
+
+uint32_t SCPIVNA::GetInstrumentTypesForChannel(size_t /*i*/)
+{
+	return Instrument::INST_OSCILLOSCOPE;
+}
+
+float SCPIVNA::GetChannelVoltageRange(size_t i, size_t stream)
+{
+	//range in cache is always valid
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelVoltageRange[pair<size_t, size_t>(i, stream)];
+}
+
+void SCPIVNA::SetChannelVoltageRange(size_t i, size_t stream, float range)
+{
+	//Range is entirely clientside, hardware is always full scale dynamic range
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelVoltageRange[pair<size_t, size_t>(i, stream)]= range;
+}
+
+float SCPIVNA::GetChannelOffset(size_t i, size_t stream)
+{
+	//offset in cache is always valid
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_channelOffset[pair<size_t, size_t>(i, stream)];
+}
+
+void SCPIVNA::SetChannelOffset(size_t i, size_t stream, float offset)
+{
+	//Offset is entirely clientside, hardware is always full scale dynamic range
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffset[pair<size_t, size_t>(i, stream)] = offset;
+}

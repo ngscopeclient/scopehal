@@ -41,25 +41,8 @@ public:
 	CopperMountainVNA(SCPITransport* transport);
 	virtual ~CopperMountainVNA();
 
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
-
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i) override;
-	virtual void EnableChannel(size_t i) override;
-	virtual void DisableChannel(size_t i) override;
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
-	virtual double GetChannelAttenuation(size_t i) override;
-	virtual void SetChannelAttenuation(size_t i, double atten) override;
-	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
-	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
 	virtual OscilloscopeChannel* GetExternalTrigger() override;
-	virtual float GetChannelOffset(size_t i, size_t stream) override;
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger() override;
@@ -73,34 +56,20 @@ public:
 	virtual void PullTrigger() override;
 
 	//Timebase
-	virtual std::vector<uint64_t> GetSampleRatesNonInterleaved() override;
-	virtual std::vector<uint64_t> GetSampleRatesInterleaved() override;
-	virtual std::set<InterleaveConflict> GetInterleaveConflicts() override;
 	virtual std::vector<uint64_t> GetSampleDepthsNonInterleaved() override;
-	virtual std::vector<uint64_t> GetSampleDepthsInterleaved() override;
-	virtual uint64_t GetSampleRate() override;
 	virtual uint64_t GetSampleDepth() override;
 	virtual void SetSampleDepth(uint64_t depth) override;
-	virtual void SetSampleRate(uint64_t rate) override;
-	virtual void SetTriggerOffset(int64_t offset) override;
-	virtual int64_t GetTriggerOffset() override;
-	virtual bool IsInterleaving() override;
-	virtual bool SetInterleaving(bool combine) override;
-
-	virtual bool HasFrequencyControls() override;
-	virtual bool HasTimebaseControls() override;
+	virtual void SetSpan(int64_t span) override;
+	virtual int64_t GetSpan() override;
+	virtual void SetCenterFrequency(size_t channel, int64_t freq) override;
+	virtual int64_t GetCenterFrequency(size_t channel) override;
 
 	//TODO: Sweep configuration
 	virtual int64_t GetResolutionBandwidth() override;
 
 protected:
-	//Mutexing for thread safety
-	std::recursive_mutex m_cacheMutex;
 
 	std::string GetChannelColor(size_t i);
-
-	std::map<std::pair<size_t, size_t>, float> m_channelVoltageRange;
-	std::map<std::pair<size_t, size_t>, float> m_channelOffset;
 
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
@@ -108,6 +77,9 @@ protected:
 	int64_t m_memoryDepth;
 	int64_t m_sweepStart;
 	int64_t m_sweepStop;
+
+	int64_t m_freqMin;
+	int64_t m_freqMax;
 
 	int64_t m_rbw;
 
