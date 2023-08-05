@@ -69,12 +69,49 @@ CopperMountainVNA::CopperMountainVNA(SCPITransport* transport)
 		}
 	}
 
-	//TODO: FORMat:DATA binary??
-	//this isn't supported over sockets??
+	//Apparently binary data transfer is not supported over TCP sockets since they ONLY use newline as end of message
+	//while HiSLIP does not support pipelining of commands? That's derpy...
+
+	//Set trigger source to internal
+	m_transport->SendCommandQueued("TRIG:SOUR INT");
+
+	//Turn off continuous trigger sweep
+	m_transport->SendCommandQueued("INIT:CONT OFF");
+
+	//Turn on RF power
+	m_transport->SendCommandQueued("OUTP ON");
+
+	//Set the channels we want to look at
+	m_transport->SendCommandQueued("CALC:PAR1:DEF S11");
+	m_transport->SendCommandQueued("CALC:PAR2:DEF S21");
+	m_transport->SendCommandQueued("CALC:PAR3:DEF S12");
+	m_transport->SendCommandQueued("CALC:PAR4:DEF S22");
+
+	//Format polar (real + imag)
+	m_transport->SendCommandQueued("CALC:TRAC1:FORM POL");
+	m_transport->SendCommandQueued("CALC:TRAC2:FORM POL");
+	m_transport->SendCommandQueued("CALC:TRAC3:FORM POL");
+	m_transport->SendCommandQueued("CALC:TRAC4:FORM POL");
+
+	//Get and cache resolution bandwidth
+	auto srbw = m_transport->SendCommandQueuedWithReply("SENS:BWID?");
+	Unit hz(Unit::UNIT_HZ);
+	m_rbw = hz.ParseString(srbw);
+
+	//Get and cache memory depth
+	auto sdepth = m_transport->SendCommandQueuedWithReply("SENS:SWE:POIN?");
+	m_memoryDepth = stoi(srbw);
+
+	//Get and cache start frequency
+	auto sfreq = m_transport->SendCommandQueuedWithReply("SENS:FREQ:STAR?");
+	m_sweepStart = hz.ParseString(sfreq);
+	sfreq = m_transport->SendCommandQueuedWithReply("SENS:FREQ:STOP?");
+	m_sweepStop = hz.ParseString(sfreq);
 }
 
 CopperMountainVNA::~CopperMountainVNA()
 {
+	m_transport->SendCommandQueued("OUTP OFF");
 }
 
 /**
@@ -222,15 +259,25 @@ OscilloscopeChannel* CopperMountainVNA::GetExternalTrigger()
 
 Oscilloscope::TriggerMode CopperMountainVNA::PollTrigger()
 {
-	//Always report "triggered" so we can block on AcquireData() in ScopeThread
-	//TODO: peek function of some sort?
-	return TRIGGER_MODE_TRIGGERED;
+	auto state = Trim(m_transport->SendCommandQueuedWithReply("TRIG:STAT?"));
+
+	//Pending, but no data yet
+	if( (state ==  "MEAS") || (state == "WTRG") )
+		return TRIGGER_MODE_RUN;
+
+	else //if(state == "HOLD")
+	{
+		if(m_triggerArmed)
+			return TRIGGER_MODE_TRIGGERED;
+		else
+			return TRIGGER_MODE_STOP;
+	}
 }
 
 void CopperMountainVNA::Start()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT:IMM");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
 }
@@ -238,15 +285,14 @@ void CopperMountainVNA::Start()
 void CopperMountainVNA::StartSingleTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT:IMM");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
 
 void CopperMountainVNA::Stop()
 {
-	//TODO: send something other than *RST
-	//For now: just wrap up after the current acquisition ends
+	m_transport->SendCommandQueued("ABOR");
 	m_triggerArmed = false;
 	m_triggerOneShot = false;
 }
@@ -254,7 +300,7 @@ void CopperMountainVNA::Stop()
 void CopperMountainVNA::ForceTrigger()
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT:IMM");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
 }
@@ -275,6 +321,83 @@ void CopperMountainVNA::PullTrigger()
 
 bool CopperMountainVNA::AcquireData()
 {
+	m_transport->SendCommandQueuedWithReply("*OPC?");
+
+	SequenceSet s;
+	double tstart = GetTime();
+	int64_t fs = (tstart - floor(tstart)) * FS_PER_SECOND;
+
+	for(size_t dest = 0; dest<2; dest ++)
+	{
+		for(size_t src=0; src<2; src++)
+		{
+			//Hardware name of the channel
+			string chname = "S" + to_string(dest+1) + to_string(src+1);
+
+			int nparam = dest*2 + src;
+			auto sdata = m_transport->SendCommandQueuedWithReply(
+				string("CALC:TRAC") + to_string(nparam+1) + ":DATA:FDAT?");
+
+			auto values = explode(sdata, ',');
+			size_t npoints = values.size() / 2;
+
+			int64_t stepsize = (m_sweepStop - m_sweepStart) / npoints;
+
+			//Create the waveforms
+			auto mcap = new UniformAnalogWaveform;
+			mcap->m_timescale = stepsize;
+			mcap->m_triggerPhase = m_sweepStart;
+			mcap->m_startTimestamp = floor(tstart);
+			mcap->m_startFemtoseconds = fs;
+			mcap->PrepareForCpuAccess();
+
+			auto acap = new UniformAnalogWaveform;
+			acap->m_timescale = stepsize;
+			acap->m_triggerPhase = m_sweepStart;
+			acap->m_startTimestamp = floor(tstart);
+			acap->m_startFemtoseconds = fs;
+			acap->PrepareForCpuAccess();
+
+			//Make content for display (dB and degrees)
+			mcap->Resize(npoints);
+			acap->Resize(npoints);
+			for(size_t i=0; i<npoints; i++)
+			{
+				float real = stof(values[i*2]);
+				float imag = stof(values[i*2 + 1]);
+
+				float mag = sqrt(real*real + imag*imag);
+				float angle = atan2(imag, real);
+
+				mcap->m_samples[i] = 20 * log10(mag);
+				acap->m_samples[i] = angle * 180 / M_PI;
+			}
+
+			acap->MarkModifiedFromCpu();
+			mcap->MarkModifiedFromCpu();
+
+			auto chan = GetChannel(nparam);
+			s[StreamDescriptor(chan, 0)] = mcap;
+			s[StreamDescriptor(chan, 1)] = acap;
+		}
+	}
+
+	//Save the waveforms to our queue
+	m_pendingWaveformsMutex.lock();
+	m_pendingWaveforms.push_back(s);
+	m_pendingWaveformsMutex.unlock();
+
+	//If this was a one-shot trigger we're no longer armed
+	if(m_triggerOneShot)
+		m_triggerArmed = false;
+
+	//If continuous trigger, re-arm for another acquisition
+	else if(m_triggerArmed)
+	{
+		//m_transport->SendCommand("*TRG");
+		m_transport->SendCommandQueued("INIT:IMM");
+	}
+
 	return true;
 }
 
@@ -302,7 +425,7 @@ set<Oscilloscope::InterleaveConflict> CopperMountainVNA::GetInterleaveConflicts(
 vector<uint64_t> CopperMountainVNA::GetSampleDepthsNonInterleaved()
 {
 	vector<uint64_t> ret;
-	ret.push_back(10001);
+	ret.push_back(10000);
 	return ret;
 }
 
@@ -320,7 +443,7 @@ uint64_t CopperMountainVNA::GetSampleRate()
 
 uint64_t CopperMountainVNA::GetSampleDepth()
 {
-	return 10001;
+	return m_memoryDepth;
 }
 
 void CopperMountainVNA::SetSampleDepth(uint64_t /*depth*/)

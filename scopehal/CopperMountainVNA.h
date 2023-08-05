@@ -105,6 +105,10 @@ protected:
 	bool m_triggerArmed;
 	bool m_triggerOneShot;
 
+	int64_t m_memoryDepth;
+	int64_t m_sweepStart;
+	int64_t m_sweepStop;
+
 	int64_t m_rbw;
 
 public:
