@@ -74,6 +74,14 @@ public:
 	 */
 	virtual bool SupportsOvercurrentShutdown();
 
+	/**
+		@brief Determines if the power supply supports voltage/current control for the given channel.
+
+		If this function returns false, GetPowerVoltage* and GetPowerCurrent* will always return zero,
+		and SetPowerCurrent*, and SetPowerVoltage* are no-ops.
+	 */
+	virtual bool SupportsVoltageCurrentControl(int chan);
+
 	virtual bool AcquireData() override;
 
 	//Read sensors

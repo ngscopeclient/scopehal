@@ -64,6 +64,11 @@ bool PowerSupply::SupportsOvercurrentShutdown()
 	return false;
 }
 
+bool PowerSupply::SupportsVoltageCurrentControl(int /*chan*/)
+{
+	return true;
+}
+
 bool PowerSupply::GetPowerChannelActive(int /*chan*/)
 {
 	return true;
