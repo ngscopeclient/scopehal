@@ -183,7 +183,7 @@ void SiglentPowerSupply::SetPowerCurrent(int chan, double amps)
 void SiglentPowerSupply::SetPowerChannelActive(int chan, bool on)
 {
 	if(on)
-		m_transport->SendCommandQueued(string("OUTP ") + m_channels[chan]->GetHwname() + ", ON");
+		m_transport->SendCommandQueued(string("OUTP ") + m_channels[chan]->GetHwname() + ",ON");
 	else
-		m_transport->SendCommandQueued(string("OUTP ") + m_channels[chan]->GetHwname() + ", OFF");
+		m_transport->SendCommandQueued(string("OUTP ") + m_channels[chan]->GetHwname() + ",OFF");
 }
