@@ -61,6 +61,7 @@
 #include "GWInstekGPDX303SPowerSupply.h"
 #include "RigolDP8xxPowerSupply.h"
 #include "RohdeSchwarzHMC804xPowerSupply.h"
+#include "SiglentPowerSupply.h"
 
 #include "SiglentLoad.h"
 
@@ -218,6 +219,7 @@ void DriverStaticInit()
 	AddPowerSupplyDriverClass(GWInstekGPDX303SPowerSupply);
 	AddPowerSupplyDriverClass(RigolDP8xxPowerSupply);
 	AddPowerSupplyDriverClass(RohdeSchwarzHMC804xPowerSupply);
+	AddPowerSupplyDriverClass(SiglentPowerSupply);
 
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
