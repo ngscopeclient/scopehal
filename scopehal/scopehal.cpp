@@ -65,6 +65,7 @@
 #include "SiglentLoad.h"
 
 #include "CopperMountainVNA.h"
+#include "PicoVNA.h"
 
 #include "SiglentVectorSignalGenerator.h"
 
@@ -221,6 +222,7 @@ void DriverStaticInit()
 	AddRFSignalGeneratorDriverClass(SiglentVectorSignalGenerator);
 
 	AddVNADriverClass(CopperMountainVNA);
+	AddVNADriverClass(PicoVNA);
 
 	AddTriggerClass(CDR8B10BTrigger);
 	AddTriggerClass(CDRNRZPatternTrigger);
