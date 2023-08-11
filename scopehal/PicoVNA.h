@@ -80,6 +80,7 @@ protected:
 	bool m_triggerOneShot;
 
 	int64_t m_rbw;
+	int64_t m_sampleDepth;
 
 public:
 	static std::string GetDriverNameInternal();

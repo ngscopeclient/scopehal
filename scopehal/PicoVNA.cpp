@@ -48,8 +48,8 @@ PicoVNA::PicoVNA(SCPITransport* transport)
 	, m_triggerOneShot(true)
 	, m_rbw(1)
 {
-	//Set up VNA in a known configuration
-	m_transport->SendCommand("*RST");
+	//Set up VNA in a known configuration (returns "OK", ignore reply but need to read it to stay synced)
+	m_transport->SendCommandQueuedWithReply("*RST");
 
 	//Add analog channel objects
 	for(size_t dest = 0; dest<2; dest ++)
@@ -77,6 +77,13 @@ PicoVNA::PicoVNA(SCPITransport* transport)
 			SetChannelOffset(ichan, 1, 0);
 		}
 	}
+
+	//Get initial number of points
+	auto spoints = Trim(m_transport->SendCommandQueuedWithReply("SENS:SWE:POIN?"));
+	m_sampleDepth = stoi(spoints);
+
+	//Immediate trigger
+	m_transport->SendCommandQueuedWithReply("TRIG:SOUR IMM");
 }
 
 /**
@@ -154,8 +161,8 @@ bool PicoVNA::AcquireData()
 	size_t expectedFirstSample = 0;
 	bool first = true;
 
-	double tstart;
-	int64_t fs;
+	double tstart = 0;
+	int64_t fs = 0;
 
 	//For now, we don't support streaming of partial waveforms.
 	//Just wait for the complete waveform to show up, then display it in one block.
@@ -362,52 +369,50 @@ bool PicoVNA::AcquireData()
 
 	//If continuous trigger, re-arm for another acquisition
 	else if(m_triggerArmed)
-	{
-		lock_guard<recursive_mutex> lock(m_mutex);
-		m_transport->SendCommand("*TRG");
-	}
+		m_transport->SendCommandQueued("INIT");
 
 	return !skipping;
 }
 
 void PicoVNA::Start()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = false;
+
+	m_transport->FlushCommandQueue();
 }
 
 void PicoVNA::StartSingleTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
+
+	m_transport->FlushCommandQueue();
 }
 
 void PicoVNA::Stop()
 {
-	//TODO: send something other than *RST
-	//lock_guard<recursive_mutex> lock(m_mutex);
-	//m_transport->SendCommand("*RST");
-	//For now: just wrap up after the current acquisition ends
+	m_transport->SendCommandQueued("ABOR");
 	m_triggerArmed = false;
 	m_triggerOneShot = false;
+
+	m_transport->FlushCommandQueue();
 }
 
 void PicoVNA::ForceTrigger()
 {
-	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand("INIT:ALL");
+	m_transport->SendCommandQueued("INIT");
 	m_triggerArmed = true;
 	m_triggerOneShot = true;
+
+	m_transport->FlushCommandQueue();
 }
 
 bool PicoVNA::IsTriggerArmed()
 {
-	//return m_triggerArmed;
-	return true;
+	return m_triggerArmed;
 }
 
 vector<uint64_t> PicoVNA::GetSampleDepthsNonInterleaved()
@@ -424,10 +429,10 @@ vector<uint64_t> PicoVNA::GetSampleDepthsNonInterleaved()
 
 uint64_t PicoVNA::GetSampleDepth()
 {
-	return 10001;
+	return m_sampleDepth;
 }
 
-void PicoVNA::SetSampleDepth(uint64_t /*depth*/)
+void PicoVNA::SetSampleDepth(uint64_t depth)
 {
 }
 
@@ -452,12 +457,14 @@ void PicoVNA::SetSpan(int64_t span)
 
 int64_t PicoVNA::GetSpan()
 {
+	return 0;
 }
 
-void PicoVNA::SetCenterFrequency(size_t channel, int64_t freq)
+void PicoVNA::SetCenterFrequency(size_t /*channel*/, int64_t freq)
 {
 }
 
-int64_t PicoVNA::GetCenterFrequency(size_t channel)
+int64_t PicoVNA::GetCenterFrequency(size_t /*channel*/)
 {
+	return 0;
 }
