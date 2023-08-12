@@ -180,7 +180,7 @@ shared_ptr<QueueHandle> QueueManager::GetQueueWithFlags(vk::QueueFlags flags, st
 	for(size_t i=0; i<m_queues.size(); i++)
 	{
 		//Skip if flags don't match
-		if(!(m_queues[i].Flags & flags))
+		if((m_queues[i].Flags & flags) != flags)
 			continue;
 
 		//If handle is unallocated, use it right away
