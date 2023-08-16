@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -120,7 +120,7 @@ void WaveformGenerationFilter::Refresh()
 	size_t edgeSamples = floor(edgeTime / samplePeriod);
 
 	//Configure output waveform
-	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0);
+	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->PrepareForCpuAccess();
 	cap->m_timescale = samplePeriod;
 
@@ -163,18 +163,12 @@ void WaveformGenerationFilter::Refresh()
 			float frac = max(0.0f, tdelta / edgeTime);
 			float vcur = vlast + delta*frac;
 
-			cap->m_offsets[nsamp] = nsamp;
-			cap->m_durations[nsamp] = 1;
 			cap->m_samples[nsamp] = vcur;
 		}
 
 		//Emit samples for the rest of the UI
 		for(; (nsamp < tend_rounded) && (nsamp < caplen); nsamp ++)
-		{
-			cap->m_offsets[nsamp] = nsamp;
-			cap->m_durations[nsamp] = 1;
 			cap->m_samples[nsamp] = v;
-		}
 
 		vlast = v;
 	}
