@@ -163,6 +163,7 @@ void SiglentBINImportFilter::OnFileNameChanged()
 			wfm->m_triggerPhase = 0;
 			wfm->PrepareForCpuAccess();
 			SetData(wfm, m_streams.size() - 1);
+			wfm->Resize(wh.wave_length);
 
 			LogDebug("Waveform[%d]: %s\n", wave_idx, name.c_str());
 			double v_gain = wh.ch_v_gain[i].value * wh.ch_probe[i] / wh.ch_codes_per_div[i];
@@ -171,23 +172,23 @@ void SiglentBINImportFilter::OnFileNameChanged()
 
 			if(data_width == 2)
 			{
-				for(size_t j = 0; j < wh.wave_length; j++)
-				{
-					const uint16_t* sample = reinterpret_cast<const uint16_t*>(f.c_str() + fpos);
-					float value = ((static_cast<int32_t>(*sample) - center_code)) * v_gain - wh.ch_v_offset[i].value;
-					wfm->m_samples.push_back(value);
-					fpos += 2;
-				}
+				Oscilloscope::ConvertUnsigned16BitSamples(
+					wfm->m_samples.GetCpuPointer(),
+					(uint16_t*)(f.c_str() + fpos),
+					v_gain,
+					v_gain * center_code + wh.ch_v_offset[i].value,
+					wh.wave_length);
+				fpos += 2 * wh.wave_length;
 			}
 			else
 			{
-				for(size_t j = 0; j < wh.wave_length; j++)
-				{
-					const uint8_t* sample = reinterpret_cast<const uint8_t*>(f.c_str() + fpos);
-					float value = (static_cast<int32_t>(*sample) - center_code) * v_gain - wh.ch_v_offset[i].value;
-					wfm->m_samples.push_back(value);
-					fpos += 1;
-				}
+				Oscilloscope::ConvertUnsigned8BitSamples(
+					wfm->m_samples.GetCpuPointer(),
+					(uint8_t*)(f.c_str() + fpos),
+					v_gain,
+					v_gain * center_code + wh.ch_v_offset[i].value,
+					wh.wave_length);
+				fpos += wh.wave_length;
 			}
 
 			wfm->MarkModifiedFromCpu();
@@ -209,6 +210,7 @@ void SiglentBINImportFilter::OnFileNameChanged()
 			wfm->m_triggerPhase = 0;
 			wfm->PrepareForCpuAccess();
 			SetData(wfm, m_streams.size() - 1);
+			wfm->Resize(wh.math_wave_length[i]);
 
 			LogDebug("Waveform[%d]: %s\n", wave_idx, name.c_str());
 			double v_gain = wh.math_v_gain[i].value / wh.math_codes_per_div;
@@ -217,23 +219,23 @@ void SiglentBINImportFilter::OnFileNameChanged()
 
 			if(data_width == 2)
 			{
-				for(size_t j = 0; j < wh.math_wave_length[i]; j++)
-				{
-					const uint16_t* sample = reinterpret_cast<const uint16_t*>(f.c_str() + fpos);
-					float value = ((static_cast<int32_t>(*sample) - center_code)) * v_gain - wh.math_v_offset[i].value;
-					wfm->m_samples.push_back(value);
-					fpos += 2;
-				}
+				Oscilloscope::ConvertUnsigned16BitSamples(
+					wfm->m_samples.GetCpuPointer(),
+					(uint16_t*)(f.c_str() + fpos),
+					v_gain,
+					v_gain * center_code + wh.math_v_offset[i].value,
+					wh.math_wave_length[i]);
+				fpos += 2 * wh.math_wave_length[i];
 			}
 			else
 			{
-				for(size_t j = 0; j < wh.math_wave_length[i]; j++)
-				{
-					const uint8_t* sample = reinterpret_cast<const uint8_t*>(f.c_str() + fpos);
-					float value = (static_cast<int32_t>(*sample) - center_code) * v_gain - wh.math_v_offset[i].value;
-					wfm->m_samples.push_back(value);
-					fpos += 1;
-				}
+				Oscilloscope::ConvertUnsigned8BitSamples(
+					wfm->m_samples.GetCpuPointer(),
+					(uint8_t*)(f.c_str() + fpos),
+					v_gain,
+					v_gain * center_code + wh.math_v_offset[i].value,
+					wh.math_wave_length[i]);
+				fpos += wh.math_wave_length[i];
 			}
 
 			wfm->MarkModifiedFromCpu();

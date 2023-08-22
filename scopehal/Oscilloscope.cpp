@@ -1277,3 +1277,221 @@ void Oscilloscope::Convert16BitSamplesAVX512F(float* pout, int16_t* pin, float g
 }
 #endif /* __x86_64__ */
 
+/**
+	@brief Converts Unsigned 16-bit ADC samples to floating point
+ */
+void Oscilloscope::ConvertUnsigned16BitSamples(float* pout, uint16_t* pin, float gain, float offset, size_t count)
+{
+	//Divide large waveforms (>1M points) into blocks and multithread them
+	//TODO: tune split
+	if(count > 1000000)
+	{
+		//Round blocks to multiples of 64 samples for clean vectorization
+		size_t numblocks = omp_get_max_threads();
+		size_t lastblock = numblocks - 1;
+		size_t blocksize = count / numblocks;
+		blocksize = blocksize - (blocksize % 64);
+
+		#pragma omp parallel for
+		for(size_t i=0; i<numblocks; i++)
+		{
+			//Last block gets any extra that didn't divide evenly
+			size_t nsamp = blocksize;
+			if(i == lastblock)
+				nsamp = count - i*blocksize;
+
+			size_t off = i*blocksize;
+			#ifdef __x86_64__
+			if(g_hasAvx2)
+			{
+				if(g_hasFMA)
+				{
+					ConvertUnsigned16BitSamplesFMA(
+						pout + off,
+						pin + off,
+						gain,
+						offset,
+						nsamp);
+				}
+				else
+				{
+					ConvertUnsigned16BitSamplesAVX2(
+						pout + off,
+						pin + off,
+						gain,
+						offset,
+						nsamp);
+				}
+			}
+			else
+			#endif /* __x86_64__ */
+			{
+				ConvertUnsigned16BitSamplesGeneric(
+					pout + off,
+					pin + off,
+					gain,
+					offset,
+					nsamp);
+			}
+		}
+	}
+
+	//Small waveforms get done single threaded to avoid overhead
+	else
+	{
+		#ifdef __x86_64__
+		if(g_hasAvx2)
+		{
+			if(g_hasFMA)
+				ConvertUnsigned16BitSamplesFMA(pout, pin, gain, offset, count);
+			else
+				ConvertUnsigned16BitSamplesAVX2(pout, pin, gain, offset, count);
+		}
+		else
+		#endif /* __x86_64__ */
+			ConvertUnsigned16BitSamplesGeneric(pout, pin, gain, offset, count);
+	}
+}
+
+/**
+	@brief Generic backend for ConvertUnsigned16BitSamples()
+ */
+void Oscilloscope::ConvertUnsigned16BitSamplesGeneric(float* pout, uint16_t* pin, float gain, float offset, size_t count)
+{
+	for(unsigned int k=0; k<count; k++)
+		pout[k] = pin[k] * gain - offset;
+}
+
+#ifdef __x86_64__
+__attribute__((target("avx2")))
+void Oscilloscope::ConvertUnsigned16BitSamplesAVX2(float* pout, uint16_t* pin, float gain, float offset, size_t count)
+{
+	size_t end = count - (count % 32);
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(size_t k=0; k<end; k += 32)
+	{
+		//Load all 32 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
+
+		//Extract the low and high halves (8 samples each) from the input blocks
+		__m128i block0_u16 = _mm256_extracti128_si256(raw_samples1, 0);
+		__m128i block1_u16 = _mm256_extracti128_si256(raw_samples1, 1);
+		__m128i block2_u16 = _mm256_extracti128_si256(raw_samples2, 0);
+		__m128i block3_u16 = _mm256_extracti128_si256(raw_samples2, 1);
+
+		//Convert both blocks from unsigned 16-bit to signed 32-bit, giving us a pair of 8x int32 vectors
+		__m256i block0_i32 = _mm256_cvtepu16_epi32(block0_u16);
+		__m256i block1_i32 = _mm256_cvtepu16_epi32(block1_u16);
+		__m256i block2_i32 = _mm256_cvtepu16_epi32(block2_u16);
+		__m256i block3_i32 = _mm256_cvtepu16_epi32(block3_u16);
+
+		//Convert the 32-bit int blocks to fp32
+		//Sadly there's no direct epi16 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_i32);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_i32);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_mul_ps(block0_float, gains);
+		block1_float = _mm256_mul_ps(block1_float, gains);
+		block2_float = _mm256_mul_ps(block2_float, gains);
+		block3_float = _mm256_mul_ps(block3_float, gains);
+
+		block0_float = _mm256_sub_ps(block0_float, offsets);
+		block1_float = _mm256_sub_ps(block1_float, offsets);
+		block2_float = _mm256_sub_ps(block2_float, offsets);
+		block3_float = _mm256_sub_ps(block3_float, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<count; k++)
+		pout[k] = pin[k] * gain - offset;
+}
+
+__attribute__((target("avx2,fma")))
+void Oscilloscope::ConvertUnsigned16BitSamplesFMA(float* pout, uint16_t* pin, float gain, float offset, size_t count)
+{
+	size_t end = count - (count % 64);
+
+	__m256 gains = { gain, gain, gain, gain, gain, gain, gain, gain };
+	__m256 offsets = { offset, offset, offset, offset, offset, offset, offset, offset };
+
+	for(size_t k=0; k<end; k += 64)
+	{
+		//Load all 64 raw ADC samples, without assuming alignment
+		//(on most modern Intel processors, load and loadu have same latency/throughput)
+		__m256i raw_samples1 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k));
+		__m256i raw_samples2 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 16));
+		__m256i raw_samples3 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 32));
+		__m256i raw_samples4 = _mm256_loadu_si256(reinterpret_cast<__m256i*>(pin + k + 48));
+
+		//Extract the low and high halves (8 samples each) from the input blocks
+		__m128i block0_u16 = _mm256_extracti128_si256(raw_samples1, 0);
+		__m128i block1_u16 = _mm256_extracti128_si256(raw_samples1, 1);
+		__m128i block2_u16 = _mm256_extracti128_si256(raw_samples2, 0);
+		__m128i block3_u16 = _mm256_extracti128_si256(raw_samples2, 1);
+		__m128i block4_u16 = _mm256_extracti128_si256(raw_samples3, 0);
+		__m128i block5_u16 = _mm256_extracti128_si256(raw_samples3, 1);
+		__m128i block6_u16 = _mm256_extracti128_si256(raw_samples4, 0);
+		__m128i block7_u16 = _mm256_extracti128_si256(raw_samples4, 1);
+
+		//Convert the blocks from unsigned 16-bit to signed 32-bit, giving us a pair of 8x int32 vectors
+		__m256i block0_i32 = _mm256_cvtepu16_epi32(block0_u16);
+		__m256i block1_i32 = _mm256_cvtepu16_epi32(block1_u16);
+		__m256i block2_i32 = _mm256_cvtepu16_epi32(block2_u16);
+		__m256i block3_i32 = _mm256_cvtepu16_epi32(block3_u16);
+		__m256i block4_i32 = _mm256_cvtepu16_epi32(block4_u16);
+		__m256i block5_i32 = _mm256_cvtepu16_epi32(block5_u16);
+		__m256i block6_i32 = _mm256_cvtepu16_epi32(block6_u16);
+		__m256i block7_i32 = _mm256_cvtepu16_epi32(block7_u16);
+
+		//Convert the 32-bit int blocks to fp32
+		//Sadly there's no direct epi16 to ps conversion instruction.
+		__m256 block0_float = _mm256_cvtepi32_ps(block0_i32);
+		__m256 block1_float = _mm256_cvtepi32_ps(block1_i32);
+		__m256 block2_float = _mm256_cvtepi32_ps(block2_i32);
+		__m256 block3_float = _mm256_cvtepi32_ps(block3_i32);
+		__m256 block4_float = _mm256_cvtepi32_ps(block4_i32);
+		__m256 block5_float = _mm256_cvtepi32_ps(block5_i32);
+		__m256 block6_float = _mm256_cvtepi32_ps(block6_i32);
+		__m256 block7_float = _mm256_cvtepi32_ps(block7_i32);
+
+		//Woo! We've finally got floating point data. Now we can do the fun part.
+		block0_float = _mm256_fmsub_ps(block0_float, gains, offsets);
+		block1_float = _mm256_fmsub_ps(block1_float, gains, offsets);
+		block2_float = _mm256_fmsub_ps(block2_float, gains, offsets);
+		block3_float = _mm256_fmsub_ps(block3_float, gains, offsets);
+		block4_float = _mm256_fmsub_ps(block4_float, gains, offsets);
+		block5_float = _mm256_fmsub_ps(block5_float, gains, offsets);
+		block6_float = _mm256_fmsub_ps(block6_float, gains, offsets);
+		block7_float = _mm256_fmsub_ps(block7_float, gains, offsets);
+
+		//All done, store back to the output buffer
+		_mm256_store_ps(pout + k, 		block0_float);
+		_mm256_store_ps(pout + k + 8,	block1_float);
+		_mm256_store_ps(pout + k + 16,	block2_float);
+		_mm256_store_ps(pout + k + 24,	block3_float);
+
+		_mm256_store_ps(pout + k + 32,	block4_float);
+		_mm256_store_ps(pout + k + 40,	block5_float);
+		_mm256_store_ps(pout + k + 48,	block6_float);
+		_mm256_store_ps(pout + k + 56,	block7_float);
+	}
+
+	//Get any extras we didn't get in the SIMD loop
+	for(size_t k=end; k<count; k++)
+		pout[k] = pin[k] * gain - offset;
+}
+#endif /* __x86_64__ */
