@@ -133,13 +133,16 @@ public:
 	/// Get a handle to a compute queue
 	std::shared_ptr<QueueHandle> GetComputeQueue(std::string name)
 	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
+
 	/// Get a handle to a render queue
 	/// @note Currently this requires Graphics and Transfer capabilities to simplify texture transfer code in WaveformArea.
 	std::shared_ptr<QueueHandle> GetRenderQueue(std::string name)
 	{ return GetQueueWithFlags(vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eTransfer, name); }
+
 	/// Get a handle to a transfer queue
+	/// @note This currently requires Compute capabilities so we can barrier on compute operations
 	std::shared_ptr<QueueHandle> GetTransferQueue(std::string name)
-	{ return GetQueueWithFlags(vk::QueueFlagBits::eTransfer, name); }
+	{ return GetQueueWithFlags(vk::QueueFlagBits::eCompute | vk::QueueFlagBits::eTransfer, name); }
 
 	/// Get a handle to a queue that has the given flag bits set, allocating the queue if necessary,
 	/// and set or append name to the queue name for debug
