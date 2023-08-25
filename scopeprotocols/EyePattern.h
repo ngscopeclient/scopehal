@@ -76,6 +76,8 @@ public:
 	void SetMaskHitRate(float rate)
 	{ m_maskHitRate = rate; }
 
+	double GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, ssize_t ymid);
+
 protected:
 	int64_t* m_accumdata;
 
