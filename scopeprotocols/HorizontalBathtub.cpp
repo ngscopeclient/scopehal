@@ -108,45 +108,16 @@ void HorizontalBathtub::Refresh()
 	cap->m_timescale = fs_per_pixel;
 
 	//Extract the single scanline we're interested in
-	//TODO: support a range of voltages
-	int64_t* row = din->GetAccumData() + ybin*din->GetWidth();
+	//TODO: support non-NRZ waveforms
 	size_t len = din->GetWidth();
 	cap->Resize(len);
 	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] = row[i];
-
-	//Move from the center out and integrate BER
-	float sumleft = 0;
-	float sumright = 0;
-	ssize_t mid = len/2;
-	for(ssize_t i=mid; i>=0; i--)
 	{
-		float& samp = cap->m_samples[i];
-		sumleft += samp;
-		samp = sumleft;
-	}
-	for(size_t i=mid; i<len; i++)
-	{
-		float& samp = cap->m_samples[i];
-		sumright += samp;
-		samp = sumright;
-	}
-
-	//Normalize to max amplitude
-	float nmax = sumleft;
-	if(sumright > sumleft)
-		nmax = sumright;
-	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] /= nmax;
-
-	//Log post-scaling
-	for(size_t i=0; i<len; i++)
-	{
-		float& samp = cap->m_samples[i];
-		if(samp < 1e-12)
-			samp = -14;	//cap ber if we don't have enough data
+		auto ber = din->GetBERAtPoint(i, ybin, din->GetWidth()/2, din->GetHeight()/2);
+		if(ber < 1e-20)
+			cap->m_samples[i] = -20;
 		else
-			samp = log10(samp);
+			cap->m_samples[i] = log10(ber);
 	}
 
 	SetData(cap, 0);

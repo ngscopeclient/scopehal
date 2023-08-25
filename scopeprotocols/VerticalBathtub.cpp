@@ -110,51 +110,21 @@ void VerticalBathtub::Refresh()
 
 	//Extract the single column we're interested in
 	//TODO: support a range of times around the midpoint
-	int64_t* data = eye->GetAccumData();
-	size_t width = eye->GetWidth();
+	//TODO: support non-NRZ waveforms
 	size_t len = eye->GetHeight();
 	cap->Resize(len);
 	for(size_t i=0; i<len; i++)
 	{
+		auto ber = log10(eye->GetBERAtPoint(xbin, i, eye->GetWidth()/2, eye->GetHeight()/2));
+		if(ber < 1e-20)
+			cap->m_samples[i] = -20;
+		else
+			cap->m_samples[i] = log10(ber);
+
 		cap->m_offsets[i] = i*mv_per_pixel - mv_off;
 		cap->m_durations[i] = mv_per_pixel;
-		cap->m_samples[i] = data[i*width + xbin];
 	}
 	SetData(cap, 0);
-
-	//Move from the center out and integrate BER
-	float sumleft = 0;
-	float sumright = 0;
-	ssize_t mid = len/2;
-	for(ssize_t i=mid; i>=0; i--)
-	{
-		float& samp = cap->m_samples[i];
-		sumleft += samp;
-		samp = sumleft;
-	}
-	for(size_t i=mid; i<len; i++)
-	{
-		float& samp = cap->m_samples[i];
-		sumright += samp;
-		samp = sumright;
-	}
-
-	//Normalize to max amplitude
-	float nmax = sumleft;
-	if(sumright > sumleft)
-		nmax = sumright;
-	for(size_t i=0; i<len; i++)
-		cap->m_samples[i] /= nmax;
-
-	//Log post-scaling
-	for(size_t i=0; i<len; i++)
-	{
-		float& samp = cap->m_samples[i];
-		if(samp < 1e-12)
-			samp = -14;	//cap ber if we don't have enough data
-		else
-			samp = log10(samp);
-	}
 
 	cap->MarkModifiedFromCpu();
 }
