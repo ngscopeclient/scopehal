@@ -159,7 +159,7 @@ QueueManager::QueueManager(vk::raii::PhysicalDevice* phys, std::shared_ptr<vk::r
 				if(static_cast<uint32_t>(b.Flags) & (1<<i))
 					flag_count_b++;
 			}
-			return flag_count_a > flag_count_b;
+			return flag_count_a < flag_count_b;
 		});
 	LogDebug("Sorted queues:\n");
 	LogIndenter li;
