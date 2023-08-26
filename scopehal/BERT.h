@@ -44,6 +44,75 @@ public:
 
 	virtual unsigned int GetInstrumentTypes();
 
+	enum Pattern
+	{
+		//Standard PRBS polynomials
+		PATTERN_PRBS7,
+		PATTERN_PRBS9,
+		PATTERN_PRBS11,
+		PATTERN_PRBS15,
+		PATTERN_PRBS23,
+		PATTERN_PRBS31,
+
+		//Custom output pattern
+		PATTERN_CUSTOM,
+
+		//Autodetect input pattern
+		PATTERN_AUTO
+	};
+
+	std::string GetPatternName(Pattern pat);
+
+	/**
+		@brief Gets the currently selected transmit pattern for a channel
+	 */
+	virtual Pattern GetTxPattern(size_t i) =0;
+
+	/**
+		@brief Gets the current transmit invert flag for a channel
+	 */
+	virtual bool GetTxInvert(size_t i) =0;
+
+	/**
+		@brief Gets the current transmit invert flag for a channel
+	 */
+	virtual bool GetRxInvert(size_t i) =0;
+
+	/**
+		@brief Sets the transmit invert flag for a channel
+	 */
+	virtual void SetTxInvert(size_t i, bool invert) =0;
+
+	/**
+		@brief Sets the receive invert flag for a channel
+	 */
+	virtual void SetRxInvert(size_t i, bool invert) =0;
+
+	/**
+		@brief Sets the transmit pattern for the selected channel
+	 */
+	virtual void SetTxPattern(size_t i, Pattern pattern) =0;
+
+	/**
+		@brief Gets the currently selected receive pattern for a channel
+	 */
+	virtual Pattern GetRxPattern(size_t i) =0;
+
+	/**
+		@brief Sets the receive pattern for the selected channel
+	 */
+	virtual void SetRxPattern(size_t i, Pattern pattern) =0;
+
+	/**
+		@brief Gets the list of available transmit patterns for a channel
+	 */
+	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i) =0;
+
+	/**
+		@brief Gets the list of available receive patterns for a channel
+	 */
+	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) =0;
+
 	//Device capabilities
 	//virtual bool AcquireData() override;
 };

@@ -30,6 +30,8 @@
 #include "scopehal.h"
 #include "BERT.h"
 
+using namespace std;
+
 BERT::BERT()
 {
 }
@@ -42,4 +44,37 @@ BERT::~BERT()
 unsigned int BERT::GetInstrumentTypes()
 {
 	return INST_BERT;
+}
+
+string BERT::GetPatternName(Pattern pat)
+{
+	switch(pat)
+	{
+		case PATTERN_PRBS7:
+			return "PRBS7";
+
+		case PATTERN_PRBS9:
+			return "PRBS9";
+
+		case PATTERN_PRBS11:
+			return "PRBS11";
+
+		case PATTERN_PRBS15:
+			return "PRBS15";
+
+		case PATTERN_PRBS23:
+			return "PRBS23";
+
+		case PATTERN_PRBS31:
+			return "PRBS31";
+
+		case PATTERN_CUSTOM:
+			return "Custom";
+
+		case PATTERN_AUTO:
+			return "Auto";
+
+		default:
+			return "invalid";
+	}
 }

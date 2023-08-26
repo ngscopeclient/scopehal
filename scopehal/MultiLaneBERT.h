@@ -46,6 +46,28 @@ public:
 	//Device information
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
+	//Pattern configuration
+	virtual Pattern GetTxPattern(size_t i);
+	virtual void SetTxPattern(size_t i, Pattern pattern);
+	virtual Pattern GetRxPattern(size_t i);
+	virtual void SetRxPattern(size_t i, Pattern pattern);
+	virtual bool GetTxInvert(size_t i);
+	virtual bool GetRxInvert(size_t i);
+	virtual void SetTxInvert(size_t i, bool invert);
+	virtual void SetRxInvert(size_t i, bool invert);
+	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i);
+	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i);
+
+protected:
+
+	int m_rxChannelBase;
+
+	//Cached settings
+	Pattern m_txPattern[4];
+	Pattern m_rxPattern[4];
+	bool m_txInvert[4];
+	bool m_rxInvert[4];
+
 public:
 	static std::string GetDriverNameInternal();
 	BERT_INITPROC(MultiLaneBERT)

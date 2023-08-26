@@ -59,7 +59,7 @@ BERTInputChannel::~BERTInputChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Flow graph updates
 
-bool BERTInputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+bool BERTInputChannel::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
