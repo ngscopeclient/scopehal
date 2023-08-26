@@ -86,6 +86,8 @@ set(SCOPEHAL_SOURCES
 	Instrument.cpp
 	InstrumentChannel.cpp
 	BERT.cpp
+	BERTInputChannel.cpp
+	BERTOutputChannel.cpp
 	FunctionGenerator.cpp
 	FunctionGeneratorChannel.cpp
 	Load.cpp

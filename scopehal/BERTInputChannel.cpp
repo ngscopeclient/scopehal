@@ -28,52 +28,69 @@
 ***********************************************************************************************************************/
 
 #include "scopehal.h"
-#include "MultiLaneBERT.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
-	: SCPIDevice(transport)
-	, SCPIInstrument(transport)
+BERTInputChannel::BERTInputChannel(
+	const string& hwname,
+	BERT* bert,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	, m_bert(bert)
 {
-	//Add pattern generator channels
-	int nchans = 4;
-	for(int i=0; i<nchans; i++)
-		m_channels.push_back(new BERTOutputChannel(string("TX") + to_string(i+1), this, "#808080", i));
+	ClearStreams();
+	AddStream(Unit(Unit::UNIT_RATIO_SCI), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	/*AddStream(Unit(Unit::UNIT_VOLTS), "VoltageSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_AMPS), "CurrentSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	//Add pattern checker channels
-	for(int i=0; i<nchans; i++)
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#808080", i+nchans));
+	CreateInput("VoltageSetPoint");
+	CreateInput("CurrentSetPoint");*/
 }
 
-MultiLaneBERT::~MultiLaneBERT()
+BERTInputChannel::~BERTInputChannel()
 {
-
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Instrument config
-
-string MultiLaneBERT::GetDriverNameInternal()
-{
-	return "mlbert";
-}
-
-uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/)
-{
-	return INST_BERT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Channel configuration
+// Flow graph updates
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Data acquisition
-
-bool MultiLaneBERT::AcquireData()
+bool BERTInputChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	return true;
+	if(stream.m_channel == NULL)
+		return false;
+
+	/*
+	if(i >= 2)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;
+	*/
+
+	return false;
+}
+
+
+void BERTInputChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	/*
+	auto voltageSetPointIn = GetInput(0);
+	if(voltageSetPointIn)
+	{
+		if(Unit(Unit::UNIT_VOLTS) == voltageSetPointIn.GetYAxisUnits())
+			m_bert->SetPowerVoltage(m_index, voltageSetPointIn.GetScalarValue());
+	}
+
+	auto currentSetPointIn = GetInput(1);
+	if(currentSetPointIn)
+	{
+		if(Unit(Unit::UNIT_AMPS) == currentSetPointIn.GetYAxisUnits())
+			m_bert->SetPowerCurrent(m_index, currentSetPointIn.GetScalarValue());
+	}
+	*/
 }

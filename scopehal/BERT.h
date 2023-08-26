@@ -30,6 +30,9 @@
 #ifndef BERT_h
 #define BERT_h
 
+#include "BERTInputChannel.h"
+#include "BERTOutputChannel.h"
+
 /**
 	@brief Base class for bit error rate testers
  */

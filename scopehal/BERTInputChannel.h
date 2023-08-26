@@ -27,53 +27,31 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "MultiLaneBERT.h"
+#ifndef BERTInputChannel_h
+#define BERTInputChannel_h
 
-using namespace std;
+class BERT;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
-	: SCPIDevice(transport)
-	, SCPIInstrument(transport)
+/**
+	@brief A pattern checker channel of a BERT
+ */
+class BERTInputChannel : public InstrumentChannel
 {
-	//Add pattern generator channels
-	int nchans = 4;
-	for(int i=0; i<nchans; i++)
-		m_channels.push_back(new BERTOutputChannel(string("TX") + to_string(i+1), this, "#808080", i));
+public:
 
-	//Add pattern checker channels
-	for(int i=0; i<nchans; i++)
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#808080", i+nchans));
-}
+	BERTInputChannel(
+		const std::string& hwname,
+		BERT* bert,
+		const std::string& color = "#808080",
+		size_t index = 0);
 
-MultiLaneBERT::~MultiLaneBERT()
-{
+	virtual ~BERTInputChannel();
 
-}
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Instrument config
+protected:
+	BERT* m_bert;
+};
 
-string MultiLaneBERT::GetDriverNameInternal()
-{
-	return "mlbert";
-}
-
-uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/)
-{
-	return INST_BERT;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Channel configuration
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Data acquisition
-
-bool MultiLaneBERT::AcquireData()
-{
-	return true;
-}
+#endif
