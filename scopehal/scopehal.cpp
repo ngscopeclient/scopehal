@@ -54,6 +54,8 @@
 #include "TektronixOscilloscope.h"
 #include "ThunderScopeOscilloscope.h"
 
+#include "MultiLaneBERT.h"
+
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
 #include "RigolFunctionGenerator.h"
@@ -191,6 +193,8 @@ void DriverStaticInit()
 {
 	InitializeSearchPaths();
 	DetectCPUFeatures();
+
+	AddBERTDriverClass(MultiLaneBERT);
 
 	AddDriverClass(AgilentOscilloscope);
 	AddDriverClass(AntikernelLabsOscilloscope);

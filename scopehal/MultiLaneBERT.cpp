@@ -27,43 +27,54 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIBERT_h
-#define SCPIBERT_h
+#include "scopehal.h"
+#include "MultiLaneBERT.h"
 
-/**
-	@brief An SCPI-based BERT
- */
-class SCPIBERT 	: public virtual BERT
-				, public virtual SCPIInstrument
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
+	: SCPIDevice(transport)
+	, SCPIInstrument(transport)
 {
-public:
-	SCPIBERT();
-	virtual ~SCPIBERT();
+	/*
+	//Figure out how many channels we have
+	int nchans = atoi(m_model.c_str() + strlen("HMC804"));
+	for(int i=0; i<nchans; i++)
+	{
+		m_channels.push_back(
+			new PowerSupplyChannel(string("CH") + to_string(i+1), this, "#808080", i));
+	}
+	*/
+}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIBERT* (*BERTCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, BERTCreateProcType proc);
+MultiLaneBERT::~MultiLaneBERT()
+{
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIBERT* CreateBERT(std::string driver, SCPITransport* transport);
+}
 
-	virtual std::string GetDriverName() =0;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Instrument config
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, BERTCreateProcType > BERTCreateMapType;
-	static BERTCreateMapType m_powercreateprocs;
-};
+string MultiLaneBERT::GetDriverNameInternal()
+{
+	return "mlbert";
+}
 
-#define BERT_INITPROC(T) \
-	static SCPIBERT* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
+uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/)
+{
+	return INST_BERT;
+}
 
-#define AddBERTDriverClass(T) SCPIBERT::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Channel configuration
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Data acquisition
 
-#endif
+bool MultiLaneBERT::AcquireData()
+{
+	return true;
+}

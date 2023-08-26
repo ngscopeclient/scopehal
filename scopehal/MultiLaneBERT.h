@@ -27,43 +27,28 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIBERT_h
-#define SCPIBERT_h
+#ifndef MultiLaneBERT_h
+#define MultiLaneBERT_h
 
 /**
-	@brief An SCPI-based BERT
+	@brief A MultiLANE BERT accessed via scopehal-mlbert-bridge
  */
-class SCPIBERT 	: public virtual BERT
-				, public virtual SCPIInstrument
+class MultiLaneBERT
+	: public virtual SCPIBERT
+	, public virtual SCPIDevice
 {
 public:
-	SCPIBERT();
-	virtual ~SCPIBERT();
+	MultiLaneBERT(SCPITransport* transport);
+	virtual ~MultiLaneBERT();
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
+	virtual bool AcquireData() override;
+
+	//Device information
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+
 public:
-	typedef SCPIBERT* (*BERTCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, BERTCreateProcType proc);
-
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIBERT* CreateBERT(std::string driver, SCPITransport* transport);
-
-	virtual std::string GetDriverName() =0;
-
-protected:
-	//Class enumeration
-	typedef std::map< std::string, BERTCreateProcType > BERTCreateMapType;
-	static BERTCreateMapType m_powercreateprocs;
+	static std::string GetDriverNameInternal();
+	BERT_INITPROC(MultiLaneBERT)
 };
-
-#define BERT_INITPROC(T) \
-	static SCPIBERT* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
-	{ return GetDriverNameInternal(); }
-
-#define AddBERTDriverClass(T) SCPIBERT::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
 
 #endif
