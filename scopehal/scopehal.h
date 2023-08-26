@@ -105,6 +105,7 @@ extern bool g_hasAvx2;
 #include "Trigger.h"
 
 #include "Instrument.h"
+#include "BERT.h"
 #include "FunctionGenerator.h"
 #include "FunctionGeneratorChannel.h"
 #include "Load.h"
@@ -116,6 +117,7 @@ extern bool g_hasAvx2;
 #include "PowerSupplyChannel.h"
 #include "RFSignalGenerator.h"
 #include "SCPIInstrument.h"
+#include "SCPIBERT.h"
 #include "SCPIFunctionGenerator.h"
 #include "SCPILoad.h"
 #include "SCPIMultimeter.h"

@@ -88,7 +88,10 @@ public:
 		INST_RF_GEN				= 0x10,
 
 		//An electronic load
-		INST_LOAD				= 0x20
+		INST_LOAD				= 0x20,
+
+		//A bit error rate tester
+		INST_BERT				= 0x40
 	};
 
 	/**

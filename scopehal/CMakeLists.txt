@@ -85,6 +85,7 @@ set(SCOPEHAL_SOURCES
 
 	Instrument.cpp
 	InstrumentChannel.cpp
+	BERT.cpp
 	FunctionGenerator.cpp
 	FunctionGeneratorChannel.cpp
 	Load.cpp
@@ -96,6 +97,7 @@ set(SCOPEHAL_SOURCES
 	PowerSupply.cpp
 	PowerSupplyChannel.cpp
 	RFSignalGenerator.cpp
+	SCPIBERT.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
 	SCPILoad.cpp
