@@ -68,6 +68,12 @@ public:
 	unsigned short GetPort()
 	{ return m_port; }
 
+	void SetTimeouts(unsigned int txUs, unsigned int rxUs)
+	{
+		m_socket.SetTxTimeout(txUs);
+		m_socket.SetRxTimeout(rxUs);
+	}
+
 protected:
 
 	void SharedCtorInit();

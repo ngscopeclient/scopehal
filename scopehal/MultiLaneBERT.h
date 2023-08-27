@@ -46,15 +46,10 @@ public:
 	//Device information
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
-	//Pattern configuration
+	//TX pattern generator configuration
 	virtual Pattern GetTxPattern(size_t i) override;
 	virtual void SetTxPattern(size_t i, Pattern pattern) override;
-	virtual Pattern GetRxPattern(size_t i) override;
-	virtual void SetRxPattern(size_t i, Pattern pattern) override;
-	virtual bool GetRxInvert(size_t i) override;
-	virtual void SetRxInvert(size_t i, bool invert) override;
 	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i) override;
-	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) override;
 
 	//TX driver configuration
 	virtual bool GetTxInvert(size_t i) override;
@@ -69,6 +64,19 @@ public:
 	virtual float GetTxPostCursor(size_t i) override;
 	virtual void SetTxPostCursor(size_t i, float postcursor) override;
 
+	//RX input buffer configuration
+	virtual bool GetRxInvert(size_t i) override;
+	virtual void SetRxInvert(size_t i, bool invert) override;
+
+	//RX pattern checker configuration
+	virtual Pattern GetRxPattern(size_t i) override;
+	virtual void SetRxPattern(size_t i, Pattern pattern) override;
+	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) override;
+
+	//RX data readout
+	virtual bool GetRxCdrLockState(size_t i) override;
+	virtual void MeasureHBathtub(size_t i) override;
+
 protected:
 
 	int m_rxChannelBase;
@@ -82,6 +90,7 @@ protected:
 	bool m_txEnable[4];
 	float m_txPreCursor[4];
 	float m_txPostCursor[4];
+	bool m_rxLock[4];
 
 public:
 	static std::string GetDriverNameInternal();

@@ -160,6 +160,16 @@ public:
 		@brief Set the post-cursor equalizer tap for a channel
 	 */
 	virtual void SetTxPostCursor(size_t i, float postcursor) =0;
+
+	/**
+		@brief Gets the RX CDR lock state (true=lock, false=unlock)
+	 */
+	virtual bool GetRxCdrLockState(size_t i) =0;
+
+	/**
+		@brief Acquires a bathtub curve
+	 */
+	virtual void MeasureHBathtub(size_t i) =0;
 };
 
 #include "BERTInputChannel.h"

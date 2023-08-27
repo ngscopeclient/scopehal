@@ -34,8 +34,10 @@ class BERT;
 
 /**
 	@brief A pattern checker channel of a BERT
+
+	Derived from OscilloscopeChannel because we can output time domain bathtub curves etc
  */
-class BERTInputChannel : public InstrumentChannel
+class BERTInputChannel : public OscilloscopeChannel
 {
 public:
 
@@ -49,6 +51,53 @@ public:
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+
+	BERT* GetBERT() const
+	{ return m_bert; }
+
+	bool GetInvert()
+	{ return m_bert->GetRxInvert(GetIndex()); }
+
+	void SetInvert(bool invert)
+	{ m_bert->SetRxInvert(GetIndex(), invert); }
+
+	bool GetCdrLockState()
+	{ return m_bert->GetRxCdrLockState(GetIndex()); }
+
+	void SetPattern(BERT::Pattern pattern)
+	{ m_bert->SetRxPattern(GetIndex(), pattern); }
+
+	BERT::Pattern GetPattern()
+	{ return m_bert->GetRxPattern(GetIndex()); }
+
+	std::vector<BERT::Pattern> GetAvailablePatterns()
+	{ return m_bert->GetAvailableRxPatterns(GetIndex()); }
+
+	enum StreamIDs
+	{
+		STREAM_HBATHTUB = 0
+	};
+
+	StreamDescriptor GetHBathtubStream()
+	{ return StreamDescriptor(this, STREAM_HBATHTUB); }
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Vertical scaling and stream management
+
+public:
+	virtual void ClearStreams() override;
+	virtual size_t AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0) override;
+
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual void SetVoltageRange(float range, size_t stream) override;
+
+	virtual float GetOffset(size_t stream) override;
+	virtual void SetOffset(float offset, size_t stream) override;
+
+protected:
+	std::vector<float> m_ranges;
+	std::vector<float> m_offsets;
+
 
 protected:
 	BERT* m_bert;

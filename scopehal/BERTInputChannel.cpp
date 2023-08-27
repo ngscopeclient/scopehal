@@ -39,21 +39,78 @@ BERTInputChannel::BERTInputChannel(
 	BERT* bert,
 	const string& color,
 	size_t index)
-	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	: OscilloscopeChannel(nullptr, hwname, color, Unit(Unit::UNIT_FS), index)
 	, m_bert(bert)
 {
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_RATIO_SCI), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	/*AddStream(Unit(Unit::UNIT_VOLTS), "VoltageSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_AMPS), "CurrentMeasured", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_AMPS), "CurrentSetPoint", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	//AddStream(Unit(Unit::UNIT_RATIO_SCI), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	CreateInput("VoltageSetPoint");
-	CreateInput("CurrentSetPoint");*/
+	//Make horizontal bathtub stream
+	AddStream(Unit::UNIT_LOG_BER, "HBathtub", Stream::STREAM_TYPE_ANALOG);
+	SetVoltageRange(15, 0);
+	SetOffset(7.5, 0);
+
+	//TODO: figure out how to handle vertical bathtubs since right now all streams share the same X axis units
+	//and we can't do that since we have X axis units in the time domain
 }
 
 BERTInputChannel::~BERTInputChannel()
 {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Vertical scaling and stream management
+
+//This section is mostly lifted from the Filter class since we don't have any of these settings in actual hardware
+
+void BERTInputChannel::ClearStreams()
+{
+	OscilloscopeChannel::ClearStreams();
+	m_ranges.clear();
+	m_offsets.clear();
+}
+
+size_t BERTInputChannel::AddStream(Unit yunit, const string& name, Stream::StreamType stype, uint8_t flags)
+{
+	m_ranges.push_back(0);
+	m_offsets.push_back(0);
+	return OscilloscopeChannel::AddStream(yunit, name, stype, flags);
+}
+
+float BERTInputChannel::GetVoltageRange(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+	{
+		if(GetData(stream) == nullptr)
+			return 1;
+
+		//AutoscaleVertical(stream);
+	}
+
+	return m_ranges[stream];
+}
+
+void BERTInputChannel::SetVoltageRange(float range, size_t stream)
+{
+	m_ranges[stream] = range;
+}
+
+float BERTInputChannel::GetOffset(size_t stream)
+{
+	if(m_ranges[stream] == 0)
+	{
+		if(GetData(stream) == nullptr)
+			return 0;
+
+		//AutoscaleVertical(stream);
+	}
+
+	return m_offsets[stream];
+}
+
+void BERTInputChannel::SetOffset(float offset, size_t stream)
+{
+	m_offsets[stream] = offset;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
