@@ -278,12 +278,16 @@ void RigolOscilloscope::EnableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":DISP ON");
+	// invalidate channel enable cache until confirmed on next IsChannelEnabled
+	m_channelsEnabled.erase(i);
 }
 
 void RigolOscilloscope::DisableChannel(size_t i)
 {
 	lock_guard<recursive_mutex> lock(m_mutex);
 	m_transport->SendCommand(":" + m_channels[i]->GetHwname() + ":DISP OFF");
+	// invalidate channel enable cache until confirmed on next IsChannelEnabled
+	m_channelsEnabled.erase(i);
 }
 
 vector<OscilloscopeChannel::CouplingType> RigolOscilloscope::GetAvailableCouplings(size_t /*i*/)
