@@ -30,7 +30,7 @@
 #ifndef BERTOutputChannel_h
 #define BERTOutputChannel_h
 
-class BERT;
+#include "BERT.h"
 
 /**
 	@brief A pattern generator channel of a BERT
@@ -48,7 +48,52 @@ public:
 	virtual ~BERTOutputChannel();
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	BERT* GetBERT() const
+	{ return m_bert; }
+
+	void SetPattern(BERT::Pattern pattern)
+	{ m_bert->SetTxPattern(GetIndex(), pattern); }
+
+	BERT::Pattern GetPattern()
+	{ return m_bert->GetTxPattern(GetIndex()); }
+
+	std::vector<BERT::Pattern> GetAvailablePatterns()
+	{ return m_bert->GetAvailableTxPatterns(GetIndex()); }
+
+	bool GetInvert()
+	{ return m_bert->GetTxInvert(GetIndex()); }
+
+	void SetInvert(bool invert)
+	{ m_bert->SetTxInvert(GetIndex(), invert); }
+
+	std::vector<float> GetAvailableDriveStrengths()
+	{ return m_bert->GetAvailableTxDriveStrengths(GetIndex()); }
+
+	float GetDriveStrength()
+	{ return m_bert->GetTxDriveStrength(GetIndex()); }
+
+	void SetDriveStrength(float drive)
+	{ m_bert->SetTxDriveStrength(GetIndex(), drive); }
+
+	bool GetEnable()
+	{ return m_bert->GetTxEnable(GetIndex()); }
+
+	void Enable(bool b)
+	{ m_bert->SetTxEnable(GetIndex(), b); }
+
+	float GetPreCursor()
+	{ return m_bert->GetTxPreCursor(GetIndex()); }
+
+	void SetPreCursor(float f)
+	{ m_bert->SetTxPreCursor(GetIndex(), f); }
+
+	float GetPostCursor()
+	{ return m_bert->GetTxPostCursor(GetIndex()); }
+
+	void SetPostCursor(float f)
+	{ m_bert->SetTxPostCursor(GetIndex(), f); }
 
 protected:
 	BERT* m_bert;

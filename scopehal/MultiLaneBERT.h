@@ -47,16 +47,27 @@ public:
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//Pattern configuration
-	virtual Pattern GetTxPattern(size_t i);
-	virtual void SetTxPattern(size_t i, Pattern pattern);
-	virtual Pattern GetRxPattern(size_t i);
-	virtual void SetRxPattern(size_t i, Pattern pattern);
-	virtual bool GetTxInvert(size_t i);
-	virtual bool GetRxInvert(size_t i);
-	virtual void SetTxInvert(size_t i, bool invert);
-	virtual void SetRxInvert(size_t i, bool invert);
-	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i);
-	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i);
+	virtual Pattern GetTxPattern(size_t i) override;
+	virtual void SetTxPattern(size_t i, Pattern pattern) override;
+	virtual Pattern GetRxPattern(size_t i) override;
+	virtual void SetRxPattern(size_t i, Pattern pattern) override;
+	virtual bool GetRxInvert(size_t i) override;
+	virtual void SetRxInvert(size_t i, bool invert) override;
+	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i) override;
+	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) override;
+
+	//TX driver configuration
+	virtual bool GetTxInvert(size_t i) override;
+	virtual void SetTxInvert(size_t i, bool invert) override;
+	virtual std::vector<float> GetAvailableTxDriveStrengths(size_t i) override;
+	virtual float GetTxDriveStrength(size_t i) override;
+	virtual void SetTxDriveStrength(size_t i, float drive) override;
+	virtual void SetTxEnable(size_t i, bool enable) override;
+	virtual bool GetTxEnable(size_t i) override;
+	virtual float GetTxPreCursor(size_t i) override;
+	virtual void SetTxPreCursor(size_t i, float precursor) override;
+	virtual float GetTxPostCursor(size_t i) override;
+	virtual void SetTxPostCursor(size_t i, float postcursor) override;
 
 protected:
 
@@ -67,6 +78,10 @@ protected:
 	Pattern m_rxPattern[4];
 	bool m_txInvert[4];
 	bool m_rxInvert[4];
+	float m_txDrive[4];
+	bool m_txEnable[4];
+	float m_txPreCursor[4];
+	float m_txPostCursor[4];
 
 public:
 	static std::string GetDriverNameInternal();

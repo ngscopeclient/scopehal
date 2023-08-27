@@ -30,9 +30,6 @@
 #ifndef BERT_h
 #define BERT_h
 
-#include "BERTInputChannel.h"
-#include "BERTOutputChannel.h"
-
 /**
 	@brief Base class for bit error rate testers
  */
@@ -69,12 +66,12 @@ public:
 	virtual Pattern GetTxPattern(size_t i) =0;
 
 	/**
-		@brief Gets the current transmit invert flag for a channel
+		@brief Gets the transmit invert flag for a channel
 	 */
 	virtual bool GetTxInvert(size_t i) =0;
 
 	/**
-		@brief Gets the current transmit invert flag for a channel
+		@brief Gets the transmit invert flag for a channel
 	 */
 	virtual bool GetRxInvert(size_t i) =0;
 
@@ -113,8 +110,59 @@ public:
 	 */
 	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) =0;
 
-	//Device capabilities
-	//virtual bool AcquireData() override;
+	/**
+		@brief Gets the list of available drive strengths (in volts) for a channel
+
+		Drive strength is nominal p-p swing with full main cursor tap and pre/post cursors at zero.
+	 */
+	virtual std::vector<float> GetAvailableTxDriveStrengths(size_t i) =0;
+
+	/**
+		@brief Get the drive strength for a channel
+	 */
+	virtual float GetTxDriveStrength(size_t i) =0;
+
+	/**
+		@brief Set the drive strength for a channel
+	 */
+	virtual void SetTxDriveStrength(size_t i, float drive) =0;
+
+	/**
+		@brief Sets the transmit enable flag for a channel
+	 */
+	virtual void SetTxEnable(size_t i, bool enable) =0;
+
+	/**
+		@brief Gets the transmit enable flag for a channel
+	 */
+	virtual bool GetTxEnable(size_t i) =0;
+
+	/**
+		@brief Get the pre-cursor equalizer tap for a channel
+
+		Tap values are normalized to 0-1
+	 */
+	virtual float GetTxPreCursor(size_t i) =0;
+
+	/**
+		@brief Set the pre-cursor equalizer tap for a channel
+	 */
+	virtual void SetTxPreCursor(size_t i, float precursor) =0;
+
+	/**
+		@brief Get the post-cursor equalizer tap for a channel
+
+		Tap values are normalized to 0-1
+	 */
+	virtual float GetTxPostCursor(size_t i) =0;
+
+	/**
+		@brief Set the post-cursor equalizer tap for a channel
+	 */
+	virtual void SetTxPostCursor(size_t i, float postcursor) =0;
 };
+
+#include "BERTInputChannel.h"
+#include "BERTOutputChannel.h"
 
 #endif

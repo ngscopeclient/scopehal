@@ -47,6 +47,10 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 		m_channels.push_back(new BERTOutputChannel(string("TX") + to_string(i+1), this, "#808080", i));
 		SetTxPattern(i, PATTERN_PRBS7);
 		SetTxInvert(i, false);
+		SetTxDriveStrength(i, 0.2);
+		SetTxEnable(i, true);	//TODO: should we default to on or off?
+		SetTxPreCursor(i, 0);
+		SetTxPostCursor(i, 0);
 	}
 
 	//Add pattern checker channels
@@ -91,6 +95,9 @@ void MultiLaneBERT::SetTxPattern(size_t i, Pattern pattern)
 		case PATTERN_PRBS7:
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS7");
 			break;
+		case PATTERN_PRBS9:
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS9");
+			break;
 		case PATTERN_PRBS15:
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS15");
 			break;
@@ -121,6 +128,9 @@ void MultiLaneBERT::SetRxPattern(size_t i, Pattern pattern)
 		case PATTERN_PRBS7:
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS7");
 			break;
+		case PATTERN_PRBS9:
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS9");
+			break;
 		case PATTERN_PRBS15:
 			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY PRBS15");
 			break;
@@ -139,24 +149,9 @@ void MultiLaneBERT::SetRxPattern(size_t i, Pattern pattern)
 	m_rxPattern[i - m_rxChannelBase] = pattern;
 }
 
-bool MultiLaneBERT::GetTxInvert(size_t i)
-{
-	return m_txInvert[i];
-}
-
 bool MultiLaneBERT::GetRxInvert(size_t i)
 {
 	return m_rxInvert[i - m_rxChannelBase];
-}
-
-void MultiLaneBERT::SetTxInvert(size_t i, bool invert)
-{
-	if(invert)
-		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 1");
-	else
-		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 0");
-
-	m_txInvert[i] = invert;
 }
 
 void MultiLaneBERT::SetRxInvert(size_t i, bool invert)
@@ -189,6 +184,83 @@ vector<BERT::Pattern> MultiLaneBERT::GetAvailableRxPatterns(size_t /*i*/)
 	ret.push_back(PATTERN_PRBS31);
 	ret.push_back(PATTERN_AUTO);
 	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TX driver control
+
+bool MultiLaneBERT::GetTxInvert(size_t i)
+{
+	return m_txInvert[i];
+}
+
+void MultiLaneBERT::SetTxInvert(size_t i, bool invert)
+{
+	if(invert)
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 1");
+	else
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 0");
+
+	m_txInvert[i] = invert;
+}
+
+vector<float> MultiLaneBERT::GetAvailableTxDriveStrengths(size_t /*i*/)
+{
+	vector<float> ret;
+	ret.push_back(0.0);
+	ret.push_back(0.1);
+	ret.push_back(0.2);
+	ret.push_back(0.3);
+	ret.push_back(0.4);
+	return ret;
+}
+
+float MultiLaneBERT::GetTxDriveStrength(size_t i)
+{
+	return m_txDrive[i];
+}
+
+void MultiLaneBERT::SetTxDriveStrength(size_t i, float drive)
+{
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":SWING " + to_string((int)(drive*1000)));
+	m_txDrive[i] = drive;
+}
+
+void MultiLaneBERT::SetTxEnable(size_t i, bool enable)
+{
+	if(enable)
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 1");
+	else
+		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":ENABLE 0");
+
+	m_txEnable[i] = enable;
+}
+
+bool MultiLaneBERT::GetTxEnable(size_t i)
+{
+	return m_txEnable[i];
+}
+
+float MultiLaneBERT::GetTxPreCursor(size_t i)
+{
+	return m_txPreCursor[i];
+}
+
+void MultiLaneBERT::SetTxPreCursor(size_t i, float precursor)
+{
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":PRECURSOR " + to_string((int)(precursor*100)));
+	m_txPreCursor[i] = precursor;
+}
+
+float MultiLaneBERT::GetTxPostCursor(size_t i)
+{
+	return m_txPostCursor[i];
+}
+
+void MultiLaneBERT::SetTxPostCursor(size_t i, float postcursor)
+{
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POSTCURSOR " + to_string((int)(postcursor*100)));
+	m_txPostCursor[i] = postcursor;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
