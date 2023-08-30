@@ -83,7 +83,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	SetGlobalCustomPattern(0xff00);
 
 	//Set the output mux refclk to LO/32
-	SetRefclkOutMux(LO_DIV32);
+	SetRefclkOutMux(LO_DIV32_OR_80);
 }
 
 MultiLaneBERT::~MultiLaneBERT()
@@ -144,6 +144,7 @@ vector<BERT::Pattern> MultiLaneBERT::GetAvailableRxPatterns(size_t /*i*/)
 {
 	vector<Pattern> ret;
 	ret.push_back(PATTERN_PRBS7);
+	ret.push_back(PATTERN_PRBS9);
 	ret.push_back(PATTERN_PRBS15);
 	ret.push_back(PATTERN_PRBS23);
 	ret.push_back(PATTERN_PRBS31);
@@ -176,6 +177,7 @@ vector<BERT::Pattern> MultiLaneBERT::GetAvailableTxPatterns(size_t /*i*/)
 {
 	vector<Pattern> ret;
 	ret.push_back(PATTERN_PRBS7);
+	ret.push_back(PATTERN_PRBS9);
 	ret.push_back(PATTERN_PRBS15);
 	ret.push_back(PATTERN_PRBS23);
 	ret.push_back(PATTERN_PRBS31);
@@ -360,8 +362,8 @@ void MultiLaneBERT::SetRefclkOutMux(size_t i)
 			m_transport->SendCommandQueued("CLKOUT RX3_DIV16");
 			break;
 
-		case LO_DIV32:
-			m_transport->SendCommandQueued("CLKOUT LO_DIV32");
+		case LO_DIV32_OR_80:
+			m_transport->SendCommandQueued("CLKOUT LO_DIV32");	//or div80 in high speed mode
 			break;
 
 		case SERDES:
@@ -387,8 +389,15 @@ vector<string> MultiLaneBERT::GetRefclkOutMuxNames()
 	ret.push_back("RX2 CDR/16");
 	ret.push_back("RX3 CDR/8");
 	ret.push_back("RX3 CDR/16");
-	ret.push_back("TX LO/32");
-	ret.push_back("SERDES");
+	if(m_dataRate > 16000000000LL)
+		ret.push_back("TX LO/80");
+	else
+	{
+		ret.push_back("TX LO/32");
+
+		//not available in high rate mode
+		ret.push_back("SERDES");
+	}
 	return ret;
 }
 

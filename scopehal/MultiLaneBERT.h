@@ -119,7 +119,7 @@ protected:
 		RX2_DIV16,
 		RX3_DIV8,
 		RX3_DIV16,
-		LO_DIV32,
+		LO_DIV32_OR_80,	//div32 in low rate, div80 in high rate
 		SERDES
 	};
 
