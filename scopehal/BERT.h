@@ -227,6 +227,11 @@ public:
 		@brief Gets the list of available data rates
 	 */
 	virtual std::vector<int64_t> GetAvailableDataRates() =0;
+
+	/**
+		@brief Acquires an eye pattern
+	 */
+	virtual void MeasureEye(size_t i) =0;
 };
 
 #include "BERTInputChannel.h"

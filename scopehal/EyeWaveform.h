@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopehal                                                                                                          *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -27,84 +27,71 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef BERTInputChannel_h
-#define BERTInputChannel_h
-
-class BERT;
-
 /**
-	@brief A pattern checker channel of a BERT
-
-	Derived from OscilloscopeChannel because we can output time domain bathtub curves etc
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of EyeWaveform
  */
-class BERTInputChannel : public OscilloscopeChannel
+
+#ifndef EyeWaveform_h
+#define EyeWaveform_h
+
+#include "../scopehal/DensityFunctionWaveform.h"
+
+class EyeWaveform : public DensityFunctionWaveform
 {
 public:
-
-	BERTInputChannel(
-		const std::string& hwname,
-		BERT* bert,
-		const std::string& color = "#808080",
-		size_t index = 0);
-
-	virtual ~BERTInputChannel();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	BERT* GetBERT() const
-	{ return m_bert; }
-
-	bool GetInvert()
-	{ return m_bert->GetRxInvert(GetIndex()); }
-
-	void SetInvert(bool invert)
-	{ m_bert->SetRxInvert(GetIndex(), invert); }
-
-	bool GetCdrLockState()
-	{ return m_bert->GetRxCdrLockState(GetIndex()); }
-
-	void SetPattern(BERT::Pattern pattern)
-	{ m_bert->SetRxPattern(GetIndex(), pattern); }
-
-	BERT::Pattern GetPattern()
-	{ return m_bert->GetRxPattern(GetIndex()); }
-
-	std::vector<BERT::Pattern> GetAvailablePatterns()
-	{ return m_bert->GetAvailableRxPatterns(GetIndex()); }
-
-	enum StreamIDs
+	enum EyeType
 	{
-		STREAM_HBATHTUB = 0,
-		STREAM_EYE = 1
+		EYE_NORMAL,		//Eye is a normal measurement from a realtime or sampling scope
+		EYE_BER,		//Eye is a SERDES BER measurement (scaled by 1e15)
 	};
 
-	StreamDescriptor GetHBathtubStream()
-	{ return StreamDescriptor(this, STREAM_HBATHTUB); }
+	EyeWaveform(size_t width, size_t height, float center, EyeWaveform::EyeType etype);
+	virtual ~EyeWaveform();
 
-	StreamDescriptor GetEyeStream()
-	{ return StreamDescriptor(this, STREAM_EYE); }
+	//not copyable or assignable
+	EyeWaveform(const EyeWaveform&) =delete;
+	EyeWaveform& operator=(const EyeWaveform&) =delete;
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Vertical scaling and stream management
+	int64_t* GetAccumData()
+	{ return m_accumdata; }
 
-public:
-	virtual void ClearStreams() override;
-	virtual size_t AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0) override;
+	void Normalize();
 
-	virtual float GetVoltageRange(size_t stream) override;
-	virtual void SetVoltageRange(float range, size_t stream) override;
+	size_t GetTotalUIs()
+	{ return m_totalUIs; }
 
-	virtual float GetOffset(size_t stream) override;
-	virtual void SetOffset(float offset, size_t stream) override;
+	float GetCenterVoltage()
+	{ return m_centerVoltage; }
+
+	void IntegrateUIs(size_t uis)
+	{ m_totalUIs += uis; }
+
+	float GetUIWidth()
+	{ return m_uiWidth; }
+
+	float m_uiWidth;
+
+	float m_saturationLevel;
+
+	float GetMaskHitRate()
+	{ return m_maskHitRate; }
+
+	void SetMaskHitRate(float rate)
+	{ m_maskHitRate = rate; }
+
+	double GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, ssize_t ymid);
 
 protected:
-	std::vector<float> m_ranges;
-	std::vector<float> m_offsets;
+	int64_t* m_accumdata;
 
+	size_t m_totalUIs;
+	float m_centerVoltage;
 
-protected:
-	BERT* m_bert;
+	float m_maskHitRate;
+
+	EyeType m_type;
 };
 
 #endif

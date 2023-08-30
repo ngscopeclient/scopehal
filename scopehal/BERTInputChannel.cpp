@@ -47,8 +47,13 @@ BERTInputChannel::BERTInputChannel(
 
 	//Make horizontal bathtub stream
 	AddStream(Unit::UNIT_LOG_BER, "HBathtub", Stream::STREAM_TYPE_ANALOG);
-	SetVoltageRange(15, 0);
-	SetOffset(7.5, 0);
+	SetVoltageRange(15, STREAM_HBATHTUB);
+	SetOffset(7.5, STREAM_HBATHTUB);
+
+	//Make eye pattern stream
+	AddStream(Unit::UNIT_VOLTS, "Eye", Stream::STREAM_TYPE_EYE);
+	SetVoltageRange(1, STREAM_EYE);	//default, will change when data is acquired
+	SetOffset(0, STREAM_EYE);
 
 	//TODO: figure out how to handle vertical bathtubs since right now all streams share the same X axis units
 	//and we can't do that since we have X axis units in the time domain

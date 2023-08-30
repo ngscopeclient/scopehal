@@ -80,6 +80,7 @@ public:
 	//RX data readout
 	virtual bool GetRxCdrLockState(size_t i) override;
 	virtual void MeasureHBathtub(size_t i) override;
+	virtual void MeasureEye(size_t i) override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;

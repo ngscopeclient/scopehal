@@ -29,6 +29,7 @@
 
 #include "scopehal.h"
 #include "MultiLaneBERT.h"
+#include "EyeWaveform.h"
 
 using namespace std;
 
@@ -452,8 +453,6 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 	}
 
 	//Create the output waveform
-
-	//Create the output
 	auto cap = dynamic_cast<SparseAnalogWaveform*>(GetChannel(i)->GetData(BERTInputChannel::STREAM_HBATHTUB));
 	if(!cap)
 	{
@@ -477,10 +476,21 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 	 */
 
 	int state = 0;
+	float last_time = 0;
 	for(size_t j=0; j<128; j++)
 	{
 		float time = values[j*2];
 		float ber = values[j*2 + 1];
+
+		//If time goes backwards, we're dealing with a bug in mlBert_CalculateBathtubDualDirac
+		//Discard this point
+		if(time < last_time)
+			continue;
+		last_time = time;
+
+		//If BER is invalid, we got hit by the bug also
+		if(isinf(ber) || isnan(ber))
+			continue;
 
 		//Filler block? See if this is the end or what
 		if(time < 0.001)
@@ -508,6 +518,70 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 	cap->m_triggerPhase = -(start + end) / 2;
 	for(size_t j=0; j<cap->m_offsets.size(); j++)
 		cap->m_offsets[j] -= start;
+
+	cap->MarkModifiedFromCpu();
+}
+
+void MultiLaneBERT::MeasureEye(size_t i)
+{
+	auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i]->GetHwname() + ":EYE?");
+	auto chan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
+	if(!chan)
+		return;
+
+	//Parse the reply
+	auto data = explode(reply, ',');
+	vector<float> values;
+	float tmp;
+	for(auto num : data)
+	{
+		sscanf(num.c_str(), "%f", &tmp);
+		values.push_back(tmp);
+	}
+
+	if(values.size() < 32770)	//expect 32k plus x and y spacing
+	{
+		LogError("not enough data came back\n");
+		return;
+	}
+
+	//Extract offsets
+	int64_t dx_fs = round(values[0] * 1e3);
+	float dy_v = values[1] * 1e-3;
+
+	//Create the output waveform
+	//Always 128 phases x 256 ADC codes and centered at 0V (since the input is AC coupled)
+	//Make the texture 256 pixels wide due to normalization etc
+	auto cap = new EyeWaveform(256, 256, 0.0, EyeWaveform::EYE_BER);
+	cap->m_timescale = dx_fs;
+	chan->SetData(cap, BERTInputChannel::STREAM_EYE);
+	cap->PrepareForCpuAccess();
+
+	//Set up metadata
+	chan->SetVoltageRange(dy_v * 256, BERTInputChannel::STREAM_EYE);
+	cap->m_uiWidth = dx_fs * 128;
+	cap->m_saturationLevel = 3;
+
+	//Copy the actual data
+	auto accum = cap->GetAccumData();
+	for(int y=0; y<256; y++)
+	{
+		for(int x=0; x<128; x++)
+		{
+			//Sample order coming off the BERT is right to left in X axis, then scanning bottom to top in Y
+			double ber = values[y*128 + (127-x) + 2];
+
+			//Rescale to generate fake hit count
+			//Also need to rearrange so that we get the render-friendly eye pattern scopehal wants
+			//(half a UI left and right of the center opening)
+			if(x < 64)
+				accum[y*256 + x + 192] = ber * 1e15;
+			else
+				accum[y*256 + x + 64] = ber * 1e15;
+		}
+	}
+	cap->Normalize();
+	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value
 
 	cap->MarkModifiedFromCpu();
 }

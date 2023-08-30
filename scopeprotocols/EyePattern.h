@@ -37,55 +37,7 @@
 #define EyePattern_h
 
 #include "EyeMask.h"
-#include "../scopehal/DensityFunctionWaveform.h"
-
-class EyeWaveform : public DensityFunctionWaveform
-{
-public:
-	EyeWaveform(size_t width, size_t height, float center);
-	virtual ~EyeWaveform();
-
-	//not copyable or assignable
-	EyeWaveform(const EyeWaveform&) =delete;
-	EyeWaveform& operator=(const EyeWaveform&) =delete;
-
-	int64_t* GetAccumData()
-	{ return m_accumdata; }
-
-	void Normalize();
-
-	size_t GetTotalUIs()
-	{ return m_totalUIs; }
-
-	float GetCenterVoltage()
-	{ return m_centerVoltage; }
-
-	void IntegrateUIs(size_t uis)
-	{ m_totalUIs += uis; }
-
-	float GetUIWidth()
-	{ return m_uiWidth; }
-
-	float m_uiWidth;
-
-	float m_saturationLevel;
-
-	float GetMaskHitRate()
-	{ return m_maskHitRate; }
-
-	void SetMaskHitRate(float rate)
-	{ m_maskHitRate = rate; }
-
-	double GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, ssize_t ymid);
-
-protected:
-	int64_t* m_accumdata;
-
-	size_t m_totalUIs;
-	float m_centerVoltage;
-
-	float m_maskHitRate;
-};
+#include "../scopehal/EyeWaveform.h"
 
 class EyePattern : public Filter
 {
