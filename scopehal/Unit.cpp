@@ -472,7 +472,7 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 					snprintf(tmp, sizeof(tmp), format.c_str(), value_rescaled, space, prefix.c_str(), suffix.c_str());
 				}
 
-				//If not a round number, add more digits (up to 4)
+				//If not a round number, add more digits (up to 5)
 				else
 				{
 					if( fabs(round(value_rescaled) - value_rescaled) < 0.001 )
@@ -483,8 +483,10 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 						snprintf(tmp, sizeof(tmp), "%.2f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
 					else if(fabs(round(value_rescaled*1000) - value_rescaled*1000) < 0.001 )
 						snprintf(tmp, sizeof(tmp), "%.3f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
-					else
+					else if(fabs(round(value_rescaled*10000) - value_rescaled*10000) < 0.001 )
 						snprintf(tmp, sizeof(tmp), "%.4f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
+					else
+						snprintf(tmp, sizeof(tmp), "%.5f%s%s%s", value_rescaled, space, prefix.c_str(), suffix.c_str());
 				}
 			}
 			break;

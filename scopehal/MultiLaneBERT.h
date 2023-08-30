@@ -50,6 +50,10 @@ public:
 	virtual Pattern GetTxPattern(size_t i) override;
 	virtual void SetTxPattern(size_t i, Pattern pattern) override;
 	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i) override;
+	virtual bool IsCustomPatternPerChannel() override;
+	virtual size_t GetCustomPatternLength() override;
+	virtual void SetGlobalCustomPattern(uint64_t pattern) override;
+	virtual uint64_t GetGlobalCustomPattern() override;
 
 	//TX driver configuration
 	virtual bool GetTxInvert(size_t i) override;
@@ -77,6 +81,16 @@ public:
 	virtual bool GetRxCdrLockState(size_t i) override;
 	virtual void MeasureHBathtub(size_t i) override;
 
+	//Reference clock output
+	virtual size_t GetRefclkOutMux() override;
+	virtual void SetRefclkOutMux(size_t i) override;
+	virtual std::vector<std::string> GetRefclkOutMuxNames() override;
+
+	//Timebase
+	virtual int64_t GetDataRate() override;
+	virtual void SetDataRate(int64_t rate) override;
+	virtual std::vector<int64_t> GetAvailableDataRates() override;
+
 protected:
 
 	int m_rxChannelBase;
@@ -91,6 +105,24 @@ protected:
 	float m_txPreCursor[4];
 	float m_txPostCursor[4];
 	bool m_rxLock[4];
+	uint64_t m_txCustomPattern;
+	size_t m_refclkOutMux;
+
+	enum RefclkMuxSelectors
+	{
+		RX0_DIV8,
+		RX0_DIV16,
+		RX1_DIV8,
+		RX1_DIV16,
+		RX2_DIV8,
+		RX2_DIV16,
+		RX3_DIV8,
+		RX3_DIV16,
+		LO_DIV32,
+		SERDES
+	};
+
+	uint64_t m_dataRate;
 
 public:
 	static std::string GetDriverNameInternal();

@@ -49,6 +49,9 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	//Don't push changes to hardware every time we poke a single channel setting
 	transport->SendCommandQueued("DEFER");
 
+	//Change the data rate
+	SetDataRate(10312500000LL);
+
 	//Add and provide default configuration for pattern generator channels
 	int nchans = 4;
 	m_rxChannelBase = nchans;
@@ -74,6 +77,12 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	//Apply the deferred changes
 	//This results in a single API call instead of four for each channel, causing a massive speedup during initialization
 	transport->SendCommandQueued("APPLY");
+
+	//Set up default custom pattern
+	SetGlobalCustomPattern(0xff00);
+
+	//Set the output mux refclk to LO/32
+	SetRefclkOutMux(LO_DIV32);
 }
 
 MultiLaneBERT::~MultiLaneBERT()
@@ -200,10 +209,32 @@ void MultiLaneBERT::SetTxPattern(size_t i, Pattern pattern)
 
 		case PATTERN_CUSTOM:
 		default:
-			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY CUSTOM");
+			m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POLY USER");
 	}
 
 	m_txPattern[i] = pattern;
+}
+
+bool MultiLaneBERT::IsCustomPatternPerChannel()
+{
+	return false;
+}
+
+size_t MultiLaneBERT::GetCustomPatternLength()
+{
+	return 16;
+}
+
+void MultiLaneBERT::SetGlobalCustomPattern(uint64_t pattern)
+{
+	m_transport->SendCommandQueued(string("USERPATTERN ") + to_string_hex(pattern));
+
+	m_txCustomPattern = pattern;
+}
+
+uint64_t MultiLaneBERT::GetGlobalCustomPattern()
+{
+	return m_txCustomPattern;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,6 +312,115 @@ void MultiLaneBERT::SetTxPostCursor(size_t i, float postcursor)
 {
 	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":POSTCURSOR " + to_string((int)(postcursor*100)));
 	m_txPostCursor[i] = postcursor;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Reference clock output
+
+size_t MultiLaneBERT::GetRefclkOutMux()
+{
+	return m_refclkOutMux;
+}
+
+void MultiLaneBERT::SetRefclkOutMux(size_t i)
+{
+	//It seems that if you select a channel that's not currently locked, nothing changes
+	switch(i)
+	{
+		case RX0_DIV8:
+			m_transport->SendCommandQueued("CLKOUT RX0_DIV8");
+			break;
+
+		case RX0_DIV16:
+			m_transport->SendCommandQueued("CLKOUT RX0_DIV16");
+			break;
+
+		case RX1_DIV8:
+			m_transport->SendCommandQueued("CLKOUT RX1_DIV8");
+			break;
+
+		case RX1_DIV16:
+			m_transport->SendCommandQueued("CLKOUT RX1_DIV16");
+			break;
+
+		case RX2_DIV8:
+			m_transport->SendCommandQueued("CLKOUT RX2_DIV8");
+			break;
+
+		case RX2_DIV16:
+			m_transport->SendCommandQueued("CLKOUT RX2_DIV16");
+			break;
+
+		case RX3_DIV8:
+			m_transport->SendCommandQueued("CLKOUT RX3_DIV8");
+			break;
+
+		case RX3_DIV16:
+			m_transport->SendCommandQueued("CLKOUT RX3_DIV16");
+			break;
+
+		case LO_DIV32:
+			m_transport->SendCommandQueued("CLKOUT LO_DIV32");
+			break;
+
+		case SERDES:
+			m_transport->SendCommandQueued("CLKOUT SERDES");
+			m_txCustomPattern = 0xaaaa;	//derpy
+			break;
+
+		default:
+			break;
+	}
+
+	m_refclkOutMux = i;
+}
+
+vector<string> MultiLaneBERT::GetRefclkOutMuxNames()
+{
+	vector<string> ret;
+	ret.push_back("RX0 CDR/8");
+	ret.push_back("RX0 CDR/16");
+	ret.push_back("RX1 CDR/8");
+	ret.push_back("RX1 CDR/16");
+	ret.push_back("RX2 CDR/8");
+	ret.push_back("RX2 CDR/16");
+	ret.push_back("RX3 CDR/8");
+	ret.push_back("RX3 CDR/16");
+	ret.push_back("TX LO/32");
+	ret.push_back("SERDES");
+	return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Timebase
+
+int64_t MultiLaneBERT::GetDataRate()
+{
+	return m_dataRate;
+}
+
+void MultiLaneBERT::SetDataRate(int64_t rate)
+{
+	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
+	m_dataRate = rate;
+}
+
+vector<int64_t> MultiLaneBERT::GetAvailableDataRates()
+{
+	vector<int64_t> ret;
+
+	ret.push_back( 8500000000LL);
+	ret.push_back(10000000000LL);	//broken, gives garbage result
+	ret.push_back(10312500000LL);
+	ret.push_back(14025000000LL);
+	ret.push_back(14062500000LL);
+	ret.push_back(25000000000LL);
+	ret.push_back(25781250000LL);
+	ret.push_back(28050000000LL);
+	//data file for 30 Gbps is present in the data directory
+	//but doesn't seem to actually function
+
+	return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

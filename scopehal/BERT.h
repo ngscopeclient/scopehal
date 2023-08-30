@@ -170,6 +170,63 @@ public:
 		@brief Acquires a bathtub curve
 	 */
 	virtual void MeasureHBathtub(size_t i) =0;
+
+	/**
+		@brief Determines whether custom patterns are settable per channel, or shared by the whole device
+
+		True = per channel, false = global
+	 */
+	virtual bool IsCustomPatternPerChannel() =0;
+
+	/**
+		@brief Returns the number of bits in a custom pattern (may change with line rate)
+	 */
+	virtual size_t GetCustomPatternLength() =0;
+
+	/**
+		@brief Sets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
+	 */
+	virtual void SetGlobalCustomPattern(uint64_t pattern) =0;
+
+	/**
+		@brief Gets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
+	 */
+	virtual uint64_t GetGlobalCustomPattern() =0;
+
+	/**
+		@brief Gets the currently selected reference clock output mux setting
+	 */
+	virtual size_t GetRefclkOutMux() =0;
+
+	/**
+		@brief Sets the reference clock output mux
+	 */
+	virtual void SetRefclkOutMux(size_t i) =0;
+
+	/**
+		@brief Gets the list of available reference clock mux settings
+
+		Mux selector names are free-form text whose meaning is defined by the instrument.
+	 */
+	virtual std::vector<std::string> GetRefclkOutMuxNames() =0;
+
+	/**
+		@brief Gets the currently selected line rate (in bits/sec)
+
+		TODO: this might need to be adjustable per channel in a future API revision
+		ML4039 only has global line rate
+	 */
+	virtual int64_t GetDataRate() =0;
+
+	/**
+		@brief Sets the data rate (in bits/sec)
+	 */
+	virtual void SetDataRate(int64_t rate) =0;
+
+	/**
+		@brief Gets the list of available data rates
+	 */
+	virtual std::vector<int64_t> GetAvailableDataRates() =0;
 };
 
 #include "BERTInputChannel.h"
