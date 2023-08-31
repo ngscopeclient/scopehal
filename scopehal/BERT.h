@@ -211,6 +211,11 @@ public:
 	virtual std::vector<std::string> GetRefclkOutMuxNames() =0;
 
 	/**
+		@brief Gets the currently selected refclk out frequency
+	 */
+	virtual int64_t GetRefclkOutFrequency() =0;
+
+	/**
 		@brief Gets the currently selected line rate (in bits/sec)
 
 		TODO: this might need to be adjustable per channel in a future API revision

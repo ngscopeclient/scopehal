@@ -401,6 +401,57 @@ vector<string> MultiLaneBERT::GetRefclkOutMuxNames()
 	return ret;
 }
 
+int64_t MultiLaneBERT::GetRefclkOutFrequency()
+{
+	switch(m_refclkOutMux)
+	{
+		case RX0_DIV8:
+		case RX1_DIV8:
+		case RX2_DIV8:
+		case RX3_DIV8:
+			return m_dataRate / 8;
+
+		case RX0_DIV16:
+		case RX1_DIV16:
+		case RX2_DIV16:
+		case RX3_DIV16:
+			return m_dataRate / 16;
+
+		case LO_DIV32_OR_80:
+			if(m_dataRate > 16000000000LL)
+				return m_dataRate / 80;
+			else
+				return m_dataRate / 32;
+			break;
+
+		case SERDES:
+
+			//Find the number of toggles in the pattern
+			//For now, assume it's a 16 bit repeating pattern
+			//even though it seems it might actually be 32 under the hood?
+			int64_t pattern = m_txCustomPattern;
+			pattern = (pattern << 16) | pattern;
+			{
+				int ntoggles = 0;
+				for(int i=0; i<16; i++)
+				{
+					bool a = (pattern >> i) & 1 ? true : false;
+					bool b = (pattern >> i) & 2 ? true : false;
+					if(a != b)
+						ntoggles ++;
+				}
+
+				if(ntoggles == 0)
+					return 0;
+				else
+					return (m_dataRate / 32) * ntoggles;
+			}
+			break;
+	}
+
+	return 0;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Timebase
 

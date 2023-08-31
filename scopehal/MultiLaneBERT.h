@@ -86,6 +86,7 @@ public:
 	virtual size_t GetRefclkOutMux() override;
 	virtual void SetRefclkOutMux(size_t i) override;
 	virtual std::vector<std::string> GetRefclkOutMuxNames() override;
+	virtual int64_t GetRefclkOutFrequency() override;
 
 	//Timebase
 	virtual int64_t GetDataRate() override;
