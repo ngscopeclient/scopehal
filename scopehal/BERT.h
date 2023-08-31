@@ -41,6 +41,9 @@ public:
 
 	virtual unsigned int GetInstrumentTypes();
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// TX pattern generator configuration
+
 	enum Pattern
 	{
 		//Standard PRBS polynomials
@@ -66,39 +69,9 @@ public:
 	virtual Pattern GetTxPattern(size_t i) =0;
 
 	/**
-		@brief Gets the transmit invert flag for a channel
-	 */
-	virtual bool GetTxInvert(size_t i) =0;
-
-	/**
-		@brief Gets the transmit invert flag for a channel
-	 */
-	virtual bool GetRxInvert(size_t i) =0;
-
-	/**
-		@brief Sets the transmit invert flag for a channel
-	 */
-	virtual void SetTxInvert(size_t i, bool invert) =0;
-
-	/**
-		@brief Sets the receive invert flag for a channel
-	 */
-	virtual void SetRxInvert(size_t i, bool invert) =0;
-
-	/**
 		@brief Sets the transmit pattern for the selected channel
 	 */
 	virtual void SetTxPattern(size_t i, Pattern pattern) =0;
-
-	/**
-		@brief Gets the currently selected receive pattern for a channel
-	 */
-	virtual Pattern GetRxPattern(size_t i) =0;
-
-	/**
-		@brief Sets the receive pattern for the selected channel
-	 */
-	virtual void SetRxPattern(size_t i, Pattern pattern) =0;
 
 	/**
 		@brief Gets the list of available transmit patterns for a channel
@@ -106,9 +79,41 @@ public:
 	virtual std::vector<Pattern> GetAvailableTxPatterns(size_t i) =0;
 
 	/**
-		@brief Gets the list of available receive patterns for a channel
+		@brief Determines whether custom patterns are settable per channel, or shared by the whole device
+
+		True = per channel, false = global
 	 */
-	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) =0;
+	virtual bool IsCustomPatternPerChannel() =0;
+
+	/**
+		@brief Returns the number of bits in a custom pattern (may change with line rate)
+	 */
+	virtual size_t GetCustomPatternLength() =0;
+
+	/**
+		@brief Sets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
+	 */
+	virtual void SetGlobalCustomPattern(uint64_t pattern) =0;
+
+	/**
+		@brief Gets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
+	 */
+	virtual uint64_t GetGlobalCustomPattern() =0;
+
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// TX driver configuration
+
+	/**
+		@brief Gets the transmit invert flag for a channel
+	 */
+	virtual bool GetTxInvert(size_t i) =0;
+
+
+	/**
+		@brief Sets the transmit invert flag for a channel
+	 */
+	virtual void SetTxInvert(size_t i, bool invert) =0;
 
 	/**
 		@brief Gets the list of available drive strengths (in volts) for a channel
@@ -161,10 +166,67 @@ public:
 	 */
 	virtual void SetTxPostCursor(size_t i, float postcursor) =0;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RX input buffer configuration
+
+	/**
+		@brief Gets the transmit invert flag for a channel
+	 */
+	virtual bool GetRxInvert(size_t i) =0;
+
+
+	/**
+		@brief Sets the receive invert flag for a channel
+	 */
+	virtual void SetRxInvert(size_t i, bool invert) =0;
+
 	/**
 		@brief Gets the RX CDR lock state (true=lock, false=unlock)
+
+		NOTE: For some instruments this is just CDR lock, for others it indicates both CDR and pattern checker lock
 	 */
 	virtual bool GetRxCdrLockState(size_t i) =0;
+
+	/**
+		@brief Determines whether the input buffer has a continuous-time linear equalizer
+	 */
+	virtual bool HasRxCTLE() =0;
+
+	/**
+		@brief Get the list of available RX CTLE gain values, in dB
+	 */
+	virtual std::vector<float> GetRxCTLEGainSteps() =0;
+
+	/**
+		@brief Gets the currently selected RX CTLE gain index
+	 */
+	virtual size_t GetRxCTLEGainStep(size_t i) =0;
+
+	/**
+		@brief Sets the RX CTLE gain index
+	 */
+	virtual void SetRxCTLEGainStep(size_t i, size_t step) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RX pattern checker configuration
+
+	/**
+		@brief Gets the currently selected receive pattern for a channel
+	 */
+	virtual Pattern GetRxPattern(size_t i) =0;
+
+	/**
+		@brief Sets the receive pattern for the selected channel
+	 */
+	virtual void SetRxPattern(size_t i, Pattern pattern) =0;
+
+	/**
+		@brief Gets the list of available receive patterns for a channel
+	 */
+	virtual std::vector<Pattern> GetAvailableRxPatterns(size_t i) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// RX data readout
 
 	/**
 		@brief Acquires a bathtub curve
@@ -172,26 +234,12 @@ public:
 	virtual void MeasureHBathtub(size_t i) =0;
 
 	/**
-		@brief Determines whether custom patterns are settable per channel, or shared by the whole device
-
-		True = per channel, false = global
+		@brief Acquires an eye pattern
 	 */
-	virtual bool IsCustomPatternPerChannel() =0;
+	virtual void MeasureEye(size_t i) =0;
 
-	/**
-		@brief Returns the number of bits in a custom pattern (may change with line rate)
-	 */
-	virtual size_t GetCustomPatternLength() =0;
-
-	/**
-		@brief Sets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
-	 */
-	virtual void SetGlobalCustomPattern(uint64_t pattern) =0;
-
-	/**
-		@brief Gets the global custom pattern (only valid if IsCustomPatternPerChannel returns false)
-	 */
-	virtual uint64_t GetGlobalCustomPattern() =0;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Reference clock output
 
 	/**
 		@brief Gets the currently selected reference clock output mux setting
@@ -215,6 +263,9 @@ public:
 	 */
 	virtual int64_t GetRefclkOutFrequency() =0;
 
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Timebase
+
 	/**
 		@brief Gets the currently selected line rate (in bits/sec)
 
@@ -232,11 +283,6 @@ public:
 		@brief Gets the list of available data rates
 	 */
 	virtual std::vector<int64_t> GetAvailableDataRates() =0;
-
-	/**
-		@brief Acquires an eye pattern
-	 */
-	virtual void MeasureEye(size_t i) =0;
 };
 
 #include "BERTInputChannel.h"

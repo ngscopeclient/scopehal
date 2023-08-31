@@ -73,6 +73,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#808080", i+nchans));
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
+		SetRxCTLEGainStep(i+nchans, 4);
 	}
 
 	//Apply the deferred changes
@@ -168,6 +169,43 @@ void MultiLaneBERT::SetRxInvert(size_t i, bool invert)
 		m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":INVERT 0");
 
 	m_rxInvert[i - m_rxChannelBase] = invert;
+}
+
+bool MultiLaneBERT::HasRxCTLE()
+{
+	return true;
+}
+
+vector<float> MultiLaneBERT::GetRxCTLEGainSteps()
+{
+	vector<float> ret;
+	ret.push_back(0.67);
+	ret.push_back(1.34);
+	ret.push_back(2.01);
+	ret.push_back(2.68);
+	ret.push_back(3.35);
+	ret.push_back(4.02);
+	ret.push_back(4.69);
+	ret.push_back(5.36);
+	ret.push_back(6.03);
+	ret.push_back(6.7);
+	ret.push_back(7.37);
+	ret.push_back(8.04);
+	ret.push_back(8.71);
+	ret.push_back(9.38);
+	ret.push_back(10);
+	return ret;
+}
+
+size_t MultiLaneBERT::GetRxCTLEGainStep(size_t i)
+{
+	return m_rxCtleGainSteps[i - m_rxChannelBase];
+}
+
+void MultiLaneBERT::SetRxCTLEGainStep(size_t i, size_t step)
+{
+	m_transport->SendCommandQueued(m_channels[i]->GetHwname() + ":CTLESTEP " + to_string(step));
+	m_rxCtleGainSteps[i - m_rxChannelBase] = step;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

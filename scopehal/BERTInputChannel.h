@@ -85,6 +85,18 @@ public:
 	StreamDescriptor GetEyeStream()
 	{ return StreamDescriptor(this, STREAM_EYE); }
 
+	bool HasCTLE()
+	{ return m_bert->HasRxCTLE(); }
+
+	std::vector<float> GetCTLEGainSteps()
+	{ return m_bert->GetRxCTLEGainSteps(); }
+
+	size_t GetCTLEGainStep()
+	{ return m_bert->GetRxCTLEGainStep(GetIndex()); }
+
+	void SetCTLEGainStep(size_t step)
+	{ m_bert->SetRxCTLEGainStep(GetIndex(), step); }
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 

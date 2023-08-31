@@ -71,6 +71,10 @@ public:
 	//RX input buffer configuration
 	virtual bool GetRxInvert(size_t i) override;
 	virtual void SetRxInvert(size_t i, bool invert) override;
+	virtual bool HasRxCTLE() override;
+	virtual std::vector<float> GetRxCTLEGainSteps() override;
+	virtual size_t GetRxCTLEGainStep(size_t i) override;
+	virtual void SetRxCTLEGainStep(size_t i, size_t step) override;
 
 	//RX pattern checker configuration
 	virtual Pattern GetRxPattern(size_t i) override;
@@ -109,6 +113,7 @@ protected:
 	bool m_rxLock[4];
 	uint64_t m_txCustomPattern;
 	size_t m_refclkOutMux;
+	size_t m_rxCtleGainSteps[4];
 
 	enum RefclkMuxSelectors
 	{
