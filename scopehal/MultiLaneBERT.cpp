@@ -505,6 +505,9 @@ void MultiLaneBERT::SetDataRate(int64_t rate)
 {
 	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
 	m_dataRate = rate;
+
+	//Reset refclk mux since this seems to get corrupted somehow
+	SetRefclkOutMux(m_refclkOutMux);
 }
 
 vector<int64_t> MultiLaneBERT::GetAvailableDataRates()
@@ -512,7 +515,7 @@ vector<int64_t> MultiLaneBERT::GetAvailableDataRates()
 	vector<int64_t> ret;
 
 	ret.push_back( 8500000000LL);
-	ret.push_back(10000000000LL);	//broken, gives garbage result
+	ret.push_back(10000000000LL);
 	ret.push_back(10312500000LL);
 	ret.push_back(14025000000LL);
 	ret.push_back(14062500000LL);
