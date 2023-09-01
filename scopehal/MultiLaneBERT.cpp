@@ -85,6 +85,9 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 
 	//Set the output mux refclk to LO/32
 	SetRefclkOutMux(LO_DIV32_OR_80);
+
+	//Default integration is 10M UIs
+	SetBERIntegrationLength(1e7);
 }
 
 MultiLaneBERT::~MultiLaneBERT()
@@ -525,6 +528,17 @@ vector<int64_t> MultiLaneBERT::GetAvailableDataRates()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Data acquisition
 
+void MultiLaneBERT::SetBERIntegrationLength(int64_t uis)
+{
+	m_transport->SendCommandQueued(string("INTEGRATION ") + to_string(uis));
+	m_integrationLength = uis;
+}
+
+int64_t MultiLaneBERT::GetBERIntegrationLength()
+{
+	return m_integrationLength;
+}
+
 bool MultiLaneBERT::GetRxCdrLockState(size_t i)
 {
 	return m_rxLock[i - m_rxChannelBase];
@@ -562,7 +576,7 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 	cap->clear();
 
 	/*
-		Format of incoming data
+		Format of incoming data (if doing dual Dirac server side)
 			Timestamp (in ps relative to start of UI)
 			BER (raw, not logarithmic)
 
@@ -572,8 +586,7 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 			Points coming from right side of bathtub
 			Zeroes as filler up to 128
 	 */
-
-	int state = 0;
+	//int state = 0;
 	float last_time = 0;
 	for(size_t j=0; j<128; j++)
 	{
@@ -590,6 +603,11 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 		if(isinf(ber) || isnan(ber))
 			continue;
 
+		//Log doesn't work for zero, so clamp to a very small value
+		if(ber < 1e-20)
+			ber = 1e-20;
+
+		/*
 		//Filler block? See if this is the end or what
 		if(time < 0.001)
 		{
@@ -598,7 +616,7 @@ void MultiLaneBERT::MeasureHBathtub(size_t i)
 				break;
 		}
 
-		else
+		else*/
 		{
 			cap->m_offsets.push_back(round(time * 1000));	//convert ps to fs
 			cap->m_samples.push_back(log10(ber));			//convert ber to logarithmic since display units are linear
@@ -691,6 +709,22 @@ bool MultiLaneBERT::AcquireData()
 	{
 		auto reply = m_transport->SendCommandQueuedWithReply(m_channels[i + m_rxChannelBase]->GetHwname() + ":LOCK?");
 		m_rxLock[i] = (reply == "1");
+	}
+
+	//Read BER for each channel
+	auto sber = m_transport->SendCommandQueuedWithReply("BER?");
+	float bers[4];
+	sscanf(sber.c_str(), "%f,%f,%f,%f", &bers[0], &bers[1], &bers[2], &bers[3]);
+
+	for(size_t i=0; i<4; i++)
+	{
+		//For some reason we sometimes report NaN as BER if there's no errors
+		if( (isnan(bers[i])) || (bers[i] == 0) )
+			bers[i] = -20;
+		else
+			bers[i] = log10(bers[i]);
+
+		GetChannel(i+m_rxChannelBase)->SetScalarValue(BERTInputChannel::STREAM_BER, bers[i]);
 	}
 
 	return true;

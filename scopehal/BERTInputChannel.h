@@ -76,7 +76,8 @@ public:
 	enum StreamIDs
 	{
 		STREAM_HBATHTUB = 0,
-		STREAM_EYE = 1
+		STREAM_EYE = 1,
+		STREAM_BER
 	};
 
 	StreamDescriptor GetHBathtubStream()

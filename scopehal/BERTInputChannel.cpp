@@ -43,7 +43,6 @@ BERTInputChannel::BERTInputChannel(
 	, m_bert(bert)
 {
 	ClearStreams();
-	//AddStream(Unit(Unit::UNIT_RATIO_SCI), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Make horizontal bathtub stream
 	AddStream(Unit::UNIT_LOG_BER, "HBathtub", Stream::STREAM_TYPE_ANALOG);
@@ -54,6 +53,9 @@ BERTInputChannel::BERTInputChannel(
 	AddStream(Unit::UNIT_VOLTS, "Eye", Stream::STREAM_TYPE_EYE);
 	SetVoltageRange(1, STREAM_EYE);	//default, will change when data is acquired
 	SetOffset(0, STREAM_EYE);
+
+	//Stream for current BER
+	AddStream(Unit(Unit::UNIT_LOG_BER), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//TODO: figure out how to handle vertical bathtubs since right now all streams share the same X axis units
 	//and we can't do that since we have X axis units in the time domain

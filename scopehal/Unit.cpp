@@ -436,7 +436,8 @@ string Unit::PrettyPrint(double value, int sigfigs, bool useDisplayLocale) const
 	switch(m_type)
 	{
 		case UNIT_LOG_BER:		//special formatting for BER since it's already logarithmic
-			snprintf(tmp, sizeof(tmp), "1e%.2f", value);
+			snprintf(tmp, sizeof(tmp), "%.2e", pow(10, value));
+			//snprintf(tmp, sizeof(tmp), "1e%.2f", value);
 			break;
 
 		case UNIT_RATIO_SCI:

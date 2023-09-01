@@ -85,6 +85,8 @@ public:
 	virtual bool GetRxCdrLockState(size_t i) override;
 	virtual void MeasureHBathtub(size_t i) override;
 	virtual void MeasureEye(size_t i) override;
+	virtual void SetBERIntegrationLength(int64_t uis) override;
+	virtual int64_t GetBERIntegrationLength() override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;
@@ -114,6 +116,7 @@ protected:
 	uint64_t m_txCustomPattern;
 	size_t m_refclkOutMux;
 	size_t m_rxCtleGainSteps[4];
+	int64_t m_integrationLength;
 
 	enum RefclkMuxSelectors
 	{

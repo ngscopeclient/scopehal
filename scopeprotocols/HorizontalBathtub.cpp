@@ -104,21 +104,25 @@ void HorizontalBathtub::Refresh()
 	//Create the output
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(din, 0);
 	cap->PrepareForCpuAccess();
-	cap->m_triggerPhase = -din->m_uiWidth;
+	cap->m_triggerPhase = -din->m_uiWidth/2;
 	cap->m_timescale = fs_per_pixel;
 
 	//Extract the single scanline we're interested in
 	//TODO: support non-NRZ waveforms
 	size_t len = din->GetWidth();
-	cap->Resize(len);
-	for(size_t i=0; i<len; i++)
+	auto halflen = len/2;
+	auto quartlen = halflen/2;
+	cap->Resize(halflen);
+	for(size_t i=0; i<halflen; i++)
 	{
-		auto ber = din->GetBERAtPoint(i, ybin, din->GetWidth()/2, din->GetHeight()/2);
+		auto ber = din->GetBERAtPoint(i + quartlen, ybin, din->GetWidth()/2, din->GetHeight()/2);
 		if(ber < 1e-20)
 			cap->m_samples[i] = -20;
 		else
 			cap->m_samples[i] = log10(ber);
 	}
+
+	//TODO: dual dirac extrapolation
 
 	SetData(cap, 0);
 	cap->MarkModifiedFromCpu();

@@ -238,6 +238,18 @@ public:
 	 */
 	virtual void MeasureEye(size_t i) =0;
 
+	/**
+		@brief Set the integration period for BER measurements
+
+		Longer values give better resolution for low BERs but update more slowly
+	 */
+	virtual void SetBERIntegrationLength(int64_t uis) =0;
+
+	/**
+		@brief Get the integration period for BER measurements
+	 */
+	virtual int64_t GetBERIntegrationLength() =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Reference clock output
 
