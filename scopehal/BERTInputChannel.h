@@ -98,6 +98,12 @@ public:
 	void SetCTLEGainStep(size_t step)
 	{ m_bert->SetRxCTLEGainStep(GetIndex(), step); }
 
+	void SetBERSamplingPoint(int64_t dx, float dy)
+	{ m_bert->SetBERSamplingPoint(GetIndex(), dx, dy); }
+
+	void GetBERSamplingPoint(int64_t& dx, float& dy)
+	{ m_bert->GetBERSamplingPoint(GetIndex(), dx, dy); }
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 

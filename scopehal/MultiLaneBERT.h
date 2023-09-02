@@ -87,6 +87,8 @@ public:
 	virtual void MeasureEye(size_t i) override;
 	virtual void SetBERIntegrationLength(int64_t uis) override;
 	virtual int64_t GetBERIntegrationLength() override;
+	virtual void SetBERSamplingPoint(size_t i, int64_t dx, float dy) override;
+	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) override;
 
 	//Reference clock output
 	virtual size_t GetRefclkOutMux() override;
@@ -117,6 +119,8 @@ protected:
 	size_t m_refclkOutMux;
 	size_t m_rxCtleGainSteps[4];
 	int64_t m_integrationLength;
+	int64_t m_sampleX[4];
+	float m_sampleY[4];
 
 	enum RefclkMuxSelectors
 	{

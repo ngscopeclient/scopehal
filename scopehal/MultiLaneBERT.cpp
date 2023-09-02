@@ -70,10 +70,11 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	//Add pattern checker channels
 	for(int i=0; i<nchans; i++)
 	{
-		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#808080", i+nchans));
+		m_channels.push_back(new BERTInputChannel(string("RX") + to_string(i+1), this, "#4040c0", i+nchans));
 		SetRxPattern(i+nchans, PATTERN_PRBS7);
 		SetRxInvert(i+nchans, false);
 		SetRxCTLEGainStep(i+nchans, 4);
+		SetBERSamplingPoint(i+nchans, 0, 0);
 	}
 
 	//Apply the deferred changes
@@ -495,6 +496,30 @@ int64_t MultiLaneBERT::GetRefclkOutFrequency()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Timebase
+
+void MultiLaneBERT::SetBERSamplingPoint(size_t i, int64_t dx, float dy)
+{
+	//Offset our X sample point by 0.5 UI since the scopehal convention is midpoint referenced
+	float uiWidth = FS_PER_SECOND / m_dataRate;
+	float dx_offset = dx + uiWidth/2;
+
+	//Offset our Y sample point by 200 mV (seems to be fixed scale)
+	float dy_offset = dy + 0.2;
+
+	m_transport->SendCommandQueued(
+		m_channels[i]->GetHwname() +
+		":SAMPLE " + to_string(dx_offset * 1e-3) + ", " +	//convert fs to ps
+		to_string(dy_offset * 1e3));						//convert v to mv
+
+	m_sampleX[i - m_rxChannelBase] = dx;
+	m_sampleY[i - m_rxChannelBase] = dy;
+}
+
+void MultiLaneBERT::GetBERSamplingPoint(size_t i, int64_t& dx, float& dy)
+{
+	dx = m_sampleX[i - m_rxChannelBase];
+	dy = m_sampleY[i - m_rxChannelBase];
+}
 
 int64_t MultiLaneBERT::GetDataRate()
 {

@@ -250,6 +250,19 @@ public:
 	 */
 	virtual int64_t GetBERIntegrationLength() =0;
 
+	/**
+		@brief Set the sampling point for BER measurements
+
+		X position is measured in fs relative to nominal eye center
+		Y position is measured in V relative to nominal eye center
+	 */
+	virtual void SetBERSamplingPoint(size_t i, int64_t dx, float dy) =0;
+
+	/**
+		@brief Get the sampling point for BER measurements
+	 */
+	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Reference clock output
 
