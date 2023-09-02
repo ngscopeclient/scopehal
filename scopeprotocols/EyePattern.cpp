@@ -857,58 +857,14 @@ void EyePattern::RecalculateUIWidth()
  */
 void EyePattern::DoMaskTest(EyeWaveform* cap)
 {
-	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
-
-	//Create the Cairo surface we're drawing on
-	Cairo::RefPtr< Cairo::ImageSurface > surface =
-		Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, m_width, m_height);
-	Cairo::RefPtr< Cairo::Context > cr = Cairo::Context::create(surface);
-
-	//Set up transformation to match GL's bottom-left origin
-	//cr->translate(0, m_height);
-	//cr->scale(1, -1);
-
-	//Clear to a blank background
-	cr->set_source_rgba(0, 0, 0, 1);
-	cr->rectangle(0, 0, m_width, m_height);
-	cr->fill();
-
-	//Software rendering
-	float yscale = m_height / GetVoltageRange(0);
-	m_mask.RenderForAnalysis(
-		cr,
+	auto rate = m_mask.CalculateHitRate(
 		cap,
+		m_width,
+		m_height,
+		GetVoltageRange(0),
 		m_xscale,
-		m_xoff,
-		yscale,
-		0,
-		m_height);
+		m_xoff);
 
-	auto accum = cap->GetAccumData();
-
-	//Test each pixel of the eye pattern against the mask
-	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
-	int stride = surface->get_stride() / sizeof(uint32_t);
-	size_t total = 0;
-	size_t hits = 0;
-	for(size_t y=0; y<m_height; y++)
-	{
-		auto row = data + (y*stride);
-		auto eyerow = accum + (y*m_width);
-		for(size_t x=0; x<m_width; x++)
-		{
-			//Look up the eye pattern pixel
-			auto bin = eyerow[x];
-			total += bin;
-
-			//If mask pixel isn't black, count violations
-			uint32_t pix = row[x];
-			if( (pix & 0xff) != 0)
-				hits += bin;
-		}
-	}
-
-	auto rate = hits * 1.0f / total;
-	cap->SetMaskHitRate(rate);
 	m_streams[1].m_value = rate;
+	cap->SetMaskHitRate(rate);
 }

@@ -66,7 +66,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	ExportFilter.cpp
 	EyeBitRateMeasurement.cpp
 	EyePattern.cpp
-	EyeMask.cpp
 	EyeHeightMeasurement.cpp
 	EyeJitterMeasurement.cpp
 	EyePeriodMeasurement.cpp

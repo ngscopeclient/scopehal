@@ -50,6 +50,7 @@ set(SCOPEHAL_SOURCES
 	Unit.cpp
 	Waveform.cpp
 	DensityFunctionWaveform.cpp
+	EyeMask.cpp
 	EyeWaveform.cpp
 
 	SCPITransport.cpp

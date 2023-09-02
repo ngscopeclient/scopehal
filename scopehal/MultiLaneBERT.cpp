@@ -702,7 +702,8 @@ void MultiLaneBERT::MeasureEye(size_t i)
 	cap->PrepareForCpuAccess();
 
 	//Set up metadata
-	chan->SetVoltageRange(dy_v * 256, BERTInputChannel::STREAM_EYE);
+	auto vrange = dy_v * 256;
+	chan->SetVoltageRange(vrange, BERTInputChannel::STREAM_EYE);
 	cap->m_uiWidth = dx_fs * 128;
 	cap->m_saturationLevel = 3;
 
@@ -726,6 +727,17 @@ void MultiLaneBERT::MeasureEye(size_t i)
 	}
 	cap->Normalize();
 	cap->IntegrateUIs(1);	//have to put something here, but we don't have the true count value
+
+	//Check against the eye pattern
+	auto rate = chan->GetMask().CalculateHitRate(
+		cap,
+		256,
+		256,
+		vrange,
+		256.0 / (2*cap->m_uiWidth),
+		-cap->m_uiWidth);
+	GetChannel(i)->SetScalarValue(BERTInputChannel::STREAM_MASKHITRATE, rate);
+	cap->SetMaskHitRate(rate);
 
 	cap->MarkModifiedFromCpu();
 }

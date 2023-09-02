@@ -31,6 +31,7 @@
 #define BERTInputChannel_h
 
 class BERT;
+#include "EyeMask.h"
 
 /**
 	@brief A pattern checker channel of a BERT
@@ -75,9 +76,10 @@ public:
 
 	enum StreamIDs
 	{
-		STREAM_HBATHTUB = 0,
-		STREAM_EYE = 1,
-		STREAM_BER
+		STREAM_HBATHTUB		= 0,
+		STREAM_EYE 			= 1,
+		STREAM_BER 			= 2,
+		STREAM_MASKHITRATE	= 3
 	};
 
 	StreamDescriptor GetHBathtubStream()
@@ -104,6 +106,14 @@ public:
 	void GetBERSamplingPoint(int64_t& dx, float& dy)
 	{ m_bert->GetBERSamplingPoint(GetIndex(), dx, dy); }
 
+	std::string GetMaskFile()
+	{ return m_maskFile; }
+
+	void SetMaskFile(const std::string& fname);
+
+	const EyeMask& GetMask()
+	{ return m_mask; }
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 
@@ -121,6 +131,8 @@ protected:
 	std::vector<float> m_ranges;
 	std::vector<float> m_offsets;
 
+	std::string m_maskFile;
+	EyeMask m_mask;
 
 protected:
 	BERT* m_bert;

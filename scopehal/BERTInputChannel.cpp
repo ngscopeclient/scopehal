@@ -57,6 +57,9 @@ BERTInputChannel::BERTInputChannel(
 	//Stream for current BER
 	AddStream(Unit(Unit::UNIT_LOG_BER), "RealTimeBER", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
+	//Stream for mask hit rate
+	AddStream(Unit(Unit::UNIT_RATIO_SCI), "MaskHitRate", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
 	//TODO: figure out how to handle vertical bathtubs since right now all streams share the same X axis units
 	//and we can't do that since we have X axis units in the time domain
 }
@@ -122,6 +125,12 @@ void BERTInputChannel::SetOffset(float offset, size_t stream)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Flow graph updates
+
+void BERTInputChannel::SetMaskFile(const string& fname)
+{
+	m_maskFile = fname;
+	m_mask.Load(fname);
+}
 
 bool BERTInputChannel::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 {

@@ -33,8 +33,8 @@
 	@brief Implementation of EyeMask
  */
 
-#include "../scopehal/scopehal.h"
-#include "EyePattern.h"
+#include "scopehal.h"
+#include "EyeWaveform.h"
 #include "EyeMask.h"
 
 using namespace std;
@@ -226,4 +226,69 @@ void EyeMask::RenderInternal(
 		}
 		cr->fill();
 	}
+}
+
+/**
+	@brief Checks a raw eye pattern dataset against the mask
+ */
+float EyeMask::CalculateHitRate(
+	EyeWaveform* cap,
+	size_t width,
+	size_t height,
+	float fullscalerange,
+	float xscale,
+	float xoff
+	) const
+{
+	//TODO: performance optimization, don't re-render mask every waveform, only when we resize
+
+	//Create the Cairo surface we're drawing on
+	Cairo::RefPtr< Cairo::ImageSurface > surface =
+		Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, width, height);
+	Cairo::RefPtr< Cairo::Context > cr = Cairo::Context::create(surface);
+
+	//Set up transformation to match GL's bottom-left origin
+	//cr->translate(0, m_height);
+	//cr->scale(1, -1);
+
+	//Clear to a blank background
+	cr->set_source_rgba(0, 0, 0, 1);
+	cr->rectangle(0, 0, width, height);
+	cr->fill();
+
+	//Software rendering
+	float yscale = height / fullscalerange;
+	RenderForAnalysis(
+		cr,
+		cap,
+		xscale,
+		xoff,
+		yscale,
+		0,
+		height);
+
+	//Test each pixel of the eye pattern against the mask
+	auto accum = cap->GetAccumData();
+	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
+	int stride = surface->get_stride() / sizeof(uint32_t);
+	size_t total = 0;
+	size_t hits = 0;
+	for(size_t y=0; y<height; y++)
+	{
+		auto row = data + (y*stride);
+		auto eyerow = accum + (y*width);
+		for(size_t x=0; x<width; x++)
+		{
+			//Look up the eye pattern pixel
+			auto bin = eyerow[x];
+			total += bin;
+
+			//If mask pixel isn't black, count violations
+			uint32_t pix = row[x];
+			if( (pix & 0xff) != 0)
+				hits += bin;
+		}
+	}
+
+	return hits * 1.0f / total;
 }

@@ -106,6 +106,14 @@ public:
 		float yoff,
 		float height) const;
 
+	float CalculateHitRate(
+		EyeWaveform* cap,
+		size_t width,
+		size_t height,
+		float fullscalerange,
+		float xscale,
+		float xoff) const;
+
 	bool empty() const
 	{ return m_polygons.empty(); }
 
