@@ -51,6 +51,7 @@ MultiLaneBERT::MultiLaneBERT(SCPITransport* transport)
 	transport->SendCommandQueued("DEFER");
 
 	//Change the data rate
+	SetUseExternalRefclk(false);
 	SetDataRate(10312500000LL);
 
 	//Add and provide default configuration for pattern generator channels
@@ -492,6 +493,29 @@ int64_t MultiLaneBERT::GetRefclkOutFrequency()
 	}
 
 	return 0;
+}
+
+int64_t MultiLaneBERT::GetRefclkInFrequency()
+{
+	if(m_dataRate > 16000000000LL)
+		return m_dataRate / 80;
+	else
+		return m_dataRate / 32;
+}
+
+void MultiLaneBERT::SetUseExternalRefclk(bool external)
+{
+	if(external)
+		m_transport->SendCommandQueued("REFCLK EXT");
+	else
+		m_transport->SendCommandQueued("REFCLK INT");
+
+	m_useExternalRefclk = external;
+}
+
+bool MultiLaneBERT::GetUseExternalRefclk()
+{
+	return m_useExternalRefclk;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

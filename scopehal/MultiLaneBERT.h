@@ -95,11 +95,14 @@ public:
 	virtual void SetRefclkOutMux(size_t i) override;
 	virtual std::vector<std::string> GetRefclkOutMuxNames() override;
 	virtual int64_t GetRefclkOutFrequency() override;
+	virtual int64_t GetRefclkInFrequency() override;
 
 	//Timebase
 	virtual int64_t GetDataRate() override;
 	virtual void SetDataRate(int64_t rate) override;
 	virtual std::vector<int64_t> GetAvailableDataRates() override;
+	virtual void SetUseExternalRefclk(bool external) override;
+	virtual bool GetUseExternalRefclk() override;
 
 protected:
 
@@ -121,6 +124,7 @@ protected:
 	int64_t m_integrationLength;
 	int64_t m_sampleX[4];
 	float m_sampleY[4];
+	bool m_useExternalRefclk;
 
 	enum RefclkMuxSelectors
 	{

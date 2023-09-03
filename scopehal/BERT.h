@@ -264,7 +264,7 @@ public:
 	virtual void GetBERSamplingPoint(size_t i, int64_t& dx, float& dy) =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Reference clock output
+	// Reference clock control
 
 	/**
 		@brief Gets the currently selected reference clock output mux setting
@@ -288,6 +288,11 @@ public:
 	 */
 	virtual int64_t GetRefclkOutFrequency() =0;
 
+	/**
+		@brief Gets the refclk in frequency required to generate the currently selected data rate
+	 */
+	virtual int64_t GetRefclkInFrequency() =0;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Timebase
 
@@ -308,6 +313,16 @@ public:
 		@brief Gets the list of available data rates
 	 */
 	virtual std::vector<int64_t> GetAvailableDataRates() =0;
+
+	/**
+		@brief Sets the reference clock source
+	 */
+	virtual void SetUseExternalRefclk(bool external) =0;
+
+	/**
+		@brief Sets the reference clock source
+	 */
+	virtual bool GetUseExternalRefclk() =0;
 };
 
 #include "BERTInputChannel.h"
