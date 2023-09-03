@@ -511,6 +511,10 @@ void MultiLaneBERT::SetUseExternalRefclk(bool external)
 		m_transport->SendCommandQueued("REFCLK INT");
 
 	m_useExternalRefclk = external;
+
+	//refresh ref out
+	SetRefclkOutMux(GetRefclkOutMux());
+	SetGlobalCustomPattern(m_txCustomPattern);
 }
 
 bool MultiLaneBERT::GetUseExternalRefclk()
@@ -555,8 +559,9 @@ void MultiLaneBERT::SetDataRate(int64_t rate)
 	m_transport->SendCommandQueued(string("RATE ") + to_string(rate));
 	m_dataRate = rate;
 
-	//Reset refclk mux since this seems to get corrupted somehow
+	//Reset refclk out mux
 	SetRefclkOutMux(m_refclkOutMux);
+	SetGlobalCustomPattern(m_txCustomPattern);
 }
 
 vector<int64_t> MultiLaneBERT::GetAvailableDataRates()
