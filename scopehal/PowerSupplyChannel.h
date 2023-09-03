@@ -69,6 +69,8 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
 
+	virtual PhysicalConnector GetPhysicalConnector() override;
+
 protected:
 	PowerSupply* m_powerSupply;
 };

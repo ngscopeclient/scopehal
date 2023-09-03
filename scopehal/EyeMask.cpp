@@ -268,6 +268,7 @@ float EyeMask::CalculateHitRate(
 		height);
 
 	//Test each pixel of the eye pattern against the mask
+	//TODO: rather than averaging we should report the highest hit rate
 	auto accum = cap->GetAccumData();
 	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
 	int stride = surface->get_stride() / sizeof(uint32_t);

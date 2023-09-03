@@ -52,6 +52,11 @@ FunctionGeneratorChannel::~FunctionGeneratorChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Input processing
 
+InstrumentChannel::PhysicalConnector FunctionGeneratorChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_BNC;
+}
+
 bool FunctionGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

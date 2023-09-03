@@ -101,6 +101,7 @@ set(SCOPEHAL_SOURCES
 	PowerSupply.cpp
 	PowerSupplyChannel.cpp
 	RFSignalGenerator.cpp
+	RFSignalGeneratorChannel.cpp
 	SCPIBERT.cpp
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp

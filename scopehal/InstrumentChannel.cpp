@@ -77,6 +77,11 @@ InstrumentChannel::~InstrumentChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
+InstrumentChannel::PhysicalConnector InstrumentChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_BNC;
+}
+
 /**
 	@brief Sets the human-readable nickname for this channel, as displayed in the GUI
  */

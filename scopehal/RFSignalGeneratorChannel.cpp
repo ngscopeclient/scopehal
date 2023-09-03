@@ -27,33 +27,80 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef FunctionGeneratorChannel_h
-#define FunctionGeneratorChannel_h
+#include "scopehal.h"
 
-/**
-	@brief A single channel of a function generator
- */
-class FunctionGeneratorChannel : public InstrumentChannel
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+RFSignalGeneratorChannel::RFSignalGeneratorChannel(
+	const string& hwname,
+	const string& color,
+	size_t index)
+	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
 {
-public:
+	ClearStreams();
 
-	FunctionGeneratorChannel(
-		const std::string& hwname,
-		const std::string& color = "#808080",
-		size_t index = 0);
+	CreateInput("Frequency");
+}
 
-	virtual ~FunctionGeneratorChannel();
+RFSignalGeneratorChannel::~RFSignalGeneratorChannel()
+{
+}
 
-	//Well defined stream IDs used by FunctionGeneratorChannel
-	enum StreamIndexes
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input processing
+
+InstrumentChannel::PhysicalConnector RFSignalGeneratorChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_N;
+}
+
+bool RFSignalGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(stream.m_channel == NULL)
+		return false;
+/*
+	if(i >= 1)
+		return false;
+
+	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+		return true;*/
+
+	return false;
+}
+
+
+void RFSignalGeneratorChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	/*
+	auto setPointIn = GetInput(0);
+	if(setPointIn)
 	{
-		STREAM_FREQUENCY
-	};
+		//Validate that set point has the correct units
+		Unit expectedUnit(Unit::UNIT_COUNTS);
+		switch(m_load->GetLoadMode(m_index))
+		{
+			case Load::MODE_CONSTANT_CURRENT:
+				expectedUnit = Unit(Unit::UNIT_AMPS);
+				break;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+			case Load::MODE_CONSTANT_VOLTAGE:
+				expectedUnit = Unit(Unit::UNIT_VOLTS);
+				break;
 
-	virtual PhysicalConnector GetPhysicalConnector() override;
-};
+			case Load::MODE_CONSTANT_POWER:
+				expectedUnit = Unit(Unit::UNIT_WATTS);
+				break;
 
-#endif
+			case Load::MODE_CONSTANT_RESISTANCE:
+				expectedUnit = Unit(Unit::UNIT_OHMS);
+				break;
+		}
+
+		if(expectedUnit == setPointIn.GetYAxisUnits())
+			m_load->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
+	}
+	*/
+}

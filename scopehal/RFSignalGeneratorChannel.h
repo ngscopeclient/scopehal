@@ -27,24 +27,24 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef FunctionGeneratorChannel_h
-#define FunctionGeneratorChannel_h
+#ifndef RFSignalGeneratorChannel_h
+#define RFSignalGeneratorChannel_h
 
 /**
-	@brief A single channel of a function generator
+	@brief A single channel of an RF signal generator
  */
-class FunctionGeneratorChannel : public InstrumentChannel
+class RFSignalGeneratorChannel : public InstrumentChannel
 {
 public:
 
-	FunctionGeneratorChannel(
+	RFSignalGeneratorChannel(
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		size_t index = 0);
 
-	virtual ~FunctionGeneratorChannel();
+	virtual ~RFSignalGeneratorChannel();
 
-	//Well defined stream IDs used by FunctionGeneratorChannel
+	//Well defined stream IDs used by RFSignalGeneratorChannel
 	enum StreamIndexes
 	{
 		STREAM_FREQUENCY

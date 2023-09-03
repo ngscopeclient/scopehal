@@ -95,6 +95,8 @@ public:
 	void SetPostCursor(float f)
 	{ m_bert->SetTxPostCursor(GetIndex(), f); }
 
+	virtual PhysicalConnector GetPhysicalConnector() override;
+
 protected:
 	BERT* m_bert;
 };

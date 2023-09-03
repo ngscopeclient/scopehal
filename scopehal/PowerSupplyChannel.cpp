@@ -59,6 +59,11 @@ PowerSupplyChannel::~PowerSupplyChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Flow graph updates
 
+InstrumentChannel::PhysicalConnector PowerSupplyChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_BANANA_DUAL;
+}
+
 bool PowerSupplyChannel::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

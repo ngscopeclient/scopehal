@@ -61,6 +61,11 @@ BERTOutputChannel::~BERTOutputChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Flow graph updates
 
+InstrumentChannel::PhysicalConnector BERTOutputChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_K_DUAL;
+}
+
 bool BERTOutputChannel::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)

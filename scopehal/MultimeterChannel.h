@@ -56,6 +56,8 @@ public:
 	float GetSecondaryValue()
 	{ return GetScalarValue(m_secondaryStream); }
 
+	virtual PhysicalConnector GetPhysicalConnector() override;
+
 protected:
 	size_t m_primaryStream;
 	size_t m_secondaryStream;

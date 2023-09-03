@@ -71,6 +71,11 @@ BERTInputChannel::~BERTInputChannel()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vertical scaling and stream management
 
+InstrumentChannel::PhysicalConnector BERTInputChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_K_DUAL;
+}
+
 //This section is mostly lifted from the Filter class since we don't have any of these settings in actual hardware
 
 void BERTInputChannel::ClearStreams()

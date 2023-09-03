@@ -56,3 +56,8 @@ void MultimeterChannel::Update(Multimeter* meter)
 	m_streams[m_secondaryStream].m_yAxisUnit = meter->GetSecondaryMeterUnit();
 	m_streams[m_secondaryStream].m_value = meter->GetSecondaryMeterValue();
 }
+
+InstrumentChannel::PhysicalConnector MultimeterChannel::GetPhysicalConnector()
+{
+	return CONNECTOR_BANANA_DUAL;
+}

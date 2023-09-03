@@ -41,8 +41,8 @@ SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transp
 {
 	//TODO: query options to figure out what we actually have
 
-	m_channels.push_back(new InstrumentChannel("RFOUT", "#808080", Unit(Unit::UNIT_HZ), 0));
-	m_channels.push_back(new InstrumentChannel("LFO", "#808080", Unit(Unit::UNIT_HZ), 1));
+	m_channels.push_back(new RFSignalGeneratorChannel("RFOUT", "#808080", 0));
+	m_channels.push_back(new FunctionGeneratorChannel("LFO", "#808080", 1));
 }
 
 SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()

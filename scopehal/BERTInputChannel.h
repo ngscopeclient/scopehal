@@ -114,6 +114,8 @@ public:
 	const EyeMask& GetMask()
 	{ return m_mask; }
 
+	virtual PhysicalConnector GetPhysicalConnector() override;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vertical scaling and stream management
 
