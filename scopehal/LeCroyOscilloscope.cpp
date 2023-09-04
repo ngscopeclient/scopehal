@@ -94,7 +94,7 @@ void LeCroyOscilloscope::SharedCtorInit()
 	m_extTrigChannel = new OscilloscopeChannel(
 		this,
 		"Ext",
-		"",
+		"#808080",
 		Unit(Unit::UNIT_FS),
 		Unit(Unit::UNIT_VOLTS),
 		Stream::STREAM_TYPE_TRIGGER,
@@ -2216,13 +2216,9 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 bool LeCroyOscilloscope::PeekTriggerArmed()
 {
-	//Read the Internal State Change Register
-	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
-	int inr = atoi(sinr.c_str());
-
-	if(inr & 0x2000)
+	auto str = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.TriggerMode'"));
+	if(str == "Single")
 		return true;
-
 	else
 		return false;
 }
