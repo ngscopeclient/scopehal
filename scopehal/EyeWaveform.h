@@ -83,6 +83,9 @@ public:
 
 	double GetBERAtPoint(ssize_t pointx, ssize_t pointy, ssize_t xmid, ssize_t ymid);
 
+	EyeType GetType()
+	{ return m_type; }
+
 protected:
 	int64_t* m_accumdata;
 

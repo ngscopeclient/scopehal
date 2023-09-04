@@ -247,10 +247,6 @@ float EyeMask::CalculateHitRate(
 		Cairo::ImageSurface::create(Cairo::FORMAT_ARGB32, width, height);
 	Cairo::RefPtr< Cairo::Context > cr = Cairo::Context::create(surface);
 
-	//Set up transformation to match GL's bottom-left origin
-	//cr->translate(0, m_height);
-	//cr->scale(1, -1);
-
 	//Clear to a blank background
 	cr->set_source_rgba(0, 0, 0, 1);
 	cr->rectangle(0, 0, width, height);
@@ -268,28 +264,52 @@ float EyeMask::CalculateHitRate(
 		height);
 
 	//Test each pixel of the eye pattern against the mask
-	//TODO: rather than averaging we should report the highest hit rate
-	auto accum = cap->GetAccumData();
-	uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
-	int stride = surface->get_stride() / sizeof(uint32_t);
-	size_t total = 0;
-	size_t hits = 0;
-	for(size_t y=0; y<height; y++)
+	float nmax = 0;
+	if(cap->GetType() == EyeWaveform::EYE_NORMAL)
 	{
-		auto row = data + (y*stride);
-		auto eyerow = accum + (y*width);
-		for(size_t x=0; x<width; x++)
+		auto accum = cap->GetAccumData();
+		uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
+		int stride = surface->get_stride() / sizeof(uint32_t);
+		for(size_t y=0; y<height; y++)
 		{
-			//Look up the eye pattern pixel
-			auto bin = eyerow[x];
-			total += bin;
-
-			//If mask pixel isn't black, count violations
-			uint32_t pix = row[x];
-			if( (pix & 0xff) != 0)
-				hits += bin;
+			auto row = data + (y*stride);
+			auto eyerow = accum + (y*width);
+			for(size_t x=0; x<width; x++)
+			{
+				//If mask pixel isn't black, count violations
+				uint32_t pix = row[x];
+				if( (pix & 0xff) != 0)
+				{
+					float rate = (eyerow[x] * 1.0f / cap->GetTotalUIs());
+					if(rate > nmax)
+						nmax = rate;
+				}
+			}
+		}
+	}
+	else //if(cap->GetType() == EyeWaveform::EYE_BER)
+	{
+		auto accum = cap->GetData();
+		uint32_t* data = reinterpret_cast<uint32_t*>(surface->get_data());
+		int stride = surface->get_stride() / sizeof(uint32_t);
+		for(size_t y=0; y<height; y++)
+		{
+			auto row = data + (y*stride);
+			auto eyerow = accum + (y*width);
+			for(size_t x=0; x<width; x++)
+			{
+				//If mask pixel isn't black, count violations
+				uint32_t pix = row[x];
+				if( (pix & 0xff) != 0)
+				{
+					//BER eyes don't need any preprocessing since the pixel values are already raw BER
+					float rate = eyerow[x];
+					if(rate > nmax)
+						nmax = rate;
+				}
+			}
 		}
 	}
 
-	return hits * 1.0f / total;
+	return nmax;
 }
