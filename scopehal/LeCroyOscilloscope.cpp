@@ -65,6 +65,7 @@ LeCroyOscilloscope::LeCroyOscilloscope(SCPITransport* transport)
 	, m_hasXdev(false)
 	, m_maxBandwidth(10000)
 	, m_triggerArmed(false)
+	, m_triggerReallyArmed(false)
 	, m_triggerOneShot(false)
 	, m_sampleRateValid(false)
 	, m_sampleRate(1)
@@ -2197,6 +2198,10 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 		//since AcquireData() will reset the trigger for the next acquisition.
 		if(m_triggerOneShot)
 			m_triggerArmed = false;
+
+		//May still be conceptually in the "armed" state if this is a repeating trigger
+		//but in dead time between triggers
+		m_triggerReallyArmed = false;
 		return TRIGGER_MODE_TRIGGERED;
 	}
 
@@ -2204,6 +2209,7 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 	if(inr & 0x2000)
 	{
 		m_triggerArmed = true;
+		m_triggerReallyArmed = true;
 		return TRIGGER_MODE_RUN;
 	}
 
@@ -2216,11 +2222,23 @@ Oscilloscope::TriggerMode LeCroyOscilloscope::PollTrigger()
 
 bool LeCroyOscilloscope::PeekTriggerArmed()
 {
-	auto str = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.TriggerMode'"));
-	if(str == "Single")
+	if(m_triggerReallyArmed)
 		return true;
-	else
-		return false;
+
+	//Read the Internal State Change Register
+	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
+	int inr = atoi(sinr.c_str());
+
+	if(inr & 0x2000)
+	{
+		m_triggerReallyArmed = true;
+		return true;
+	}
+
+	//TODO: if 0x0001 is set we got a waveform
+	//but PollTrigger will miss it!
+
+	return false;
 }
 
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)

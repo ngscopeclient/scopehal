@@ -330,7 +330,13 @@ protected:
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 
+	///@brief True if we have sent an arm command to the scope (may not have executed  yet)
 	bool m_triggerArmed;
+
+	///@brief True if the scope has reported it is in fact in the arm state
+	bool m_triggerReallyArmed;
+
+	///@brief True if current trigger is a single-shot and should not re-arm
 	bool m_triggerOneShot;
 
 	//Cached configuration
