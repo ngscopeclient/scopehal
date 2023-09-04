@@ -198,6 +198,24 @@ void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& no
 		//Create the channel ID
 		table.emplace(cnode["id"].as<int>(), chan);
 	}
+
+	//If any of our channels are null, we're missing configuration for them in the file
+	//Create dummy channels so nothing segfaults
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		if(m_channels[i] != nullptr)
+			continue;
+
+		auto chan = new OscilloscopeChannel(
+			this,
+			"MISSINGNO.",
+			"#808080",
+			Unit(Unit::UNIT_FS),
+			Unit(Unit::UNIT_VOLTS),
+			Stream::STREAM_TYPE_UNDEFINED,
+			i);
+		m_channels[i] = chan;
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

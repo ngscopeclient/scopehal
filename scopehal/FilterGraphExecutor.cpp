@@ -65,6 +65,8 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 		return;
 
 	m_incompleteNodes = nodes;
+	m_incompleteNodes.erase(nullptr);	//don't crash if a null filter somehow ended up in the list
+
 	m_runnableNodes.clear();
 	m_allWorkersComplete = false;
 
