@@ -101,6 +101,71 @@ public:
 	virtual void SetChannelCenterFrequency(int chan, float freq) =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Analog modulation
+
+	/**
+		@brief Checks if an instrument is analog modulation capable
+
+		@param chan		Zero-based channel index
+	 */
+	virtual bool IsAnalogModulationAvailable(int chan) =0;
+
+	/**
+		@brief Enable or disable analog modulation
+	 */
+	virtual void SetAnalogModulationEnable(int chan, bool on) =0;
+
+	/**
+		@brief Enable or disable analog modulation
+	 */
+	virtual bool GetAnalogModulationEnable(int chan) =0;
+
+	/**
+		@brief Enable or disable analog frequency modulation (also requires modulation to be turned on)
+	 */
+	virtual void SetAnalogFMEnable(int chan, bool on) =0;
+
+	/**
+		@brief Enable or disable analog frequency modulation
+	 */
+	virtual bool GetAnalogFMEnable(int chan) =0;
+
+	/**
+		@brief Get the set of waveforms available for analog FM
+	 */
+	virtual std::vector<FunctionGenerator::WaveShape> GetAnalogFMWaveShapes() =0;
+
+	/**
+		@brief Get the current waveform selected for analog FM
+	 */
+	virtual FunctionGenerator::WaveShape GetAnalogFMWaveShape(int chan) =0;
+
+	/**
+		@brief Sets the analog FM modulation shape for a channel
+	 */
+	virtual void SetAnalogFMWaveShape(int chan, FunctionGenerator::WaveShape shape) =0;
+
+	/**
+		@brief Sets the analog FM deviation for a channel (in Hz)
+	 */
+	virtual void SetAnalogFMDeviation(int chan, int64_t deviation) =0;
+
+	/**
+		@brief Gets the analog FM deviation for a channel
+	 */
+	virtual int64_t GetAnalogFMDeviation(int chan) =0;
+
+	/**
+		@brief Sets the analog FM frequency for a channel (in Hz)
+	 */
+	virtual void SetAnalogFMFrequency(int chan, int64_t frequency) =0;
+
+	/**
+		@brief Gets the analog FM frequency for a channel
+	 */
+	virtual int64_t GetAnalogFMFrequency(int chan) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Vector modulation
 
 	/**

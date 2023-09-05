@@ -453,3 +453,86 @@ bool SiglentVectorSignalGenerator::HasFunctionImpedanceControls(int /*chan*/)
 
 //TODO: LFO phase
 //TODO: LFO sweep
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Analog modulation
+
+bool SiglentVectorSignalGenerator::IsAnalogModulationAvailable(int /*chan*/)
+{
+	return true;
+}
+
+bool SiglentVectorSignalGenerator::GetAnalogModulationEnable(int /*chan*/)
+{
+	auto state = Trim(m_transport->SendCommandQueuedWithReply("SOUR:MOD?"));
+	return (state == "1");
+}
+
+void SiglentVectorSignalGenerator::SetAnalogModulationEnable(int /*chan*/, bool on)
+{
+	if(on)
+		m_transport->SendCommandQueued("SOUR:MOD ON");
+	else
+		m_transport->SendCommandQueued("SOUR:MOD OFF");
+}
+
+void SiglentVectorSignalGenerator::SetAnalogFMEnable(int /*chan*/, bool on)
+{
+	if(on)
+		m_transport->SendCommandQueued("SOUR:FM:STAT ON");
+	else
+		m_transport->SendCommandQueued("SOUR:FM:STAT OFF");
+}
+
+bool SiglentVectorSignalGenerator::GetAnalogFMEnable(int /*chan*/)
+{
+	auto state = Trim(m_transport->SendCommandQueuedWithReply("SOUR:FM:STAT?"));
+	return (state == "1");
+}
+
+vector<FunctionGenerator::WaveShape> SiglentVectorSignalGenerator::GetAnalogFMWaveShapes()
+{
+	vector<FunctionGenerator::WaveShape> ret;
+	ret.push_back(FunctionGenerator::SHAPE_SINE);
+	ret.push_back(FunctionGenerator::SHAPE_SQUARE);
+	return ret;
+}
+
+FunctionGenerator::WaveShape SiglentVectorSignalGenerator::GetAnalogFMWaveShape(int /*chan*/)
+{
+	auto shape = Trim(m_transport->SendCommandQueuedWithReply("SOUR:FM:WAVE?"));
+	if(shape == "SINE")
+		return FunctionGenerator::SHAPE_SINE;
+	else
+		return FunctionGenerator::SHAPE_SQUARE;
+}
+
+void SiglentVectorSignalGenerator::SetAnalogFMWaveShape(int /*chan*/, FunctionGenerator::WaveShape shape)
+{
+	if(shape == FunctionGenerator::SHAPE_SINE)
+		m_transport->SendCommandQueued("SOUR:FM:WAVE SINE");
+	else
+		m_transport->SendCommandQueued("SOUR:FM:WAVE SQUA");
+}
+
+void SiglentVectorSignalGenerator::SetAnalogFMDeviation(int /*chan*/, int64_t deviation)
+{
+	m_transport->SendCommandQueued(string("SOUR:FM:DEV ") + to_string(deviation));
+}
+
+int64_t SiglentVectorSignalGenerator::GetAnalogFMDeviation(int /*chan*/)
+{
+	auto ret = Trim(m_transport->SendCommandQueuedWithReply("SOUR:FM:DEV?"));
+	return stoll(ret);
+}
+
+void SiglentVectorSignalGenerator::SetAnalogFMFrequency(int chan, int64_t frequency)
+{
+	m_transport->SendCommandQueued(string("SOUR:FM:FREQ ") + to_string(frequency));
+}
+
+int64_t SiglentVectorSignalGenerator::GetAnalogFMFrequency(int /*chan*/)
+{
+	auto ret = Trim(m_transport->SendCommandQueuedWithReply("SOUR:FM:FREQ?"));
+	return stoll(ret);
+}

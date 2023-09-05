@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -90,7 +90,7 @@ public:
 		SHAPE_ARB
 	};
 
-	std::string GetNameOfShape(WaveShape shape);
+	static std::string GetNameOfShape(WaveShape shape);
 
 	//Configuration
 	virtual bool GetFunctionChannelActive(int chan) =0;

@@ -59,6 +59,20 @@ public:
 	virtual float GetChannelCenterFrequency(int chan) override;
 	virtual void SetChannelCenterFrequency(int chan, float freq) override;
 
+	//Analog modulation
+	virtual bool IsAnalogModulationAvailable(int chan) override;
+	virtual bool GetAnalogModulationEnable(int chan) override;
+	virtual void SetAnalogModulationEnable(int chan, bool on) override;
+	virtual void SetAnalogFMEnable(int chan, bool on) override;
+	virtual bool GetAnalogFMEnable(int chan) override;
+	virtual std::vector<FunctionGenerator::WaveShape> GetAnalogFMWaveShapes() override;
+	virtual FunctionGenerator::WaveShape GetAnalogFMWaveShape(int chan) override;
+	virtual void SetAnalogFMWaveShape(int chan, FunctionGenerator::WaveShape shape) override;
+	virtual void SetAnalogFMDeviation(int chan, int64_t deviation) override;
+	virtual int64_t GetAnalogFMDeviation(int chan) override;
+	virtual void SetAnalogFMFrequency(int chan, int64_t frequency) override;
+	virtual int64_t GetAnalogFMFrequency(int chan) override;
+
 	//Vector modulation
 	virtual bool IsVectorModulationAvailable(int chan) override;
 
