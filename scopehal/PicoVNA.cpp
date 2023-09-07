@@ -42,7 +42,7 @@ using namespace std;
 //Construction / destruction
 
 PicoVNA::PicoVNA(SCPITransport* transport)
-	: SCPIDevice(transport, false)
+	: SCPIDevice(transport, true)
 	, SCPIInstrument(transport)
 	, m_triggerArmed(false)
 	, m_triggerOneShot(true)
