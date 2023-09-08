@@ -2225,20 +2225,46 @@ bool LeCroyOscilloscope::PeekTriggerArmed()
 	if(m_triggerReallyArmed)
 		return true;
 
-	//Read the Internal State Change Register
-	auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
-	int inr = atoi(sinr.c_str());
-
-	if(inr & 0x2000)
+	switch(m_modelid)
 	{
-		m_triggerReallyArmed = true;
-		return true;
+		//WavePro HD and WR8K HD series have direct FPGA "is trigger ready" flag
+		//per Honam @ LeCroy apps (TLC#00338786)
+		//All other scopes do not as of 2023-09-08 but they are thinking of rolling it out to
+		//other recent models in a future FW update
+		case MODEL_WAVEPRO_HD:
+		case MODEL_WAVERUNNER_8K_HD:
+			{
+				auto str = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.Acquisition.IsTriggerReady'"));
+				if(str == "1")
+				{
+					m_triggerReallyArmed = true;
+					return true;
+				}
+				else
+					return false;
+			}
+
+		//For all other models: Read the Internal State Change Register
+		//This isn't perfect and has a small race window still so add a fixed time delay after it returns ready
+		//Experimentally, 5ms seems adequate on a WaveRunner 8404M-MS (measured race window is ~1ms)
+		default:
+		{
+			auto sinr = m_transport->SendCommandQueuedWithReply("INR?");
+			int inr = atoi(sinr.c_str());
+
+			if(inr & 0x2000)
+			{
+				this_thread::sleep_for(chrono::milliseconds(5));
+				m_triggerReallyArmed = true;
+				return true;
+			}
+
+			//TODO: if 0x0001 is set we got a waveform
+			//but PollTrigger will miss it!
+
+			return false;
+		}
 	}
-
-	//TODO: if 0x0001 is set we got a waveform
-	//but PollTrigger will miss it!
-
-	return false;
 }
 
 bool LeCroyOscilloscope::ReadWaveformBlock(string& data)
