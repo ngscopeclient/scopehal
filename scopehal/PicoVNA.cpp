@@ -358,8 +358,8 @@ bool PicoVNA::AcquireData()
 	{
 		for(int j=0; j<2; j++)
 		{
-			delete mags[i][j];
-			delete angles[i][j];
+			delete[] mags[i][j];
+			delete[] angles[i][j];
 		}
 	}
 
