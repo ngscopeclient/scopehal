@@ -3513,6 +3513,8 @@ void LeCroyOscilloscope::EnableTriggerOutput()
 		case MODEL_DDA_5K:
 		case MODEL_SDA_3K:
 		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+		case MODEL_SDA_8ZI_B:	//TODO: unsure if B has this, A definitely does not
 			break;
 
 		default:
