@@ -45,7 +45,7 @@ inline Unit StreamDescriptor::GetYAxisUnits()
 	return m_channel->GetYAxisUnits(m_stream);
 }
 
-inline WaveformBase* StreamDescriptor::GetData()
+inline WaveformBase* StreamDescriptor::GetData() const
 {
 	if(m_channel == nullptr)
 		return nullptr;
@@ -73,7 +73,7 @@ inline bool StreamDescriptor::operator<(const StreamDescriptor& rhs) const
 	return false;
 }
 
-inline uint8_t StreamDescriptor::GetFlags()
+inline uint8_t StreamDescriptor::GetFlags() const
 {
 	if(m_channel == NULL)
 		return 0;

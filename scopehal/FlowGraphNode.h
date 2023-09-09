@@ -72,11 +72,11 @@ public:
 	//See StreamDescriptor_inlines.h for implementations
 	Unit GetXAxisUnits();
 	Unit GetYAxisUnits();
-	WaveformBase* GetData();
+	WaveformBase* GetData() const;
 	bool operator==(const StreamDescriptor& rhs) const;
 	bool operator!=(const StreamDescriptor& rhs) const;
 	bool operator<(const StreamDescriptor& rhs) const;
-	uint8_t GetFlags();
+	uint8_t GetFlags() const;
 	float GetVoltageRange();
 	float GetOffset();
 	void SetVoltageRange(float v);
