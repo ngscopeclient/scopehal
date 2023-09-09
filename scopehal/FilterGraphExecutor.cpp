@@ -215,9 +215,16 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 	while(true)
 	{
 		{
-			//Wait until the main thread starts a new round of execution
+			//Wait until the main thread starts a new round of execution, or the timeout elapses
+			//When we time out, check if we're shutting down
 			unique_lock<mutex> lock(m_workerCvarMutex);
-			m_workerCvar.wait(lock);
+			if(cv_status::timeout == m_workerCvar.wait_for(lock, chrono::milliseconds(50)))
+			{
+				if(m_terminating)
+					break;
+				else
+					continue;
+			}
 		}
 
 		//If they woke us up because the context is being destroyed, we're done
