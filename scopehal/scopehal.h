@@ -208,9 +208,11 @@ extern uint32_t g_vkLocalMemoryHeap;
 //Enable flags for various features
 extern bool g_gpuFilterEnabled;
 extern bool g_gpuScopeDriverEnabled;
+extern bool g_hasShaderFloat64;
 extern bool g_hasShaderInt64;
 extern bool g_hasShaderInt16;
 extern bool g_hasShaderInt8;
+extern bool g_hasShaderAtomicFloat;
 extern bool g_hasDebugUtils;
 extern bool g_hasMemoryBudget;
 

@@ -140,9 +140,11 @@ uint32_t g_vkLocalMemoryHeap = 0;
 bool IsDevicePreferred(const vk::PhysicalDeviceProperties& a, const vk::PhysicalDeviceProperties& b);
 
 //Feature flags indicating that we have support for specific data types / features on the GPU
+bool g_hasShaderFloat64 = false;
 bool g_hasShaderInt64 = false;
 bool g_hasShaderInt16 = false;
 bool g_hasShaderInt8 = false;
+bool g_hasShaderAtomicFloat = false;
 bool g_hasDebugUtils = false;
 bool g_hasMemoryBudget = false;
 
@@ -602,6 +604,12 @@ bool VulkanInit(bool skipGLFW)
 				vk::PhysicalDevice8BitStorageFeatures features8bit;
 				vk::PhysicalDeviceVulkan12Features featuresVulkan12;
 				void* pNext = nullptr;
+				if(device.getFeatures().shaderFloat64)
+				{
+					enabledFeatures.shaderFloat64 = true;
+					g_hasShaderFloat64 = true;
+					LogDebug("Enabling 64-bit float support\n");
+				}
 				if(device.getFeatures().shaderInt64)
 				{
 					enabledFeatures.shaderInt64 = true;
@@ -703,6 +711,11 @@ bool VulkanInit(bool skipGLFW)
 						hasNonSemanticInfo = true;
 						LogDebug("Device has VK_KHR_shader_non_semantic_info, requesting it\n");
 					}
+					if(!strcmp(&ext.extensionName[0], "VK_EXT_shader_atomic_float"))
+					{
+						g_hasShaderAtomicFloat = true;
+						LogDebug("Device has VK_EXT_shader_atomic_float, requesting it\n");
+					}
 
 					if(!strcmp(&ext.extensionName[0], "VK_EXT_memory_budget"))
 					{
@@ -723,6 +736,8 @@ bool VulkanInit(bool skipGLFW)
 					devextensions.push_back("VK_KHR_portability_subset");
 				if(hasNonSemanticInfo)
 					devextensions.push_back("VK_KHR_shader_non_semantic_info");
+				if(g_hasShaderAtomicFloat)
+					devextensions.push_back("VK_EXT_shader_atomic_float");
 				if(g_hasMemoryBudget)
 					devextensions.push_back("VK_EXT_memory_budget");
 				vk::DeviceCreateInfo devinfo(
