@@ -948,6 +948,22 @@ protected:
 
 		m_gpuPhysMemIsStale = false;
 	}
+public:
+	/**
+		@brief Adds a memory barrier for transferring data from host to device
+	 */
+	static void HostToDeviceTransferMemoryBarrier(vk::raii::CommandBuffer& cmdBuf)
+	{
+		cmdBuf.pipelineBarrier(
+			vk::PipelineStageFlagBits::eTransfer,
+			vk::PipelineStageFlagBits::eComputeShader,
+			{},
+			vk::MemoryBarrier(
+				vk::AccessFlagBits::eTransferWrite,
+				vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite),
+			{},
+			{});
+	}
 
 
 protected:
