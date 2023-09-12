@@ -37,6 +37,14 @@
 
 class QueueHandle;
 
+class SubtractFilterConstants
+{
+public:
+	uint32_t offsetP;
+	uint32_t offsetN;
+	uint32_t size;
+};
+
 class SubtractFilter : public Filter
 {
 public:

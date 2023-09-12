@@ -40,7 +40,7 @@ using namespace std;
 
 SubtractFilter::SubtractFilter(const string& color)
 	: Filter(color, CAT_MATH)
-	, m_computePipeline("shaders/SubtractFilter.spv", 3, sizeof(uint32_t))
+	, m_computePipeline("shaders/SubtractFilter.spv", 3, sizeof(SubtractFilterConstants))
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
 	CreateInput("IN+");
@@ -133,17 +133,40 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 		return;
 	}
 
-	//We need meaningful data
-	size_t len = min(din_p->size(), din_n->size());
+	//Waveforms must be equal sample *rate* to make things work as expected.
+	//But if they don't have the same trigger phase, we can easily correct for that..
+	Unit fs(Unit::UNIT_FS);
+	int64_t skew = llabs(din_p->m_triggerPhase - din_n->m_triggerPhase);
+
+	//Convert calculated skew to offset in samples from start of each waveform
+	size_t offsetP = 0;
+	size_t offsetN = 0;
+	if(din_p->m_triggerPhase > din_n->m_triggerPhase)
+		offsetN = skew / din_n->m_timescale;
+	else
+		offsetP = skew / din_p->m_timescale;
+
+	//Bail if the waveforms don't overlap
+	if(offsetP > din_p->size())
+		return;
+	if(offsetN > din_n->size())
+		return;
+
+	//We need meaningful data after any offset that may have been applied
+	size_t len = min( (din_p->size() - offsetP), (din_n->size() - offsetN) );
 
 	//Setup output waveform
 	UniformAnalogWaveform* ucap = nullptr;
 	SparseAnalogWaveform* scap = nullptr;
 	if(sdin_p && sdin_n)
+	{
 		scap = SetupSparseOutputWaveform(sdin_p, 0, 0, 0);
+		scap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
+	}
 	else if(udin_p && udin_n)
 	{
 		ucap = SetupEmptyUniformAnalogOutputWaveform(udin_p, 0);
+		ucap->m_triggerPhase = max(din_p->m_triggerPhase, din_n->m_triggerPhase);
 		ucap->Resize(len);
 	}
 
@@ -172,7 +195,7 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 
 		for(size_t i=0; i<len; i++)
 		{
-			out[i] 		= a[i] - b[i];
+			out[i] 		= a[i + offsetP] - b[i + offsetN];
 			if(out[i] < -180)
 				out[i] += 360;
 			if(out[i] > 180)
@@ -190,10 +213,15 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	{
 		cmdBuf.begin({});
 
+		SubtractFilterConstants cfg;
+		cfg.offsetP = offsetP;
+		cfg.offsetN = offsetN;
+		cfg.size = len;
+
 		m_computePipeline.BindBufferNonblocking(0, sdin_p ? sdin_p->m_samples : udin_p->m_samples, cmdBuf);
 		m_computePipeline.BindBufferNonblocking(1, sdin_n ? sdin_n->m_samples : udin_n->m_samples, cmdBuf);
 		m_computePipeline.BindBufferNonblocking(2, scap ? scap->m_samples : ucap->m_samples, cmdBuf, true);
-		m_computePipeline.Dispatch(cmdBuf, (uint32_t)len, GetComputeBlockCount(len, 64));
+		m_computePipeline.Dispatch(cmdBuf, cfg, GetComputeBlockCount(len, 64));
 
 		cmdBuf.end();
 		queue->SubmitAndBlock(cmdBuf);
@@ -218,6 +246,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 		float* out = scap ? scap->m_samples.GetCpuPointer() : ucap->m_samples.GetCpuPointer();
 		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
 		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
+		a += offsetP;
+		b += offsetN;
 
 		#ifdef __x86_64__
 		if(g_hasAvx2)
@@ -233,13 +263,8 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	}
 }
 
-//We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
 void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
 {
-	out = (float*)__builtin_assume_aligned(out, 64);
-	a = (float*)__builtin_assume_aligned(a, 64);
-	b = (float*)__builtin_assume_aligned(b, 64);
-
 	for(size_t i=0; i<len; i++)
 		out[i] 		= a[i] - b[i];
 }
@@ -253,8 +278,8 @@ void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
 	//AVX2
 	for(size_t i=0; i<end; i+=8)
 	{
-		__m256 pa = _mm256_load_ps(a + i);
-		__m256 pb = _mm256_load_ps(b + i);
+		__m256 pa = _mm256_loadu_ps(a + i);
+		__m256 pb = _mm256_loadu_ps(b + i);
 		__m256 o = _mm256_sub_ps(pa, pb);
 		_mm256_store_ps(out+i, o);
 	}

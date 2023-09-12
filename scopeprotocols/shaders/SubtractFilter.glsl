@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,6 +47,8 @@ layout(std430, binding=2) restrict writeonly buffer buf_dout
 
 layout(std430, push_constant) uniform constants
 {
+	uint offsetP;
+	uint offsetN;
 	uint size;
 };
 
@@ -57,5 +59,5 @@ void main()
 	if(gl_GlobalInvocationID.x >= size)
 		return;
 
-	dout[gl_GlobalInvocationID.x] = inP[gl_GlobalInvocationID.x] - inN[gl_GlobalInvocationID.x];
+	dout[gl_GlobalInvocationID.x] = inP[gl_GlobalInvocationID.x + offsetP] - inN[gl_GlobalInvocationID.x + offsetN];
 }
