@@ -142,9 +142,9 @@ void WFMImportFilter::OnFileNameChanged()
 		return;
 	}
 	LogDebug("Bytes per point:      %d\n", bytesperpoint);
-	if(bytesperpoint != 2)
+	if( (bytesperpoint != 1) && (bytesperpoint != 2) )
 	{
-		LogError("Only 2 bytes per point supported for now\n");
+		LogError("Only 1 or 2 bytes per point supported for now\n");
 		fclose(fp);
 		return;
 	}
@@ -376,7 +376,26 @@ void WFMImportFilter::OnFileNameChanged()
 		return;
 	}
 	if(format == 0)
+	{
 		LogDebug("Data format:          int16_t\n");
+		if(bytesperpoint != 2)
+		{
+			LogError("data format int16_t is only valid with 2 bytes per point\n");
+			fclose(fp);
+			return;
+		}
+	}
+	else if(format == 7)
+	{
+		LogDebug("Data format:          int8_t (undocumented, guessed)\n");
+
+		if(bytesperpoint != 1)
+		{
+			LogError("data format int8_t is only valid with 1 byte per point\n");
+			fclose(fp);
+			return;
+		}
+	}
 	else
 	{
 		LogError("Data format:          %d (unimplemented)\n", format);
@@ -614,25 +633,47 @@ void WFMImportFilter::OnFileNameChanged()
 	wfm->PrepareForCpuAccess();
 	SetData(wfm, 0);
 
-	//Read sample data
-	int16_t* rawdata = new int16_t[numRealSamples];
-	fseek(fp, curveoffset, SEEK_SET);
-	if(numRealSamples != fread(rawdata, sizeof(int16_t), numRealSamples, fp))
+	if(bytesperpoint == 2)
 	{
-		LogError("Fail to read waveform data\n");
-		delete[] rawdata;
-		return;
-	}
+		//Read sample data
+		int16_t* rawdata = new int16_t[numRealSamples];
+		fseek(fp, curveoffset, SEEK_SET);
+		if(numRealSamples != fread(rawdata, sizeof(int16_t), numRealSamples, fp))
+		{
+			LogError("Fail to read waveform data\n");
+			delete[] rawdata;
+			return;
+		}
 
-	//Read sample data
-	for(size_t i=0; i<numRealSamples; i++)
-		wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
+		//Convert (TODO vectorize)
+		for(size_t i=0; i<numRealSamples; i++)
+			wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
+
+		delete[] rawdata;
+	}
+	else //if(bytesperpoint == 1)
+	{
+		//Read sample data
+		int8_t* rawdata = new int8_t[numRealSamples];
+		fseek(fp, curveoffset, SEEK_SET);
+		if(numRealSamples != fread(rawdata, sizeof(int8_t), numRealSamples, fp))
+		{
+			LogError("Fail to read waveform data\n");
+			delete[] rawdata;
+			return;
+		}
+
+		//Convert (TODO vectorize)
+		for(size_t i=0; i<numRealSamples; i++)
+			wfm->m_samples[i] = (rawdata[i] * yscale) + yoff;
+
+		delete[] rawdata;
+	}
 
 	//Done, set scale
 	wfm->MarkModifiedFromCpu();
 	AutoscaleVertical(0);
 
 	//Clean up
-	delete[] rawdata;
 	fclose(fp);
 }
