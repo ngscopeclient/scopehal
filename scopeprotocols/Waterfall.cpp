@@ -38,7 +38,13 @@ using namespace std;
 
 WaterfallWaveform::WaterfallWaveform(size_t width, size_t height)
 	: DensityFunctionWaveform(width, height)
+	, m_tempBuf("WaterfallWaveform.m_tempBuf")
 {
+	//Temporary buffer is GPU-only
+	m_tempBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_tempBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
+	m_tempBuf.resize(width*height);
 }
 
 WaterfallWaveform::~WaterfallWaveform()
@@ -53,6 +59,7 @@ Waterfall::Waterfall(const string& color)
 	, m_width(1)
 	, m_height(1)
 	, m_maxwidth("Max width")
+	, m_computePipeline("shaders/WaterfallFilter.spv", 3, sizeof(WaterfallFilterArgs))
 {
 	AddStream(Unit(Unit::UNIT_DBM), "data", Stream::STREAM_TYPE_WATERFALL);
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
@@ -109,7 +116,7 @@ void Waterfall::ClearPersistence()
 	SetData(nullptr, 0);
 }
 
-void Waterfall::Refresh()
+void Waterfall::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -120,7 +127,6 @@ void Waterfall::Refresh()
 
 	//Get the input data
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForCpuAccess();
 	size_t inlen = din->size();
 
 	//Figure out how wide we want the input capture to be
@@ -139,42 +145,52 @@ void Waterfall::Refresh()
 	//Figure out the frequency span of the input
 	int64_t spanIn = din->m_timescale * inlen;
 
-	//Recalculate timescale
+	//Recalculate timescale and update timestamps
 	cap->m_timescale = spanIn / capwidth;
-
-	//Update timestamps
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->PrepareForCpuAccess();
 
-	//Move the whole waterfall down by one row
-	//TODO: can we just rotate indexes or something to make this more efficient?
-	float* data = cap->GetData();
-	for(size_t y=0; y < m_height-1 ; y++)
-		memcpy(data + y*m_width, data + (y+1)*m_width, m_width * sizeof(float));
+	//Calculate some coefficients
+	WaterfallFilterArgs args;
+	args.width = m_width;
+	args.height = m_height;
+	args.inlen = inlen;
+	args.vrange = m_inputs[0].GetVoltageRange(); //db from min to max scale
+	args.vfs = args.vrange/2 - m_inputs[0].GetOffset();
 
-	//Zero the new row
-	float* prow = data + (m_height-1)*m_width;
-	memset(prow, 0, m_width*sizeof(float));
+	//TODO: is this OK or are we going to lose too much precision doing this?
+	args.timescaleRatio = cap->m_timescale * 1.0 / din->m_timescale;
 
-	//Add the new data, downsampling if needed, then normalize to full scale range
-	float vmin = 1.0 / 255.0;
-	float vrange = m_inputs[0].GetVoltageRange();	//db from min to max scale
-	float vfs = vrange/2 - m_inputs[0].GetOffset();
-	for(size_t x=0; x<m_width; x++)
-	{
-		//TODO: account for triggerPhase of input!
-		size_t binMin = (x * cap->m_timescale) / din->m_timescale;
-		size_t binMax = ( ((x+1) * cap->m_timescale) / din->m_timescale ) - 1;
+	//Make sure input is ready
+	din->PrepareForGpuAccess();
+	cap->PrepareForGpuAccess();
+	cap->m_tempBuf.PrepareForGpuAccess();
 
-		float maxAmplitude = vmin;
-		for(size_t i=binMin; (i <= binMax) && (i <= inlen); i++)
-		{
-			float v = 1 - ( (din->m_samples[i] - vfs) / -vrange);
-			maxAmplitude = max(maxAmplitude, v);
-		}
-		prow[x] = maxAmplitude;
-	}
+	cmdBuf.begin({});
 
-	cap->MarkModifiedFromCpu();
+	//Run the actual compute on the GPU
+	m_computePipeline.BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	m_computePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf);
+	m_computePipeline.BindBufferNonblocking(2, cap->m_tempBuf, cmdBuf, true);
+	m_computePipeline.Dispatch(cmdBuf, args, GetComputeBlockCount(args.width, 64), m_height);
+
+	//Wait for the shader to finish
+	cmdBuf.pipelineBarrier(
+		vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer,
+		{},
+		vk::MemoryBarrier(
+			vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eTransferWrite,
+			vk::AccessFlagBits::eTransferRead),
+		{},
+		{});
+
+	//Copy the output buffer over the input
+	vk::BufferCopy region(0, 0, cap->GetOutData().size() * sizeof(float));
+	cmdBuf.copyBuffer(cap->m_tempBuf.GetBuffer(), cap->GetOutData().GetBuffer(), {region});
+
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
+
+	cap->GetOutData().MarkModifiedFromGpu();
 }

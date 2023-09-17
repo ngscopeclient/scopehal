@@ -42,6 +42,7 @@ add_compute_shaders(
 		RectangularWindow.glsl
 		SubtractFilter.glsl
 		UpsampleFilter.glsl
+		WaterfallFilter.glsl
 	)
 
 add_dependencies(scopeprotocols protocolshaders)

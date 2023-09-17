@@ -37,6 +37,16 @@
 
 #include "../scopehal/DensityFunctionWaveform.h"
 
+struct WaterfallFilterArgs
+{
+	uint32_t width;
+	uint32_t height;
+	uint32_t inlen;
+	float vrange;
+	float vfs;
+	float timescaleRatio;
+};
+
 class WaterfallWaveform : public DensityFunctionWaveform
 {
 public:
@@ -46,6 +56,8 @@ public:
 	//not copyable or assignable
 	WaterfallWaveform(const WaterfallWaveform&) =delete;
 	WaterfallWaveform& operator=(const WaterfallWaveform&) =delete;
+
+	AcceleratorBuffer<float> m_tempBuf;
 };
 
 class Waterfall : public Filter
@@ -57,7 +69,7 @@ public:
 	Waterfall(const Waterfall&) =delete;
 	Waterfall& operator=(const Waterfall&) =delete;
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 
 	static std::string GetProtocolName();
 
@@ -87,6 +99,8 @@ protected:
 	size_t m_height;
 
 	std::string m_maxwidth;
+
+	ComputePipeline m_computePipeline;
 };
 
 #endif

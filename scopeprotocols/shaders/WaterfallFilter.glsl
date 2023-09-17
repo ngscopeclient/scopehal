@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal                                                                                                          *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,26 +27,70 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
-#include "DensityFunctionWaveform.h"
+#version 430
+#pragma shader_stage(compute)
 
-DensityFunctionWaveform::DensityFunctionWaveform(size_t width, size_t height)
-	: m_width(width)
-	, m_height(height)
-	, m_outdata("DensityFunctionWaveform.m_outdata")
+layout(std430, binding=0) restrict readonly buffer buf_dnew
 {
-	//Default to CPU+GPU mirror
-	m_outdata.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	m_outdata.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	float dnew[];
+};
 
-	size_t npix = width*height;
-	m_outdata.resize(npix);
-	m_outdata.PrepareForCpuAccess();
-	for(size_t i=0; i<npix; i++)
-		m_outdata[i] = 0;
-	m_outdata.MarkModifiedFromCpu();
-}
-
-DensityFunctionWaveform::~DensityFunctionWaveform()
+layout(std430, binding=1) restrict readonly buffer buf_din
 {
+	float din[];
+};
+
+layout(std430, binding=2) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint width;
+	uint height;
+	uint inlen;
+	float vrange;
+	float vfs;
+	float timescaleRatio;
+};
+
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
+{
+	//Bounds check
+	if(gl_GlobalInvocationID.x >= width)
+		return;
+	if(gl_GlobalInvocationID.y >= height)
+		return;
+
+	//Lower rows move down
+	if(gl_GlobalInvocationID.y < (height-1) )
+	{
+		dout[gl_GlobalInvocationID.y * width + gl_GlobalInvocationID.x] =
+			din[(gl_GlobalInvocationID.y+1) * width + gl_GlobalInvocationID.x];
+	}
+
+	//Topmost row gets new content
+	else
+	{
+		float vmin = 1.0 / 255.0;
+		uint maxBinsPerPixel = 8;
+
+		uint binMin = uint(round(gl_GlobalInvocationID.x * timescaleRatio));
+		uint binMax = uint(round((gl_GlobalInvocationID.x+1) * timescaleRatio)) - 1;
+		if(binMax > (binMin + maxBinsPerPixel))
+			binMax = binMin + maxBinsPerPixel;
+
+		float maxAmplitude = vmin;
+		for(uint i=binMin; (i <= binMax) && (i <= inlen); i++)
+		{
+			float v = 1 - ( (dnew[i] - vfs) / -vrange);
+			maxAmplitude = max(maxAmplitude, v);
+		}
+
+		dout[gl_GlobalInvocationID.y * width + gl_GlobalInvocationID.x] = maxAmplitude;
+	}
+
 }
