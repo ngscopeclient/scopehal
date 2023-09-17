@@ -34,6 +34,10 @@ DensityFunctionWaveform::DensityFunctionWaveform(size_t width, size_t height)
 	: m_width(width)
 	, m_height(height)
 {
+	//Default to CPU+GPU mirror
+	m_outdata.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_outdata.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+
 	size_t npix = width*height;
 	m_outdata.resize(npix);
 	m_outdata.PrepareForCpuAccess();
