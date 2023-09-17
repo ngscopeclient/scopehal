@@ -58,7 +58,7 @@ Waterfall::Waterfall(const string& color)
 	m_xAxisUnit = Unit(Unit::UNIT_HZ);
 
 	m_parameters[m_maxwidth] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_maxwidth].SetIntVal(131072);
+	m_parameters[m_maxwidth].SetIntVal(32768);
 
 	//Set up channels
 	CreateInput("Spectrum");
