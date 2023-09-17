@@ -67,22 +67,10 @@ public:
 	virtual void ClearPersistence();
 
 	void SetWidth(size_t width)
-	{
-		m_width = width;
-		SetData(NULL, 0);
-	}
+	{ m_width = width; }
 
 	void SetHeight(size_t height)
-	{
-		m_height = height;
-		SetData(NULL, 0);
-	}
-
-	void SetTimeScale(double pixelsPerHz)
-	{ m_pixelsPerHz = pixelsPerHz; }
-
-	void SetTimeOffset(double offsetHz)
-	{ m_offsetHz = offsetHz; }
+	{ m_height = height; }
 
 	size_t GetWidth()
 	{ return m_width; }
@@ -93,11 +81,12 @@ public:
 	PROTOCOL_DECODER_INITPROC(Waterfall)
 
 protected:
-	double m_pixelsPerHz;
 	double m_offsetHz;
 
 	size_t m_width;
 	size_t m_height;
+
+	std::string m_maxwidth;
 };
 
 #endif
