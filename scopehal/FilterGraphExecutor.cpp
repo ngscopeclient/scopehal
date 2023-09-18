@@ -35,7 +35,7 @@ using namespace std;
 // Construction / destruction
 
 FilterGraphExecutor::FilterGraphExecutor(size_t numThreads)
-	: m_allWorkersComplete(false)
+	: m_allWorkersComplete(true)
 	, m_terminating(false)
 {
 	//Create our thread pool
@@ -64,13 +64,20 @@ void FilterGraphExecutor::RunBlocking(const set<FlowGraphNode*>& nodes)
 	if(nodes.empty())
 		return;
 
-	m_incompleteNodes = nodes;
-	m_incompleteNodes.erase(nullptr);	//don't crash if a null filter somehow ended up in the list
+	{
+		lock_guard<mutex> lock(m_mutex);
 
-	m_runnableNodes.clear();
-	m_allWorkersComplete = false;
+		if(!m_allWorkersComplete)
+			LogWarning("Entering RunBlocking() but not all workers are complete from previous run\n");
 
-	Filter::ClearAnalysisCache();
+		m_incompleteNodes = nodes;
+		m_incompleteNodes.erase(nullptr);	//don't crash if a null filter somehow ended up in the list
+
+		m_runnableNodes.clear();
+		m_allWorkersComplete = false;
+
+		Filter::ClearAnalysisCache();
+	}
 
 	//Wake up our workers
 	m_workerCvar.notify_all();
@@ -218,13 +225,7 @@ void FilterGraphExecutor::DoExecutorThread(size_t i)
 			//Wait until the main thread starts a new round of execution, or the timeout elapses
 			//When we time out, check if we're shutting down
 			unique_lock<mutex> lock(m_workerCvarMutex);
-			if(cv_status::timeout == m_workerCvar.wait_for(lock, chrono::milliseconds(50)))
-			{
-				if(m_terminating)
-					break;
-				else
-					continue;
-			}
+			m_workerCvar.wait_for(lock, chrono::milliseconds(50));
 		}
 
 		//If they woke us up because the context is being destroyed, we're done
