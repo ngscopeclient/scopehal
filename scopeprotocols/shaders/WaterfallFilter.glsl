@@ -76,12 +76,9 @@ void main()
 	else
 	{
 		float vmin = 1.0 / 255.0;
-		uint maxBinsPerPixel = 8;
 
 		uint binMin = uint(round(gl_GlobalInvocationID.x * timescaleRatio));
 		uint binMax = uint(round((gl_GlobalInvocationID.x+1) * timescaleRatio)) - 1;
-		if(binMax > (binMin + maxBinsPerPixel))
-			binMax = binMin + maxBinsPerPixel;
 
 		float maxAmplitude = vmin;
 		for(uint i=binMin; (i <= binMax) && (i <= inlen); i++)
