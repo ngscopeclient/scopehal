@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,22 +44,17 @@ using namespace std;
 // Construction / destruction
 
 SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, float fmax, int64_t tstart, int64_t duration)
-	: m_width(width)
-	, m_height(height)
+	: DensityFunctionWaveform(width, height)
 	, m_fmax(fmax)
 	, m_tstart(tstart)
 	, m_duration(duration)
 {
-	size_t npix = width*height;
-	m_data = new float[npix];
-	for(size_t i=0; i<npix; i++)
-		m_data[i] = 0;
+
 }
 
 SpectrogramWaveform::~SpectrogramWaveform()
 {
-	delete[] m_data;
-	m_data = NULL;
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

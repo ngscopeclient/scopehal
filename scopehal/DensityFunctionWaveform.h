@@ -84,19 +84,19 @@ public:
 	{ m_outdata.PrepareForCpuAccess(); }
 
 	virtual void PrepareForGpuAccess()
-	{}
+	{ m_outdata.PrepareForGpuAccess();}
 
 	virtual void MarkSamplesModifiedFromCpu()
 	{ m_outdata.MarkModifiedFromCpu(); }
 
 	virtual void MarkSamplesModifiedFromGpu()
-	{}
+	{ m_outdata.MarkModifiedFromGpu(); }
 
 	virtual void MarkModifiedFromCpu()
 	{ m_outdata.MarkModifiedFromCpu(); }
 
 	virtual void MarkModifiedFromGpu()
-	{}
+	{ m_outdata.MarkModifiedFromGpu(); }
 
 	virtual size_t size() const
 	{ return 0; }

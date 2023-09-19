@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -39,7 +39,9 @@
 
 #include <ffts.h>
 
-class SpectrogramWaveform : public WaveformBase
+#include "../scopehal/DensityFunctionWaveform.h"
+
+class SpectrogramWaveform : public DensityFunctionWaveform
 {
 public:
 	SpectrogramWaveform(size_t width, size_t height, float fmax, int64_t tstart, int64_t duration);
@@ -48,19 +50,6 @@ public:
 	//not copyable or assignable
 	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
 	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
-
-	//nothing to do if not gpu accelerated
-	virtual void Rename(const std::string& /*name*/ = "")
-	{}
-
-	float* GetData()
-	{ return m_data; }
-
-	size_t GetHeight()
-	{ return m_height; }
-
-	size_t GetWidth()
-	{ return m_width; }
 
 	float GetMaxFrequency()
 	{ return m_fmax; }
@@ -71,42 +60,10 @@ public:
 	int64_t GetDuration()
 	{ return m_duration; }
 
-	//Unused virtual methods from WaveformBase that we have to override
-	virtual void clear()
-	{}
-
-	virtual void Resize(size_t /*unused*/)
-	{}
-
-	virtual void PrepareForCpuAccess()
-	{}
-
-	virtual void PrepareForGpuAccess()
-	{}
-
-	virtual void MarkSamplesModifiedFromCpu()
-	{}
-
-	virtual void MarkSamplesModifiedFromGpu()
-	{}
-
-	virtual void MarkModifiedFromCpu()
-	{}
-
-	virtual void MarkModifiedFromGpu()
-	{}
-
-	virtual size_t size() const
-	{ return 0; }
-
 protected:
-	size_t m_width;
-	size_t m_height;
 	float m_fmax;
 	int64_t m_tstart;
 	int64_t m_duration;
-
-	float* m_data;
 };
 
 class SpectrogramFilter : public Filter
