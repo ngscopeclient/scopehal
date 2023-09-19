@@ -43,9 +43,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, float fmax)
+SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, double binsize)
 	: DensityFunctionWaveform(width, height)
-	, m_fmax(fmax)
+	, m_binsize(binsize)
 {
 
 }
@@ -93,6 +93,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_parameters[m_fftLengthName].AddEnumValue("4096", 4096);
 	m_parameters[m_fftLengthName].AddEnumValue("8192", 8192);
 	m_parameters[m_fftLengthName].AddEnumValue("16384", 16384);
+	m_parameters[m_fftLengthName].AddEnumValue("32768", 32768);
 	m_parameters[m_fftLengthName].SetIntVal(512);
 
 	m_parameters[m_rangeMaxName] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_DBM));
@@ -185,7 +186,7 @@ void SpectrogramFilter::Refresh()
 	double fs_per_sample = din->m_timescale;
 	float scale = 2.0 / fftlen;
 	double sample_ghz = 1e6 / fs_per_sample;
-	double bin_hz = round((0.5f * sample_ghz * 1e9f) / fftlen);
+	double bin_hz = round((sample_ghz * 1e9f) / fftlen);
 	double fmax = bin_hz * fftlen;
 
 	Unit hz(Unit::UNIT_HZ);
@@ -199,7 +200,7 @@ void SpectrogramFilter::Refresh()
 	auto cap = new SpectrogramWaveform(
 		nblocks,
 		nouts,
-		fmax);
+		bin_hz);
 	cap->PrepareForCpuAccess();
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;

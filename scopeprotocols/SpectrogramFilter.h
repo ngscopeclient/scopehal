@@ -44,18 +44,18 @@
 class SpectrogramWaveform : public DensityFunctionWaveform
 {
 public:
-	SpectrogramWaveform(size_t width, size_t height, float fmax);
+	SpectrogramWaveform(size_t width, size_t height, double binsize);
 	virtual ~SpectrogramWaveform();
 
 	//not copyable or assignable
 	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
 	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
 
-	float GetMaxFrequency()
-	{ return m_fmax; }
+	double GetBinSize()
+	{ return m_binsize; }
 
 protected:
-	float m_fmax;
+	double m_binsize;
 };
 
 class SpectrogramFilter : public Filter
