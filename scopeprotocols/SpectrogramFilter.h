@@ -44,7 +44,7 @@
 class SpectrogramWaveform : public DensityFunctionWaveform
 {
 public:
-	SpectrogramWaveform(size_t width, size_t height, float fmax, int64_t tstart, int64_t duration);
+	SpectrogramWaveform(size_t width, size_t height, float fmax);
 	virtual ~SpectrogramWaveform();
 
 	//not copyable or assignable
@@ -54,16 +54,8 @@ public:
 	float GetMaxFrequency()
 	{ return m_fmax; }
 
-	int64_t GetStartTime()
-	{ return m_tstart; }
-
-	int64_t GetDuration()
-	{ return m_duration; }
-
 protected:
 	float m_fmax;
-	int64_t m_tstart;
-	int64_t m_duration;
 };
 
 class SpectrogramFilter : public Filter

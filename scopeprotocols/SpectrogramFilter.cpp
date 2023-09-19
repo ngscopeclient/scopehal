@@ -43,11 +43,9 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, float fmax, int64_t tstart, int64_t duration)
+SpectrogramWaveform::SpectrogramWaveform(size_t width, size_t height, float fmax)
 	: DensityFunctionWaveform(width, height)
 	, m_fmax(fmax)
-	, m_tstart(tstart)
-	, m_duration(duration)
 {
 
 }
@@ -201,15 +199,12 @@ void SpectrogramFilter::Refresh()
 	auto cap = new SpectrogramWaveform(
 		nblocks,
 		nouts,
-		fmax,
-		din->m_triggerPhase,
-		fs_per_sample * nblocks * fftlen
-		);
+		fmax);
 	cap->PrepareForCpuAccess();
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
-	cap->m_triggerPhase = 0;
-	cap->m_timescale = bin_hz;
+	cap->m_triggerPhase = din->m_triggerPhase;
+	cap->m_timescale = fs_per_sample * fftlen;
 	SetData(cap, 0);
 
 	//Run the FFTs
