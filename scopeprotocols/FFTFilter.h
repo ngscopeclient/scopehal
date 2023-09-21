@@ -39,10 +39,6 @@
 #include <ffts.h>
 #endif
 
-#ifdef HAVE_CLFFT
-#include <clFFT.h>
-#endif
-
 #include "VulkanFFTPlan.h"
 
 class QueueHandle;
