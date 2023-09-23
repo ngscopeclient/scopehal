@@ -453,7 +453,7 @@ vector<uint64_t> DigilentOscilloscope::GetSampleRatesNonInterleaved()
 			break;
 
 		auto block = rates.substr(istart, i-istart);
-		auto fs = stol(block);
+		auto fs = stoll(block);
 		auto hz = FS_PER_SECOND / fs;
 		ret.push_back(hz);
 
