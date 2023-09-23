@@ -2,6 +2,7 @@ include_directories(SYSTEM ${GTKMM_INCLUDE_DIRS} ${SIGCXX_INCLUDE_DIRS})
 link_directories(${GTKMM_LIBRARY_DIRS} ${SIGCXX_LIBRARY_DIRS})
 
 find_library(LXI_LIB lxi)
+find_library(TIRPC_LIB tirpc)
 find_library(LINUXGPIB_LIB gpib)
 find_package(glfw3 REQUIRED)
 
@@ -18,14 +19,29 @@ else()
 	find_package(YAML REQUIRED)
 endif()
 
+if(LINUX AND CMAKE_SYSTEM_VERSION MATCHES "\.fc[0-9]+\.")
+	set(FEDORA TRUE)
+endif()
+
+if(WIN32 OR FEDORA)
+	set(SPIRV_LIBRARIES SPIRV SPIRV-Tools-opt SPIRV-Tools)
+else()
+	set(SPIRV_LIBRARIES "")
+endif()
+
 # Apple has their own idea about stat structs
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Dst_mtim=st_mtimespec")
 endif()
 
-if(LXI_LIB)
+if(LXI_LIB AND (NOT FEDORA OR TIRPC_LIB))
 	set(HAS_LXI true)
-	set(LXI_LIBRARIES ${LXI_LIB})
+	if (FEDORA)
+		# On Fedora, tirpc is (still?) not linked into lxi
+		set(LXI_LIBRARIES ${LXI_LIB} ${TIRPC_LIB})
+	else()
+		set(LXI_LIBRARIES ${LXI_LIB})
+	endif()
 else()
 	set(HAS_LXI false)
 	set(LXI_LIBRARIES "")
@@ -194,9 +210,7 @@ target_link_libraries(scopehal
 	${LIBFFTS_LIBRARIES}
 	${OpenMP_CXX_LIBRARIES}
 	${Vulkan_LIBRARIES}
-	SPIRV
-	SPIRV-Tools-opt
-	SPIRV-Tools
+	${SPIRV_LIBRARIES}
 	glslang
 	Vulkan::Vulkan
 	-Wl,--start-group
@@ -221,6 +235,7 @@ target_link_libraries(scopehal
 	${LIN_LIBS}
 	${OpenMP_CXX_LIBRARIES}
 	${Vulkan_LIBRARIES}
+	${SPIRV_LIBRARIES}
 	Vulkan::Vulkan
 	Vulkan::glslang
 	Vulkan::shaderc_combined
@@ -240,6 +255,7 @@ target_link_libraries(scopehal
 	${LIBFFTS_LIBRARIES}
 	${OpenMP_CXX_LIBRARIES}
 	${Vulkan_LIBRARIES}
+	${SPIRV_LIBRARIES}
 	Vulkan::Vulkan
 	Vulkan::glslang
 	Vulkan::shaderc_combined
