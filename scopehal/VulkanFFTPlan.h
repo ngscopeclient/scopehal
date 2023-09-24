@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -68,7 +68,9 @@ public:
 	void AppendForward(
 		AcceleratorBuffer<float>& dataIn,
 		AcceleratorBuffer<float>& dataOut,
-		vk::raii::CommandBuffer& cmdBuf);
+		vk::raii::CommandBuffer& cmdBuf,
+		uint64_t offsetIn = 0,
+		uint64_t offsetOut = 0);
 
 	void AppendReverse(
 		AcceleratorBuffer<float>& dataIn,

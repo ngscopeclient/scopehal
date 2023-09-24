@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -73,7 +73,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
 
-		cacheKey = string("VkFFT_FWD_") + to_string(npoints);
+		cacheKey = string("VkFFT_FWD_V2_") + to_string(npoints);
 	}
 	else
 	{
@@ -89,7 +89,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_config.inputBufferSize = &m_isize;
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_") + to_string(npoints);
+		cacheKey = string("VkFFT_INV_V2_") + to_string(npoints);
 	}
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
@@ -119,6 +119,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_config.fence = &m_rawfence;
 	m_config.isCompilerInitialized = 1;
 	m_config.isInputFormatted = 1;
+	m_config.specifyOffsetsAtLaunch = 1;
 	m_config.pipelineCache = &m_pipelineCache;
 
 	//We have "C" locale all the time internally, so no need to setlocale() in the library
@@ -167,7 +168,10 @@ VulkanFFTPlan::~VulkanFFTPlan()
 void VulkanFFTPlan::AppendForward(
 	AcceleratorBuffer<float>& dataIn,
 	AcceleratorBuffer<float>& dataOut,
-	vk::raii::CommandBuffer& cmdBuf)
+	vk::raii::CommandBuffer& cmdBuf,
+	uint64_t offsetIn,
+	uint64_t offsetOut
+	)
 {
 	dataIn.PrepareForGpuAccess();
 	dataOut.PrepareForGpuAccess();
@@ -182,6 +186,9 @@ void VulkanFFTPlan::AppendForward(
 	params.inputBuffer = &inbuf;
 	params.buffer = &outbuf;
 	params.commandBuffer = &cmd;
+	params.bufferOffset = offsetOut;
+	params.tempBufferOffset = 0;	//not used
+	params.inputBufferOffset = offsetIn;
 
 	auto err = VkFFTAppend(&m_app, -1, &params);
 	if(VKFFT_SUCCESS != err)

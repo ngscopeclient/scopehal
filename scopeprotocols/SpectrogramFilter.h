@@ -37,7 +37,7 @@
 #ifndef SpectrogramFilter_h
 #define SpectrogramFilter_h
 
-#include <ffts.h>
+#include "VulkanFFTPlan.h"
 
 #include "../scopehal/DensityFunctionWaveform.h"
 
@@ -64,7 +64,7 @@ public:
 	SpectrogramFilter(const std::string& color);
 	virtual ~SpectrogramFilter();
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
@@ -80,8 +80,8 @@ public:
 protected:
 	void ReallocateBuffers(size_t fftlen);
 
-	std::vector<float, AlignedAllocator<float, 64> > m_rdinbuf;
-	std::vector<float, AlignedAllocator<float, 64> > m_rdoutbuf;
+	AcceleratorBuffer<float> m_rdinbuf;
+	AcceleratorBuffer<float> m_rdoutbuf;
 
 	void ProcessSpectrumGeneric(
 		size_t nblocks,
@@ -92,20 +92,8 @@ protected:
 		float scale,
 		float* data);
 
-#ifdef __x86_64__
-	void ProcessSpectrumAVX2FMA(
-		size_t nblocks,
-		size_t block,
-		size_t nouts,
-		float minscale,
-		float range,
-		float scale,
-		float* data);
-#endif
-
 	size_t m_cachedFFTLength;
 
-	ffts_plan_t* m_plan;
 	float m_range;
 	float m_offset;
 
@@ -113,6 +101,8 @@ protected:
 	std::string m_fftLengthName;
 	std::string m_rangeMinName;
 	std::string m_rangeMaxName;
+
+	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
 };
 
 #endif

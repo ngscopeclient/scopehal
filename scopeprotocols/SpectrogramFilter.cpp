@@ -69,7 +69,6 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 
 	//Set up channels
 	CreateInput("din");
-	m_plan = NULL;
 
 	//Default config
 	m_range = 1e9;
@@ -105,8 +104,6 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 
 SpectrogramFilter::~SpectrogramFilter()
 {
-	if(m_plan)
-		ffts_free(m_plan);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,14 +154,29 @@ string SpectrogramFilter::GetProtocolName()
 void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
 {
 	m_cachedFFTLength = fftlen;
-	ffts_free(m_plan);
-	m_plan = ffts_init_1d_real(fftlen, FFTS_FORWARD);
+
+	size_t nouts = fftlen/2 + 1;
+	if(m_vkPlan)
+	{
+		if(m_vkPlan->size() != fftlen)
+			m_vkPlan = nullptr;
+	}
+	if(!m_vkPlan)
+		m_vkPlan = make_unique<VulkanFFTPlan>(fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+
+	//TODO: tweak
+	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	//m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	//m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	m_rdinbuf.resize(fftlen);
 	m_rdoutbuf.resize(fftlen + 2);
 }
 
-void SpectrogramFilter::Refresh()
+void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
@@ -208,27 +220,49 @@ void SpectrogramFilter::Refresh()
 	cap->m_timescale = fs_per_sample * fftlen;
 	SetData(cap, 0);
 
-	//Run the FFTs
 	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	auto data = cap->GetData();
 	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
 	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
 	float range = fullscale - minscale;
+
+	//Run the FFTs
 	for(size_t block=0; block<nblocks; block++)
 	{
 		//Grab the input and apply the window function
+		//TODO gpu ify
 		FFTFilter::ApplyWindow((float*)&din->m_samples[block*fftlen], fftlen, &m_rdinbuf[0], window);
+		m_rdinbuf.MarkModifiedFromCpu();
 
-		//Do the actual FFT
-		ffts_execute(m_plan, &m_rdinbuf[0], &m_rdoutbuf[0]);
 
-		#ifdef __x86_64__
-		if(g_hasAvx2 && g_hasFMA)
-			ProcessSpectrumAVX2FMA(nblocks, block, nouts, minscale, range, scale, data);
-		else
-		#endif
-			ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
+		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+		cmdBuf.reset();
+		cmdBuf.begin({});
+
+		m_rdinbuf.PrepareForGpuAccessNonblocking(false, cmdBuf);
+
+		//Input was modified from CPU
+		m_vkPlan->AppendForward(
+			m_rdinbuf,
+			m_rdoutbuf,
+			cmdBuf,
+			/*block*fftlen*sizeof(float)*/0,
+			/*block*fftlen*sizeof(float)*2*/0);
+
+		//Done, block until the compute operations finish
+		cmdBuf.end();
+		queue->SubmitAndBlock(cmdBuf);
+
+		m_rdoutbuf.MarkModifiedFromGpu();
+		m_rdoutbuf.PrepareForCpuAccess();
+		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
 	}
+
+	//Temp: hack the output on the CPU
+	/*m_rdoutbuf.MarkModifiedFromGpu();
+	m_rdoutbuf.PrepareForCpuAccess();
+	for(size_t block=0; block<nblocks; block++)
+		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);*/
 
 	cap->MarkModifiedFromCpu();
 }
@@ -261,97 +295,4 @@ void SpectrogramFilter::ProcessSpectrumGeneric(
 			data[i*nblocks + block] = (dbm - minscale) * irange;
 	}
 }
-
-#ifdef __x86_64__
-__attribute__((target("avx2,fma")))
-void SpectrogramFilter::ProcessSpectrumAVX2FMA(
-	size_t nblocks,
-	size_t block,
-	size_t nouts,
-	float minscale,
-	float range,
-	float scale,
-	float* data)
-{
-	const float impedance = 50;
-	const float logscale = 10 / log(10);
-	const float irange = 1.0 / range;
-	const float impscale = scale*scale / impedance;
-
-	float* pout = data + block;
-
-	const int blocksize = 8;
-	size_t end = 0;//len - (len % blocksize);
-	float* pin = &m_rdoutbuf[0];
-
-	/*
-		voltage = sqrt * scale
-
-		log in = voltage*voltage * inverse_impedance
-		= sqrt*sqrt * scale*scale * inverse_impedance
-	 */
-
-	//prefill a bunch of vectors with constants
-	__m256 vimpscale = { impscale, impscale, impscale, impscale, impscale, impscale, impscale, impscale };
-	__m256 vlogscale = { logscale, logscale, logscale, logscale, logscale, logscale, logscale, logscale };
-	__m256 vminscale = { minscale, minscale, minscale, minscale, minscale, minscale, minscale, minscale };
-	__m256 virange = { irange, irange, irange, irange, irange, irange, irange, irange };
-	__m256 const_30 = {30, 30, 30, 30, 30, 30, 30, 30 };
-
-	for(size_t i=0; i<end; i += blocksize)
-	{
-		//Read interleaved real/imaginary FFT output (riririri riririri)
-		__m256 din0 = _mm256_load_ps(pin + i*2);
-		__m256 din1 = _mm256_load_ps(pin + i*2 + 8);
-
-		//Step 1: Shuffle 32-bit values within 128-bit lanes to get rriirrii rriirrii.
-		din0 = _mm256_permute_ps(din0, 0xd8);
-		din1 = _mm256_permute_ps(din1, 0xd8);
-
-		//Step 2: Shuffle 64-bit values to get rrrriiii rrrriiii.
-		__m256i block0 = _mm256_permute4x64_epi64(_mm256_castps_si256(din0), 0xd8);
-		__m256i block1 = _mm256_permute4x64_epi64(_mm256_castps_si256(din1), 0xd8);
-
-		//Step 3: Shuffle 128-bit values to get rrrrrrrr iiiiiiii.
-		__m256 real = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x20));
-		__m256 imag = _mm256_castsi256_ps(_mm256_permute2x128_si256(block0, block1, 0x31));
-
-		//Actual vector normalization
-		real = _mm256_mul_ps(real, real);
-		imag = _mm256_mul_ps(imag, imag);
-		__m256 vsq = _mm256_add_ps(real, imag);
-		vsq = _mm256_mul_ps(vsq, vimpscale);
-
-		//Convert to dBm
-		vsq = _mm256_log_ps(vsq);
-		__m256 dbm = _mm256_fmadd_ps(vsq, vlogscale, const_30);
-
-		//Format output
-		__m256 vout = _mm256_sub_ps(dbm, vminscale);
-		vout = _mm256_mul_ps(vout, virange);
-
-		//Saturate to zero if less than min scale
-		__m256 mask = _mm256_cmp_ps(dbm, vminscale, _CMP_GE_OQ);
-		vout = _mm256_and_ps(vout, mask);
-
-		//Done, save output
-		float* blockout = pout + (i*nblocks);
-		_mm256_store_ps(blockout, vout);
-	}
-
-	//Catch any stragglers at the end
-	for(size_t i=end; i<nouts; i++)
-	{
-		float real = m_rdoutbuf[i*2 + 0];
-		float imag = m_rdoutbuf[i*2 + 1];
-		float vsq = real*real + imag*imag;
-		float dbm = (logscale * log(vsq * impscale) + 30);
-		if(dbm < minscale)
-			pout[i*nblocks] = 0;
-		else
-			pout[i*nblocks] = (dbm - minscale) * irange;
-	}
-}
-#endif /* __x86_64__ */
-
 #endif
