@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -61,7 +61,7 @@ protected:
 	std::vector<float> m_inputSums;
 	size_t m_numAverages;
 
-	ffts_plan_t* m_plan;
+	//ffts_plan_t* m_plan;
 	size_t m_cachedPlanSize;
 
 	std::vector<float, AlignedAllocator<float, 64> > m_signalinbuf;

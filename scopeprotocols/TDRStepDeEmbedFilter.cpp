@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -47,7 +47,7 @@ TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
 	//Set up channels
 	CreateInput("step");
 
-	m_plan = NULL;
+	//m_plan = NULL;
 	m_cachedPlanSize = 0;
 
 	m_numAverages = 0;
@@ -55,8 +55,8 @@ TDRStepDeEmbedFilter::TDRStepDeEmbedFilter(const string& color)
 
 TDRStepDeEmbedFilter::~TDRStepDeEmbedFilter()
 {
-	if(m_plan)
-		ffts_free(m_plan);
+	//if(m_plan)
+	//	ffts_free(m_plan);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +116,7 @@ void TDRStepDeEmbedFilter::Refresh()
 		LogDebug("No edges found, nothing to do\n");
 		return;
 	}
-	int64_t tedge = edges[0];
+	//int64_t tedge = edges[0];
 
 	//Figure out FFT size.
 	//Pad npoints if too small
@@ -126,16 +126,19 @@ void TDRStepDeEmbedFilter::Refresh()
 	const size_t nouts = npoints/2 + 1;
 
 	//New input size? Clear out old state
+	/*
 	if(m_plan && (m_cachedPlanSize != npoints) )
 	{
 		ffts_free(m_plan);
 		m_plan = NULL;
 	}
+	*/
 
 	//Reset inputs as needed
+	/*
 	if(!m_plan)
 	{
-		m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
+		//m_plan = ffts_init_1d_real(npoints, FFTS_FORWARD);
 		m_signalinbuf.resize(npoints);
 		m_signaloutbuf.resize(2*nouts);
 		m_stepinbuf.resize(npoints);
@@ -151,8 +154,9 @@ void TDRStepDeEmbedFilter::Refresh()
 				m_stepinbuf[i] = 1;
 		}
 		FFTFilter::ApplyWindow(&m_stepinbuf[0], npoints_raw, &m_stepinbuf[0], FFTFilter::WINDOW_BLACKMAN_HARRIS);
-		ffts_execute(m_plan, &m_stepinbuf[0], &m_stepoutbuf[0]);
+		//ffts_execute(m_plan, &m_stepinbuf[0], &m_stepoutbuf[0]);
 	}
+	*/
 
 	//DEBUG: remove old averages
 	//ClearSweeps();
@@ -172,7 +176,7 @@ void TDRStepDeEmbedFilter::Refresh()
 	FFTFilter::ApplyWindow(&m_signalinbuf[0], npoints_raw, &m_signalinbuf[0], FFTFilter::WINDOW_BLACKMAN_HARRIS);
 	for(size_t i=npoints_raw; i<npoints; i++)
 		m_signalinbuf[i] = 0;
-	ffts_execute(m_plan, &m_signalinbuf[0], &m_signaloutbuf[0]);
+	//ffts_execute(m_plan, &m_signalinbuf[0], &m_signaloutbuf[0]);
 
 	//Generate the de-embedding filter
 	SParameters params;
