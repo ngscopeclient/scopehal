@@ -171,13 +171,12 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
 	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 	//m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-
-	m_rdinbuf.resize(fftlen);
-	m_rdoutbuf.resize(fftlen + 2);
 }
 
 void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
+	double start = GetTime();
+
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
@@ -220,6 +219,11 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cap->m_timescale = fs_per_sample * fftlen;
 	SetData(cap, 0);
 
+	//Make sure our temporary buffers are big enough
+	m_rdinbuf.resize(fftlen * nblocks);
+	m_rdoutbuf.resize(fftlen * nouts);
+
+	//Cache a bunch of configuration
 	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	auto data = cap->GetData();
 	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
@@ -265,6 +269,9 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);*/
 
 	cap->MarkModifiedFromCpu();
+
+	double dt = GetTime() - start;
+	LogDebug("SpectrogramFilter: %.3f ms\n", dt*1e3);
 }
 
 void SpectrogramFilter::ProcessSpectrumGeneric(
