@@ -40,7 +40,7 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir)
+VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t bufferSizeMultiplier)
 	: m_size(npoints)
 	, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 {
@@ -65,15 +65,15 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_config.makeForwardPlanOnly = 1;
 
 		//output is complex buffer of full size
-		m_bsize = 2 * nouts * sizeof(float);
+		m_bsize = 2 * nouts * sizeof(float) * bufferSizeMultiplier;
 
 		//input is real buffer of full size
-		m_isize = npoints * sizeof(float);
+		m_isize = npoints * sizeof(float) * bufferSizeMultiplier;
 
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
 
-		cacheKey = string("VkFFT_FWD_V2_") + to_string(npoints);
+		cacheKey = string("VkFFT_FWD_V5_") + to_string(npoints) + "_" + to_string(bufferSizeMultiplier);
 	}
 	else
 	{
@@ -89,7 +89,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_config.inputBufferSize = &m_isize;
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_V2_") + to_string(npoints);
+		cacheKey = string("VkFFT_INV_V5_") + to_string(npoints);
 	}
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
@@ -185,9 +185,12 @@ void VulkanFFTPlan::AppendForward(
 	memset(&params, 0, sizeof(params));
 	params.inputBuffer = &inbuf;
 	params.buffer = &outbuf;
+	//params.outputBuffer = &outbuf;
 	params.commandBuffer = &cmd;
+	//params.outputBufferOffset = offsetOut;
 	params.bufferOffset = offsetOut;
-	params.tempBufferOffset = 0;	//not used
+	params.tempBufferOffset = /*offsetIn*/0;
+	//TODO: we need to make a temp buffer internally?
 	params.inputBufferOffset = offsetIn;
 
 	auto err = VkFFTAppend(&m_app, -1, &params);

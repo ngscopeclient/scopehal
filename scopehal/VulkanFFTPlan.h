@@ -62,7 +62,7 @@ public:
 		DIRECTION_REVERSE
 	};
 
-	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir);
+	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t bufferSizeMultiplier = 1);
 	~VulkanFFTPlan();
 
 	void AppendForward(
@@ -89,6 +89,8 @@ protected:
 	VkPhysicalDevice m_physicalDevice;
 	VkDevice m_device;
 	VkPipelineCache m_pipelineCache;
+
+	//Temporary buffer
 
 	vk::raii::Fence m_fence;
 	VkFence m_rawfence;

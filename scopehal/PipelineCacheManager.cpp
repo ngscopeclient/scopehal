@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -80,7 +80,7 @@ void PipelineCacheManager::FindPath()
 	}
 
 	wchar_t directory[MAX_PATH];
-	if(NULL == PathCombineW(directory, stem, L"glscopeclient"))
+	if(NULL == PathCombineW(directory, stem, L"ngscopeclient"))
 	{
 		throw runtime_error("failed to build directory path");
 	}
@@ -98,8 +98,8 @@ void PipelineCacheManager::FindPath()
 #else
 	// Ensure all directories in path exist
 	CreateDirectory("~/.cache");
-	CreateDirectory("~/.cache/glscopeclient");
-	m_cacheRootDir = ExpandPath("~/.cache/glscopeclient") + "/";
+	CreateDirectory("~/.cache/ngscopeclient");
+	m_cacheRootDir = ExpandPath("~/.cache/ngscopeclient") + "/";
 #endif
 
 	LogTrace("Cache root directory is %s\n", m_cacheRootDir.c_str());
