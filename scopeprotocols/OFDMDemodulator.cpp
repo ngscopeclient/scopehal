@@ -60,18 +60,18 @@ OFDMDemodulator::OFDMDemodulator(const string& color)
 	m_parameters[m_fftSizeName].SetIntVal(64);
 
 	m_cachedFftSize = 0;
-	m_fftPlan = NULL;
+	//m_fftPlan = NULL;
 	m_fftInputBuf = NULL;
 	m_fftOutputBuf = NULL;
 
 	//Constant 16 point FFT
-	m_fftPlan16 = ffts_init_1d(16, FFTS_FORWARD);
+	//m_fftPlan16 = ffts_init_1d(16, FFTS_FORWARD);
 }
 
 OFDMDemodulator::~OFDMDemodulator()
 {
-	ffts_free(m_fftPlan);
-	ffts_free(m_fftPlan16);
+	//ffts_free(m_fftPlan);
+	//ffts_free(m_fftPlan16);
 
 	m_allocator.deallocate(m_fftInputBuf);
 	m_allocator.deallocate(m_fftOutputBuf);

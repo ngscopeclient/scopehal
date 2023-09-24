@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,8 +37,6 @@
 #ifndef OFDMDemodulator_h
 #define OFDMDemodulator_h
 
-#include <ffts.h>
-
 class OFDMDemodulator : public Filter
 {
 public:
@@ -55,8 +53,8 @@ public:
 
 protected:
 
-	ffts_plan_t* m_fftPlan;
-	ffts_plan_t* m_fftPlan16;
+	//ffts_plan_t* m_fftPlan;
+	//ffts_plan_t* m_fftPlan16;
 	float* m_fftInputBuf;
 	float* m_fftOutputBuf;
 	int m_cachedFftSize;
