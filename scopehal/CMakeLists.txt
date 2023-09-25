@@ -227,7 +227,6 @@ target_link_libraries(scopehal
 	${GTKMM_LIBRARIES}
 	xptools
 	log
-	graphwidget
 	${YAML_LIBRARIES}
 	${LXI_LIBRARIES}
 	${LINUXGPIB_LIBRARIES}
