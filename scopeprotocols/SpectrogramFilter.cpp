@@ -27,8 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef _APPLE_SILICON
-
 #include "../scopehal/scopehal.h"
 #include "../scopehal/AlignedAllocator.h"
 #include "SpectrogramFilter.h"
@@ -369,4 +367,3 @@ void SpectrogramFilter::ProcessSpectrumGeneric(
 			data[i*nblocks + block] = (dbm - minscale) * irange;
 	}
 }
-#endif

@@ -27,8 +27,6 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef _APPLE_SILICON
-
 /**
 	@file
 	@author Andrew D. Zonenberg
@@ -109,7 +107,5 @@ protected:
 	ComputePipeline m_rectangularComputePipeline;
 	ComputePipeline m_cosineSumComputePipeline;
 };
-
-#endif
 
 #endif

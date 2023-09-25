@@ -168,9 +168,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(SNRFilter);
 	AddDecoderClass(SParameterCascadeFilter);
 	AddDecoderClass(SParameterDeEmbedFilter);
-#ifndef _APPLE_SILICON
 	AddDecoderClass(SpectrogramFilter);
-#endif
 	AddDecoderClass(SPIDecoder);
 	AddDecoderClass(SPIFlashDecoder);
 	AddDecoderClass(SquelchFilter);
