@@ -195,11 +195,11 @@ public:
 
 	virtual void AutoscaleVertical(size_t stream);
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual void SetVoltageRange(float range, size_t stream);
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual void SetVoltageRange(float range, size_t stream) override;
 
-	virtual float GetOffset(size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	virtual float GetOffset(size_t stream) override;
+	virtual void SetOffset(float offset, size_t stream) override;
 
 protected:
 	std::vector<float> m_ranges;
