@@ -128,7 +128,7 @@ public:
 		m_instanceCount[GetProtocolDisplayName()] --;
 	}
 
-	virtual void ClearStreams();
+	virtual void ClearStreams() override;
 	virtual size_t AddStream(Unit yunit, const std::string& name, Stream::StreamType stype, uint8_t flags = 0) override;
 
 	void AddProtocolStream(const std::string& name)
@@ -158,8 +158,8 @@ public:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Reference counting
 
-	virtual void AddRef();
-	virtual void Release();
+	virtual void AddRef() override;
+	virtual void Release() override;
 
 	size_t GetRefCount()
 	{ return m_refcount; }
@@ -210,11 +210,11 @@ public:
 	// Serialization
 
 	/**
-		@brief Serialize this decoder's configuration to a string
+		@brief Serialize this filter's configuration to a string
 	 */
-	virtual YAML::Node SerializeConfiguration(IDTable& table);
+	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
 
-	virtual void LoadParameters(const YAML::Node& node, IDTable& table);
+	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
 
 protected:
 
@@ -1111,7 +1111,7 @@ protected:
 	{ \
 		return new T(color); \
 	} \
-	virtual std::string GetProtocolDisplayName() \
+	virtual std::string GetProtocolDisplayName() override \
 	{ return GetProtocolName(); }
 
 #define AddDecoderClass(T) Filter::DoAddDecoderClass(T::GetProtocolName(), T::CreateInstance)

@@ -47,8 +47,8 @@ public:
 
 	virtual void Refresh() override;
 
-	virtual std::vector<std::string> EnumActions();
-	virtual void PerformAction(const std::string& id);
+	virtual std::vector<std::string> EnumActions() override;
+	virtual void PerformAction(const std::string& id) override;
 
 protected:
 
