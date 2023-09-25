@@ -47,9 +47,6 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	memset(&m_app, 0, sizeof(m_app));
 	memset(&m_config, 0, sizeof(m_config));
 
-	m_tempBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
-	m_tempBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-
 	//Create a command pool for initialization use
 	vk::CommandPoolCreateInfo poolInfo(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -98,11 +95,6 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 
 		cacheKey = string("VkFFT_INV_V6_") + to_string(npoints);
 	}
-
-	//Allocate temp buffer
-	//m_config.userTempBuffer = 1;
-	//m_tempBuf.resize(m_tsize);
-	//m_config.tempBufferSize = &m_tsize;
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
 	QueueLock queuelock(g_vkTransferQueue);
@@ -189,7 +181,6 @@ void VulkanFFTPlan::AppendForward(
 	//Extract raw handles of all of our Vulkan objects
 	VkBuffer inbuf = dataIn.GetBuffer();
 	VkBuffer outbuf = dataOut.GetBuffer();
-	VkBuffer tempbuf = m_tempBuf.GetBuffer();
 	VkCommandBuffer cmd = *cmdBuf;
 
 	VkFFTLaunchParams params;
@@ -197,7 +188,6 @@ void VulkanFFTPlan::AppendForward(
 	params.inputBuffer = &inbuf;
 	params.buffer = &outbuf;
 	params.commandBuffer = &cmd;
-	//params.tempBuffer = &tempbuf;
 
 	auto err = VkFFTAppend(&m_app, -1, &params);
 	if(VKFFT_SUCCESS != err)

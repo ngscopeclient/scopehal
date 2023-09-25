@@ -88,9 +88,6 @@ protected:
 	VkDevice m_device;
 	VkPipelineCache m_pipelineCache;
 
-	//Temporary buffer
-	AcceleratorBuffer<float> m_tempBuf;
-
 	vk::raii::Fence m_fence;
 	VkFence m_rawfence;
 
