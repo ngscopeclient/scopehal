@@ -39,7 +39,7 @@ public:
 	PowerSupply();
 	virtual ~PowerSupply();
 
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() override;
 
 	//Device capabilities
 	/**

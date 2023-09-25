@@ -69,7 +69,7 @@ public:
 	Waterfall(const Waterfall&) =delete;
 	Waterfall& operator=(const Waterfall&) =delete;
 
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
 
