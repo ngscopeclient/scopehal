@@ -155,6 +155,24 @@ public:
 		cmdBuf.dispatch(x, y, z);
 	}
 
+	/**
+		@brief Dispatches a compute operation to a command buffer, but does *not* update/bind descriptors or pipelines
+
+		Intended for repeat invocations of the same pipeline in a single command buffer, with different push constants.
+
+		Must be called immediately after a Dispatch() call.
+	 */
+	template<class T>
+	void DispatchNoRebind(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
+	{
+		cmdBuf.pushConstants<T>(
+			**m_pipelineLayout,
+			vk::ShaderStageFlagBits::eCompute,
+			0,
+			pushConstants);
+		cmdBuf.dispatch(x, y, z);
+	}
+
 protected:
 	void DeferredInit();
 
