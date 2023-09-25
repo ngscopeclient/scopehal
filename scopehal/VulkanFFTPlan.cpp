@@ -40,12 +40,15 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t bufferSizeMultiplier)
+VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t numBatches)
 	: m_size(npoints)
 	, m_fence(*g_vkComputeDevice, vk::FenceCreateInfo())
 {
 	memset(&m_app, 0, sizeof(m_app));
 	memset(&m_config, 0, sizeof(m_config));
+
+	m_tempBuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
+	m_tempBuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 
 	//Create a command pool for initialization use
 	vk::CommandPoolCreateInfo poolInfo(
@@ -59,38 +62,47 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_config.size[1] = 1;
 	m_config.size[2] = 1;
 
+	m_config.numberBatches = numBatches;
+
 	string cacheKey;
 	if(dir == DIRECTION_FORWARD)
 	{
 		m_config.makeForwardPlanOnly = 1;
 
 		//output is complex buffer of full size
-		m_bsize = 2 * nouts * sizeof(float) * bufferSizeMultiplier;
+		m_bsize = 2 * nouts * sizeof(float) * numBatches;
+		m_tsize = m_bsize;
 
 		//input is real buffer of full size
-		m_isize = npoints * sizeof(float) * bufferSizeMultiplier;
+		m_isize = npoints * sizeof(float) * numBatches;
 
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
 
-		cacheKey = string("VkFFT_FWD_V5_") + to_string(npoints) + "_" + to_string(bufferSizeMultiplier);
+		cacheKey = string("VkFFT_FWD_V6_") + to_string(npoints) + "_" + to_string(numBatches);
 	}
 	else
 	{
 		m_config.makeInversePlanOnly = 1;
 
 		//input is complex buffer of full size
-		m_isize = 2 * nouts * sizeof(float);
+		m_isize = 2 * nouts * sizeof(float) * numBatches;
+		m_tsize = m_isize;
 
 		//output is real buffer of full size
-		m_bsize = npoints * sizeof(float);
+		m_bsize = npoints * sizeof(float) * numBatches;
 
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_V5_") + to_string(npoints);
+		cacheKey = string("VkFFT_INV_V6_") + to_string(npoints);
 	}
+
+	//Allocate temp buffer
+	//m_config.userTempBuffer = 1;
+	//m_tempBuf.resize(m_tsize);
+	//m_config.tempBufferSize = &m_tsize;
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
 	QueueLock queuelock(g_vkTransferQueue);
@@ -119,7 +131,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_config.fence = &m_rawfence;
 	m_config.isCompilerInitialized = 1;
 	m_config.isInputFormatted = 1;
-	m_config.specifyOffsetsAtLaunch = 1;
+	m_config.specifyOffsetsAtLaunch = 0;
 	m_config.pipelineCache = &m_pipelineCache;
 
 	//We have "C" locale all the time internally, so no need to setlocale() in the library
@@ -168,9 +180,7 @@ VulkanFFTPlan::~VulkanFFTPlan()
 void VulkanFFTPlan::AppendForward(
 	AcceleratorBuffer<float>& dataIn,
 	AcceleratorBuffer<float>& dataOut,
-	vk::raii::CommandBuffer& cmdBuf,
-	uint64_t offsetIn,
-	uint64_t offsetOut
+	vk::raii::CommandBuffer& cmdBuf
 	)
 {
 	dataIn.PrepareForGpuAccess();
@@ -179,19 +189,15 @@ void VulkanFFTPlan::AppendForward(
 	//Extract raw handles of all of our Vulkan objects
 	VkBuffer inbuf = dataIn.GetBuffer();
 	VkBuffer outbuf = dataOut.GetBuffer();
+	VkBuffer tempbuf = m_tempBuf.GetBuffer();
 	VkCommandBuffer cmd = *cmdBuf;
 
 	VkFFTLaunchParams params;
 	memset(&params, 0, sizeof(params));
 	params.inputBuffer = &inbuf;
 	params.buffer = &outbuf;
-	//params.outputBuffer = &outbuf;
 	params.commandBuffer = &cmd;
-	//params.outputBufferOffset = offsetOut;
-	params.bufferOffset = offsetOut;
-	params.tempBufferOffset = /*offsetIn*/0;
-	//TODO: we need to make a temp buffer internally?
-	params.inputBufferOffset = offsetIn;
+	//params.tempBuffer = &tempbuf;
 
 	auto err = VkFFTAppend(&m_app, -1, &params);
 	if(VKFFT_SUCCESS != err)

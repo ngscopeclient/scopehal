@@ -78,7 +78,7 @@ public:
 	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
 
 protected:
-	void ReallocateBuffers(size_t fftlen);
+	void ReallocateBuffers(size_t fftlen, size_t nblocks);
 
 	AcceleratorBuffer<float> m_rdinbuf;
 	AcceleratorBuffer<float> m_rdoutbuf;
@@ -93,6 +93,7 @@ protected:
 		float* data);
 
 	size_t m_cachedFFTLength;
+	size_t m_cachedFFTNumBlocks;
 
 	float m_range;
 	float m_offset;

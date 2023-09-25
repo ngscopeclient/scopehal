@@ -62,15 +62,13 @@ public:
 		DIRECTION_REVERSE
 	};
 
-	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t bufferSizeMultiplier = 1);
+	VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirection dir, size_t numBatches = 1);
 	~VulkanFFTPlan();
 
 	void AppendForward(
 		AcceleratorBuffer<float>& dataIn,
 		AcceleratorBuffer<float>& dataOut,
-		vk::raii::CommandBuffer& cmdBuf,
-		uint64_t offsetIn = 0,
-		uint64_t offsetOut = 0);
+		vk::raii::CommandBuffer& cmdBuf);
 
 	void AppendReverse(
 		AcceleratorBuffer<float>& dataIn,
@@ -91,11 +89,13 @@ protected:
 	VkPipelineCache m_pipelineCache;
 
 	//Temporary buffer
+	AcceleratorBuffer<float> m_tempBuf;
 
 	vk::raii::Fence m_fence;
 	VkFence m_rawfence;
 
 	uint64_t m_bsize;
+	uint64_t m_tsize;
 	uint64_t m_isize;
 };
 

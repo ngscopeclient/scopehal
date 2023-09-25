@@ -74,6 +74,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_range = 1e9;
 	m_offset = -5e8;
 	m_cachedFFTLength = 0;
+	m_cachedFFTNumBlocks = 0;
 
 	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
 	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", FFTFilter::WINDOW_BLACKMAN_HARRIS);
@@ -151,9 +152,10 @@ string SpectrogramFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
+void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 {
 	m_cachedFFTLength = fftlen;
+	m_cachedFFTNumBlocks = nblocks;
 
 	size_t nouts = fftlen/2 + 1;
 	if(m_vkPlan)
@@ -162,7 +164,7 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen)
 			m_vkPlan = nullptr;
 	}
 	if(!m_vkPlan)
-		m_vkPlan = make_unique<VulkanFFTPlan>(fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD);
+		m_vkPlan = make_unique<VulkanFFTPlan>(fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD, nblocks);
 
 	//TODO: tweak
 	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
@@ -189,9 +191,10 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	//For now, consecutive blocks and not a sliding window
 	size_t inlen = din->size();
 	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
-	if(fftlen != m_cachedFFTLength)
-		ReallocateBuffers(fftlen);
-	size_t nblocks = inlen / fftlen;
+	size_t nblocks = floor(inlen * 1.0 / fftlen);
+
+	if( (fftlen != m_cachedFFTLength) || (nblocks != m_cachedFFTNumBlocks) )
+		ReallocateBuffers(fftlen, nblocks);
 
 	//Figure out range of the FFTs
 	double fs_per_sample = din->m_timescale;
@@ -220,8 +223,9 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	SetData(cap, 0);
 
 	//Make sure our temporary buffers are big enough
-	m_rdinbuf.resize(fftlen * nblocks);
-	m_rdoutbuf.resize(fftlen * nouts);
+	//TODO: why do we have to expand the input buffer? why are we getting garbage at the end?
+	m_rdinbuf.resize((nblocks+1) * fftlen);
+	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
 	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
@@ -230,43 +234,34 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
 	float range = fullscale - minscale;
 
-	//Run the FFTs
+	//Grab the input and apply the window function
+	//TODO gpu ify
 	for(size_t block=0; block<nblocks; block++)
-	{
-		//Grab the input and apply the window function
-		//TODO gpu ify
-		FFTFilter::ApplyWindow((float*)&din->m_samples[block*fftlen], fftlen, &m_rdinbuf[0], window);
-		m_rdinbuf.MarkModifiedFromCpu();
+		FFTFilter::ApplyWindow((float*)&din->m_samples[block*fftlen], fftlen, &m_rdinbuf[block*fftlen], window);
 
+	m_rdinbuf.MarkModifiedFromCpu();
 
-		//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
-		cmdBuf.reset();
-		cmdBuf.begin({});
+	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
+	cmdBuf.begin({});
+	m_rdinbuf.PrepareForGpuAccessNonblocking(false, cmdBuf);
 
-		m_rdinbuf.PrepareForGpuAccessNonblocking(false, cmdBuf);
+	//Do the actual FFT
+	m_vkPlan->AppendForward(
+		m_rdinbuf,
+		m_rdoutbuf,
+		cmdBuf);
 
-		//Input was modified from CPU
-		m_vkPlan->AppendForward(
-			m_rdinbuf,
-			m_rdoutbuf,
-			cmdBuf,
-			/*block*fftlen*sizeof(float)*/0,
-			/*block*fftlen*sizeof(float)*2*/0);
+	//Done, block until the compute operations finish
+	cmdBuf.end();
+	queue->SubmitAndBlock(cmdBuf);
 
-		//Done, block until the compute operations finish
-		cmdBuf.end();
-		queue->SubmitAndBlock(cmdBuf);
-
-		m_rdoutbuf.MarkModifiedFromGpu();
-		m_rdoutbuf.PrepareForCpuAccess();
-		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
-	}
-
-	//Temp: hack the output on the CPU
-	/*m_rdoutbuf.MarkModifiedFromGpu();
+	//Temp: Process the output on the CPU
+	//For some reason the last block seems to be corrupted, not sure why!
+	//Don't include it for the moment
+	m_rdoutbuf.MarkModifiedFromGpu();
 	m_rdoutbuf.PrepareForCpuAccess();
-	for(size_t block=0; block<nblocks; block++)
-		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);*/
+	for(size_t block=0; block<(nblocks-1); block++)
+		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
 
 	cap->MarkModifiedFromCpu();
 
@@ -290,10 +285,11 @@ void SpectrogramFilter::ProcessSpectrumGeneric(
 	const float irange = 1.0 / range;
 	const float impscale = scale*scale * inverse_impedance;
 
+	size_t base = nouts * block * 2;
 	for(size_t i=0; i<nouts; i++)
 	{
-		float real = m_rdoutbuf[i*2 + 0];
-		float imag = m_rdoutbuf[i*2 + 1];
+		float real = m_rdoutbuf[base + i*2 + 0];
+		float imag = m_rdoutbuf[base + i*2 + 1];
 		float vsq = real*real + imag*imag;
 		float dbm = (logscale * log(vsq * impscale) + 30);
 		if(dbm < minscale)
