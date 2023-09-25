@@ -47,6 +47,8 @@ struct WindowFunctionArgs
 {
 	uint32_t numActualSamples;
 	uint32_t npoints;
+	uint32_t offsetIn;
+	uint32_t offsetOut;
 	float scale;
 	float alpha0;
 	float alpha1;

@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,6 +44,8 @@ layout(std430, push_constant) uniform constants
 {
 	uint numActualSamples;
 	uint npoints;
+	uint offsetIn;
+	uint offsetOut;
 
 	//not used in rectangular window, only for interface compatibility
 	float scale;
@@ -61,9 +63,9 @@ void main()
 
 	//If off end of input, zero fill
 	else if(gl_GlobalInvocationID.x >= numActualSamples)
-		dout[gl_GlobalInvocationID.x] = 0;
+		dout[gl_GlobalInvocationID.x + offsetOut] = 0;
 
 	//Nope, copy it
 	else
-		dout[gl_GlobalInvocationID.x] = din[gl_GlobalInvocationID.x];
+		dout[gl_GlobalInvocationID.x + offsetOut] = din[gl_GlobalInvocationID.x + offsetIn];
 }

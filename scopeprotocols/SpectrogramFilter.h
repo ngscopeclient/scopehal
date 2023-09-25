@@ -104,6 +104,10 @@ protected:
 	std::string m_rangeMaxName;
 
 	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
+
+	ComputePipeline m_blackmanHarrisComputePipeline;
+	ComputePipeline m_rectangularComputePipeline;
+	ComputePipeline m_cosineSumComputePipeline;
 };
 
 #endif

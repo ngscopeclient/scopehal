@@ -278,6 +278,8 @@ void FFTFilter::DoRefresh(
 		args.numActualSamples = numActualSamples;
 		args.npoints = npoints;
 		args.scale = 2 * M_PI / numActualSamples;
+		args.offsetIn = 0;
+		args.offsetOut = 0;
 		switch(window)
 		{
 			case WINDOW_HANN:

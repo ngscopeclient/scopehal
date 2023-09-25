@@ -64,6 +64,9 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	, m_fftLengthName("FFT length")
 	, m_rangeMinName("Range Min")
 	, m_rangeMaxName("Range Max")
+	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
 {
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_SPECTROGRAM);
 
@@ -77,11 +80,11 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	m_cachedFFTNumBlocks = 0;
 
 	m_parameters[m_windowName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", FFTFilter::WINDOW_BLACKMAN_HARRIS);
-	m_parameters[m_windowName].AddEnumValue("Hamming", FFTFilter::WINDOW_HAMMING);
-	m_parameters[m_windowName].AddEnumValue("Hann", FFTFilter::WINDOW_HANN);
-	m_parameters[m_windowName].AddEnumValue("Rectangular", FFTFilter::WINDOW_RECTANGULAR);
-	m_parameters[m_windowName].SetIntVal(FFTFilter::WINDOW_BLACKMAN_HARRIS);
+	m_parameters[m_windowName].AddEnumValue("Blackman-Harris", FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
+	m_parameters[m_windowName].AddEnumValue("Hamming", FFTFilter::FFTFilter::WINDOW_HAMMING);
+	m_parameters[m_windowName].AddEnumValue("Hann", FFTFilter::FFTFilter::WINDOW_HANN);
+	m_parameters[m_windowName].AddEnumValue("Rectangular", FFTFilter::FFTFilter::WINDOW_RECTANGULAR);
+	m_parameters[m_windowName].SetIntVal(FFTFilter::FFTFilter::WINDOW_BLACKMAN_HARRIS);
 
 	m_parameters[m_fftLengthName] = FilterParameter(FilterParameter::TYPE_ENUM, Unit(Unit::UNIT_SAMPLEDEPTH));
 	m_parameters[m_fftLengthName].AddEnumValue("64", 64);
@@ -222,28 +225,96 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cap->m_timescale = fs_per_sample * fftlen;
 	SetData(cap, 0);
 
+	//We also need to adjust the scale by the coherent power gain of the window function
+	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
+	switch(window)
+	{
+		case FFTFilter::WINDOW_HAMMING:
+			scale *= 1.862;
+			break;
+
+		case FFTFilter::WINDOW_HANN:
+			scale *= 2.013;
+			break;
+
+		case FFTFilter::WINDOW_BLACKMAN_HARRIS:
+			scale *= 2.805;
+			break;
+
+		//unit
+		case FFTFilter::WINDOW_RECTANGULAR:
+		default:
+			break;
+	}
+
+	//Configure the window
+	WindowFunctionArgs args;
+	args.numActualSamples = fftlen;
+	args.npoints = fftlen;
+	args.scale = 2 * M_PI / fftlen;
+	switch(window)
+	{
+		case FFTFilter::WINDOW_HANN:
+			args.alpha0 = 0.5;
+			break;
+
+		case FFTFilter::WINDOW_HAMMING:
+			args.alpha0 = 25.0f / 46;
+			break;
+
+		default:
+			args.alpha0 = 0;
+			break;
+	}
+	args.alpha1 = 1 - args.alpha0;
+
+	//Figure out which window shader to use
+	ComputePipeline* wpipe = nullptr;
+	switch(window)
+	{
+		case FFTFilter::WINDOW_BLACKMAN_HARRIS:
+			wpipe = &m_blackmanHarrisComputePipeline;
+			break;
+
+		case FFTFilter::WINDOW_HANN:
+		case FFTFilter::WINDOW_HAMMING:
+			wpipe = &m_cosineSumComputePipeline;
+			break;
+
+		default:
+		case FFTFilter::WINDOW_RECTANGULAR:
+			wpipe = &m_rectangularComputePipeline;
+			break;
+	}
+
 	//Make sure our temporary buffers are big enough
 	//TODO: why do we have to expand the input buffer? why are we getting garbage at the end?
 	m_rdinbuf.resize((nblocks+1) * fftlen);
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
-	auto window = static_cast<FFTFilter::WindowFunction>(m_parameters[m_windowName].GetIntVal());
 	auto data = cap->GetData();
 	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
 	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
 	float range = fullscale - minscale;
 
-	//Grab the input and apply the window function
-	//TODO gpu ify
-	for(size_t block=0; block<nblocks; block++)
-		FFTFilter::ApplyWindow((float*)&din->m_samples[block*fftlen], fftlen, &m_rdinbuf[block*fftlen], window);
-
-	m_rdinbuf.MarkModifiedFromCpu();
-
 	//Prepare to do all of our compute stuff in one dispatch call to reduce overhead
 	cmdBuf.begin({});
-	m_rdinbuf.PrepareForGpuAccessNonblocking(false, cmdBuf);
+
+	//Grab the input and apply the window function
+	wpipe->BindBufferNonblocking(0, din->m_samples, cmdBuf);
+	wpipe->BindBufferNonblocking(1, m_rdinbuf, cmdBuf, true);
+	for(size_t block=0; block<nblocks; block++)
+	{
+		args.offsetIn = block*fftlen;
+		args.offsetOut = block*fftlen;
+
+		if(block == 0)
+			wpipe->Dispatch(cmdBuf, args, GetComputeBlockCount(fftlen, 64));
+		else
+			wpipe->DispatchNoRebind(cmdBuf, args, GetComputeBlockCount(fftlen, 64));
+	}
+	wpipe->AddComputeMemoryBarrier(cmdBuf);
 
 	//Do the actual FFT
 	m_vkPlan->AppendForward(
