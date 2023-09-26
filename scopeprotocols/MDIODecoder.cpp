@@ -53,6 +53,7 @@ MDIODecoder::MDIODecoder(const string& color)
 	m_parameters[m_typename].AddEnumValue("Generic", PHY_TYPE_GENERIC);
 	m_parameters[m_typename].AddEnumValue("DP83867", PHY_TYPE_DP83867);
 	m_parameters[m_typename].AddEnumValue("KSZ9031", PHY_TYPE_KSZ9031);
+	m_parameters[m_typename].AddEnumValue("VSC8512", PHY_TYPE_VSC8512);
 	m_parameters[m_typename].SetIntVal(PHY_TYPE_GENERIC);
 }
 
@@ -109,6 +110,20 @@ void MDIODecoder::Refresh()
 	//Maintain MMD state across transactions
 	int mmd_dev = 0;
 	bool mmd_is_reg = false;
+
+	//Context for VSC8512 (not used for other PHYs)
+	int vsc8512_page = 0;
+	enum vsc_page_t
+	{
+		VSC_PAGE_MAIN				= 0x0000,
+		VSC_PAGE_EXT2				= 0x0002,
+		VSC_PAGE_EXT3				= 0x0003,
+
+		VSC_PAGE_GENERAL_PURPOSE	= 0x0010,
+		VSC_PAGE_TEST				= 0x2a30,
+		VSC_PAGE_TR					= 0x52b5
+	};
+
 
 	//Sample the data stream at each clock edge
 	SparseDigitalWaveform dmdio;
@@ -302,6 +317,7 @@ void MDIODecoder::Refresh()
 			{
 				//802.3 Basic Control
 				case 0x00:
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
 					{
 						info = "Basic Control: ";
 
@@ -354,41 +370,43 @@ void MDIODecoder::Refresh()
 
 				//802.3 Basic Status
 				case 0x1:
-					info = "Basic Status: ";
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+					{
+						info = "Basic Status: ";
 
-					if(value & 0x4)
-						info += "Up ";
-					else
-						info += "Down ";
-					if(value & 0x20)
-						info += "AnegDone ";
+						if(value & 0x4)
+							info += "Up ";
+						else
+							info += "Down ";
+						if(value & 0x20)
+							info += "AnegDone ";
 
-					if(value & 0x0100)
-						info += "ExtStatus ";
-					if(value & 0x01)
-						info += "ExtCaps ";
+						if(value & 0x0100)
+							info += "ExtStatus ";
+						if(value & 0x01)
+							info += "ExtCaps ";
 
-					if(value & 0x0040)
-						info += "PreambleSupp ";
-					if(value & 0x10)
-						info += "RemoteFault ";
-					if(value & 0x08)
-						info += "AnegCapable ";
-					if(value & 0x02)
-						info += "JabberDetect ";
+						if(value & 0x0040)
+							info += "PreambleSupp ";
+						if(value & 0x10)
+							info += "RemoteFault ";
+						if(value & 0x08)
+							info += "AnegCapable ";
+						if(value & 0x02)
+							info += "JabberDetect ";
 
-					info += "PMAs: ";
-					if(value & 0x8000)
-						info += "100baseT4 ";
-					if(value & 0x4000)
-						info += "100baseTX/full ";
-					if(value & 0x2000)
-						info += "100baseTX/half ";
-					if(value & 0x1000)
-						info += "10baseT/full ";
-					if(value & 0x0800)
-						info += "10baseT/half ";
-
+						info += "PMAs: ";
+						if(value & 0x8000)
+							info += "100baseT4 ";
+						if(value & 0x4000)
+							info += "100baseTX/full ";
+						if(value & 0x2000)
+							info += "100baseTX/half ";
+						if(value & 0x1000)
+							info += "10baseT/full ";
+						if(value & 0x0800)
+							info += "10baseT/half ";
+					}
 					break;
 
 				//PHY ID
@@ -401,6 +419,13 @@ void MDIODecoder::Refresh()
 								info += ": ERROR, should be 0x0022 for KSZ9031";
 							else
 								info += ": Kendin/Micrel/Microchip";
+							break;
+
+						case PHY_TYPE_VSC8512:
+							if(value != 0x0007)
+								info += ": ERROR, should be 0x0007 for VSC8512";
+							else
+								info += ": Vitesse/Microchip";
 							break;
 
 						default:
@@ -424,6 +449,18 @@ void MDIODecoder::Refresh()
 							}
 							break;
 
+						case PHY_TYPE_VSC8512:
+							if( ((value >> 10) & 0x3f) != 0x1)
+								info += ": ERROR, vendor ID should be 0x1 for VSC8512";
+							else
+							{
+								if( ((value >> 4) & 0x3f) != 0x2e)
+									info += ": ERROR, model ID should be 0x2e for VSC8512";
+								else
+									info += string(": VSC8512 stepping ") + to_string(value & 0xf);
+							}
+							break;
+
 						default:
 							break;
 					}
@@ -431,104 +468,119 @@ void MDIODecoder::Refresh()
 
 				//Autonegotiation
 				case 0x4:
-					info = "ANEG Advertisement: ";
-					if( (value & 0x1F) != 1)
-						info += "NotEthernet ";
-					if(value & 0x8000)
-						info += "NextPage ";
-					if(value & 0x2000)
-						info += "RemFltSupp ";
-					if(value & 0x0800)
-						info += "AsymPause ";
-					if(value & 0x0400)
-						info += "SymPause ";
-					if(value & 0x0200)
-						info += "100baseT4 ";
-					if(value & 0x0100)
-						info += "100baseTX/full ";
-					if(value & 0x0080)
-						info += "100baseTX/half ";
-					if(value & 0x0040)
-						info += "10baseTX/full ";
-					if(value & 0x0020)
-						info += "10baseTX/half ";
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+					{
+						info = "ANEG Advertisement: ";
+						if( (value & 0x1F) != 1)
+							info += "NotEthernet ";
+						if(value & 0x8000)
+							info += "NextPage ";
+						if(value & 0x2000)
+							info += "RemFltSupp ";
+						if(value & 0x0800)
+							info += "AsymPause ";
+						if(value & 0x0400)
+							info += "SymPause ";
+						if(value & 0x0200)
+							info += "100baseT4 ";
+						if(value & 0x0100)
+							info += "100baseTX/full ";
+						if(value & 0x0080)
+							info += "100baseTX/half ";
+						if(value & 0x0040)
+							info += "10baseTX/full ";
+						if(value & 0x0020)
+							info += "10baseTX/half ";
+					}
 					break;
-				case 0x5:
-					info = "ANEG Partner Ability";
 
-					if( (value & 0x1F) != 1)
-						info += "NotEthernet ";
-					if(value & 0x8000)
-						info += "NextPage ";
-					if(value & 0x4000)
-						info += "ACK ";
-					if(value & 0x2000)
-						info += "RemoteFault ";
-					if(value & 0x0800)
-						info += "AsymPause ";
-					if(value & 0x0400)
-						info += "SymPause ";
-					if(value & 0x0200)
-						info += "100baseT4 ";
-					if(value & 0x0100)
-						info += "100baseTX/full ";
-					if(value & 0x0080)
-						info += "100baseTX/half ";
-					if(value & 0x0040)
-						info += "10baseTX/full ";
-					if(value & 0x0020)
-						info += "10baseTX/half ";
+				case 0x5:
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+					{
+						info = "ANEG Partner Ability";
+
+						if( (value & 0x1F) != 1)
+							info += "NotEthernet ";
+						if(value & 0x8000)
+							info += "NextPage ";
+						if(value & 0x4000)
+							info += "ACK ";
+						if(value & 0x2000)
+							info += "RemoteFault ";
+						if(value & 0x0800)
+							info += "AsymPause ";
+						if(value & 0x0400)
+							info += "SymPause ";
+						if(value & 0x0200)
+							info += "100baseT4 ";
+						if(value & 0x0100)
+							info += "100baseTX/full ";
+						if(value & 0x0080)
+							info += "100baseTX/half ";
+						if(value & 0x0040)
+							info += "10baseTX/full ";
+						if(value & 0x0020)
+							info += "10baseTX/half ";
+					}
 					break;
 				case 0x6:
-					info = "ANEG Expansion";
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+						info = "ANEG Expansion";
 					break;
 				case 0x7:
-					info = "ANEG Next Page";
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+						info = "ANEG Next Page";
 					break;
 				case 0x8:
-					info = "ANEG Partner Next Page";
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
+						info = "ANEG Partner Next Page";
 					break;
 
 				//1000base-T
 				case 0x9:
-					info = "1000base-T Control: ";
-					if( (value >> 13) != 0)
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
 					{
-						snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
-						info += tmp;
-					}
+						info = "1000base-T Control: ";
+						if( (value >> 13) != 0)
+						{
+							snprintf(tmp, sizeof(tmp), "Test mode %d, ", value >> 13);
+							info += tmp;
+						}
 
-					if(value & 0x1000)
-					{
-						if(value & 0x0800)
-							info += "Force master";
+						if(value & 0x1000)
+						{
+							if(value & 0x0800)
+								info += "Force master";
+							else
+								info += "Force slave";
+						}
 						else
-							info += "Force slave";
-					}
-					else
-					{
-						if(value & 0x0400)
-							info += "Prefer master";
-						else
-							info += "Prefer slave";
+						{
+							if(value & 0x0400)
+								info += "Prefer master";
+							else
+								info += "Prefer slave";
+						}
 					}
 					break;
 
 				case 0xa:
-					info = "1000base-T Status: ";
-
-					if(value & 0x4000)
-						info += "Master, ";
-					else
-						info += "Slave, ";
-
-					//TODO: other fields
-
+					if( (phytype != PHY_TYPE_VSC8512) || (vsc8512_page == VSC_PAGE_MAIN) )
 					{
-						snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
-						info += tmp;
-					}
+						info = "1000base-T Status: ";
 
+						if(value & 0x4000)
+							info += "Master, ";
+						else
+							info += "Slave, ";
+
+						//TODO: other fields
+
+						{
+							snprintf(tmp, sizeof(tmp), "Err count: %d", value & 0xff);
+							info += tmp;
+						}
+					}
 					break;
 
 				//MMD stuff
@@ -584,7 +636,199 @@ void MDIODecoder::Refresh()
 						info += "1000base-T/half ";
 					break;
 
-				//TODO: support for PHY vendor specific registers if we know the PHY ID (or are told)
+				case 0x10:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						switch(vsc8512_page)
+						{
+							case VSC_PAGE_EXT2:
+								info += "Cu PMD TX: ";
+								info += string("1000baseT trim 0x") + to_string_hex( (value >> 12) & 0xf);
+								info += string(" 100baseTX trim 0x") + to_string_hex( (value >> 8) & 0xf);
+								info += string(" 10baseT trim 0x") + to_string_hex( (value >> 4) & 0xf);
+								info += string(" 10baseTe trim 0x") + to_string_hex( (value >> 0) & 0xf);
+								break;
+						}
+					}
+					break;
+
+				case 0x12:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						switch(vsc8512_page)
+						{
+							case VSC_PAGE_GENERAL_PURPOSE:
+								info += "Command/SERDES: ";
+								switch(value)
+								{
+									case 0x80a0:
+										info += "12 PHY QSGMII";
+										break;
+
+									case 0x80b0:
+										info += "12 PHY SGMII";
+										break;
+
+									//TODO: 4 PHY baseX modes from table 77
+
+									default:
+										info += "Reserved";
+								}
+								break;
+						}
+					}
+					break;
+
+				case 0x13:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						switch(vsc8512_page)
+						{
+							case VSC_PAGE_GENERAL_PURPOSE:
+								info += "MAC mode: ";
+								switch(value >> 14)
+								{
+									case 0:
+										info += "QSGMII to baseT";
+										break;
+
+									case 0x1:
+										info += "SGMII to baseT";
+										break;
+
+									case 0x2:
+										info += "QSGMII to baseT + fiber";
+										break;
+
+									default:
+										info += "Reserved";
+								}
+
+								info += " Fast link failure ";
+								if( (value & 0xf) >= 12)
+									info += "disabled";
+								else
+									info += string("PHY") + to_string(value & 0xf);
+
+								break;
+						}
+					}
+					break;
+
+				case 0x14:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						switch(vsc8512_page)
+						{
+							case VSC_PAGE_MAIN:
+								info += string("Extended Ctrl/Stat: 100/1000 false error count = ") +
+									to_string(value & 0xff);
+								break;
+						}
+					}
+					break;
+
+				case 0x18:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						switch(vsc8512_page)
+						{
+							case VSC_PAGE_MAIN:
+								info += string("Extended Ctrl/Stat 2: ");
+
+								info += "100baseTX edge rate ";
+								switch(value >> 13)
+								{
+									case 7:
+										info += "+1";
+										break;
+									case 0:
+										info += "+2";
+										break;
+									case 1:
+										info += "+3";
+										break;
+									case 2:
+										info += "+4";
+										break;
+									case 3:
+										info += "+5";
+										break;
+									case 6:
+										info += "Default";
+										break;
+									case 5:
+										info += "-1";
+										break;
+									case 4:
+										info += "-2";
+										break;
+								}
+
+								switch( (value >> 4) & 1)
+								{
+									case 0:
+										info += " 1500 byte MTU";
+										break;
+
+									case 1:
+										info += " 9 kB MTU";
+										break;
+
+									case 2:
+										info += " 12 kB MTU";
+										break;
+								}
+
+								if(value & 1)
+									info += " ConnectorLoopback";
+
+								break; //VSC_PAGE_MAIN
+
+							default:
+								break;
+
+						}
+					}
+					break;
+
+				case 0x1f:
+					if(phytype == PHY_TYPE_VSC8512)
+					{
+						vsc8512_page = value;
+						pack->m_displayBackgroundColor = m_backgroundColors[PROTO_COLOR_CONTROL];
+
+						info = "Page select: ";
+						switch(value)
+						{
+							case VSC_PAGE_MAIN:
+								info += "Main";
+								break;
+
+							case VSC_PAGE_EXT2:
+								info += "EXT2";
+								break;
+
+							case VSC_PAGE_EXT3:
+								info += "EXT3";
+								break;
+
+							case VSC_PAGE_GENERAL_PURPOSE:
+								info += "General purpose";
+								break;
+
+							case VSC_PAGE_TEST:
+								info += "Test";
+								break;
+
+							case VSC_PAGE_TR:
+								info += "Token Ring / reserved";
+								break;
+
+							default:
+								info += string("Unknown ") + to_string_hex(value);
+						}
+					}
 			}
 			pack->m_headers["Info"] = info;
 

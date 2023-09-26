@@ -91,7 +91,8 @@ public:
 	{
 		PHY_TYPE_GENERIC,	//IEEE registers only
 		PHY_TYPE_KSZ9031,
-		PHY_TYPE_DP83867
+		PHY_TYPE_DP83867,
+		PHY_TYPE_VSC8512
 	};
 
 	virtual std::vector<std::string> GetHeaders();
