@@ -59,6 +59,9 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 	m_config.size[1] = 1;
 	m_config.size[2] = 1;
 
+	//DEBUG: print shaders
+	//m_config.keepShaderCode = 1;
+
 	m_config.numberBatches = numBatches;
 
 	string cacheKey;
@@ -75,8 +78,9 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 
 		m_config.bufferSize = &m_bsize;
 		m_config.inputBufferSize = &m_isize;
+		m_config.inputBufferStride[0] = npoints;
 
-		cacheKey = string("VkFFT_FWD_V6_") + to_string(npoints) + "_" + to_string(numBatches);
+		cacheKey = string("VkFFT_FWD_V7_") + to_string(npoints) + "_" + to_string(numBatches);
 	}
 	else
 	{
@@ -93,7 +97,7 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		m_config.inputBufferSize = &m_isize;
 		m_config.inverseReturnToInputBuffer = 1;
 
-		cacheKey = string("VkFFT_INV_V6_") + to_string(npoints);
+		cacheKey = string("VkFFT_INV_V7_") + to_string(npoints);
 	}
 
 	lock_guard<mutex> lock(g_vkTransferMutex);
