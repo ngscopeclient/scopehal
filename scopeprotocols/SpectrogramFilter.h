@@ -75,13 +75,14 @@ public:
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
 	static std::string GetProtocolName();
+	virtual DataLocation GetInputLocation() override;
 
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual float GetVoltageRange(size_t stream) override;
+	virtual float GetOffset(size_t stream) override;
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
+	virtual void SetVoltageRange(float range, size_t stream) override;
+	virtual void SetOffset(float offset, size_t stream) override;
 
 	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
 

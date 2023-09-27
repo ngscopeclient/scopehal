@@ -170,10 +170,13 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
+FlowGraphNode::DataLocation SpectrogramFilter::GetInputLocation()
+{
+	return LOC_GPU;
+}
+
 void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
 {
-	double start = GetTime();
-
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOKAndUniformAnalog())
 	{
@@ -214,6 +217,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = din->m_triggerPhase;
 	cap->m_timescale = fs_per_sample * fftlen;
+	cap->PrepareForGpuAccess();
 	SetData(cap, 0);
 
 	//We also need to adjust the scale by the coherent power gain of the window function
@@ -330,10 +334,4 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	queue->SubmitAndBlock(cmdBuf);
 
 	cap->MarkModifiedFromGpu();
-
-	//TODO: why is this needed?
-	cap->PrepareForCpuAccess();
-
-	double dt = GetTime() - start;
-	LogDebug("SpectrogramFilter: %.3f ms\n", dt*1e3);
 }
