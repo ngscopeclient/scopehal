@@ -188,13 +188,6 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
 	size_t nblocks = floor(inlen * 1.0 / fftlen);
 
-	//DEBUG: cap block length
-	/*
-	size_t nmax = 22;
-	if(nblocks > nmax)
-		nblocks = nmax;
-	*/
-
 	if( (fftlen != m_cachedFFTLength) || (nblocks != m_cachedFFTNumBlocks) )
 		ReallocateBuffers(fftlen, nblocks);
 
@@ -286,8 +279,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	}
 
 	//Make sure our temporary buffers are big enough
-	//TODO: why do we have to expand the input buffer? why are we getting garbage at the end?
-	m_rdinbuf.resize((nblocks+1) * fftlen);
+	m_rdinbuf.resize(nblocks * fftlen);
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
