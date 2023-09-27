@@ -61,6 +61,7 @@ SpectrogramFilter::SpectrogramFilter(const string& color)
 	, m_blackmanHarrisComputePipeline("shaders/BlackmanHarrisWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_rectangularComputePipeline("shaders/RectangularWindow.spv", 2, sizeof(WindowFunctionArgs))
 	, m_cosineSumComputePipeline("shaders/CosineSumWindow.spv", 2, sizeof(WindowFunctionArgs))
+	, m_postprocessComputePipeline("shaders/SpectrogramPostprocess.spv", 2, sizeof(SpectrogramPostprocessArgs))
 {
 	AddStream(Unit(Unit::UNIT_HZ), "data", Stream::STREAM_TYPE_SPECTROGRAM);
 
@@ -164,11 +165,10 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 		m_vkPlan = make_unique<VulkanFFTPlan>(fftlen, nouts, VulkanFFTPlan::DIRECTION_FORWARD, nblocks);
 
 	//TODO: tweak
-	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	//m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
+	m_rdinbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	//m_rdinbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_rdoutbuf.SetCpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
-	//m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_NEVER);
 	m_rdoutbuf.SetGpuAccessHint(AcceleratorBuffer<float>::HINT_LIKELY);
 }
 
@@ -189,6 +189,13 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	size_t inlen = din->size();
 	size_t fftlen = m_parameters[m_fftLengthName].GetIntVal();
 	size_t nblocks = floor(inlen * 1.0 / fftlen);
+
+	//DEBUG: cap block length
+	/*
+	size_t nmax = 22;
+	if(nblocks > nmax)
+		nblocks = nmax;
+	*/
 
 	if( (fftlen != m_cachedFFTLength) || (nblocks != m_cachedFFTNumBlocks) )
 		ReallocateBuffers(fftlen, nblocks);
@@ -212,7 +219,6 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		nblocks,
 		nouts,
 		bin_hz);
-	cap->PrepareForCpuAccess();
 	cap->m_startTimestamp = din->m_startTimestamp;
 	cap->m_startFemtoseconds = din->m_startFemtoseconds;
 	cap->m_triggerPhase = din->m_triggerPhase;
@@ -287,7 +293,6 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	m_rdoutbuf.resize(nblocks * (nouts * 2) );
 
 	//Cache a bunch of configuration
-	auto data = cap->GetData();
 	float minscale = m_parameters[m_rangeMinName].GetFloatVal();
 	float fullscale = m_parameters[m_rangeMaxName].GetFloatVal();
 	float range = fullscale - minscale;
@@ -316,50 +321,29 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		m_rdoutbuf,
 		cmdBuf);
 
+	//Postprocess the output
+	const float impedance = 50;
+	SpectrogramPostprocessArgs postargs;
+	postargs.nblocks = nblocks;
+	postargs.nouts = nouts;
+	postargs.logscale = 10.0 / log(10);
+	postargs.impscale = scale*scale / impedance;
+	postargs.minscale = minscale;
+	postargs.irange = 1.0 / range;
+	m_postprocessComputePipeline.AddComputeMemoryBarrier(cmdBuf);
+	m_postprocessComputePipeline.BindBufferNonblocking(0, m_rdoutbuf, cmdBuf);
+	m_postprocessComputePipeline.BindBufferNonblocking(1, cap->GetOutData(), cmdBuf, true);
+	m_postprocessComputePipeline.Dispatch(cmdBuf, postargs, GetComputeBlockCount(nouts, 64), nblocks);
+
 	//Done, block until the compute operations finish
 	cmdBuf.end();
 	queue->SubmitAndBlock(cmdBuf);
 
-	//Temp: Process the output on the CPU
-	//For some reason the last block seems to be corrupted, not sure why!
-	//Don't include it for the moment
-	m_rdoutbuf.MarkModifiedFromGpu();
-	m_rdoutbuf.PrepareForCpuAccess();
-	for(size_t block=0; block<(nblocks-1); block++)
-		ProcessSpectrumGeneric(nblocks, block, nouts, minscale, range, scale, data);
+	cap->MarkModifiedFromGpu();
 
-	cap->MarkModifiedFromCpu();
+	//TODO: why is this needed?
+	cap->PrepareForCpuAccess();
 
 	double dt = GetTime() - start;
 	LogDebug("SpectrogramFilter: %.3f ms\n", dt*1e3);
-}
-
-void SpectrogramFilter::ProcessSpectrumGeneric(
-	size_t nblocks,
-	size_t block,
-	size_t nouts,
-	float minscale,
-	float range,
-	float scale,
-	float* data)
-{
-	const float impedance = 50;
-	const float inverse_impedance = 1.0f / impedance;
-	const float flog10 = log(10);
-	const float logscale = 10 / flog10;
-	const float irange = 1.0 / range;
-	const float impscale = scale*scale * inverse_impedance;
-
-	size_t base = nouts * block * 2;
-	for(size_t i=0; i<nouts; i++)
-	{
-		float real = m_rdoutbuf[base + i*2 + 0];
-		float imag = m_rdoutbuf[base + i*2 + 1];
-		float vsq = real*real + imag*imag;
-		float dbm = (logscale * log(vsq * impscale) + 30);
-		if(dbm < minscale)
-			data[i*nblocks + block] = 0;
-		else
-			data[i*nblocks + block] = (dbm - minscale) * irange;
-	}
 }

@@ -27,88 +27,51 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of SpectrogramFilter
- */
-#ifndef SpectrogramFilter_h
-#define SpectrogramFilter_h
+#version 430
+#pragma shader_stage(compute)
 
-#include "VulkanFFTPlan.h"
-
-#include "../scopehal/DensityFunctionWaveform.h"
-
-struct SpectrogramPostprocessArgs
+layout(std430, binding=0) restrict readonly buffer buf_din
 {
-	uint32_t nblocks;
-	uint32_t nouts;
+	float din[];
+};
+
+layout(std430, binding=1) restrict writeonly buffer buf_dout
+{
+	float dout[];
+};
+
+layout(std430, push_constant) uniform constants
+{
+	uint nblocks;
+	uint nouts;
 	float logscale;
 	float impscale;
 	float minscale;
 	float irange;
 };
 
-class SpectrogramWaveform : public DensityFunctionWaveform
+layout(local_size_x=64, local_size_y=1, local_size_z=1) in;
+
+void main()
 {
-public:
-	SpectrogramWaveform(size_t width, size_t height, double binsize);
-	virtual ~SpectrogramWaveform();
+	const float flog10 = log(10);
+	const float logscale = 10 / flog10;
 
-	//not copyable or assignable
-	SpectrogramWaveform(const SpectrogramWaveform&) =delete;
-	SpectrogramWaveform& operator=(const SpectrogramWaveform&) =delete;
+	//If off end of array, stop
+	if(gl_GlobalInvocationID.x >= nouts)
+		return;
+	//Y axis grid size must exactly equal nblocks, so don't validate
 
-	double GetBinSize()
-	{ return m_binsize; }
+	uint nin = (nouts*gl_GlobalInvocationID.y + gl_GlobalInvocationID.x)*2;
+	uint nout = gl_GlobalInvocationID.x*nblocks + gl_GlobalInvocationID.y;
 
-protected:
-	double m_binsize;
-};
+	float real = din[nin];
+	float imag = din[nin + 1];
 
-class SpectrogramFilter : public Filter
-{
-public:
-	SpectrogramFilter(const std::string& color);
-	virtual ~SpectrogramFilter();
-
-	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
-
-	static std::string GetProtocolName();
-
-	virtual float GetVoltageRange(size_t stream);
-	virtual float GetOffset(size_t stream);
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
-
-	virtual void SetVoltageRange(float range, size_t stream);
-	virtual void SetOffset(float offset, size_t stream);
-
-	PROTOCOL_DECODER_INITPROC(SpectrogramFilter)
-
-protected:
-	void ReallocateBuffers(size_t fftlen, size_t nblocks);
-
-	AcceleratorBuffer<float> m_rdinbuf;
-	AcceleratorBuffer<float> m_rdoutbuf;
-
-	size_t m_cachedFFTLength;
-	size_t m_cachedFFTNumBlocks;
-
-	float m_range;
-	float m_offset;
-
-	std::string m_windowName;
-	std::string m_fftLengthName;
-	std::string m_rangeMinName;
-	std::string m_rangeMaxName;
-
-	std::unique_ptr<VulkanFFTPlan> m_vkPlan;
-
-	ComputePipeline m_blackmanHarrisComputePipeline;
-	ComputePipeline m_rectangularComputePipeline;
-	ComputePipeline m_cosineSumComputePipeline;
-
-	ComputePipeline m_postprocessComputePipeline;
-};
-
-#endif
+	float vsq = real*real + imag*imag;
+	float dbm = (logscale * log(vsq * impscale) + 30);
+	if(dbm < minscale)
+		dout[nout] = 0;
+	else
+		dout[nout] = (dbm - minscale) * irange;
+}

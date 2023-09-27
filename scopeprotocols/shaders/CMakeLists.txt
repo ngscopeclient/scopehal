@@ -40,6 +40,7 @@ add_compute_shaders(
 		DeEmbedNormalization.glsl
 		FIRFilter.glsl
 		RectangularWindow.glsl
+		SpectrogramPostprocess.glsl
 		SubtractFilter.glsl
 		UpsampleFilter.glsl
 		WaterfallFilter.glsl
