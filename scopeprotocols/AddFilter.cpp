@@ -29,9 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "AddFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#endif
 
 using namespace std;
 
@@ -231,8 +228,8 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 			ucap->m_samples.MarkModifiedFromCpu();
 	}
 
-	//Just regular subtraction, use the GPU filter
-	else if(g_gpuFilterEnabled)
+	//Just regular addition, use the GPU filter
+	else
 	{
 		cmdBuf.begin({});
 
@@ -250,66 +247,7 @@ void AddFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shar
 			ucap->m_samples.MarkModifiedFromGpu();
 	}
 
-	//Software fallback
-	else
-	{
-		//Waveform data must be on CPU
-		din_p->PrepareForCpuAccess();
-		din_n->PrepareForCpuAccess();
-		if(scap)
-			scap->PrepareForCpuAccess();
-		else
-			ucap->PrepareForCpuAccess();
-
-		float* out = scap ? scap->m_samples.GetCpuPointer() : ucap->m_samples.GetCpuPointer();
-		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
-		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
-
-		#ifdef __x86_64__
-		if(g_hasAvx2)
-			InnerLoopAVX2(out, a, b, len);
-		else
-		#endif
-			InnerLoop(out, a, b, len);
-
-		if(scap)
-			scap->m_samples.MarkModifiedFromCpu();
-		else
-			ucap->m_samples.MarkModifiedFromCpu();
-	}
 }
-
-//We probably still have SSE2 or similar if no AVX, so give alignment hints for compiler auto-vectorization
-void AddFilter::InnerLoop(float* out, float* a, float* b, size_t len)
-{
-	out = (float*)__builtin_assume_aligned(out, 64);
-	a = (float*)__builtin_assume_aligned(a, 64);
-	b = (float*)__builtin_assume_aligned(b, 64);
-
-	for(size_t i=0; i<len; i++)
-		out[i] 		= a[i] + b[i];
-}
-
-#ifdef __x86_64__
-__attribute__((target("avx2")))
-void AddFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
-{
-	size_t end = len - (len % 8);
-
-	//AVX2
-	for(size_t i=0; i<end; i+=8)
-	{
-		__m256 pa = _mm256_load_ps(a + i);
-		__m256 pb = _mm256_load_ps(b + i);
-		__m256 o = _mm256_add_ps(pa, pb);
-		_mm256_store_ps(out+i, o);
-	}
-
-	//Get any extras
-	for(size_t i=end; i<len; i++)
-		out[i] 		= a[i] + b[i];
-}
-#endif /* __x86_64__ */
 
 Filter::DataLocation AddFilter::GetInputLocation()
 {
