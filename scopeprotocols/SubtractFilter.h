@@ -64,11 +64,6 @@ protected:
 	void DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue);
 	void DoRefreshScalarScalar();
 
-	void InnerLoop(float* out, float* a, float* b, size_t len);
-#ifdef __x86_64__
-	void InnerLoopAVX2(float* out, float* a, float* b, size_t len);
-#endif
-
 	ComputePipeline m_computePipeline;
 };
 
