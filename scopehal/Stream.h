@@ -109,13 +109,17 @@ public:
 		                           discrete parts of a waveform.
 
 		STREAM_FILL_UNDER:			requests that waveform be drawn with area under curve filled (e.g. histogram)
+
+		STREAM_INFREQUENTLY_USED:	hint that the stream is not commonly used, and should not be automatically added
+									to the scope display to prevent clutter
 	 */
 	uint8_t m_flags;
 
 	enum
 	{
 		STREAM_DO_NOT_INTERPOLATE	= 1,
-		STREAM_FILL_UNDER			= 2
+		STREAM_FILL_UNDER			= 2,
+		STREAM_INFREQUENTLY_USED	= 4
 	};
 };
 

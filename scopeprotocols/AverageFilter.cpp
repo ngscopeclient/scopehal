@@ -40,6 +40,9 @@ AverageFilter::AverageFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "totalSamples", Stream::STREAM_TYPE_ANALOG_SCALAR);
 	AddStream(Unit(Unit::UNIT_COUNTS), "totalWaveforms", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
+	m_streams[2].m_flags = Stream::STREAM_INFREQUENTLY_USED;
+	m_streams[3].m_flags = Stream::STREAM_INFREQUENTLY_USED;
+
 	CreateInput("in");
 
 	ClearSweeps();
