@@ -29,9 +29,6 @@
 
 #include "../scopehal/scopehal.h"
 #include "SubtractFilter.h"
-#ifdef __x86_64__
-#include <immintrin.h>
-#endif
 
 using namespace std;
 
@@ -209,7 +206,7 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 	}
 
 	//Just regular subtraction, use the GPU filter
-	else if(g_gpuFilterEnabled)
+	else
 	{
 		cmdBuf.begin({});
 
@@ -231,64 +228,7 @@ void SubtractFilter::DoRefreshVectorVector(vk::raii::CommandBuffer& cmdBuf, std:
 		else
 			ucap->m_samples.MarkModifiedFromGpu();
 	}
-
-	//Software fallback
-	else
-	{
-		//Waveform data must be on CPU
-		din_p->PrepareForCpuAccess();
-		din_n->PrepareForCpuAccess();
-		if(scap)
-			scap->PrepareForCpuAccess();
-		else
-			ucap->PrepareForCpuAccess();
-
-		float* out = scap ? scap->m_samples.GetCpuPointer() : ucap->m_samples.GetCpuPointer();
-		float* a = sdin_p ? sdin_p->m_samples.GetCpuPointer() : udin_p->m_samples.GetCpuPointer();
-		float* b = sdin_n ? sdin_n->m_samples.GetCpuPointer() : udin_n->m_samples.GetCpuPointer();
-		a += offsetP;
-		b += offsetN;
-
-		#ifdef __x86_64__
-		if(g_hasAvx2)
-			InnerLoopAVX2(out, a, b, len);
-		else
-		#endif
-			InnerLoop(out, a, b, len);
-
-		if(scap)
-			scap->m_samples.MarkModifiedFromCpu();
-		else
-			ucap->m_samples.MarkModifiedFromCpu();
-	}
 }
-
-void SubtractFilter::InnerLoop(float* out, float* a, float* b, size_t len)
-{
-	for(size_t i=0; i<len; i++)
-		out[i] 		= a[i] - b[i];
-}
-
-#ifdef __x86_64__
-__attribute__((target("avx2")))
-void SubtractFilter::InnerLoopAVX2(float* out, float* a, float* b, size_t len)
-{
-	size_t end = len - (len % 8);
-
-	//AVX2
-	for(size_t i=0; i<end; i+=8)
-	{
-		__m256 pa = _mm256_loadu_ps(a + i);
-		__m256 pb = _mm256_loadu_ps(b + i);
-		__m256 o = _mm256_sub_ps(pa, pb);
-		_mm256_store_ps(out+i, o);
-	}
-
-	//Get any extras
-	for(size_t i=end; i<len; i++)
-		out[i] 		= a[i] - b[i];
-}
-#endif /* __x86_64__ */
 
 Filter::DataLocation SubtractFilter::GetInputLocation()
 {
