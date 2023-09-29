@@ -8,6 +8,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ADL5205Decoder.cpp
 	AreaMeasurement.cpp
 	AutocorrelationFilter.cpp
+	AverageFilter.cpp
 	BandwidthMeasurement.cpp
 	BaseMeasurement.cpp
 	BINImportFilter.cpp
@@ -94,9 +95,11 @@ set(SCOPEPROTOCOLS_SOURCES
 	JitterSpectrumFilter.cpp
 	JtagDecoder.cpp
 	MagnitudeFilter.cpp
+	MaximumFilter.cpp
 	MDIODecoder.cpp
 	MemoryFilter.cpp
 	MilStd1553Decoder.cpp
+	MinimumFilter.cpp
 	MovingAverageFilter.cpp
 	MultiplyFilter.cpp
 	NoiseFilter.cpp
@@ -177,10 +180,6 @@ set(SCOPEPROTOCOLS_SOURCES
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 	WindowFilter.cpp
-
-	AverageStatistic.cpp
-	MaximumStatistic.cpp
-	MinimumStatistic.cpp
 
 	scopeprotocols.cpp
 	)

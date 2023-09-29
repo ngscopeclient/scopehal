@@ -44,6 +44,7 @@
 #include "ACRMSMeasurement.h"
 #include "ADL5205Decoder.h"
 #include "AreaMeasurement.h"
+#include "AverageFilter.h"
 #include "AutocorrelationFilter.h"
 #include "BandwidthMeasurement.h"
 #include "BaseMeasurement.h"
@@ -130,9 +131,11 @@
 #include "JitterSpectrumFilter.h"
 #include "JtagDecoder.h"
 #include "MagnitudeFilter.h"
+#include "MaximumFilter.h"
 #include "MDIODecoder.h"
 #include "MemoryFilter.h"
 #include "MilStd1553Decoder.h"
+#include "MinimumFilter.h"
 #include "MovingAverageFilter.h"
 #include "MultiplyFilter.h"
 #include "NoiseFilter.h"
@@ -211,10 +214,6 @@
 #include "WFMImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
 #include "WindowFilter.h"
-
-#include "AverageStatistic.h"
-#include "MaximumStatistic.h"
-#include "MinimumStatistic.h"
 
 void ScopeProtocolStaticInit();
 

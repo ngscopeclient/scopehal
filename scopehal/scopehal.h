@@ -131,7 +131,6 @@ extern bool g_hasAvx2;
 #include "TouchstoneParser.h"
 #include "IBISParser.h"
 
-#include "Statistic.h"
 #include "FilterParameter.h"
 #include "Filter.h"
 #include "ImportFilter.h"

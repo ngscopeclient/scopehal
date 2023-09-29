@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,27 +27,108 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of AverageStatistic
- */
+#include "../scopehal/scopehal.h"
+#include "MaximumFilter.h"
 
-#ifndef AverageStatistic_h
-#define AverageStatistic_h
+using namespace std;
 
-class AverageStatistic : public Statistic
+MaximumFilter::MaximumFilter(const string& color)
+	: Filter(color, CAT_MATH)
 {
-public:
-	virtual void Clear();
-	static std::string GetStatisticName();
-	virtual bool Calculate(StreamDescriptor stream, double& value);
+	AddStream(Unit(Unit::UNIT_VOLTS), "latest", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "cumulative", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "totalSamples", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_COUNTS), "totalWaveforms", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	STATISTIC_INITPROC(AverageStatistic)
+	CreateInput("in");
 
-protected:
-	std::map<StreamDescriptor, double> m_pastSums;
-	std::map<StreamDescriptor, size_t> m_pastCounts;
-};
+	ClearSweeps();
+}
 
-#endif
+MaximumFilter::~MaximumFilter()
+{
+}
+
+void MaximumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	auto din = GetInput(0);
+	if(!din)
+		return;
+
+	//Copy units to output streams
+	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
+	m_streams[1].m_yAxisUnit = din.GetYAxisUnits();
+
+	//If input is scalar, we are processing a single sample
+	if(din.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+	{
+		auto vin = din.GetScalarValue();
+
+		m_streams[0].m_value = vin;
+		m_streams[1].m_value = max(vin, m_streams[1].m_value);
+		m_streams[2].m_value ++;
+		m_streams[3].m_value ++;
+	}
+
+	//If input is a vector, process each sample
+	else
+	{
+		auto data = din.GetData();
+		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
+		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+		float total = 0;
+		size_t len = data->size();
+
+		if(udata)
+		{
+			for(auto sample : udata->m_samples)
+				total = max(total, sample);
+		}
+		else if(sdata)
+		{
+			for(auto sample : sdata->m_samples)
+				total = max(total, sample);
+		}
+
+		m_streams[0].m_value = total;
+		m_streams[1].m_value = max(total, m_streams[1].m_value);
+		m_streams[2].m_value += len;
+		m_streams[3].m_value ++;
+	}
+}
+
+Filter::DataLocation MaximumFilter::GetInputLocation()
+{
+	return LOC_CPU;
+}
+
+string MaximumFilter::GetProtocolName()
+{
+	return "Maximum";
+}
+
+bool MaximumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(i > 0)
+		return false;
+
+	switch(stream.GetType())
+	{
+		case Stream::STREAM_TYPE_ANALOG:
+		case Stream::STREAM_TYPE_ANALOG_SCALAR:
+			return true;
+
+		default:
+			return false;
+	}
+
+	return true;
+}
+
+void MaximumFilter::ClearSweeps()
+{
+	m_streams[0].m_value = 0;
+	m_streams[1].m_value = FLT_MIN;
+	m_streams[2].m_value = 0;
+	m_streams[3].m_value = 0;
+}

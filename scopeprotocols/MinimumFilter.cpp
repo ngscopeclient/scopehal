@@ -28,55 +28,107 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "AverageStatistic.h"
+#include "MinimumFilter.h"
 
 using namespace std;
 
-void AverageStatistic::Clear()
+MinimumFilter::MinimumFilter(const string& color)
+	: Filter(color, CAT_MATH)
 {
-	m_pastSums.clear();
-	m_pastCounts.clear();
+	AddStream(Unit(Unit::UNIT_VOLTS), "latest", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "cumulative", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "totalSamples", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_COUNTS), "totalWaveforms", Stream::STREAM_TYPE_ANALOG_SCALAR);
+
+	CreateInput("in");
+
+	ClearSweeps();
 }
 
-string AverageStatistic::GetStatisticName()
+MinimumFilter::~MinimumFilter()
 {
-	return "Average";
 }
 
-bool AverageStatistic::Calculate(StreamDescriptor stream, double& value)
+void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
-	//Start integrating from the past value, if we have one
-	value = 0;
-	size_t count = 0;
-	if(m_pastSums.find(stream) != m_pastSums.end())
+	auto din = GetInput(0);
+	if(!din)
+		return;
+
+	//Copy units to output streams
+	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
+	m_streams[1].m_yAxisUnit = din.GetYAxisUnits();
+
+	//If input is scalar, we are processing a single sample
+	if(din.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
 	{
-		value = m_pastSums[stream];
-		count = m_pastCounts[stream];
+		auto vin = din.GetScalarValue();
+
+		m_streams[0].m_value = vin;
+		m_streams[1].m_value = min(vin, m_streams[1].m_value);
+		m_streams[2].m_value ++;
+		m_streams[3].m_value ++;
 	}
 
-	//Get input data
-	auto w = stream.GetData();
-	auto udata = dynamic_cast<UniformAnalogWaveform*>(w);
-	auto sdata = dynamic_cast<SparseAnalogWaveform*>(w);
-
-	//Add new sample data
-	if(udata)
+	//If input is a vector, process each sample
+	else
 	{
-		for(auto sample : udata->m_samples)
-			value += sample;
+		auto data = din.GetData();
+		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
+		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+		float total = 0;
+		size_t len = data->size();
+
+		if(udata)
+		{
+			for(auto sample : udata->m_samples)
+				total = min(total, sample);
+		}
+		else if(sdata)
+		{
+			for(auto sample : sdata->m_samples)
+				total = min(total, sample);
+		}
+
+		m_streams[0].m_value = total;
+		m_streams[1].m_value = min(total, m_streams[1].m_value);
+		m_streams[2].m_value += len;
+		m_streams[3].m_value ++;
 	}
-	else if(sdata)
+}
+
+Filter::DataLocation MinimumFilter::GetInputLocation()
+{
+	return LOC_CPU;
+}
+
+string MinimumFilter::GetProtocolName()
+{
+	return "Minimum";
+}
+
+bool MinimumFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(i > 0)
+		return false;
+
+	switch(stream.GetType())
 	{
-		for(auto sample : sdata->m_samples)
-			value += sample;
+		case Stream::STREAM_TYPE_ANALOG:
+		case Stream::STREAM_TYPE_ANALOG_SCALAR:
+			return true;
+
+		default:
+			return false;
 	}
-	count += w->size();
-
-	//Average and save
-	m_pastCounts[stream] = count;
-	m_pastSums[stream] = value;
-
-	value /= count;
 
 	return true;
+}
+
+void MinimumFilter::ClearSweeps()
+{
+	m_streams[0].m_value = 0;
+	m_streams[1].m_value = FLT_MAX;
+	m_streams[2].m_value = 0;
+	m_streams[3].m_value = 0;
 }

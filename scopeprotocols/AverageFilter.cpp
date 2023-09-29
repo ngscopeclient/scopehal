@@ -1,8 +1,8 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopehal v0.1                                                                                                     *
+* libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -27,47 +27,115 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-/**
-	@file
-	@author Andrew D. Zonenberg
-	@brief Declaration of Statistic
- */
+#include "../scopehal/scopehal.h"
+#include "AverageFilter.h"
 
-#ifndef Statistic_h
-#define Statistic_h
+using namespace std;
 
-class Statistic
+AverageFilter::AverageFilter(const string& color)
+	: Filter(color, CAT_MATH)
 {
-public:
-	Statistic();
-	virtual ~Statistic();
+	AddStream(Unit(Unit::UNIT_VOLTS), "latest", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_VOLTS), "cumulative", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_SAMPLEDEPTH), "totalSamples", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_COUNTS), "totalWaveforms", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
-	///@brief Removes any integrated statistic data
-	virtual void Clear() =0;
+	CreateInput("in");
 
-	virtual std::string GetStatisticDisplayName() =0;
-	virtual bool Calculate(StreamDescriptor stream, double& value) =0;
+	ClearSweeps();
+}
 
-	//Enumeration / factory
-public:
-	typedef Statistic* (*CreateProcType)();
-	static void DoAddStatisticClass(std::string name, CreateProcType proc);
+AverageFilter::~AverageFilter()
+{
+}
 
-	static void EnumStatistics(std::vector<std::string>& names);
-	static Statistic* CreateStatistic(std::string measurement);
+void AverageFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
+{
+	auto din = GetInput(0);
+	if(!din)
+		return;
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, CreateProcType > CreateMapType;
-	static CreateMapType m_createprocs;
-};
+	//Copy units to output streams
+	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
+	m_streams[1].m_yAxisUnit = din.GetYAxisUnits();
 
-#define STATISTIC_INITPROC(T) \
-	static Statistic* CreateInstance() \
-	{ return new T; } \
-	virtual std::string GetStatisticDisplayName() \
-	{ return GetStatisticName(); }
+	//If input is scalar, we are processing a single sample
+	if(din.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+	{
+		auto vin = din.GetScalarValue();
+		m_pastCount ++;
+		m_pastSum += vin;
 
-#define AddStatisticClass(T) Statistic::DoAddStatisticClass(T::GetStatisticName(), T::CreateInstance)
+		m_streams[0].m_value = vin;
+		m_streams[1].m_value = m_pastSum / m_pastCount;
+		m_streams[2].m_value = m_pastCount;
+		m_streams[3].m_value = m_pastCount;
+	}
 
-#endif
+	//If input is a vector, process each sample
+	else
+	{
+		auto data = din.GetData();
+		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
+		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
+		double total = 0;
+		size_t len = data->size();
+
+		if(udata)
+		{
+			for(auto sample : udata->m_samples)
+				total += sample;
+		}
+		else if(sdata)
+		{
+			for(auto sample : sdata->m_samples)
+				total += sample;
+		}
+		m_pastCount += len;
+		m_pastSum += total;
+
+		m_streams[0].m_value = total / len;
+		m_streams[1].m_value = m_pastSum / m_pastCount;
+		m_streams[2].m_value = m_pastCount;
+		m_streams[3].m_value ++;
+	}
+}
+
+Filter::DataLocation AverageFilter::GetInputLocation()
+{
+	return LOC_CPU;
+}
+
+string AverageFilter::GetProtocolName()
+{
+	return "Average";
+}
+
+bool AverageFilter::ValidateChannel(size_t i, StreamDescriptor stream)
+{
+	if(i > 0)
+		return false;
+
+	switch(stream.GetType())
+	{
+		case Stream::STREAM_TYPE_ANALOG:
+		case Stream::STREAM_TYPE_ANALOG_SCALAR:
+			return true;
+
+		default:
+			return false;
+	}
+
+	return true;
+}
+
+void AverageFilter::ClearSweeps()
+{
+	m_pastSum = 0;
+	m_pastCount = 0;
+
+	m_streams[0].m_value = 0;
+	m_streams[1].m_value = 0;
+	m_streams[2].m_value = 0;
+	m_streams[3].m_value = 0;
+}

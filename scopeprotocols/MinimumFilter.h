@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2021 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -30,23 +30,27 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of MinimumStatistic
+	@brief Declaration of MinimumFilter
  */
 
-#ifndef MinimumStatistic_h
-#define MinimumStatistic_h
+#ifndef MinimumFilter_h
+#define MinimumFilter_h
 
-class MinimumStatistic : public Statistic
+class MinimumFilter : public Filter
 {
 public:
-	virtual void Clear();
-	static std::string GetStatisticName();
-	virtual bool Calculate(StreamDescriptor stream, double& value);
+	MinimumFilter(const std::string& color);
+	~MinimumFilter();
 
-	STATISTIC_INITPROC(MinimumStatistic)
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
-protected:
-	std::map<StreamDescriptor, double> m_pastMinimums;
+	static std::string GetProtocolName();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
+
+	virtual void ClearSweeps() override;
+
+	PROTOCOL_DECODER_INITPROC(MinimumFilter)
 };
 
 #endif

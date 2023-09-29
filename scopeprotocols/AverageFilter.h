@@ -27,46 +27,34 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "../scopehal/scopehal.h"
-#include "MinimumStatistic.h"
+/**
+	@file
+	@author Andrew D. Zonenberg
+	@brief Declaration of AverageFilter
+ */
 
-using namespace std;
+#ifndef AverageFilter_h
+#define AverageFilter_h
 
-void MinimumStatistic::Clear()
+class AverageFilter : public Filter
 {
-	m_pastMinimums.clear();
-}
+public:
+	AverageFilter(const std::string& color);
+	~AverageFilter();
 
-string MinimumStatistic::GetStatisticName()
-{
-	return "Minimum";
-}
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
+	virtual DataLocation GetInputLocation() override;
 
-bool MinimumStatistic::Calculate(StreamDescriptor stream, double& value)
-{
-	//Starting value is previous minimum, if we have one
-	value = 1e20;
-	if(m_pastMinimums.find(stream) != m_pastMinimums.end())
-		value = m_pastMinimums[stream];
+	static std::string GetProtocolName();
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	//Get input data
-	auto w = stream.GetData();
-	auto udata = dynamic_cast<UniformAnalogWaveform*>(w);
-	auto sdata = dynamic_cast<SparseAnalogWaveform*>(w);
+	virtual void ClearSweeps() override;
 
-	//Add new sample data
-	if(udata)
-	{
-		for(auto sample : udata->m_samples)
-			value = min(value, (double)sample);
-	}
-	else if(sdata)
-	{
-		for(auto sample : sdata->m_samples)
-			value = min(value, (double)sample);
-	}
+	PROTOCOL_DECODER_INITPROC(AverageFilter)
 
-	m_pastMinimums[stream] = value;
+protected:
+	double m_pastSum;
+	int64_t m_pastCount;
+};
 
-	return true;
-}
+#endif

@@ -46,6 +46,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(ADL5205Decoder);
 	AddDecoderClass(AreaMeasurement);
 	AddDecoderClass(AutocorrelationFilter);
+	AddDecoderClass(AverageFilter);
 	AddDecoderClass(BandwidthMeasurement);
 	AddDecoderClass(BaseMeasurement);
 	AddDecoderClass(BINImportFilter);
@@ -130,9 +131,11 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(JitterSpectrumFilter);
 	AddDecoderClass(JtagDecoder);
 	AddDecoderClass(MagnitudeFilter);
+	AddDecoderClass(MaximumFilter);
 	AddDecoderClass(MDIODecoder);
 	AddDecoderClass(MemoryFilter);
 	AddDecoderClass(MilStd1553Decoder);
+	AddDecoderClass(MinimumFilter);
 	AddDecoderClass(MovingAverageFilter);
 	AddDecoderClass(MultiplyFilter);
 	AddDecoderClass(NoiseFilter);
@@ -211,8 +214,4 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(WFMImportFilter);
 	AddDecoderClass(WindowedAutocorrelationFilter);
 	AddDecoderClass(WindowFilter);
-
-	AddStatisticClass(AverageStatistic);
-	AddStatisticClass(MaximumStatistic);
-	AddStatisticClass(MinimumStatistic);
 }

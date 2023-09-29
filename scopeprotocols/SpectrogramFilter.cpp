@@ -172,7 +172,7 @@ void SpectrogramFilter::ReallocateBuffers(size_t fftlen, size_t nblocks)
 
 FlowGraphNode::DataLocation SpectrogramFilter::GetInputLocation()
 {
-	return LOC_GPU;
+	return LOC_DONTCARE;
 }
 
 void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<QueueHandle> queue)
@@ -184,6 +184,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		return;
 	}
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	din->PrepareForGpuAccess();
 
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not a sliding window
@@ -208,6 +209,7 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 	LogTrace("%s per bin\n", hz.PrettyPrint(bin_hz).c_str());
 
 	//Create the output
+	//TODO: reuse existing buffer if available and same size
 	size_t nouts = fftlen/2 + 1;
 	auto cap = new SpectrogramWaveform(
 		nblocks,
