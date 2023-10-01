@@ -184,7 +184,6 @@ void SpectrogramFilter::Refresh(vk::raii::CommandBuffer& cmdBuf, shared_ptr<Queu
 		return;
 	}
 	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	din->PrepareForGpuAccess();
 
 	//Figure out how many FFTs to do
 	//For now, consecutive blocks and not a sliding window
