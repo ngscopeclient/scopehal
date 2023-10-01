@@ -288,6 +288,9 @@ protected:
 	bool m_hasSpiTrigger;
 	bool m_hasUartTrigger;
 
+	//SDS2000XP firmware <=1.3.6R6 has data size bug while in 10 bit mode
+	bool m_requireSizeWorkaround;
+
 	///Maximum bandwidth we support, in MHz
 	unsigned int m_maxBandwidth;
 

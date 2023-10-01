@@ -294,6 +294,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 	//Look up model info
 	m_modelid = MODEL_UNKNOWN;
 	m_maxBandwidth = 0;
+	m_requireSizeWorkaround = false;
 
 	if(m_vendor.compare("Siglent Technologies") == 0)
 	{
@@ -335,6 +336,35 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 350;
 			if(m_model.compare(4, 1, "5") == 0)
 				m_maxBandwidth = 500;
+
+			//Check if version requires size workaround (1.3.9R6 and older)
+			int ubootMajorVersion;
+			int ubootMinorVersion;
+			int fwMajorVersion;
+			int fwMinorVersion;
+			int fwPatchVersion;
+			int fwPatchRevision;
+
+			sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%dR%d",
+				&ubootMajorVersion,
+				&ubootMinorVersion,
+				&fwMajorVersion,
+				&fwMinorVersion,
+				&fwPatchVersion,
+				&fwPatchRevision);
+			//Firmware 1.3.9R6 and older require size workaround.
+			//TODO: validate with scope with older versions
+			if(fwMajorVersion < 1)
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion < 9))
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion == 9) && (fwPatchRevision <= 6))
+				m_requireSizeWorkaround = true;
+
+			if(m_requireSizeWorkaround)
+				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 
 			//TODO: check for whether we actually have the license
 			//(no SCPI command for this yet)
@@ -2049,9 +2079,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				//BUG: When SDS2000X+ (tested on 1.3.9R6) is in 10-bit mode, the SCPI length header reports the size of the data blob in
 				//16-bit words, rather than bytes!
 				//2000X+ HD running firmware 1.1.7.0 seems to be unaffected.
-				bool hdWorkaround = false;
-				if( (m_modelid == MODEL_SIGLENT_SDS2000XP) && m_highDefinition)
-					hdWorkaround = true;
+				bool hdWorkaround = m_requireSizeWorkaround && m_highDefinition;
 
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
