@@ -660,15 +660,20 @@ bool PicoOscilloscope::AcquireData()
 	}
 
 	//If we have GPU support for int16, we can do the conversion on the card
-	if(g_hasShaderInt16)
+	//But only do this if we also have push-descriptor support, because doing N separate dispatches is likely
+	//to be slower than a parallel CPU-side conversion
+	//Note also that a strict benchmarking here may be slower than the CPU version due to transfer latency,
+	//but having the waveform on the GPU now means we don't have to do *that* later.
+	if(g_hasShaderInt16 && g_hasPushDescriptor)
 	{
-		//TODO: we can probably be more efficient here doing this in one dispatch
+		m_cmdBuf->begin({});
+
+		m_conversionPipeline->Bind(*m_cmdBuf);
+
 		for(size_t i=0; i<awfms.size(); i++)
 		{
-			m_cmdBuf->begin({});
 			auto cap = awfms[i];
 
-			//Update our descriptor sets with current buffers
 			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
 			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
 
@@ -677,14 +682,13 @@ bool PicoOscilloscope::AcquireData()
 			args.gain = scales[i];
 			args.offset = -offsets[i];
 
-			//Dispatch the compute operation and block until it completes
-			m_conversionPipeline->Dispatch(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
-			m_cmdBuf->end();
-
-			m_queue->SubmitAndBlock(*m_cmdBuf);
+			m_conversionPipeline->DispatchNoRebind(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
 
 			cap->MarkModifiedFromGpu();
 		}
+
+		m_cmdBuf->end();
+		m_queue->SubmitAndBlock(*m_cmdBuf);
 	}
 	else
 	{
