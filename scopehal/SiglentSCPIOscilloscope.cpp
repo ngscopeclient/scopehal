@@ -98,6 +98,7 @@ static const struct
 } c_sds2000xp_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
 static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
+static const std::chrono::milliseconds c_adc_delay(200);		 // Delay required when setting ADC mode
 static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
 static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
 
@@ -293,6 +294,7 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 	//Look up model info
 	m_modelid = MODEL_UNKNOWN;
 	m_maxBandwidth = 0;
+	m_requireSizeWorkaround = false;
 
 	if(m_vendor.compare("Siglent Technologies") == 0)
 	{
@@ -334,6 +336,35 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				m_maxBandwidth = 350;
 			if(m_model.compare(4, 1, "5") == 0)
 				m_maxBandwidth = 500;
+
+			//Check if version requires size workaround (1.3.9R6 and older)
+			int ubootMajorVersion;
+			int ubootMinorVersion;
+			int fwMajorVersion;
+			int fwMinorVersion;
+			int fwPatchVersion;
+			int fwPatchRevision;
+
+			sscanf(m_fwVersion.c_str(), "%d.%d.%d.%d.%dR%d",
+				&ubootMajorVersion,
+				&ubootMinorVersion,
+				&fwMajorVersion,
+				&fwMinorVersion,
+				&fwPatchVersion,
+				&fwPatchRevision);
+			//Firmware 1.3.9R6 and older require size workaround.
+			//TODO: validate with scope with older versions
+			if(fwMajorVersion < 1)
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion < 9))
+				m_requireSizeWorkaround = true;
+			else if((fwMajorVersion == 1) && (fwMinorVersion == 3) && (fwPatchVersion == 9) && (fwPatchRevision <= 6))
+				m_requireSizeWorkaround = true;
+
+			if(m_requireSizeWorkaround)
+				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 
 			//TODO: check for whether we actually have the license
 			//(no SCPI command for this yet)
@@ -2048,9 +2079,7 @@ bool SiglentSCPIOscilloscope::AcquireData()
 				//BUG: When SDS2000X+ (tested on 1.3.9R6) is in 10-bit mode, the SCPI length header reports the size of the data blob in
 				//16-bit words, rather than bytes!
 				//2000X+ HD running firmware 1.1.7.0 seems to be unaffected.
-				bool hdWorkaround = false;
-				if( (m_modelid == MODEL_SIGLENT_SDS2000XP) && m_highDefinition)
-					hdWorkaround = true;
+				bool hdWorkaround = m_requireSizeWorkaround && m_highDefinition;
 
 				//Read the data from each analog waveform
 				for(unsigned int i = 0; i < m_analogChannelCount; i++)
@@ -3242,13 +3271,13 @@ size_t SiglentSCPIOscilloscope::GetADCMode(size_t /*channel*/)
 	{
 		m_adcMode = ADC_MODE_10BIT;
 		m_highDefinition = true;
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
 	}
 	else //if(reply == "8Bits")
 	{
 		m_adcMode = ADC_MODE_8BIT;
 		m_highDefinition = false;
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
 	}
 
 	return m_adcMode;
@@ -3278,13 +3307,16 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 	if(mode == ADC_MODE_10BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 10Bits");
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH WORD");
+		this_thread::sleep_for(c_adc_delay);
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
 	}
 	else //if(mode == ADC_MODE_8BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 8Bits");
-		m_transport->SendCommandQueuedWithReply(":WAVEFORM:WIDTH BYTE");
+		this_thread::sleep_for(c_adc_delay);
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
 	}
+	this_thread::sleep_for(c_adc_delay);
 
 	if(IsTriggerArmed())
 		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
