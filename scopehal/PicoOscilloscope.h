@@ -225,6 +225,12 @@ protected:
 	///@brief Buffers for storing raw ADC samples before converting to fp32
 	std::vector<std::unique_ptr<AcceleratorBuffer<int16_t> > > m_analogRawWaveformBuffers;
 
+	//Vulkan waveform conversion
+	std::shared_ptr<QueueHandle> m_queue;
+	std::unique_ptr<vk::raii::CommandPool> m_pool;
+	std::unique_ptr<vk::raii::CommandBuffer> m_cmdBuf;
+	std::unique_ptr<ComputePipeline> m_conversionPipeline;
+
 public:
 
 	static std::string GetDriverNameInternal();

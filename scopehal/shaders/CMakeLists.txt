@@ -27,21 +27,10 @@ function(add_compute_shaders target)
 endfunction()
 
 add_compute_shaders(
-	protocolshaders
+	halshaders
 	SOURCES
-		AddFilter.glsl
-		BlackmanHarrisWindow.glsl
-		ComplexToLogMagnitude.glsl
-		ComplexToMagnitude.glsl
-		CosineSumWindow.glsl
-		DeEmbedFilter.glsl
-		DeEmbedNormalization.glsl
-		FIRFilter.glsl
-		RectangularWindow.glsl
-		SpectrogramPostprocess.glsl
-		SubtractFilter.glsl
-		UpsampleFilter.glsl
-		WaterfallFilter.glsl
+		Convert8BitSamples.glsl
+		Convert16BitSamples.glsl
 	)
 
-add_dependencies(scopeprotocols protocolshaders)
+add_dependencies(scopehal halshaders)

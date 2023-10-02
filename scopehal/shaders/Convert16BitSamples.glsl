@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -29,7 +29,7 @@
 
 #version 430
 #pragma shader_stage(compute)
-#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+#extension GL_EXT_shader_16bit_storage : require
 
 layout(std430, binding=0) restrict writeonly buffer buf_pout
 {
@@ -55,5 +55,5 @@ void main()
 	if(gl_GlobalInvocationID.x >= size)
 		return;
 
-	pout[gl_GlobalInvocationID.x] = gain*pin[gl_GlobalInvocationID.x] - offset;
+	pout[gl_GlobalInvocationID.x] = gain*float(int(pin[gl_GlobalInvocationID.x])) - offset;
 }

@@ -391,7 +391,7 @@ bool VulkanInit(bool skipGLFW)
 
 					if(features.shaderInt16)
 					{
-						if(storageFeatures16.storageBuffer16BitAccess)
+						if(storageFeatures16.storageBuffer16BitAccess && storageFeatures16.uniformAndStorageBuffer16BitAccess)
 							LogDebug("int16:                  yes (allowed in SSBOs)\n");
 						else
 							LogDebug("int16:                  yes (but not allowed in SSBOs)\n");
@@ -635,9 +635,10 @@ bool VulkanInit(bool skipGLFW)
 					auto vulkan12Features = std::get<3>(features2);
 
 					//Enable 16 bit SSBOs
-					if(storageFeatures16.storageBuffer16BitAccess)
+					if(storageFeatures16.storageBuffer16BitAccess && storageFeatures16.uniformAndStorageBuffer16BitAccess)
 					{
 						features16bit.storageBuffer16BitAccess = true;
+						features16bit.uniformAndStorageBuffer16BitAccess = true;
 						features16bit.pNext = pNext;
 						pNext = &features16bit;
 						LogDebug("Enabling 16-bit integer support for SSBOs\n");
@@ -647,8 +648,6 @@ bool VulkanInit(bool skipGLFW)
 					//Vulkan 1.2 allows some stuff to be done simpler
 					if(vulkan12Available)
 					{
-						if(storageFeatures16.storageBuffer16BitAccess)
-
 						//Enable 8 bit shader variables
 						if(vulkan12Features.shaderInt8)
 						{

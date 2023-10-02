@@ -190,13 +190,44 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 	SetTriggerOffset(10 * 1000L * 1000L);
 
 	//Initialize waveform buffers
-	//Plain old garden-variety CPU-side RAM here
 	for(size_t i=0; i<m_analogChannelCount; i++)
 	{
 		m_analogRawWaveformBuffers.push_back(std::make_unique<AcceleratorBuffer<int16_t> >());
 		m_analogRawWaveformBuffers[i]->SetCpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
-		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_NEVER);
+		m_analogRawWaveformBuffers[i]->SetGpuAccessHint(AcceleratorBuffer<int16_t>::HINT_LIKELY);
 	}
+
+	//Create Vulkan objects for the waveform conversion
+	m_queue = g_vkQueueManager->GetComputeQueue("PicoOscilloscope.queue");
+	vk::CommandPoolCreateInfo poolInfo(
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		m_queue->m_family );
+	m_pool = make_unique<vk::raii::CommandPool>(*g_vkComputeDevice, poolInfo);
+
+	vk::CommandBufferAllocateInfo bufinfo(**m_pool, vk::CommandBufferLevel::ePrimary, 1);
+	m_cmdBuf = make_unique<vk::raii::CommandBuffer>(
+		move(vk::raii::CommandBuffers(*g_vkComputeDevice, bufinfo).front()));
+
+	if(g_hasDebugUtils)
+	{
+		string poolname = "PicoOscilloscope.pool";
+		string bufname = "PicoOscilloscope.cmdbuf";
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandPool,
+				reinterpret_cast<int64_t>(static_cast<VkCommandPool>(**m_pool)),
+				poolname.c_str()));
+
+		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+			vk::DebugUtilsObjectNameInfoEXT(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<int64_t>(static_cast<VkCommandBuffer>(**m_cmdBuf)),
+				bufname.c_str()));
+	}
+
+	m_conversionPipeline = make_unique<ComputePipeline>(
+			"shaders/Convert16BitSamples.spv", 2, sizeof(ConvertRawSamplesShaderArgs) );
 }
 
 /**
@@ -628,21 +659,51 @@ bool PicoOscilloscope::AcquireData()
 		}
 	}
 
-	//Fallback path
-	//Process analog captures in parallel
-	#pragma omp parallel for
-	for(size_t i=0; i<awfms.size(); i++)
+	//If we have GPU support for int16, we can do the conversion on the card
+	if(g_hasShaderInt16)
 	{
-		auto cap = awfms[i];
-		cap->PrepareForCpuAccess();
-		Convert16BitSamples(
-			cap->m_samples.GetCpuPointer(),
-			m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
-			scales[i],
-			-offsets[i],
-			cap->size());
+		//TODO: we can probably be more efficient here doing this in one dispatch
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			m_cmdBuf->begin({});
+			auto cap = awfms[i];
 
-		cap->MarkSamplesModifiedFromCpu();
+			//Update our descriptor sets with current buffers
+			m_conversionPipeline->BindBufferNonblocking(0, cap->m_samples, *m_cmdBuf, true);
+			m_conversionPipeline->BindBufferNonblocking(1, *m_analogRawWaveformBuffers[achans[i]], *m_cmdBuf);
+
+			ConvertRawSamplesShaderArgs args;
+			args.size = cap->size();
+			args.gain = scales[i];
+			args.offset = -offsets[i];
+
+			//Dispatch the compute operation and block until it completes
+			m_conversionPipeline->Dispatch(*m_cmdBuf, args, GetComputeBlockCount(cap->size(), 64));
+			m_cmdBuf->end();
+
+			m_queue->SubmitAndBlock(*m_cmdBuf);
+
+			cap->MarkModifiedFromGpu();
+		}
+	}
+	else
+	{
+		//Fallback path
+		//Process analog captures in parallel
+		#pragma omp parallel for
+		for(size_t i=0; i<awfms.size(); i++)
+		{
+			auto cap = awfms[i];
+			cap->PrepareForCpuAccess();
+			Convert16BitSamples(
+				cap->m_samples.GetCpuPointer(),
+				m_analogRawWaveformBuffers[achans[i]]->GetCpuPointer(),
+				scales[i],
+				-offsets[i],
+				cap->size());
+
+			cap->MarkSamplesModifiedFromCpu();
+		}
 	}
 
 	//Save the waveforms to our queue

@@ -326,3 +326,5 @@ if(${HAS_LINUXGPIB})
 endif()
 
 install(TARGETS scopehal LIBRARY)
+
+add_subdirectory(shaders)
