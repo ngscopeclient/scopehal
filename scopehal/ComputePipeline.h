@@ -30,6 +30,7 @@
 #ifndef ComputePipeline_h
 #define ComputePipeline_h
 
+#include "scopehal.h"
 #include "AcceleratorBuffer.h"
 
 /**
@@ -62,8 +63,16 @@ public:
 		buf.PrepareForGpuAccess(outputOnly);
 
 		m_bufferInfo[i] = buf.GetBufferInfo();
-		m_writeDescriptors[i] =
-			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		if(g_hasPushDescriptor)
+		{
+			m_writeDescriptors[i] =
+				vk::WriteDescriptorSet(nullptr, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		}
+		else
+		{
+			m_writeDescriptors[i] =
+				vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		}
 	}
 
 	/**
@@ -76,8 +85,17 @@ public:
 
 		size_t numImage = i - m_numSSBOs;
 		m_storageImageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
-		m_writeDescriptors[i] = vk::WriteDescriptorSet(
-			**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_storageImageInfo[numImage]);
+
+		if(g_hasPushDescriptor)
+		{
+			m_writeDescriptors[i] = vk::WriteDescriptorSet(
+				nullptr, i, 0, vk::DescriptorType::eStorageImage, m_storageImageInfo[numImage]);
+		}
+		else
+		{
+			m_writeDescriptors[i] = vk::WriteDescriptorSet(
+				**m_descriptorSet, i, 0, vk::DescriptorType::eStorageImage, m_storageImageInfo[numImage]);
+		}
 	}
 
 	/**
@@ -90,8 +108,17 @@ public:
 
 		size_t numImage = i - (m_numSSBOs + m_numStorageImages);
 		m_sampledImageInfo[numImage] = vk::DescriptorImageInfo(sampler, view, layout);
-		m_writeDescriptors[i] = vk::WriteDescriptorSet(
-			**m_descriptorSet, i, 0, vk::DescriptorType::eCombinedImageSampler, m_sampledImageInfo[numImage]);
+
+		if(g_hasPushDescriptor)
+		{
+			m_writeDescriptors[i] = vk::WriteDescriptorSet(
+				nullptr, i, 0, vk::DescriptorType::eCombinedImageSampler, m_sampledImageInfo[numImage]);
+		}
+		else
+		{
+			m_writeDescriptors[i] = vk::WriteDescriptorSet(
+				**m_descriptorSet, i, 0, vk::DescriptorType::eCombinedImageSampler, m_sampledImageInfo[numImage]);
+		}
 	}
 
 	/**
@@ -112,8 +139,16 @@ public:
 		buf.PrepareForGpuAccessNonblocking(outputOnly, cmdBuf);
 
 		m_bufferInfo[i] = buf.GetBufferInfo();
-		m_writeDescriptors[i] =
-			vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		if(g_hasPushDescriptor)
+		{
+			m_writeDescriptors[i] =
+				vk::WriteDescriptorSet(nullptr, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		}
+		else
+		{
+			m_writeDescriptors[i] =
+				vk::WriteDescriptorSet(**m_descriptorSet, i, 0, vk::DescriptorType::eStorageBuffer, {}, m_bufferInfo[i]);
+		}
 	}
 
 	/**
@@ -131,27 +166,49 @@ public:
 	}
 
 	/**
+		@brief Binds the pipeline to a command buffer
+	 */
+	void Bind(vk::raii::CommandBuffer& cmdBuf)
+	{
+		if(m_computePipeline == nullptr)
+			DeferredInit();
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
+	}
+
+	/**
 		@brief Dispatches a compute operation to a command buffer
 	 */
 	template<class T>
 	void Dispatch(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
 	{
-		if(m_computePipeline == nullptr)
-			DeferredInit();
+		if(!g_hasPushDescriptor)
+			g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr);
 
-		g_vkComputeDevice->updateDescriptorSets(m_writeDescriptors, nullptr);
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, **m_computePipeline);
+		Bind(cmdBuf);
 		cmdBuf.pushConstants<T>(
 			**m_pipelineLayout,
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pushConstants);
-		cmdBuf.bindDescriptorSets(
-			vk::PipelineBindPoint::eCompute,
-			**m_pipelineLayout,
-			0,
-			**m_descriptorSet,
-			{});
+
+		if(g_hasPushDescriptor)
+		{
+			cmdBuf.pushDescriptorSetKHR(
+				vk::PipelineBindPoint::eCompute,
+				**m_pipelineLayout,
+				0,
+			m_writeDescriptors
+			);
+		}
+		else
+		{
+			cmdBuf.bindDescriptorSets(
+				vk::PipelineBindPoint::eCompute,
+				**m_pipelineLayout,
+				0,
+				**m_descriptorSet,
+				{});
+		}
 		cmdBuf.dispatch(x, y, z);
 	}
 
@@ -165,6 +222,16 @@ public:
 	template<class T>
 	void DispatchNoRebind(vk::raii::CommandBuffer& cmdBuf, T pushConstants, uint32_t x, uint32_t y=1, uint32_t z=1)
 	{
+		if(g_hasPushDescriptor)
+		{
+			cmdBuf.pushDescriptorSetKHR(
+				vk::PipelineBindPoint::eCompute,
+				**m_pipelineLayout,
+				0,
+			m_writeDescriptors
+			);
+		}
+
 		cmdBuf.pushConstants<T>(
 			**m_pipelineLayout,
 			vk::ShaderStageFlagBits::eCompute,

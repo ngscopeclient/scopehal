@@ -97,8 +97,17 @@ void ComputePipeline::DeferredInit()
 		bindings.push_back(vk::DescriptorSetLayoutBinding(
 			i + ibase, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eCompute));
 	}
-	vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
-	m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
+	if(g_hasPushDescriptor)
+	{
+		vk::DescriptorSetLayoutCreateInfo dinfo(
+			{vk::DescriptorSetLayoutCreateFlagBits::ePushDescriptorKHR}, bindings);
+		m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
+	}
+	else
+	{
+		vk::DescriptorSetLayoutCreateInfo dinfo({}, bindings);
+		m_descriptorSetLayout = make_unique<vk::raii::DescriptorSetLayout>(*g_vkComputeDevice, dinfo);
+	}
 
 	//Configure push constants
 	vk::PushConstantRange range(vk::ShaderStageFlagBits::eCompute, 0, m_pushConstantSize);
@@ -116,25 +125,28 @@ void ComputePipeline::DeferredInit()
 	m_computePipeline = make_unique<vk::raii::Pipeline>(
 		std::move(g_vkComputeDevice->createComputePipelines(*cache, pinfo).front()));
 
-	//Descriptor pool for our shader parameters
-	vector<vk::DescriptorPoolSize> poolSizes;
-	if(m_numSSBOs)
-		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs));
-	if(m_numStorageImages)
-		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, m_numStorageImages));
-	if(m_numSampledImages)
-		poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, m_numSampledImages));
-	vk::DescriptorPoolCreateInfo poolInfo(
-		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
-			vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
-		1,
-		poolSizes);
-	m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
+	//Descriptor pool for our shader parameters (only if not using push descriptors)
+	if(!g_hasPushDescriptor)
+	{
+		vector<vk::DescriptorPoolSize> poolSizes;
+		if(m_numSSBOs)
+			poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, m_numSSBOs));
+		if(m_numStorageImages)
+			poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, m_numStorageImages));
+		if(m_numSampledImages)
+			poolSizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, m_numSampledImages));
+		vk::DescriptorPoolCreateInfo poolInfo(
+			vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
+				vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
+			1,
+			poolSizes);
+		m_descriptorPool = make_unique<vk::raii::DescriptorPool>(*g_vkComputeDevice, poolInfo);
 
-	//Set up descriptors for our buffers
-	vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
-	m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
-		std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
+		//Set up descriptors for our buffers
+		vk::DescriptorSetAllocateInfo dsinfo(**m_descriptorPool, **m_descriptorSetLayout);
+		m_descriptorSet = make_unique<vk::raii::DescriptorSet>(
+			std::move(vk::raii::DescriptorSets(*g_vkComputeDevice, dsinfo).front()));
+	}
 
 	//Name the various resources
 	if(g_hasDebugUtils)
@@ -164,16 +176,19 @@ void ComputePipeline::DeferredInit()
 				reinterpret_cast<int64_t>(static_cast<VkPipelineLayout>(**m_pipelineLayout)),
 				plName.c_str()));
 
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eDescriptorPool,
-				reinterpret_cast<int64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
-				dpName.c_str()));
+		if(!g_hasPushDescriptor)
+		{
+			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+				vk::DebugUtilsObjectNameInfoEXT(
+					vk::ObjectType::eDescriptorPool,
+					reinterpret_cast<int64_t>(static_cast<VkDescriptorPool>(**m_descriptorPool)),
+					dpName.c_str()));
 
-		g_vkComputeDevice->setDebugUtilsObjectNameEXT(
-			vk::DebugUtilsObjectNameInfoEXT(
-				vk::ObjectType::eDescriptorSet,
-				reinterpret_cast<int64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
-				dsName.c_str()));
+			g_vkComputeDevice->setDebugUtilsObjectNameEXT(
+				vk::DebugUtilsObjectNameInfoEXT(
+					vk::ObjectType::eDescriptorSet,
+					reinterpret_cast<int64_t>(static_cast<VkDescriptorSet>(**m_descriptorSet)),
+					dsName.c_str()));
+		}
 	}
 }

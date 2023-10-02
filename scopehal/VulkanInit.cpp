@@ -147,6 +147,7 @@ bool g_hasShaderInt8 = false;
 bool g_hasShaderAtomicFloat = false;
 bool g_hasDebugUtils = false;
 bool g_hasMemoryBudget = false;
+bool g_hasPushDescriptor = false;
 
 //Feature flags indicating specific drivers, for bug workarounds
 bool g_vulkanDeviceIsIntelMesa = false;
@@ -710,6 +711,11 @@ bool VulkanInit(bool skipGLFW)
 						hasNonSemanticInfo = true;
 						LogDebug("Device has VK_KHR_shader_non_semantic_info, requesting it\n");
 					}
+					if(!strcmp(&ext.extensionName[0], "VK_KHR_push_descriptor"))
+					{
+						g_hasPushDescriptor = true;
+						LogDebug("Device has VK_KHR_push_descriptor, requesting it\n");
+					}
 					if(!strcmp(&ext.extensionName[0], "VK_EXT_shader_atomic_float"))
 					{
 						g_hasShaderAtomicFloat = true;
@@ -739,6 +745,8 @@ bool VulkanInit(bool skipGLFW)
 					devextensions.push_back("VK_EXT_shader_atomic_float");
 				if(g_hasMemoryBudget)
 					devextensions.push_back("VK_EXT_memory_budget");
+				if(g_hasPushDescriptor)
+					devextensions.push_back("VK_KHR_push_descriptor");
 				vk::DeviceCreateInfo devinfo(
 					{},
 					qinfo,

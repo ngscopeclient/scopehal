@@ -75,6 +75,18 @@ extern bool g_hasAvx512DQ;
 extern bool g_hasAvx2;
 #endif
 
+//Enable flags for various features
+extern bool g_gpuFilterEnabled;
+extern bool g_gpuScopeDriverEnabled;
+extern bool g_hasShaderFloat64;
+extern bool g_hasShaderInt64;
+extern bool g_hasShaderInt16;
+extern bool g_hasShaderInt8;
+extern bool g_hasShaderAtomicFloat;
+extern bool g_hasDebugUtils;
+extern bool g_hasMemoryBudget;
+extern bool g_hasPushDescriptor;
+
 #include "Unit.h"
 #include "Bijection.h"
 #include "IDTable.h"
@@ -191,6 +203,14 @@ std::string str_replace(const std::string& search, const std::string& replace, c
 
 extern std::vector<std::string> g_searchPaths;
 
+//Shader args for frequently used kernels
+struct ConvertRawSamplesShaderArgs
+{
+	uint32_t size;
+	float gain;
+	float offset;
+};
+
 //Vulkan global stuff
 extern vk::raii::Context g_vkContext;
 extern std::unique_ptr<vk::raii::Instance> g_vkInstance;
@@ -203,25 +223,6 @@ extern bool g_vulkanDeviceIsAnyMesa;
 extern bool g_vulkanDeviceIsMoltenVK;
 extern uint32_t g_vkPinnedMemoryHeap;
 extern uint32_t g_vkLocalMemoryHeap;
-
-//Enable flags for various features
-extern bool g_gpuFilterEnabled;
-extern bool g_gpuScopeDriverEnabled;
-extern bool g_hasShaderFloat64;
-extern bool g_hasShaderInt64;
-extern bool g_hasShaderInt16;
-extern bool g_hasShaderInt8;
-extern bool g_hasShaderAtomicFloat;
-extern bool g_hasDebugUtils;
-extern bool g_hasMemoryBudget;
-
-//Shader args for frequently used kernels
-struct ConvertRawSamplesShaderArgs
-{
-	uint32_t size;
-	float gain;
-	float offset;
-};
 
 uint32_t GetComputeBlockCount(size_t numGlobal, size_t blockSize);
 
