@@ -93,8 +93,8 @@ VulkanFFTPlan::VulkanFFTPlan(size_t npoints, size_t nouts, VulkanFFTPlanDirectio
 		//output is real buffer of full size
 		m_bsize = npoints * sizeof(float) * numBatches;
 
-		m_config.bufferSize = &m_bsize;
-		m_config.inputBufferSize = &m_isize;
+		m_config.bufferSize = &m_isize;
+		m_config.inputBufferSize = &m_bsize;	//note that input and output buffers are swapped for reverse transform
 		m_config.inverseReturnToInputBuffer = 1;
 
 		cacheKey = string("VkFFT_INV_V7_") + to_string(npoints);
