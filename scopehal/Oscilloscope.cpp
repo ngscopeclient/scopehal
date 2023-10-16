@@ -58,6 +58,7 @@ Oscilloscope::Oscilloscope()
 
 	m_serializers.push_back(sigc::mem_fun(this, &Oscilloscope::DoSerializeConfiguration));
 	m_loaders.push_back(sigc::mem_fun(this, &Oscilloscope::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &Oscilloscope::DoPreLoadConfiguration));
 }
 
 Oscilloscope::~Oscilloscope()
@@ -475,6 +476,131 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		trig->LoadParameters(tnode, table);
 		trig->LoadInputs(tnode, table);
 		SetTrigger(trig);
+	}
+}
+
+void Oscilloscope::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
+{
+	//Create a dummy warning message
+	list.m_instrumentWarnings[this].m_messages.push_back(ConfigWarningMessage(
+		"Output foobar changed", "1V", "5V"));
+
+	//Load some definitely-safe configuration such as channel and instrument nicknames to make messages easier to understand
+	m_nickname = node["nick"].as<string>();
+
+	//Load the channels
+	auto& chans = node["channels"];
+	for(auto it : chans)
+	{
+		/*
+		auto& cnode = it.second;
+		auto chan = GetOscilloscopeChannel(cnode["index"].as<int>());
+		table.emplace(cnode["id"].as<int>(), chan);
+
+		//Ignore name/type.
+		//These are only needed for offline scopes to create a representation of the original instrument.
+
+		chan->m_displaycolor = cnode["color"].as<string>();
+		chan->SetDisplayName(cnode["nick"].as<string>());
+
+		if(cnode["enabled"].as<int>())
+			chan->Enable();
+		else
+			chan->Disable();
+
+		//Input mux and attenuation control a bunch of the other parameters, so must be changed first
+		if(cnode["inmux"])
+			chan->SetInputMux(cnode["inmux"].as<int>());
+		if(cnode["attenuation"])
+			chan->SetAttenuation(cnode["attenuation"].as<float>());
+
+		Unit yunit = chan->GetYAxisUnits(0);
+		if(cnode["yunit"])
+			yunit = Unit(cnode["yunit"].as<string>());
+		if(cnode["vrange"])
+			chan->SetVoltageRange(cnode["vrange"].as<float>(), 0);
+		if(cnode["offset"])
+			chan->SetOffset(cnode["offset"].as<float>(), 0);
+		if(cnode["invert"])
+		{
+			if(version >= 1)
+				chan->Invert(cnode["invert"].as<bool>());
+			else
+				chan->Invert(cnode["invert"].as<int>());
+		}
+
+		//Add multiple streams if present
+		auto snode = cnode["nstreams"];
+		if(snode)
+		{
+			size_t nstreams = snode.as<size_t>();
+			if(nstreams > 1)
+			{
+				auto stype = chan->GetType(0);
+
+				chan->ClearStreams();
+
+				//We have to keep track of indexes because streams might show up out of order
+				//but right now OscilloscopeChannel only lets us add them in order
+				map<int, string> names;
+				map<int, string> yunits;
+
+				auto streams = cnode["streams"];
+				for(auto st : streams)
+				{
+					auto index = st.second["index"].as<size_t>();
+					names[index] = st.second["name"].as<string>();
+
+					if(st.second["yunit"])
+						yunits[index] = st.second["yunit"].as<string>();
+					else
+						yunits[index] = "V";
+
+					if(st.second["vrange"])
+						chan->SetVoltageRange(st.second["vrange"].as<float>(), index);
+					if(st.second["offset"])
+						chan->SetOffset(st.second["offset"].as<float>(), index);
+				}
+
+				for(size_t j=0; j<nstreams; j++)
+					chan->AddStream(yunit, names[j], stype);
+			}
+		}
+
+		switch(chan->GetType(0))
+		{
+			case Stream::STREAM_TYPE_ANALOG:
+				chan->SetBandwidthLimit(cnode["bwlimit"].as<int>());
+
+				if(cnode["xunit"])
+					chan->SetXAxisUnits(cnode["xunit"].as<string>());
+
+				if(cnode["coupling"])
+				{
+					string coupling = cnode["coupling"].as<string>();
+					if(coupling == "dc_50")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_50);
+					else if(coupling == "dc_1M")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_DC_1M);
+					else if(coupling == "ac_1M")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_AC_1M);
+					else if(coupling == "gnd")
+						chan->SetCoupling(OscilloscopeChannel::COUPLE_GND);
+				}
+				if(cnode["adcmode"])
+					SetADCMode(chan->GetIndex(), cnode["adcmode"].as<int>());
+				break;
+
+			case Stream::STREAM_TYPE_DIGITAL:
+				if(cnode["thresh"])
+					chan->SetDigitalThreshold(cnode["thresh"].as<float>());
+				if(cnode["hys"])
+					chan->SetDigitalHysteresis(cnode["hys"].as<float>());
+				break;
+
+			default:
+				break;
+		}*/
 	}
 }
 

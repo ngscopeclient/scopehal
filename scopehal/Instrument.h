@@ -37,6 +37,7 @@
 #define Instrument_h
 
 #include "InstrumentChannel.h"
+#include "ConfigWarningList.h"
 
 
 /**
@@ -217,6 +218,15 @@ public:
 	 */
 	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
+	/**
+		@brief Parse a limited subset of instrument configuration but do *not* apply it.
+
+		This is an optional method intended to be called prior to loading a file in order to identify potential problems
+		with the setup being loaded (for example, attenuation or output voltage settings wildly different from the
+		current configuration).
+	 */
+	virtual void PreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings);
+
 protected:
 
 	/**
@@ -228,6 +238,11 @@ protected:
 		@brief List of methods which need to be called to deserialize this node's configuration
 	 */
 	std::list< sigc::slot<void(int, const YAML::Node&, IDTable&)> > m_loaders;
+
+	/**
+		@brief List of methods which need to be called to pre-load this node's configuration
+	 */
+	std::list< sigc::slot<void(int, const YAML::Node&, IDTable&, ConfigWarningList&)> > m_preloaders;
 
 protected:
 
