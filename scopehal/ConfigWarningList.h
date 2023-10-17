@@ -42,12 +42,14 @@ class ConfigWarningMessage
 {
 public:
 
+	std::string m_object;
 	std::string m_messageText;
 	std::string m_existingValue;
 	std::string m_proposedValue;
 
-	ConfigWarningMessage(const std::string& m, const std::string& e, const std::string& p)
-	: m_messageText(m)
+	ConfigWarningMessage(const std::string& o, const std::string& m, const std::string& e, const std::string& p)
+	: m_object(o)
+	, m_messageText(m)
 	, m_existingValue(e)
 	, m_proposedValue(p)
 	{}
@@ -66,14 +68,13 @@ class ConfigWarningList
 {
 public:
 
-	///@brief Warnings that apply to the instrument as a whole
-	std::map<Instrument*, WarningList> m_instrumentWarnings;
+	std::map<Instrument*, WarningList> m_warnings;
 
-	///@brief Warnings that apply to a single channel
-	std::map<InstrumentChannel*, WarningList> m_channelWarnings;
+	bool empty() const
+	{ return m_warnings.empty(); }
 
-	bool empty()
-	{ return m_instrumentWarnings.empty() && m_channelWarnings.empty(); }
+	void clear()
+	{ m_warnings.clear(); }
 };
 
 #endif
