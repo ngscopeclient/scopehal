@@ -43,10 +43,13 @@ public:
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
-	virtual std::string GetDriverName() =0;
+	virtual std::string GetName() const;
+	virtual std::string GetVendor() const;
+	virtual std::string GetSerial() const;
+	virtual std::string GetDriverName() const =0;
+
+protected:
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 };
 
 #endif

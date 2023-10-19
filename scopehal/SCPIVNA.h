@@ -103,7 +103,7 @@ public:
 #define VNA_INITPROC(T) \
 	static SCPIVNA* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddVNADriverClass(T) SCPIVNA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

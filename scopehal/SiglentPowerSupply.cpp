@@ -59,21 +59,6 @@ string SiglentPowerSupply::GetDriverNameInternal()
 	return "siglent_spd";
 }
 
-string SiglentPowerSupply::GetName()
-{
-	return m_model;
-}
-
-string SiglentPowerSupply::GetVendor()
-{
-	return m_vendor;
-}
-
-string SiglentPowerSupply::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t SiglentPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return INST_PSU;

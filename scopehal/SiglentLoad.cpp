@@ -64,21 +64,6 @@ unsigned int SiglentLoad::GetInstrumentTypes()
 	return INST_LOAD;
 }
 
-string SiglentLoad::GetName()
-{
-	return m_model;
-}
-
-string SiglentLoad::GetVendor()
-{
-	return m_vendor;
-}
-
-string SiglentLoad::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t SiglentLoad::GetInstrumentTypesForChannel(size_t i)
 {
 	if(i == 0)

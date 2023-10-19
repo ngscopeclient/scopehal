@@ -103,9 +103,9 @@ public:
 	virtual unsigned int GetInstrumentTypes() =0;
 
 	//Device information
-	virtual std::string GetName() =0;
-	virtual std::string GetVendor() =0;
-	virtual std::string GetSerial() =0;
+	virtual std::string GetName() const =0;
+	virtual std::string GetVendor() const =0;
+	virtual std::string GetSerial() const =0;
 
 	/**
 		@brief Optional user-selected nickname of the instrument

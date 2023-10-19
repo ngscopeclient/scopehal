@@ -910,9 +910,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static Oscilloscope* CreateOscilloscope(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-	//static std::string GetDriverNameInternal();
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, CreateProcType > CreateMapType;
@@ -926,7 +923,7 @@ protected:
 #define OSCILLOSCOPE_INITPROC(T) \
 	static Oscilloscope* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddDriverClass(T) Oscilloscope::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

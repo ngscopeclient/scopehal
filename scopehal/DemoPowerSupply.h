@@ -42,9 +42,6 @@ public:
 	virtual ~DemoPowerSupply();
 
 	//Device information
-	std::string GetName() override;
-	std::string GetVendor() override;
-	std::string GetSerial() override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//Device capabilities

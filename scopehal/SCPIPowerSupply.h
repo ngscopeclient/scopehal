@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPIPowerSupply* CreatePowerSupply(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, PowerCreateProcType > PowerCreateMapType;
@@ -60,7 +58,7 @@ protected:
 #define POWER_INITPROC(T) \
 	static SCPIPowerSupply* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddPowerSupplyDriverClass(T) SCPIPowerSupply::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

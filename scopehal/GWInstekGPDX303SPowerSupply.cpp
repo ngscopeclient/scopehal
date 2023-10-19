@@ -66,21 +66,6 @@ string GWInstekGPDX303SPowerSupply::GetDriverNameInternal()
 	return "gwinstek_gpdx303s";
 }
 
-string GWInstekGPDX303SPowerSupply::GetName()
-{
-	return m_model;
-}
-
-string GWInstekGPDX303SPowerSupply::GetVendor()
-{
-	return m_vendor;
-}
-
-string GWInstekGPDX303SPowerSupply::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return INST_PSU;

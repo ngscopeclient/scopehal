@@ -62,21 +62,6 @@ string RohdeSchwarzHMC804xPowerSupply::GetDriverNameInternal()
 	return "rs_hmc804x";
 }
 
-string RohdeSchwarzHMC804xPowerSupply::GetName()
-{
-	return m_model;
-}
-
-string RohdeSchwarzHMC804xPowerSupply::GetVendor()
-{
-	return m_vendor;
-}
-
-string RohdeSchwarzHMC804xPowerSupply::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return INST_PSU;

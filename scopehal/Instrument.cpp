@@ -86,8 +86,17 @@ string Instrument::GetChannelDisplayName(size_t i)
 YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
 {
 	YAML::Node node;
+
+	//Serialize instrument-wide stuff
+	node["nick"] = m_nickname;
+	node["name"] = GetName();
+	node["vendor"] = GetVendor();
+	node["serial"] = GetSerial();
+
+	//Call each derived class
 	for(auto& s : m_serializers)
 		s(node, table);
+
 	return node;
 }
 

@@ -597,21 +597,6 @@ uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t i)
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-string SiglentSCPIOscilloscope::GetName()
-{
-	return m_model;
-}
-
-string SiglentSCPIOscilloscope::GetVendor()
-{
-	return m_vendor;
-}
-
-string SiglentSCPIOscilloscope::GetSerial()
-{
-	return m_serial;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Channel configuration
 

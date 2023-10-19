@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPIRFSignalGenerator* CreateRFSignalGenerator(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, VSGCreateProcType > VSGCreateMapType;
@@ -60,7 +58,7 @@ protected:
 #define VSG_INITPROC(T) \
 	static SCPIRFSignalGenerator* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddRFSignalGeneratorDriverClass(T) SCPIRFSignalGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

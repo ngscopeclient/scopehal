@@ -70,21 +70,6 @@ string DemoPowerSupply::GetDriverNameInternal()
 	return "demo";
 }
 
-string DemoPowerSupply::GetName()
-{
-	return m_model;
-}
-
-string DemoPowerSupply::GetVendor()
-{
-	return m_vendor;
-}
-
-string DemoPowerSupply::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t DemoPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
 {
 	return INST_PSU;

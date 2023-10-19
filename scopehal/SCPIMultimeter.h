@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPIMultimeter* CreateMultimeter(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Configuration storage
 
@@ -75,7 +73,7 @@ protected:
 #define METER_INITPROC(T) \
 	static SCPIMultimeter* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddMultimeterDriverClass(T) SCPIMultimeter::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

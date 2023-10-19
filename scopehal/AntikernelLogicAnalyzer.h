@@ -38,7 +38,7 @@
 
 class AntikernelLogicAnalyzer
 	: public virtual Oscilloscope
-	, public SCPIDevice
+	, public SCPIInstrument
 {
 public:
 	AntikernelLogicAnalyzer(SCPITransport* transport);
@@ -53,9 +53,9 @@ public:
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+	virtual std::string GetName() const override;
+	virtual std::string GetVendor() const override;
+	virtual std::string GetSerial() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//Channel configuration

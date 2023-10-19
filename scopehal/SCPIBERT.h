@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPIBERT* CreateBERT(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, BERTCreateProcType > BERTCreateMapType;
@@ -60,7 +58,7 @@ protected:
 #define BERT_INITPROC(T) \
 	static SCPIBERT* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddBERTDriverClass(T) SCPIBERT::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

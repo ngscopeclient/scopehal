@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPIFunctionGenerator* CreateFunctionGenerator(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, GeneratorCreateProcType > GeneratorCreateMapType;
@@ -61,7 +59,7 @@ protected:
 #define GENERATOR_INITPROC(T) \
 	static SCPIFunctionGenerator* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
 #define AddFunctionGeneratorDriverClass(T) SCPIFunctionGenerator::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

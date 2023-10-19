@@ -37,6 +37,7 @@ using namespace std;
 SCPIInstrument::SCPIInstrument(SCPITransport* transport, bool identify)
 	: SCPIDevice(transport, identify)
 {
+	m_serializers.push_back(sigc::mem_fun(this, &SCPIInstrument::DoSerializeConfiguration));
 }
 
 SCPIInstrument::~SCPIInstrument()
@@ -57,17 +58,27 @@ string SCPIInstrument::GetTransportConnectionString()
 	return m_transport->GetConnectionString();
 }
 
-string SCPIInstrument::GetName()
+string SCPIInstrument::GetName() const
 {
 	return m_model;
 }
 
-string SCPIInstrument::GetVendor()
+string SCPIInstrument::GetVendor() const
 {
 	return m_vendor;
 }
 
-string SCPIInstrument::GetSerial()
+string SCPIInstrument::GetSerial() const
 {
 	return m_serial;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void SCPIInstrument::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+	node["transport"] = GetTransportName();
+	node["args"] = GetTransportConnectionString();
+	node["driver"] = GetDriverName();
 }

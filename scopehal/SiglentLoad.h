@@ -44,9 +44,6 @@ public:
 
 	//Instrument
 	virtual unsigned int GetInstrumentTypes() override;
-	virtual std::string GetName() override;
-	virtual std::string GetVendor() override;
-	virtual std::string GetSerial() override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 
 	//Load

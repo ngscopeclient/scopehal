@@ -76,9 +76,9 @@ public:
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
 
-	virtual std::string GetName();
-	virtual std::string GetVendor();
-	virtual std::string GetSerial();
+	virtual std::string GetName() const;
+	virtual std::string GetVendor() const;
+	virtual std::string GetSerial() const;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
@@ -125,6 +125,7 @@ public:
 	virtual unsigned int GetInstrumentTypes();
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
 	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 
 protected:
 

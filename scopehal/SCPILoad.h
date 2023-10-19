@@ -49,8 +49,6 @@ public:
 	static void EnumDrivers(std::vector<std::string>& names);
 	static SCPILoad* CreateLoad(std::string driver, SCPITransport* transport);
 
-	virtual std::string GetDriverName() =0;
-
 protected:
 	//Class enumeration
 	typedef std::map< std::string, LoadCreateProcType > LoadCreateMapType;
@@ -60,7 +58,7 @@ protected:
 #define LOAD_INITPROC(T) \
 	static SCPILoad* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
-	virtual std::string GetDriverName() \
+	virtual std::string GetDriverName() const \
 	{ return GetDriverNameInternal(); }
 
 #define AddLoadDriverClass(T) SCPILoad::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)

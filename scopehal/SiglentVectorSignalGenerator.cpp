@@ -67,21 +67,6 @@ unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes()
 	return INST_RF_GEN | INST_FUNCTION;
 }
 
-string SiglentVectorSignalGenerator::GetName()
-{
-	return m_model;
-}
-
-string SiglentVectorSignalGenerator::GetVendor()
-{
-	return m_vendor;
-}
-
-string SiglentVectorSignalGenerator::GetSerial()
-{
-	return m_serial;
-}
-
 uint32_t SiglentVectorSignalGenerator::GetInstrumentTypesForChannel(size_t i)
 {
 	if(i == CHANNEL_RFOUT)

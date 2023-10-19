@@ -32,6 +32,9 @@
 
 PowerSupply::PowerSupply()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &PowerSupply::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &PowerSupply::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &PowerSupply::DoPreLoadConfiguration));
 }
 
 PowerSupply::~PowerSupply()
@@ -130,4 +133,19 @@ bool PowerSupply::AcquireData()
 	}
 
 	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+}
+
+void PowerSupply::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+{
+}
+
+void PowerSupply::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
+{
 }

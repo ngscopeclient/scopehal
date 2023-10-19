@@ -192,13 +192,6 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	int iscope = table.emplace(this);
 
 	node["id"] = iscope;
-	node["nick"] = m_nickname;
-	node["name"] = GetName();
-	node["vendor"] = GetVendor();
-	node["serial"] = GetSerial();
-	node["transport"] = GetTransportName();
-	node["args"] = GetTransportConnectionString();
-	node["driver"] = GetDriverName();
 
 	//Save timebase info
 	node["rate"] = GetSampleRate();

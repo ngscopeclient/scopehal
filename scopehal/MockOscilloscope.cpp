@@ -59,6 +59,8 @@ MockOscilloscope::MockOscilloscope(
 {
 	//Need to run this loader prior to the main Oscilloscope loader
 	m_loaders.push_front(sigc::mem_fun(this, &MockOscilloscope::DoLoadConfiguration));
+
+	m_serializers.push_back(sigc::mem_fun(this, &MockOscilloscope::DoSerializeConfiguration));
 }
 
 MockOscilloscope::~MockOscilloscope()
@@ -99,17 +101,17 @@ uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-string MockOscilloscope::GetName()
+string MockOscilloscope::GetName() const
 {
 	return m_name;
 }
 
-string MockOscilloscope::GetVendor()
+string MockOscilloscope::GetVendor() const
 {
 	return m_vendor;
 }
 
-string MockOscilloscope::GetSerial()
+string MockOscilloscope::GetSerial() const
 {
 	return m_serial;
 }
@@ -161,6 +163,13 @@ bool MockOscilloscope::IsTriggerArmed()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
+
+void MockOscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& /*table*/)
+{
+	node["transport"] = GetTransportName();
+	node["args"] = GetTransportConnectionString();
+	node["driver"] = GetDriverName();
+}
 
 void MockOscilloscope::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& table)
 {

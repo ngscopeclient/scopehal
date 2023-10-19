@@ -70,6 +70,7 @@ enum opcodes_t
  */
 AntikernelLogicAnalyzer::AntikernelLogicAnalyzer(SCPITransport* transport)
 	: SCPIDevice(transport, false)
+	, SCPIInstrument(transport)
 {
 	m_transport = transport;
 
@@ -159,17 +160,17 @@ uint32_t AntikernelLogicAnalyzer::GetInstrumentTypesForChannel(size_t /*i*/)
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-string AntikernelLogicAnalyzer::GetName()
+string AntikernelLogicAnalyzer::GetName() const
 {
 	return "NoName";
 }
 
-string AntikernelLogicAnalyzer::GetVendor()
+string AntikernelLogicAnalyzer::GetVendor() const
 {
 	return "Antikernel ILA";
 }
 
-string AntikernelLogicAnalyzer::GetSerial()
+string AntikernelLogicAnalyzer::GetSerial() const
 {
 	return "NoSerialNumber";
 }
