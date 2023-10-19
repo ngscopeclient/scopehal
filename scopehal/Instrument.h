@@ -137,7 +137,7 @@ public:
 	/**
 		@brief Gets the number of channels (of any type) this instrument has.
 	 */
-	size_t GetChannelCount()
+	size_t GetChannelCount() const
 	{ return m_channels.size(); }
 
 	/**
@@ -148,7 +148,7 @@ public:
 
 		@param i		Channel index
 	 */
-	InstrumentChannel* GetChannel(size_t i)
+	InstrumentChannel* GetChannel(size_t i) const
 	{
 		if(i >= m_channels.size())
 			return nullptr;

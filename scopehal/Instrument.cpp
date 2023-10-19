@@ -93,6 +93,26 @@ YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
 	node["vendor"] = GetVendor();
 	node["serial"] = GetSerial();
 
+	//give us an ID just in case, but i'm not sure how much that gets used
+	node["id"] = table.emplace(const_cast<Instrument*>(this));
+
+	//Serialize base channel configuration
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		auto chan = GetChannel(i);
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Save basic info
+		channelNode["id"] = table.emplace(chan);
+		channelNode["index"] = i;
+		channelNode["color"] = chan->m_displaycolor;
+		channelNode["nick"] = chan->GetDisplayName();
+		channelNode["name"] = chan->GetHwname();
+
+		node["channels"][key] = channelNode;
+	}
+
 	//Call each derived class
 	for(auto& s : m_serializers)
 		s(node, table);

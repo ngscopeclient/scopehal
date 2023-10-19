@@ -187,11 +187,7 @@ bool Oscilloscope::PopPendingWaveform()
 
 void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
-	//Save basic scope info
-	YAML::Node channels;
-	int iscope = table.emplace(this);
-
-	node["id"] = iscope;
+	YAML::Node channels = node["channels"];
 
 	//Save timebase info
 	node["rate"] = GetSampleRate();

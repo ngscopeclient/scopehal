@@ -30,6 +30,8 @@
 #include "scopehal.h"
 #include "PowerSupply.h"
 
+using namespace std;
+
 PowerSupply::PowerSupply()
 {
 	m_serializers.push_back(sigc::mem_fun(this, &PowerSupply::DoSerializeConfiguration));
@@ -140,6 +142,57 @@ bool PowerSupply::AcquireData()
 
 void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
+	//Global capabilities/status
+	//(This info is only used if we're loading offline)
+	YAML::Node caps;
+	caps["softstart"] = SupportsSoftStart();
+	caps["individualSwitching"] = SupportsIndividualOutputSwitching();
+	caps["globalSwitch"] = SupportsMasterOutputSwitching();
+	caps["overcurrentShutdown"] = SupportsOvercurrentShutdown();
+	node["capabilities"] = caps;
+
+	//Master enable (if present)
+	if(SupportsMasterOutputSwitching())
+		node["globalSwitch"] = GetMasterPowerEnable();
+
+	//Channel configuration
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
+			continue;
+
+		auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+
+		//Save basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+		channelNode["psuid"] = table.emplace(chan);
+
+		//Save PSU-specific settings (including actual sensor readings for use during offline load)
+		if(SupportsVoltageCurrentControl(i))
+		{
+			channelNode["voltageActual"] = GetPowerVoltageActual(i);
+			channelNode["voltageNominal"] = GetPowerVoltageNominal(i);
+			channelNode["currentActual"] = GetPowerCurrentActual(i);
+			channelNode["currentNominal"] = GetPowerCurrentNominal(i);
+			channelNode["constantCurrent"] = IsPowerConstantCurrent(i);
+		}
+		if(SupportsOvercurrentShutdown())
+		{
+			channelNode["overcurrentShutdown"] = GetPowerOvercurrentShutdownEnabled(i);
+			channelNode["overcurrentTripped"] = GetPowerOvercurrentShutdownTripped(i);
+		}
+		if(SupportsSoftStart())
+		{
+			YAML::Node ss;
+			ss["enable"] = IsSoftStartEnabled(i);
+			//TODO: soft start ramp rate etc
+			channelNode["softStart"] = ss;
+		}
+		channelNode["enabled"] = GetPowerChannelActive(i);
+
+		node["channels"][key] = channelNode;
+	}
 }
 
 void PowerSupply::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)

@@ -206,9 +206,7 @@ void Multimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 	//TODO: ranges
 
-	YAML::Node chnode;
-	if(!node["channels"])
-		node["channels"] = chnode;
+	YAML::Node chnode = node["channels"];
 
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
