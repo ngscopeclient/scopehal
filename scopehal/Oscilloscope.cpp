@@ -474,9 +474,6 @@ void Oscilloscope::DoPreLoadConfiguration(int version, const YAML::Node& node, I
 	//list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
 	//	"CH3 input coupling", "50Ω mode has lower max voltage than 1MΩ", "1MΩ", "50Ω"));
 
-	//Load some definitely-safe configuration such as channel and instrument nicknames to make messages easier to understand
-	m_nickname = node["nick"].as<string>();
-
 	//Load the channels
 	auto& chans = node["channels"];
 	for(auto it : chans)

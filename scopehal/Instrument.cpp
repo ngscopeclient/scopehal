@@ -128,6 +128,9 @@ void Instrument::LoadConfiguration(int version, const YAML::Node& node, IDTable&
 
 void Instrument::PreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& warnings)
 {
+	//Load channel nickname now to make messages easier to understand
+	m_nickname = node["nick"].as<string>();
+
 	for(auto& preload : m_preloaders)
 		preload(version, node, idmap, warnings);
 }

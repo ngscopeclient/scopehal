@@ -195,10 +195,76 @@ void PowerSupply::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	}
 }
 
-void PowerSupply::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+void PowerSupply::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& idmap,
+	ConfigWarningList& list)
 {
+	Unit volts(Unit::UNIT_VOLTS);
+	Unit amps(Unit::UNIT_AMPS);
+
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
+			continue;
+
+		auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+
+		//Save basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Set our ID
+		idmap.emplace(channelNode["psuid"].as<int>(), chan);
+
+		//Compare settings to what's on the instrument now and warn if increasing limits,
+		//or disabling overcurrent shutdown or soft start
+		if(channelNode["voltageNominal"])
+		{
+			float vnom = channelNode["voltageNominal"].as<float>();
+			float inom = channelNode["currentNominal"].as<float>();
+
+			float vact = GetPowerVoltageNominal(i);
+			float iact = GetPowerCurrentNominal(i);
+
+			if(vnom > vact)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName().c_str(),
+					string("Increasing output voltage by ") + volts.PrettyPrint(vnom - vact),
+					volts.PrettyPrint(vact),
+					volts.PrettyPrint(vnom)));
+			}
+
+			if(inom > iact)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName().c_str(),
+					string("Increasing output current limit by ") + amps.PrettyPrint(inom - iact),
+					volts.PrettyPrint(iact),
+					volts.PrettyPrint(inom)));
+			}
+		}
+		if(channelNode["overcurrentShutdown"])
+		{
+			bool ocp = channelNode["overcurrentShutdown"].as<bool>();
+		}
+		if(channelNode["softStart"])
+		{
+			bool ss = channelNode["softStart"]["enable"].as<bool>();
+		}
+
+		//Warn if turning output on that's currently off
+		bool en = channelNode["enabled"].as<bool>();
+		if(en && !GetPowerChannelActive(i))
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName().c_str(), "Power will be turned on when session is loaded", "off", "on"));
+		}
+	}
 }
 
-void PowerSupply::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
+void PowerSupply::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
 }
