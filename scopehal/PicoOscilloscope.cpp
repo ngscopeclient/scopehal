@@ -332,7 +332,7 @@ PicoOscilloscope::~PicoOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
-unsigned int PicoOscilloscope::GetInstrumentTypes()
+unsigned int PicoOscilloscope::GetInstrumentTypes() const
 {
 	switch(m_series)
 	{
@@ -349,7 +349,7 @@ unsigned int PicoOscilloscope::GetInstrumentTypes()
 	}
 }
 
-uint32_t PicoOscilloscope::GetInstrumentTypesForChannel(size_t i)
+uint32_t PicoOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(m_awgChannel && (m_awgChannel->GetIndex() == i))
 		return Instrument::INST_FUNCTION;

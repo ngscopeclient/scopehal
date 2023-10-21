@@ -44,7 +44,7 @@ PowerSupply::~PowerSupply()
 }
 
 
-unsigned int PowerSupply::GetInstrumentTypes()
+unsigned int PowerSupply::GetInstrumentTypes() const
 {
 	return INST_PSU;
 }

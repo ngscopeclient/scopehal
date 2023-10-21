@@ -96,6 +96,25 @@ YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
 	//give us an ID just in case, but i'm not sure how much that gets used
 	node["id"] = table.emplace(const_cast<Instrument*>(this));
 
+	//type bitmask, only used for offline loading so we know what the mock instrument should support
+	YAML::Node types;
+	auto typemask = GetInstrumentTypes();
+	if(typemask & INST_OSCILLOSCOPE)
+		types.push_back("oscilloscope");
+	if(typemask & INST_DMM)
+		types.push_back("multimeter");
+	if(typemask & INST_PSU)
+		types.push_back("psu");
+	if(typemask & INST_FUNCTION)
+		types.push_back("funcgen");
+	if(typemask & INST_RF_GEN)
+		types.push_back("rfgen");
+	if(typemask & INST_LOAD)
+		types.push_back("load");
+	if(typemask & INST_BERT)
+		types.push_back("bert");
+	node["types"] = types;
+
 	//Serialize base channel configuration
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
@@ -109,6 +128,25 @@ YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
 		channelNode["color"] = chan->m_displaycolor;
 		channelNode["nick"] = chan->GetDisplayName();
 		channelNode["name"] = chan->GetHwname();
+
+		//type bitmask, only used for offline loading so we know what the mock instrument should support
+		YAML::Node chtypes;
+		typemask = GetInstrumentTypesForChannel(i);
+		if(typemask & INST_OSCILLOSCOPE)
+			chtypes.push_back("oscilloscope");
+		if(typemask & INST_DMM)
+			chtypes.push_back("multimeter");
+		if(typemask & INST_PSU)
+			chtypes.push_back("psu");
+		if(typemask & INST_FUNCTION)
+			chtypes.push_back("funcgen");
+		if(typemask & INST_RF_GEN)
+			chtypes.push_back("rfgen");
+		if(typemask & INST_LOAD)
+			chtypes.push_back("load");
+		if(typemask & INST_BERT)
+			chtypes.push_back("bert");
+		channelNode["types"] = chtypes;
 
 		node["channels"][key] = channelNode;
 	}

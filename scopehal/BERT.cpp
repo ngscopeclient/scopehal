@@ -41,7 +41,7 @@ BERT::~BERT()
 }
 
 
-unsigned int BERT::GetInstrumentTypes()
+unsigned int BERT::GetInstrumentTypes() const
 {
 	return INST_BERT;
 }

@@ -105,7 +105,7 @@ string MultiLaneBERT::GetDriverNameInternal()
 	return "mlbert";
 }
 
-uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t MultiLaneBERT::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_BERT;
 }

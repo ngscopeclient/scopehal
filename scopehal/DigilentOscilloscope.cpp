@@ -181,12 +181,12 @@ DigilentOscilloscope::~DigilentOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
-unsigned int DigilentOscilloscope::GetInstrumentTypes()
+unsigned int DigilentOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t DigilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t DigilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

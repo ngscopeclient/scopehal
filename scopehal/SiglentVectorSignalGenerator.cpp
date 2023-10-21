@@ -62,12 +62,12 @@ string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)
 	return "RFOUT";
 }
 
-unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes()
+unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes() const
 {
 	return INST_RF_GEN | INST_FUNCTION;
 }
 
-uint32_t SiglentVectorSignalGenerator::GetInstrumentTypesForChannel(size_t i)
+uint32_t SiglentVectorSignalGenerator::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(i == CHANNEL_RFOUT)
 		return Instrument::INST_RF_GEN;

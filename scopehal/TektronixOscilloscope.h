@@ -73,12 +73,12 @@ public:
 public:
 
 	//Device information
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() const override;
 
 	virtual void FlushConfigCache();
 
 	//Channel configuration
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual bool CanEnableChannel(size_t i);

@@ -39,7 +39,7 @@ public:
 	PowerSupply();
 	virtual ~PowerSupply();
 
-	virtual unsigned int GetInstrumentTypes() override;
+	virtual unsigned int GetInstrumentTypes() const override;
 
 	//Device capabilities
 	/**
@@ -110,7 +110,7 @@ public:
 	virtual void SetSoftStartEnabled(int chan, bool enable);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Configuration storage
+	// Serialization
 
 protected:
 	/**

@@ -122,8 +122,8 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
-	virtual unsigned int GetInstrumentTypes();
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual unsigned int GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
 

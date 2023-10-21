@@ -73,9 +73,9 @@ public:
 	virtual std::string GetName();
 	virtual std::string GetVendor();
 	virtual std::string GetSerial();
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() const override;
 	virtual unsigned int GetMeasurementTypes();
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	virtual void FlushConfigCache();
 

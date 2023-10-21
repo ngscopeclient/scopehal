@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -213,7 +213,7 @@ string RSRTO6Oscilloscope::GetDriverNameInternal()
 	return "rs.rto6";
 }
 
-unsigned int RSRTO6Oscilloscope::GetInstrumentTypes()
+unsigned int RSRTO6Oscilloscope::GetInstrumentTypes() const
 {
 	unsigned int resp = Instrument::INST_OSCILLOSCOPE;
 
@@ -223,7 +223,7 @@ unsigned int RSRTO6Oscilloscope::GetInstrumentTypes()
 	return resp;
 }
 
-uint32_t RSRTO6Oscilloscope::GetInstrumentTypesForChannel(size_t i)
+uint32_t RSRTO6Oscilloscope::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(m_hasAFG && (i >= m_firstAFGIndex))
 		return Instrument::INST_FUNCTION;
@@ -296,7 +296,7 @@ void RSRTO6Oscilloscope::EnableChannel(size_t i)
 		m_transport->SendCommandImmediate("BUS1:PAR:BIT" + to_string(HWDigitalNumber(i)) + ":STATE 1; *WAI");
 
 	lock_guard<recursive_mutex> lock2(m_cacheMutex);
-	
+
 	if (IsAnalog(i))
 		m_channelsEnabled[i] = true; // Digital channel may fail to enable if pod not connected
 }
@@ -729,7 +729,7 @@ template <typename T> size_t RSRTO6Oscilloscope::AcquireHeader(T* cap, string ch
 	}
 
 	//Set up the capture we're going to store our data into (no high res timer on R&S scopes)
-	
+
 	cap->m_timescale = fs_per_sample;
 	cap->m_triggerPhase = 0;
 	cap->m_startTimestamp = time(NULL);
@@ -1457,7 +1457,7 @@ bool RSRTO6Oscilloscope::HasFunctionRiseFallTimeControls(int /*chan*/)
 
 FunctionGenerator::OutputImpedance RSRTO6Oscilloscope::GetFunctionChannelOutputImpedance(int chan)
 {
-	return (m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":OUTPUT?") == "FIFT") ? 
+	return (m_transport->SendCommandQueuedWithReply("WGEN" + TO_HW_STR(chan) +":OUTPUT?") == "FIFT") ?
 			FunctionGenerator::IMPEDANCE_50_OHM : FunctionGenerator::IMPEDANCE_HIGH_Z;
 }
 

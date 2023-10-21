@@ -42,7 +42,7 @@ public:
 	virtual ~SiglentPowerSupply();
 
 	//Device information
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Device capabilities
 	virtual bool SupportsIndividualOutputSwitching() override;

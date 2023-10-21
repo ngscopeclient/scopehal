@@ -363,6 +363,25 @@ public:
 	virtual void SetSweepDirection(int chan, SweepDirection dir);
 
 	bool AcquireData() override;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Serialization
+
+protected:
+	/**
+		@brief Serializes this oscilloscope's configuration to a YAML node.
+	 */
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+
+	/**
+		@brief Validate instrument and channel configuration from a save file
+	 */
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 };
 
 #endif

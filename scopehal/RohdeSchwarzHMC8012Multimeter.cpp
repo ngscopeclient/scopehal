@@ -62,7 +62,7 @@ string RohdeSchwarzHMC8012Multimeter::GetDriverNameInternal()
 	return "rs_hmc8012";
 }
 
-unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes()
+unsigned int RohdeSchwarzHMC8012Multimeter::GetInstrumentTypes() const
 {
 	return INST_DMM;
 }
@@ -85,7 +85,7 @@ unsigned int RohdeSchwarzHMC8012Multimeter::GetSecondaryMeasurementTypes()
 	}
 }
 
-uint32_t RohdeSchwarzHMC8012Multimeter::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t RohdeSchwarzHMC8012Multimeter::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_DMM;
 }

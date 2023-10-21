@@ -91,12 +91,12 @@ string MockOscilloscope::GetTransportConnectionString()
 	return m_args;
 }
 
-unsigned int MockOscilloscope::GetInstrumentTypes()
+unsigned int MockOscilloscope::GetInstrumentTypes() const
 {
 	return INST_OSCILLOSCOPE;
 }
 
-uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t MockOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

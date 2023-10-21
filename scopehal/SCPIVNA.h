@@ -45,8 +45,8 @@ public:
 	SCPIVNA();
 	virtual ~SCPIVNA();
 
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual unsigned int GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i) override;

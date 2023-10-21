@@ -44,8 +44,8 @@ public:
 	virtual ~SiglentVectorSignalGenerator();
 
 	//Instrument
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual unsigned int GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//RF signal generator base stuff
 	virtual std::string GetChannelName(int chan) override;

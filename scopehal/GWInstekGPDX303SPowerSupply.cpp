@@ -66,7 +66,7 @@ string GWInstekGPDX303SPowerSupply::GetDriverNameInternal()
 	return "gwinstek_gpdx303s";
 }
 
-uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t GWInstekGPDX303SPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_PSU;
 }

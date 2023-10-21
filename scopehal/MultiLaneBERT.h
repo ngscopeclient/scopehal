@@ -44,7 +44,7 @@ public:
 	virtual bool AcquireData() override;
 
 	//Device information
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//TX pattern generator configuration
 	virtual Pattern GetTxPattern(size_t i) override;

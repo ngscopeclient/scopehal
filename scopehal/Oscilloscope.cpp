@@ -218,7 +218,6 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		channelNode["nick"] = chan->GetDisplayName();
 		channelNode["name"] = chan->GetHwname();
 
-
 		if(chan->HasInputMux())
 			channelNode["inmux"] = chan->GetInputMuxSetting();
 

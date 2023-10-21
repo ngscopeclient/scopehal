@@ -150,12 +150,12 @@ uint8_t AntikernelLogicAnalyzer::Read1ByteReply()
 	return ret;
 }
 
-unsigned int AntikernelLogicAnalyzer::GetInstrumentTypes()
+unsigned int AntikernelLogicAnalyzer::GetInstrumentTypes() const
 {
 	return INST_OSCILLOSCOPE;
 }
 
-uint32_t AntikernelLogicAnalyzer::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t AntikernelLogicAnalyzer::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

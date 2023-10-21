@@ -121,12 +121,12 @@ string KeysightDCA::GetDriverNameInternal()
 	return "keysightdca";
 }
 
-unsigned int KeysightDCA::GetInstrumentTypes()
+unsigned int KeysightDCA::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t KeysightDCA::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t KeysightDCA::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

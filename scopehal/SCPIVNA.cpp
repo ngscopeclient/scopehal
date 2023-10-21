@@ -192,12 +192,12 @@ uint64_t SCPIVNA::GetSampleRate()
 	return 1;
 }
 
-unsigned int SCPIVNA::GetInstrumentTypes()
+unsigned int SCPIVNA::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t SCPIVNA::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t SCPIVNA::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

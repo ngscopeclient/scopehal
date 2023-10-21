@@ -59,7 +59,7 @@ string SiglentPowerSupply::GetDriverNameInternal()
 	return "siglent_spd";
 }
 
-uint32_t SiglentPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t SiglentPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_PSU;
 }

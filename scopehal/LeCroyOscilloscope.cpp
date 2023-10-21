@@ -1049,7 +1049,7 @@ unsigned int LeCroyOscilloscope::GetMeasurementTypes()
 /**
 	@brief See what features we have
  */
-unsigned int LeCroyOscilloscope::GetInstrumentTypes()
+unsigned int LeCroyOscilloscope::GetInstrumentTypes() const
 {
 	unsigned int type = INST_OSCILLOSCOPE;
 	if(m_hasDVM)
@@ -1059,7 +1059,7 @@ unsigned int LeCroyOscilloscope::GetInstrumentTypes()
 	return type;
 }
 
-uint32_t LeCroyOscilloscope::GetInstrumentTypesForChannel(size_t i)
+uint32_t LeCroyOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 {
 	//AWG outputs
 	if(m_hasFunctionGen && (i == m_awgChannel->GetIndex()))

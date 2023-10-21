@@ -42,7 +42,7 @@ public:
 	virtual ~DemoPowerSupply();
 
 	//Device information
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Device capabilities
 	bool SupportsSoftStart() override;

@@ -130,12 +130,12 @@ string DemoOscilloscope::GetDriverNameInternal()
 	return "demo";
 }
 
-unsigned int DemoOscilloscope::GetInstrumentTypes()
+unsigned int DemoOscilloscope::GetInstrumentTypes() const
 {
 	return INST_OSCILLOSCOPE;
 }
 
-uint32_t DemoOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t DemoOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

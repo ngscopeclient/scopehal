@@ -206,12 +206,12 @@ RigolOscilloscope::~RigolOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
-unsigned int RigolOscilloscope::GetInstrumentTypes()
+unsigned int RigolOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t RigolOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t RigolOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

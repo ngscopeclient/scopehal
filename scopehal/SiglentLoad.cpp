@@ -59,12 +59,12 @@ string SiglentLoad::GetDriverNameInternal()
 	return "siglent_load";
 }
 
-unsigned int SiglentLoad::GetInstrumentTypes()
+unsigned int SiglentLoad::GetInstrumentTypes() const
 {
 	return INST_LOAD;
 }
 
-uint32_t SiglentLoad::GetInstrumentTypesForChannel(size_t i)
+uint32_t SiglentLoad::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(i == 0)
 		return Instrument::INST_LOAD;

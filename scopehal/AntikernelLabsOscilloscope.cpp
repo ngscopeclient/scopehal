@@ -128,12 +128,12 @@ string AntikernelLabsOscilloscope::GetDriverNameInternal()
 	return "aklabs";
 }
 
-unsigned int AntikernelLabsOscilloscope::GetInstrumentTypes()
+unsigned int AntikernelLabsOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t AntikernelLabsOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t AntikernelLabsOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

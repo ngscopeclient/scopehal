@@ -39,7 +39,7 @@ Load::~Load()
 {
 }
 
-unsigned int Load::GetInstrumentTypes()
+unsigned int Load::GetInstrumentTypes() const
 {
 	return INST_LOAD;
 }

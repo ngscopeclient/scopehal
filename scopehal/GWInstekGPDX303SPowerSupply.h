@@ -48,7 +48,7 @@ class GWInstekGPDX303SPowerSupply
 	virtual ~GWInstekGPDX303SPowerSupply();
 
 	//Device information
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Device capabilities
 	bool SupportsMasterOutputSwitching() override;

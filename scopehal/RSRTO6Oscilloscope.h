@@ -32,7 +32,7 @@
 
 class EdgeTrigger;
 
-class RSRTO6Oscilloscope 
+class RSRTO6Oscilloscope
 	: public virtual SCPIOscilloscope
 	, public virtual SCPIFunctionGenerator
 {
@@ -46,13 +46,13 @@ public:
 
 public:
 	//Device information
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() const;
 
 	virtual void FlushConfigCache();
 	virtual OscilloscopeChannel* GetExternalTrigger();
 
 	//Channel configuration
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 	virtual bool IsChannelEnabled(size_t i);
 	virtual void EnableChannel(size_t i);
 	virtual void DisableChannel(size_t i);

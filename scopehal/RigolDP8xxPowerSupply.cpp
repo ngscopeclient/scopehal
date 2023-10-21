@@ -65,7 +65,7 @@ string RigolDP8xxPowerSupply::GetDriverNameInternal()
 	return "rigol_dp8xx";
 }
 
-uint32_t RigolDP8xxPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t RigolDP8xxPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_PSU;
 }

@@ -56,7 +56,7 @@ public:
 	virtual std::string GetName() const override;
 	virtual std::string GetVendor() const override;
 	virtual std::string GetSerial() const override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
@@ -102,7 +102,7 @@ public:
 	virtual bool IsInterleaving();
 	virtual bool SetInterleaving(bool combine);
 
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() const;
 
 protected:
 	void LoadChannels();

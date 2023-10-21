@@ -37,8 +37,8 @@ public:
 	virtual ~RigolFunctionGenerator();
 
 	//Device information
-	virtual unsigned int GetInstrumentTypes() override;
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual unsigned int GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	virtual bool AcquireData() override;
 

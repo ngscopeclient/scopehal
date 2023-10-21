@@ -53,7 +53,7 @@ public:
 
 	virtual std::string GetTransportConnectionString();
 	virtual std::string GetTransportName();
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
 	//Channel configuration
 	virtual bool IsChannelEnabled(size_t i);
@@ -104,7 +104,7 @@ public:
 	virtual std::vector<AnalogBank> GetAnalogBanks();
 	virtual AnalogBank GetAnalogBank(size_t channel);
 
-	virtual unsigned int GetInstrumentTypes();
+	virtual unsigned int GetInstrumentTypes() const;
 	virtual void LoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
 
 protected:

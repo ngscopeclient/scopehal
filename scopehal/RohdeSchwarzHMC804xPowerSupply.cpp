@@ -62,7 +62,7 @@ string RohdeSchwarzHMC804xPowerSupply::GetDriverNameInternal()
 	return "rs_hmc804x";
 }
 
-uint32_t RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t RohdeSchwarzHMC804xPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return INST_PSU;
 }

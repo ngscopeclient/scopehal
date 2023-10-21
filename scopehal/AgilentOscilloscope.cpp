@@ -186,12 +186,12 @@ string AgilentOscilloscope::GetDriverNameInternal()
 	return "agilent";
 }
 
-unsigned int AgilentOscilloscope::GetInstrumentTypes()
+unsigned int AgilentOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t AgilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t AgilentOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

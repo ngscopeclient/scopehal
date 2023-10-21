@@ -39,7 +39,7 @@ public:
 	Load();
 	virtual ~Load();
 
-	virtual unsigned int GetInstrumentTypes() override;
+	virtual unsigned int GetInstrumentTypes() const override;
 
 	virtual bool AcquireData() override;
 

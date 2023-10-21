@@ -51,12 +51,12 @@ RigolFunctionGenerator::~RigolFunctionGenerator()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instrument
 
-unsigned int RigolFunctionGenerator::GetInstrumentTypes()
+unsigned int RigolFunctionGenerator::GetInstrumentTypes() const
 {
 	return INST_FUNCTION;
 }
 
-uint32_t RigolFunctionGenerator::GetInstrumentTypesForChannel(size_t i)
+uint32_t RigolFunctionGenerator::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(i < 2)
 		return INST_FUNCTION;

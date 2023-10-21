@@ -580,7 +580,7 @@ unsigned int SiglentSCPIOscilloscope::GetMeasurementTypes()
 /**
 	@brief See what features we have
  */
-unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes()
+unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes() const
 {
 	unsigned int type = INST_OSCILLOSCOPE;
 	if(m_hasFunctionGen)
@@ -588,7 +588,7 @@ unsigned int SiglentSCPIOscilloscope::GetInstrumentTypes()
 	return type;
 }
 
-uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t i)
+uint32_t SiglentSCPIOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(m_awgChannel && (m_awgChannel->GetIndex() == i) )
 		return Instrument::INST_FUNCTION;

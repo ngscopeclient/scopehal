@@ -147,12 +147,12 @@ ThunderScopeOscilloscope::~ThunderScopeOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
-unsigned int ThunderScopeOscilloscope::GetInstrumentTypes()
+unsigned int ThunderScopeOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t ThunderScopeOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t ThunderScopeOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

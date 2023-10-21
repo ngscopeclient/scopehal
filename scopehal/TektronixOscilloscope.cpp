@@ -304,7 +304,7 @@ string TektronixOscilloscope::GetDriverNameInternal()
 	return "tektronix";
 }
 
-unsigned int TektronixOscilloscope::GetInstrumentTypes()
+unsigned int TektronixOscilloscope::GetInstrumentTypes() const
 {
 	unsigned int mask = Instrument::INST_OSCILLOSCOPE;
 	if(m_hasDVM)
@@ -314,7 +314,7 @@ unsigned int TektronixOscilloscope::GetInstrumentTypes()
 	return mask;
 }
 
-uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i)
+uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 {
 	if(m_hasAFG && (i == m_awgChannel->GetIndex()))
 		return Instrument::INST_FUNCTION;

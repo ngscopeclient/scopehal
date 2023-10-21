@@ -224,12 +224,12 @@ DSLabsOscilloscope::~DSLabsOscilloscope()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Accessors
 
-unsigned int DSLabsOscilloscope::GetInstrumentTypes()
+unsigned int DSLabsOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t DSLabsOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t DSLabsOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

@@ -197,12 +197,12 @@ string RohdeSchwarzOscilloscope::GetDriverNameInternal()
 	return "rs";
 }
 
-unsigned int RohdeSchwarzOscilloscope::GetInstrumentTypes()
+unsigned int RohdeSchwarzOscilloscope::GetInstrumentTypes() const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }
 
-uint32_t RohdeSchwarzOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/)
+uint32_t RohdeSchwarzOscilloscope::GetInstrumentTypesForChannel(size_t /*i*/) const
 {
 	return Instrument::INST_OSCILLOSCOPE;
 }

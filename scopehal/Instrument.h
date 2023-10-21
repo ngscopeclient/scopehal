@@ -100,7 +100,7 @@ public:
 
 		Not all types may be available on a given channel.
 	 */
-	virtual unsigned int GetInstrumentTypes() =0;
+	virtual unsigned int GetInstrumentTypes() const =0;
 
 	//Device information
 	virtual std::string GetName() const =0;
@@ -132,7 +132,7 @@ public:
 
 		@param i	Channel index
 	 */
-	virtual uint32_t GetInstrumentTypesForChannel(size_t i) =0;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const =0;
 
 	/**
 		@brief Gets the number of channels (of any type) this instrument has.
