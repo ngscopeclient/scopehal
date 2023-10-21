@@ -4,9 +4,6 @@
 [submodule "log"]
 	path = log
 	url = ../logtools.git
-[submodule "graphwidget"]
-	path = graphwidget
-	url = ../graphwidget.git
 [submodule "VkFFT"]
 	path = VkFFT
 	url = ../VkFFT.git
