@@ -204,6 +204,15 @@ void PowerSupply::DoPreLoadConfiguration(
 	Unit volts(Unit::UNIT_VOLTS);
 	Unit amps(Unit::UNIT_AMPS);
 
+	if(SupportsMasterOutputSwitching())
+	{
+		if(node["globalSwitch"].as<bool>() && !GetMasterPowerEnable())
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				"Master enable", "Turning global power switch on", "off", "on"));
+		}
+	}
+
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
@@ -231,7 +240,7 @@ void PowerSupply::DoPreLoadConfiguration(
 			if(vnom > vact)
 			{
 				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-					chan->GetDisplayName().c_str(),
+					chan->GetDisplayName(),
 					string("Increasing output voltage by ") + volts.PrettyPrint(vnom - vact),
 					volts.PrettyPrint(vact),
 					volts.PrettyPrint(vnom)));
@@ -240,7 +249,7 @@ void PowerSupply::DoPreLoadConfiguration(
 			if(inom > iact)
 			{
 				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-					chan->GetDisplayName().c_str(),
+					chan->GetDisplayName(),
 					string("Increasing output current limit by ") + amps.PrettyPrint(inom - iact),
 					volts.PrettyPrint(iact),
 					volts.PrettyPrint(inom)));
@@ -249,10 +258,20 @@ void PowerSupply::DoPreLoadConfiguration(
 		if(channelNode["overcurrentShutdown"])
 		{
 			bool ocp = channelNode["overcurrentShutdown"].as<bool>();
+			if(GetPowerOvercurrentShutdownEnabled(i) && !ocp)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " OCP", "Disabling overcurrent protection", "on", "off"));
+			}
 		}
 		if(channelNode["softStart"])
 		{
 			bool ss = channelNode["softStart"]["enable"].as<bool>();
+			if(IsSoftStartEnabled(i) && !ss)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " SS", "Disabling soft start", "on", "off"));
+			}
 		}
 
 		//Warn if turning output on that's currently off
@@ -260,11 +279,44 @@ void PowerSupply::DoPreLoadConfiguration(
 		if(en && !GetPowerChannelActive(i))
 		{
 			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName().c_str(), "Power will be turned on when session is loaded", "off", "on"));
+				chan->GetDisplayName(), "Turning power on", "off", "on"));
 		}
 	}
 }
 
-void PowerSupply::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
+	//Master enable (if present)
+	if(SupportsMasterOutputSwitching())
+		SetMasterPowerEnable(node["globalSwitch"].as<bool>());
+
+	//Channel configuration
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_PSU))
+			continue;
+
+		//auto chan = dynamic_cast<PowerSupplyChannel*>(GetChannel(i));
+
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		if(SupportsVoltageCurrentControl(i))
+		{
+			SetPowerVoltage(i, channelNode["voltageNominal"].as<float>());
+			SetPowerCurrent(i, channelNode["currentNominal"].as<float>());
+		}
+		if(SupportsOvercurrentShutdown())
+		{
+			channelNode["overcurrentShutdown"] = GetPowerOvercurrentShutdownEnabled(i);
+		}
+		if(SupportsSoftStart())
+		{
+			YAML::Node ss = channelNode["softStart"];
+
+			SetSoftStartEnabled(i, ss["enable"].as<bool>());
+		}
+
+		SetPowerChannelActive(i, channelNode["enabled"].as<bool>());
+	}
 }

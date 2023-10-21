@@ -329,8 +329,12 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 	auto& chans = node["channels"];
 	for(auto it : chans)
 	{
+		//Skip non-scope channels
 		auto& cnode = it.second;
 		auto chan = GetOscilloscopeChannel(cnode["index"].as<int>());
+		if(!chan)
+			continue;
+
 		table.emplace(cnode["id"].as<int>(), chan);
 
 		//Ignore name/type.
