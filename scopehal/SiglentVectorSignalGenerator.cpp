@@ -57,11 +57,6 @@ string SiglentVectorSignalGenerator::GetDriverNameInternal()
 	return "siglent_ssg";
 }
 
-string SiglentVectorSignalGenerator::GetChannelName(int /*chan*/)
-{
-	return "RFOUT";
-}
-
 unsigned int SiglentVectorSignalGenerator::GetInstrumentTypes() const
 {
 	return INST_RF_GEN | INST_FUNCTION;

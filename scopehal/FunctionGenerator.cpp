@@ -37,6 +37,9 @@ using namespace std;
 
 FunctionGenerator::FunctionGenerator()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &FunctionGenerator::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &FunctionGenerator::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &FunctionGenerator::DoPreLoadConfiguration));
 }
 
 FunctionGenerator::~FunctionGenerator()
@@ -234,5 +237,20 @@ FunctionGenerator::OutputImpedance FunctionGenerator::GetFunctionChannelOutputIm
 }
 
 void FunctionGenerator::SetFunctionChannelOutputImpedance(int /*chan*/, OutputImpedance /*z*/)
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+}
+
+void FunctionGenerator::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+{
+}
+
+void FunctionGenerator::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
 {
 }

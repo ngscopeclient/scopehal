@@ -43,13 +43,6 @@ public:
 	// General
 
 	/**
-		@brief Returns the name of a given output channel
-
-		@param chan	Zero-based channel index
-	 */
-	virtual std::string GetChannelName(int chan) =0;
-
-	/**
 		@brief Check if a channel is currently enabled
 
 		@param chan	Zero-based channel index
@@ -192,6 +185,11 @@ public:
 	};
 
 	/**
+		@brief Converts a SweepType to a human-readable name
+	 */
+	static std::string GetNameOfSweepType(SweepType type);
+
+	/**
 		@brief Gets the type of a sweep
 
 		@param chan		Zero-based channel index
@@ -306,6 +304,11 @@ public:
 	};
 
 	/**
+		@brief Converts a SweepShape to a human-readable name
+	 */
+	static std::string GetNameOfSweepShape(SweepShape shape);
+
+	/**
 		@brief Gets the shape of a sweep
 
 		@param chan		Zero-based channel index
@@ -327,6 +330,11 @@ public:
 	};
 
 	/**
+		@brief Converts a SweepSpacing to a human-readable name
+	 */
+	static std::string GetNameOfSweepSpacing(SweepSpacing spacing);
+
+	/**
 		@brief Gets the spacing of a sweep (log or linear)
 
 		@param chan		Zero-based channel index
@@ -346,6 +354,11 @@ public:
 		SWEEP_DIR_FWD,
 		SWEEP_DIR_REV
 	};
+
+	/**
+		@brief Converts a SweepDirection to a human-readable name
+	 */
+	static std::string GetNameOfSweepDirection(SweepDirection dir);
 
 	/**
 		@brief Gets the direction of a sweep
