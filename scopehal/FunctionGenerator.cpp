@@ -243,12 +243,69 @@ void FunctionGenerator::SetFunctionChannelOutputImpedance(int /*chan*/, OutputIm
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
+string FunctionGenerator::GetNameOfImpedance(OutputImpedance imp)
+{
+	switch(imp)
+	{
+		case IMPEDANCE_HIGH_Z:
+			return "Hi-Z";
+
+		case IMPEDANCE_50_OHM:
+			return "50Ω";
+
+		default:
+			return "Invalid";
+	}
+}
+
 void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_FUNCTION))
+			continue;
+
+		auto chan = dynamic_cast<FunctionGeneratorChannel*>(GetChannel(i));
+
+		//Save basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+		channelNode["funcgenid"] = table.emplace(chan);
+
+		//Common config every function generator channel has
+		channelNode["enabled"] = GetFunctionChannelActive(i);
+		YAML::Node shapenode;
+		auto shapes = GetAvailableWaveformShapes(i);
+		for(auto s : shapes)
+			shapenode.push_back(GetNameOfShape(s));
+		channelNode["shapes"] = shapenode;
+		channelNode["amplitude"] = GetFunctionChannelAmplitude(i);
+		channelNode["offset"] = GetFunctionChannelOffset(i);
+		channelNode["frequency"] = GetFunctionChannelFrequency(i);
+		channelNode["shape"] = GetNameOfShape(GetFunctionChannelShape(i));
+
+		//Optional configuration not all instruments have
+		if(HasFunctionDutyCycleControls(i))
+			channelNode["duty"] = GetFunctionChannelDutyCycle(i);
+
+		if(HasFunctionRiseFallTimeControls(i))
+		{
+			channelNode["rise"] = GetFunctionChannelRiseTime(i);
+			channelNode["fall"] = GetFunctionChannelFallTime(i);
+		}
+
+		if(HasFunctionImpedanceControls(i))
+			channelNode["impedance"] = GetNameOfImpedance(GetFunctionChannelOutputImpedance(i));
+	}
 }
 
 void FunctionGenerator::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_FUNCTION))
+			continue;
+	}
 }
 
 void FunctionGenerator::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)

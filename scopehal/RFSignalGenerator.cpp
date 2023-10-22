@@ -299,6 +299,21 @@ void RFSignalGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& tabl
 
 void RFSignalGenerator::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
 {
+	//Ignore analogfmwaveshapes, that's only important for offline
+
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_RF_GEN))
+			continue;
+
+		auto chan = dynamic_cast<RFSignalGeneratorChannel*>(GetChannel(i));
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Complain if power level is increased
+
+		//If we have sweep capability, complain if sweep power is increased
+	}
 }
 
 void RFSignalGenerator::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)

@@ -139,6 +139,8 @@ public:
 		IMPEDANCE_50_OHM
 	};
 
+	static std::string GetNameOfImpedance(OutputImpedance imp);
+
 	/**
 		@brief Determines if the function generator allows control over rise/fall times
 
