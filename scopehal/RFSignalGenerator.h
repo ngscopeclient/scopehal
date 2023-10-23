@@ -190,6 +190,11 @@ public:
 	static std::string GetNameOfSweepType(SweepType type);
 
 	/**
+		@brief Converts a human-readable name to a SweepType
+	 */
+	static SweepType GetSweepTypeOfName(const std::string& name);
+
+	/**
 		@brief Gets the type of a sweep
 
 		@param chan		Zero-based channel index
@@ -309,6 +314,11 @@ public:
 	static std::string GetNameOfSweepShape(SweepShape shape);
 
 	/**
+		@brief Converts a human-readable name to a SweepShape
+	 */
+	static SweepShape GetSweepShapeOfName(const std::string& name);
+
+	/**
 		@brief Gets the shape of a sweep
 
 		@param chan		Zero-based channel index
@@ -335,6 +345,11 @@ public:
 	static std::string GetNameOfSweepSpacing(SweepSpacing spacing);
 
 	/**
+		@brief Converts a human-readable name to a SweepSpacing
+	 */
+	static SweepSpacing GetSweepSpacingOfName(const std::string& name);
+
+	/**
 		@brief Gets the spacing of a sweep (log or linear)
 
 		@param chan		Zero-based channel index
@@ -359,6 +374,11 @@ public:
 		@brief Converts a SweepDirection to a human-readable name
 	 */
 	static std::string GetNameOfSweepDirection(SweepDirection dir);
+
+	/**
+		@brief Converts a human-readable name to a SweepDirection
+	 */
+	static SweepDirection GetSweepDirectionOfName(const std::string& name);
 
 	/**
 		@brief Gets the direction of a sweep

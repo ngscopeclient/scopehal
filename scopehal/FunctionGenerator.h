@@ -91,6 +91,7 @@ public:
 	};
 
 	static std::string GetNameOfShape(WaveShape shape);
+	static WaveShape GetShapeOfName(const std::string& name);
 
 	//Configuration
 	virtual bool GetFunctionChannelActive(int chan) =0;

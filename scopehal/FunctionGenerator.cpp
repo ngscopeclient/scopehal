@@ -194,6 +194,105 @@ string FunctionGenerator::GetNameOfShape(WaveShape shape)
 	}
 }
 
+FunctionGenerator::WaveShape FunctionGenerator::GetShapeOfName(const string& name)
+{
+	if(name =="Sine")
+		return FunctionGenerator::SHAPE_SINE;
+	else if(name == "Square")
+		return FunctionGenerator::SHAPE_SQUARE;
+	else if(name == "Triangle")
+		return FunctionGenerator::SHAPE_TRIANGLE;
+	else if(name == "Pulse")
+		return FunctionGenerator::SHAPE_PULSE;
+	else if(name == "DC")
+		return FunctionGenerator::SHAPE_DC;
+	else if(name == "Noise")
+		return FunctionGenerator::SHAPE_NOISE;
+	else if(name == "Sawtooth up")
+		return FunctionGenerator::SHAPE_SAWTOOTH_UP;
+	else if(name == "Sawtooth down")
+		return FunctionGenerator::SHAPE_SAWTOOTH_DOWN;
+	else if(name == "Sinc")
+		return FunctionGenerator::SHAPE_SINC;
+	else if(name == "Gaussian")
+		return FunctionGenerator::SHAPE_GAUSSIAN;
+	else if(name == "Lorentz")
+		return FunctionGenerator::SHAPE_LORENTZ;
+	else if(name == "Half sine")
+		return FunctionGenerator::SHAPE_HALF_SINE;
+	else if(name == "PRBS (nonstandard polynomial)")
+		return FunctionGenerator::SHAPE_PRBS_NONSTANDARD;
+	else if(name == "Exponential Rise")
+		return FunctionGenerator::SHAPE_EXPONENTIAL_RISE;
+	else if(name == "Exponential Decay")
+		return FunctionGenerator::SHAPE_EXPONENTIAL_DECAY;
+	else if(name == "Haversine")
+		return FunctionGenerator::SHAPE_HAVERSINE;
+	else if(name == "Cardiac")
+		return FunctionGenerator::SHAPE_CARDIAC;
+	else if(name == "Stairup")
+		return FunctionGenerator::SHAPE_STAIRCASE_UP;
+	else if(name == "Stairdown")
+		return FunctionGenerator::SHAPE_STAIRCASE_DOWN;
+	else if(name == "Stairtriangular")
+		return FunctionGenerator::SHAPE_STAIRCASE_UP_DOWN;
+	else if(name == "Negative pulse")
+		return FunctionGenerator::SHAPE_NEGATIVE_PULSE;
+	else if(name == "Logarithmic rise")
+		return FunctionGenerator::SHAPE_LOG_RISE;
+	else if(name == "Logarithmic decay")
+		return FunctionGenerator::SHAPE_LOG_DECAY;
+	else if(name == "Square root")
+		return FunctionGenerator::SHAPE_SQUARE_ROOT;
+	else if(name == "Cube root")
+		return FunctionGenerator::SHAPE_CUBE_ROOT;
+	else if(name == "Quadratic")
+		return FunctionGenerator::SHAPE_QUADRATIC;
+	else if(name == "Cubic")
+		return FunctionGenerator::SHAPE_CUBIC;
+	else if(name == "DLorentz")
+		return FunctionGenerator::SHAPE_DLORENTZ;
+	else if(name == "Gaussian pulse")
+		return FunctionGenerator::SHAPE_GAUSSIAN_PULSE;
+	else if(name == "Hamming")
+		return FunctionGenerator::SHAPE_HAMMING;
+	else if(name == "Hanning")
+		return FunctionGenerator::SHAPE_HANNING;
+	else if(name == "Kaiser")
+		return FunctionGenerator::SHAPE_KAISER;
+	else if(name == "Blackman")
+		return FunctionGenerator::SHAPE_BLACKMAN;
+	else if(name == "Gaussian window")
+		return FunctionGenerator::SHAPE_GAUSSIAN_WINDOW;
+	else if(name == "Harris")
+		return FunctionGenerator::SHAPE_HARRIS;
+	else if(name == "Bartlett")
+		return FunctionGenerator::SHAPE_BARTLETT;
+	else if(name == "Tan")
+		return FunctionGenerator::SHAPE_TAN;
+	else if(name == "Cot")
+		return FunctionGenerator::SHAPE_COT;
+	else if(name == "Sec")
+		return FunctionGenerator::SHAPE_SEC;
+	else if(name == "Csc")
+		return FunctionGenerator::SHAPE_CSC;
+	else if(name == "Asin")
+		return FunctionGenerator::SHAPE_ASIN;
+	else if(name == "Acos")
+		return FunctionGenerator::SHAPE_ACOS;
+	else if(name == "Atan")
+		return FunctionGenerator::SHAPE_ATAN;
+	else if(name == "Acot")
+		return FunctionGenerator::SHAPE_ACOT;
+
+		//Arbitrary is not supported yet so don't show it in the list
+		//FunctionGenerator::SHAPE_ARBITRARY;
+		//	continue;
+
+	else //default to sine
+		return FunctionGenerator::SHAPE_SINE;
+}
+
 float FunctionGenerator::GetFunctionChannelRiseTime(int /*chan*/)
 {
 	return 0;

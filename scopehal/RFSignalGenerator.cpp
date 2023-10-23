@@ -176,6 +176,21 @@ string RFSignalGenerator::GetNameOfSweepType(SweepType type)
 	}
 }
 
+RFSignalGenerator::SweepType RFSignalGenerator::GetSweepTypeOfName(const string& name)
+{
+	if(name == "None")
+		return SWEEP_TYPE_NONE;
+	else if(name == "Frequency")
+		return SWEEP_TYPE_FREQ;
+	else if(name == "Level")
+		return SWEEP_TYPE_LEVEL;
+	else if(name == "Frequency + level")
+		return SWEEP_TYPE_FREQ_LEVEL;
+
+	else
+		return SWEEP_TYPE_NONE;
+}
+
 string RFSignalGenerator::GetNameOfSweepShape(SweepShape shape)
 {
 	switch(shape)
@@ -189,6 +204,18 @@ string RFSignalGenerator::GetNameOfSweepShape(SweepShape shape)
 		default:
 			return "invalid";
 	}
+}
+
+RFSignalGenerator::SweepShape RFSignalGenerator::GetSweepShapeOfName(const string& name)
+{
+	if(name == "Triangle")
+		return SWEEP_SHAPE_TRIANGLE;
+	else if(name == "Sawtooth")
+		return SWEEP_SHAPE_SAWTOOTH;
+
+	//invalid
+	else
+		return SWEEP_SHAPE_TRIANGLE;
 }
 
 string RFSignalGenerator::GetNameOfSweepSpacing(SweepSpacing spacing)
@@ -206,6 +233,18 @@ string RFSignalGenerator::GetNameOfSweepSpacing(SweepSpacing spacing)
 	}
 }
 
+RFSignalGenerator::SweepSpacing RFSignalGenerator::GetSweepSpacingOfName(const string& name)
+{
+	if(name == "Linear")
+		return SWEEP_SPACING_LINEAR;
+	else if(name == "Log")
+		return SWEEP_SPACING_LOG;
+
+	//invalid
+	else
+		return SWEEP_SPACING_LINEAR;
+}
+
 string RFSignalGenerator::GetNameOfSweepDirection(SweepDirection dir)
 {
 	switch(dir)
@@ -219,6 +258,18 @@ string RFSignalGenerator::GetNameOfSweepDirection(SweepDirection dir)
 		default:
 			return "invalid";
 	}
+}
+
+RFSignalGenerator::SweepDirection RFSignalGenerator::GetSweepDirectionOfName(const string& name)
+{
+	if(name == "Forward")
+		return SWEEP_DIR_FWD;
+	else if(name == "Reverse")
+		return SWEEP_DIR_REV;
+
+	//invalid
+	else
+		return SWEEP_DIR_FWD;
 }
 
 void RFSignalGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
@@ -297,9 +348,16 @@ void RFSignalGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& tabl
 	}
 }
 
-void RFSignalGenerator::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+void RFSignalGenerator::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& /*idmap*/,
+	ConfigWarningList& list)
 {
 	//Ignore analogfmwaveshapes, that's only important for offline
+
+	Unit db(Unit::UNIT_DB);
+	Unit dbm(Unit::UNIT_DBM);
 
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
@@ -310,12 +368,124 @@ void RFSignalGenerator::DoLoadConfiguration(int version, const YAML::Node& node,
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
 
+		//Warn if turned on
+		if(channelNode["enabled"] && !GetChannelOutputEnable(i))
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName(), "Turning RF power on", "off", "on"));
+		}
+
 		//Complain if power level is increased
+		float pact = GetChannelOutputPower(i);
+		float pnom = channelNode["power"].as<float>();
+		if(pnom > pact)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " output power",
+				string("Increasing output level by ") + db.PrettyPrint(pnom - pact),
+				dbm.PrettyPrint(pact),
+				dbm.PrettyPrint(pnom)));
+		}
 
 		//If we have sweep capability, complain if sweep power is increased
+		auto snode = channelNode["sweep"];
+		if(IsSweepAvailable(i) && snode)
+		{
+			//Complain if enabling power sweep
+			auto sweepType = GetSweepType(i);
+			if( (sweepType == SWEEP_TYPE_LEVEL) || (sweepType == SWEEP_TYPE_FREQ_LEVEL) )
+			{
+				//already doing power sweep
+			}
+			else if(snode["type"].as<string>().find("evel") != string::npos)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " sweep mode",
+					"Enabling level sweep",
+					GetNameOfSweepType(GetSweepType(i)),
+					snode["type"].as<string>()));
+			}
+
+			//Check if increasing sweep power levels
+			float bact = GetSweepStartLevel(i);
+			float bnom = snode["startlevel"].as<float>();
+
+			float eact = GetSweepStopLevel(i);
+			float enom = snode["stoplevel"].as<float>();
+
+			if(bnom > bact)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " power sweep start",
+					string("Increasing sweep start level by ") + db.PrettyPrint(bnom - bact),
+					dbm.PrettyPrint(bact),
+					dbm.PrettyPrint(bnom)));
+			}
+
+			if(enom > eact)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " power sweep stop",
+					string("Increasing sweep stop level by ") + db.PrettyPrint(enom - eact),
+					dbm.PrettyPrint(eact),
+					dbm.PrettyPrint(enom)));
+			}
+		}
 	}
 }
 
-void RFSignalGenerator::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
+void RFSignalGenerator::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& idmap)
 {
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_RF_GEN))
+			continue;
+
+		auto chan = dynamic_cast<RFSignalGeneratorChannel*>(GetChannel(i));
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+		idmap.emplace(channelNode["rfgenid"].as<intptr_t>(), chan);
+
+		SetChannelOutputPower(i, channelNode["power"].as<float>());
+		SetChannelCenterFrequency(i, channelNode["centerfreq"].as<float>());
+		SetChannelOutputEnable(i, channelNode["enabled"].as<bool>());
+
+		YAML::Node anode = channelNode["analogMod"];
+		if(IsAnalogModulationAvailable(i) && anode)
+		{
+			SetAnalogModulationEnable(i, anode["enabled"].as<bool>());
+
+			YAML::Node fmnode = anode["fm"];
+			if(fmnode)
+			{
+				SetAnalogFMEnable(i, fmnode["enabled"].as<bool>());
+
+				SetAnalogFMDeviation(i, fmnode["deviation"].as<float>());
+				SetAnalogFMFrequency(i, fmnode["frequency"].as<int64_t>());
+				SetAnalogFMWaveShape(i, FunctionGenerator::GetShapeOfName(fmnode["shape"].as<string>()));
+			}
+		}
+
+		YAML::Node vnode = channelNode["vectorMod"];
+		if(IsVectorModulationAvailable(i) && vnode)
+		{
+			//TODO
+		}
+
+		YAML::Node snode = channelNode["sweep"];
+		if(IsSweepAvailable(i) && snode)
+		{
+			SetSweepType(i, GetSweepTypeOfName(snode["type"].as<string>()));
+			SetSweepStartFrequency(i, snode["startfreq"].as<float>());
+			SetSweepStopFrequency(i, snode["stopfreq"].as<float>());
+			SetSweepStartLevel(i, snode["startlevel"].as<float>());
+			SetSweepStopLevel(i, snode["stoplevel"].as<float>());
+			SetSweepDwellTime(i, snode["dwell"].as<float>());
+			SetSweepPoints(i, snode["points"].as<int>());
+			SetSweepShape(i, GetSweepShapeOfName(snode["shape"].as<string>()));
+			SetSweepSpacing(i, GetSweepSpacingOfName(snode["spacing"].as<string>()));
+			SetSweepDirection(i, GetSweepDirectionOfName(snode["direction"].as<string>()));
+		}
+
+	}
 }

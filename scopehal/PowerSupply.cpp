@@ -251,8 +251,8 @@ void PowerSupply::DoPreLoadConfiguration(
 				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
 					chan->GetDisplayName(),
 					string("Increasing output current limit by ") + amps.PrettyPrint(inom - iact),
-					volts.PrettyPrint(iact),
-					volts.PrettyPrint(inom)));
+					amps.PrettyPrint(iact),
+					amps.PrettyPrint(inom)));
 			}
 		}
 		if(channelNode["overcurrentShutdown"])

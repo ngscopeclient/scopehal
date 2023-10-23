@@ -67,7 +67,7 @@ DemoPowerSupply::~DemoPowerSupply()
 
 string DemoPowerSupply::GetDriverNameInternal()
 {
-	return "demo";
+	return "demopsu";
 }
 
 uint32_t DemoPowerSupply::GetInstrumentTypesForChannel(size_t /*i*/) const
