@@ -183,7 +183,7 @@ RSRTO6Oscilloscope::RSRTO6Oscilloscope(SCPITransport* transport)
 		for (int i = 0; i < 2; i++)
 		{
 			m_firstAFGIndex = m_channels.size();
-			auto ch = new FunctionGeneratorChannel("WGEN" + to_string(i + 1), "#808080", m_channels.size());
+			auto ch = new FunctionGeneratorChannel(this, "WGEN" + to_string(i + 1), "#808080", m_channels.size());
 			m_channels.push_back(ch);
 		}
 	}

@@ -38,6 +38,7 @@ class FunctionGeneratorChannel : public InstrumentChannel
 public:
 
 	FunctionGeneratorChannel(
+		FunctionGenerator* gen,
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		size_t index = 0);
@@ -54,6 +55,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
+
+protected:
+	FunctionGenerator* m_gen;
 };
 
 #endif

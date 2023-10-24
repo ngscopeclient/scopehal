@@ -156,6 +156,7 @@ PicoOscilloscope::PicoOscilloscope(SCPITransport* transport)
 			SetFunctionChannelOutputImpedance(0, IMPEDANCE_HIGH_Z);
 			SetFunctionChannelActive(0, false);
 			m_awgChannel = new FunctionGeneratorChannel(
+				this,
 				"AWG",
 				"#808080",
 				m_channels.size());

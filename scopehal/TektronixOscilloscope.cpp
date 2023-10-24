@@ -282,7 +282,7 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	//Add AWG channel
 	if(m_hasAFG)
 	{
-		m_awgChannel = new FunctionGeneratorChannel("AWG", "#808080", m_channels.size());
+		m_awgChannel = new FunctionGeneratorChannel(this, "AWG", "#808080", m_channels.size());
 		m_channels.push_back(m_awgChannel);
 	}
 	else

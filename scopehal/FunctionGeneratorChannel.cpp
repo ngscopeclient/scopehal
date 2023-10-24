@@ -35,10 +35,12 @@ using namespace std;
 // Construction / destruction
 
 FunctionGeneratorChannel::FunctionGeneratorChannel(
+	FunctionGenerator* gen,
 	const string& hwname,
 	const string& color,
 	size_t index)
 	: InstrumentChannel(hwname, color, Unit(Unit::UNIT_COUNTS), index)
+	, m_gen(gen)
 {
 	ClearStreams();
 
@@ -61,12 +63,17 @@ bool FunctionGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream
 {
 	if(stream.m_channel == NULL)
 		return false;
-/*
+
 	if(i >= 1)
 		return false;
 
-	if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
-		return true;*/
+	//TODO: verify unit
+
+	if(i == STREAM_FREQUENCY)
+	{
+		if(stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR)
+			return true;
+	}
 
 	return false;
 }
@@ -74,33 +81,7 @@ bool FunctionGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream
 
 void FunctionGeneratorChannel::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
-	/*
-	auto setPointIn = GetInput(0);
-	if(setPointIn)
-	{
-		//Validate that set point has the correct units
-		Unit expectedUnit(Unit::UNIT_COUNTS);
-		switch(m_load->GetLoadMode(m_index))
-		{
-			case Load::MODE_CONSTANT_CURRENT:
-				expectedUnit = Unit(Unit::UNIT_AMPS);
-				break;
-
-			case Load::MODE_CONSTANT_VOLTAGE:
-				expectedUnit = Unit(Unit::UNIT_VOLTS);
-				break;
-
-			case Load::MODE_CONSTANT_POWER:
-				expectedUnit = Unit(Unit::UNIT_WATTS);
-				break;
-
-			case Load::MODE_CONSTANT_RESISTANCE:
-				expectedUnit = Unit(Unit::UNIT_OHMS);
-				break;
-		}
-
-		if(expectedUnit == setPointIn.GetYAxisUnits())
-			m_load->SetLoadSetPoint(m_index, setPointIn.GetScalarValue());
-	}
-	*/
+	auto freqIn = GetInput(STREAM_FREQUENCY);
+	if(freqIn && (freqIn.GetYAxisUnits() == Unit::UNIT_HZ))
+		m_gen->SetFunctionChannelFrequency(m_index, freqIn.GetScalarValue());
 }

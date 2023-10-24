@@ -70,6 +70,10 @@ public:
 public:
 	static std::string GetDriverNameInternal();
 	GENERATOR_INITPROC(RigolFunctionGenerator)
+
+protected:
+	bool m_cachedFrequencyValid[2];
+	int64_t m_cachedFrequency[2];
 };
 
 #endif

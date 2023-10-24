@@ -188,7 +188,7 @@ void SiglentSCPIOscilloscope::SharedCtorInit()
 	{
 		//TODO: this is stupid, it shares the same name as our scope input!
 		//Is this going to break anything??
-		m_awgChannel = new FunctionGeneratorChannel("C1", "#808080", m_channels.size());
+		m_awgChannel = new FunctionGeneratorChannel(this, "C1", "#808080", m_channels.size());
 		m_channels.push_back(m_awgChannel);
 		m_awgChannel->SetDisplayName("AWG");
 	}

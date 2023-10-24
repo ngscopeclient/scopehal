@@ -43,7 +43,7 @@ SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transp
 	//My unit has 1E1,1EA,540,H30,UNT,UNU.
 
 	m_channels.push_back(new RFSignalGeneratorChannel("RFOUT", "#808080", 0));
-	m_channels.push_back(new FunctionGeneratorChannel("LFO", "#808080", 1));
+	m_channels.push_back(new FunctionGeneratorChannel(this ,"LFO", "#808080", 1));
 
 	sscanf(m_fwVersion.c_str(), "V%d.%d.%d.%d.%d",	//TODO: some versions have a letter after the last digit?
 		&m_firmwareRev[0],

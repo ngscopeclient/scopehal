@@ -40,8 +40,14 @@ RigolFunctionGenerator::RigolFunctionGenerator(SCPITransport* transport)
 	, SCPIInstrument(transport)
 {
 	//All DG4000 series have two channels
-	m_channels.push_back(new FunctionGeneratorChannel("CH1", "#ffff00", 0));
-	m_channels.push_back(new FunctionGeneratorChannel("CH2", "#00ffff", 1));
+	m_channels.push_back(new FunctionGeneratorChannel(this, "CH1", "#ffff00", 0));
+	m_channels.push_back(new FunctionGeneratorChannel(this, "CH2", "#00ffff", 1));
+
+	for(int i=0; i<2; i++)
+	{
+		m_cachedFrequency[i] = 0;
+		m_cachedFrequencyValid[i] = false;
+	}
 }
 
 RigolFunctionGenerator::~RigolFunctionGenerator()
@@ -154,13 +160,21 @@ void RigolFunctionGenerator::SetFunctionChannelOffset(int chan, float offset)
 
 float RigolFunctionGenerator::GetFunctionChannelFrequency(int chan)
 {
+	if(m_cachedFrequencyValid[chan])
+		return m_cachedFrequency[chan];
+
 	auto reply = Trim(m_transport->SendCommandQueuedWithReply(string("SOUR") + to_string(chan+1) + ":FREQ?"));
-	return stof(reply);
+	m_cachedFrequency[chan] = stof(reply);
+	m_cachedFrequencyValid[chan] = true;
+	return m_cachedFrequency[chan];
 }
 
 void RigolFunctionGenerator::SetFunctionChannelFrequency(int chan, float hz)
 {
 	m_transport->SendCommandQueued(string("SOUR") + to_string(chan+1) + ":FREQ " + to_string(hz));
+
+	m_cachedFrequency[chan] = hz;
+	m_cachedFrequencyValid[chan] = true;
 }
 
 FunctionGenerator::WaveShape RigolFunctionGenerator::GetFunctionChannelShape(int chan)
