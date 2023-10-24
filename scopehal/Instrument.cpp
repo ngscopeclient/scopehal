@@ -148,6 +148,12 @@ YAML::Node Instrument::SerializeConfiguration(IDTable& table) const
 			chtypes.push_back("bert");
 		channelNode["types"] = chtypes;
 
+		//Save inputs for the channel as well (may not be fully serialized yet so add to the table if needed)
+		//FlowGraphNode::SerializeConfiguration() expects to be the first thing called so we have to tweak a bit
+		auto tnode = chan->SerializeConfiguration(table);
+		channelNode["inputs"] = tnode["inputs"];
+		//no parameters for channels, for now
+
 		node["channels"][key] = channelNode;
 	}
 
