@@ -447,7 +447,7 @@ void RFSignalGenerator::DoLoadConfiguration(int /*version*/, const YAML::Node& n
 		idmap.emplace(channelNode["rfgenid"].as<intptr_t>(), chan);
 
 		SetChannelOutputPower(i, channelNode["power"].as<float>());
-		SetChannelCenterFrequency(i, channelNode["centerfreq"].as<float>());
+		SetChannelCenterFrequency(i, channelNode["centerfreq"].as<double>());
 		SetChannelOutputEnable(i, channelNode["enabled"].as<bool>());
 
 		YAML::Node anode = channelNode["analogMod"];

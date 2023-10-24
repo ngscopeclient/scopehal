@@ -121,6 +121,8 @@ protected:
 		CHANNEL_RFOUT = 0,
 		CHANNEL_LFO = 1
 	};
+
+	int m_firmwareRev[5];
 };
 
 #endif

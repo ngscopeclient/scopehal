@@ -39,10 +39,26 @@ SiglentVectorSignalGenerator::SiglentVectorSignalGenerator(SCPITransport* transp
 	: SCPIDevice(transport)
 	, SCPIInstrument(transport)
 {
-	//TODO: query options to figure out what we actually have
+	//TODO: query options to figure out what we actually have (*OPT?)
+	//My unit has 1E1,1EA,540,H30,UNT,UNU.
 
 	m_channels.push_back(new RFSignalGeneratorChannel("RFOUT", "#808080", 0));
 	m_channels.push_back(new FunctionGeneratorChannel("LFO", "#808080", 1));
+
+	sscanf(m_fwVersion.c_str(), "V%d.%d.%d.%d.%d",	//TODO: some versions have a letter after the last digit?
+		&m_firmwareRev[0],
+		&m_firmwareRev[1],
+		&m_firmwareRev[2],
+		&m_firmwareRev[3],
+		&m_firmwareRev[4]);
+
+	LogDebug("Connected to %s running firmware %d.%d.%d.%d.%d\n",
+		m_model.c_str(),
+		m_firmwareRev[0],
+		m_firmwareRev[1],
+		m_firmwareRev[2],
+		m_firmwareRev[3],
+		m_firmwareRev[4]);
 }
 
 SiglentVectorSignalGenerator::~SiglentVectorSignalGenerator()
@@ -88,12 +104,15 @@ void SiglentVectorSignalGenerator::SetChannelOutputEnable(int /*chan*/, bool on)
 		m_transport->SendCommandQueued("OUTP OFF");
 }
 
-float SiglentVectorSignalGenerator::GetChannelOutputPower(int /*chan*/)
+float SiglentVectorSignalGenerator::GetChannelOutputPower(int chan)
 {
-	//FIXME: this does not return actual current value if sweeping
-	//We will be able to use SWE:CURR:LEV in a future firmware (not yet released)
+	//Special command path for sweep (if running firmware 2.x or newer)
+	auto sweeptype = GetSweepType(chan);
+	if( (m_firmwareRev[0] >= 2) &&  ( (sweeptype == SWEEP_TYPE_LEVEL) || (sweeptype == SWEEP_TYPE_FREQ_LEVEL) ) )
+		return stod(m_transport->SendCommandQueuedWithReply("SWE:CURR:LEV?"));
 
-	return stof(m_transport->SendCommandQueuedWithReply("SOUR:POW?"));
+	else
+		return stof(m_transport->SendCommandQueuedWithReply("SOUR:POW?"));
 }
 
 void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float power)
@@ -104,16 +123,19 @@ void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float pow
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Synthesizer
 
-double SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
+double SiglentVectorSignalGenerator::GetChannelCenterFrequency(int chan)
 {
-	return stod(m_transport->SendCommandQueuedWithReply("SOUR:FREQ?"));
+	//Special command path for sweep (if running firmware 2.x or newer)
+	auto sweeptype = GetSweepType(chan);
+	if( (m_firmwareRev[0] >= 2) &&  ( (sweeptype == SWEEP_TYPE_FREQ) || (sweeptype == SWEEP_TYPE_FREQ_LEVEL) ) )
+		return stod(m_transport->SendCommandQueuedWithReply("SWE:CURR:FREQ?"));
+
+	else
+		return stod(m_transport->SendCommandQueuedWithReply("SOUR:FREQ?"));
 }
 
 void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, double freq)
 {
-	//FIXME: this does not return actual current value if sweeping
-	//We will be able to use SWE:CURR:FREQ in a future firmware (not yet released)
-
 	m_transport->SendCommandQueued(string("SOUR:FREQ ") + to_string(freq));
 }
 
@@ -506,7 +528,7 @@ int64_t SiglentVectorSignalGenerator::GetAnalogFMDeviation(int /*chan*/)
 	return stoll(ret);
 }
 
-void SiglentVectorSignalGenerator::SetAnalogFMFrequency(int chan, int64_t frequency)
+void SiglentVectorSignalGenerator::SetAnalogFMFrequency(int /*chan*/, int64_t frequency)
 {
 	m_transport->SendCommandQueued(string("SOUR:FM:FREQ ") + to_string(frequency));
 }
