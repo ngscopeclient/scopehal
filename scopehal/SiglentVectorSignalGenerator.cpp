@@ -104,12 +104,12 @@ void SiglentVectorSignalGenerator::SetChannelOutputPower(int /*chan*/, float pow
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Synthesizer
 
-float SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
+double SiglentVectorSignalGenerator::GetChannelCenterFrequency(int /*chan*/)
 {
-	return stof(m_transport->SendCommandQueuedWithReply("SOUR:FREQ?"));
+	return stod(m_transport->SendCommandQueuedWithReply("SOUR:FREQ?"));
 }
 
-void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, float freq)
+void SiglentVectorSignalGenerator::SetChannelCenterFrequency(int /*chan*/, double freq)
 {
 	//FIXME: this does not return actual current value if sweeping
 	//We will be able to use SWE:CURR:FREQ in a future firmware (not yet released)

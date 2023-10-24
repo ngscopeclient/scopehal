@@ -83,7 +83,7 @@ public:
 
 		@return Center frequency, in Hz
 	 */
-	virtual float GetChannelCenterFrequency(int chan) =0;
+	virtual double GetChannelCenterFrequency(int chan) =0;
 
 	/**
 		@brief Sets the power level of a channel
@@ -91,7 +91,7 @@ public:
 		@param chan		Zero-based channel index
 		@param freq		Center frequency, in Hz
 	 */
-	virtual void SetChannelCenterFrequency(int chan, float freq) =0;
+	virtual void SetChannelCenterFrequency(int chan, double freq) =0;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Analog modulation

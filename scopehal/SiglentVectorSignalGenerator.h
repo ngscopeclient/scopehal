@@ -52,8 +52,8 @@ public:
 	virtual void SetChannelOutputEnable(int chan, bool on) override;
 	virtual float GetChannelOutputPower(int chan) override;
 	virtual void SetChannelOutputPower(int chan, float power) override;
-	virtual float GetChannelCenterFrequency(int chan) override;
-	virtual void SetChannelCenterFrequency(int chan, float freq) override;
+	virtual double GetChannelCenterFrequency(int chan) override;
+	virtual void SetChannelCenterFrequency(int chan, double freq) override;
 
 	//Analog modulation
 	virtual bool IsAnalogModulationAvailable(int chan) override;
