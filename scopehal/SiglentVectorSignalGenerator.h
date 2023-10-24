@@ -47,6 +47,8 @@ public:
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
+	virtual bool AcquireData() override;
+
 	//RF signal generator base stuff
 	virtual bool GetChannelOutputEnable(int chan) override;
 	virtual void SetChannelOutputEnable(int chan, bool on) override;

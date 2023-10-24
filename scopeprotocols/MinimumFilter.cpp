@@ -68,7 +68,7 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		auto vin = din.GetScalarValue();
 
 		m_streams[0].m_value = vin;
-		m_streams[1].m_value = min(vin, m_streams[1].m_value);
+		m_streams[1].m_value = min((double)vin, m_streams[1].m_value);
 		m_streams[2].m_value ++;
 		m_streams[3].m_value ++;
 	}
@@ -94,7 +94,7 @@ void MinimumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		}
 
 		m_streams[0].m_value = total;
-		m_streams[1].m_value = min(total, m_streams[1].m_value);
+		m_streams[1].m_value = min((double)total, m_streams[1].m_value);
 		m_streams[2].m_value += len;
 		m_streams[3].m_value ++;
 	}

@@ -395,7 +395,7 @@ public:
 	 */
 	virtual void SetSweepDirection(int chan, SweepDirection dir);
 
-	bool AcquireData() override;
+	virtual bool AcquireData() override;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Serialization

@@ -149,6 +149,16 @@ void RFSignalGenerator::SetSweepType(int /*chan*/, SweepType /*type*/)
 
 bool RFSignalGenerator::AcquireData()
 {
+	for(size_t i=0; i<m_channels.size(); i++)
+	{
+		auto pchan = dynamic_cast<RFSignalGeneratorChannel*>(m_channels[i]);
+		if(!pchan)
+			continue;
+
+		pchan->SetScalarValue(RFSignalGeneratorChannel::STREAM_FREQUENCY, GetChannelCenterFrequency(i));
+		pchan->SetScalarValue(RFSignalGeneratorChannel::STREAM_LEVEL, GetChannelOutputPower(i));
+	}
+
 	return true;
 }
 

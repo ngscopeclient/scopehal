@@ -47,8 +47,15 @@ public:
 	//Well defined stream IDs used by RFSignalGeneratorChannel
 	enum StreamIndexes
 	{
-		STREAM_FREQUENCY
+		STREAM_FREQUENCY,	//inout
+		STREAM_LEVEL		//out only for now
 	};
+
+	double GetFrequency()
+	{ return m_streams[STREAM_FREQUENCY].m_value; }
+
+	double GetLevel()
+	{ return m_streams[STREAM_LEVEL].m_value; }
 
 	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;

@@ -43,6 +43,9 @@ RFSignalGeneratorChannel::RFSignalGeneratorChannel(
 	ClearStreams();
 
 	CreateInput("Frequency");
+
+	AddStream(Unit(Unit::UNIT_HZ), "Frequency", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	AddStream(Unit(Unit::UNIT_DBM), "Level", Stream::STREAM_TYPE_ANALOG_SCALAR);
 }
 
 RFSignalGeneratorChannel::~RFSignalGeneratorChannel()

@@ -68,7 +68,7 @@ void MaximumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		auto vin = din.GetScalarValue();
 
 		m_streams[0].m_value = vin;
-		m_streams[1].m_value = max(vin, m_streams[1].m_value);
+		m_streams[1].m_value = max((double)vin, m_streams[1].m_value);
 		m_streams[2].m_value ++;
 		m_streams[3].m_value ++;
 	}
@@ -94,7 +94,7 @@ void MaximumFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 		}
 
 		m_streams[0].m_value = total;
-		m_streams[1].m_value = max(total, m_streams[1].m_value);
+		m_streams[1].m_value = max((double)total, m_streams[1].m_value);
 		m_streams[2].m_value += len;
 		m_streams[3].m_value ++;
 	}

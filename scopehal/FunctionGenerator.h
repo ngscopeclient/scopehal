@@ -39,6 +39,8 @@ public:
 	FunctionGenerator();
 	virtual ~FunctionGenerator();
 
+	virtual bool AcquireData() override;
+
 	enum WaveShape
 	{
 		SHAPE_SINE,

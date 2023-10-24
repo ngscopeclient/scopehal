@@ -339,6 +339,12 @@ void FunctionGenerator::SetFunctionChannelOutputImpedance(int /*chan*/, OutputIm
 {
 }
 
+bool FunctionGenerator::AcquireData()
+{
+	//no-op for now
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 

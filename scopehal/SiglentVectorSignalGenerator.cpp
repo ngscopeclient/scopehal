@@ -89,6 +89,19 @@ uint32_t SiglentVectorSignalGenerator::GetInstrumentTypesForChannel(size_t i) co
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Readback
+
+bool SiglentVectorSignalGenerator::AcquireData()
+{
+	if(!FunctionGenerator::AcquireData())
+		return false;
+	if(!RFSignalGenerator::AcquireData())
+		return false;
+
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Output stage
 
 bool SiglentVectorSignalGenerator::GetChannelOutputEnable(int /*chan*/)

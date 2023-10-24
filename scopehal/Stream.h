@@ -96,7 +96,7 @@ public:
 	WaveformBase* m_waveform;
 
 	///@brief The current value (only meaningful for analog scalar type)
-	float m_value;
+	double m_value;
 
 	///@brief General datatype stored in the stream
 	StreamType m_stype;
