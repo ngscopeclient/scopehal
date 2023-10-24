@@ -89,8 +89,27 @@ string ScalarStairstepFilter::GetProtocolName()
 void ScalarStairstepFilter::OnUnitChanged()
 {
 	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
+
+	//Don't touch anything if our unit is already the same
+	if(m_parameters[m_start].GetUnit() == unit)
+		return;
+
+	auto oldstart = m_parameters[m_start].GetFloatVal();
+	auto oldend = m_parameters[m_end].GetFloatVal();
+
 	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_parameters[m_start].SetFloatVal(oldstart);
+
 	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
+	m_parameters[m_end].SetFloatVal(oldend);
+}
+
+void ScalarStairstepFilter::LoadParameters(const YAML::Node& node, IDTable& table)
+{
+	//Do two passes of loading
+	//First of base class to set unit, second to configure everything else
+	FlowGraphNode::LoadParameters(node, table);
+	Filter::LoadParameters(node, table);
 }
 
 void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
