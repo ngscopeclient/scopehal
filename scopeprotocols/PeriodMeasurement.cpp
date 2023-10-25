@@ -38,7 +38,8 @@ using namespace std;
 PeriodMeasurement::PeriodMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	//Set up channels
 	CreateInput("din");
@@ -78,16 +79,27 @@ void PeriodMeasurement::Refresh()
 		return;
 	}
 
-	//Find average voltage of the waveform and use that as the zero crossing
 	auto din = GetInputWaveform(0);
 	din->PrepareForCpuAccess();
-	auto sdin = dynamic_cast<SparseAnalogWaveform*>(din);
-	auto udin = dynamic_cast<UniformAnalogWaveform*>(din);
-	float midpoint = GetAvgVoltage(sdin, udin);
-
-	//Timestamps of the edges
+	auto uadin = dynamic_cast<UniformAnalogWaveform*>(din);
+	auto sadin = dynamic_cast<SparseAnalogWaveform*>(din);
+	auto uddin = dynamic_cast<UniformDigitalWaveform*>(din);
+	auto sddin = dynamic_cast<SparseDigitalWaveform*>(din);
 	vector<int64_t> edges;
-	FindZeroCrossings(sdin, udin, midpoint, edges);
+
+	//Auto-threshold analog signals at 50% of full scale range
+	if(uadin)
+		FindZeroCrossings(uadin, GetAvgVoltage(uadin), edges);
+	else if(sadin)
+		FindZeroCrossings(sadin, GetAvgVoltage(sadin), edges);
+
+	//Just find edges in digital signals
+	else if(uddin)
+		FindZeroCrossings(uddin, edges);
+	else
+		FindZeroCrossings(sddin, edges);
+
+	//We need at least one full cycle of the waveform to have a meaningful frequency
 	if(edges.size() < 2)
 	{
 		SetData(NULL, 0);
@@ -96,20 +108,31 @@ void PeriodMeasurement::Refresh()
 
 	//Create the output
 	auto cap = SetupEmptySparseAnalogOutputWaveform(din, 0, true);
-	cap->PrepareForCpuAccess();
 	cap->m_timescale = 1;
+	cap->PrepareForCpuAccess();
 
-	for(size_t i=0; i < (edges.size()-2); i+= 2)
+	size_t elen = edges.size();
+	for(size_t i=0; i < (elen - 2); i+= 2)
 	{
 		//measure from edge to 2 edges later, since we find all zero crossings regardless of polarity
 		int64_t start = edges[i];
 		int64_t end = edges[i+2];
 
 		int64_t delta = end - start;
+
 		cap->m_offsets.push_back(start);
-		cap->m_durations.push_back(delta);
+		cap->m_durations.push_back(round(delta));
 		cap->m_samples.push_back(delta);
 	}
 
 	SetData(cap, 0);
+
+	cap->MarkModifiedFromCpu();
+
+	//For the scalar average output, find the total number of zero crossings and divide by the spacing
+	//(excluding partial cycles at start and end).
+	//This gives us twice our frequency (since we count both zero crossings) so divide by two again
+	double ncycles = (elen - 1) / 2;
+	double interval = edges[elen-1] - edges[0];
+	m_streams[1].m_value = interval / ncycles;
 }
