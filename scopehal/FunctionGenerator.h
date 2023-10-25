@@ -143,6 +143,7 @@ public:
 	};
 
 	static std::string GetNameOfImpedance(OutputImpedance imp);
+	static OutputImpedance GetImpedanceOfName(const std::string& name);
 
 	/**
 		@brief Determines if the function generator allows control over rise/fall times

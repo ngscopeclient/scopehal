@@ -363,6 +363,18 @@ string FunctionGenerator::GetNameOfImpedance(OutputImpedance imp)
 	}
 }
 
+FunctionGenerator::OutputImpedance FunctionGenerator::GetImpedanceOfName(const string& name)
+{
+	if(name == "Hi-Z")
+		return IMPEDANCE_HIGH_Z;
+	else if(name == "50Ω")
+		return IMPEDANCE_50_OHM;
+
+	//invalid
+	else
+		return IMPEDANCE_HIGH_Z;
+}
+
 void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
 	for(size_t i=0; i<GetChannelCount(); i++)
@@ -404,15 +416,105 @@ void FunctionGenerator::DoSerializeConfiguration(YAML::Node& node, IDTable& tabl
 	}
 }
 
-void FunctionGenerator::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+void FunctionGenerator::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& idmap,
+	ConfigWarningList& list)
+{
+	Unit volts(Unit::UNIT_VOLTS);
+
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_FUNCTION))
+			continue;
+
+		auto chan = dynamic_cast<FunctionGeneratorChannel*>(GetChannel(i));
+
+		//Save basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+		idmap.emplace(channelNode["funcgenid"].as<uintptr_t>(), chan);
+
+		//Changing impedance from high-Z to 50 ohm will double output swing
+		if(HasFunctionImpedanceControls(i))
+		{
+			auto imp = GetImpedanceOfName(channelNode["impedance"].as<string>());
+			if( (imp == IMPEDANCE_50_OHM) && (GetFunctionChannelOutputImpedance(i) == IMPEDANCE_HIGH_Z))
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					chan->GetDisplayName() + " output impedance",
+					"Changing impedance from high-Z to 50Ω will double output amplitude",
+					"Hi-Z",
+					"50Ω"));
+			}
+		}
+
+		//Complain about increasing amplitude
+		auto aact = GetFunctionChannelAmplitude(i);
+		auto anom = channelNode["amplitude"].as<float>();
+		if(anom > aact)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " amplitude",
+				string("Increasing amplitude by ") + volts.PrettyPrint(anom - aact),
+				volts.PrettyPrint(aact),
+				volts.PrettyPrint(anom)));
+		}
+
+		//Complain about increasing magnitude of, or changing sign of, offset
+		auto oact = GetFunctionChannelOffset(i);
+		auto onom = channelNode["offset"].as<float>();
+		if(fabs(onom) > fabs(oact))
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " offset",
+				string("Increasing offset magnitude by ") + volts.PrettyPrint(fabs(onom - oact)),
+				volts.PrettyPrint(oact),
+				volts.PrettyPrint(onom)));
+		}
+		if( ( (onom > 0) && (oact < 0)) || ( (onom < 0) && (oact > 0)) )
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " offset",
+				"Changing sign of offset",
+				volts.PrettyPrint(oact),
+				volts.PrettyPrint(onom)));
+		}
+	}
+}
+
+void FunctionGenerator::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
 {
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_FUNCTION))
 			continue;
-	}
-}
 
-void FunctionGenerator::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
-{
+		//auto chan = dynamic_cast<FunctionGeneratorChannel*>(GetChannel(i));
+
+		//Load basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		SetFunctionChannelAmplitude(i, channelNode["amplitude"].as<float>());
+		SetFunctionChannelOffset(i, channelNode["offset"].as<float>());
+		SetFunctionChannelFrequency(i, channelNode["frequency"].as<float>());
+		SetFunctionChannelShape(i, GetShapeOfName(channelNode["shape"].as<string>()));
+
+		//Optional configuration not all instruments have
+		if(HasFunctionDutyCycleControls(i) && channelNode["duty"])
+			SetFunctionChannelDutyCycle(i, channelNode["duty"].as<float>());
+
+		if(HasFunctionRiseFallTimeControls(i))
+		{
+			SetFunctionChannelRiseTime(i, channelNode["rise"].as<float>());
+			SetFunctionChannelFallTime(i, channelNode["fall"].as<float>());
+		}
+
+		if(HasFunctionImpedanceControls(i))
+			SetFunctionChannelOutputImpedance(i, GetImpedanceOfName(channelNode["impedance"].as<string>()));
+
+		SetFunctionChannelActive(i, channelNode["enabled"].as<bool>());
+	}
 }
