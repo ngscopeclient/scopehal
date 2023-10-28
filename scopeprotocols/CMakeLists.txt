@@ -128,6 +128,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	ReferencePlaneExtensionFilter.cpp
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
+	RMSMeasurement.cpp
 	ScalarStairstepFilter.cpp
 	ScaleFilter.cpp
 	SDCmdDecoder.cpp

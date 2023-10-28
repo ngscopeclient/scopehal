@@ -28,14 +28,14 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ACRMSMeasurement.h"
+#include "RMSMeasurement.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ACRMSMeasurement::ACRMSMeasurement(const string& color)
+RMSMeasurement::RMSMeasurement(const string& color)
 	: Filter(color, CAT_MEASUREMENT)
 {
 	AddStream(Unit(Unit::UNIT_VOLTS), "trend", Stream::STREAM_TYPE_ANALOG);
@@ -48,7 +48,7 @@ ACRMSMeasurement::ACRMSMeasurement(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ACRMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
+bool RMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
@@ -65,15 +65,15 @@ bool ACRMSMeasurement::ValidateChannel(size_t i, StreamDescriptor stream)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string ACRMSMeasurement::GetProtocolName()
+string RMSMeasurement::GetProtocolName()
 {
-	return "AC RMS";
+	return "RMS";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ACRMSMeasurement::Refresh()
+void RMSMeasurement::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
@@ -91,8 +91,6 @@ void ACRMSMeasurement::Refresh()
 	//Copy input unit to output
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 0);
 	SetYAxisUnits(m_inputs[0].GetYAxisUnits(), 1);
-
-	float average = GetAvgVoltage(sadin, uadin);
 	auto length = din->size();
 
 	//Calculate the global RMS value
@@ -101,12 +99,12 @@ void ACRMSMeasurement::Refresh()
 	if(uadin)
 	{
 		for (size_t i = 0; i < length; i++)
-			temp += ((uadin->m_samples[i] - average) * (uadin->m_samples[i] - average));
+			temp += uadin->m_samples[i] * uadin->m_samples[i];
 	}
 	else if(sadin)
 	{
 		for (size_t i = 0; i < length; i++)
-			temp += ((sadin->m_samples[i] - average) * (sadin->m_samples[i] - average));
+			temp += sadin->m_samples[i] * sadin->m_samples[i];
 	}
 
 	//Divide by total number of samples and take the square root to get the final AC RMS
@@ -116,11 +114,13 @@ void ACRMSMeasurement::Refresh()
 	temp = 0;
 	vector<int64_t> edges;
 
-	//Auto-threshold analog signals at average of the full scale range
+	//Auto-threshold analog signals at average value
+	//TODO: make threshold configurable?
+	float threshold = GetAvgVoltage(sadin, uadin);
 	if(uadin)
-		FindZeroCrossings(uadin, average, edges);
+		FindZeroCrossings(uadin, threshold, edges);
 	else if(sadin)
-		FindZeroCrossings(sadin, average, edges);
+		FindZeroCrossings(sadin, threshold, edges);
 
 	//We need at least one full cycle of the waveform to have a meaningful AC RMS Measurement
 	if(edges.size() < 2)
@@ -146,12 +146,12 @@ void ACRMSMeasurement::Refresh()
 		if(uadin)
 		{
 			for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				temp += ((uadin->m_samples[j] - average) * (uadin->m_samples[j] - average));
+				temp += uadin->m_samples[j] * uadin->m_samples[j];
 		}
 		else if(sadin)
 		{
 			for(j = start; (j <= end) && (j < (int64_t)length); j++)
-				temp += ((sadin->m_samples[j] - average) * (sadin->m_samples[j] - average));
+				temp += sadin->m_samples[j] * sadin->m_samples[j];
 		}
 
 		//Get the difference between the end and start of cycle. This would be the number of samples
