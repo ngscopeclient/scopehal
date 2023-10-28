@@ -620,10 +620,20 @@ void WFMImportFilter::OnFileNameChanged()
 	LogDebug("Actual sample count:  %zu\n", numRealSamples);
 	LogDebug("Actual byte count:    %zu\n", numBytes);
 
+	//Figure out what unit to use for the stream
+	Unit yunit = Unit::UNIT_VOLTS;
+	string sunit(yunits);
+	if(sunit == "V")
+		yunit = Unit::UNIT_VOLTS;
+	else if(sunit == "A")
+		yunit = Unit::UNIT_AMPS;
+	else
+		LogWarning("Unrecognized Y axis unit \"%s\"\n", yunits);
+
 	//Create output waveform and stream
 	//TODO: handle multi channel etc
 	ClearStreams();
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(yunit, "data", Stream::STREAM_TYPE_ANALOG);
 	auto wfm = new UniformAnalogWaveform;
 	wfm->m_timescale = FS_PER_SECOND * (spacing+1) * xscale;
 	wfm->Resize(numRealSamples);
