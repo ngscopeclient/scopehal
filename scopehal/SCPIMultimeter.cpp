@@ -75,9 +75,6 @@ SCPIMultimeter* SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* t
 
 void SCPIMultimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 {
-	int imeter = table.emplace(this);
-	node["meterid"] = imeter;
-
 	node["nick"] = m_nickname;
 	node["name"] = GetName();
 	node["vendor"] = GetVendor();
@@ -87,7 +84,7 @@ void SCPIMultimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	node["driver"] = GetDriverName();
 }
 
-void SCPIMultimeter::DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap)
+void SCPIMultimeter::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& idmap)
 {
 	m_nickname = node["nick"].as<string>();
 }

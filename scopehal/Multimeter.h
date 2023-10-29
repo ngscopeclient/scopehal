@@ -121,6 +121,11 @@ protected:
 		@brief Load instrument and channel configuration from a save file
 	 */
 	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+
+	/**
+		@brief Validate instrument and channel configuration from a save file
+	 */
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 };
 
 #endif

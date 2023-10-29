@@ -36,6 +36,7 @@ Multimeter::Multimeter()
 {
 	m_serializers.push_back(sigc::mem_fun(this, &Multimeter::DoSerializeConfiguration));
 	m_loaders.push_back(sigc::mem_fun(this, &Multimeter::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &Multimeter::DoPreLoadConfiguration));
 }
 
 Multimeter::~Multimeter()
@@ -246,4 +247,23 @@ void Multimeter::DoLoadConfiguration(int /*version*/, const YAML::Node& node, ID
 		SetSecondaryMeterMode(TextToMode(node["secondaryMode"].as<string>()));
 	if(node["autoRange"])
 		SetMeterAutoRange(node["autoRange"].as<bool>());
+}
+
+void Multimeter::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& /*idmap*/,
+	ConfigWarningList& list)
+{
+	//Complain if mode is changed
+
+	auto mode = TextToMode(node["meterMode"].as<string>());
+	if(mode != GetMeterMode())
+	{
+		list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+			"Operating mode",
+			"Changing meter mode",
+			ModeToText(GetMeterMode()),
+			node["meterMode"].as<string>()));
+	}
 }
