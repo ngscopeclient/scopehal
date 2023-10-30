@@ -220,11 +220,6 @@ void Multimeter::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 
 		//Save basic info
 		channelNode["meterid"] = table.emplace(chan);
-		channelNode["index"] = i;
-		channelNode["color"] = chan->m_displaycolor;
-		channelNode["nick"] = chan->GetDisplayName();
-		channelNode["name"] = chan->GetHwname();
-
 		node["channels"][key] = channelNode;
 	}
 }

@@ -67,6 +67,8 @@ public:
 	 */
 	virtual void SetLoadMode(size_t channel, LoadMode mode) =0;
 
+	std::string LoadModeToString(LoadMode mode);
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Range selection
 
@@ -153,6 +155,25 @@ protected:
 		@brief Get the measured current of the load
 	 */
 	virtual float GetLoadCurrentActual(size_t channel) =0;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Configuration storage
+
+protected:
+	/**
+		@brief Serializes this multimeter's configuration to a YAML node.
+	 */
+	void DoSerializeConfiguration(YAML::Node& node, IDTable& table);
+
+	/**
+		@brief Load instrument and channel configuration from a save file
+	 */
+	void DoLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap);
+
+	/**
+		@brief Validate instrument and channel configuration from a save file
+	 */
+	void DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list);
 };
 
 #endif

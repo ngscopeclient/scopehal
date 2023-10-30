@@ -31,8 +31,13 @@
 #include "Load.h"
 #include "LoadChannel.h"
 
+using namespace std;
+
 Load::Load()
 {
+	m_serializers.push_back(sigc::mem_fun(this, &Load::DoSerializeConfiguration));
+	m_loaders.push_back(sigc::mem_fun(this, &Load::DoLoadConfiguration));
+	m_preloaders.push_back(sigc::mem_fun(this, &Load::DoPreLoadConfiguration));
 }
 
 Load::~Load()
@@ -61,4 +66,121 @@ bool Load::AcquireData()
 	}
 
 	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+string Load::LoadModeToString(LoadMode mode)
+{
+	switch(mode)
+	{
+		case MODE_CONSTANT_CURRENT:
+			return "Constant current";
+
+		case MODE_CONSTANT_VOLTAGE:
+			return "Constant voltage";
+
+		case MODE_CONSTANT_RESISTANCE:
+			return "Constant resistance";
+
+		case MODE_CONSTANT_POWER:
+			return "Constant power";
+
+		default:
+			return "Invalid";
+	}
+}
+
+void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
+{
+	//If we're derived from load class but not a load, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_LOAD) == 0)
+		return;
+
+	YAML::Node chnode = node["channels"];
+
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_LOAD))
+			continue;
+
+		auto chan = GetChannel(i);
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Save basic info
+		channelNode["loadid"] = table.emplace(chan);
+
+		channelNode["mode"] = LoadModeToString(GetLoadMode(i));
+		channelNode["enabled"] = GetLoadActive(i);
+		channelNode["setpoint"] = GetLoadSetPoint(i);
+		channelNode["voltageActual"] = GetLoadVoltageActual(i);
+		channelNode["currentActual"] = GetLoadCurrentActual(i);
+
+		//Current ranges
+		YAML::Node iranges;
+		auto ranges = GetLoadCurrentRanges(i);
+		for(auto r : ranges)
+			iranges.push_back(r);
+		channelNode["irange"] = GetLoadCurrentRange(i);
+		channelNode["iranges"] = iranges;
+
+		//Voltage ranges
+		YAML::Node vranges;
+		ranges = GetLoadCurrentRanges(i);
+		for(auto r : ranges)
+			vranges.push_back(r);
+		channelNode["vrange"] = GetLoadVoltageRange(i);
+		channelNode["vranges"] = vranges;
+
+		node["channels"][key] = channelNode;
+	}
+}
+
+void Load::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+{
+	/*
+	//If we're derived from load class but not a load, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_LOAD) == 0)
+		return;
+
+	if(node["currentChannel"])
+		SetCurrentMeterChannel(node["currentChannel"].as<int>());
+	if(node["meterMode"])
+		SetMeterMode(TextToMode(node["meterMode"].as<string>()));
+
+	//TODO: ranges
+
+	if(node["secondaryMode"])
+		SetSecondaryMeterMode(TextToMode(node["secondaryMode"].as<string>()));
+	if(node["autoRange"])
+		SetMeterAutoRange(node["autoRange"].as<bool>());
+	*/
+}
+
+void Load::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& /*idmap*/,
+	ConfigWarningList& list)
+{
+	//If we're derived from load class but not a load, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_LOAD) == 0)
+		return;
+
+	//Complain if mode is changed
+	/*
+	auto mode = TextToMode(node["meterMode"].as<string>());
+	if(mode != GetMeterMode())
+	{
+		list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+			"Operating mode",
+			"Changing meter mode",
+			ModeToText(GetMeterMode()),
+			node["meterMode"].as<string>()));
+	}*/
 }
