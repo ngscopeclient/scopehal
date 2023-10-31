@@ -71,7 +71,7 @@ bool Load::AcquireData()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
-string Load::LoadModeToString(LoadMode mode)
+string Load::GetNameOfLoadMode(LoadMode mode)
 {
 	switch(mode)
 	{
@@ -90,6 +90,22 @@ string Load::LoadModeToString(LoadMode mode)
 		default:
 			return "Invalid";
 	}
+}
+
+Load::LoadMode Load::GetLoadModeOfName(const string& name)
+{
+	if(name == "Constant current")
+		return MODE_CONSTANT_CURRENT;
+	else if(name == "Constant voltage")
+		return MODE_CONSTANT_VOLTAGE;
+	else if(name == "Constant resistance")
+		return MODE_CONSTANT_RESISTANCE;
+	else if(name == "Constant power")
+		return MODE_CONSTANT_POWER;
+
+	//invalid
+	else
+		return MODE_CONSTANT_CURRENT;
 }
 
 void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
@@ -113,7 +129,7 @@ void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		//Save basic info
 		channelNode["loadid"] = table.emplace(chan);
 
-		channelNode["mode"] = LoadModeToString(GetLoadMode(i));
+		channelNode["mode"] = GetNameOfLoadMode(GetLoadMode(i));
 		channelNode["enabled"] = GetLoadActive(i);
 		channelNode["setpoint"] = GetLoadSetPoint(i);
 		channelNode["voltageActual"] = GetLoadVoltageActual(i);
@@ -139,26 +155,25 @@ void Load::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	}
 }
 
-void Load::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& /*idmap*/)
+void Load::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& idmap)
 {
-	/*
-	//If we're derived from load class but not a load, do nothing
-	//(we're probably a multi function instrument missing an option)
-	if( (GetInstrumentTypes() & Instrument::INST_LOAD) == 0)
-		return;
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_LOAD))
+			continue;
 
-	if(node["currentChannel"])
-		SetCurrentMeterChannel(node["currentChannel"].as<int>());
-	if(node["meterMode"])
-		SetMeterMode(TextToMode(node["meterMode"].as<string>()));
+		auto chan = dynamic_cast<LoadChannel*>(GetChannel(i));
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+		idmap.emplace(channelNode["loadid"].as<intptr_t>(), chan);
 
-	//TODO: ranges
+		SetLoadMode(i, GetLoadModeOfName(channelNode["mode"].as<string>()));
+		SetLoadSetPoint(i, channelNode["setpoint"].as<float>());
+		SetLoadCurrentRange(i, channelNode["irange"].as<size_t>());
+		SetLoadVoltageRange(i, channelNode["vrange"].as<size_t>());
 
-	if(node["secondaryMode"])
-		SetSecondaryMeterMode(TextToMode(node["secondaryMode"].as<string>()));
-	if(node["autoRange"])
-		SetMeterAutoRange(node["autoRange"].as<bool>());
-	*/
+		SetLoadActive(i, channelNode["enabled"].as<bool>());
+	}
 }
 
 void Load::DoPreLoadConfiguration(
@@ -172,15 +187,100 @@ void Load::DoPreLoadConfiguration(
 	if( (GetInstrumentTypes() & Instrument::INST_LOAD) == 0)
 		return;
 
-	//Complain if mode is changed
-	/*
-	auto mode = TextToMode(node["meterMode"].as<string>());
-	if(mode != GetMeterMode())
+	Unit volts(Unit::UNIT_VOLTS);
+	Unit amps(Unit::UNIT_AMPS);
+	Unit watts(Unit::UNIT_WATTS);
+	Unit ohms(Unit::UNIT_OHMS);
+
+	for(size_t i=0; i<GetChannelCount(); i++)
 	{
-		list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-			"Operating mode",
-			"Changing meter mode",
-			ModeToText(GetMeterMode()),
-			node["meterMode"].as<string>()));
-	}*/
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_LOAD))
+			continue;
+
+		auto chan = dynamic_cast<LoadChannel*>(GetChannel(i));
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Warn if turned on
+		if(channelNode["enabled"] && !GetLoadActive(i))
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " enable", "Turning load on", "off", "on"));
+		}
+
+		//Complain if mode is changed
+		auto newMode = channelNode["mode"].as<string>();
+		auto curMode = GetLoadMode(i);
+		auto mode = GetLoadModeOfName(newMode);
+		if(mode != curMode)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " mode",
+				"Changing operating mode",
+				GetNameOfLoadMode(curMode),
+				newMode));
+		}
+
+		//Figure out current unit
+		Unit vunit(Unit::UNIT_VOLTS);
+		switch(mode)
+		{
+			case MODE_CONSTANT_CURRENT:
+				vunit = amps;
+				break;
+
+			case MODE_CONSTANT_VOLTAGE:
+				vunit = volts;
+				break;
+
+			case MODE_CONSTANT_POWER:
+				vunit = watts;
+				break;
+
+			case MODE_CONSTANT_RESISTANCE:
+				vunit = ohms;
+				break;
+
+			default:
+				break;
+		}
+
+		//Complain if set point is increased
+		auto newSet = channelNode["setpoint"].as<float>();
+		auto oldSet = GetLoadSetPoint(i);
+		if(newSet > oldSet)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " set point",
+				string("Increasing set point by ") + vunit.PrettyPrint(newSet - oldSet),
+				vunit.PrettyPrint(oldSet),
+				vunit.PrettyPrint(newSet)));
+		}
+
+		//Complain if range has changed
+		//TODO: only if decreased?
+		auto ranges = GetLoadCurrentRanges(i);
+		auto newRange = channelNode["irange"].as<size_t>();
+		auto curRange = GetLoadCurrentRange(i);
+		if(newRange != curRange)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " current range",
+				"Changing full scale range",
+				amps.PrettyPrint(ranges[curRange]),
+				amps.PrettyPrint(ranges[newRange])));
+		}
+
+		ranges = GetLoadVoltageRanges(i);
+		newRange = channelNode["vrange"].as<size_t>();
+		curRange = GetLoadVoltageRange(i);
+		if(newRange != curRange)
+		{
+			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+				chan->GetDisplayName() + " voltage range",
+				"Changing full scale range",
+				volts.PrettyPrint(ranges[curRange]),
+				volts.PrettyPrint(ranges[newRange])));
+		}
+	}
 }

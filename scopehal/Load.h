@@ -67,7 +67,8 @@ public:
 	 */
 	virtual void SetLoadMode(size_t channel, LoadMode mode) =0;
 
-	std::string LoadModeToString(LoadMode mode);
+	static std::string GetNameOfLoadMode(LoadMode mode);
+	static LoadMode GetLoadModeOfName(const std::string& name);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Range selection
