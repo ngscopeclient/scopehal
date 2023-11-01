@@ -160,6 +160,14 @@ size_t SiglentLoad::GetLoadCurrentRange(size_t channel)
 			maxcur = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:VOLT:IRANG?")));
 			break;
 
+		case MODE_CONSTANT_POWER:
+			maxcur = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:POW:IRANG?")));
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			maxcur = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:RES:IRANG?")));
+			break;
+
 		default:
 			LogWarning("[SiglentLoad::GetLoadCurrentRange] Unknown mode %d\n", mode);
 			break;
@@ -192,6 +200,14 @@ size_t SiglentLoad::GetLoadVoltageRange(size_t channel)
 
 		case MODE_CONSTANT_VOLTAGE:
 			maxvolt = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:VOLT:VRANG?")));
+			break;
+
+		case MODE_CONSTANT_POWER:
+			maxvolt = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:POW:VRANG?")));
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			maxvolt = stoi(Trim(m_transport->SendCommandQueuedWithReply("SOUR:RES:VRANG?")));
 			break;
 
 		default:
@@ -227,6 +243,14 @@ void SiglentLoad::SetLoadVoltageRange(size_t channel, size_t rangeIndex)
 			m_transport->SendCommandQueued(string("SOUR:VOLT:VRANG ") + to_string(fullScaleRange));
 			break;
 
+		case MODE_CONSTANT_POWER:
+			m_transport->SendCommandQueued(string("SOUR:POW:VRANG ") + to_string(fullScaleRange));
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			m_transport->SendCommandQueued(string("SOUR:RES:VRANG ") + to_string(fullScaleRange));
+			break;
+
 		default:
 			LogWarning("[SiglentLoad::SetLoadVoltageRange] Unknown mode %d\n", mode);
 			break;
@@ -255,6 +279,14 @@ void SiglentLoad::SetLoadCurrentRange(size_t channel, size_t rangeIndex)
 
 		case MODE_CONSTANT_VOLTAGE:
 			m_transport->SendCommandQueued(string("SOUR:VOLT:IRANG ") + to_string(fullScaleRange));
+			break;
+
+		case MODE_CONSTANT_POWER:
+			m_transport->SendCommandQueued(string("SOUR:POW:IRANG ") + to_string(fullScaleRange));
+			break;
+
+		case MODE_CONSTANT_RESISTANCE:
+			m_transport->SendCommandQueued(string("SOUR:RES:IRANG ") + to_string(fullScaleRange));
 			break;
 
 		default:

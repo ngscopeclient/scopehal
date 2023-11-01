@@ -202,7 +202,7 @@ void Load::DoPreLoadConfiguration(
 		auto channelNode = node["channels"][key];
 
 		//Warn if turned on
-		if(channelNode["enabled"] && !GetLoadActive(i))
+		if(channelNode["enabled"].as<bool>() && !GetLoadActive(i))
 		{
 			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
 				chan->GetDisplayName() + " enable", "Turning load on", "off", "on"));
