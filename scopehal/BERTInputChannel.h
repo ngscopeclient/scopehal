@@ -88,6 +88,9 @@ public:
 	StreamDescriptor GetEyeStream()
 	{ return StreamDescriptor(this, STREAM_EYE); }
 
+	StreamDescriptor GetBERStream()
+	{ return StreamDescriptor(this, STREAM_BER); }
+
 	bool HasCTLE()
 	{ return m_bert->HasRxCTLE(); }
 

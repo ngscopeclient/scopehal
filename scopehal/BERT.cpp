@@ -139,14 +139,66 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_BERT))
 			continue;
 
-		/*
 		auto chan = GetChannel(i);
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
 
-		//Save basic info
-		channelNode["loadid"] = table.emplace(chan);
+		auto ichan = dynamic_cast<BERTInputChannel*>(chan);
+		auto ochan = dynamic_cast<BERTOutputChannel*>(chan);
 
+		if(ichan)
+		{
+			channelNode["bertid"] = table.emplace(ichan);
+			channelNode["direction"] = "in";
+
+			channelNode["invert"] = GetRxInvert(i);
+			channelNode["cdrlock"] = GetRxCdrLockState(i);
+			channelNode["ctleStep"] = GetRxCTLEGainStep(i);
+			channelNode["pattern"] = GetPatternName(GetRxPattern(i));
+
+			YAML::Node avail;
+			auto patterns = GetAvailableRxPatterns(i);
+			for(auto p : patterns)
+				avail.push_back(GetPatternName(p));
+			channelNode["availablePatterns"] = avail;
+
+			int64_t dx;
+			float dy;
+			GetBERSamplingPoint(i, dx, dy);
+			YAML::Node sampler;
+			sampler["dx"] = dx;
+			sampler["dy"] = dy;
+			sampler["ber"] = ichan->GetBERStream().GetScalarValue();
+			channelNode["sampler"] = sampler;
+		}
+		else
+		{
+			channelNode["bertid"] = table.emplace(ochan);
+			channelNode["direction"] = "out";
+
+			channelNode["pattern"] = GetPatternName(GetTxPattern(i));
+
+			YAML::Node avail;
+			auto patterns = GetAvailableTxPatterns(i);
+			for(auto p : patterns)
+				avail.push_back(GetPatternName(p));
+			channelNode["availablePatterns"] = avail;
+
+			channelNode["invert"] = GetTxInvert(i);
+			channelNode["drive"] = GetTxDriveStrength(i);
+
+			YAML::Node adrives;
+			auto drives = GetAvailableTxDriveStrengths(i);
+			for(auto d : drives)
+				adrives.push_back(d);
+			channelNode["availableDrives"] = adrives;
+
+			channelNode["enabled"] = GetTxEnable(i);
+			channelNode["preCursor"] = GetTxPreCursor(i);
+			channelNode["postCursor"] = GetTxPostCursor(i);
+		}
+
+		/*
 		channelNode["mode"] = GetNameOfLoadMode(GetLoadMode(i));
 		channelNode["enabled"] = GetLoadActive(i);
 		channelNode["setpoint"] = GetLoadSetPoint(i);
@@ -167,10 +219,9 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 		for(auto r : ranges)
 			vranges.push_back(r);
 		channelNode["vrange"] = GetLoadVoltageRange(i);
-		channelNode["vranges"] = vranges;
+		channelNode["vranges"] = vranges;*/
 
 		node["channels"][key] = channelNode;
-		*/
 	}
 }
 
