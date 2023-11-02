@@ -471,7 +471,11 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 	}
 }
 
-void Oscilloscope::DoPreLoadConfiguration(int version, const YAML::Node& node, IDTable& idmap, ConfigWarningList& list)
+void Oscilloscope::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& /*idmap*/,
+	ConfigWarningList& /*list*/)
 {
 	//Create a dummy warning message
 	//list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(

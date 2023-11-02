@@ -82,6 +82,30 @@ string BERT::GetPatternName(Pattern pat)
 	}
 }
 
+BERT::Pattern BERT::GetPatternOfName(string name)
+{
+	if(name == "PRBS7")
+		return PATTERN_PRBS7;
+	else if(name == "PRBS9")
+		return PATTERN_PRBS9;
+	else if(name == "PRBS11")
+		return PATTERN_PRBS11;
+	else if(name == "PRBS15")
+		return PATTERN_PRBS15;
+	else if(name == "PRBS23")
+		return PATTERN_PRBS23;
+	else if(name == "PRBS31")
+		return PATTERN_PRBS31;
+	else if(name == "Custom")
+		return PATTERN_CUSTOM;
+	else if(name == "Auto")
+		return PATTERN_AUTO;
+
+	//invalid
+	else
+		return PATTERN_PRBS7;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
 
@@ -198,54 +222,53 @@ void BERT::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 			channelNode["postCursor"] = GetTxPostCursor(i);
 		}
 
-		/*
-		channelNode["mode"] = GetNameOfLoadMode(GetLoadMode(i));
-		channelNode["enabled"] = GetLoadActive(i);
-		channelNode["setpoint"] = GetLoadSetPoint(i);
-		channelNode["voltageActual"] = GetLoadVoltageActual(i);
-		channelNode["currentActual"] = GetLoadCurrentActual(i);
-
-		//Current ranges
-		YAML::Node iranges;
-		auto ranges = GetLoadCurrentRanges(i);
-		for(auto r : ranges)
-			iranges.push_back(r);
-		channelNode["irange"] = GetLoadCurrentRange(i);
-		channelNode["iranges"] = iranges;
-
-		//Voltage ranges
-		YAML::Node vranges;
-		ranges = GetLoadCurrentRanges(i);
-		for(auto r : ranges)
-			vranges.push_back(r);
-		channelNode["vrange"] = GetLoadVoltageRange(i);
-		channelNode["vranges"] = vranges;*/
-
 		node["channels"][key] = channelNode;
 	}
 }
 
 void BERT::DoLoadConfiguration(int /*version*/, const YAML::Node& node, IDTable& idmap)
 {
-	/*
+	SetGlobalCustomPattern(node["customPattern"]["globalPattern"].as<uint64_t>());
+	SetBERIntegrationLength(node["berIntegrationLength"].as<int>());
+	SetRefclkOutMux(node["berIntegrationLength"].as<int>());
+	auto timebase = node["timebase"];
+	SetUseExternalRefclk(timebase["useExtRefclk"].as<bool>());
+	SetDataRate(timebase["dataRate"].as<int64_t>());
+
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_BERT))
 			continue;
 
-		auto chan = dynamic_cast<LoadChannel*>(GetChannel(i));
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
-		idmap.emplace(channelNode["loadid"].as<intptr_t>(), chan);
 
-		SetLoadMode(i, GetLoadModeOfName(channelNode["mode"].as<string>()));
-		SetLoadSetPoint(i, channelNode["setpoint"].as<float>());
-		SetLoadCurrentRange(i, channelNode["irange"].as<size_t>());
-		SetLoadVoltageRange(i, channelNode["vrange"].as<size_t>());
+		auto ichan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
+		auto ochan = dynamic_cast<BERTOutputChannel*>(GetChannel(i));
 
-		SetLoadActive(i, channelNode["enabled"].as<bool>());
+		if(ichan)
+		{
+			idmap.emplace(channelNode["bertid"].as<intptr_t>(), ichan);
+
+			SetRxInvert(i, channelNode["invert"].as<bool>());
+			SetRxCTLEGainStep(i, channelNode["ctleStep"].as<size_t>());
+			SetRxPattern(i, GetPatternOfName(channelNode["pattern"].as<string>()));
+
+			auto sampler = channelNode["sampler"];
+			SetBERSamplingPoint(i, sampler["dx"].as<int64_t>(), sampler["dy"].as<float>());
+		}
+		else if(ochan)
+		{
+			idmap.emplace(channelNode["bertid"].as<intptr_t>(), ochan);
+
+			SetTxPattern(i, GetPatternOfName(channelNode["pattern"].as<string>()));
+			SetTxInvert(i, channelNode["invert"].as<bool>());
+			SetTxDriveStrength(i, channelNode["drive"].as<float>());
+			SetTxEnable(i, channelNode["enabled"].as<bool>());
+			SetTxPreCursor(i, channelNode["preCursor"].as<float>());
+			SetTxPostCursor(i, channelNode["postCursor"].as<float>());
+		}
 	}
-	*/
 }
 
 void BERT::DoPreLoadConfiguration(
@@ -259,103 +282,43 @@ void BERT::DoPreLoadConfiguration(
 	if( (GetInstrumentTypes() & Instrument::INST_BERT) == 0)
 		return;
 
-	/*
 	Unit volts(Unit::UNIT_VOLTS);
-	Unit amps(Unit::UNIT_AMPS);
-	Unit watts(Unit::UNIT_WATTS);
-	Unit ohms(Unit::UNIT_OHMS);
 
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
 		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_BERT))
 			continue;
 
-		auto chan = dynamic_cast<LoadChannel*>(GetChannel(i));
+		auto ichan = dynamic_cast<BERTInputChannel*>(GetChannel(i));
+		auto ochan = dynamic_cast<BERTOutputChannel*>(GetChannel(i));
 		auto key = "ch" + to_string(i);
 		auto channelNode = node["channels"][key];
 
-		//Warn if turned on
-		if(channelNode["enabled"].as<bool>() && !GetLoadActive(i))
+		if(ichan)
 		{
-			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName() + " enable", "Turning load on", "off", "on"));
+			//nothing on input channel can break things, don't have to check anything
 		}
-
-		//Complain if mode is changed
-		auto newMode = channelNode["mode"].as<string>();
-		auto curMode = GetLoadMode(i);
-		auto mode = GetLoadModeOfName(newMode);
-		if(mode != curMode)
+		else if(ochan)
 		{
-			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName() + " mode",
-				"Changing operating mode",
-				GetNameOfLoadMode(curMode),
-				newMode));
-		}
+			//complain if output turned on, or level increased
 
-		//Figure out current unit
-		Unit vunit(Unit::UNIT_VOLTS);
-		switch(mode)
-		{
-			case MODE_CONSTANT_CURRENT:
-				vunit = amps;
-				break;
+			if(channelNode["enabled"].as<bool>() && !GetTxEnable(i))
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					ochan->GetDisplayName() + " enable", "Turning output on", "off", "on"));
+			}
 
-			case MODE_CONSTANT_VOLTAGE:
-				vunit = volts;
-				break;
-
-			case MODE_CONSTANT_POWER:
-				vunit = watts;
-				break;
-
-			case MODE_CONSTANT_RESISTANCE:
-				vunit = ohms;
-				break;
-
-			default:
-				break;
-		}
-
-		//Complain if set point is increased
-		auto newSet = channelNode["setpoint"].as<float>();
-		auto oldSet = GetLoadSetPoint(i);
-		if(newSet > oldSet)
-		{
-			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName() + " set point",
-				string("Increasing set point by ") + vunit.PrettyPrint(newSet - oldSet),
-				vunit.PrettyPrint(oldSet),
-				vunit.PrettyPrint(newSet)));
-		}
-
-		//Complain if range has changed
-		//TODO: only if decreased?
-		auto ranges = GetLoadCurrentRanges(i);
-		auto newRange = channelNode["irange"].as<size_t>();
-		auto curRange = GetLoadCurrentRange(i);
-		if(newRange != curRange)
-		{
-			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName() + " current range",
-				"Changing full scale range",
-				amps.PrettyPrint(ranges[curRange]),
-				amps.PrettyPrint(ranges[newRange])));
-		}
-
-		ranges = GetLoadVoltageRanges(i);
-		newRange = channelNode["vrange"].as<size_t>();
-		curRange = GetLoadVoltageRange(i);
-		if(newRange != curRange)
-		{
-			list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
-				chan->GetDisplayName() + " voltage range",
-				"Changing full scale range",
-				volts.PrettyPrint(ranges[curRange]),
-				volts.PrettyPrint(ranges[newRange])));
+			auto drive = GetTxDriveStrength(i);
+			auto ndrive = channelNode["drive"].as<float>();
+			if(ndrive > drive)
+			{
+				list.m_warnings[this].m_messages.push_back(ConfigWarningMessage(
+					ochan->GetDisplayName() + " output swing",
+					string("Increasing drive by ") + volts.PrettyPrint(ndrive - drive),
+					volts.PrettyPrint(drive),
+					volts.PrettyPrint(ndrive)));
+			}
 		}
 	}
-	*/
 }
 

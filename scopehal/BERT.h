@@ -61,7 +61,8 @@ public:
 		PATTERN_AUTO
 	};
 
-	std::string GetPatternName(Pattern pat);
+	static std::string GetPatternName(Pattern pat);
+	static Pattern GetPatternOfName(std::string name);
 
 	/**
 		@brief Gets the currently selected transmit pattern for a channel

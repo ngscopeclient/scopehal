@@ -60,7 +60,7 @@ InstrumentChannel::PhysicalConnector RFSignalGeneratorChannel::GetPhysicalConnec
 	return CONNECTOR_N;
 }
 
-bool RFSignalGeneratorChannel::ValidateChannel(size_t i, StreamDescriptor stream)
+bool RFSignalGeneratorChannel::ValidateChannel(size_t /*i*/, StreamDescriptor stream)
 {
 	if(stream.m_channel == NULL)
 		return false;
