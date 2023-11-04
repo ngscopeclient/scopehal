@@ -65,6 +65,12 @@ string MemoryFilter::GetProtocolName()
 	return "Memory";
 }
 
+bool MemoryFilter::ShouldPersistWaveform()
+{
+	//Our waveform should be saved since it's not possible to generate from the live waveforms
+	return true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
@@ -72,10 +78,7 @@ void MemoryFilter::Refresh()
 {
 	//Make sure we've got valid inputs
 	if(!VerifyAllInputsOK())
-	{
-		SetData(NULL, 0);
 		return;
-	}
 
 	//If this is our first refresh after creation, copy the input immediately
 	if(GetData(0) == nullptr)
@@ -97,6 +100,8 @@ void MemoryFilter::PerformAction(const string& id)
 
 void MemoryFilter::Update()
 {
+	LogDebug("MemoryFilter::Update\n");
+
 	auto sin = GetInput(0);
 	auto data = sin.GetData();
 	auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);

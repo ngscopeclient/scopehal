@@ -139,3 +139,9 @@ void InstrumentChannel::SetData(WaveformBase* pNew, size_t stream)
 		delete m_streams[stream].m_waveform;
 	m_streams[stream].m_waveform = pNew;
 }
+
+bool InstrumentChannel::ShouldPersistWaveform()
+{
+	//Default to persisting everything
+	return true;
+}

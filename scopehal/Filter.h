@@ -216,6 +216,8 @@ public:
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
 
+	virtual bool ShouldPersistWaveform() override;
+
 protected:
 
 	///Group used for the display menu

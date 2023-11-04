@@ -903,6 +903,12 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	}
 }
 
+bool Filter::ShouldPersistWaveform()
+{
+	//all filters default to not saving waveforms since the data can (almost) always be recomputed
+	return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Interpolation helpers
 

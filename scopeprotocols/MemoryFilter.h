@@ -53,6 +53,8 @@ public:
 	virtual std::vector<std::string> EnumActions();
 	virtual void PerformAction(const std::string& id);
 
+	virtual bool ShouldPersistWaveform() override;
+
 	PROTOCOL_DECODER_INITPROC(MemoryFilter)
 
 protected:

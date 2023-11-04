@@ -220,6 +220,11 @@ public:
 		return tmp;
 	}
 
+	/**
+		@brief Determine whether the channel's waveform(s) should be persisted to a session file
+	 */
+	virtual bool ShouldPersistWaveform();
+
 protected:
 
 	virtual void ClearStreams();
