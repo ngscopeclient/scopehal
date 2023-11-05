@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,52 +30,86 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ExportFilter
+	@brief Implementation of PausableFilter
  */
-#ifndef ExportFilter_h
-#define ExportFilter_h
 
-#include "../scopehal/ActionProvider.h"
+#include "scopehal.h"
+#include "ActionProvider.h"
+#include "PausableFilter.h"
 
-class ExportFilter
-	: public Filter
-	, public ActionProvider
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+PausableFilter::PausableFilter(const string& color, Category cat, Unit xunit)
+	: Filter(color, cat, xunit)
+	, m_running(true)
+	, m_oneShot(false)
 {
-public:
-	ExportFilter(const std::string& color);
-	virtual ~ExportFilter();
+}
 
-	virtual void Refresh() override;
+PausableFilter::~PausableFilter()
+{
+}
 
-	virtual std::vector<std::string> EnumActions() override;
-	virtual bool PerformAction(const std::string& id) override;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pausing / unpausing
 
-protected:
+vector<string> PausableFilter::EnumActions()
+{
+	vector<string> ret;
+	ret.push_back("Run");
+	ret.push_back("Single");
+	ret.push_back("Stop");
+	return ret;
+}
 
-	/**
-		@brief Clears the output file
-	 */
-	virtual void Clear();
+void PausableFilter::Run()
+{
+	m_running = true;
+	m_oneShot = false;
+}
 
-	/**
-		@brief Writes the current inputs to the output file in the appropriate format
-	 */
-	virtual void Export() =0;
+void PausableFilter::Single()
+{
+	m_running = true;
+	m_oneShot = true;
+}
 
-	enum ExportMode_t
+void PausableFilter::Stop()
+{
+	m_running = false;
+	m_oneShot = false;
+}
+
+bool PausableFilter::PerformAction(const string& id)
+{
+	if(id == "Run")
+		Run();
+	else if(id == "Single")
+		Single();
+	else if(id == "Stop")
+		Stop();
+	else
+		LogError("PausableFilter: unrecognized action\n");
+
+	return false;
+}
+
+bool PausableFilter::ShouldRefresh()
+{
+	//Running?
+	if(m_running)
 	{
-		MODE_CONTINUOUS_APPEND,
-		MODE_CONTINUOUS_OVERWRITE,
-		MODE_MANUAL_APPEND,
-		MODE_MANUAL_OVERWRITE
-	};
+		//Single shot trigger?
+		if(m_oneShot)
+			m_running = false;
 
-	std::string m_fname;
-	std::string m_mode;
+		//Either way, refresh this time
+		return true;
+	}
 
-	FILE* m_fp;
-
-	void OnFileNameChanged();
-};
-
-#endif
+	//otherwise don't do anything
+	return false;
+}

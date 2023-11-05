@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -44,14 +44,14 @@ class MemoryFilter
 public:
 	MemoryFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
-	virtual std::vector<std::string> EnumActions();
-	virtual void PerformAction(const std::string& id);
+	virtual std::vector<std::string> EnumActions() override;
+	virtual bool PerformAction(const std::string& id) override;
 
 	virtual bool ShouldPersistWaveform() override;
 

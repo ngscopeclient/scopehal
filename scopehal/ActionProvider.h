@@ -55,8 +55,10 @@ public:
 
 	/**
 		@brief Perform a specific action
+
+		@return True if the action should be treated as reconfiguring the filter (clear and re-evaluate), false if not
 	 */
-	virtual void PerformAction(const std::string& id) =0;
+	virtual bool PerformAction(const std::string& id) =0;
 };
 
 #endif

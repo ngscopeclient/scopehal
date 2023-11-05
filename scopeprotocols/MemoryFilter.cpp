@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopeprotocols                                                                                                    *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -92,10 +92,12 @@ vector<string> MemoryFilter::EnumActions()
 	return ret;
 }
 
-void MemoryFilter::PerformAction(const string& id)
+bool MemoryFilter::PerformAction(const string& id)
 {
 	if(id == "Update")
 		Update();
+
+	return true;
 }
 
 void MemoryFilter::Update()

@@ -165,6 +165,7 @@ set(SCOPEHAL_SOURCES
 	FilterParameter.cpp
 	ImportFilter.cpp
 	PacketDecoder.cpp
+	PausableFilter.cpp
 	PeakDetectionFilter.cpp
 	SpectrumChannel.cpp
 	SParameterSourceFilter.cpp

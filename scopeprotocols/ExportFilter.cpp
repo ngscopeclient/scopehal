@@ -101,12 +101,14 @@ vector<string> ExportFilter::EnumActions()
 	return ret;
 }
 
-void ExportFilter::PerformAction(const string& id)
+bool ExportFilter::PerformAction(const string& id)
 {
 	if(id == "Clear")
 		Clear();
 	if(id == "Export")
 		Export();
+
+	return false;
 }
 
 /**

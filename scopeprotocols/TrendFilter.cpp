@@ -36,7 +36,7 @@ using namespace std;
 // Construction / destruction
 
 TrendFilter::TrendFilter(const string& color)
-	: Filter(color, CAT_MATH)
+	: PausableFilter(color, CAT_MATH)
 	, m_tlast(0)
 	, m_depthname("Buffer length")
 {
@@ -77,11 +77,17 @@ string TrendFilter::GetProtocolName()
 
 void TrendFilter::ClearSweeps()
 {
+	LogDebug("clearing\n");
 	SetData(nullptr, 0);
 }
 
-void TrendFilter::Refresh()
+void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
 {
+	if(!ShouldRefresh())
+	{
+		return;
+	}
+
 	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
 
 	//See if we have output already
@@ -100,6 +106,8 @@ void TrendFilter::Refresh()
 	}
 	else
 	{
+		LogDebug("making new waveform\n");
+
 		wfm = new SparseAnalogWaveform;
 		SetData(wfm, 0);
 

@@ -1,6 +1,6 @@
 /***********************************************************************************************************************
 *                                                                                                                      *
-* libscopeprotocols                                                                                                    *
+* libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
 * Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
@@ -30,52 +30,39 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of ExportFilter
+	@brief Declaration of PausableFilter
  */
-#ifndef ExportFilter_h
-#define ExportFilter_h
+#ifndef PausableFilter_h
+#define PausableFilter_h
 
-#include "../scopehal/ActionProvider.h"
+#include "ActionProvider.h"
 
-class ExportFilter
+/**
+	@brief A filter which may be started and stopped
+ */
+class PausableFilter
 	: public Filter
 	, public ActionProvider
 {
 public:
-	ExportFilter(const std::string& color);
-	virtual ~ExportFilter();
-
-	virtual void Refresh() override;
+	PausableFilter(
+		const std::string& color,
+		Category cat,
+		Unit xunit = Unit::UNIT_FS);
+	virtual ~PausableFilter();
 
 	virtual std::vector<std::string> EnumActions() override;
 	virtual bool PerformAction(const std::string& id) override;
 
+	bool ShouldRefresh();
+
+	void Run();
+	void Single();
+	void Stop();
+
 protected:
-
-	/**
-		@brief Clears the output file
-	 */
-	virtual void Clear();
-
-	/**
-		@brief Writes the current inputs to the output file in the appropriate format
-	 */
-	virtual void Export() =0;
-
-	enum ExportMode_t
-	{
-		MODE_CONTINUOUS_APPEND,
-		MODE_CONTINUOUS_OVERWRITE,
-		MODE_MANUAL_APPEND,
-		MODE_MANUAL_OVERWRITE
-	};
-
-	std::string m_fname;
-	std::string m_mode;
-
-	FILE* m_fp;
-
-	void OnFileNameChanged();
+	bool m_running;
+	bool m_oneShot;
 };
 
 #endif

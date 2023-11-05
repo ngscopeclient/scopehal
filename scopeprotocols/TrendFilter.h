@@ -35,18 +35,20 @@
 #ifndef TrendFilter_h
 #define TrendFilter_h
 
-class TrendFilter : public Filter
+#include "../scopehal/PausableFilter.h"
+
+class TrendFilter : public PausableFilter
 {
 public:
 	TrendFilter(const std::string& color);
 
-	virtual void Refresh();
+	virtual void Refresh(vk::raii::CommandBuffer& cmdBuf, std::shared_ptr<QueueHandle> queue) override;
 
-	virtual void ClearSweeps();
+	virtual void ClearSweeps() override;
 
 	static std::string GetProtocolName();
 
-	virtual bool ValidateChannel(size_t i, StreamDescriptor stream);
+	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	PROTOCOL_DECODER_INITPROC(TrendFilter)
 
