@@ -77,16 +77,13 @@ string TrendFilter::GetProtocolName()
 
 void TrendFilter::ClearSweeps()
 {
-	LogDebug("clearing\n");
 	SetData(nullptr, 0);
 }
 
 void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<QueueHandle> /*queue*/)
 {
 	if(!ShouldRefresh())
-	{
 		return;
-	}
 
 	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
 
@@ -106,8 +103,6 @@ void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<Q
 	}
 	else
 	{
-		LogDebug("making new waveform\n");
-
 		wfm = new SparseAnalogWaveform;
 		SetData(wfm, 0);
 
