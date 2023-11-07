@@ -373,8 +373,14 @@ void TektronixOscilloscope::DetectProbes()
 
 	for (size_t i = 0; i < m_channels.size(); i++)
 	{
-		if (currentlyEnabled[i]) EnableChannel(i);
-		else                     DisableChannel(i);
+		auto ochan = GetOscilloscopeChannel(i);
+		if(!ochan)
+			continue;
+
+		if (currentlyEnabled[i])
+			EnableChannel(i);
+		else
+			DisableChannel(i);
 	}
 }
 
@@ -415,6 +421,11 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 {
 	//ext trigger should never be displayed
 	if(m_extTrigChannel && i == m_extTrigChannel->GetIndex())
+		return false;
+
+	//Not a scope channel (AWG)? Skip it
+	auto ochan = GetOscilloscopeChannel(i);
+	if(!ochan)
 		return false;
 
 	{
@@ -463,14 +474,14 @@ bool TektronixOscilloscope::IsChannelEnabled(size_t i)
 			else
 			{
 				reply = m_transport->SendCommandQueuedWithReply(
-					string("DISP:WAVEV:") + GetOscilloscopeChannel(i)->GetHwname() + ":STATE?");
+					string("DISP:WAVEV:") + ochan->GetHwname() + ":STATE?");
 
 				if (IsDigital(i))
 				{
 					// Digital channels may report enabled, but not actually be displayed because the associated _DALL
 					//  view is not enabled. Especially relevant after doing File -> Default Setup
 					string dall_reply = m_transport->SendCommandQueuedWithReply(
-						string("DISP:WAVEV:") + m_channels[m_flexChannelParents[GetOscilloscopeChannel(i)]]->GetHwname() + "_DALL:STATE?");
+						string("DISP:WAVEV:") + m_channels[m_flexChannelParents[ochan]]->GetHwname() + "_DALL:STATE?");
 
 					if (dall_reply == "0")
 					{
@@ -593,6 +604,11 @@ bool TektronixOscilloscope::CanEnableChannel(size_t i)
 
 void TektronixOscilloscope::DisableChannel(size_t i)
 {
+	//Not a scope channel (AWG)? Skip it
+	auto ochan = GetOscilloscopeChannel(i);
+	if(!ochan)
+		return;
+
 	{
 		lock_guard<recursive_mutex> lock(m_cacheMutex);
 
@@ -614,7 +630,7 @@ void TektronixOscilloscope::DisableChannel(size_t i)
 			if(IsSpectrum(i))
 				m_transport->SendCommandQueued(m_channels[i - m_spectrumChannelBase]->GetHwname() + ":SV:STATE OFF");
 			else
-				m_transport->SendCommandQueued(string("DISP:WAVEV:") + GetOscilloscopeChannel(i)->GetHwname() + ":STATE OFF");
+				m_transport->SendCommandQueued(string("DISP:WAVEV:") + ochan->GetHwname() + ":STATE OFF");
 			break;
 
 		default:
@@ -1443,7 +1459,7 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 	int read = 0;
 	mso56_preamble& p = preamble_out;
 
-	if (semicolons == 23)
+	if (semicolons >= 23)
 	{
 		read = sscanf(preamble_in.c_str(),
 			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
@@ -1468,6 +1484,8 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 
 		if (read == 21) return true;
 	}
+	else
+		LogError("Unsupported preamble format (semicolons=%zu)\n", semicolons);
 
 	LogWarning("Preamble error (read only %d fields)\n", read);
 	LogDebug(" -> Failed preamble: %s\n", preamble_in.c_str());
