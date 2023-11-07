@@ -80,7 +80,7 @@ public:
 		//TODO: more here
 	};
 
-	Unit(Unit::UnitType t)
+	Unit(Unit::UnitType t = UNIT_COUNTS)
 	: m_type(t)
 	{}
 

@@ -72,6 +72,12 @@ TektronixOscilloscope::TektronixOscilloscope(SCPITransport* transport)
 	, m_afgShape(FunctionGenerator::SHAPE_SINE)
 	, m_afgImpedance(FunctionGenerator::IMPEDANCE_HIGH_Z)
 {
+	//If we are reconnecting after a crash or something went wrong, the scope might have a reply or two queued up
+	//If this happens, every time we send a command we'll get a reply meant for something else!
+	//Resync twice to verify we get good alignment after
+	ResynchronizeSCPI();
+	ResynchronizeSCPI();
+
 	//Figure out what device family we are
 	if(m_model.find("MSO5") == 0)
 		m_family = FAMILY_MSO5;
@@ -394,6 +400,7 @@ void TektronixOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_probeTypes.clear();
 	m_channelDeskew.clear();
+	m_channelUnits.clear();
 
 	//Clear cached display name of all channels
 	for(auto c : m_channels)
@@ -1108,6 +1115,47 @@ OscilloscopeChannel* TektronixOscilloscope::GetExternalTrigger()
 	return m_extTrigChannel;
 }
 
+Unit TektronixOscilloscope::GetYAxisUnit(size_t i)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelUnits.find(i) != m_channelUnits.end())
+			return m_channelUnits[i];
+	}
+
+	//Only do this for analog channels
+	if(i < m_analogChannelCount)
+	{
+		Unit u(Unit::UNIT_VOLTS);
+		auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+			GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:UNI?"));
+
+		//Note that the unit is *in quotes*!
+		char unit[128] = {0};
+		sscanf(reply.c_str(), "\"%127[^\"]", unit);
+		string sunit(unit);
+
+		if(sunit == "V")
+			u = Unit(Unit::UNIT_VOLTS);
+		else if(sunit == "A")
+			u = Unit(Unit::UNIT_AMPS);
+		else
+		{
+			LogWarning("Unrecognized unit %s for channel %s\n",
+				unit,
+				GetOscilloscopeChannel(i)->GetHwname().c_str());
+		}
+
+		//Add to cache
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		m_channelUnits[i] = u;
+		return u;
+	}
+
+	else
+		return Unit::UNIT_VOLTS;
+}
+
 string TektronixOscilloscope::GetChannelDisplayName(size_t i)
 {
 	auto chan = GetOscilloscopeChannel(i);
@@ -1459,7 +1507,37 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 	int read = 0;
 	mso56_preamble& p = preamble_out;
 
-	if (semicolons >= 23)
+	//New format seen on recent firmware in a demo unit: 24 fields, or 23 with missing WFID
+	//but also has "VEC" at the end as a 23rd/24th field
+	if(preamble_in.find("VEC") != string::npos)
+	{
+		if (semicolons == 24)
+		{
+			read = sscanf(preamble_in.c_str(),
+				"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
+				"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+				&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order, p.wfid,
+				&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+				&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+
+			if (read == 22) return true;
+		}
+		else if (semicolons == 23)
+		{
+			read = sscanf(preamble_in.c_str(),
+				"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%d;%c;%31[^;];" // wfid missing
+				"%31[^;];%lf;%lf;%d;%31[^;];%lf;%lf;%lf;%31[^;];%31[^;];%lf;%lf",
+				&p.byte_num, &p.bit_num, p.encoding, p.bin_format, p.asc_format, p.byte_order,
+				&p.nr_pt, p.pt_fmt, p.pt_order, p.xunit, &p.xincrement, &p.xzero,
+				&p.pt_off, p.yunit,	&p.ymult, &p.yoff, &p.yzero, p.domain, p.wfmtype, &p.centerfreq, &p.span);
+			strcpy(p.wfid, "<missing (Tek bug)>");
+
+			LogDebug("!!Tek decided to not send the WFId in WFMO? preamble. Compensating!!\n");
+
+			if (read == 21) return true;
+		}
+	}
+	else if (semicolons >= 23)
 	{
 		read = sscanf(preamble_in.c_str(),
 			"%d;%d;%31[^;];%31[^;];%31[^;];%31[^;];%255[^;];%d;%c;%31[^;];"
@@ -1487,13 +1565,95 @@ bool TektronixOscilloscope::ReadPreamble(string& preamble_in, mso56_preamble& pr
 	else
 		LogError("Unsupported preamble format (semicolons=%zu)\n", semicolons);
 
-	LogWarning("Preamble error (read only %d fields)\n", read);
+	LogWarning("Preamble error (read only %d fields from %zu semicolons)\n", read, semicolons);
 	LogDebug(" -> Failed preamble: %s\n", preamble_in.c_str());
 	return false;
 }
 
 void TektronixOscilloscope::ResynchronizeSCPI()
 {
+	LogTrace("Resynchronizing\n");
+	LogIndenter li;
+
+	m_transport->SendCommandImmediate("*CLS");
+	m_transport->SendCommandImmediate("*CLS");
+	// The manual has very confusing things to say about this needing to follow an "<EOI>" which
+	// appears to be a holdover from IEEE488 that IDK how is supposed to work (or not) over socket
+	// transport. Who knows. Another option: set Protocol to Terminal in socket server settings and
+	// use '!d' which issues the "DCL (Device CLear) control message" but this means dealing with
+	// prompts and stuff like that.
+
+	m_transport->FlushRXBuffer();
+
+	//This is absolutely disgusting but will work as long as there's not more than a few lines worth of desync
+
+	//Send a PRBS-3 encoded as SCPI commands and read back the responses
+	const int prbslen = 7;
+	int prbs3[prbslen] = {1, 0, 1, 1, 1, 0, 0};
+	int replies[prbslen] = {0};
+	for(int i=0; i<prbslen; i++)
+	{
+		string reply;
+		if(prbs3[i])
+			reply = m_transport->SendCommandQueuedWithReply("*IDN?");	//should return a string starting with "TEKTRONIX"
+		else
+			reply = m_transport->SendCommandQueuedWithReply("HOR:MODE:RECO?");	//should return a number
+
+		if(reply.find("TEKTRONIX") != string::npos)
+			replies[i] = 1;
+		else
+			replies[i] = 0;
+	}
+
+	//Debug print
+	LogTrace("PRBS sent: %d%d%d%d%d%d%d\n",
+		prbs3[0], prbs3[1], prbs3[2], prbs3[3],
+		prbs3[4], prbs3[5], prbs3[6]);
+	LogTrace("PRBS got:  %d%d%d%d%d%d%d\n",
+		replies[0], replies[1], replies[2], replies[3],
+		replies[4], replies[5], replies[6]);
+
+	//Try shifts of up to 3 lines and see if we get a good alignment
+	int delta = -1;
+	for(int shift=0; shift<3; shift++)
+	{
+		bool match = true;
+		for(int i=0; i<prbslen; i++)
+		{
+			if(i+shift >= prbslen)
+				break;
+			if(prbs3[i] != replies[i+shift])
+			{
+				match = false;
+				break;
+			}
+		}
+		if(match)
+		{
+			delta = shift;
+			break;
+		}
+	}
+
+	if(delta < 0)
+	{
+		LogError("SCPI resync failed, firmware is probably in a bad state. Try rebooting the scope.\n");
+		exit(1);
+	}
+
+	if(delta != 0)
+	{
+		LogDebug("PRBS locked with offset of %d lines, discarding extra replies from buffer\n", delta);
+		for(int i=0; i<delta; i++)
+		{
+			auto reply = m_transport->SendCommandQueuedWithReply("HEAD 0");	//send something so we can fetch a reply
+			LogTrace("Extra reply: %s\n", reply.c_str());
+		}
+	}
+	else
+		LogTrace("PRBS locked with zero offset\n");
+
+	/*
 	//Resynchronize
 	LogWarning("SCPI out of sync, attempting to recover\n");
 	while(1)
@@ -1510,6 +1670,7 @@ void TektronixOscilloscope::ResynchronizeSCPI()
 		if (IDPing() != "")
 			break;
 	}
+	*/
 }
 
 bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& pending_waveforms)
@@ -1534,6 +1695,9 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 			pending_waveforms[i].push_back(NULL);
 			continue;
 		}
+
+		//Update the Y axis units
+		GetOscilloscopeChannel(i)->SetYAxisUnits(GetYAxisUnit(i), 0);
 
 		bool succeeded = false;
 		for (int retry = 0; retry < 3; retry++)
@@ -1587,7 +1751,7 @@ bool TektronixOscilloscope::AcquireDataMSO56(map<int, vector<WaveformBase*> >& p
 
 			//Set up the capture we're going to store our data into
 			//(no TDC data or fine timestamping available on Tektronix scopes?)
-			auto cap = new UniformAnalogWaveform;
+			auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 			cap->m_timescale = timebase;
 			cap->m_triggerPhase = 0;
 			cap->m_startTimestamp = time(NULL);
@@ -3682,12 +3846,12 @@ void TektronixOscilloscope::SetFunctionChannelActive(int /*chan*/, bool on)
 	lock_guard<recursive_mutex> lock(m_mutex);
 	if(on)
 	{
-		m_transport->SendCommand("AFG:OUTPUT:STATE 1");
-		m_transport->SendCommand("AFG:OUTPUT:MODE CONTINUOUS");
+		m_transport->SendCommandQueued("AFG:OUTPUT:STATE 1");
+		m_transport->SendCommandQueued("AFG:OUTPUT:MODE CONTINUOUS");
 	}
 	else
 	{
-		m_transport->SendCommand("AFG:OUTPUT:STATE 0");
+		m_transport->SendCommandQueued("AFG:OUTPUT:STATE 0");
 	}
 }
 
@@ -3704,7 +3868,7 @@ void TektronixOscilloscope::SetFunctionChannelDutyCycle(int /*chan*/, float duty
 		return;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AFG:SQUARE:DUTY ") + to_string(duty * 100));
+	m_transport->SendCommandQueued(string("AFG:SQUARE:DUTY ") + to_string(duty * 100));
 }
 
 float TektronixOscilloscope::GetFunctionChannelAmplitude(int /*chan*/)
@@ -3721,7 +3885,7 @@ void TektronixOscilloscope::SetFunctionChannelAmplitude(int /*chan*/, float ampl
 		amplitude *= 2;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AFG:AMPLITUDE ") + to_string(amplitude));
+	m_transport->SendCommandQueued(string("AFG:AMPLITUDE ") + to_string(amplitude));
 }
 
 float TektronixOscilloscope::GetFunctionChannelOffset(int /*chan*/)
@@ -3738,7 +3902,7 @@ void TektronixOscilloscope::SetFunctionChannelOffset(int /*chan*/, float offset)
 		offset *= 2;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AFG:OFFSET ") + to_string(offset));
+	m_transport->SendCommandQueued(string("AFG:OFFSET ") + to_string(offset));
 }
 
 float TektronixOscilloscope::GetFunctionChannelFrequency(int /*chan*/)
@@ -3751,7 +3915,7 @@ void TektronixOscilloscope::SetFunctionChannelFrequency(int /*chan*/, float hz)
 	m_afgFrequency = hz;
 
 	lock_guard<recursive_mutex> lock(m_mutex);
-	m_transport->SendCommand(string("AFG:FREQUENCY ") + to_string(hz));
+	m_transport->SendCommandQueued(string("AFG:FREQUENCY ") + to_string(hz));
 }
 
 FunctionGenerator::WaveShape TektronixOscilloscope::GetFunctionChannelShape(int /*chan*/)
@@ -3767,55 +3931,55 @@ void TektronixOscilloscope::SetFunctionChannelShape(int /*chan*/, WaveShape shap
 	switch(shape)
 	{
 		case SHAPE_SINE:
-			m_transport->SendCommand(string("AFG:FUNCTION SINE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION SINE"));
 			break;
 
 		case SHAPE_SQUARE:
-			m_transport->SendCommand(string("AFG:FUNCTION SQUARE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION SQUARE"));
 			break;
 
 		case SHAPE_PULSE:
-			m_transport->SendCommand(string("AFG:FUNCTION PULSE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION PULSE"));
 			break;
 
 		case SHAPE_TRIANGLE:
-			m_transport->SendCommand(string("AFG:FUNCTION RAMP"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION RAMP"));
 			break;
 
 		case SHAPE_DC:
-			m_transport->SendCommand(string("AFG:FUNCTION DC"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION DC"));
 			break;
 
 		case SHAPE_NOISE:
-			m_transport->SendCommand(string("AFG:FUNCTION NOISE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION NOISE"));
 			break;
 
 		case SHAPE_SINC:
-			m_transport->SendCommand(string("AFG:FUNCTION SINC")); // Called Sin(x)/x in scope UI
+			m_transport->SendCommandQueued(string("AFG:FUNCTION SINC")); // Called Sin(x)/x in scope UI
 			break;
 
 		case SHAPE_GAUSSIAN:
-			m_transport->SendCommand(string("AFG:FUNCTION GAUSSIAN"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION GAUSSIAN"));
 			break;
 
 		case SHAPE_LORENTZ:
-			m_transport->SendCommand(string("AFG:FUNCTION LORENTZ"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION LORENTZ"));
 			break;
 
 		case SHAPE_EXPONENTIAL_RISE:
-			m_transport->SendCommand(string("AFG:FUNCTION ERISE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION ERISE"));
 			break;
 
 		case SHAPE_EXPONENTIAL_DECAY:
-			m_transport->SendCommand(string("AFG:FUNCTION EDECAY"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION EDECAY"));
 			break;
 
 		case SHAPE_HAVERSINE:
-			m_transport->SendCommand(string("AFG:FUNCTION HAVERSINE"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION HAVERSINE"));
 			break;
 
 		case SHAPE_CARDIAC:
-			m_transport->SendCommand(string("AFG:FUNCTION CARDIAC"));
+			m_transport->SendCommandQueued(string("AFG:FUNCTION CARDIAC"));
 			break;
 
 		// TODO: ARB
@@ -3843,9 +4007,9 @@ void TektronixOscilloscope::SetFunctionChannelOutputImpedance(int chan, OutputIm
 
 	m_afgImpedance = z;
 	if (z == IMPEDANCE_50_OHM)
-		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE FIFTY"));
+		m_transport->SendCommandQueued(string("AFG:OUTPUT:LOAD:IMPEDANCE FIFTY"));
 	else
-		m_transport->SendCommand(string("AFG:OUTPUT:LOAD:IMPEDANCE HIGHZ"));
+		m_transport->SendCommandQueued(string("AFG:OUTPUT:LOAD:IMPEDANCE HIGHZ"));
 
 	//Restore with new impedance
 	SetFunctionChannelAmplitude(chan, amp);
