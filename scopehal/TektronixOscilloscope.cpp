@@ -1192,11 +1192,20 @@ bool TektronixOscilloscope::ShouldDegauss(size_t i)
 	auto chan = GetOscilloscopeChannel(i);
 	auto state = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":PRO:DEGAUSS:STATE?"));
 
+	if(state == "PASS")
+		return false;
+	else if(state == "FAIL")
+		return true;
+	//TODO: What are short versions of REQUIRED and RECOMMENDED?
+	else if(state[0] == 'R')
+		return true;
+
 	return false;
 }
 
 void TektronixOscilloscope::Degauss(size_t i)
 {
+	auto chan = GetOscilloscopeChannel(i);
 	m_transport->SendCommandQueued(chan->GetHwname() + ":PRO:DEGAUSS EXEC");
 }
 
