@@ -255,6 +255,29 @@ public:
 	virtual void AutoZero(size_t i);
 
 	/**
+		@brief Determines if a channel has a probe connected which supports the "degauss" feature.
+
+		This is typically true for current probes and false for most others.
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool CanDegauss(size_t i);
+
+	/**
+		@brief Determines if a channel requires a degauss cycle (if supported)
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool ShouldDegauss(size_t i);
+
+	/**
+		@brief Performs an "degauss" cycle on the attached active probe, if supported by the hardware
+
+		@param i			Zero-based index of channel
+	 */
+	virtual void Degauss(size_t i);
+
+	/**
 		@brief Returns the name of the probe connected to the scope, if possible.
 
 		If a passive or no probe is connected, or the instrument driver does not support probe identification,

@@ -640,6 +640,20 @@ void Oscilloscope::AutoZero(size_t /*i*/)
 {
 }
 
+bool Oscilloscope::CanDegauss(size_t /*i*/)
+{
+	return false;
+}
+
+bool Oscilloscope::ShouldDegauss(size_t /*i*/)
+{
+	return false;
+}
+
+void Oscilloscope::Degauss(size_t /*i*/)
+{
+}
+
 string Oscilloscope::GetProbeName(size_t /*i*/)
 {
 	return "";

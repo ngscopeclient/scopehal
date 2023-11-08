@@ -99,6 +99,10 @@ public:
 	virtual void SetChannelDisplayName(size_t i, std::string name) override;
 	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
 	Unit GetYAxisUnit(size_t i);
+	virtual bool CanDegauss(size_t i) override;
+	virtual bool ShouldDegauss(size_t i) override;
+	virtual void Degauss(size_t i) override;
+	virtual std::string GetProbeName(size_t i) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -255,6 +259,7 @@ protected:
 	{
 		PROBE_TYPE_ANALOG,
 		PROBE_TYPE_ANALOG_250K,
+		PROBE_TYPE_ANALOG_CURRENT,
 		PROBE_TYPE_DIGITAL_8BIT
 	};
 
@@ -275,6 +280,7 @@ protected:
 	int64_t m_triggerOffset;
 	std::map<size_t, int64_t> m_channelDeskew;
 	std::map<size_t, ProbeType> m_probeTypes;
+	std::map<size_t, std::string> m_probeNames;
 	bool m_rbwValid;
 	int64_t m_rbw;
 	bool m_dmmAutorangeValid;

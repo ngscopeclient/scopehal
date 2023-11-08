@@ -336,6 +336,12 @@ uint32_t TektronixOscilloscope::GetInstrumentTypesForChannel(size_t i) const
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Device interface functions
 
+string TektronixOscilloscope::GetProbeName(size_t i)
+{
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	return m_probeNames[i];
+}
+
 void TektronixOscilloscope::DetectProbes()
 {
 	std::vector<bool> currentlyEnabled;
@@ -357,7 +363,11 @@ void TektronixOscilloscope::DetectProbes()
 				string reply = m_transport->SendCommandQueuedWithReply(GetOscilloscopeChannel(i)->GetHwname() + ":PROBETYPE?");
 
 				if(reply == "DIG")
+				{
+					lock_guard<recursive_mutex> lock(m_cacheMutex);
 					m_probeTypes[i] = PROBE_TYPE_DIGITAL_8BIT;
+					m_probeNames[i] = "DIG";
+				}
 
 				//Treat anything else as analog. See what type
 				else
@@ -365,8 +375,13 @@ void TektronixOscilloscope::DetectProbes()
 					string id = TrimQuotes(m_transport->SendCommandQueuedWithReply(
 						GetOscilloscopeChannel(i)->GetHwname() + ":PROBE:ID:TYP?"));
 
+					lock_guard<recursive_mutex> lock(m_cacheMutex);
+					m_probeNames[i] = reply;
+
 					if(id == "TPP1000")
 						m_probeTypes[i] = PROBE_TYPE_ANALOG_250K;
+					else if(id.find("TCP") == 0)
+						m_probeTypes[i] = PROBE_TYPE_ANALOG_CURRENT;
 					else
 						m_probeTypes[i] = PROBE_TYPE_ANALOG;
 				}
@@ -1154,6 +1169,35 @@ Unit TektronixOscilloscope::GetYAxisUnit(size_t i)
 
 	else
 		return Unit::UNIT_VOLTS;
+}
+
+bool TektronixOscilloscope::CanDegauss(size_t i)
+{
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_probeTypes[i] == PROBE_TYPE_ANALOG_CURRENT)
+			return true;
+	}
+
+	return false;
+}
+
+bool TektronixOscilloscope::ShouldDegauss(size_t i)
+{
+	//No current probe connected? Don't even ask
+	if(!CanDegauss(i))
+		return false;
+
+	//See if we should degauss
+	auto chan = GetOscilloscopeChannel(i);
+	auto state = Trim(m_transport->SendCommandQueuedWithReply(chan->GetHwname() + ":PRO:DEGAUSS:STATE?"));
+
+	return false;
+}
+
+void TektronixOscilloscope::Degauss(size_t i)
+{
+	m_transport->SendCommandQueued(chan->GetHwname() + ":PRO:DEGAUSS EXEC");
 }
 
 string TektronixOscilloscope::GetChannelDisplayName(size_t i)

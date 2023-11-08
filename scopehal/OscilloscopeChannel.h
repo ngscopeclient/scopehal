@@ -132,6 +132,8 @@ public:
 
 	bool CanAutoZero();
 	void AutoZero();
+	bool CanDegauss();
+	void Degauss();
 	std::string GetProbeName();
 
 	virtual bool CanInvert();

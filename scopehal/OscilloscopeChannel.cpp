@@ -302,6 +302,20 @@ bool OscilloscopeChannel::CanAutoZero()
 		return false;
 }
 
+void OscilloscopeChannel::Degauss()
+{
+	if(m_scope)
+		m_scope->Degauss(m_index);
+}
+
+bool OscilloscopeChannel::CanDegauss()
+{
+	if(m_scope)
+		return m_scope->CanDegauss(m_index);
+	else
+		return false;
+}
+
 string OscilloscopeChannel::GetProbeName()
 {
 	if(m_scope)
