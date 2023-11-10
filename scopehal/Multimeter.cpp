@@ -250,6 +250,11 @@ void Multimeter::DoPreLoadConfiguration(
 	IDTable& /*idmap*/,
 	ConfigWarningList& list)
 {
+	//If we're derived from multimeter class but not a meter, do nothing
+	//(we're probably a multi function instrument missing an option)
+	if( (GetInstrumentTypes() & Instrument::INST_DMM) == 0)
+		return;
+
 	//Complain if mode is changed
 
 	auto mode = TextToMode(node["meterMode"].as<string>());
