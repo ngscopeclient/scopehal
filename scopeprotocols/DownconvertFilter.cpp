@@ -47,6 +47,9 @@ DownconvertFilter::DownconvertFilter(const string& color)
 	AddStream(Unit(Unit::UNIT_VOLTS), "I", Stream::STREAM_TYPE_ANALOG);
 	AddStream(Unit(Unit::UNIT_VOLTS), "Q", Stream::STREAM_TYPE_ANALOG);
 
+	//Optional input for LO frequency (overrides parameter)
+	CreateInput("LOFrequency");
+
 	m_freqname = "LO Frequency";
 	m_parameters[m_freqname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_HZ));
 	m_parameters[m_freqname].SetFloatVal(1e9);
@@ -61,6 +64,8 @@ bool DownconvertFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 		return false;
 
 	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG) )
+		return true;
+	if( (i == 1) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
 		return true;
 
 	return false;
@@ -79,20 +84,24 @@ string DownconvertFilter::GetProtocolName()
 
 void DownconvertFilter::Refresh()
 {
-	//Make sure we've got valid inputs
-	if(!VerifyAllInputsOKAndUniformAnalog())
+	//Get the input data
+	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	if(!din)
 	{
 		SetData(NULL, 0);
 		SetData(NULL, 1);
 		return;
 	}
-
-	//Get the input data
-	auto din = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
 	din->PrepareForCpuAccess();
 
-	//Calculate phase velocity
+	//Get LO frequency
+	//(input channel overrides parameter)
 	double lo_freq = m_parameters[m_freqname].GetFloatVal();
+	auto loin = GetInput(1);
+	if(loin)
+		lo_freq = loin.GetScalarValue();
+
+	//Calculate phase velocity
 	double sample_freq = FS_PER_SECOND / din->m_timescale;
 	double lo_cycles_per_sample = lo_freq / sample_freq;
 	double lo_rad_per_sample = lo_cycles_per_sample * 2 * M_PI;
