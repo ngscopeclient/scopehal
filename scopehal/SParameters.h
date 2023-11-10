@@ -141,6 +141,32 @@ public:
 		m_points.MarkModifiedFromCpu();
 	}
 
+	/**
+		@brief Similar to ConvertFromWaveforms() but sets mag/angle values to zero indicating "no data"
+
+		The waveforms may be sparse or uniformly sampled, but must be sampled at the same frequencies.
+	 */
+	template<class T>
+	__attribute__((noinline))
+	void ZeroFromWaveforms(const T* wmag, const T* wang)
+	{
+		if( (wmag == nullptr) || (wang == nullptr) )
+		{
+			LogError("Null input supplied to SParameterVector::ZeroFromWaveforms\n");
+			return;
+		}
+
+		size_t len = std::min(wmag->size(), wang->size());
+		m_points.resize(len);
+		m_points.PrepareForCpuAccess();
+
+		float ascale = M_PI / 180;
+		for(size_t i=0; i<len; i++)
+			m_points[i] = SParameterPoint(GetOffsetScaled(wmag, i), 0, 0);
+
+		m_points.MarkModifiedFromCpu();
+	}
+
 	void ConvertToWaveforms(SparseAnalogWaveform* wmag, SparseAnalogWaveform* wang);
 
 	SParameterPoint InterpolatePoint(float frequency) const;
@@ -159,6 +185,9 @@ public:
 
 	SParameterPoint& operator[](size_t i)
 	{ return m_points[i]; }
+
+	void clear()
+	{ m_points.clear(); }
 
 protected:
 	float InterpolatePhase(float phase_lo, float phase_hi, float frac) const;

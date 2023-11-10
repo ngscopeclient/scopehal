@@ -114,8 +114,8 @@ string TouchstoneExportFilter::GetProtocolName()
 
 void TouchstoneExportFilter::Export()
 {
-	if(!VerifyAllInputsOK())
-		return;
+	LogTrace("Exporting Touchstone data to %s\n", m_parameters[m_fname].GetFileName().c_str());
+	LogIndenter li;
 
 	//Touchstone files don't support appending, that makes no sense. So always close and rewrite the file
 	Clear();
@@ -147,9 +147,44 @@ void TouchstoneExportFilter::Export()
 				params[SPair(to+1, from+1)].ConvertFromWaveforms(umagData, uangData);
 			else if(smagData && sangData)
 				params[SPair(to+1, from+1)].ConvertFromWaveforms(smagData, sangData);
+
+			//Missing data, fill it out with zeroes at the same frequency spacing
 			else
 			{
-				LogError("Missing mag or angle data\n");
+				LogTrace("No data for S%d%d, zero filling\n", to+1, from+1);
+
+				bool hit = false;
+				for(int refto=0; refto < nports; refto++)
+				{
+					for(int reffrom=0; reffrom < nports; reffrom++)
+					{
+						auto refbase = refto*nports + reffrom;
+						auto refmdata = GetInput(refbase*2).GetData();
+						auto refadata = GetInput(refbase*2 + 1).GetData();
+
+						auto refumagData = dynamic_cast<const UniformAnalogWaveform*>(refmdata);
+						auto refuangData = dynamic_cast<const UniformAnalogWaveform*>(refadata);
+
+						auto refsmagData = dynamic_cast<const SparseAnalogWaveform*>(refmdata);
+						auto refsangData = dynamic_cast<const SparseAnalogWaveform*>(refadata);
+
+						if(refumagData && refuangData)
+							params[SPair(to+1, from+1)].ZeroFromWaveforms(refumagData, refuangData);
+						else if(refsmagData && refsangData)
+							params[SPair(to+1, from+1)].ZeroFromWaveforms(refsmagData, refsangData);
+						else
+							continue;
+
+						hit = true;
+						break;
+					}
+				}
+
+				//nothing found, stop
+				if(!hit)
+					params[SPair(to+1, from+1)].clear();
+
+
 				continue;
 			}
 		}
