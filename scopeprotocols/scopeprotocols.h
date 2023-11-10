@@ -110,6 +110,7 @@
 #include "FallMeasurement.h"
 #include "FSKDecoder.h"
 #include "FullWidthHalfMax.h"
+#include "GateFilter.h"
 #include "GlitchRemovalFilter.h"
 #include "FFTFilter.h"
 #include "FIRFilter.h"

@@ -77,6 +77,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	FrequencyMeasurement.cpp
 	FSKDecoder.cpp
 	FullWidthHalfMax.cpp
+	GateFilter.cpp
 	GlitchRemovalFilter.cpp
 	GroupDelayFilter.cpp
 	HistogramFilter.cpp
