@@ -211,6 +211,7 @@ void DivideFilter::DoRefreshVectorVector()
 
 	//Set up the output waveform
 	auto cap = SetupEmptyUniformAnalogOutputWaveform(a, 0);
+	cap->Resize(len);
 	cap->PrepareForCpuAccess();
 
 	float* fa = (float*)__builtin_assume_aligned(&a->m_samples[0], 16);
