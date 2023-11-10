@@ -133,9 +133,9 @@ void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_
 	float stepsize = delta / m_parameters[m_nsteps].GetIntVal();
 
 	//Clip out of range values
-	if((end > start) && (m_streams[0].m_value > end) )
+	if((end > start) && ( (m_streams[0].m_value > end) || (m_streams[0].m_value < start) ) )
 		m_streams[0].m_value = start;
-	else if((end < start) && (m_streams[0].m_value < end) )
+	else if((end < start) && ( (m_streams[0].m_value < end) || (m_streams[0].m_value > start) ) )
 		m_streams[0].m_value = start;
 
 	//Are we at the last step? If so, wrap back to the start
