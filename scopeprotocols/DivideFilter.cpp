@@ -198,7 +198,7 @@ void DivideFilter::DoRefreshVectorVector()
 	//Get the input data
 	//For now, only implement uniform analog
 	auto a = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
-	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(0));
+	auto b = dynamic_cast<UniformAnalogWaveform*>(GetInputWaveform(1));
 	if(!a || !b)
 	{
 		SetData(NULL, 0);
