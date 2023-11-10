@@ -79,6 +79,11 @@ void AverageFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<Queu
 	else
 	{
 		auto data = din.GetData();
+		if(!data)
+		{
+			SetData(nullptr, 0);
+			return;
+		}
 		auto udata = dynamic_cast<UniformAnalogWaveform*>(data);
 		auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
 		double total = 0;
