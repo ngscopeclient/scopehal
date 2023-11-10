@@ -28,40 +28,24 @@
 ***********************************************************************************************************************/
 
 #include "../scopehal/scopehal.h"
-#include "ScalarStairstepFilter.h"
+#include "ScalarPulseDelayFilter.h"
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
-	: Filter(color, CAT_GENERATION)
-	, m_start("Begin")
-	, m_end("End")
-	, m_interval("Step interval")
-	, m_nsteps("Step count")
-	, m_unit("Unit")
+ScalarPulseDelayFilter::ScalarPulseDelayFilter(const string& color)
+	: Filter(color, CAT_MATH)
+	, m_interval("Interval")
 	, m_lastUpdate(GetTime())
+	, m_active(false)
 {
-	AddStream(Unit(Unit::UNIT_VOLTS), "data", Stream::STREAM_TYPE_ANALOG_SCALAR);
-	AddStream(Unit(Unit::UNIT_COUNTS), "updated", Stream::STREAM_TYPE_ANALOG_SCALAR);
-
-	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_start].SetFloatVal(0);
-
-	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_VOLTS));
-	m_parameters[m_end].SetFloatVal(1);
+	AddStream(Unit(Unit::UNIT_COUNTS), "pulseout", Stream::STREAM_TYPE_ANALOG_SCALAR);
+	CreateInput("pulsein");
 
 	m_parameters[m_interval] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_FS));
-	m_parameters[m_interval].SetFloatVal(FS_PER_SECOND);
-
-	m_parameters[m_nsteps] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_COUNTS));
-	m_parameters[m_nsteps].SetIntVal(10);
-
-	m_parameters[m_unit] = FilterParameter::UnitSelector();
-	m_parameters[m_unit].SetIntVal(Unit::UNIT_VOLTS);
-	m_parameters[m_unit].signal_changed().connect(sigc::mem_fun(*this, &ScalarStairstepFilter::OnUnitChanged));
+	m_parameters[m_interval].SetFloatVal(FS_PER_SECOND / 2);
 
 	SetData(nullptr, 0);
 }
@@ -70,84 +54,44 @@ ScalarStairstepFilter::ScalarStairstepFilter(const string& color)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Factory methods
 
-bool ScalarStairstepFilter::ValidateChannel(size_t /*i*/, StreamDescriptor /*stream*/)
+bool ScalarPulseDelayFilter::ValidateChannel(size_t i, StreamDescriptor stream)
 {
-	//no inputs
+	if( (i == 0) && (stream.GetType() == Stream::STREAM_TYPE_ANALOG_SCALAR) )
+		return true;
+
 	return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Accessors
 
-string ScalarStairstepFilter::GetProtocolName()
+string ScalarPulseDelayFilter::GetProtocolName()
 {
-	return "Scalar Stairstep";
+	return "Scalar Pulse Delay";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
-void ScalarStairstepFilter::OnUnitChanged()
+void ScalarPulseDelayFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
 {
-	auto unit = static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal());
-
-	//Don't touch anything if our unit is already the same
-	if(m_parameters[m_start].GetUnit() == unit)
+	//If the input pulse goes high high, start the timer
+	auto din = GetInput(0);
+	if(!din)
 		return;
-
-	auto oldstart = m_parameters[m_start].GetFloatVal();
-	auto oldend = m_parameters[m_end].GetFloatVal();
-
-	m_parameters[m_start] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
-	m_parameters[m_start].SetFloatVal(oldstart);
-
-	m_parameters[m_end] = FilterParameter(FilterParameter::TYPE_FLOAT, unit);
-	m_parameters[m_end].SetFloatVal(oldend);
-}
-
-void ScalarStairstepFilter::LoadParameters(const YAML::Node& node, IDTable& table)
-{
-	//Do two passes of loading
-	//First of base class to set unit, second to configure everything else
-	FlowGraphNode::LoadParameters(node, table);
-	Filter::LoadParameters(node, table);
-}
-
-void ScalarStairstepFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, shared_ptr<QueueHandle> /*queue*/)
-{
-	SetYAxisUnits(static_cast<Unit::UnitType>(m_parameters[m_unit].GetIntVal()), 0);
-
-	//See how long it's been since our last update and set update flag accordingly
-	double now = GetTime();
-	double timeOfNextUpdate = m_lastUpdate + m_parameters[m_interval].GetFloatVal()*SECONDS_PER_FS;
-	if(timeOfNextUpdate > now)
+	if(din.GetScalarValue())
 	{
-		m_streams[1].m_value = 0;
-		return;
+		m_active = true;
+		m_lastUpdate = GetTime();
 	}
-	m_streams[1].m_value = 1;
 
-	//Time to update!
-	//Backdate our nominal update time to the exact interval
-	//so graph execution times don't cause skew of future updates
-	m_lastUpdate = timeOfNextUpdate;
-
-	float start = m_parameters[m_start].GetFloatVal();
-	float end = m_parameters[m_end].GetFloatVal();
-	float delta = end - start;
-	float stepsize = delta / m_parameters[m_nsteps].GetIntVal();
-
-	//Clip out of range values
-	if((end > start) && ( (m_streams[0].m_value > end) || (m_streams[0].m_value < start) ) )
-		m_streams[0].m_value = start;
-	else if((end < start) && ( (m_streams[0].m_value < end) || (m_streams[0].m_value > start) ) )
-		m_streams[0].m_value = start;
-
-	//Are we at the last step? If so, wrap back to the start
-	if( fabs(m_streams[0].m_value - end) < (0.5*stepsize) )
-		m_streams[0].m_value = start;
-
-	//Otherwise, bump
+	//Check for timneout
+	double target = m_lastUpdate + m_parameters[m_interval].GetFloatVal()*SECONDS_PER_FS;;
+	if(m_active && (GetTime() > target) )
+	{
+		m_active = false;
+		m_streams[0].m_value = 1;
+	}
 	else
-		m_streams[0].m_value += stepsize;
+		m_streams[0].m_value = 0;
 }

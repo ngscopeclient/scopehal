@@ -129,6 +129,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	RiseMeasurement.cpp
 	RjBUjFilter.cpp
 	RMSMeasurement.cpp
+	ScalarPulseDelayFilter.cpp
 	ScalarStairstepFilter.cpp
 	ScaleFilter.cpp
 	SDCmdDecoder.cpp

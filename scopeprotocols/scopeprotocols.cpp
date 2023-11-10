@@ -165,6 +165,7 @@ void ScopeProtocolStaticInit()
 	AddDecoderClass(RiseMeasurement);
 	AddDecoderClass(RMSMeasurement);
 	AddDecoderClass(RjBUjFilter);
+	AddDecoderClass(ScalarPulseDelayFilter);
 	AddDecoderClass(ScalarStairstepFilter);
 	AddDecoderClass(ScaleFilter);
 	AddDecoderClass(SDCmdDecoder);
