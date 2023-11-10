@@ -30,6 +30,8 @@
 #ifndef RFSignalGeneratorChannel_h
 #define RFSignalGeneratorChannel_h
 
+class RFSignalGenerator;
+
 /**
 	@brief A single channel of an RF signal generator
  */
@@ -38,6 +40,7 @@ class RFSignalGeneratorChannel : public InstrumentChannel
 public:
 
 	RFSignalGeneratorChannel(
+		RFSignalGenerator* gen,
 		const std::string& hwname,
 		const std::string& color = "#808080",
 		size_t index = 0);
@@ -61,6 +64,9 @@ public:
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 
 	virtual PhysicalConnector GetPhysicalConnector() override;
+
+protected:
+	RFSignalGenerator* m_gen;
 };
 
 #endif
