@@ -183,6 +183,7 @@ set(SCOPEPROTOCOLS_SOURCES
 	WFMImportFilter.cpp
 	WindowedAutocorrelationFilter.cpp
 	WindowFilter.cpp
+	XYSweepFilter.cpp
 
 	scopeprotocols.cpp
 	)

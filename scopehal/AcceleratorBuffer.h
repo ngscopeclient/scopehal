@@ -699,6 +699,35 @@ public:
 	}
 
 	/**
+		@brief Inserts a new item at the beginning of the container. This is inefficient due to copying.
+
+		TODO: GPU implementation of this?
+	 */
+	void push_front(const T& value)
+	{
+		size_t cursize = m_size;
+		resize(m_size + 1);
+
+		PrepareForCpuAccess();
+
+		//non-trivially-copyable types have to be copied one at a time
+		if(!std::is_trivially_copyable<T>::value)
+		{
+			for(size_t i=0; i<cursize; i++)
+				m_cpuPtr[i+1] = std::move(m_cpuPtr[i]);
+		}
+
+		//Trivially copyable types can be done more efficiently in a block
+		else
+			memmove(m_cpuPtr+1, m_cpuPtr, sizeof(T) * (cursize));
+
+		//Insert the new first element
+		m_cpuPtr[0] = value;
+
+		MarkModifiedFromCpu();
+	}
+
+	/**
 		@brief Removes the first item in the container
 
 		TODO: GPU implementation of this?
@@ -713,6 +742,8 @@ public:
 		}
 
 		//Don't touch GPU side buffer
+
+		PrepareForCpuAccess();
 
 		//non-trivially-copyable types have to be copied one at a time
 		if(!std::is_trivially_copyable<T>::value)

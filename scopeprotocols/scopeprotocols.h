@@ -217,6 +217,7 @@
 #include "WFMImportFilter.h"
 #include "WindowedAutocorrelationFilter.h"
 #include "WindowFilter.h"
+#include "XYSweepFilter.h"
 
 void ScopeProtocolStaticInit();
 
