@@ -31,16 +31,16 @@
 
 using namespace std;
 
-SCPIMultimeter::MeterCreateMapType SCPIMultimeter::m_metercreateprocs;
+SCPIMiscInstrument::MeterCreateMapType SCPIMiscInstrument::m_misccreateprocs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
 
-SCPIMultimeter::SCPIMultimeter()
+SCPIMiscInstrument::SCPIMiscInstrument()
 {
 }
 
-SCPIMultimeter::~SCPIMultimeter()
+SCPIMiscInstrument::~SCPIMiscInstrument()
 {
 
 }
@@ -48,22 +48,22 @@ SCPIMultimeter::~SCPIMultimeter()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Enumeration
 
-void SCPIMultimeter::DoAddDriverClass(string name, MeterCreateProcType proc)
+void SCPIMiscInstrument::DoAddDriverClass(string name, MiscCreateProcType proc)
 {
-	m_metercreateprocs[name] = proc;
+	m_misccreateprocs[name] = proc;
 }
 
-void SCPIMultimeter::EnumDrivers(vector<string>& names)
+void SCPIMiscInstrument::EnumDrivers(vector<string>& names)
 {
-	for(auto it=m_metercreateprocs.begin(); it != m_metercreateprocs.end(); ++it)
+	for(auto it=m_misccreateprocs.begin(); it != m_misccreateprocs.end(); ++it)
 		names.push_back(it->first);
 }
 
-SCPIMultimeter* SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* transport)
+SCPIMiscInstrument* SCPIMiscInstrument::CreateInstrument(string driver, SCPITransport* transport)
 {
-	if(m_metercreateprocs.find(driver) != m_metercreateprocs.end())
-		return m_metercreateprocs[driver](transport);
+	if(m_misccreateprocs.find(driver) != m_misccreateprocs.end())
+		return m_misccreateprocs[driver](transport);
 
-	LogError("Invalid multimeter driver name \"%s\"\n", driver.c_str());
+	LogError("Invalid miscellaneous driver name \"%s\"\n", driver.c_str());
 	return NULL;
 }

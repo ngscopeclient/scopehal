@@ -133,6 +133,7 @@ extern bool g_hasPushDescriptor;
 #include "SCPIBERT.h"
 #include "SCPIFunctionGenerator.h"
 #include "SCPILoad.h"
+#include "SCPIMiscInstrument.h"
 #include "SCPIMultimeter.h"
 #include "SCPIOscilloscope.h"
 #include "SCPIRFSignalGenerator.h"

@@ -92,7 +92,10 @@ public:
 		INST_LOAD				= 0x20,
 
 		//A bit error rate tester
-		INST_BERT				= 0x40
+		INST_BERT				= 0x40,
+
+		//A miscellaneous instrument that doesn't fit any other category
+		INST_MISC				= 0x80
 	};
 
 	/**

@@ -122,6 +122,7 @@ set(SCOPEHAL_SOURCES
 	SCPIFunctionGenerator.cpp
 	SCPIInstrument.cpp
 	SCPILoad.cpp
+	SCPIMiscInstrument.cpp
 	SCPIMultimeter.cpp
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp

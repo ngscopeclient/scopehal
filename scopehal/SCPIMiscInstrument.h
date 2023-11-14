@@ -27,43 +27,43 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#include "scopehal.h"
+#ifndef SCPIMiscInstrument_h
+#define SCPIMiscInstrument_h
 
-using namespace std;
-
-SCPIMultimeter::MeterCreateMapType SCPIMultimeter::m_metercreateprocs;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Construction / destruction
-
-SCPIMultimeter::SCPIMultimeter()
+/**
+	@brief An SCPI-based miscellaneous instrument
+ */
+class SCPIMiscInstrument 	: public virtual SCPIInstrument
 {
-}
+public:
+	SCPIMiscInstrument();
+	virtual ~SCPIMiscInstrument();
 
-SCPIMultimeter::~SCPIMultimeter()
-{
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Dynamic creation
+public:
+	typedef SCPIMiscInstrument* (*MiscCreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, MiscCreateProcType proc);
 
-}
+	static void EnumDrivers(std::vector<std::string>& names);
+	static SCPIMiscInstrument* CreateInstrument(std::string driver, SCPITransport* transport);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Enumeration
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Configuration storage
 
-void SCPIMultimeter::DoAddDriverClass(string name, MeterCreateProcType proc)
-{
-	m_metercreateprocs[name] = proc;
-}
+protected:
+	//Class enumeration
+	typedef std::map< std::string, MiscCreateProcType > MeterCreateMapType;
+	static MeterCreateMapType m_misccreateprocs;
+};
 
-void SCPIMultimeter::EnumDrivers(vector<string>& names)
-{
-	for(auto it=m_metercreateprocs.begin(); it != m_metercreateprocs.end(); ++it)
-		names.push_back(it->first);
-}
+#define MISC_INITPROC(T) \
+	static SCPIMiscInstrument* CreateInstance(SCPITransport* transport) \
+	{	return new T(transport); } \
+	virtual std::string GetDriverName() const override \
+	{ return GetDriverNameInternal(); }
 
-SCPIMultimeter* SCPIMultimeter::CreateMultimeter(string driver, SCPITransport* transport)
-{
-	if(m_metercreateprocs.find(driver) != m_metercreateprocs.end())
-		return m_metercreateprocs[driver](transport);
+#define AddMiscInstrumentDriverClass(T) SCPIMiscInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
 
-	LogError("Invalid multimeter driver name \"%s\"\n", driver.c_str());
-	return NULL;
-}
+
+#endif
