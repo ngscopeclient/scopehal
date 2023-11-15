@@ -27,43 +27,140 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIMiscInstrument_h
-#define SCPIMiscInstrument_h
+#include "scopehal.h"
+#include "CSVStreamInstrument.h"
 
-/**
-	@brief An SCPI-based miscellaneous instrument
- */
-class SCPIMiscInstrument 	: public virtual SCPIInstrument
+using namespace std;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Construction / destruction
+
+CSVStreamInstrument::CSVStreamInstrument(SCPITransport* transport)
+	: SCPIDevice(transport, false)
+	, SCPIInstrument(transport, false)
 {
-public:
-	SCPIMiscInstrument();
-	virtual ~SCPIMiscInstrument();
+	m_vendor = "Antikernel Labs";
+	m_model = "CSV Stream";
+	m_serial = "N/A";
+	m_fwVersion = "1.0";
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIMiscInstrument* (*MiscCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, MiscCreateProcType proc);
+	//Create initial stream
+	m_channels.push_back(new InstrumentChannel(
+		"CH1",
+		"#808080",
+		Unit(Unit::UNIT_COUNTS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_ANALOG_SCALAR,
+		0));
+}
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIMiscInstrument* CreateInstrument(std::string driver, SCPITransport* transport);
+CSVStreamInstrument::~CSVStreamInstrument()
+{
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Configuration storage
+}
 
-protected:
-	//Class enumeration
-	typedef std::map< std::string, MiscCreateProcType > MiscCreateMapType;
-	static MiscCreateMapType m_misccreateprocs;
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Instantiation
 
-#define MISC_INITPROC(T) \
-	static SCPIMiscInstrument* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() const override \
-	{ return GetDriverNameInternal(); }
+uint32_t CSVStreamInstrument::GetInstrumentTypes() const
+{
+	return INST_MISC;
+}
 
-#define AddMiscInstrumentDriverClass(T) SCPIMiscInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+uint32_t CSVStreamInstrument::GetInstrumentTypesForChannel(size_t /*i*/) const
+{
+	return INST_MISC;
+}
 
+string CSVStreamInstrument::GetDriverNameInternal()
+{
+	return "csvstream";
+}
 
-#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Acquisition
+
+bool CSVStreamInstrument::AcquireData()
+{
+	//Read a line of input (may or may not be relevant to us)
+	auto line = m_transport->ReadReply(false);
+
+	//Split up at commas
+	auto fields = explode(line, ',');
+
+	if(fields[0] == "CSV-NAME")
+	{
+		//Name all of our channels
+		for(size_t i=1; i<fields.size(); i++)
+		{
+			//Add a new channel
+			if(m_channels.size() < i)
+			{
+				m_channels.push_back(new InstrumentChannel(
+					fields[i],
+					"#808080",
+					Unit(Unit::UNIT_COUNTS),
+					Unit(Unit::UNIT_VOLTS),
+					Stream::STREAM_TYPE_ANALOG_SCALAR,
+					i-1));
+			}
+
+			//Rename an existing channel
+			else
+				m_channels[i-1]->SetDisplayName(fields[i]);
+		}
+	}
+
+	else if(fields[0] == "CSV-UNIT")
+	{
+		//Update units, creating new channels if needed
+		for(size_t i=1; i<fields.size(); i++)
+		{
+			Unit yunit(fields[i]);
+
+			//Add a new channel
+			if(m_channels.size() < i)
+			{
+				m_channels.push_back(new InstrumentChannel(
+					string("CH") + to_string(i),
+					"#808080",
+					Unit(Unit::UNIT_COUNTS),
+					yunit,
+					Stream::STREAM_TYPE_ANALOG_SCALAR,
+					i-1));
+			}
+
+			//Rename an existing channel
+			else
+				m_channels[i-1]->SetYAxisUnits(yunit, 0);
+		}
+	}
+
+	else if(fields[0] == "CSV-DATA")
+	{
+		//Update data, creating new channels if needed
+		for(size_t i=1; i<fields.size(); i++)
+		{
+			//Add a new channel if it doesn't exist
+			if(m_channels.size() < i)
+			{
+				m_channels.push_back(new InstrumentChannel(
+					string("CH") + to_string(i),
+					"#808080",
+					Unit(Unit::UNIT_COUNTS),
+					Unit(Unit::UNIT_VOLTS),
+					Stream::STREAM_TYPE_ANALOG_SCALAR,
+					i-1));
+			}
+
+			m_channels[i-1]->SetScalarValue(0, m_channels[i-1]->GetYAxisUnits(0).ParseString(fields[i]));
+		}
+	}
+
+	else
+	{
+		//Nothing to do, it's probably stdout data or something irrelevant
+	}
+
+	return true;
+}

@@ -56,6 +56,8 @@
 
 #include "MultiLaneBERT.h"
 
+#include "CSVStreamInstrument.h"
+
 #include "RohdeSchwarzHMC8012Multimeter.h"
 
 #include "RigolFunctionGenerator.h"
@@ -216,6 +218,8 @@ void DriverStaticInit()
 	AddFunctionGeneratorDriverClass(RigolFunctionGenerator);
 
 	AddLoadDriverClass(SiglentLoad);
+
+	AddMiscInstrumentDriverClass(CSVStreamInstrument);
 
 	AddMultimeterDriverClass(RohdeSchwarzHMC8012Multimeter);
 

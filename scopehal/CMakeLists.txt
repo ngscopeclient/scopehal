@@ -134,6 +134,7 @@ set(SCOPEHAL_SOURCES
 	AntikernelLabsOscilloscope.cpp
 	AntikernelLogicAnalyzer.cpp
 	CopperMountainVNA.cpp
+	CSVStreamInstrument.cpp
 	DemoOscilloscope.cpp
 	DemoPowerSupply.cpp
 	DigilentOscilloscope.cpp

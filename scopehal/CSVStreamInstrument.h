@@ -27,43 +27,31 @@
 *                                                                                                                      *
 ***********************************************************************************************************************/
 
-#ifndef SCPIMiscInstrument_h
-#define SCPIMiscInstrument_h
+#ifndef CSVStreamInstrument_h
+#define CSVStreamInstrument_h
 
 /**
-	@brief An SCPI-based miscellaneous instrument
+	@brief A miscellaneous instrument which streams scalar data over CSV
  */
-class SCPIMiscInstrument 	: public virtual SCPIInstrument
+class CSVStreamInstrument
+	: public virtual SCPIMiscInstrument
 {
 public:
-	SCPIMiscInstrument();
-	virtual ~SCPIMiscInstrument();
+	CSVStreamInstrument(SCPITransport* transport);
+	virtual ~CSVStreamInstrument();
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Dynamic creation
-public:
-	typedef SCPIMiscInstrument* (*MiscCreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, MiscCreateProcType proc);
+	//Device information
+	virtual uint32_t GetInstrumentTypes() const override;
+	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
 
-	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIMiscInstrument* CreateInstrument(std::string driver, SCPITransport* transport);
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// Configuration storage
+	//Acquisition
+	virtual bool AcquireData() override;
 
 protected:
-	//Class enumeration
-	typedef std::map< std::string, MiscCreateProcType > MiscCreateMapType;
-	static MiscCreateMapType m_misccreateprocs;
+
+public:
+	static std::string GetDriverNameInternal();
+	MISC_INITPROC(CSVStreamInstrument);
 };
-
-#define MISC_INITPROC(T) \
-	static SCPIMiscInstrument* CreateInstance(SCPITransport* transport) \
-	{	return new T(transport); } \
-	virtual std::string GetDriverName() const override \
-	{ return GetDriverNameInternal(); }
-
-#define AddMiscInstrumentDriverClass(T) SCPIMiscInstrument::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
-
 
 #endif

@@ -31,7 +31,7 @@
 
 using namespace std;
 
-SCPIMiscInstrument::MeterCreateMapType SCPIMiscInstrument::m_misccreateprocs;
+SCPIMiscInstrument::MiscCreateMapType SCPIMiscInstrument::m_misccreateprocs;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Construction / destruction
