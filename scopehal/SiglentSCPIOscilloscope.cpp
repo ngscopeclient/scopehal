@@ -1042,7 +1042,7 @@ void SiglentSCPIOscilloscope::SetChannelAttenuation(size_t i, double atten)
 		case MODEL_SIGLENT_SDS2000X_HD:
 		case MODEL_SIGLENT_SDS5000X:
 		case MODEL_SIGLENT_SDS6000A:
-			sendOnly(":CHANNEL%d:PROBE %lf", i + 1, atten);
+			sendOnly(":CHANNEL%d:PROBE VALUE,%lf", i + 1, atten);
 			break;
 
 		// --------------------------------------------------
