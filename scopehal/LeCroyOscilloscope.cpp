@@ -1016,6 +1016,7 @@ void LeCroyOscilloscope::FlushConfigCache()
 	m_channelsEnabled.clear();
 	m_channelDeskew.clear();
 	m_probeIsActive.clear();
+	m_channelNavg.clear();
 	m_sampleRateValid = false;
 	m_memoryDepthValid = false;
 	m_triggerOffsetValid = false;
@@ -3500,6 +3501,46 @@ void LeCroyOscilloscope::SetSampleRate(uint64_t rate)
 
 	m_sampleRate = rate;
 	m_sampleRateValid = true;
+}
+
+bool LeCroyOscilloscope::CanAverage(size_t i)
+{
+	return (i < m_analogChannelCount);
+}
+
+size_t LeCroyOscilloscope::GetNumAverages(size_t i)
+{
+	//not meaningful for trigger or digital channels
+	if(i > m_analogChannelCount)
+		return 1;
+
+	{
+		lock_guard<recursive_mutex> lock(m_cacheMutex);
+		if(m_channelNavg.find(i) != m_channelNavg.end())
+			return m_channelNavg[i];
+	}
+
+	auto reply = Trim(m_transport->SendCommandQueuedWithReply(
+		string("VBS? 'return = app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps'"));
+	auto navg = stoi(reply);
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelNavg[i] = navg;
+	return navg;
+}
+
+void LeCroyOscilloscope::SetNumAverages(size_t i, size_t navg)
+{
+	//not meaningful for trigger or digital channels
+	if(i > m_analogChannelCount)
+		return;
+
+	m_transport->SendCommandQueued(
+		string("VBS? 'app.Acquisition.") + GetOscilloscopeChannel(i)->GetHwname() + ".AverageSweeps = " +
+		to_string(navg) + "'");
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelNavg[i] = navg;
 }
 
 void LeCroyOscilloscope::EnableTriggerOutput()

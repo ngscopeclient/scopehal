@@ -181,6 +181,24 @@ bool Oscilloscope::PopPendingWaveform()
 	return false;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Averaging
+
+bool Oscilloscope::CanAverage(size_t /*i*/)
+{
+	return false;
+}
+
+size_t Oscilloscope::GetNumAverages(size_t /*i*/)
+{
+	return 1;
+}
+
+void Oscilloscope::SetNumAverages(size_t /*i*/, size_t /*navg*/)
+{
+
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Serialization
@@ -286,6 +304,11 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 					LogWarning("unsupported coupling value when saving\n");
 					break;
 			}
+
+			//averaging is a channel property for now, not stream
+			//(this may change if we find an instrument that supports per-stream average config)
+			if(CanAverage(i))
+				channelNode["navg"] = GetNumAverages(i);
 		}
 
 		//Save streams if there's more than one
@@ -367,6 +390,9 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 			else
 				chan->Invert(cnode["invert"].as<int>());
 		}
+
+		if(cnode["navg"])
+			SetNumAverages(chan->GetIndex(), cnode["navg"].as<size_t>());
 
 		//Add multiple streams if present
 		auto snode = cnode["nstreams"];

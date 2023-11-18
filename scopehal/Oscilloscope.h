@@ -278,6 +278,28 @@ public:
 	virtual void Degauss(size_t i);
 
 	/**
+		@brief Determines if the channel supports hardware averaging
+
+		@param i			Zero-based index of channel
+	 */
+	virtual bool CanAverage(size_t i);
+
+	/**
+		@brief Returns the number of averages the channel is configured for
+
+		@param i			Zero-based index of channel
+	 */
+	virtual size_t GetNumAverages(size_t i);
+
+	/**
+		@brief Sets the number of hardware averages to use
+
+		@param i			Zero-based index of channel
+		@param navg			Number of averages to use
+	 */
+	virtual void SetNumAverages(size_t i, size_t navg);
+
+	/**
 		@brief Returns the name of the probe connected to the scope, if possible.
 
 		If a passive or no probe is connected, or the instrument driver does not support probe identification,

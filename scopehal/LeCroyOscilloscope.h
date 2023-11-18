@@ -82,35 +82,38 @@ public:
 	void ForceHDMode(bool mode);
 
 	//Channel configuration
-	virtual bool IsChannelEnabled(size_t i);
-	virtual void EnableChannel(size_t i);
-	virtual bool CanEnableChannel(size_t i);
-	virtual void DisableChannel(size_t i);
-	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i);
-	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type);
-	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i);
-	virtual double GetChannelAttenuation(size_t i);
-	virtual void SetChannelAttenuation(size_t i, double atten);
-	virtual unsigned int GetChannelBandwidthLimit(size_t i);
-	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz);
-	virtual float GetChannelVoltageRange(size_t i, size_t stream);
-	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range);
-	virtual OscilloscopeChannel* GetExternalTrigger();
-	virtual float GetChannelOffset(size_t i, size_t stream);
-	virtual void SetChannelOffset(size_t i, size_t stream, float offset);
-	virtual std::string GetChannelDisplayName(size_t i);
-	virtual void SetChannelDisplayName(size_t i, std::string name);
-	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i);
-	virtual bool CanInvert(size_t i);
-	virtual void Invert(size_t i, bool invert);
-	virtual bool IsInverted(size_t i);
-	virtual bool CanAutoZero(size_t i);
-	virtual void AutoZero(size_t i);
-	virtual std::string GetProbeName(size_t i);
-	virtual bool HasInputMux(size_t i);
-	virtual size_t GetInputMuxSetting(size_t i);
-	virtual std::vector<std::string> GetInputMuxNames(size_t i);
-	virtual void SetInputMux(size_t i, size_t select);
+	virtual bool IsChannelEnabled(size_t i) override;
+	virtual void EnableChannel(size_t i) override;
+	virtual bool CanEnableChannel(size_t i) override;
+	virtual void DisableChannel(size_t i) override;
+	virtual OscilloscopeChannel::CouplingType GetChannelCoupling(size_t i) override;
+	virtual void SetChannelCoupling(size_t i, OscilloscopeChannel::CouplingType type) override;
+	virtual std::vector<OscilloscopeChannel::CouplingType> GetAvailableCouplings(size_t i) override;
+	virtual double GetChannelAttenuation(size_t i) override;
+	virtual void SetChannelAttenuation(size_t i, double atten) override;
+	virtual unsigned int GetChannelBandwidthLimit(size_t i) override;
+	virtual void SetChannelBandwidthLimit(size_t i, unsigned int limit_mhz) override;
+	virtual float GetChannelVoltageRange(size_t i, size_t stream) override;
+	virtual void SetChannelVoltageRange(size_t i, size_t stream, float range) override;
+	virtual OscilloscopeChannel* GetExternalTrigger() override;
+	virtual float GetChannelOffset(size_t i, size_t stream) override;
+	virtual void SetChannelOffset(size_t i, size_t stream, float offset) override;
+	virtual std::string GetChannelDisplayName(size_t i) override;
+	virtual void SetChannelDisplayName(size_t i, std::string name) override;
+	virtual std::vector<unsigned int> GetChannelBandwidthLimiters(size_t i) override;
+	virtual bool CanInvert(size_t i) override;
+	virtual void Invert(size_t i, bool invert) override;
+	virtual bool IsInverted(size_t i) override;
+	virtual bool CanAutoZero(size_t i) override;
+	virtual void AutoZero(size_t i) override;
+	virtual std::string GetProbeName(size_t i) override;
+	virtual bool HasInputMux(size_t i) override;
+	virtual size_t GetInputMuxSetting(size_t i) override;
+	virtual std::vector<std::string> GetInputMuxNames(size_t i) override;
+	virtual void SetInputMux(size_t i, size_t select) override;
+	virtual bool CanAverage(size_t i) override;
+	virtual size_t GetNumAverages(size_t i) override;
+	virtual void SetNumAverages(size_t i, size_t navg) override;
 
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
@@ -342,6 +345,7 @@ protected:
 	//Cached configuration
 	std::map<size_t, float> m_channelVoltageRanges;
 	std::map<size_t, float> m_channelOffsets;
+	std::map<size_t, size_t> m_channelNavg;
 	std::map<int, bool> m_channelsEnabled;
 	bool m_sampleRateValid;
 	int64_t m_sampleRate;
