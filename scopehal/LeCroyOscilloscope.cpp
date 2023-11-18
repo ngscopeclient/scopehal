@@ -3454,6 +3454,18 @@ set<LeCroyOscilloscope::InterleaveConflict> LeCroyOscilloscope::GetInterleaveCon
 			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(3), GetOscilloscopeChannel(3)));
 			break;
 
+		//SDA 8Zi and 8Zi-A cannot interleave without external interleaving adapter
+		//(not currently supported)
+		case MODEL_WAVEMASTER_8ZI:
+		case MODEL_WAVEMASTER_8ZI_A:
+		case MODEL_SDA_8ZI:
+		case MODEL_SDA_8ZI_A:
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(0), GetOscilloscopeChannel(0)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(1), GetOscilloscopeChannel(1)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(2), GetOscilloscopeChannel(2)));
+			ret.emplace(InterleaveConflict(GetOscilloscopeChannel(3), GetOscilloscopeChannel(3)));
+			break;
+
 		default:
 			break;
 	}
