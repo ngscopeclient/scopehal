@@ -102,8 +102,6 @@ bool MemoryFilter::PerformAction(const string& id)
 
 void MemoryFilter::Update()
 {
-	LogDebug("MemoryFilter::Update\n");
-
 	auto sin = GetInput(0);
 	auto data = sin.GetData();
 	auto sdata = dynamic_cast<SparseAnalogWaveform*>(data);
