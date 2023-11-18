@@ -83,7 +83,7 @@ string CSVStreamInstrument::GetDriverNameInternal()
 bool CSVStreamInstrument::AcquireData()
 {
 	//Read a line of input (may or may not be relevant to us)
-	auto line = m_transport->ReadReply(false);
+	auto line = Trim(m_transport->ReadReply(false));
 
 	//Split up at commas
 	auto fields = explode(line, ',');
