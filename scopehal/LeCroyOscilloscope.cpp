@@ -2473,11 +2473,12 @@ time_t LeCroyOscilloscope::ExtractTimestamp(unsigned char* wavedesc, double& bas
 		wavedesc[305],
 		wavedesc[304],
 		seconds);
+
 	locale cur_locale;
 	auto& tget = use_facet< time_get<char> >(cur_locale);
 	istringstream stream(tblock);
 	ios::iostate state;
-	char format[] = "%F %T";
+	char format[] = "%Y-%m-%d %T";
 	tget.get(stream, time_get<char>::iter_type(), stream, state, &tstruc, format, format+strlen(format));
 	return mktime(&tstruc);
 }
