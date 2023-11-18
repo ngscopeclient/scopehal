@@ -213,6 +213,11 @@ void Oscilloscope::DoSerializeConfiguration(YAML::Node& node, IDTable& table)
 	node["interleave"] = IsInterleaving();
 	node["triggerpos"] = GetTriggerOffset();
 
+	if(GetSamplingMode() == REAL_TIME)
+		node["samplemode"] = "realtime";
+	else
+		node["samplemode"] = "equivalent";
+
 	//Save channels
 	for(size_t i=0; i<GetChannelCount(); i++)
 	{
@@ -484,6 +489,13 @@ void Oscilloscope::DoLoadConfiguration(int version, const YAML::Node& node, IDTa
 		SetSampleRate(node["rate"].as<unsigned long>());
 	if(node["depth"])
 		SetSampleDepth(node["depth"].as<unsigned long>());
+	if(node["samplemode"])
+	{
+		if(node["samplemode"].as<string>() == "equivalent")
+			SetSamplingMode(EQUIVALENT_TIME);
+		else
+			SetSamplingMode(REAL_TIME);
+	}
 	if(node["triggerpos"])
 		SetTriggerOffset(node["triggerpos"].as<int64_t>());
 
