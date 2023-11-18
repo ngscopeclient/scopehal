@@ -2535,7 +2535,7 @@ vector<WaveformBase*> LeCroyOscilloscope::ProcessAnalogWaveform(
 		cap->PrepareForCpuAccess();
 
 		//Parse the time
-		if(num_sequences > 1)
+		if(wavetime)
 			cap->m_startFemtoseconds = static_cast<int64_t>( (basetime + wavetime[j*2]) * FS_PER_SECOND );
 		else
 			cap->m_startFemtoseconds = static_cast<int64_t>(basetime * FS_PER_SECOND);
@@ -2741,7 +2741,7 @@ bool LeCroyOscilloscope::AcquireData()
 	string wavetime;
 	bool enabled[8] = {false};
 	vector<string> wavedescs;
-	double* pwtime = NULL;
+	double* pwtime = nullptr;
 	string digitalWaveformData;
 
 	//Acquire the data (but don't parse it)
@@ -2756,10 +2756,18 @@ bool LeCroyOscilloscope::AcquireData()
 
 		//Grab the WAVEDESC from the first enabled channel
 		unsigned char* pdesc = NULL;
+		bool useClientsideTimestamp = false;
 		for(unsigned int i=0; i<m_analogChannelCount; i++)
 		{
 			if(enabled[i] || (!any_enabled && i==0))
 			{
+				//If our FIRST enabled channel (the source of the timestamp) has averaging enabled,
+				//for some reason timestamps don't work.
+				//https://github.com/ngscopeclient/scopehal/issues/813
+				//Unless LeCroy gets us a better workaround (TLC#00342021), just use clientside clock
+				if(GetNumAverages(i) > 1)
+					useClientsideTimestamp = true;
+
 				pdesc = (unsigned char*)(&wavedescs[i][0]);
 				break;
 			}
@@ -2811,8 +2819,18 @@ bool LeCroyOscilloscope::AcquireData()
 			//Read the timestamps if we're doing segmented capture
 			ttime = ExtractTimestamp(pdesc, basetime);
 			if(num_sequences > 1)
+			{
 				wavetime = m_transport->ReadReply();
-			pwtime = reinterpret_cast<double*>(&wavetime[16]);	//skip 16-byte SCPI header
+				pwtime = reinterpret_cast<double*>(&wavetime[16]);	//skip 16-byte SCPI header
+			}
+
+			//If instrument timestamp in the WAVEDESC is not valid, use our local clock instead
+			if(useClientsideTimestamp)
+			{
+				double t = GetTime();
+				ttime = floor(t);
+				basetime = t - ttime;
+			}
 
 			//Read the data from each analog waveform
 			for(unsigned int i=0; i<m_analogChannelCount; i++)
