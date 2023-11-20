@@ -852,12 +852,13 @@ bool RigolOscilloscope::AcquireData()
 			if(header_blocksize == 0)
 			{
 				LogWarning("Ran out of data after %zu points\n", npoint);
+				m_transport->ReadRawData(1, temp_buf);					//discard the trailing newline
 				break;
 			}
 
 			//Read actual block content and decode it
 			//Scale: (value - Yorigin - Yref) * Yinc
-			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	 //why is there a trailing byte here??´
+			m_transport->ReadRawData(header_blocksize + 1, temp_buf);	 //trailing newline after data block
 
 			double ydelta = yorigin + yreference;
 			cap->Resize(cap->m_samples.size() + header_blocksize);
