@@ -794,7 +794,7 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		//Set up the capture we're going to store our data into
-		auto cap = new UniformAnalogWaveform;
+		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 		cap->m_timescale = fs_per_sample;
 		cap->m_triggerPhase = 0;
 		cap->m_startTimestamp = time(NULL);
