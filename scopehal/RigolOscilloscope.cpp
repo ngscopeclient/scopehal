@@ -793,6 +793,10 @@ bool RigolOscilloscope::AcquireData()
 			//LogDebug("Y: %f inc, %f origin, %f ref\n", yincrement, yorigin, yreference);
 		}
 
+		//If we have zero points in the reply, skip reading data from this channel
+		if(npoints == 0)
+			continue;
+
 		//Set up the capture we're going to store our data into
 		auto cap = AllocateAnalogWaveform(m_nickname + "." + GetChannel(i)->GetHwname());
 		cap->m_timescale = fs_per_sample;
