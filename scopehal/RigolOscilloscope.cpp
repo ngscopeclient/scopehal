@@ -857,6 +857,13 @@ bool RigolOscilloscope::AcquireData()
 			{
 				LogWarning("Ran out of data after %zu points\n", npoint);
 				m_transport->ReadRawData(1, temp_buf);					//discard the trailing newline
+
+				//If this happened after zero samples, free the waveform so it doesn't leak
+				if(npoint == 0)
+				{
+					AddWaveformToAnalogPool(cap);
+					cap = nullptr;
+				}
 				break;
 			}
 
@@ -881,7 +888,8 @@ bool RigolOscilloscope::AcquireData()
 		}
 
 		//Done, update the data
-		pending_waveforms[i].push_back(cap);
+		if(cap)
+			pending_waveforms[i].push_back(cap);
 	}
 
 	//Now that we have all of the pending waveforms, save them in sets across all channels
