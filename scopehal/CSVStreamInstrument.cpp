@@ -85,6 +85,12 @@ bool CSVStreamInstrument::AcquireData()
 	//Read a line of input (may or may not be relevant to us)
 	auto line = Trim(m_transport->ReadReply(false));
 
+	//Trim off anything before "CSV" prefix and discard mismatched lines
+	auto start = line.find("CSV-");
+	if(start == string::npos)
+		return true;
+	line = line.substr(start);
+
 	//Split up at commas
 	auto fields = explode(line, ',');
 
