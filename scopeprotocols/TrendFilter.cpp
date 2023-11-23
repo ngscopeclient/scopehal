@@ -75,6 +75,12 @@ string TrendFilter::GetProtocolName()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Actual decoder logic
 
+bool TrendFilter::ShouldPersistWaveform()
+{
+	//Our waveform should be saved since it's not possible to generate from the input
+	return true;
+}
+
 void TrendFilter::ClearSweeps()
 {
 	SetData(nullptr, 0);
@@ -85,7 +91,11 @@ void TrendFilter::Refresh(vk::raii::CommandBuffer& /*cmdBuf*/, std::shared_ptr<Q
 	if(!ShouldRefresh())
 		return;
 
-	m_streams[0].m_yAxisUnit = GetInput(0).GetYAxisUnits();
+	auto din = GetInput(0);
+	if(!din)
+		return;
+
+	m_streams[0].m_yAxisUnit = din.GetYAxisUnits();
 
 	//See if we have output already
 	double now = GetTime();

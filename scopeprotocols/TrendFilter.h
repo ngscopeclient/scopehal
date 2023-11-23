@@ -47,6 +47,7 @@ public:
 	virtual void ClearSweeps() override;
 
 	static std::string GetProtocolName();
+	virtual bool ShouldPersistWaveform() override;
 
 	virtual bool ValidateChannel(size_t i, StreamDescriptor stream) override;
 

@@ -42,7 +42,10 @@ inline Unit StreamDescriptor::GetXAxisUnits()
 
 inline Unit StreamDescriptor::GetYAxisUnits()
 {
-	return m_channel->GetYAxisUnits(m_stream);
+	if(m_channel == nullptr)
+		return Unit(Unit::UNIT_VOLTS);
+	else
+		return m_channel->GetYAxisUnits(m_stream);
 }
 
 inline WaveformBase* StreamDescriptor::GetData() const
@@ -115,7 +118,10 @@ inline void StreamDescriptor::SetOffset(float v)
 
 inline float StreamDescriptor::GetScalarValue()
 {
-	return m_channel->GetScalarValue(m_stream);
+	if(m_channel == nullptr)
+		return 0;
+	else
+		return m_channel->GetScalarValue(m_stream);
 }
 
 #endif
