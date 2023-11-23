@@ -94,6 +94,7 @@ void RiseMeasurement::Refresh()
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
+		m_streams[1].m_value = 0;
 		return;
 	}
 
