@@ -40,7 +40,8 @@ FallMeasurement::FallMeasurement(const string& color)
 {
 	//Set up channels
 	CreateInput("din");
-	AddStream(Unit(Unit::UNIT_FS), "data", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "trend", Stream::STREAM_TYPE_ANALOG);
+	AddStream(Unit(Unit::UNIT_FS), "avg", Stream::STREAM_TYPE_ANALOG_SCALAR);
 
 	m_startname = "Start Fraction";
 	m_parameters[m_startname] = FilterParameter(FilterParameter::TYPE_FLOAT, Unit(Unit::UNIT_PERCENT));
@@ -81,6 +82,7 @@ void FallMeasurement::Refresh()
 	if(!VerifyAllInputsOK())
 	{
 		SetData(NULL, 0);
+		m_streams[1].m_value = 0;
 		return;
 	}
 
@@ -112,6 +114,8 @@ void FallMeasurement::Refresh()
 	int64_t tlast = 0;
 
 	//LogDebug("vstart = %.3f, vend = %.3f\n", vstart, vend);
+	double sum = 0;
+	int64_t num = 0;
 	for(size_t i=0; i < len; i++)
 	{
 		float cur = GetValue(sdin, udin, i);
@@ -139,6 +143,9 @@ void FallMeasurement::Refresh()
 				cap->m_samples.push_back(dt);
 				tlast = tnow;
 
+				sum += dt;
+				num ++;
+
 				state = 0;
 			}
 		}
@@ -149,4 +156,6 @@ void FallMeasurement::Refresh()
 	SetData(cap, 0);
 
 	cap->MarkModifiedFromCpu();
+
+	m_streams[1].m_value = sum / num;
 }
