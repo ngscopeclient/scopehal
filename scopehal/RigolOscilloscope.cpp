@@ -646,6 +646,9 @@ float RigolOscilloscope::GetChannelOffset(size_t i, size_t /*stream*/)
 void RigolOscilloscope::SetChannelOffset(size_t i, size_t /*stream*/, float offset)
 {
 	m_transport->SendCommandQueued(":" + m_channels[i]->GetHwname() + ":OFFS " + to_string(offset));
+
+	lock_guard<recursive_mutex> lock(m_cacheMutex);
+	m_channelOffsets[i] = offset;
 }
 
 Oscilloscope::TriggerMode RigolOscilloscope::PollTrigger()
