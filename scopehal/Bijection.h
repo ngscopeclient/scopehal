@@ -90,6 +90,9 @@ public:
 		m_forwardMap.erase(value);
 	}
 
+	size_t size()
+	{ return m_forwardMap.size(); }
+
 protected:
 	forwardType m_forwardMap;
 	reverseType m_reverseMap;
