@@ -2,7 +2,7 @@
 *                                                                                                                      *
 * libscopehal v0.1                                                                                                     *
 *                                                                                                                      *
-* Copyright (c) 2012-2022 Andrew D. Zonenberg and contributors                                                         *
+* Copyright (c) 2012-2023 Andrew D. Zonenberg and contributors                                                         *
 * All rights reserved.                                                                                                 *
 *                                                                                                                      *
 * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the     *
@@ -37,8 +37,6 @@
 
 /**
 	@brief A one-to-one mapping from objects of type T1 to type T2 (which must be different types)
-
-	For now insert-only, elements can be inserted or iterated but not removed.
  */
 template<class T1, class T2, typename Compare1 = std::less<T1>, typename Compare2 = std::less<T2> >
 class Bijection
@@ -71,6 +69,12 @@ public:
 
 	bool HasEntry(T2 key)
 	{ return m_reverseMap.find(key) != m_reverseMap.end(); }
+
+	void clear()
+	{
+		m_forwardMap.clear();
+		m_reverseMap.clear();
+	}
 
 protected:
 	forwardType m_forwardMap;
