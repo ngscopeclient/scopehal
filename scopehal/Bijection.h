@@ -76,6 +76,20 @@ public:
 		m_reverseMap.clear();
 	}
 
+	void erase(T1 key)
+	{
+		auto value = m_forwardMap[key];
+		m_forwardMap.erase(key);
+		m_reverseMap.erase(value);
+	}
+
+	void erase(T2 key)
+	{
+		auto value = m_reverseMap[key];
+		m_reverseMap.erase(key);
+		m_forwardMap.erase(value);
+	}
+
 protected:
 	forwardType m_forwardMap;
 	reverseType m_reverseMap;
