@@ -247,7 +247,7 @@ void Multimeter::DoLoadConfiguration(int /*version*/, const YAML::Node& node, ID
 void Multimeter::DoPreLoadConfiguration(
 	int /*version*/,
 	const YAML::Node& node,
-	IDTable& /*idmap*/,
+	IDTable& idmap,
 	ConfigWarningList& list)
 {
 	//If we're derived from multimeter class but not a meter, do nothing
@@ -256,7 +256,6 @@ void Multimeter::DoPreLoadConfiguration(
 		return;
 
 	//Complain if mode is changed
-
 	auto mode = TextToMode(node["meterMode"].as<string>());
 	if(mode != GetMeterMode())
 	{
@@ -266,4 +265,21 @@ void Multimeter::DoPreLoadConfiguration(
 			ModeToText(GetMeterMode()),
 			node["meterMode"].as<string>()));
 	}
+
+	//Set channel IDs
+	for(size_t i=0; i<GetChannelCount(); i++)
+	{
+		if(0 == (GetInstrumentTypesForChannel(i) & Instrument::INST_DMM))
+			continue;
+
+		auto chan = dynamic_cast<MultimeterChannel*>(GetChannel(i));
+
+		//Save basic info
+		auto key = "ch" + to_string(i);
+		auto channelNode = node["channels"][key];
+
+		//Set our ID
+		idmap.emplace(channelNode["meterid"].as<int>(), chan);
+	}
+
 }
