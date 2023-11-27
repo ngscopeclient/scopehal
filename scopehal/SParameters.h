@@ -160,7 +160,6 @@ public:
 		m_points.resize(len);
 		m_points.PrepareForCpuAccess();
 
-		float ascale = M_PI / 180;
 		for(size_t i=0; i<len; i++)
 			m_points[i] = SParameterPoint(GetOffsetScaled(wmag, i), 0, 0);
 
