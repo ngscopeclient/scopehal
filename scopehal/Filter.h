@@ -215,6 +215,7 @@ public:
 	virtual YAML::Node SerializeConfiguration(IDTable& table) override;
 
 	virtual void LoadParameters(const YAML::Node& node, IDTable& table) override;
+	virtual void LoadInputs(const YAML::Node& node, IDTable& table) override;
 
 	virtual bool ShouldPersistWaveform() override;
 

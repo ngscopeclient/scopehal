@@ -903,6 +903,31 @@ void Filter::LoadParameters(const YAML::Node& node, IDTable& table)
 	}
 }
 
+void Filter::LoadInputs(const YAML::Node& node, IDTable& table)
+{
+	FlowGraphNode::LoadInputs(node, table);
+
+	//We don't currently persist the "is using default" name" flag.
+	//Even if we did, older files might not support it.
+	//So we need to figure out the hard way.
+	auto oldhw = m_hwname;
+	auto olddisp = m_displayname;
+
+	//Try using the default
+	SetDefaultDisplayName();
+
+	//See if we are actually using the auto-assigned name.
+	//If not, roll back
+	if( (oldhw == m_hwname) && (olddisp == m_displayname) && (m_hwname == m_displayname) )
+		m_usingDefault = true;
+	else
+	{
+		m_usingDefault = false;
+		m_hwname = oldhw;
+		m_displayname = olddisp;
+	}
+}
+
 bool Filter::ShouldPersistWaveform()
 {
 	//all filters default to not saving waveforms since the data can (almost) always be recomputed
