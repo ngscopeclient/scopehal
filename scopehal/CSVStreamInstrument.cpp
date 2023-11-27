@@ -52,6 +52,9 @@ CSVStreamInstrument::CSVStreamInstrument(SCPITransport* transport)
 		Unit(Unit::UNIT_VOLTS),
 		Stream::STREAM_TYPE_ANALOG_SCALAR,
 		0));
+
+	//needs to run *before* the Oscilloscope class implementation
+	m_preloaders.push_front(sigc::mem_fun(this, &CSVStreamInstrument::DoPreLoadConfiguration));
 }
 
 CSVStreamInstrument::~CSVStreamInstrument()
@@ -75,6 +78,41 @@ uint32_t CSVStreamInstrument::GetInstrumentTypesForChannel(size_t /*i*/) const
 string CSVStreamInstrument::GetDriverNameInternal()
 {
 	return "csvstream";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serialization
+
+void CSVStreamInstrument::DoPreLoadConfiguration(
+	int /*version*/,
+	const YAML::Node& node,
+	IDTable& idmap,
+	ConfigWarningList& /*list*/)
+{
+	m_channels.clear();
+
+	auto& chans = node["channels"];
+	for(auto it : chans)
+	{
+		auto& cnode = it.second;
+		auto index = cnode["index"].as<int>();
+
+		//If we don't have the channel yet, create it
+		while(m_channels.size() <= (size_t)index)
+		{
+			m_channels.push_back(new InstrumentChannel(
+				string("CH") + to_string(index),
+				"#808080",
+				Unit(Unit::UNIT_COUNTS),
+				Unit(Unit::UNIT_VOLTS),
+				Stream::STREAM_TYPE_ANALOG_SCALAR,
+				m_channels.size()));
+		}
+
+		//Channel exists, register its ID
+		auto chan = m_channels[index];
+		idmap.emplace(cnode["id"].as<int>(), chan);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
