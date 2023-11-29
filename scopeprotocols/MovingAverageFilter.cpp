@@ -43,7 +43,7 @@ MovingAverageFilter::MovingAverageFilter(const string& color)
 
 	m_depthname = "Depth";
 	m_parameters[m_depthname] = FilterParameter(FilterParameter::TYPE_INT, Unit(Unit::UNIT_SAMPLEDEPTH));
-	m_parameters[m_depthname].SetFloatVal(0);
+	m_parameters[m_depthname].SetFloatVal(10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
