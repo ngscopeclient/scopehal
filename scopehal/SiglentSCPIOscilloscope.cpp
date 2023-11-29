@@ -3283,9 +3283,8 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 			m_highDefinition = true;
 	}
 
-	//Seems ADC mode cannot be changed while stopped
-	if(!m_triggerArmed)
-		m_transport->SendCommandQueued("TRIG_MODE AUTO");
+	//ADC mode cannot be changed while stopped
+	m_transport->SendCommandQueued("TRIG_MODE AUTO");
 
 	//Flush command queue and delay with query
 	m_transport->SendCommandQueuedWithReply("TRIG_MODE?");
@@ -3299,6 +3298,7 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 		m_transport->SendCommandQueued("ACQ:RES 8Bits");
 	}
 
+	//Re-arm trigger if previously armed
 	if(IsTriggerArmed())
 		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
 	else
