@@ -49,7 +49,9 @@
  * SDS2000XP
  *
  * - Basic functionality for analog channels works.
- * - There is no feature detection because the scope does not support *OPT? (Request made)
+ * - Feature detection via LCISL? or *OPT? not yet implemented.
+ *     - With a request, *OPT? command got added in firmware 1.5.2R1.
+ *     - LCISL? command present in firmware 1.3.5 through 1.5.2 (although undocumented).
  * - Digital channels are not implemented (code in here is leftover from LeCroy)
  * - Triggers are untested.
  * - Sampling lengths up to 10MSamples are supported. 50M and 100M need to be batched and will be
@@ -353,7 +355,6 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				&fwPatchVersion,
 				&fwPatchRevision);
 			//Firmware 1.3.9R6 and older require size workaround.
-			//TODO: validate with scope with older versions
 			if(fwMajorVersion < 1)
 				m_requireSizeWorkaround = true;
 			else if((fwMajorVersion == 1) && (fwMinorVersion < 3))
@@ -367,7 +368,6 @@ void SiglentSCPIOscilloscope::IdentifyHardware()
 				LogTrace("Current firmware (%s) requires size workaround\n", m_fwVersion.c_str());
 
 			//TODO: check for whether we actually have the license
-			//(no SCPI command for this yet)
 			m_hasFunctionGen = true;
 		}
 		else if( (m_model.compare(0, 4, "SDS2") == 0) && (m_model.find("HD") != string::npos) )
@@ -424,7 +424,9 @@ void SiglentSCPIOscilloscope::DetectOptions()
 {
 	//AddDigitalChannels(16);
 
-	/* SDS2000XP has no capability to find the options :-( */
+	//TODO: support feature checking for SDS2000XP
+	//SDS2000XP supports optional feature checking via LCISL? <OPT> on all firmware
+	//Valid OPT choices: AWG, MSO, FLX, CFD, I2S, 1553, PWA, MANC, SENT
 	return;
 }
 
@@ -2061,9 +2063,9 @@ bool SiglentSCPIOscilloscope::AcquireData()
 					wavetime = m_transport->ReadReply();
 				pwtime = reinterpret_cast<double*>(&wavetime[16]);	  //skip 16-byte SCPI header
 
-				//BUG: When SDS2000X+ (tested on 1.3.9R6) is in 10-bit mode, the SCPI length header reports the size of the data blob in
-				//16-bit words, rather than bytes!
-				//2000X+ HD running firmware 1.1.7.0 seems to be unaffected.
+				//QUIRK: On SDS2000X+ with firmware 1.3.9R6 and older, the SCPI length header reports the
+				//sample count rather than size in bytes! Firmware 1.3.9R10 and newer reports size in bytes.
+				//2000X+ HD running firmware 1.1.7.0 seems to report size in bytes.
 				bool hdWorkaround = m_requireSizeWorkaround && m_highDefinition;
 
 				//Read the data from each analog waveform
