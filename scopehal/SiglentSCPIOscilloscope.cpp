@@ -100,7 +100,6 @@ static const struct
 } c_sds2000xp_threshold_table[] = {{"TTL", 1.5F}, {"CMOS", 1.65F}, {"LVCMOS33", 1.65F}, {"LVCMOS25", 1.25F}, {NULL, 0}};
 
 static const std::chrono::milliseconds c_trigger_delay(1000);	 // Delay required when forcing trigger
-static const std::chrono::milliseconds c_adc_delay(200);		 // Delay required when setting ADC mode
 static const char* c_custom_thresh = "CUSTOM,";					 // Prepend string for custom digital threshold
 static const float c_thresh_thresh = 0.01f;						 // Zero equivalence threshold for fp comparisons
 
@@ -3286,29 +3285,38 @@ void SiglentSCPIOscilloscope::SetADCMode(size_t /*channel*/, size_t mode)
 			m_highDefinition = true;
 	}
 
-	//Seems ADC mode cannot be changed while stopped
-	if(!m_triggerArmed)
-		m_transport->SendCommandQueued("TRIG_MODE AUTO");
+	//ADC mode cannot be changed while stopped
+	m_transport->SendCommandQueued("TRIG_MODE AUTO");
 
-	//Send the actual command
+	//Flush command queue and delay with query
+	m_transport->SendCommandQueuedWithReply("TRIG_MODE?");
+
 	if(mode == ADC_MODE_10BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 10Bits");
-		this_thread::sleep_for(c_adc_delay);
-		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
 	}
 	else //if(mode == ADC_MODE_8BIT)
 	{
 		m_transport->SendCommandQueued("ACQ:RES 8Bits");
-		this_thread::sleep_for(c_adc_delay);
-		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
 	}
-	this_thread::sleep_for(c_adc_delay);
 
+	//Re-arm trigger if previously armed
 	if(IsTriggerArmed())
 		m_transport->SendCommandQueued("TRIG_MODE SINGLE");
 	else
 		m_transport->SendCommandQueued("TRIG_MODE STOP");
+
+	//Flush command queue and delay with query
+	m_transport->SendCommandQueuedWithReply("TRIG_MODE?");
+
+	if(mode == ADC_MODE_10BIT)
+	{
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH WORD");
+	}
+	else //if(mode == ADC_MODE_8BIT)
+	{
+		m_transport->SendCommandQueued(":WAVEFORM:WIDTH BYTE");
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
