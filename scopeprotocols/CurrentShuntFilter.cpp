@@ -95,7 +95,8 @@ void CurrentShuntFilter::Refresh()
 	if(udin)
 	{
 		//Set up the output waveform
-		auto cap = SetupEmptyUniformAnalogOutputWaveform(sdin, 0);
+		auto cap = SetupEmptyUniformAnalogOutputWaveform(udin, 0);
+		cap->Resize(len);
 		cap->PrepareForCpuAccess();
 
 		float* fsrc = (float*)__builtin_assume_aligned(udin->m_samples.GetCpuPointer(), 16);
