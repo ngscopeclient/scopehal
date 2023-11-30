@@ -115,6 +115,12 @@ public:
 	virtual size_t GetNumAverages(size_t i) override;
 	virtual void SetNumAverages(size_t i, size_t navg) override;
 
+	OscilloscopeChannel* GetACLineTrigger()
+	{ return m_acLineChannel; }
+
+	OscilloscopeChannel* GetFastEdgeTrigger()
+	{ return m_fastEdgeChannel; }
+
 	//Triggering
 	virtual Oscilloscope::TriggerMode PollTrigger();
 	virtual bool PeekTriggerArmed();
@@ -363,8 +369,15 @@ protected:
 	//True if we have >8 bit capture depth
 	bool m_highDefinition;
 
-	//External trigger input
+	///@brief External trigger input
 	OscilloscopeChannel* m_extTrigChannel;
+
+	///@brief Internal "AC line" trigger source
+	OscilloscopeChannel* m_acLineChannel;
+
+	///@brief Internal "fast edge" trigger source
+	OscilloscopeChannel* m_fastEdgeChannel;
+
 	FunctionGeneratorChannel* m_awgChannel;
 	std::vector<OscilloscopeChannel*> m_digitalChannels;
 

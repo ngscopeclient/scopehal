@@ -102,6 +102,28 @@ void LeCroyOscilloscope::SharedCtorInit()
 		m_channels.size());
 	m_channels.push_back(m_extTrigChannel);
 
+	//Add dummy channels for AC line and internal fast edge source
+	m_acLineChannel = new OscilloscopeChannel(
+		this,
+		"Line",
+		"#808080",
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
+	m_acLineChannel->SetDisplayName("ACLine");
+	m_channels.push_back(m_acLineChannel);
+
+	m_fastEdgeChannel = new OscilloscopeChannel(
+		this,
+		"FastEdge",
+		"#808080",
+		Unit(Unit::UNIT_FS),
+		Unit(Unit::UNIT_VOLTS),
+		Stream::STREAM_TYPE_TRIGGER,
+		m_channels.size());
+	m_channels.push_back(m_fastEdgeChannel);
+
 	//Desired format for waveform data
 	//Only use increased bit depth if the scope actually puts content there!
 	if(m_highDefinition)
@@ -1094,10 +1116,6 @@ string LeCroyOscilloscope::GetSerial()
 
 bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 {
-	//ext trigger should never be displayed
-	if(i == m_extTrigChannel->GetIndex())
-		return false;
-
 	//Disable end channels if interleaving
 	if(m_interleaving)
 	{
@@ -1127,7 +1145,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 	}
 
 	//Digital
-	else
+	else if(i >= m_digitalChannelBase)
 	{
 		//If the digital channel *group* is off, don't show anything
 		auto reply = Trim(m_transport->SendCommandQueuedWithReply("VBS? 'return = app.LogicAnalyzer.Digital1.UseGrid'"));
@@ -1140,7 +1158,7 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 
 		//See if the channel is on
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
-		size_t nchan = i - (m_analogChannelCount+1);
+		size_t nchan = i - m_digitalChannelBase;
 		reply = Trim(m_transport->SendCommandQueuedWithReply(
 			string("VBS? 'return = app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + "'"));
 
@@ -1150,6 +1168,9 @@ bool LeCroyOscilloscope::IsChannelEnabled(size_t i)
 		else
 			m_channelsEnabled[i] = true;
 	}
+
+	else
+		return false;
 
 	return m_channelsEnabled[i];
 }
@@ -1178,13 +1199,8 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 		m_transport->SendCommandQueued(chan->GetHwname() + ":TRACE ON");
 	}
 
-	//Trigger can't be enabled
-	else if(i == m_extTrigChannel->GetIndex())
-	{
-	}
-
 	//Digital channel
-	else
+	else if(i >= m_digitalChannelBase)
 	{
 		//If we have NO digital channels enabled, enable the first digital bus
 		bool anyDigitalEnabled = false;
@@ -1202,7 +1218,7 @@ void LeCroyOscilloscope::EnableChannel(size_t i)
 
 		//Enable this channel on the hardware
 		//Note that GetHwname() returns Dn, as used by triggers, not Digitaln, as used here
-		size_t nchan = i - (m_analogChannelCount+1);
+		size_t nchan = i - m_digitalChannelBase;
 		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 1'");
 		char tmp[128];
 		size_t nbit = (i - m_digitalChannels[0]->GetIndex());
@@ -1269,13 +1285,8 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 	if(i < m_analogChannelCount)
 		m_transport->SendCommandQueued(GetOscilloscopeChannel(i)->GetHwname() + ":TRACE OFF");
 
-	//Trigger can't be enabled
-	else if(i == m_extTrigChannel->GetIndex())
-	{
-	}
-
 	//Digital channel
-	else
+	else if(i >= m_digitalChannelBase)
 	{
 		//If we have NO digital channels enabled, disable the first digital bus
 		bool anyDigitalEnabled = false;
@@ -1292,7 +1303,7 @@ void LeCroyOscilloscope::DisableChannel(size_t i)
 			m_transport->SendCommandQueued("VBS 'app.LogicAnalyzer.Digital1.UseGrid=\"NotOnGrid\"'");
 
 		//Disable this channel
-		size_t nchan = i - (m_analogChannelCount+1);
+		size_t nchan = i - m_digitalChannelBase;
 		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.Digital") + to_string(nchan) + " = 0'");
 	}
 }
@@ -1789,7 +1800,7 @@ void LeCroyOscilloscope::SetChannelDisplayName(size_t i, string name)
 	if(i < m_analogChannelCount)
 		m_transport->SendCommandQueued(string("VBS 'app.Acquisition.") + chan->GetHwname() + ".Alias = \"" + name + "\"");
 
-	else
+	else if(i >= m_digitalChannelBase)
 	{
 		m_transport->SendCommandQueued(string("VBS 'app.LogicAnalyzer.Digital1.CustomBitName") +
 			to_string(i - m_digitalChannelBase) + " = \"" + name + "\"");
@@ -1802,17 +1813,12 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 	if(!chan)
 		return "";
 
-	//External trigger cannot be renamed in hardware.
-	//TODO: allow clientside renaming?
-	if(chan == m_extTrigChannel)
-		return m_extTrigChannel->GetHwname();
-
 	//Analog and digital channels use completely different namespaces, as usual.
 	//Because clean, orthogonal APIs are apparently for losers?
 	string name;
 	if(i < m_analogChannelCount)
 		name = GetPossiblyEmptyString(string("app.Acquisition.") + chan->GetHwname() + ".Alias");
-	else
+	else if(i > m_digitalChannelBase)
 	{
 		auto prop = string("app.LogicAnalyzer.Digital1.CustomBitName") + to_string(i - m_digitalChannelBase);
 		name = GetPossiblyEmptyString(prop);
@@ -1824,6 +1830,9 @@ string LeCroyOscilloscope::GetChannelDisplayName(size_t i)
 			name = "";
 		}
 	}
+
+	//External trigger, ACLine, FastEdge cannot be renamed in hardware.
+	//TODO: allow clientside renaming?
 
 	//Default to using hwname if no alias defined
 	if(name == "")
