@@ -71,6 +71,9 @@ public:
 		UNIT_CELSIUS,		//Degrees Celsius
 		UNIT_RHO,			//Reflection coefficient (dimensionless ratio)
 		UNIT_HEXNUM,		//Hexadecimal address or similar
+		UNIT_PM,			//Distance or wavelength.
+							//As with femtoseconds, this provides a reasonable range
+							//(1 picometer to +/- 9223 km) of distances using int64's.
 
 		UNIT_MILLIVOLTS,	//Hack needed for voltage in the X axis since we use integer coordinates there
 		UNIT_VOLT_SEC,      //Hack needed to measure area under the curve in terms of volt-seconds

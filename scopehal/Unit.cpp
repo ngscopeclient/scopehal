@@ -45,6 +45,8 @@ Unit::Unit(const string& rhs)
 {
 	if(rhs == "fs")
 		m_type = UNIT_FS;
+	else if(rhs == "pm")
+		m_type = UNIT_PM;
 	else if(rhs == "Hz")
 		m_type = UNIT_HZ;
 	else if(rhs == "V")
@@ -106,6 +108,9 @@ string Unit::ToString() const
 	{
 		case UNIT_FS:
 			return "fs";
+
+		case UNIT_PM:
+			return "pm";
 
 		case UNIT_HZ:
 			return "Hz";
@@ -282,6 +287,42 @@ void Unit::GetUnitSuffix(UnitType type, double num, double& scaleFactor, string&
 			{
 				scaleFactor = 1;
 				prefix = "f";
+			}
+			break;
+
+		//Also not a SI base unit
+		case UNIT_PM:
+			suffix = "m";
+
+			if(fabs(num) >= 1e15)
+			{
+				scaleFactor = 1e-15;
+				prefix = "k";
+			}
+			else if(fabs(num) >= 1e12)
+			{
+				scaleFactor = 1e-12;
+				prefix = "";
+			}
+			else if(fabs(num) >= 1e9)
+			{
+				scaleFactor = 1e-9;
+				prefix = "m";
+			}
+			else if(fabs(num) >= 1e6)
+			{
+				scaleFactor = 1e-6;
+				prefix = "μ";
+			}
+			else if(fabs(num) >= 1e3)
+			{
+				scaleFactor = 1e-3;
+				prefix = "n";
+			}
+			else
+			{
+				scaleFactor = 1;
+				prefix = "p";
 			}
 			break;
 
@@ -690,6 +731,10 @@ double Unit::ParseString(const string& str, bool useDisplayLocale)
 		{
 			case Unit::UNIT_FS:
 				ret *= 1e15;
+				break;
+
+			case Unit::UNIT_PM:
+				ret *= 1e12;
 				break;
 
 			case Unit::UNIT_PERCENT:
