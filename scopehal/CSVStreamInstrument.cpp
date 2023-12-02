@@ -197,7 +197,8 @@ bool CSVStreamInstrument::AcquireData()
 					i-1));
 			}
 
-			m_channels[i-1]->SetScalarValue(0, m_channels[i-1]->GetYAxisUnits(0).ParseString(fields[i]));
+			auto value = m_channels[i-1]->GetYAxisUnits(0).ParseString(fields[i]);
+			m_channels[i-1]->SetScalarValue(0, value);
 		}
 	}
 
