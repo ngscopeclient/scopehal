@@ -30,20 +30,20 @@
 /**
 	@file
 	@author Andrew D. Zonenberg
-	@brief Declaration of VNA
+	@brief Declaration of Spectrometer
  */
 
-#ifndef SCPIVNA_h
-#define SCPIVNA_h
+#ifndef SCPISpectrometer_h
+#define SCPISpectrometer_h
 
 /**
-	@brief Generic representation of a vector network analyzer
+	@brief Generic representation of an optical (UV-VIS-IR) spectrometer
  */
-class SCPIVNA : public virtual SCPIOscilloscope
+class SCPISpectrometer : public virtual SCPIOscilloscope
 {
 public:
-	SCPIVNA();
-	virtual ~SCPIVNA();
+	SCPISpectrometer();
+	virtual ~SCPISpectrometer();
 
 	virtual unsigned int GetInstrumentTypes() const override;
 	virtual uint32_t GetInstrumentTypesForChannel(size_t i) const override;
@@ -89,23 +89,23 @@ protected:
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Dynamic creation
 public:
-	typedef SCPIVNA* (*VNACreateProcType)(SCPITransport*);
-	static void DoAddDriverClass(std::string name, VNACreateProcType proc);
+	typedef SCPISpectrometer* (*SpectrometerCreateProcType)(SCPITransport*);
+	static void DoAddDriverClass(std::string name, SpectrometerCreateProcType proc);
 
 	static void EnumDrivers(std::vector<std::string>& names);
-	static SCPIVNA* CreateVNA(std::string driver, SCPITransport* transport);
+	static SCPISpectrometer* CreateSpectrometer(std::string driver, SCPITransport* transport);
 
 	//Class enumeration
-	typedef std::map< std::string, VNACreateProcType > VNACreateMapType;
-	static VNACreateMapType m_vnacreateprocs;
+	typedef std::map< std::string, SpectrometerCreateProcType > SpectrometerCreateMapType;
+	static SpectrometerCreateMapType m_spectrometercreateprocs;
 };
 
-#define VNA_INITPROC(T) \
-	static SCPIVNA* CreateInstance(SCPITransport* transport) \
+#define SPECTROMETER_INITPROC(T) \
+	static SCPISpectrometer* CreateInstance(SCPITransport* transport) \
 	{	return new T(transport); } \
 	virtual std::string GetDriverName() const override \
 	{ return GetDriverNameInternal(); }
 
-#define AddVNADriverClass(T) SCPIVNA::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
+#define AddSpectrometerDriverClass(T) SCPISpectrometer::DoAddDriverClass(T::GetDriverNameInternal(), T::CreateInstance)
 
 #endif

@@ -127,6 +127,7 @@ set(SCOPEHAL_SOURCES
 	SCPIOscilloscope.cpp
 	SCPIPowerSupply.cpp
 	SCPIRFSignalGenerator.cpp
+	SCPISpectrometer.cpp
 	SCPIVNA.cpp
 	RemoteBridgeOscilloscope.cpp
 
