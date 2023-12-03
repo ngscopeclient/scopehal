@@ -315,6 +315,8 @@ void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, I
 			SetSoftStartEnabled(i, ss["enable"].as<bool>());
 		}
 
-		SetPowerChannelActive(i, channelNode["enabled"].as<bool>());
+		auto en = channelNode["enabled"].as<bool>();
+		if(en != GetPowerChannelActive(i))
+			SetPowerChannelActive(i, en);
 	}
 }
