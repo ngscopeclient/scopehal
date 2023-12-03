@@ -307,13 +307,11 @@ void PowerSupply::DoLoadConfiguration(int /*version*/, const YAML::Node& node, I
 			SetPowerCurrent(i, channelNode["currentNominal"].as<float>());
 		}
 		if(SupportsOvercurrentShutdown())
-		{
-			channelNode["overcurrentShutdown"] = GetPowerOvercurrentShutdownEnabled(i);
-		}
+			SetPowerOvercurrentShutdownEnabled(i, channelNode["overcurrentShutdown"].as<bool>());
 		if(SupportsSoftStart())
 		{
 			YAML::Node ss = channelNode["softStart"];
-
+			//todo: ramp rates etc
 			SetSoftStartEnabled(i, ss["enable"].as<bool>());
 		}
 
